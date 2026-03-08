@@ -117,6 +117,8 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
               inAppNotifyOnStatusChange: preferences.inAppNotifyOnStatusChange,
               emailNotifyOnNewComment: preferences.emailNotifyOnNewComment,
               inAppNotifyOnNewComment: preferences.inAppNotifyOnNewComment,
+              emailNotifyOnMentioned: preferences.emailNotifyOnMentioned,
+              inAppNotifyOnMentioned: preferences.inAppNotifyOnMentioned,
               emailNotifyOnNewIssue: preferences.emailNotifyOnNewIssue,
               inAppNotifyOnNewIssue: preferences.inAppNotifyOnNewIssue,
               emailWatchNewIssuesGlobal: preferences.emailWatchNewIssuesGlobal,

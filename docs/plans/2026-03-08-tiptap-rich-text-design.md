@@ -6,14 +6,14 @@ PinPoint's text fields (issue descriptions, comments, machine notes) are plain t
 
 ## Decisions
 
-| Aspect | Decision | Rationale |
-| :--- | :--- | :--- |
-| Editor | Tiptap (headless ProseMirror) | Well-lit path, modular, React-native |
-| Storage | ProseMirror JSON in JSONB columns | Lossless round-trip, JSON operators, GIN-indexable |
-| Rendering | `generateHTML()` server-side | Built-in Tiptap utility, no custom serializer |
-| Mentions | Logged-in users only | Anonymous reporters get formatting but not @mentions |
-| Mentionables | All active registered users | `status = 'active'` (excludes invited) |
-| Static pages | Keep `markdown.ts` | Different concern (author-time vs user-time content) |
+| Aspect       | Decision                          | Rationale                                            |
+| :----------- | :-------------------------------- | :--------------------------------------------------- |
+| Editor       | Tiptap (headless ProseMirror)     | Well-lit path, modular, React-native                 |
+| Storage      | ProseMirror JSON in JSONB columns | Lossless round-trip, JSON operators, GIN-indexable   |
+| Rendering    | `generateHTML()` server-side      | Built-in Tiptap utility, no custom serializer        |
+| Mentions     | Logged-in users only              | Anonymous reporters get formatting but not @mentions |
+| Mentionables | All active registered users       | `status = 'active'` (excludes invited)               |
+| Static pages | Keep `markdown.ts`                | Different concern (author-time vs user-time content) |
 
 ## Scope
 
@@ -30,12 +30,15 @@ Three surfaces get the Tiptap editor:
 Convert affected TEXT columns to JSONB with a data migration:
 
 **Issues table:**
+
 - `description: text()` → `description: jsonb()`
 
 **Issue comments table:**
+
 - `content: text()` → `content: jsonb()`
 
 **Machines table:**
+
 - `description: text()` → `description: jsonb()`
 - `tournamentNotes: text()` → `tournamentNotes: jsonb()`
 - `ownerRequirements: text()` → `ownerRequirements: jsonb()`
@@ -64,6 +67,7 @@ Multi-paragraph content (containing `\n\n`) should be split into separate paragr
 Add `'mentioned'` to the `notification_type` enum.
 
 Add to notification preferences:
+
 - `emailNotifyOnMentioned: boolean (default true)`
 - `inAppNotifyOnMentioned: boolean (default true)`
 
@@ -90,7 +94,7 @@ interface RichTextEditorProps {
   onChange: (doc: ProseMirrorDoc) => void;
   mentionsEnabled: boolean;
   placeholder?: string;
-  compact?: boolean;         // Shorter min-height for inline fields
+  compact?: boolean; // Shorter min-height for inline fields
   disabled?: boolean;
 }
 ```
@@ -117,17 +121,18 @@ Slim icon toolbar above the editor:
 
 ### Integration by Surface
 
-| Surface | `mentionsEnabled` | `compact` | Notes |
-| :--- | :--- | :--- | :--- |
-| Report form description | `userAuthenticated` | `false` | Replaces `<Textarea>` |
-| AddCommentForm | `true` | `false` | Always authenticated context |
-| InlineEditableField | `true` | `true` | Click-to-edit: rendered HTML when collapsed, editor when editing |
+| Surface                 | `mentionsEnabled`   | `compact` | Notes                                                            |
+| :---------------------- | :------------------ | :-------- | :--------------------------------------------------------------- |
+| Report form description | `userAuthenticated` | `false`   | Replaces `<Textarea>`                                            |
+| AddCommentForm          | `true`              | `false`   | Always authenticated context                                     |
+| InlineEditableField     | `true`              | `true`    | Click-to-edit: rendered HTML when collapsed, editor when editing |
 
 ## @Mentions
 
 ### User Search
 
 Server action `searchMentionableUsers(query: string)`:
+
 - Queries `userProfiles` where `status = 'active'` and name matches (case-insensitive `ILIKE`)
 - Returns `{ id, name, avatarUrl }` — **no email** (non-negotiable #12)
 - Requires authentication (`checkPermission()`)
@@ -136,11 +141,13 @@ Server action `searchMentionableUsers(query: string)`:
 ### Mention Node
 
 Tiptap Mention extension configured with:
+
 - `HTMLAttributes: { class: "mention" }`
 - `suggestion.items`: async function calling the server action
 - `suggestion.render`: popup with avatar + name list (uses shadcn/ui Popover or custom)
 
 Stored in JSON as:
+
 ```json
 { "type": "mention", "attrs": { "id": "user-uuid", "label": "Tim" } }
 ```
@@ -164,6 +171,7 @@ When content is saved (issue created, comment added, description edited):
 ### `generateHTML()`
 
 Tiptap's built-in utility converts ProseMirror JSON to HTML server-side. Used for:
+
 - Issue timeline (comment display)
 - Machine detail pages (description, notes)
 - Email notifications
@@ -171,6 +179,7 @@ Tiptap's built-in utility converts ProseMirror JSON to HTML server-side. Used fo
 ### Mention Rendering
 
 The Mention extension renders as:
+
 ```html
 <a href="/profile/{id}" class="mention" data-mention-id="{id}">@{label}</a>
 ```
@@ -178,6 +187,7 @@ The Mention extension renders as:
 ### Sanitization
 
 Output from `generateHTML()` is sanitized with `sanitize-html` using the same security model as `markdown.ts`:
+
 - Allowed tags: `h2`, `h3`, `p`, `ul`, `ol`, `li`, `strong`, `em`, `a`, `br`, `span`
 - Allowed attributes: `a[href, class, data-mention-id]`, `span[class]`
 - Allowed classes: `text-link`, `mention`

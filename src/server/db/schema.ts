@@ -3,6 +3,7 @@ import {
   pgTable,
   uuid,
   text,
+  jsonb,
   timestamp,
   boolean,
   pgSchema,
@@ -14,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { citext } from "~/server/db/citext";
 import { ISSUE_STATUS_VALUES, type IssueStatus } from "~/lib/issues/status";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -123,10 +125,10 @@ export const machines = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    description: text("description"),
-    tournamentNotes: text("tournament_notes"),
-    ownerRequirements: text("owner_requirements"),
-    ownerNotes: text("owner_notes"),
+    description: jsonb("description").$type<ProseMirrorDoc>(),
+    tournamentNotes: jsonb("tournament_notes").$type<ProseMirrorDoc>(),
+    ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
+    ownerNotes: jsonb("owner_notes").$type<ProseMirrorDoc>(),
     presenceStatus: text("presence_status", {
       enum: [
         "on_the_floor",
@@ -168,7 +170,7 @@ export const issues = pgTable(
       .references(() => machines.initials, { onDelete: "cascade" }),
     issueNumber: integer("issue_number").notNull(),
     title: text("title").notNull(),
-    description: text("description"),
+    description: jsonb("description").$type<ProseMirrorDoc>(),
     // Status values imported from single source of truth
     // Based on _issue-status-redesign/README.md - Final design with 11 statuses
     status: text("status", {
@@ -294,7 +296,7 @@ export const issueComments = pgTable(
       .notNull()
       .references(() => issues.id, { onDelete: "cascade" }),
     authorId: uuid("author_id").references(() => userProfiles.id),
-    content: text("content").notNull(),
+    content: jsonb("content").$type<ProseMirrorDoc>().notNull(),
     isSystem: boolean("is_system").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -382,6 +384,7 @@ export const notifications = pgTable(
         "new_comment",
         "new_issue",
         "machine_ownership_changed",
+        "mentioned",
       ],
     }).notNull(),
     resourceId: uuid("resource_id").notNull(), // Generic reference to issue or machine
@@ -444,6 +447,14 @@ export const notificationPreferences = pgTable(
     inAppNotifyOnNewComment: boolean("in_app_notify_on_new_comment")
       .notNull()
       .default(false),
+
+    // Mentions
+    emailNotifyOnMentioned: boolean("email_notify_on_mentioned")
+      .notNull()
+      .default(true),
+    inAppNotifyOnMentioned: boolean("in_app_notify_on_mentioned")
+      .notNull()
+      .default(true),
 
     // New Issues (Owned Machines)
     emailNotifyOnNewIssue: boolean("email_notify_on_new_issue")

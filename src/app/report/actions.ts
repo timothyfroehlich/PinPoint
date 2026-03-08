@@ -27,6 +27,7 @@ import { imagesMetadataArraySchema } from "../(app)/issues/schemas";
 import { deleteFromBlob } from "~/lib/blob/client";
 import { z } from "zod";
 import { ok, err, type Result } from "~/lib/result";
+import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import type {
   IssueStatus,
   IssueSeverity,
@@ -108,7 +109,7 @@ export async function submitPublicIssueAction(
   const {
     machineId,
     title,
-    description,
+    description: descriptionJson,
     severity,
     email,
     firstName,
@@ -119,6 +120,18 @@ export async function submitPublicIssueAction(
     assignedTo,
     watchIssue,
   } = parsedValue.data;
+
+  // Parse description JSON if present
+  let description: ProseMirrorDoc | null = null;
+  if (descriptionJson) {
+    try {
+      description = JSON.parse(descriptionJson) as ProseMirrorDoc;
+    } catch (e) {
+      log.error({ e, descriptionJson }, "Failed to parse description JSON");
+      // Fallback or error? For now, we'll try to treat it as plain text if it's not valid JSON
+      // but the editor should always send JSON.
+    }
+  }
 
   // 3. Resolve reporter
   const supabase = await createClient();

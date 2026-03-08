@@ -7,6 +7,7 @@
 
 import { db, type DbTransaction } from "~/server/db";
 import { issueComments } from "~/server/db/schema";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 
 /**
  * Create a system timeline event for an issue
@@ -34,7 +35,7 @@ export async function createTimelineEvent(
 ): Promise<void> {
   await tx.insert(issueComments).values({
     issueId,
-    content,
+    content: plainTextToDoc(content),
     isSystem: true,
     authorId: actorId ?? null,
   });

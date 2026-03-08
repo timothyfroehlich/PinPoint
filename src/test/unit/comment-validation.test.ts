@@ -91,7 +91,7 @@ describe("addCommentSchema", () => {
   });
 
   it("should accept long comments within limit", () => {
-    const longComment = "a".repeat(5000);
+    const longComment = "a".repeat(20000);
     const result = addCommentSchema.safeParse({
       issueId: validUuid,
       comment: longComment,
@@ -104,7 +104,7 @@ describe("addCommentSchema", () => {
   });
 
   it("should reject extremely long comments", () => {
-    const longComment = "a".repeat(5001);
+    const longComment = "a".repeat(20001);
     const result = addCommentSchema.safeParse({
       issueId: validUuid,
       comment: longComment,

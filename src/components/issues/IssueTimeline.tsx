@@ -23,7 +23,6 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { SaveCancelButtons } from "~/components/save-cancel-buttons";
 import { toast } from "sonner";
-import { Textarea } from "~/components/ui/textarea";
 import {
   editCommentAction,
   deleteCommentAction,
@@ -41,6 +40,9 @@ import {
 } from "~/components/ui/alert-dialog";
 import { type AccessLevel } from "~/lib/permissions/matrix";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
+import { RichTextEditor } from "~/components/editor/RichTextEditor";
+import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
+import { type ProseMirrorDoc, docToPlainText } from "~/lib/tiptap/types";
 
 // ----------------------------------------------------------------------
 // Types
@@ -59,7 +61,7 @@ interface TimelineEvent {
   };
   createdAt: Date;
   updatedAt: Date;
-  content: string | null;
+  content: ProseMirrorDoc | null;
   images?: IssueImage[];
   isSystem: boolean;
 }
@@ -88,13 +90,16 @@ function CommentEditForm({
   onCancel,
 }: {
   commentId: string;
-  initialContent: string;
+  initialContent: ProseMirrorDoc;
   onCancel: () => void;
 }): React.JSX.Element {
   const [state, formAction] = useActionState<
     EditCommentResult | undefined,
     FormData
   >(editCommentAction, undefined);
+  const [content, setContent] = React.useState<ProseMirrorDoc | null>(
+    initialContent
+  );
 
   React.useEffect(() => {
     if (state?.ok) {
@@ -108,12 +113,16 @@ function CommentEditForm({
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="commentId" value={commentId} />
-      <Textarea
-        name="comment"
-        defaultValue={initialContent}
+      <RichTextEditor
+        content={content}
+        onChange={setContent}
+        mentionsEnabled={true}
         className="min-h-32"
-        aria-label="Edit comment"
-        required
+      />
+      <input
+        type="hidden"
+        name="comment"
+        value={content ? JSON.stringify(content) : ""}
       />
       <CommentEditFormButtons onCancel={onCancel} />
     </form>
@@ -229,7 +238,7 @@ function TimelineItem({
                 {event.author.name}
               </span>
             )}
-            <span>{event.content}</span>
+            <span>{event.content ? docToPlainText(event.content) : ""}</span>
             <span className="text-muted-foreground/40">&bull;</span>
             <span
               className="text-[11px] text-muted-foreground/60"
@@ -314,16 +323,12 @@ function TimelineItem({
             {isEditing ? (
               <CommentEditForm
                 commentId={event.id}
-                initialContent={event.content ?? ""}
+                initialContent={event.content ?? { type: "doc", content: [] }}
                 onCancel={() => setIsEditing(false)}
               />
             ) : (
               <>
-                {event.content && (
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                    {event.content}
-                  </div>
-                )}
+                {event.content && <RichTextDisplay content={event.content} />}
 
                 {event.images && event.images.length > 0 && (
                   <div className="mt-4">
@@ -354,7 +359,7 @@ interface IssueTimelineProps {
   currentUserRole: AccessLevel;
   currentUserInitials: string;
   /** Owner requirements to display after the initial report (authenticated users only) */
-  ownerRequirements?: string | undefined;
+  ownerRequirements?: ProseMirrorDoc | undefined;
   /** Machine name for the requirements callout title */
   machineName?: string | undefined;
 }

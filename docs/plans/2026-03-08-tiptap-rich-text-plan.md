@@ -13,11 +13,13 @@
 ## Task 1: Install Tiptap Packages
 
 **Files:**
+
 - Modify: `package.json`
 
 **Step 1: Install Tiptap dependencies**
 
 Run:
+
 ```bash
 pnpm add @tiptap/react @tiptap/pm @tiptap/starter-kit @tiptap/extension-link @tiptap/extension-mention @tiptap/extension-placeholder
 ```
@@ -39,6 +41,7 @@ git commit -m "chore: add Tiptap editor dependencies"
 ## Task 2: Define ProseMirror JSON Types
 
 **Files:**
+
 - Create: `src/lib/tiptap/types.ts`
 - Test: `src/lib/tiptap/types.test.ts`
 
@@ -253,15 +256,11 @@ describe("extractMentions", () => {
       content: [
         {
           type: "paragraph",
-          content: [
-            { type: "mention", attrs: { id: "user-1", label: "Tim" } },
-          ],
+          content: [{ type: "mention", attrs: { id: "user-1", label: "Tim" } }],
         },
         {
           type: "paragraph",
-          content: [
-            { type: "mention", attrs: { id: "user-1", label: "Tim" } },
-          ],
+          content: [{ type: "mention", attrs: { id: "user-1", label: "Tim" } }],
         },
       ],
     };
@@ -318,6 +317,7 @@ git commit -m "feat: add ProseMirror JSON type definitions and utilities"
 ## Task 3: Database Migration — JSONB Columns
 
 **Files:**
+
 - Modify: `src/server/db/schema.ts` (lines 126-129, 171, 297)
 - Create: New Drizzle migration via `pnpm db:generate`
 
@@ -340,6 +340,7 @@ ownerNotes: jsonb("owner_notes").$type<ProseMirrorDoc>(),
 ```
 
 Add the import at the top of the schema file:
+
 ```typescript
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 ```
@@ -347,6 +348,7 @@ import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 **Step 2: Update schema — issues table**
 
 Change `description` (line 171):
+
 ```typescript
 // Before:
 description: text("description"),
@@ -358,6 +360,7 @@ description: jsonb("description").$type<ProseMirrorDoc>(),
 **Step 3: Update schema — issueComments table**
 
 Change `content` (line 297):
+
 ```typescript
 // Before:
 content: text("content").notNull(),
@@ -454,12 +457,14 @@ git commit -m "feat: migrate description and content columns to JSONB for ProseM
 ## Task 4: Database Migration — Notification Schema
 
 **Files:**
+
 - Modify: `src/server/db/schema.ts` (lines 378-386 for enum, lines 441-474 for prefs)
 - Modify: `src/lib/notifications.ts` (line 18 for type, lines 231-260 for switch)
 
 **Step 1: Add 'mentioned' to notification type enum**
 
 In `src/server/db/schema.ts`, line 379-385, add `"mentioned"`:
+
 ```typescript
 type: text("type", {
   enum: [
@@ -490,6 +495,7 @@ In `src/server/db/schema.ts`, after the new comment toggles (after line 446), ad
 **Step 3: Update TypeScript NotificationType**
 
 In `src/lib/notifications.ts`, line 18-23, add `"mentioned"`:
+
 ```typescript
 export type NotificationType =
   | "issue_assigned"
@@ -503,6 +509,7 @@ export type NotificationType =
 **Step 4: Add 'mentioned' case to the preference switch**
 
 In `src/lib/notifications.ts`, in the switch block (around line 253), add:
+
 ```typescript
       case "mentioned":
         emailNotify = prefs.emailNotifyOnMentioned;
@@ -531,6 +538,7 @@ git commit -m "feat: add 'mentioned' notification type and preference toggles"
 ## Task 5: Server-Side HTML Rendering Utility
 
 **Files:**
+
 - Create: `src/lib/tiptap/render.ts`
 - Test: `src/lib/tiptap/render.test.ts`
 
@@ -631,6 +639,7 @@ export function renderDocToEmailHtml(doc: ProseMirrorDoc): string {
 **Step 2: Write tests**
 
 Test `renderDocToHtml` and `renderDocToEmailHtml` — verify:
+
 - Simple paragraph renders to `<p>` tags
 - Mentions render as profile links with correct href and class
 - Script tags are stripped (XSS prevention)
@@ -653,6 +662,7 @@ git commit -m "feat: add server-side ProseMirror JSON to HTML rendering"
 ## Task 6: Mention User Search Server Action
 
 **Files:**
+
 - Create: `src/app/(app)/mentions/actions.ts`
 - Test: integration test following existing patterns
 
@@ -721,6 +731,7 @@ export async function searchMentionableUsers(
 **Step 2: Write integration test**
 
 Follow existing integration test patterns (check `src/test/integration/` for examples). Verify:
+
 - Authenticated users get results
 - Query filtering works by name
 - Invited users are excluded from results
@@ -744,6 +755,7 @@ git commit -m "feat: add searchMentionableUsers server action for @mention autoc
 ## Task 7: RichTextEditor Component
 
 **Files:**
+
 - Create: `src/components/editor/RichTextEditor.tsx`
 - Create: `src/components/editor/EditorToolbar.tsx`
 - Create: `src/components/editor/MentionList.tsx`
@@ -761,6 +773,7 @@ This is the core shared editor component. See the design doc at `docs/plans/2026
 4. **Mention suggestion** — The `suggestion.items` function calls `searchMentionableUsers()` with 300ms debounce. The `suggestion.render` implementation should follow Tiptap's documented pattern using `tippy.js` or a React portal approach.
 
 **Props interface:**
+
 ```typescript
 interface RichTextEditorProps {
   content: ProseMirrorDoc | null;
@@ -791,6 +804,7 @@ git commit -m "feat: add shared RichTextEditor component with toolbar and @menti
 ## Task 8: RichTextDisplay Component
 
 **Files:**
+
 - Create: `src/components/editor/RichTextDisplay.tsx`
 
 A Server Component (no `"use client"`) that renders ProseMirror JSON to sanitized HTML using `renderDocToHtml()`. Used in issue timeline, machine detail pages, and anywhere stored content is displayed.
@@ -811,6 +825,7 @@ git commit -m "feat: add RichTextDisplay component for rendering stored content"
 ## Task 9: Integrate — Report Form
 
 **Files:**
+
 - Modify: `src/app/report/unified-report-form.tsx` (lines 85, 374-387)
 - Modify: `src/app/report/actions.ts` (line 218)
 - Modify: `src/services/issues.ts` (CreateIssueParams type)
@@ -818,6 +833,7 @@ git commit -m "feat: add RichTextDisplay component for rendering stored content"
 **Step 1: Replace the description Textarea with RichTextEditor**
 
 In `unified-report-form.tsx`:
+
 - Change `description` state from `string` to `ProseMirrorDoc | null`
 - Replace the `<Textarea>` with `<RichTextEditor>` (mentionsEnabled={userAuthenticated})
 - Serialize to hidden input as `JSON.stringify(description)`
@@ -848,6 +864,7 @@ git commit -m "feat: integrate RichTextEditor into report form with @mentions"
 ## Task 10: Integrate — AddCommentForm
 
 **Files:**
+
 - Modify: `src/components/issues/AddCommentForm.tsx`
 - Modify: `src/app/(app)/issues/actions.ts` (lines 619-695)
 - Modify: `src/app/(app)/issues/schemas.ts` (line 105-113)
@@ -886,6 +903,7 @@ git commit -m "feat: integrate RichTextEditor into comments with timeline displa
 ## Task 11: Integrate — InlineEditableField
 
 **Files:**
+
 - Modify: `src/components/inline-editable-field.tsx`
 - Modify: `src/app/(app)/m/[initials]/machine-text-fields.tsx`
 - Modify: `src/app/(app)/m/actions.ts` (machine update actions)
@@ -921,12 +939,14 @@ git commit -m "feat: integrate RichTextEditor into machine inline editable field
 ## Task 12: Update Notification Formatting for Rich Content
 
 **Files:**
+
 - Modify: `src/lib/notification-formatting.ts` (lines 101-107)
 - Modify: `src/lib/notifications.ts` (commentContent handling)
 
 **Step 1: Update email formatting for new_comment**
 
 In `notification-formatting.ts`, the `new_comment` case (line 101-107) currently sanitizes `commentContent` as plain text. Update to:
+
 1. Parse `commentContent` as `ProseMirrorDoc` if it's JSON
 2. Use `renderDocToEmailHtml()` to convert to email-safe HTML
 3. Fallback to plain text sanitization for legacy content
@@ -934,6 +954,7 @@ In `notification-formatting.ts`, the `new_comment` case (line 101-107) currently
 **Step 2: Add 'mentioned' email formatting**
 
 Add a new case:
+
 ```typescript
 case "mentioned":
   body = `You were mentioned in a comment.`;
@@ -943,6 +964,7 @@ case "mentioned":
 **Step 3: Update subject formatting**
 
 Add a case for `"mentioned"`:
+
 ```typescript
 case "mentioned":
   return `${machinePrefix}${formattedIssueId}: You were mentioned`;
@@ -965,6 +987,7 @@ git commit -m "feat: update notification emails to render rich content and menti
 ## Task 13: Update Notification Preferences UI
 
 **Files:**
+
 - Locate: notification settings component in `src/app/(app)/settings/`
 - Add mention toggles following existing pattern
 
@@ -993,6 +1016,7 @@ git commit -m "feat: add mention notification toggles to settings page"
 ## Task 14: Add CSS for Mention Styling
 
 **Files:**
+
 - Modify: `src/app/globals.css` or relevant Tailwind layer
 
 **Step 1: Add mention and editor styles**
@@ -1063,20 +1087,20 @@ git push -u origin claude/add-mentions-markdown-g8PoN
 
 ## Appendix: Key File Reference
 
-| File | Purpose |
-| :--- | :--- |
-| `src/lib/tiptap/types.ts` | ProseMirrorDoc types, extractMentions, plainTextToDoc |
-| `src/lib/tiptap/render.ts` | Server-side generateHTML + sanitization |
-| `src/components/editor/RichTextEditor.tsx` | Shared Tiptap editor component |
-| `src/components/editor/EditorToolbar.tsx` | Toolbar with formatting buttons |
-| `src/components/editor/MentionList.tsx` | Mention autocomplete popup |
-| `src/components/editor/RichTextDisplay.tsx` | Read-only rich content display |
-| `src/app/(app)/mentions/actions.ts` | searchMentionableUsers server action |
-| `src/server/db/schema.ts` | JSONB columns + notification enum |
-| `src/lib/notifications.ts` | NotificationType + preference switch |
-| `src/lib/notification-formatting.ts` | Email HTML for mentions |
-| `src/app/report/unified-report-form.tsx` | Report form integration |
-| `src/components/issues/AddCommentForm.tsx` | Comment form integration |
-| `src/components/issues/IssueTimeline.tsx` | Timeline display integration |
-| `src/components/inline-editable-field.tsx` | Inline edit integration |
-| `src/app/(app)/m/[initials]/machine-text-fields.tsx` | Machine fields integration |
+| File                                                 | Purpose                                               |
+| :--------------------------------------------------- | :---------------------------------------------------- |
+| `src/lib/tiptap/types.ts`                            | ProseMirrorDoc types, extractMentions, plainTextToDoc |
+| `src/lib/tiptap/render.ts`                           | Server-side generateHTML + sanitization               |
+| `src/components/editor/RichTextEditor.tsx`           | Shared Tiptap editor component                        |
+| `src/components/editor/EditorToolbar.tsx`            | Toolbar with formatting buttons                       |
+| `src/components/editor/MentionList.tsx`              | Mention autocomplete popup                            |
+| `src/components/editor/RichTextDisplay.tsx`          | Read-only rich content display                        |
+| `src/app/(app)/mentions/actions.ts`                  | searchMentionableUsers server action                  |
+| `src/server/db/schema.ts`                            | JSONB columns + notification enum                     |
+| `src/lib/notifications.ts`                           | NotificationType + preference switch                  |
+| `src/lib/notification-formatting.ts`                 | Email HTML for mentions                               |
+| `src/app/report/unified-report-form.tsx`             | Report form integration                               |
+| `src/components/issues/AddCommentForm.tsx`           | Comment form integration                              |
+| `src/components/issues/IssueTimeline.tsx`            | Timeline display integration                          |
+| `src/components/inline-editable-field.tsx`           | Inline edit integration                               |
+| `src/app/(app)/m/[initials]/machine-text-fields.tsx` | Machine fields integration                            |

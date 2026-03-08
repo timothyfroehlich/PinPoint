@@ -108,7 +108,7 @@ export const addCommentSchema = z.object({
     .string()
     .trim()
     .min(1, "Comment cannot be empty")
-    .max(5000, "Comment is too long"),
+    .max(20000, "Comment is too long"),
   imagesMetadata: z.string().nullish(), // JSON string from hidden input
 });
 
@@ -121,7 +121,7 @@ export const editCommentSchema = z.object({
     .string()
     .trim()
     .min(1, "Comment cannot be empty")
-    .max(5000, "Comment is too long"),
+    .max(20000, "Comment is too long"),
 });
 
 /**

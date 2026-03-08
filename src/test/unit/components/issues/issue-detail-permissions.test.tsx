@@ -28,12 +28,21 @@ vi.mock("~/components/issues/SidebarActions", () => ({
 function createIssue(
   overrides?: Partial<IssueWithAllRelations>
 ): IssueWithAllRelations {
+  const description: any = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "Left flipper is stuck up." }],
+      },
+    ],
+  };
   return {
     id: "issue-1",
     machineInitials: "AFM",
     issueNumber: 1,
     title: "Flipper stuck",
-    description: "Left flipper is stuck up.",
+    description,
     status: "new",
     severity: "major",
     priority: "medium",

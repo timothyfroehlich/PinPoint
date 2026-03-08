@@ -15,12 +15,15 @@ import { log } from "~/lib/logger";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getEmailHtml, getEmailSubject } from "~/lib/notification-formatting";
 
+type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+
 export type NotificationType =
   | "issue_assigned"
   | "issue_status_changed"
   | "new_comment"
   | "new_issue"
-  | "machine_ownership_changed";
+  | "machine_ownership_changed"
+  | "mentioned";
 
 type ResourceType = "issue" | "machine";
 
@@ -28,7 +31,7 @@ export interface CreateNotificationProps {
   type: NotificationType;
   resourceId: string;
   resourceType: ResourceType;
-  actorId?: string; // User who triggered the notification (optional for anonymous)
+  actorId?: string | undefined; // User who triggered the notification (optional for anonymous)
   /**
    * Whether to include the actor in the recipient set (default: true).
    *
@@ -41,14 +44,14 @@ export interface CreateNotificationProps {
    *   receiving notifications for their own actions. Only evaluated when
    *   includeActor is true (default).
    */
-  includeActor?: boolean;
+  includeActor?: boolean | undefined;
   // Context data for emails
   issueTitle?: string | undefined;
   machineName?: string | undefined;
   formattedIssueId?: string | undefined;
   commentContent?: string | undefined;
   newStatus?: string | undefined;
-  additionalRecipientIds?: string[];
+  additionalRecipientIds?: string[] | undefined;
 }
 
 export async function createNotification(
@@ -199,7 +202,9 @@ export async function createNotification(
   const emailsToSend = [];
 
   for (const userId of recipientIds) {
-    const prefs = prefsMap.get(userId) ?? {
+    const prefs = (prefsMap.get(userId) as
+      | NotificationPreferences
+      | undefined) ?? {
       // Fallback defaults if no prefs found (e.g. trigger failed)
       userId,
       emailEnabled: true,
@@ -211,12 +216,16 @@ export async function createNotification(
       inAppNotifyOnStatusChange: false,
       emailNotifyOnNewComment: false,
       inAppNotifyOnNewComment: false,
+      emailNotifyOnMentioned: true,
+      inAppNotifyOnMentioned: true,
       emailNotifyOnNewIssue: true,
       inAppNotifyOnNewIssue: false,
       emailWatchNewIssuesGlobal: false,
       inAppWatchNewIssuesGlobal: false,
       emailNotifyOnMachineOwnershipChange: false,
       inAppNotifyOnMachineOwnershipChange: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     // Skip this recipient entirely if they triggered the action and have suppressOwnActions enabled
@@ -256,6 +265,11 @@ export async function createNotification(
         // for both old and new owners. Only main switches can suppress.
         emailNotify = true;
         inAppNotify = true;
+        break;
+      case "mentioned":
+        // Check for specific mention preference toggles.
+        emailNotify = prefs.emailNotifyOnMentioned;
+        inAppNotify = prefs.inAppNotifyOnMentioned;
         break;
     }
 

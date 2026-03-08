@@ -4,7 +4,6 @@ import type React from "react";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
-import { Textarea } from "~/components/ui/textarea";
 import {
   addCommentAction,
   type AddCommentResult,
@@ -13,6 +12,8 @@ import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { type ImageMetadata } from "~/types/images";
+import { RichTextEditor } from "~/components/editor/RichTextEditor";
+import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface AddCommentFormProps {
   issueId: string;
@@ -27,12 +28,14 @@ export function AddCommentForm({
     FormData
   >(addCommentAction, undefined);
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
+  const [comment, setComment] = useState<ProseMirrorDoc | null>(null);
 
   useEffect(() => {
     if (state?.ok) {
       toast.success("Comment added");
       formRef.current?.reset();
       setUploadedImages([]);
+      setComment(null);
     }
   }, [state]);
 
@@ -48,13 +51,18 @@ export function AddCommentForm({
         name="imagesMetadata"
         value={JSON.stringify(uploadedImages)}
       />
-      <Textarea
-        name="comment"
+      <RichTextEditor
+        content={comment}
+        onChange={setComment}
+        mentionsEnabled={true}
         placeholder="Leave a comment..."
-        aria-label="Comment"
-        required
         disabled={isPending}
-        className="border-outline-variant bg-surface text-on-surface"
+        className="min-h-[100px]"
+      />
+      <input
+        type="hidden"
+        name="comment"
+        value={comment ? JSON.stringify(comment) : ""}
       />
 
       {uploadedImages.length > 0 && (

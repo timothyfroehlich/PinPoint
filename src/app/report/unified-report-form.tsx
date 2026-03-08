@@ -11,7 +11,6 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import { useSearchParams } from "next/navigation";
@@ -38,6 +37,8 @@ import type { AccessLevel } from "~/lib/permissions/matrix";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 import { getLoginUrl } from "~/lib/login-url";
 import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
+import { RichTextEditor } from "~/components/editor/RichTextEditor";
+import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface Machine {
   id: string;
@@ -82,7 +83,7 @@ export function UnifiedReportForm({
     defaultMachineId ?? ""
   );
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState<ProseMirrorDoc | null>(null);
   const [severity, setSeverity] = useState<IssueSeverity | "">("minor");
   const [priority, setPriority] = useState<IssuePriority | "">("medium");
   const [frequency, setFrequency] = useState<IssueFrequency | "">("constant");
@@ -134,7 +135,7 @@ export function UnifiedReportForm({
       const parsed = JSON.parse(savedDraft) as Partial<{
         machineId: string;
         title: string;
-        description: string;
+        description: ProseMirrorDoc;
         severity: IssueSeverity | "";
         priority: IssuePriority | "";
         frequency: IssueFrequency | "";
@@ -375,14 +376,17 @@ export function UnifiedReportForm({
                   <Label htmlFor="description" className="text-on-surface">
                     Description
                   </Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    rows={3}
+                  <RichTextEditor
+                    content={description}
+                    onChange={setDescription}
+                    mentionsEnabled={userAuthenticated}
                     placeholder="Tell us what happened, and how often it occurs."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="min-h-[80px] border-outline-variant bg-surface text-on-surface focus:border-primary"
+                    className="min-h-[80px]"
+                  />
+                  <input
+                    type="hidden"
+                    name="description"
+                    value={description ? JSON.stringify(description) : ""}
                   />
                 </div>
 

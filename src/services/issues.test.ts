@@ -121,8 +121,18 @@ describe("Issue Service", () => {
 
   describe("createIssue", () => {
     it("auto-watches reporter by default and sends notifications", async () => {
+      const description = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "New Issue Description" }],
+          },
+        ],
+      };
       const params = {
         title: "New Issue",
+        description: description as any,
         machineInitials: "MM",
         severity: "minor" as const,
         reportedBy: "user-1",
@@ -188,9 +198,18 @@ describe("Issue Service", () => {
 
   describe("addIssueComment", () => {
     it("notifies participants without subscribing the author", async () => {
+      const content = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "My comment" }],
+          },
+        ],
+      };
       const params = {
         issueId: "issue-1",
-        content: "My comment",
+        content: content as any,
         userId: "user-1",
       };
 

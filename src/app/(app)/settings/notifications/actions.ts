@@ -19,6 +19,8 @@ const updatePreferencesSchema = z.object({
   inAppNotifyOnStatusChange: z.boolean(),
   emailNotifyOnNewComment: z.boolean(),
   inAppNotifyOnNewComment: z.boolean(),
+  emailNotifyOnMentioned: z.boolean(),
+  inAppNotifyOnMentioned: z.boolean(),
   emailNotifyOnNewIssue: z.boolean(),
   inAppNotifyOnNewIssue: z.boolean(),
 
@@ -58,6 +60,8 @@ export async function updateNotificationPreferencesAction(
       formData.get("inAppNotifyOnStatusChange") === "on",
     emailNotifyOnNewComment: formData.get("emailNotifyOnNewComment") === "on",
     inAppNotifyOnNewComment: formData.get("inAppNotifyOnNewComment") === "on",
+    emailNotifyOnMentioned: formData.get("emailNotifyOnMentioned") === "on",
+    inAppNotifyOnMentioned: formData.get("inAppNotifyOnMentioned") === "on",
     emailNotifyOnNewIssue: formData.get("emailNotifyOnNewIssue") === "on",
     inAppNotifyOnNewIssue: formData.get("inAppNotifyOnNewIssue") === "on",
 
