@@ -37,7 +37,7 @@ export function WatchButton({
   return (
     <Button
       variant="outline"
-      size={iconOnly ? "icon-sm" : "sm"}
+      size={iconOnly ? "icon" : "sm"}
       onClick={handleToggle}
       loading={isPending}
       aria-label={
