@@ -71,7 +71,7 @@ test.describe("Machine Details Redesign", () => {
     page,
   }, testInfo) => {
     // Login as admin (owner of Medieval Madness)
-    await logout(page);
+    await logout(page, testInfo);
     await loginAs(page, testInfo, {
       email: TEST_USERS.admin.email,
       password: TEST_USERS.admin.password,
@@ -85,7 +85,7 @@ test.describe("Machine Details Redesign", () => {
     await expect(descField).toContainText("Add a description");
 
     // Restore member login
-    await logout(page);
+    await logout(page, testInfo);
     await loginAs(page, testInfo, {
       email: TEST_USERS.member.email,
       password: TEST_USERS.member.password,
@@ -155,7 +155,7 @@ test.describe("Machine Details Redesign", () => {
     page,
   }, testInfo) => {
     // Login as admin (owns Medieval Madness)
-    await logout(page);
+    await logout(page, testInfo);
     await loginAs(page, testInfo, {
       email: TEST_USERS.admin.email,
       password: TEST_USERS.admin.password,
@@ -170,7 +170,7 @@ test.describe("Machine Details Redesign", () => {
     );
 
     // Restore member login
-    await logout(page);
+    await logout(page, testInfo);
     await loginAs(page, testInfo, {
       email: TEST_USERS.member.email,
       password: TEST_USERS.member.password,
@@ -179,9 +179,9 @@ test.describe("Machine Details Redesign", () => {
 
   test("should hide owner requirements from unauthenticated users", async ({
     page,
-  }) => {
+  }, testInfo) => {
     // Logout to become unauthenticated
-    await logout(page);
+    await logout(page, testInfo);
 
     // Navigate to a machine (public route)
     await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
@@ -204,7 +204,7 @@ test.describe("Machine Details Redesign", () => {
     page,
   }, testInfo) => {
     // First, let's login as admin and set owner requirements on a machine
-    await logout(page);
+    await logout(page, testInfo);
     await loginAs(page, testInfo, {
       email: TEST_USERS.admin.email,
       password: TEST_USERS.admin.password,
@@ -249,7 +249,7 @@ test.describe("Machine Details Redesign", () => {
     );
 
     // Restore member login
-    await logout(page);
+    await logout(page, testInfo);
     await loginAs(page, testInfo, {
       email: TEST_USERS.member.email,
       password: TEST_USERS.member.password,

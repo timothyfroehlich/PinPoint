@@ -83,7 +83,11 @@ export function UserMenu({
 
         {/* Settings */}
         <DropdownMenuItem asChild>
-          <a href="/settings" className="flex items-center cursor-pointer">
+          <a
+            href="/settings"
+            className="flex items-center cursor-pointer"
+            data-testid="user-menu-settings"
+          >
             <Settings className="mr-2 size-4" />
             <span>Settings</span>
           </a>
@@ -94,6 +98,7 @@ export function UserMenu({
         {/* Sign Out */}
         <DropdownMenuItem
           className="text-error hover:text-error focus:text-error cursor-pointer"
+          data-testid="user-menu-signout"
           onSelect={async (event) => {
             event.preventDefault();
             await logoutAction();

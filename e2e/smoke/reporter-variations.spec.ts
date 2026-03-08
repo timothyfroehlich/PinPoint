@@ -86,7 +86,7 @@ test.describe("Reporter Variations E2E", () => {
     page,
   }, testInfo) => {
     // Log out first to switch to admin
-    await logout(page);
+    await logout(page, testInfo);
 
     // Log in as admin
     await loginAs(page, testInfo, {
