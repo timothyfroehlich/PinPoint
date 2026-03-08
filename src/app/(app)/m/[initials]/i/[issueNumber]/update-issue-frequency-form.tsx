@@ -57,12 +57,9 @@ export function UpdateIssueFrequencyForm({
     FormData
   >(updateIssueFrequencyAction, undefined);
 
-  // Handle action result
   useEffect(() => {
     if (state?.ok) {
       toast.success("Frequency updated");
-    } else if (state?.ok === false) {
-      toast.error(state.message);
     }
   }, [state]);
 

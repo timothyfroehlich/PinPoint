@@ -59,12 +59,9 @@ export function UpdateIssueSeverityForm({
     FormData
   >(updateIssueSeverityAction, undefined);
 
-  // Handle action result
   useEffect(() => {
     if (state?.ok) {
       toast.success("Severity updated");
-    } else if (state?.ok === false) {
-      toast.error(state.message);
     }
   }, [state]);
 

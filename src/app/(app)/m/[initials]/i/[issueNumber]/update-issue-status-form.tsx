@@ -75,12 +75,9 @@ export function UpdateIssueStatusForm({
         ownershipContext
       );
 
-  // Handle action result
   useEffect(() => {
     if (state?.ok) {
       toast.success("Status updated");
-    } else if (state?.ok === false) {
-      toast.error(state.message);
     }
   }, [state]);
 
