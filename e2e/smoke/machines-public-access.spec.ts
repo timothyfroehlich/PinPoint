@@ -17,7 +17,7 @@ test.describe("Machines Public Access", () => {
     await page.goto("/m");
 
     // Verify we're on the machines page (no redirect to login)
-    await expect(page).toHaveURL("/m");
+    await expect(page).toHaveURL(/\/m(?:\?.*)?$/);
     await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
 
     // Verify machines are displayed

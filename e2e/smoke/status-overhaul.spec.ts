@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { loginAs, selectOption } from "../support/actions";
+import {
+  loginAs,
+  updateIssueField,
+  visibleIssueFieldControl,
+} from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { seededMachines, TEST_USERS } from "../support/constants";
 import { fillReportForm } from "../support/page-helpers";
@@ -41,24 +45,24 @@ test.describe("Status Overhaul E2E", () => {
     // in CI due to cookie propagation timing.
     await expect(page).toHaveURL(/\/m\/TAF\/i\/[0-9]+/, { timeout: 30000 });
 
-    await expect(page.getByTestId("issue-status-badge").first()).toHaveText(
+    await expect(visibleIssueFieldControl(page, "status")).toContainText(
       /New/i
     );
-    await expect(page.getByTestId("issue-severity-badge").first()).toHaveText(
+    await expect(visibleIssueFieldControl(page, "severity")).toContainText(
       /Unplayable/i
     );
-    await expect(page.getByTestId("issue-priority-badge").first()).toHaveText(
+    await expect(visibleIssueFieldControl(page, "priority")).toContainText(
       /High/i
     );
-    await expect(page.getByTestId("issue-frequency-badge").first()).toHaveText(
+    await expect(visibleIssueFieldControl(page, "frequency")).toContainText(
       /Frequent/i
     );
 
     // 3. Update Status
-    await selectOption(page, "issue-status-select", "in_progress");
+    await updateIssueField(page, "status", "in_progress");
 
     // 4. Verify status change in badge and timeline
-    await expect(page.getByTestId("issue-status-badge").first()).toHaveText(
+    await expect(visibleIssueFieldControl(page, "status")).toContainText(
       /In Progress/i
     );
     // 5. Verify actor attribution on the system timeline event

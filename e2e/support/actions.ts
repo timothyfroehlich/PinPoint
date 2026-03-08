@@ -76,7 +76,14 @@ export async function loginAs(
   await page.waitForLoadState("networkidle");
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
-  await assertLayoutReady(page, testInfo);
+  if (isMobile) {
+    await expect(page.getByTestId("mobile-header")).toBeVisible();
+  } else {
+    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
+  }
+
+  // Wait for user menu to hydrate before continuing
+  await expect(visibleUserMenu(page, isMobile)).toBeVisible();
 
   // Force a full server round-trip to ensure auth cookies are settled.
   // Under concurrent load (3+ Playwright workers), Supabase cookie rotation
@@ -193,15 +200,22 @@ export async function selectOption(
     ((value: string) => string) | undefined
   > = {
     "issue-status-select": (val) => `status-option-${val}`,
+    "issue-status-trigger": (val) => `status-option-${val}`,
     "issue-severity-select": (val) => `severity-option-${val}`,
+    "issue-severity-trigger": (val) => `severity-option-${val}`,
     "issue-priority-select": (val) => `priority-option-${val}`,
+    "issue-priority-trigger": (val) => `priority-option-${val}`,
     "issue-frequency-select": (val) => `frequency-option-${val}`,
+    "issue-frequency-trigger": (val) => `frequency-option-${val}`,
     "issue-assignee-select": (val) => `assignee-option-${val}`,
     "machine-select": (val) => `machine-option-${val}`,
     "filter-status": (val) => `status-option-${val}`,
     "filter-machine": (val) => `machine-option-${val}`,
     "filter-owner": (val) => `owner-option-${val}`,
     "filter-sort": (val) => `sort-option-${val}`,
+    "severity-select": (val) => `severity-option-${val}`,
+    "priority-select": (val) => `priority-option-${val}`,
+    "frequency-select": (val) => `frequency-option-${val}`,
   };
 
   const getOptionTestId = triggerToOptionTestIdMap[triggerTestId];
@@ -217,11 +231,55 @@ export async function selectOption(
   // Wait for the option to be visible in the popover
   const optionTestId = getOptionTestId(optionValue);
   const option = page.getByTestId(optionTestId);
-
-  // Use force: true because shadcn/ui Select uses a portal where Radix Select dropdown options
-  // can be positioned outside the viewport despite being visible in the DOM
-  await option.click({ force: true });
+  if (triggerTestId.endsWith("-trigger")) {
+    // Drawer items use dispatchEvent — they respond to synthetic clicks
+    await option.dispatchEvent("click");
+  } else {
+    // Use force: true because shadcn/ui Select uses a portal where Radix Select dropdown options
+    // can be positioned outside the viewport despite being visible in the DOM
+    await option.click({ force: true });
+  }
 
   // Wait for dropdown to close
   await expect(option).toBeHidden({ timeout: 5000 });
+}
+
+type IssueFieldName = "status" | "severity" | "priority" | "frequency";
+
+export function visibleIssueFieldControl(page: Page, field: IssueFieldName) {
+  return page
+    .locator(
+      `[data-testid="issue-${field}-select"],[data-testid="issue-${field}-trigger"]`
+    )
+    .filter({ visible: true })
+    .first();
+}
+
+export async function expectIssueFieldEnabled(
+  page: Page,
+  field: IssueFieldName
+): Promise<void> {
+  await expect(visibleIssueFieldControl(page, field)).toBeEnabled();
+}
+
+export async function expectIssueFieldDisabled(
+  page: Page,
+  field: IssueFieldName
+): Promise<void> {
+  await expect(visibleIssueFieldControl(page, field)).toBeDisabled();
+}
+
+export async function updateIssueField(
+  page: Page,
+  field: IssueFieldName,
+  value: string
+): Promise<void> {
+  const control = visibleIssueFieldControl(page, field);
+  const testId = await control.getAttribute("data-testid");
+
+  if (!testId) {
+    throw new Error(`Missing data-testid for issue ${field} control`);
+  }
+
+  await selectOption(page, testId, value);
 }

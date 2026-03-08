@@ -71,7 +71,7 @@ test.describe("Public Routes Audit", () => {
   test.describe("Machine routes (public read access)", () => {
     test("/m (machines list) loads without login", async ({ page }) => {
       await page.goto("/m");
-      await expect(page).toHaveURL("/m");
+      await expect(page).toHaveURL(/\/m(?:\?.*)?$/);
       await expect(
         page.getByRole("heading", { name: "Machines" })
       ).toBeVisible();
@@ -127,7 +127,7 @@ test.describe("Public Routes Audit", () => {
   test.describe("Issues route (public read access)", () => {
     test("/issues loads without login", async ({ page }) => {
       await page.goto("/issues");
-      await expect(page).toHaveURL("/issues");
+      await expect(page).toHaveURL(/\/issues(?:\?.*)?$/);
       await expect(
         page.getByRole("heading", { name: "All Issues" })
       ).toBeVisible();

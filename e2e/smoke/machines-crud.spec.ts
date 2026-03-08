@@ -43,10 +43,10 @@ test.describe("Machines CRUD", () => {
     });
 
     // Navigate to machines page (new URL: /m)
-    await page.goto("/m");
+    await page.goto("/m?availability=all");
 
     // Verify we're on the machines page
-    await expect(page).toHaveURL("/m");
+    await expect(page).toHaveURL(/\/m(?:\?.*)?$/);
     await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
 
     // Should have an "Add Machine" button (visible to admins only)
@@ -85,7 +85,7 @@ test.describe("Machines CRUD", () => {
     page,
   }) => {
     // Navigate to machines page (new URL: /m)
-    await page.goto("/m");
+    await page.goto("/m?availability=all");
 
     const machineCards = page.getByTestId("machine-card");
     const cardCount = await machineCards.count();
@@ -105,10 +105,12 @@ test.describe("Machines CRUD", () => {
       expect(Number.isNaN(Number.parseInt(countText, 10))).toBe(false);
     }
 
-    // Sanity: verify The Addams Family shows correct status (Needs Service from major severity issues)
+    // Use the stable TAF route instead of the display name: an earlier serial
+    // test intentionally renames the machine.
     const addamsCard = page.locator(
-      `a:has-text("${seededMachines.addamsFamily.name}")`
+      `a[href="/m/${seededMachines.addamsFamily.initials}"]`
     );
+    await expect(addamsCard).toBeVisible();
     await expect(
       addamsCard.getByText(machineStatuses.addamsFamily)
     ).toBeVisible();
@@ -119,13 +121,12 @@ test.describe("Machines CRUD", () => {
   test("should display machine issues on detail page via expando", async ({
     page,
   }) => {
-    // Navigate to The Addams Family (has unplayable issue)
+    // Navigate to TAF. Earlier serial tests can rename the machine, so key
+    // this test off the stable initials/route instead of the display name.
     await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
 
     // Should show machine details
-    await expect(
-      page.getByRole("heading", { name: seededMachines.addamsFamily.name })
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
 
     // Verify open issues count section is visible
     await expect(page.getByTestId("detail-open-issues")).toBeVisible();

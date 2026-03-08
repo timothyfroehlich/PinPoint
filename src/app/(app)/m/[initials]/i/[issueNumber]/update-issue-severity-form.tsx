@@ -2,14 +2,15 @@
 
 import type React from "react";
 import { useState, useActionState, useRef, useEffect } from "react";
-import { Loader2 } from "lucide-react";
 import {
   updateIssueSeverityAction,
   type UpdateIssueSeverityResult,
 } from "~/app/(app)/issues/actions";
 import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
+import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
 import { type IssueSeverity } from "~/lib/types";
 import { IssueBadge } from "~/components/issues/IssueBadge";
+import { SEVERITY_CONFIG } from "~/lib/issues/status";
 import {
   getPermissionDeniedReason,
   getPermissionState,
@@ -22,19 +23,30 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { cn } from "~/lib/utils";
+import { toast } from "sonner";
 
 interface UpdateIssueSeverityFormProps {
   issueId: string;
   currentSeverity: IssueSeverity;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean;
 }
+
+const severityOptions: IssueSeverity[] = [
+  "cosmetic",
+  "minor",
+  "major",
+  "unplayable",
+];
 
 export function UpdateIssueSeverityForm({
   issueId,
   currentSeverity,
   accessLevel,
   ownershipContext,
+  compact = false,
 }: UpdateIssueSeverityFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedSeverity, setSelectedSeverity] =
@@ -46,6 +58,13 @@ export function UpdateIssueSeverityForm({
     UpdateIssueSeverityResult | undefined,
     FormData
   >(updateIssueSeverityAction, undefined);
+
+  useEffect(() => {
+    if (state && !state.ok) {
+      toast.error(state.message);
+    }
+  }, [state]);
+
   const permissionState = getPermissionState(
     "issues.update.reporting",
     accessLevel,
@@ -81,7 +100,38 @@ export function UpdateIssueSeverityForm({
     );
   }
 
-  const selectControl = (
+  const control = compact ? (
+    <MetadataDrawer
+      title="Severity"
+      options={severityOptions.map((severity) => ({
+        value: severity,
+        label: SEVERITY_CONFIG[severity].label,
+        icon: SEVERITY_CONFIG[severity].icon,
+        iconColor: SEVERITY_CONFIG[severity].iconColor,
+        testId: `severity-option-${severity}`,
+      }))}
+      currentValue={selectedSeverity}
+      onSelect={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+      trigger={
+        <button
+          type="button"
+          className="w-full disabled:cursor-not-allowed"
+          disabled={isPending || !permissionState.allowed}
+          data-testid="issue-severity-trigger"
+        >
+          <IssueBadge
+            type="severity"
+            value={selectedSeverity}
+            variant="strip"
+            size="lg"
+            className="w-full min-w-0"
+            showTooltip={false}
+          />
+        </button>
+      }
+    />
+  ) : (
     <SeveritySelect
       value={selectedSeverity}
       onValueChange={handleValueChange}
@@ -98,26 +148,26 @@ export function UpdateIssueSeverityForm({
     >
       <input type="hidden" name="issueId" value={issueId} />
       <input type="hidden" name="severity" value={selectedSeverity} />
-      <div className="relative" title={deniedReason ?? undefined}>
+      <div
+        className={cn(
+          "relative",
+          isPending && "opacity-50 pointer-events-none"
+        )}
+        title={deniedReason ?? undefined}
+      >
         {permissionState.allowed ? (
-          selectControl
+          control
         ) : (
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger asChild>{selectControl}</TooltipTrigger>
+              <TooltipTrigger asChild>
+                {compact ? <span className="block">{control}</span> : control}
+              </TooltipTrigger>
               <TooltipContent>{deniedReason}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         )}
-        {isPending && (
-          <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-          </div>
-        )}
       </div>
-      {state && !state.ok && (
-        <p className="text-sm text-destructive">{state.message}</p>
-      )}
     </form>
   );
 }

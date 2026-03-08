@@ -21,6 +21,13 @@ describe("WatchButton", () => {
     expect(screen.queryByText("Watch Issue")).not.toBeInTheDocument();
   });
 
+  it("supports icon-only mode with an accessible label", () => {
+    render(<WatchButton issueId="123" initialIsWatching={false} iconOnly />);
+
+    const button = screen.getByRole("button", { name: "Watch Issue" });
+    expect(button).not.toHaveTextContent("Watch Issue");
+  });
+
   it("calls toggleWatcherAction on click", async () => {
     vi.mocked(toggleWatcherAction).mockResolvedValue({
       ok: true,
