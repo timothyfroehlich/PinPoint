@@ -93,7 +93,9 @@ for i in "${!PIDS[@]}"; do
 done
 
 # Clean up review watcher if still running
-[ -n "$REVIEW_WATCHER_PID" ] && kill "$REVIEW_WATCHER_PID" 2>/dev/null || true
+if [ -n "$REVIEW_WATCHER_PID" ]; then
+    kill "$REVIEW_WATCHER_PID" 2>/dev/null || true
+fi
 
 if $EARLY_EXIT; then
     exit 0
