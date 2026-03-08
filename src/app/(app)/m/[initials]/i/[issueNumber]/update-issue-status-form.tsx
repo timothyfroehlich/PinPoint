@@ -8,8 +8,10 @@ import {
   type UpdateIssueStatusResult,
 } from "~/app/(app)/issues/actions";
 import { StatusSelect } from "~/components/issues/fields/StatusSelect";
+import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import type { IssueStatus } from "~/lib/types";
+import { STATUS_CONFIG, STATUS_GROUPS } from "~/lib/issues/status";
 import {
   getPermissionDeniedReason,
   getPermissionState,
@@ -22,19 +24,35 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { toast } from "sonner";
 
 interface UpdateIssueStatusFormProps {
   issueId: string;
   currentStatus: IssueStatus;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean;
 }
+
+const statusOptions = [
+  ...STATUS_GROUPS.new,
+  ...STATUS_GROUPS.in_progress,
+  ...STATUS_GROUPS.closed,
+].map((status) => ({
+  value: status,
+  label: STATUS_CONFIG[status].label,
+  description: STATUS_CONFIG[status].description,
+  icon: STATUS_CONFIG[status].icon,
+  iconColor: STATUS_CONFIG[status].iconColor,
+  testId: `status-option-${status}`,
+}));
 
 export function UpdateIssueStatusForm({
   issueId,
   currentStatus,
   accessLevel,
   ownershipContext,
+  compact = false,
 }: UpdateIssueStatusFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedStatus, setSelectedStatus] =
@@ -56,6 +74,12 @@ export function UpdateIssueStatusForm({
         accessLevel,
         ownershipContext
       );
+
+  useEffect(() => {
+    if (state?.ok) {
+      toast.success("Status updated");
+    }
+  }, [state]);
 
   // Auto-submit form when pending status changes
   useEffect(() => {
@@ -79,7 +103,32 @@ export function UpdateIssueStatusForm({
     );
   }
 
-  const selectControl = (
+  const control = compact ? (
+    <MetadataDrawer
+      title="Status"
+      options={statusOptions}
+      currentValue={selectedStatus}
+      onSelect={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+      trigger={
+        <button
+          type="button"
+          className="w-full disabled:cursor-not-allowed"
+          disabled={isPending || !permissionState.allowed}
+          data-testid="issue-status-trigger"
+        >
+          <IssueBadge
+            type="status"
+            value={selectedStatus}
+            variant="strip"
+            size="lg"
+            className="w-full min-w-0"
+            showTooltip={false}
+          />
+        </button>
+      }
+    />
+  ) : (
     <StatusSelect
       value={selectedStatus}
       onValueChange={handleValueChange}
@@ -98,11 +147,13 @@ export function UpdateIssueStatusForm({
       <input type="hidden" name="status" value={selectedStatus} />
       <div className="relative" title={deniedReason ?? undefined}>
         {permissionState.allowed ? (
-          selectControl
+          control
         ) : (
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger asChild>{selectControl}</TooltipTrigger>
+              <TooltipTrigger asChild>
+                {compact ? <span className="block">{control}</span> : control}
+              </TooltipTrigger>
               <TooltipContent>{deniedReason}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -113,11 +164,7 @@ export function UpdateIssueStatusForm({
           </div>
         )}
       </div>
-      {state?.ok && (
-        <p className="text-sm text-success" data-testid="status-update-success">
-          Status updated successfully
-        </p>
-      )}
+
       {state && !state.ok && (
         <p className="text-sm text-destructive">{state.message}</p>
       )}

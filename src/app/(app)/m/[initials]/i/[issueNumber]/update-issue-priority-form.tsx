@@ -8,8 +8,10 @@ import {
   type UpdateIssuePriorityResult,
 } from "~/app/(app)/issues/actions";
 import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
+import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
 import { type IssuePriority } from "~/lib/types";
 import { IssueBadge } from "~/components/issues/IssueBadge";
+import { PRIORITY_CONFIG } from "~/lib/issues/status";
 import {
   getPermissionDeniedReason,
   getPermissionState,
@@ -22,13 +24,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { toast } from "sonner";
 
 interface UpdateIssuePriorityFormProps {
   issueId: string;
   currentPriority: IssuePriority;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean;
 }
+
+const priorityOptions: IssuePriority[] = ["low", "medium", "high"];
 
 /**
  * Form component for updating issue priority with progressive enhancement.
@@ -39,6 +45,7 @@ export function UpdateIssuePriorityForm({
   currentPriority,
   accessLevel,
   ownershipContext,
+  compact = false,
 }: UpdateIssuePriorityFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedPriority, setSelectedPriority] =
@@ -50,6 +57,13 @@ export function UpdateIssuePriorityForm({
     UpdateIssuePriorityResult | undefined,
     FormData
   >(updateIssuePriorityAction, undefined);
+
+  useEffect(() => {
+    if (state?.ok) {
+      toast.success("Priority updated");
+    }
+  }, [state]);
+
   const permissionState = getPermissionState(
     "issues.update.triage",
     accessLevel,
@@ -85,7 +99,38 @@ export function UpdateIssuePriorityForm({
     );
   }
 
-  const selectControl = (
+  const control = compact ? (
+    <MetadataDrawer
+      title="Priority"
+      options={priorityOptions.map((priority) => ({
+        value: priority,
+        label: PRIORITY_CONFIG[priority].label,
+        icon: PRIORITY_CONFIG[priority].icon,
+        iconColor: PRIORITY_CONFIG[priority].iconColor,
+        testId: `priority-option-${priority}`,
+      }))}
+      currentValue={selectedPriority}
+      onSelect={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+      trigger={
+        <button
+          type="button"
+          className="w-full disabled:cursor-not-allowed"
+          disabled={isPending || !permissionState.allowed}
+          data-testid="issue-priority-trigger"
+        >
+          <IssueBadge
+            type="priority"
+            value={selectedPriority}
+            variant="strip"
+            size="lg"
+            className="w-full min-w-0"
+            showTooltip={false}
+          />
+        </button>
+      }
+    />
+  ) : (
     <PrioritySelect
       value={selectedPriority}
       onValueChange={handleValueChange}
@@ -104,11 +149,13 @@ export function UpdateIssuePriorityForm({
       <input type="hidden" name="priority" value={selectedPriority} />
       <div className="relative" title={deniedReason ?? undefined}>
         {permissionState.allowed ? (
-          selectControl
+          control
         ) : (
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger asChild>{selectControl}</TooltipTrigger>
+              <TooltipTrigger asChild>
+                {compact ? <span className="block">{control}</span> : control}
+              </TooltipTrigger>
               <TooltipContent>{deniedReason}</TooltipContent>
             </Tooltip>
           </TooltipProvider>

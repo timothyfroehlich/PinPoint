@@ -55,7 +55,7 @@ test.describe("Landing Page", () => {
     await browseLink.click();
 
     // /m is a public route, unauthenticated users can access it directly
-    await expect(page).toHaveURL("/m");
+    await expect(page).toHaveURL(/\/m(?:\?.*)?$/);
   });
 
   test("Report Issue CTA is clickable and navigates to /report", async ({

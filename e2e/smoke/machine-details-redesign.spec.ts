@@ -242,7 +242,10 @@ test.describe("Machine Details Redesign", () => {
     await page.waitForLoadState("networkidle");
 
     // Owner requirements callout should be visible
-    const callout = page.getByTestId("owner-requirements-callout");
+    const callout = page
+      .getByTestId("owner-requirements-callout")
+      .filter({ visible: true })
+      .first();
     await expect(callout).toBeVisible();
     await expect(callout).toContainText(
       "Please handle with care - vintage machine"

@@ -1,21 +1,26 @@
 "use client";
 
+import type React from "react";
 import { useState, useTransition } from "react";
+
 import { Button } from "~/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
 import { toggleWatcherAction } from "~/app/(app)/issues/watcher-actions";
 import { cn } from "~/lib/utils";
+import { toast } from "sonner";
 
 interface WatchButtonProps {
   issueId: string;
   initialIsWatching: boolean;
+  iconOnly?: boolean;
+  className?: string;
 }
-
-import React from "react";
 
 export function WatchButton({
   issueId,
   initialIsWatching,
+  iconOnly = false,
+  className,
 }: WatchButtonProps): React.JSX.Element {
   const [isWatching, setIsWatching] = useState(initialIsWatching);
   const [isPending, startTransition] = useTransition();
@@ -26,8 +31,7 @@ export function WatchButton({
       if (result.ok) {
         setIsWatching(result.value.isWatching);
       } else {
-        // Handle error (toast?)
-        console.error(result.message);
+        toast.error(result.message);
       }
     });
   };
@@ -35,25 +39,29 @@ export function WatchButton({
   return (
     <Button
       variant="outline"
-      size="sm"
+      size={iconOnly ? "icon" : "sm"}
       onClick={handleToggle}
       loading={isPending}
+      aria-label={
+        iconOnly ? (isWatching ? "Unwatch Issue" : "Watch Issue") : undefined
+      }
       className={cn(
-        "w-full justify-start gap-2",
+        iconOnly ? "gap-0" : "w-full justify-start gap-2",
         isWatching
           ? "bg-primary/10 text-primary border-primary/20"
-          : "text-muted-foreground"
+          : "text-muted-foreground",
+        className
       )}
     >
       {isWatching ? (
         <>
           {!isPending && <EyeOff className="size-4" />}
-          Unwatch Issue
+          {!iconOnly ? "Unwatch Issue" : null}
         </>
       ) : (
         <>
           {!isPending && <Eye className="size-4" />}
-          Watch Issue
+          {!iconOnly ? "Watch Issue" : null}
         </>
       )}
     </Button>

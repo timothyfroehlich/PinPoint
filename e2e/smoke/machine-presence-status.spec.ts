@@ -79,18 +79,27 @@ test.describe("Machine Presence Status", () => {
     });
     await expect(presenceSelect).toBeVisible();
     await presenceSelect.click();
-    await page.getByRole("option", { name: "On Loan" }).click();
+    await page.getByRole("option", { name: "On Loan", exact: true }).click({
+      force: true,
+    });
+    await expect(presenceSelect).toContainText("On Loan");
 
     await page.getByRole("button", { name: "Update Machine" }).click();
     await expect(
       page.getByRole("heading", { name: "Edit Machine" })
     ).toBeHidden();
+    await page.reload();
+    await expect(page.getByText("On Loan").first()).toBeVisible();
+    await expect(
+      page.getByText("This machine is currently on loan.")
+    ).toBeVisible();
   });
 
   test("detail page shows presence badge and inactive banner", async ({
     page,
   }) => {
     await page.goto(`/m/${machineInitials}`);
+    await page.reload();
     await expect(page.getByText("On Loan").first()).toBeVisible();
     await expect(
       page.getByText("This machine is currently on loan.")

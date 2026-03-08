@@ -60,8 +60,8 @@ test.describe("Reporter Variations E2E", () => {
   test("should display fully anonymous reporter correctly", async ({
     page,
   }) => {
-    // GDZ Issue 2 is truly anonymous - no reportedBy, reporterName, reporterEmail, or invitedUserId
-    const issue = seededIssues.GDZ[1];
+    // GDZ Issue 3 is truly anonymous - no reportedBy, reporterName, reporterEmail, or invitedUserId
+    const issue = seededIssues.GDZ[2];
     await page.goto(`/m/GDZ/i/${issue.num}`);
     const sidebar = page.getByTestId("issue-sidebar");
 
