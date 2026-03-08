@@ -280,7 +280,7 @@ export default async function IssueDetailPage({
           <div className="space-y-5">
             {issue.images.length > 0 && (
               <div className="space-y-3">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                <h2 className="hidden md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Images ({issue.images.length})
                 </h2>
                 <ImageGallery
@@ -293,7 +293,7 @@ export default async function IssueDetailPage({
               </div>
             )}
 
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <h2 className="hidden md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Activity
             </h2>
             <IssueTimeline
