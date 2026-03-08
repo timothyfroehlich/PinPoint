@@ -37,7 +37,7 @@ pnpm run preflight                 # Full suite (~60s) - run before commit
 ### Which Tests to Run (Decision Tree)
 
 1. **Changed pure logic/utils?** → `pnpm run check` (unit tests, ~12s)
-2. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/smoke/specific-file.spec.ts --project=chromium` (~15-30s)
+2. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (~15-30s)
 3. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
 4. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs
 5. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
