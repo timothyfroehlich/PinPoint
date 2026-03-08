@@ -76,14 +76,7 @@ export async function loginAs(
   await page.waitForLoadState("networkidle");
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
-  if (isMobile) {
-    await expect(page.getByTestId("mobile-header")).toBeVisible();
-  } else {
-    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
-  }
-
-  // Wait for user menu to hydrate before continuing
-  await expect(visibleUserMenu(page, isMobile)).toBeVisible();
+  await assertLayoutReady(page, testInfo);
 
   // Force a full server round-trip to ensure auth cookies are settled.
   // Under concurrent load (3+ Playwright workers), Supabase cookie rotation
