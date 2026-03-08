@@ -455,7 +455,10 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
 ---
 
-## UI & Type System Patterns
+## UI & Visual Consistency Patterns
+
+> **Source of truth**: `docs/UI_NON_NEGOTIABLES.md` and live style guide at `/debug/`
+> When in doubt, the rendered style guide pages ARE the reference.
 
 ### 🎨 CORE-UI-003: Always Use cn() for Class Merging
 
@@ -480,6 +483,257 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
 ```
 
 **Reference**: CORE-UI-003 (NON_NEGOTIABLES.md)
+
+---
+
+### 🎨 CORE-UI-005: Semantic Color Tokens Only
+
+**Rule**: Never use raw Tailwind palette colors (`text-amber-500`, `bg-purple-900`, `text-cyan-600`) in app code. Only semantic CSS variable tokens.
+
+**Why**: Raw palette colors bypass the design system and don't adapt to theming. Semantic tokens (`text-warning`, `text-primary`) are self-documenting.
+
+**Detection**:
+- Grep for `text-amber-`, `text-purple-`, `text-cyan-`, `text-green-`, `text-red-`, `bg-purple-`, `bg-green-`, `bg-red-` in TSX files (outside of tailwind config)
+- Exception: `text-white`, `text-black` are acceptable for absolute contrast needs
+
+**Available semantic tokens**: `text-primary`, `text-secondary`, `text-muted-foreground`, `text-foreground`, `text-warning`, `text-success`, `text-destructive`, `bg-card`, `bg-surface`, `bg-muted`, `bg-primary-container`, `bg-success-container`, `bg-warning-container`, `bg-error-container`, etc.
+
+**Anti-Pattern**:
+```tsx
+// ❌ FORBIDDEN - raw palette color
+<h2 className="text-amber-500">Severity</h2>
+<div className="bg-purple-800 text-white">badge</div>
+```
+
+**Correct Pattern**:
+```tsx
+// ✅ CORRECT - semantic token
+<h2 className="text-warning">Severity</h2>
+<div className="bg-secondary text-on-secondary">badge</div>
+```
+
+**Reference**: CORE-UI-005 (docs/UI_NON_NEGOTIABLES.md)
+
+---
+
+### 🎨 CORE-UI-006/007: Page Container & Section Headings
+
+**Rule**: All pages use `max-w-6xl mx-auto py-10 space-y-6`. Section headings explicitly override base styles.
+
+**Why**: Consistent content width and vertical rhythm across every page. The `@layer base` `h2` style is `text-3xl` (for MDX) — too large for in-page section headings.
+
+**Detection**:
+- Pages using non-standard containers (`max-w-4xl`, `max-w-screen-xl`, custom padding)
+- Bare `<h2>` in app pages without explicit font-size class
+- `<p>` elements used as semantic headings
+
+**Anti-Pattern**:
+```tsx
+// ❌ WRONG container
+<div className="max-w-4xl mx-auto py-8">
+
+// ❌ WRONG - bare h2 renders at text-3xl (too large for in-page section)
+<h2>Quick Stats</h2>
+
+// ❌ WRONG - non-semantic heading element
+<p className="text-xl font-semibold mb-4">Quick Stats</p>
+```
+
+**Correct Pattern**:
+```tsx
+// ✅ Page container
+<div className="max-w-6xl mx-auto py-10 space-y-6">
+
+// ✅ Section heading with explicit override
+<h2 className="text-xl font-semibold text-foreground mb-4">Quick Stats</h2>
+```
+
+**Reference**: CORE-UI-006/007 (docs/UI_NON_NEGOTIABLES.md)
+
+---
+
+### 🎨 CORE-UI-008/009: Card Composition & Variants
+
+**Rule**: Always use shadcn/ui Card composition. Only use the 5 canonical card visual variants.
+
+**Why**: Raw bordered divs produce inconsistent padding, border-radius, and backgrounds. Ad-hoc card styles create visual clutter.
+
+**Detection**:
+- `<div className="border rounded-lg bg-card` — raw card div
+- New border/glow combinations not in the 5 canonical variants
+- `p-X` added directly to `<Card>` (padding belongs in CardContent/CardHeader)
+
+**5 Canonical Variants**:
+```tsx
+// 1. Neutral
+<Card className="border-border bg-card">
+
+// 2. Primary action (interactive)
+<Card className="border-primary/20 bg-card glow-primary hover:border-primary transition-all cursor-pointer h-full">
+
+// 3. Success
+<Card className="border-success/30 bg-success/10 glow-success">
+
+// 4. Warning
+<Card className="border-warning/30 bg-warning/10 glow-warning">
+
+// 5. Destructive
+<Card className="border-destructive/30 bg-destructive/10 glow-destructive">
+```
+
+**Reference**: CORE-UI-008/009 (docs/UI_NON_NEGOTIABLES.md), live at `/debug/cards`
+
+---
+
+### 🎨 CORE-UI-010: Standard Empty State
+
+**Rule**: Every list/grid/table must show a standard empty state — never a blank screen.
+
+**Detection**:
+- Conditional render that shows nothing when array is empty: `{items.length > 0 && items.map(...)}`
+- Custom ad-hoc empty state layouts (not using the Card + py-12 + size-12 icon pattern)
+
+**Required Pattern**:
+```tsx
+// ✅ CORRECT
+{items.length === 0 ? (
+  <Card className="border-border bg-card">
+    <CardContent className="py-12 text-center">
+      <SomeIcon className="mx-auto mb-4 size-12 text-muted-foreground" />
+      <p className="text-lg text-muted-foreground">No items yet</p>
+    </CardContent>
+  </Card>
+) : (
+  items.map(...)
+)}
+```
+
+**Reference**: CORE-UI-010 (docs/UI_NON_NEGOTIABLES.md), live at `/debug/states`
+
+---
+
+### 🎨 CORE-UI-011: Button Variants — Shadcn/ui Only
+
+**Rule**: Only use defined shadcn/ui Button variants. No custom button styling.
+
+**Detection**:
+- `<button className="bg-green-600 ...">` — raw custom button
+- `<Button className="bg-green-600 ...">` — overriding button background
+- `<a className="... px-4 py-2 rounded">` used as a button
+
+**Correct Pattern**:
+```tsx
+<Button>Default (primary action)</Button>
+<Button variant="destructive">Delete</Button>
+<Button variant="outline">Cancel</Button>
+<Button variant="secondary">Secondary</Button>
+<Button variant="ghost">Ghost</Button>
+<Button variant="link">Link</Button>
+// Icon buttons need aria-label
+<Button size="icon" aria-label="Delete"><Trash2 className="size-4" /></Button>
+```
+
+**Reference**: CORE-UI-011 (docs/UI_NON_NEGOTIABLES.md)
+
+---
+
+### 🎨 CORE-UI-012: AlertDialog for Destructive Actions
+
+**Rule**: Irreversible actions require AlertDialog confirmation. Never single-click destructive.
+
+**Detection**:
+- `<Button variant="destructive" onClick={deleteXxx}>` without AlertDialog wrapper
+- Server Action called directly from a button without confirmation step
+
+**Reference**: CORE-UI-012 (docs/UI_NON_NEGOTIABLES.md)
+
+---
+
+### 🎨 CORE-UI-013: Lucide Icons, Standard Sizes
+
+**Rule**: Only `lucide-react` for icons. Standard sizes: `size-4` (inline), `size-5` (standalone), `size-12` (empty state).
+
+**Detection**:
+- Import from `react-icons`, `@heroicons/react`, `@phosphor-icons/react`, etc.
+- Arbitrary icon sizes: `className="w-[18px] h-[18px]"`, `className="h-6 w-6"`
+- Icon-only buttons missing `aria-label`
+
+**Reference**: CORE-UI-013 (docs/UI_NON_NEGOTIABLES.md)
+
+---
+
+### 🎨 CORE-UI-014: Skeleton for Loading States
+
+**Rule**: Use `<Skeleton>` from `~/components/ui/skeleton`. No custom spinners.
+
+**Detection**:
+- `animate-spin` used for loading indicators
+- Text-only loading: `<p>Loading...</p>`
+- Custom spinner divs with `border-b-2 border-primary`
+
+**Reference**: CORE-UI-014 (docs/UI_NON_NEGOTIABLES.md), live at `/debug/states`
+
+---
+
+### 🎨 CORE-UI-015: IssueBadge for Domain Values
+
+**Rule**: Always use `<IssueBadge>` for status/severity/priority/frequency. No ad-hoc colored badges.
+
+**Detection**:
+- Inline color logic for issue fields: `issue.status === 'new' ? 'bg-green-500' : ...`
+- Raw `<Badge className="bg-...">` for domain values
+- Custom colored spans for status/severity/priority/frequency
+
+**Correct Pattern**:
+```tsx
+<IssueBadge type="status" value={issue.status} />
+<IssueBadge type="severity" value={issue.severity} />
+```
+
+**Reference**: CORE-UI-015 (docs/UI_NON_NEGOTIABLES.md), live at `/debug/badges`
+
+---
+
+### 🎨 CORE-UI-016: Glow Effects — Semantic and Interactive Only
+
+**Rule**: Glow color must match the card's semantic meaning. Only on interactive/meaningful surfaces.
+
+**Detection**:
+- `glow-primary` on a success card (`border-success/30`) — color mismatch
+- Glow on static decorative elements with no interactivity
+- `glow-secondary` used more than 1-2 times per page
+
+**Reference**: CORE-UI-016 (docs/UI_NON_NEGOTIABLES.md)
+
+---
+
+### 🎨 CORE-UI-017: Mobile-First Responsive Layout
+
+**Rule**: All layouts start single-column and expand at breakpoints. No desktop-only pages.
+
+**Why**: The BottomTabBar and MobileHeader replace the sidebar/desktop header on mobile. Page grids must be mobile-first to work correctly.
+
+**Detection**:
+- `grid grid-cols-3` without `grid-cols-1` mobile base
+- `px-4` or `px-6` added to the page container (MainLayout handles horizontal padding)
+- Desktop-only features with no mobile consideration
+
+**Correct Mobile-First Patterns**:
+```tsx
+// ✅ Grid
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+// ✅ Desktop-only panel
+<div className="hidden lg:block w-64">
+
+// ✅ Mobile-only element
+<div className="lg:hidden">
+
+// ❌ WRONG - no mobile base
+<div className="grid grid-cols-3 gap-6">
+```
+
+**Reference**: CORE-UI-017 (docs/UI_NON_NEGOTIABLES.md), live at `/debug/layout`
 
 ---
 

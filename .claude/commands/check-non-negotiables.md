@@ -36,6 +36,13 @@ Analyze specified files for violations of PinPoint's critical non-negotiable pat
 
 - **Missing Return Types**: Complex async functions without explicit return type annotations
 - **Seed Data Modifications**: Changes to SEED_TEST_IDS structure or values
+- **Raw palette colors (UI)**: `text-amber-\d+`, `text-purple-\d+`, `text-cyan-\d+`, `text-green-\d+`, `bg-purple-\d+`, `bg-green-\d+` in `.tsx` app files (not config/test) → use semantic tokens (`text-warning`, `text-primary`, etc.)
+- **Raw card divs (UI)**: `div.*border.*rounded.*bg-card` pattern → use `<Card>` component
+- **Bare section headings (UI)**: `<h2>` without explicit font-size class in app pages → use `text-xl font-semibold`
+- **Desktop-first grids (UI)**: `grid-cols-[2-9]` without `grid-cols-1` mobile base
+- **Non-Lucide icons (UI)**: imports from `react-icons`, `@heroicons/react`, `@phosphor-icons`
+- **Custom spinners (UI)**: `animate-spin.*border` patterns → use `<Skeleton>` component
+- **Ad-hoc domain badges (UI)**: inline color logic for `issue.status`, `issue.severity`, `issue.priority`, `issue.frequency` → use `<IssueBadge>`
 
 ### 🔐 SECURITY (Manual Review)
 

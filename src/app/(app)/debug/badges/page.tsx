@@ -52,7 +52,7 @@ export default function BadgeDebugPage(): React.JSX.Element {
         <div className="space-y-8">
           {/* Severities Section */}
           <section className="space-y-4">
-            <h2 className="text-xl font-semibold border-b pb-2 text-amber-500">
+            <h2 className="text-xl font-semibold border-b pb-2 text-warning">
               Severity Variations
             </h2>
             <div className="flex flex-col gap-3">
@@ -74,7 +74,7 @@ export default function BadgeDebugPage(): React.JSX.Element {
 
           {/* Priorities Section */}
           <section className="space-y-4">
-            <h2 className="text-xl font-semibold border-b pb-2 text-purple-500">
+            <h2 className="text-xl font-semibold border-b pb-2 text-secondary">
               Priority Variations
             </h2>
             <div className="flex flex-col gap-3">
@@ -96,7 +96,7 @@ export default function BadgeDebugPage(): React.JSX.Element {
 
           {/* Frequencies Section */}
           <section className="space-y-4">
-            <h2 className="text-xl font-semibold border-b pb-2 text-cyan-500">
+            <h2 className="text-xl font-semibold border-b pb-2 text-primary">
               Frequency Variations
             </h2>
             <div className="flex flex-col gap-3">
