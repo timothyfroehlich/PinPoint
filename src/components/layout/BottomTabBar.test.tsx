@@ -2,11 +2,12 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, type MockedFunction } from "vitest";
+import { usePathname } from "next/navigation";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { BottomTabBar } from "./BottomTabBar";
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/dashboard",
+  usePathname: vi.fn(() => "/dashboard"),
 }));
 
 vi.mock("next/link", () => ({
@@ -116,6 +117,34 @@ describe("BottomTabBar", () => {
     await user.click(screen.getByRole("button", { name: /more options/i }));
 
     expect(screen.queryByTestId("more-sheet-admin")).not.toBeInTheDocument();
+  });
+
+  it("highlights Issues tab (not Machines) when viewing an issue detail page", () => {
+    vi.mocked(usePathname).mockReturnValue("/m/BB/i/4");
+    render(<BottomTabBar />);
+
+    expect(screen.getByRole("link", { name: /issues/i })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    expect(screen.getByRole("link", { name: /machines/i })).not.toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
+
+  it("highlights Machines tab when viewing a machine detail page", () => {
+    vi.mocked(usePathname).mockReturnValue("/m/BB");
+    render(<BottomTabBar />);
+
+    expect(screen.getByRole("link", { name: /machines/i })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    expect(screen.getByRole("link", { name: /issues/i })).not.toHaveAttribute(
+      "aria-current",
+      "page"
+    );
   });
 
   it("shows Admin Panel in More sheet for admin role", async () => {
