@@ -175,7 +175,7 @@ test.describe("Issues System", () => {
       await expect(page.getByTestId("issue-timeline")).toBeVisible();
       await expect(page.getByTestId("issue-comment-form")).toBeVisible();
       await expect(page.getByRole("heading", { name: "Activity" })).toHaveCount(
-        0
+        isMobile ? 0 : 1
       );
 
       if (isMobile) {

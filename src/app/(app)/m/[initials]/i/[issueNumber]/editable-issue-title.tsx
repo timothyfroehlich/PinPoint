@@ -83,8 +83,8 @@ export function EditableIssueTitle({
     return (
       <h1
         className={cn(
-          "text-3xl lg:text-4xl font-extrabold tracking-tight",
-          className
+          "font-extrabold tracking-tight",
+          className ?? "text-3xl lg:text-4xl"
         )}
         title={title.length > 60 ? title : undefined}
       >
@@ -98,7 +98,7 @@ export function EditableIssueTitle({
       <form
         ref={formRef}
         action={formAction}
-        className={cn("flex items-center gap-2", className)}
+        className="flex items-center gap-2"
       >
         <input type="hidden" name="issueId" value={issueId} />
         <Input
@@ -116,7 +116,10 @@ export function EditableIssueTitle({
             }, 200);
           }}
           maxLength={100}
-          className="h-auto py-1 text-2xl font-extrabold tracking-tight lg:text-3xl"
+          className={cn(
+            "h-auto py-1 font-extrabold tracking-tight",
+            className ?? "text-2xl lg:text-3xl"
+          )}
           aria-label="Edit issue title"
           disabled={isPending}
         />
@@ -128,9 +131,12 @@ export function EditableIssueTitle({
   }
 
   return (
-    <div className={cn("group/title flex items-center gap-2", className)}>
+    <div className="group/title flex items-center gap-2">
       <h1
-        className="text-3xl lg:text-4xl font-extrabold tracking-tight"
+        className={cn(
+          "font-extrabold tracking-tight",
+          className ?? "text-3xl lg:text-4xl"
+        )}
         title={title.length > 60 ? title : undefined}
       >
         {title.length > 60 ? `${title.slice(0, 60)}...` : title}

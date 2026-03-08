@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { toast } from "sonner";
 
 interface UpdateIssueSeverityFormProps {
   issueId: string;
@@ -57,6 +58,16 @@ export function UpdateIssueSeverityForm({
     UpdateIssueSeverityResult | undefined,
     FormData
   >(updateIssueSeverityAction, undefined);
+
+  // Handle action result
+  useEffect(() => {
+    if (state?.ok) {
+      toast.success("Severity updated");
+    } else if (state?.ok === false) {
+      toast.error(state.message);
+    }
+  }, [state]);
+
   const permissionState = getPermissionState(
     "issues.update.reporting",
     accessLevel,

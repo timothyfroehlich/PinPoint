@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { toast } from "sonner";
 
 interface UpdateIssueStatusFormProps {
   issueId: string;
@@ -73,6 +74,15 @@ export function UpdateIssueStatusForm({
         accessLevel,
         ownershipContext
       );
+
+  // Handle action result
+  useEffect(() => {
+    if (state?.ok) {
+      toast.success("Status updated");
+    } else if (state?.ok === false) {
+      toast.error(state.message);
+    }
+  }, [state]);
 
   // Auto-submit form when pending status changes
   useEffect(() => {

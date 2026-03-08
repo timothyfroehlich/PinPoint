@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { toast } from "sonner";
 
 interface UpdateIssueFrequencyFormProps {
   issueId: string;
@@ -55,6 +56,16 @@ export function UpdateIssueFrequencyForm({
     UpdateIssueFrequencyResult | undefined,
     FormData
   >(updateIssueFrequencyAction, undefined);
+
+  // Handle action result
+  useEffect(() => {
+    if (state?.ok) {
+      toast.success("Frequency updated");
+    } else if (state?.ok === false) {
+      toast.error(state.message);
+    }
+  }, [state]);
+
   const permissionState = getPermissionState(
     "issues.update.reporting",
     accessLevel,

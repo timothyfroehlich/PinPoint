@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { toast } from "sonner";
 
 interface UpdateIssuePriorityFormProps {
   issueId: string;
@@ -56,6 +57,16 @@ export function UpdateIssuePriorityForm({
     UpdateIssuePriorityResult | undefined,
     FormData
   >(updateIssuePriorityAction, undefined);
+
+  // Handle action result
+  useEffect(() => {
+    if (state?.ok) {
+      toast.success("Priority updated");
+    } else if (state?.ok === false) {
+      toast.error(state.message);
+    }
+  }, [state]);
+
   const permissionState = getPermissionState(
     "issues.update.triage",
     accessLevel,

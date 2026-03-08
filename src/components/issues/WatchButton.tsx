@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import type React from "react";
+import { useState, useTransition } from "react";
+
 import { Button } from "~/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
 import { toggleWatcherAction } from "~/app/(app)/issues/watcher-actions";
