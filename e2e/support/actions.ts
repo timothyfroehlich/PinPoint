@@ -132,11 +132,8 @@ export async function ensureLoggedIn(
 /**
  * Logs out the current user via the User Menu.
  */
-export async function logout(page: Page, testInfo?: TestInfo): Promise<void> {
-  // Determine if mobile layout is active (prefer testInfo, fallback to viewport width)
-  const isMobile =
-    testInfo?.project.name.includes("Mobile") ??
-    (page.viewportSize()?.width ?? 1024) < 768;
+export async function logout(page: Page, testInfo: TestInfo): Promise<void> {
+  const isMobile = testInfo.project.name.includes("Mobile");
 
   const userMenu = visibleUserMenu(page, isMobile);
   await expect(userMenu).toBeVisible();

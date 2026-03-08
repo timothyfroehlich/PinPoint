@@ -32,6 +32,8 @@ fi
 
 echo "Monitoring runs: $ACTIVE_RUNS"
 
+PR_NUMBER="${2:-}"
+
 # Use an array to track background PIDs and their corresponding Run IDs
 declare -a PIDS
 declare -a RUN_IDS
@@ -50,6 +52,33 @@ for RID in $ACTIVE_RUNS; do
     RUN_IDS+=("$RID")
 done
 
+# If a PR number was given, also poll for new Copilot reviews in the background.
+# If a review arrives, kill the CI watchers and exit early so the agent can address it.
+REVIEW_WATCHER_PID=""
+if [ -n "$PR_NUMBER" ]; then
+    # Capture the current review count as baseline
+    BASELINE_REVIEW_COUNT=$(gh api "repos/{owner}/{repo}/pulls/${PR_NUMBER}/reviews" --jq 'length' 2>/dev/null || echo "0")
+    (
+        while true; do
+            sleep 20
+            CURRENT_COUNT=$(gh api "repos/{owner}/{repo}/pulls/${PR_NUMBER}/reviews" --jq 'length' 2>/dev/null || echo "0")
+            if [ "$CURRENT_COUNT" -gt "$BASELINE_REVIEW_COUNT" ]; then
+                echo ""
+                echo "📝 New review posted on PR #${PR_NUMBER} — stopping CI watch early."
+                echo "   Run: bash scripts/workflow/copilot-comments.sh ${PR_NUMBER}"
+                # Signal the main process group
+                kill -TERM "$$" 2>/dev/null || true
+                exit 0
+            fi
+        done
+    ) &
+    REVIEW_WATCHER_PID=$!
+fi
+
+# Trap TERM so we can clean up and exit gracefully if review watcher fires
+EARLY_EXIT=false
+trap 'EARLY_EXIT=true; kill "${PIDS[@]}" 2>/dev/null || true' TERM
+
 # Wait for all background watchers and collect failures
 FAILED_IDS=()
 for i in "${!PIDS[@]}"; do
@@ -58,10 +87,17 @@ for i in "${!PIDS[@]}"; do
     else
         EXIT_CODE=$?
     fi
-    if [ "$EXIT_CODE" -ne 0 ]; then
+    if [ "$EXIT_CODE" -ne 0 ] && ! $EARLY_EXIT; then
         FAILED_IDS+=("${RUN_IDS[$i]}")
     fi
 done
+
+# Clean up review watcher if still running
+[ -n "$REVIEW_WATCHER_PID" ] && kill "$REVIEW_WATCHER_PID" 2>/dev/null || true
+
+if $EARLY_EXIT; then
+    exit 0
+fi
 
 if [ ${#FAILED_IDS[@]} -eq 0 ]; then
     echo "All monitored workflows passed!"

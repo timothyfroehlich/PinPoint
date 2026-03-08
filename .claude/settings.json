@@ -21,6 +21,11 @@
             "type": "command",
             "command": "node .claude/hooks/normalize-workspace-paths.cjs",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-manual-ci-polling.cjs",
+            "timeout": 5000
           }
         ]
       }

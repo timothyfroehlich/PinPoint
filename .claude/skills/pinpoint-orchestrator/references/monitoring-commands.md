@@ -22,7 +22,7 @@ gh pr view <PR_NUMBER> --json statusCheckRollup \
 
 ```bash
 # Preferred (uses project scripts)
-bash scripts/workflow/copilot-comments.sh <PR>
+./scripts/workflow/copilot-comments.sh <PR>
 
 # Raw API
 gh api repos/timothyfroehlich/PinPoint/pulls/<PR_NUMBER>/comments \
@@ -33,14 +33,14 @@ gh api repos/timothyfroehlich/PinPoint/pulls/<PR_NUMBER>/comments \
 
 ```bash
 ./pinpoint-wt.py list
-bash scripts/workflow/stale-worktrees.sh           # Report status
-bash scripts/workflow/stale-worktrees.sh --clean    # Auto-remove stale
+./scripts/workflow/stale-worktrees.sh           # Report status
+./scripts/workflow/stale-worktrees.sh --clean    # Auto-remove stale
 ```
 
 ## Orchestration Startup
 
 ```bash
-bash scripts/workflow/orchestration-status.sh    # Full picture: PRs + worktrees + beads + security
+./scripts/workflow/orchestration-status.sh    # Full picture: PRs + worktrees + beads + security
 ```
 
 ## Batch PR Check

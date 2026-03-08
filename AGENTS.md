@@ -147,6 +147,7 @@ conflicts across worktrees and force-push requirements on open PRs.
 - `pnpm run db:seed:from-prod`: Reset local DB and seed from the latest production backup.
 - `pnpm run e2e:full`: Full E2E suite (Don't run Safari locally on Linux).
 - `ruff check <file> && ruff format <file>`: Lint and format Python files (`pinpoint-wt.py`, scripts). Ruff is installed globally — no venv needed.
+- `./scripts/workflow/monitor-gh-actions.sh <PR>`: Watch GitHub Actions CI for a PR. **Always use this — never write a manual polling loop.**
 
 ### Testing After Refactors
 
@@ -217,13 +218,13 @@ When merging branches with competing migrations (both created same number):
 
 **Workflow for each comment:**
 
-1. Read the comment via `bash scripts/workflow/copilot-comments.sh <PR>`
+1. Read the comment via `./scripts/workflow/copilot-comments.sh <PR>`
 2. Fix the code (or decide to ignore with justification)
 3. Reply and resolve the thread:
 
 ```bash
-bash scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <what you did>. —Claude"
-bash scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Ignored: <why this is wrong/unnecessary>. —Claude"
+./scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <what you did>. —Claude"
+./scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Ignored: <why this is wrong/unnecessary>. —Claude"
 ```
 
 Sign replies with your agent name (`—Gemini`, `—Antigravity`, `—Claude`, `—Codex`, etc.).
@@ -231,10 +232,10 @@ Sign replies with your agent name (`—Gemini`, `—Antigravity`, `—Claude`, `
 **Scripts:**
 
 ```bash
-bash scripts/workflow/copilot-comments.sh <PR>              # Show UNRESOLVED comments only
-bash scripts/workflow/copilot-comments.sh <PR> --all         # Include resolved
-bash scripts/workflow/resolve-copilot-threads.sh <PR>        # Bulk-resolve addressed threads
-bash scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + resolve one thread
+./scripts/workflow/copilot-comments.sh <PR>              # Show UNRESOLVED comments only
+./scripts/workflow/copilot-comments.sh <PR> --all         # Include resolved
+./scripts/workflow/resolve-copilot-threads.sh <PR>        # Bulk-resolve addressed threads
+./scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + resolve one thread
 ```
 
 **Rules:**
