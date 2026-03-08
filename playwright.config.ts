@@ -137,12 +137,6 @@ export default defineConfig({
     // Base URL to use in actions like `await page.goto('/')`
     baseURL,
 
-    // Pre-dismissed cookies (none currently needed as banner is disabled in E2E)
-    storageState: {
-      cookies: [],
-      origins: [],
-    },
-
     // Collect trace when retrying the failed test
     trace: "on-first-retry",
 
@@ -154,7 +148,7 @@ export default defineConfig({
     navigationTimeout: 20 * 1000,
   },
 
-  // Configure projects for major browsers (Safari can be disabled locally via env)
+  // Configure projects for major browsers (Safari only enabled in CI by default)
   projects: [
     {
       name: "chromium",
@@ -168,8 +162,8 @@ export default defineConfig({
       name: "Mobile Chrome",
       use: { ...devices["Pixel 5"] },
     },
-    ...(process.env["PLAYWRIGHT_SKIP_SAFARI"] === "true" ||
-    process.env["PLAYWRIGHT_SKIP_SAFARI"] === "1"
+    // Safari is disabled by default locally to avoid dependency issues on Linux
+    ...(!process.env["CI"] && process.env["PLAYWRIGHT_ENABLE_SAFARI"] !== "true"
       ? []
       : [
           {

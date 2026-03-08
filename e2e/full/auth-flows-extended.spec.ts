@@ -6,11 +6,10 @@
  */
 
 import { test, expect } from "@playwright/test";
+
 import { loginAs, logout } from "../support/actions.js";
 import { seededMember } from "../support/constants.js";
 import { getPasswordResetLink } from "../support/mailpit.js";
-
-// Removed local signOut helper in favor of shared action
 
 test.describe("Extended Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({

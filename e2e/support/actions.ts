@@ -1,4 +1,5 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
+
 import { TEST_USERS } from "./constants.js";
 
 /**
@@ -31,7 +32,11 @@ interface LoginOptions {
 }
 
 /**
- * Logs in through the UI using the default seeded member (or provided creds).
+ * Shared E2E action to perform a UI login.
+ *
+ * @param page Playwright page object
+ * @param testInfo Playwright test info (used for viewport detection)
+ * @param options Login credentials (defaults to member)
  */
 export async function loginAs(
   page: Page,
@@ -63,6 +68,8 @@ export async function loginAs(
   // Fill and submit login form
   await emailInput.fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
+
+  // Submit form
   await page.getByRole("button", { name: "Sign In" }).click();
 
   // Wait for initial dashboard load
@@ -91,8 +98,25 @@ export async function loginAs(
 }
 
 /**
+ * Asserts the dashboard layout (sidebar/header + user menu) is ready.
+ */
+async function assertLayoutReady(
+  page: Page,
+  testInfo: TestInfo
+): Promise<void> {
+  const isMobile = testInfo.project.name.includes("Mobile");
+
+  if (isMobile) {
+    await expect(page.getByTestId("mobile-header")).toBeVisible();
+  } else {
+    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
+  }
+
+  await expect(visibleUserMenu(page, isMobile)).toBeVisible();
+}
+
+/**
  * Ensures a test page is authenticated. If not, logs in automatically.
- * Useful for scenarios where previous tests logged out the session.
  */
 export async function ensureLoggedIn(
   page: Page,
@@ -118,15 +142,11 @@ export async function ensureLoggedIn(
   // If the sign-in button is the one that's visible, we must log in.
   if (await signIn.isVisible()) {
     await loginAs(page, testInfo, options);
+    return;
   }
 
   // Final assertion: verify we are truly logged in and layout is stable
-  if (isMobile) {
-    await expect(page.getByTestId("mobile-header")).toBeVisible();
-  } else {
-    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
-  }
-  await expect(visibleUserMenu(page, isMobile)).toBeVisible();
+  await assertLayoutReady(page, testInfo);
 }
 
 /**
@@ -175,34 +195,37 @@ export async function selectOption(
   optionValue: string
 ): Promise<void> {
   // Mapping of trigger test IDs to option test ID patterns
-  const triggerToOptionTestIdMap: Record<string, (value: string) => string> = {
-    "issue-status-select": (value) => `status-option-${value}`,
-    "issue-severity-select": (value) => `severity-option-${value}`,
-    "issue-priority-select": (value) => `priority-option-${value}`,
-    "issue-frequency-select": (value) => `frequency-option-${value}`,
-    "severity-select": (value) => `severity-option-${value}`,
-    "priority-select": (value) => `priority-option-${value}`,
-    "frequency-select": (value) => `frequency-option-${value}`,
+  const triggerToOptionTestIdMap: Record<
+    string,
+    ((value: string) => string) | undefined
+  > = {
+    "issue-status-select": (val) => `status-option-${val}`,
+    "issue-severity-select": (val) => `severity-option-${val}`,
+    "issue-priority-select": (val) => `priority-option-${val}`,
+    "issue-frequency-select": (val) => `frequency-option-${val}`,
+    "issue-assignee-select": (val) => `assignee-option-${val}`,
+    "machine-select": (val) => `machine-option-${val}`,
+    "filter-status": (val) => `status-option-${val}`,
+    "filter-machine": (val) => `machine-option-${val}`,
+    "filter-owner": (val) => `owner-option-${val}`,
+    "filter-sort": (val) => `sort-option-${val}`,
   };
 
-  // Get the test ID generator function, or create a default one
-  const getOptionTestId =
-    triggerToOptionTestIdMap[triggerTestId] ??
-    ((value: string) =>
-      `${triggerTestId.replace("issue-", "").replace("-select", "")}-option-${value}`);
+  const getOptionTestId = triggerToOptionTestIdMap[triggerTestId];
+  if (getOptionTestId === undefined) {
+    throw new Error(`Unknown select trigger: ${triggerTestId}`);
+  }
 
-  // Wait for and click the Select trigger
-  // Scroll trigger into view first to help position the dropdown on mobile viewports
+  // Click the select trigger
   const trigger = page.getByTestId(triggerTestId);
-  await expect(trigger).toBeVisible({ timeout: 10000 });
-  await trigger.scrollIntoViewIfNeeded();
+  await expect(trigger).toBeVisible();
   await trigger.click();
 
-  // Wait for the dropdown to appear and find the option
+  // Wait for the option to be visible in the popover
   const optionTestId = getOptionTestId(optionValue);
   const option = page.getByTestId(optionTestId);
-  await expect(option).toBeVisible({ timeout: 5000 });
-  // Use force:true for Mobile Chrome where Radix Select dropdown options
+
+  // Use force: true because shadcn/ui Select uses a portal where Radix Select dropdown options
   // can be positioned outside the viewport despite being visible in the DOM
   await option.click({ force: true });
 
