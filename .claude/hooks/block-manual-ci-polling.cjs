@@ -29,7 +29,7 @@ async function main() {
   }
 
   const hasLoop =
-    /\b(for |while )\b/.test(command) && /\bsleep\b/.test(command);
+    /\b(for|while)\b/.test(command) && /\bsleep\b/.test(command);
   const hasGhWatch =
     /gh (pr checks|run view|run watch)\b/.test(command);
 
