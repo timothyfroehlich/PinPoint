@@ -34,6 +34,22 @@ pnpm run smoke                     # E2E smoke tests (Playwright)
 pnpm run preflight                 # Full suite (~60s) - run before commit
 ```
 
+### Which Tests to Run (Decision Tree)
+
+1. **Changed pure logic/utils?** → `pnpm run check` (unit tests, ~12s)
+2. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (~15-30s)
+3. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
+4. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs
+5. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
+6. **NEVER** run `e2e:full` locally unless explicitly asked — that's what CI is for
+
+**Key rules for agents:**
+
+- Always use `--project=chromium` for targeted runs (skip Mobile Chrome unless testing responsive)
+- Use `--headed` for debugging visual issues
+- `pnpm run check` catches 90% of issues — E2E is for integration verification, not iteration
+- If a test is flaky locally, report it — don't retry in a loop
+
 ### Critical Rules
 
 1. **Worker-scoped PGlite only**: Per-test instances cause lockups

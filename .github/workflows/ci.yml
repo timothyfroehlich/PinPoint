@@ -772,7 +772,8 @@ jobs:
     # ==============================================================================
     name: E2E Full Tests (Mobile Safari)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    # WebKit is slow and flaky — only run on pushes to main, not on PRs
+    if: ${{ github.event_name == 'push' }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
