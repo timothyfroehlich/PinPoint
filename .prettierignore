@@ -36,3 +36,6 @@ coverage/
 
 # Beads (issue tracker database)
 .beads/
+
+# Sandbox artifacts (bwrap device nodes)
+.mcp.json
