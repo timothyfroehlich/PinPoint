@@ -59,6 +59,18 @@ Conventional commit messages required.
    - Descriptions of features, workflows, and form fields should match the actual implementation
    - No references to removed features (e.g., roadmap)
    - **Permissions matrix ↔ enforcement sync (CORE-ARCH-008)**: If a PR changes authorization logic in server actions (`actions.ts`), verify that `src/lib/permissions/matrix.ts` values and descriptions match. If a PR changes `matrix.ts`, verify the server actions enforce it. `true` means unconditional access, `"own"` means only resources the user created — mismatches here cause the help page to show incorrect permission information.
+10. **UI visual consistency** (CORE-UI-005..017): Flag violations of the UI pattern rules. Full rules in `docs/UI_NON_NEGOTIABLES.md`; live reference at `/debug/`. Key things to check:
+    - **Semantic color tokens**: Raw Tailwind palette colors (`text-amber-500`, `text-purple-500`, `bg-green-700`, etc.) are forbidden in app code. Use semantic tokens: `text-warning`, `text-primary`, `text-success`, `text-destructive`, `bg-card`, `bg-surface`, `text-muted-foreground`.
+    - **Card composition**: Raw `<div className="border rounded-lg bg-card">` should be the shadcn/ui `<Card>` component.
+    - **Card variants**: Only the 5 canonical styles — neutral (`border-border bg-card`), primary (`border-primary/20 glow-primary`), success (`border-success/30 bg-success/10`), warning (`border-warning/30 bg-warning/10`), destructive (`border-destructive/30 bg-destructive/10`). Flag invented combinations.
+    - **Section headings**: `<h2>` in app pages without explicit `text-xl font-semibold` override renders at `text-3xl` (MDX scale). Always override: `<h2 className="text-xl font-semibold text-foreground mb-4">`.
+    - **Empty states**: Every list/grid must have a standard empty state — `<CardContent className="py-12 text-center">` with a `size-12` muted icon and `text-lg text-muted-foreground` message.
+    - **Buttons**: Only shadcn/ui Button variants (`default`, `destructive`, `outline`, `secondary`, `ghost`, `link`). No custom background colors on buttons.
+    - **Destructive confirmations**: Actions that delete/remove data must use `<AlertDialog>`, not a bare single-click button.
+    - **Icons**: Only from `lucide-react`. Standard sizes: `size-4` (inline), `size-5` (standalone), `size-12` (empty state). Icon-only buttons need `aria-label`.
+    - **Loading states**: Use `<Skeleton>` — not `animate-spin` spinners or text-only "Loading..." indicators.
+    - **Domain badges**: Always `<IssueBadge type="status" value={...}>` for status/severity/priority/frequency — no inline color logic or ad-hoc spans.
+    - **Mobile-first**: Grid layouts must start `grid-cols-1` and expand with breakpoints (`md:`, `lg:`). No desktop-first grids.
 
 ## Do Not Generate
 

@@ -229,6 +229,14 @@ When merging branches with competing migrations (both created same number):
 
 ### GitHub Copilot Reviews
 
+> **Copilot review behavior is configured in two places — update BOTH when adding new patterns:**
+>
+> - `.github/copilot-instructions.md` — Global review priorities and project context (what Copilot checks on every PR)
+> - `.github/instructions/components.instructions.md` — Component-specific rules applied to `.tsx` files (DO/AVOID table, code examples)
+> - `.github/instructions/auth.instructions.md`, `database.instructions.md`, `server-actions.instructions.md`, `testing.instructions.md` — Domain-specific instruction files
+>
+> When you add a new NON_NEGOTIABLE or UI pattern rule, add it to the relevant `.github/instructions/*.instructions.md` file AND to `copilot-instructions.md` (Copilot Review Priorities section). The `pinpoint-reviewer` Claude agent (`.claude/agents/pinpoint-reviewer.md`) is separate and also needs updating.
+
 **MANDATORY**: When addressing Copilot review comments on a PR, you MUST resolve each thread as you go.
 
 **Workflow for each comment:**
