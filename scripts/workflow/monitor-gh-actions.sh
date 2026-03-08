@@ -52,6 +52,12 @@ for RID in $ACTIVE_RUNS; do
     RUN_IDS+=("$RID")
 done
 
+# Trap TERM so we can clean up and exit gracefully if review watcher fires.
+# Must be set BEFORE launching the review watcher subshell to avoid a race
+# where SIGTERM arrives before the handler is installed.
+EARLY_EXIT=false
+trap 'EARLY_EXIT=true; kill "${PIDS[@]}" 2>/dev/null || true' TERM
+
 # If a PR number was given, also poll for new Copilot reviews in the background.
 # If a review arrives, kill the CI watchers and exit early so the agent can address it.
 REVIEW_WATCHER_PID=""
@@ -65,7 +71,7 @@ if [ -n "$PR_NUMBER" ]; then
             if [ "$CURRENT_COUNT" -gt "$BASELINE_REVIEW_COUNT" ]; then
                 echo ""
                 echo "📝 New review posted on PR #${PR_NUMBER} — stopping CI watch early."
-                echo "   Run: bash scripts/workflow/copilot-comments.sh ${PR_NUMBER}"
+                echo "   Run: ./scripts/workflow/copilot-comments.sh ${PR_NUMBER}"
                 # Signal the main process group
                 kill -TERM "$$" 2>/dev/null || true
                 exit 0
@@ -74,10 +80,6 @@ if [ -n "$PR_NUMBER" ]; then
     ) &
     REVIEW_WATCHER_PID=$!
 fi
-
-# Trap TERM so we can clean up and exit gracefully if review watcher fires
-EARLY_EXIT=false
-trap 'EARLY_EXIT=true; kill "${PIDS[@]}" 2>/dev/null || true' TERM
 
 # Wait for all background watchers and collect failures
 FAILED_IDS=()
