@@ -23,8 +23,12 @@ if ! supabase status &> /dev/null; then
     SLEEP_SECONDS=2
     RETRY_COUNT=0
 
-    # Default local Supabase Auth health endpoint
-    SUPABASE_AUTH_HEALTH_URL="http://localhost:54321/auth/v1/health"
+    # Derive Supabase API port from .env.local (worktree-aware), fall back to default
+    if [ -f ".env.local" ]; then
+        SUPABASE_API_PORT=$(grep '^NEXT_PUBLIC_SUPABASE_URL=' .env.local | sed 's/.*://;s/[^0-9].*//' || true)
+    fi
+    SUPABASE_API_PORT="${SUPABASE_API_PORT:-54321}"
+    SUPABASE_AUTH_HEALTH_URL="http://localhost:${SUPABASE_API_PORT}/auth/v1/health"
 
     while true; do
         if curl -fsS --max-time 2 "${SUPABASE_AUTH_HEALTH_URL}" > /dev/null 2>&1; then
