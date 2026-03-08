@@ -232,7 +232,9 @@ export async function selectOption(
   const optionTestId = getOptionTestId(optionValue);
   const option = page.getByTestId(optionTestId);
   if (triggerTestId.endsWith("-trigger")) {
-    // Drawer items use dispatchEvent — they respond to synthetic clicks
+    // Drawer items use dispatchEvent — they respond to synthetic clicks.
+    // Wait for visibility first so the drawer open animation has completed.
+    await expect(option).toBeVisible({ timeout: 5000 });
     await option.dispatchEvent("click");
   } else {
     // Use force: true because shadcn/ui Select uses a portal where Radix Select dropdown options

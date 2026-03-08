@@ -430,7 +430,6 @@ async function seedUsersAndData() {
         frequency: "intermittent",
         reportedBy: userIds.admin,
       },
-      // Truly anonymous issue - no reporter info at all
       {
         id: "10000000-0000-4000-8000-000000000019",
         initials: "GDZ",
@@ -443,6 +442,7 @@ async function seedUsersAndData() {
         frequency: "intermittent",
         reportedBy: userIds.admin,
       },
+      // Truly anonymous issue - no reporter info at all
       {
         id: "10000000-0000-4000-8000-000000000020",
         initials: "GDZ",

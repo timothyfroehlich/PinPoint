@@ -72,8 +72,8 @@ if [ -n "$PR_NUMBER" ]; then
                 echo ""
                 echo "📝 New review posted on PR #${PR_NUMBER} — stopping CI watch early."
                 echo "   Run: ./scripts/workflow/copilot-comments.sh ${PR_NUMBER}"
-                # Signal the main process group
-                kill -TERM "$$" 2>/dev/null || true
+                # Signal the main script process ($PPID is the parent of this subshell)
+                kill -TERM "$PPID" 2>/dev/null || true
                 exit 0
             fi
         done
