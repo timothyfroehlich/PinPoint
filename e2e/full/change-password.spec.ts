@@ -1,65 +1,78 @@
 import { test, expect } from "@playwright/test";
 import { loginAs, logout } from "../support/actions";
+import { createTestUser, deleteTestUser } from "../support/supabase-admin.js";
+
+const originalPassword = "TestPassword123";
 
 test.describe("Change Password", () => {
+  // Each test gets its own user to avoid shared-password conflicts when
+  // tests run in parallel under fullyParallel: true.
+  let changePasswordUserId: string;
+  let changePasswordEmail: string;
+  let wrongPasswordUserId: string;
+  let wrongPasswordEmail: string;
+
+  test.beforeAll(async () => {
+    const ts = Date.now();
+    changePasswordEmail = `change_pw_${ts}@example.com`;
+    const changeUser = await createTestUser(
+      changePasswordEmail,
+      originalPassword
+    );
+    changePasswordUserId = changeUser.id;
+
+    wrongPasswordEmail = `wrong_pw_${ts}@example.com`;
+    const wrongUser = await createTestUser(
+      wrongPasswordEmail,
+      originalPassword
+    );
+    wrongPasswordUserId = wrongUser.id;
+  });
+
+  test.afterAll(async () => {
+    await Promise.all([
+      deleteTestUser(changePasswordUserId),
+      deleteTestUser(wrongPasswordUserId),
+    ]);
+  });
+
   test("user can change password from settings page", async ({
     page,
   }, testInfo) => {
-    const originalPassword = "TestPassword123";
     const newPassword = "NewTestPassword456";
 
-    // Login with original password
     await loginAs(page, testInfo, {
-      email: "member@test.com",
+      email: changePasswordEmail,
       password: originalPassword,
     });
 
-    // Navigate to settings
     await page.goto("/settings");
 
-    // Verify the Security section is visible
     await expect(page.getByRole("heading", { name: "Security" })).toBeVisible();
 
-    // Fill in change password form
     const form = page.getByTestId("change-password-form");
     await form.getByLabel("Current Password").fill(originalPassword);
     await form.getByLabel("New Password", { exact: true }).fill(newPassword);
     await form.getByLabel("Confirm New Password").fill(newPassword);
-
-    // Submit
     await form.getByRole("button", { name: "Change Password" }).click();
 
-    // Should show success (Saved! button state)
     await expect(form.getByRole("button", { name: "Saved!" })).toBeVisible();
 
     // --- Verify new password works ---
+    await logout(page, testInfo);
 
-    // Logout using the shared helper
-    await logout(page);
-
-    // Login with new password
     await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
+    await page.getByLabel("Email").fill(changePasswordEmail);
     await page.getByLabel("Password", { exact: true }).fill(newPassword);
     await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
-
-    // --- Restore original password (cleanup) ---
-    await page.goto("/settings");
-    const formAgain = page.getByTestId("change-password-form");
-    await formAgain.getByLabel("Current Password").fill(newPassword);
-    await formAgain
-      .getByLabel("New Password", { exact: true })
-      .fill(originalPassword);
-    await formAgain.getByLabel("Confirm New Password").fill(originalPassword);
-    await formAgain.getByRole("button", { name: "Change Password" }).click();
-    await expect(
-      formAgain.getByRole("button", { name: "Saved!" })
-    ).toBeVisible();
   });
 
   test("shows error for wrong current password", async ({ page }, testInfo) => {
-    await loginAs(page, testInfo);
+    await loginAs(page, testInfo, {
+      email: wrongPasswordEmail,
+      password: originalPassword,
+    });
 
     await page.goto("/settings");
 
@@ -71,7 +84,6 @@ test.describe("Change Password", () => {
     await form.getByLabel("Confirm New Password").fill("NewPassword123");
     await form.getByRole("button", { name: "Change Password" }).click();
 
-    // Should show error message
     await expect(
       form.getByText("Current password is incorrect.")
     ).toBeVisible();

@@ -137,11 +137,10 @@ export default defineConfig({
     // Base URL to use in actions like `await page.goto('/')`
     baseURL,
 
-    // Pre-dismissed cookies (none currently needed as banner is disabled in E2E)
-    storageState: {
-      cookies: [],
-      origins: [],
-    },
+    // Disable DEV_AUTOLOGIN in E2E — tests manage their own auth
+    // via storageState or loginAs(). Without this, a revoked session
+    // would silently autologin as admin instead of failing visibly.
+    extraHTTPHeaders: { "x-skip-autologin": "true" },
 
     // Collect trace when retrying the failed test
     trace: "on-first-retry",
@@ -154,22 +153,33 @@ export default defineConfig({
     navigationTimeout: 20 * 1000,
   },
 
-  // Configure projects for major browsers (Safari can be disabled locally via env)
+  // Configure projects for major browsers (Safari only enabled in CI by default)
   projects: [
+    // Runs once before all browser projects: logs in as each role and saves
+    // storageState to e2e/.auth/*.json. Tests opt in via test.use({ storageState }).
+    {
+      name: "auth-setup",
+      testDir: "./e2e",
+      testMatch: "auth.setup.ts",
+      use: { ...devices["Desktop Chrome"] },
+    },
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      dependencies: ["auth-setup"],
     },
     {
       name: "firefox",
       use: { ...devices["Desktop Firefox"] },
+      dependencies: ["auth-setup"],
     },
     {
       name: "Mobile Chrome",
       use: { ...devices["Pixel 5"] },
+      dependencies: ["auth-setup"],
     },
-    ...(process.env["PLAYWRIGHT_SKIP_SAFARI"] === "true" ||
-    process.env["PLAYWRIGHT_SKIP_SAFARI"] === "1"
+    // Safari is disabled by default locally to avoid dependency issues on Linux
+    ...(!process.env["CI"] && process.env["PLAYWRIGHT_ENABLE_SAFARI"] !== "true"
       ? []
       : [
           {
@@ -185,6 +195,7 @@ export default defineConfig({
             retries: process.env["CI"] ? 3 : 1,
             // Increase timeout for WebKit (2x base timeout, CI-aware)
             timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
+            dependencies: ["auth-setup"],
           },
         ]),
   ],

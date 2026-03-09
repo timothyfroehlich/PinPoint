@@ -11,13 +11,15 @@ Three steps must complete before a PR is ready for human review: CI must pass, C
 
 ## Step 1: Watch CI
 
+**ALWAYS use the dedicated monitoring script — never write a manual polling loop:**
+
 ```bash
-gh pr checks <PR>
+./scripts/workflow/monitor-gh-actions.sh <PR>
 ```
 
-Poll every 30s, max 10 minutes:
+This script polls, formats output, and exits cleanly. Manual `for`/`while` + `sleep` loops are blocked by a pre-tool-use hook.
 
-| Status           | Action                                       |
+| Exit condition   | Action                                       |
 | ---------------- | -------------------------------------------- |
 | All passing      | Proceed to Step 2                            |
 | Any failed       | Stop — investigate and fix before continuing |
@@ -30,14 +32,14 @@ Poll every 30s, max 10 minutes:
 After CI passes, wait for Copilot to review:
 
 ```bash
-bash scripts/workflow/copilot-comments.sh <PR>
+./scripts/workflow/copilot-comments.sh <PR>
 ```
 
 **Poll loop (up to 5 minutes):**
 
 ```bash
 for i in $(seq 1 5); do
-    output=$(bash scripts/workflow/copilot-comments.sh $PR_NUMBER)
+    output=$(./scripts/workflow/copilot-comments.sh $PR_NUMBER)
     echo "$output"
     echo "$output" | grep -q "⏳" || break
     sleep 60
@@ -53,7 +55,7 @@ done
 **If comments exist:**
 
 1. Evaluate each critically — not all Copilot suggestions are correct
-2. Reply and resolve: `bash scripts/workflow/respond-to-copilot.sh <PR> "path:line" "Fixed: ... —Claude"`
+2. Reply and resolve: `./scripts/workflow/respond-to-copilot.sh <PR> "path:line" "Fixed: ... —Claude"`
 3. Push fix, then poll again — Copilot may re-review after the push
 
 ---
@@ -63,7 +65,7 @@ done
 Once CI is green and Copilot comments are resolved:
 
 ```bash
-bash scripts/workflow/label-ready.sh <PR>
+./scripts/workflow/label-ready.sh <PR>
 ```
 
 This script verifies CI + Copilot status + draft state before applying the label. Use `--dry-run` to preview without acting.

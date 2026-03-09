@@ -10,17 +10,20 @@ import {
   updateIssueTitleAction,
   type UpdateIssueTitleResult,
 } from "~/app/(app)/issues/actions";
+import { cn } from "~/lib/utils";
 
 interface EditableIssueTitleProps {
   issueId: string;
   title: string;
   canEdit: boolean;
+  className?: string;
 }
 
 export function EditableIssueTitle({
   issueId,
   title,
   canEdit,
+  className,
 }: EditableIssueTitleProps): React.JSX.Element {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(title);
@@ -79,7 +82,10 @@ export function EditableIssueTitle({
   if (!canEdit) {
     return (
       <h1
-        className="text-3xl lg:text-4xl font-extrabold tracking-tight"
+        className={cn(
+          "font-extrabold tracking-tight",
+          className ?? "text-3xl lg:text-4xl"
+        )}
         title={title.length > 60 ? title : undefined}
       >
         {title.length > 60 ? `${title.slice(0, 60)}...` : title}
@@ -110,12 +116,15 @@ export function EditableIssueTitle({
             }, 200);
           }}
           maxLength={100}
-          className="text-2xl lg:text-3xl font-extrabold tracking-tight h-auto py-1"
+          className={cn(
+            "h-auto py-1 font-extrabold tracking-tight",
+            className ?? "text-2xl lg:text-3xl"
+          )}
           aria-label="Edit issue title"
           disabled={isPending}
         />
         {isPending && (
-          <Loader2 className="size-5 animate-spin text-muted-foreground flex-shrink-0" />
+          <Loader2 className="size-5 animate-spin text-muted-foreground shrink-0" />
         )}
       </form>
     );
@@ -124,7 +133,10 @@ export function EditableIssueTitle({
   return (
     <div className="group/title flex items-center gap-2">
       <h1
-        className="text-3xl lg:text-4xl font-extrabold tracking-tight"
+        className={cn(
+          "font-extrabold tracking-tight",
+          className ?? "text-3xl lg:text-4xl"
+        )}
         title={title.length > 60 ? title : undefined}
       >
         {title.length > 60 ? `${title.slice(0, 60)}...` : title}
@@ -132,7 +144,7 @@ export function EditableIssueTitle({
       <Button
         variant="ghost"
         size="icon-sm"
-        className="opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 transition-opacity flex-shrink-0"
+        className="opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 transition-opacity shrink-0"
         onClick={() => setIsEditing(true)}
         aria-label="Edit title"
       >

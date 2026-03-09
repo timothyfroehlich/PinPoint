@@ -114,11 +114,11 @@ test.describe("Image Upload Reporting", () => {
     // 6. Verify Redirection to Issue Detail
     await expect(page).toHaveURL(/\/i\/\d+/);
 
-    // 7. Verify Image on Detail Page
-    // "Images (1)" header
-    await expect(page.getByText("Images (1)")).toBeVisible();
+    // 7. Verify image appears inline in the timeline, not in a separate images panel
+    await expect(page.getByText("Images (1)")).toHaveCount(0);
+    await expect(page.getByTestId("issue-timeline")).toBeVisible();
 
-    // The image itself in the gallery (might also be in timeline, so use first())
+    // The image itself appears in the initial report card inside the timeline
     const image = page.getByRole("img", { name: "test-image.png" }).first();
     await expect(image).toBeVisible();
 

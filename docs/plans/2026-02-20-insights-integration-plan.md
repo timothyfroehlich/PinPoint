@@ -152,8 +152,8 @@ Replace the skill table (lines 31-41) with:
 **Step 2: Fix orchestrator cross-reference**
 
 In `.claude/skills/tmf-orchestrator/SKILL.md`, update:
-`bash .agent/skills/pinpoint-commit/scripts/watch-ci.sh` →
-`bash .agent/skills/tmf-commit/scripts/watch-ci.sh`
+`./.agent/skills/pinpoint-commit/scripts/watch-ci.sh` →
+`./.agent/skills/tmf-commit/scripts/watch-ci.sh`
 
 **Step 3: Verify no stale references remain**
 
@@ -284,14 +284,14 @@ Create a new `"PostToolUse"` array matching `Bash`:
 **Step 3: Verify**
 
 ```bash
-echo '{"tool_input":{"command":"git push"}}' | bash .claude/hooks/preflight-reminder.sh
+echo '{"tool_input":{"command":"git push"}}' | ./.claude/hooks/preflight-reminder.sh
 echo "Exit: $?"
 ```
 
 Expected: Prints reminder message, exits 0.
 
 ```bash
-echo '{"tool_input":{"command":"pnpm run check"}}' | bash .claude/hooks/preflight-reminder.sh
+echo '{"tool_input":{"command":"pnpm run check"}}' | ./.claude/hooks/preflight-reminder.sh
 echo "Exit: $?"
 ```
 
@@ -412,13 +412,13 @@ After the CI monitoring section and before "Final Summary", add:
 After CI completes, check for Copilot review comments:
 
 ```bash
-bash scripts/workflow/copilot-comments.sh <PR>
+./scripts/workflow/copilot-comments.sh <PR>
 ````
 
 If comments exist, address each one and resolve the thread:
 
 ```bash
-bash scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <description>. —Claude"
+./scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <description>. —Claude"
 ```
 
 ### 6.3 Label Ready for Review
@@ -426,7 +426,7 @@ bash scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <descri
 Once CI is green and Copilot comments are resolved:
 
 ```bash
-bash scripts/workflow/label-ready.sh <PR>
+./scripts/workflow/label-ready.sh <PR>
 ```
 
 ````

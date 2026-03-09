@@ -132,7 +132,7 @@ export function AssigneePicker({
       <button
         type="button"
         className={cn(
-          "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-left text-sm text-foreground transition",
+          "flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-left text-sm text-foreground transition",
           "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         )}
         onClick={() => setIsOpen((prev) => !prev)}

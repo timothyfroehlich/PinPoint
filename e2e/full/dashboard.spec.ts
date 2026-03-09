@@ -6,8 +6,8 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { ensureLoggedIn } from "../support/actions.js";
 import { getTestPrefix } from "../support/test-isolation.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
 
 async function getStatNumber(page: Page, testId: string): Promise<number> {
   const rawText = await page.getByTestId(testId).innerText();
@@ -28,8 +28,10 @@ function ensureCardsOrEmpty(
 }
 
 test.describe.serial("Member Dashboard", () => {
-  test("dashboard loads with all sections", async ({ page }, testInfo) => {
-    await ensureLoggedIn(page, testInfo);
+  test.use({ storageState: STORAGE_STATE.member });
+
+  test("dashboard loads with all sections", async ({ page }) => {
+    await page.goto("/dashboard");
 
     // Quick Stats
     await expect(
@@ -110,8 +112,8 @@ test.describe.serial("Member Dashboard", () => {
     );
   });
 
-  test("stat cards navigate to filtered lists", async ({ page }, testInfo) => {
-    await ensureLoggedIn(page, testInfo);
+  test("stat cards navigate to filtered lists", async ({ page }) => {
+    await page.goto("/dashboard");
 
     const quickStats = page.getByTestId("quick-stats");
 
@@ -151,10 +153,8 @@ test.describe.serial("Member Dashboard", () => {
     );
   });
 
-  test("dashboard issue cards link to issue detail pages", async ({
-    page,
-  }, testInfo) => {
-    await ensureLoggedIn(page, testInfo);
+  test("dashboard issue cards link to issue detail pages", async ({ page }) => {
+    await page.goto("/dashboard");
 
     // Check if there are any issue cards belonging to this worker
     // Other workers might be creating issues simultaneously

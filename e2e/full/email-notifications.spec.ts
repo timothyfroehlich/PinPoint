@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { MailpitClient } from "../support/mailpit.js";
-import { selectOption, ensureLoggedIn } from "../support/actions.js";
+import { updateIssueField, ensureLoggedIn } from "../support/actions.js";
 import {
   fillReportForm,
   submitFormAndWaitForRedirect,
@@ -204,17 +204,16 @@ test.describe.serial("Email Notifications", () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     mailpit.clearMailbox(testAdminEmail);
 
-    // Update status
-    await selectOption(page, "issue-status-select", "in_progress");
-    // Ensure revalidation is complete before checking for success message
+    // Update status (uses viewport-aware helper — works on both desktop and mobile)
+    await updateIssueField(page, "status", "in_progress");
+    // Wait for the server action to complete before checking email delivery
     await page.waitForLoadState("networkidle");
-    await expect(page.getByTestId("status-update-success")).toBeVisible({
-      timeout: 30000,
-    });
 
-    // Wait for status change email - use unique issue title to avoid crosstalk
+    // Wait for status change email - filter by "Status Changed" prefix since
+    // clearMailbox() is a no-op and the "New Issue" email (also containing
+    // issueTitle) is still in the mailbox.
     const emailAfterStatusChange = await mailpit.waitForEmail(testAdminEmail, {
-      subjectContains: issueTitle,
+      subjectContains: "Status Changed",
       timeout: 30000,
       pollIntervalMs: 750,
     });

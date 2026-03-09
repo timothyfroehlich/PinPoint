@@ -7,6 +7,32 @@
 - **Database Reset**: The database is reset before the suite runs (`globalSetup`), but NOT between tests.
 - **No "API" Shortcuts**: Prefer UI interactions over API shortcuts unless testing specific edge cases.
 
+## Authentication
+
+**Prefer `storageState` for single-role tests.** Auth is expensive (8-12s per login). The `auth-setup` Playwright project logs in once per role and saves cookies to `e2e/.auth/*.json`. Tests opt in via:
+
+```typescript
+import { STORAGE_STATE } from "../support/auth-state";
+
+test.describe("My Feature", () => {
+  test.use({ storageState: STORAGE_STATE.member }); // pre-authenticated
+
+  test("something", async ({ page }) => {
+    await page.goto("/dashboard"); // starts already logged in
+  });
+});
+```
+
+**When NOT to use `storageState`:**
+
+- **Auth flow tests** (`auth-flows.spec.ts`, signup, password reset) — must test the login UI itself
+- **Public route tests** — no auth needed, omit `test.use()` entirely
+- **Multi-role tests** — use `loginAs` to switch roles mid-test
+- **Dynamic user tests** — user is created at runtime via `createTestUser`, use `loginAs` after creation
+
+**Roles available:** `STORAGE_STATE.admin`, `.member`, `.technician`
+(guest and usernameAccount not cached — no eligible single-role tests)
+
 ## Test Structure
 
 ### Smoke Tests (`e2e/smoke/`)

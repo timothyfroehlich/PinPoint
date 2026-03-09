@@ -84,8 +84,8 @@ Report back with:
 ## Step 3: Monitor
 
 ```bash
-bash scripts/workflow/pr-dashboard.sh          # overview of open PRs
-bash scripts/workflow/copilot-comments.sh <PR> # check review status
+./scripts/workflow/pr-dashboard.sh          # overview of open PRs
+./scripts/workflow/copilot-comments.sh <PR> # check review status
 gh pr checks <PR>                              # CI status
 ```
 

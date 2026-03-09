@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
 import { TEST_USERS } from "../support/constants";
+import { STORAGE_STATE } from "../support/auth-state";
 
 test.describe("Profile Settings", () => {
-  test("should display user email in settings", async ({ page }, testInfo) => {
-    await loginAs(page, testInfo, TEST_USERS.member);
+  test.use({ storageState: STORAGE_STATE.member });
+
+  test("should display user email in settings", async ({ page }) => {
     await page.goto("/settings");
 
     const profileForm = page.getByTestId("profile-form");
@@ -16,10 +17,7 @@ test.describe("Profile Settings", () => {
     await expect(emailInput).toBeDisabled();
   });
 
-  test("should update profile and handle cancel", async ({
-    page,
-  }, testInfo) => {
-    await loginAs(page, testInfo, TEST_USERS.member);
+  test("should update profile and handle cancel", async ({ page }) => {
     await page.goto("/settings");
 
     // 1. Update Profile

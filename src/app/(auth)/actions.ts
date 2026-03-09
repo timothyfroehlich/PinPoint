@@ -390,7 +390,7 @@ export async function logoutAction(): Promise<void> {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: "local" });
 
     if (error) {
       log.error(

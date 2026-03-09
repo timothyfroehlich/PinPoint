@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions.js";
+import {
+  expectIssueFieldDisabled,
+  expectIssueFieldEnabled,
+  loginAs,
+} from "../support/actions.js";
 import { seededIssues, TEST_USERS } from "../support/constants.js";
 
 test.describe("Issue detail permission-aware UI", () => {
@@ -18,20 +22,31 @@ test.describe("Issue detail permission-aware UI", () => {
 
       // Read-only badges should be visible (use first() since badges appear in both header and sidebar)
       await expect(
-        page.getByTestId("issue-status-badge").first()
+        page.getByTestId("issue-status-badge").filter({ visible: true }).first()
       ).toBeVisible();
       await expect(
-        page.getByTestId("issue-severity-badge").first()
+        page
+          .getByTestId("issue-severity-badge")
+          .filter({ visible: true })
+          .first()
       ).toBeVisible();
       await expect(
-        page.getByTestId("issue-priority-badge").first()
+        page
+          .getByTestId("issue-priority-badge")
+          .filter({ visible: true })
+          .first()
       ).toBeVisible();
       await expect(
-        page.getByTestId("issue-frequency-badge").first()
+        page
+          .getByTestId("issue-frequency-badge")
+          .filter({ visible: true })
+          .first()
       ).toBeVisible();
 
       // Assignee should be read-only
-      await expect(page.getByTestId("assignee-readonly")).toBeVisible();
+      await expect(
+        page.getByTestId("assignee-readonly").filter({ visible: true }).first()
+      ).toBeVisible();
 
       // Watch button should be hidden
       await expect(
@@ -58,14 +73,14 @@ test.describe("Issue detail permission-aware UI", () => {
       const otherIssue = seededIssues.AFM[0]; // reported by member
       await page.goto(`/m/AFM/i/${otherIssue.num}`);
 
-      // All selects should be visible but disabled
-      await expect(page.getByTestId("issue-status-select")).toBeDisabled();
-      await expect(page.getByTestId("issue-severity-select")).toBeDisabled();
-      await expect(page.getByTestId("issue-priority-select")).toBeDisabled();
-      await expect(page.getByTestId("issue-frequency-select")).toBeDisabled();
+      await expectIssueFieldDisabled(page, "status");
+      await expectIssueFieldDisabled(page, "severity");
+      await expectIssueFieldDisabled(page, "priority");
+      await expectIssueFieldDisabled(page, "frequency");
 
-      // Assignee picker should be visible but disabled
-      await expect(page.getByTestId("assignee-picker-trigger")).toBeDisabled();
+      await expect(
+        page.getByTestId("assignee-picker-trigger").filter({ visible: true })
+      ).toBeDisabled();
     });
 
     test("can see watch button and comment input", async ({
@@ -104,16 +119,15 @@ test.describe("Issue detail permission-aware UI", () => {
       const ownIssue = seededIssues.AFM[1]; // reported by guest
       await page.goto(`/m/AFM/i/${ownIssue.num}`);
 
-      // Status, severity, frequency should be enabled on own issue
-      await expect(page.getByTestId("issue-status-select")).toBeEnabled();
-      await expect(page.getByTestId("issue-severity-select")).toBeEnabled();
-      await expect(page.getByTestId("issue-frequency-select")).toBeEnabled();
+      await expectIssueFieldEnabled(page, "status");
+      await expectIssueFieldEnabled(page, "severity");
+      await expectIssueFieldEnabled(page, "frequency");
 
-      // Priority is always disabled for guests, even on own issue
-      await expect(page.getByTestId("issue-priority-select")).toBeDisabled();
+      await expectIssueFieldDisabled(page, "priority");
 
-      // Assignee is always disabled for guests, even on own issue
-      await expect(page.getByTestId("assignee-picker-trigger")).toBeDisabled();
+      await expect(
+        page.getByTestId("assignee-picker-trigger").filter({ visible: true })
+      ).toBeDisabled();
     });
   });
 
@@ -127,14 +141,14 @@ test.describe("Issue detail permission-aware UI", () => {
       const issue = seededIssues.AFM[0];
       await page.goto(`/m/AFM/i/${issue.num}`);
 
-      // All selects should be enabled
-      await expect(page.getByTestId("issue-status-select")).toBeEnabled();
-      await expect(page.getByTestId("issue-severity-select")).toBeEnabled();
-      await expect(page.getByTestId("issue-priority-select")).toBeEnabled();
-      await expect(page.getByTestId("issue-frequency-select")).toBeEnabled();
+      await expectIssueFieldEnabled(page, "status");
+      await expectIssueFieldEnabled(page, "severity");
+      await expectIssueFieldEnabled(page, "priority");
+      await expectIssueFieldEnabled(page, "frequency");
 
-      // Assignee picker should be enabled
-      await expect(page.getByTestId("assignee-picker-trigger")).toBeEnabled();
+      await expect(
+        page.getByTestId("assignee-picker-trigger").filter({ visible: true })
+      ).toBeEnabled();
     });
 
     test("can see watch button and comment input", async ({

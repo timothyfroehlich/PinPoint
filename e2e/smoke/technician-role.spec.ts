@@ -8,20 +8,10 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { loginAs, logout } from "../support/actions";
-import { TEST_USERS } from "../support/constants";
+import { STORAGE_STATE } from "../support/auth-state";
 
 test.describe("Technician Role Permissions", () => {
-  test.beforeEach(async ({ page }, testInfo) => {
-    await loginAs(page, testInfo, {
-      email: TEST_USERS.technician.email,
-      password: TEST_USERS.technician.password,
-    });
-  });
-
-  test.afterEach(async ({ page }) => {
-    await logout(page);
-  });
+  test.use({ storageState: STORAGE_STATE.technician });
 
   test("Technician can see Add Machine button on list page", async ({
     page,
