@@ -28,9 +28,9 @@ fi
 if [ -z "$ACTIVE_RUNS" ]; then
     # Fallback: show the most recent completed run (so the agent sees the result).
     if [ -n "$PR_NUMBER" ]; then
-        ACTIVE_RUNS=$(gh run list --limit 1 --branch "$BRANCH" --json databaseId --jq '.[0].databaseId')
+        ACTIVE_RUNS=$(gh run list --status completed --limit 1 --branch "$BRANCH" --json databaseId --jq '.[0].databaseId')
     else
-        ACTIVE_RUNS=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
+        ACTIVE_RUNS=$(gh run list --status completed --limit 1 --json databaseId --jq '.[0].databaseId')
     fi
 fi
 
