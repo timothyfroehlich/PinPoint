@@ -43,6 +43,20 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 // Create direct database connection for role updates and data seeding
 const sql = postgres(POSTGRES_URL);
 
+/** Helper to wrap plain text in ProseMirror JSON format for JSONB columns */
+function wrapTextInProseMirror(text) {
+  if (!text) return null;
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: text }],
+      },
+    ],
+  };
+}
+
 const TEST_USERS = Object.entries(usersData);
 
 async function seedUsersAndData() {
@@ -447,7 +461,7 @@ async function seedUsersAndData() {
           status, severity, priority, frequency, reported_by, invited_reported_by,
           reporter_name, reporter_email, created_at, updated_at
         ) VALUES (
-          ${issue.id}, ${issue.initials}, ${issue.num}, ${issue.title}, ${issue.desc},
+          ${issue.id}, ${issue.initials}, ${issue.num}, ${issue.title}, ${wrapTextInProseMirror(issue.desc)},
           ${issue.status}, ${issue.severity}, ${issue.priority}, ${issue.frequency},
           ${issue.reportedBy ?? null}, ${issue.invitedUserId ?? null},
           ${issue.reporterName ?? null}, ${issue.reporterEmail ?? null}, NOW(), NOW()
@@ -485,7 +499,7 @@ async function seedUsersAndData() {
         VALUES (
           ${issue.id},
           null,
-          ${`Issue reported by ${reporterDesc}`},
+          ${wrapTextInProseMirror(`Issue reported by ${reporterDesc}`)},
           true,
           NOW(),
           NOW()
@@ -647,7 +661,7 @@ async function seedUsersAndData() {
             VALUES (
               ${issueId},
               ${comment.author},
-              ${comment.content},
+              ${wrapTextInProseMirror(comment.content)},
               ${comment.isSystem},
               NOW() - (${comment.daysAgo} || ' days')::INTERVAL,
               NOW() - (${comment.daysAgo} || ' days')::INTERVAL

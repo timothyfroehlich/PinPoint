@@ -27,6 +27,7 @@ interface RichTextEditorProps {
   compact?: boolean | undefined;
   disabled?: boolean | undefined;
   className?: string | undefined;
+  ariaLabel?: string | undefined;
 }
 
 export function RichTextEditor({
@@ -37,6 +38,7 @@ export function RichTextEditor({
   compact = false,
   disabled = false,
   className,
+  ariaLabel,
 }: RichTextEditorProps): React.JSX.Element {
   const extensions = useMemo(() => {
     const list: AnyExtension[] = [
@@ -138,6 +140,7 @@ export function RichTextEditor({
           "prose prose-sm dark:prose-invert focus:outline-none max-w-none min-h-[100px] px-3 py-2",
           compact ? "min-h-[40px]" : ""
         ),
+        "aria-label": ariaLabel ?? placeholder,
       },
     },
   });

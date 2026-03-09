@@ -40,9 +40,17 @@ import {
 } from "~/components/ui/alert-dialog";
 import { type AccessLevel } from "~/lib/permissions/matrix";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
-import { RichTextEditor } from "~/components/editor/RichTextEditor";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
+import dynamic from "next/dynamic";
 import { type ProseMirrorDoc, docToPlainText } from "~/lib/tiptap/types";
+
+const RichTextEditor = dynamic(
+  () =>
+    import("~/components/editor/RichTextEditor").then(
+      (mod) => mod.RichTextEditor
+    ),
+  { ssr: false }
+);
 
 // ----------------------------------------------------------------------
 // Types
@@ -117,6 +125,7 @@ function CommentEditForm({
         content={content}
         onChange={setContent}
         mentionsEnabled={true}
+        ariaLabel="Edit comment"
         className="min-h-32"
       />
       <input

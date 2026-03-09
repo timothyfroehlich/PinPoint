@@ -37,8 +37,16 @@ import type { AccessLevel } from "~/lib/permissions/matrix";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 import { getLoginUrl } from "~/lib/login-url";
 import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
-import { RichTextEditor } from "~/components/editor/RichTextEditor";
+import dynamic from "next/dynamic";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+
+const RichTextEditor = dynamic(
+  () =>
+    import("~/components/editor/RichTextEditor").then(
+      (mod) => mod.RichTextEditor
+    ),
+  { ssr: false }
+);
 
 interface Machine {
   id: string;
@@ -381,6 +389,7 @@ export function UnifiedReportForm({
                     onChange={setDescription}
                     mentionsEnabled={userAuthenticated}
                     placeholder="Tell us what happened, and how often it occurs."
+                    ariaLabel="Description"
                     className="min-h-[80px]"
                   />
                   <input

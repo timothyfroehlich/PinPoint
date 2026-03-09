@@ -22,6 +22,7 @@ import {
   updateIssueFrequency,
   createIssue,
 } from "~/services/issues";
+import { docToPlainText, plainTextToDoc } from "~/lib/tiptap/types";
 
 // Mock the database to use the PGlite instance
 vi.mock("~/server/db", () => ({
@@ -135,10 +136,12 @@ describe("Issue Service Functions (Integration)", () => {
     });
 
     const statusEvent = events.find((e) =>
-      e.content.includes("Status changed")
+      docToPlainText(e.content).includes("Status changed")
     );
     expect(statusEvent).toBeDefined();
-    expect(statusEvent?.content).toContain("from New to In Progress");
+    expect(docToPlainText(statusEvent!.content)).toContain(
+      "from New to In Progress"
+    );
     expect(statusEvent?.isSystem).toBe(true);
     expect(statusEvent?.authorId).toBe(testUser.id);
   });
@@ -164,8 +167,10 @@ describe("Issue Service Functions (Integration)", () => {
       orderBy: desc(issueComments.createdAt),
     });
 
-    expect(event?.content).toContain("Severity changed");
-    expect(event?.content).toContain("from Minor to Unplayable");
+    expect(docToPlainText(event!.content)).toContain("Severity changed");
+    expect(docToPlainText(event!.content)).toContain(
+      "from Minor to Unplayable"
+    );
     expect(event?.authorId).toBe(testUser.id);
   });
 
@@ -190,8 +195,8 @@ describe("Issue Service Functions (Integration)", () => {
       orderBy: desc(issueComments.createdAt),
     });
 
-    expect(event?.content).toContain("Priority changed");
-    expect(event?.content).toContain("from Low to High");
+    expect(docToPlainText(event!.content)).toContain("Priority changed");
+    expect(docToPlainText(event!.content)).toContain("from Low to High");
     expect(event?.authorId).toBe(testUser.id);
   });
 
@@ -216,8 +221,10 @@ describe("Issue Service Functions (Integration)", () => {
       orderBy: desc(issueComments.createdAt),
     });
 
-    expect(event?.content).toContain("Frequency changed");
-    expect(event?.content).toContain("from Intermittent to Constant");
+    expect(docToPlainText(event!.content)).toContain("Frequency changed");
+    expect(docToPlainText(event!.content)).toContain(
+      "from Intermittent to Constant"
+    );
     expect(event?.authorId).toBe(testUser.id);
   });
 
@@ -227,7 +234,7 @@ describe("Issue Service Functions (Integration)", () => {
 
       const guestInfo = {
         title: "Guest Issue",
-        description: "Guest reported this",
+        description: plainTextToDoc("Guest reported this"),
         machineInitials: testMachine.initials,
         severity: "minor" as const,
         reporterName: "Guest User",
@@ -257,6 +264,7 @@ describe("Issue Service Functions (Integration)", () => {
 
       const anonInfo = {
         title: "Anon Issue",
+        description: plainTextToDoc("Anon reported this"),
         machineInitials: testMachine.initials,
         severity: "major" as const,
       };

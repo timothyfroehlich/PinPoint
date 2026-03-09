@@ -71,10 +71,24 @@ export function plainTextToDoc(text: string): ProseMirrorDoc {
 /**
  * Extract unique mentioned user IDs from a ProseMirror document.
  */
-export function extractMentions(doc: ProseMirrorDoc): string[] {
+export function extractMentions(
+  doc: ProseMirrorDoc | null | undefined
+): string[] {
+  const d = doc as unknown;
+  if (
+    !d ||
+    typeof d !== "object" ||
+    (d as Record<string, unknown>)["type"] !== "doc" ||
+    !Array.isArray((d as Record<string, unknown>)["content"])
+  ) {
+    return [];
+  }
+
+  const validDoc = d as ProseMirrorDoc;
   const ids = new Set<string>();
 
-  function walk(nodes: ProseMirrorNode[]): void {
+  function walk(nodes: ProseMirrorNode[] | undefined): void {
+    if (!nodes || !Array.isArray(nodes)) return;
     for (const node of nodes) {
       if (node.type === "mention" && typeof node.attrs?.["id"] === "string") {
         ids.add(node.attrs["id"]);
@@ -85,17 +99,35 @@ export function extractMentions(doc: ProseMirrorDoc): string[] {
     }
   }
 
-  walk(doc.content);
+  walk(validDoc.content);
   return Array.from(ids);
 }
 
 /**
  * Extract plain text from a ProseMirror document (for search, truncation, etc.).
+ * Robustly handles legacy plain text strings.
  */
-export function docToPlainText(doc: ProseMirrorDoc): string {
+export function docToPlainText(
+  doc: ProseMirrorDoc | string | null | undefined
+): string {
+  if (!doc) return "";
+  if (typeof doc === "string") return doc;
+
+  const d = doc as unknown;
+  if (
+    !d ||
+    typeof d !== "object" ||
+    (d as Record<string, unknown>)["type"] !== "doc" ||
+    !Array.isArray((d as Record<string, unknown>)["content"])
+  ) {
+    return "";
+  }
+
+  const validDoc = d as ProseMirrorDoc;
   const parts: string[] = [];
 
-  function walk(nodes: ProseMirrorNode[]): void {
+  function walk(nodes: ProseMirrorNode[] | undefined): void {
+    if (!nodes || !Array.isArray(nodes)) return;
     for (const node of nodes) {
       if (node.type === "text" && node.text) {
         parts.push(node.text);
@@ -123,7 +155,7 @@ export function docToPlainText(doc: ProseMirrorDoc): string {
     }
   }
 
-  walk(doc.content);
+  walk(validDoc.content);
 
   return parts.join("").trim();
 }

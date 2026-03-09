@@ -80,10 +80,18 @@ export async function fillReportForm(
     watchIssue = true,
   } = options;
 
+  // Wait for the RichTextEditor to load (dynamic import with ssr: false)
+  // before interacting with any form elements to avoid detachment
+  const descriptionEditor = page.getByRole("textbox", {
+    name: "Description",
+  });
+  await descriptionEditor.waitFor({ timeout: 15000 });
+
   await page.getByLabel("Issue Title *").fill(title);
 
   if (description) {
-    await page.getByLabel("Description").fill(description);
+    await descriptionEditor.click();
+    await descriptionEditor.fill(description);
   }
 
   await selectOption(page, "issue-severity-select", severity);

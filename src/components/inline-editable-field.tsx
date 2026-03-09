@@ -7,8 +7,16 @@ import { Button } from "~/components/ui/button";
 import { Pencil } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
-import { RichTextEditor } from "~/components/editor/RichTextEditor";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
+import dynamic from "next/dynamic";
+
+const RichTextEditor = dynamic(
+  () =>
+    import("~/components/editor/RichTextEditor").then(
+      (mod) => mod.RichTextEditor
+    ),
+  { ssr: false }
+);
 
 export interface InlineEditSaveResult {
   ok: boolean;
@@ -109,6 +117,7 @@ export function InlineEditableField({
             onChange={setEditValue}
             mentionsEnabled={true}
             placeholder={placeholder}
+            ariaLabel={label}
             compact
             className="min-h-[40px]"
           />

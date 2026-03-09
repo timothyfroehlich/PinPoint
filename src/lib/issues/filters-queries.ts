@@ -45,7 +45,7 @@ export function buildWhereConditions(
     const searchConditions = [
       // Issue fields
       ilike(issues.title, search),
-      ilike(issues.description, search),
+      sql`${issues.description}::text ilike ${search}`,
       ilike(issues.machineInitials, search),
       ilike(issues.reporterName, search),
     ];
@@ -162,7 +162,7 @@ export function buildWhereConditions(
           .where(
             and(
               eq(issueComments.issueId, issues.id),
-              ilike(issueComments.content, search)
+              sql`${issueComments.content}::text ilike ${search}`
             )
           )
       )

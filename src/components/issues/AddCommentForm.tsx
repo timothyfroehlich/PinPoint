@@ -12,8 +12,16 @@ import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { type ImageMetadata } from "~/types/images";
-import { RichTextEditor } from "~/components/editor/RichTextEditor";
+import dynamic from "next/dynamic";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+
+const RichTextEditor = dynamic(
+  () =>
+    import("~/components/editor/RichTextEditor").then(
+      (mod) => mod.RichTextEditor
+    ),
+  { ssr: false }
+);
 
 interface AddCommentFormProps {
   issueId: string;
@@ -56,6 +64,7 @@ export function AddCommentForm({
         onChange={setComment}
         mentionsEnabled={true}
         placeholder="Leave a comment..."
+        ariaLabel="Comment"
         disabled={isPending}
         className="min-h-[100px]"
       />

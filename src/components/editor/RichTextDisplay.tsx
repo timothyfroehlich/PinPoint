@@ -10,9 +10,13 @@ interface RichTextDisplayProps {
 }
 
 /**
- * Server component to render ProseMirror JSON to sanitized HTML.
+ * Render ProseMirror JSON to sanitized HTML for display.
  *
- * Uses the server-side rendering utility with strict sanitization.
+ * Works in both Server Components and Client Components because
+ * the underlying renderer uses pure string operations (no DOM/jsdom).
+ *
+ * Security: Content is double-sanitized — the renderer escapes all text
+ * content, then sanitize-html applies a strict tag/attribute allowlist.
  */
 export function RichTextDisplay({
   content,
@@ -22,6 +26,7 @@ export function RichTextDisplay({
     return null;
   }
 
+  // renderDocToHtml returns sanitized HTML (via sanitize-html allowlist)
   const html = renderDocToHtml(content);
 
   return (
