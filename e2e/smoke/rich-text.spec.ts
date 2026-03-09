@@ -23,7 +23,11 @@ test.describe("Rich Text and Mentions", () => {
     const mentionedEmail = `mentioned-${timestamp}@example.com`;
 
     const reporter = await createTestUser(reporterEmail);
-    const _mentioned = await createTestUser(mentionedEmail);
+    // Give the mentioned user a distinct name so autocomplete can target them unambiguously
+    await createTestUser(mentionedEmail, undefined, {
+      firstName: "Mentioned",
+      lastName: "Person",
+    });
 
     // 2. Login as reporter
     await loginAs(page, testInfo, { email: reporterEmail });
@@ -43,16 +47,18 @@ test.describe("Rich Text and Mentions", () => {
     await editor.click();
     await page.keyboard.type("Hello ");
 
-    // 7. Trigger mention — type @Test to trigger autocomplete
-    await page.keyboard.type("@Test");
+    // 7. Trigger mention — type @Mentioned to uniquely target the mentioned user
+    await page.keyboard.type("@Mentioned");
 
-    // Wait for autocomplete and select first match
-    const mentionItem = page.locator('button:has-text("Test User")').first();
+    // Wait for autocomplete and select the specific user
+    const mentionItem = page
+      .locator('button:has-text("Mentioned Person")')
+      .first();
     await expect(mentionItem).toBeVisible();
     await page.keyboard.press("Enter");
 
     // Verify mention is in the editor
-    await expect(editor).toContainText("@Test User");
+    await expect(editor).toContainText("@Mentioned Person");
 
     // 8. Add some formatting via toolbar (cross-platform select-all)
     await page.keyboard.press("ControlOrMeta+a");
@@ -68,7 +74,9 @@ test.describe("Rich Text and Mentions", () => {
     // 11. Verify rich text rendering
     const description = page.locator(".prose");
     await expect(description.locator("strong")).toBeVisible();
-    await expect(description.locator(".mention")).toContainText("@Test User");
+    await expect(description.locator(".mention")).toContainText(
+      "@Mentioned Person"
+    );
 
     // 12. Check notification for mentioned user via the Bell dropdown
     await logout(page);
