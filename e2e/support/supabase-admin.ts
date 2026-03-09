@@ -74,15 +74,16 @@ export async function confirmUserEmail(email: string): Promise<void> {
  */
 export async function createTestUser(
   email: string,
-  password = "TestPassword123"
+  password = "TestPassword123",
+  options?: { firstName?: string; lastName?: string }
 ) {
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
     user_metadata: {
-      first_name: "Test",
-      last_name: "User",
+      first_name: options?.firstName ?? "Test",
+      last_name: options?.lastName ?? "User",
     },
   });
 

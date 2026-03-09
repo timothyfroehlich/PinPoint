@@ -101,9 +101,7 @@ test.describe("Issue detail permission-aware UI", () => {
 
       // Comment input should be visible (not the login prompt)
       await expect(page.getByTestId("login-to-comment")).toHaveCount(0);
-      await expect(
-        page.getByRole("textbox", { name: "Comment" })
-      ).toBeVisible();
+      await expect(page.getByLabel("Comment", { exact: true })).toBeVisible();
     });
   });
 
@@ -169,9 +167,7 @@ test.describe("Issue detail permission-aware UI", () => {
 
       // Comment input should be visible
       await expect(page.getByTestId("login-to-comment")).toHaveCount(0);
-      await expect(
-        page.getByRole("textbox", { name: "Comment" })
-      ).toBeVisible();
+      await expect(page.getByLabel("Comment", { exact: true })).toBeVisible();
     });
   });
 });

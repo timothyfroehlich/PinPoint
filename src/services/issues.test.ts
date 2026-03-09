@@ -13,6 +13,8 @@ import { db } from "~/server/db";
 import { createNotification } from "~/lib/notifications";
 import { createTimelineEvent } from "~/lib/timeline/events";
 
+import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+
 vi.mock("~/server/db", () => ({
   db: mockDeep(),
 }));
@@ -121,8 +123,18 @@ describe("Issue Service", () => {
 
   describe("createIssue", () => {
     it("auto-watches reporter by default and sends notifications", async () => {
+      const description = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "New Issue Description" }],
+          },
+        ],
+      };
       const params = {
         title: "New Issue",
+        description: description satisfies ProseMirrorDoc,
         machineInitials: "MM",
         severity: "minor" as const,
         reportedBy: "user-1",
@@ -188,9 +200,18 @@ describe("Issue Service", () => {
 
   describe("addIssueComment", () => {
     it("notifies participants without subscribing the author", async () => {
+      const content = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "My comment" }],
+          },
+        ],
+      };
       const params = {
         issueId: "issue-1",
-        content: "My comment",
+        content: content satisfies ProseMirrorDoc,
         userId: "user-1",
       };
 

@@ -197,7 +197,7 @@ test.describe("Public Issue Reporting", () => {
       new RegExp(`/report\\?machine=${machineInitials}`)
     );
     await expect(page.getByLabel("Issue Title")).toHaveValue(issueTitle);
-    await expect(page.getByLabel("Description")).toHaveValue(issueDescription);
+    await expect(page.getByLabel("Description")).toHaveText(issueDescription);
     await expect(page.getByLabel("First Name")).toHaveCount(0);
   });
 
@@ -242,7 +242,7 @@ test.describe("Public Issue Reporting", () => {
       new RegExp(`/report\\?machine=${machineInitials}`)
     );
     await expect(page.getByLabel("Issue Title")).toHaveValue(issueTitle);
-    await expect(page.getByLabel("Description")).toHaveValue(issueDescription);
+    await expect(page.getByLabel("Description")).toHaveText(issueDescription);
     await expect(page.getByLabel("First Name")).toHaveCount(0);
   });
 
@@ -295,7 +295,7 @@ test.describe("Public Issue Reporting", () => {
 
     // Verify text fields are empty (draft cleared, not restored)
     await expect(page.getByLabel("Issue Title")).toHaveValue("");
-    await expect(page.getByLabel("Description")).toHaveValue("");
+    await expect(page.getByLabel("Description")).toHaveText("");
 
     // Machine should be back to unselected state (empty), not the one we selected
     // This verifies draft wasn't restored - the form starts with no machine selected

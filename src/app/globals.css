@@ -114,6 +114,30 @@
   }
 }
 
+/* Rich text editor - mention styling */
+@utility mention {
+  @apply text-primary font-semibold no-underline cursor-pointer transition-all duration-300;
+  &:hover {
+    text-decoration: underline;
+    text-shadow: 0 0 8px
+      color-mix(in srgb, var(--color-primary) 80%, transparent);
+  }
+}
+
+/* Rich text editor - ProseMirror focus */
+.ProseMirror:focus {
+  outline: none;
+}
+
+/* Rich text editor - placeholder */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-muted-foreground);
+  pointer-events: none;
+  height: 0;
+}
+
 @layer base {
   * {
     @apply border-border;

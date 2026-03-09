@@ -27,6 +27,12 @@ import { imagesMetadataArraySchema } from "../(app)/issues/schemas";
 import { deleteFromBlob } from "~/lib/blob/client";
 import { z } from "zod";
 import { ok, err, type Result } from "~/lib/result";
+import {
+  type ProseMirrorDoc,
+  plainTextToDoc,
+  docToPlainText,
+  proseMirrorDocSchema,
+} from "~/lib/tiptap/types";
 import type {
   IssueStatus,
   IssueSeverity,
@@ -108,7 +114,7 @@ export async function submitPublicIssueAction(
   const {
     machineId,
     title,
-    description,
+    description: descriptionJson,
     severity,
     email,
     firstName,
@@ -119,6 +125,31 @@ export async function submitPublicIssueAction(
     assignedTo,
     watchIssue,
   } = parsedValue.data;
+
+  // Parse description JSON if present
+  let description: ProseMirrorDoc | null = null;
+  if (descriptionJson) {
+    try {
+      description = JSON.parse(descriptionJson) as ProseMirrorDoc;
+    } catch (e) {
+      log.error(
+        { e },
+        "Failed to parse description JSON — falling back to plain text"
+      );
+      description = plainTextToDoc(descriptionJson);
+    }
+    if (!proseMirrorDocSchema.safeParse(description).success) {
+      return { error: "Invalid description format." };
+    }
+    // Enforce size limits: plain-text length (catches large visible content)
+    // and serialized JSON size (prevents oversized JSONB with minimal text)
+    if (docToPlainText(description).length > 20_000) {
+      return { error: "Description is too long." };
+    }
+    if (JSON.stringify(description).length > 200_000) {
+      return { error: "Description is too long." };
+    }
+  }
 
   // 3. Resolve reporter
   const supabase = await createClient();

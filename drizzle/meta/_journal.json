@@ -148,6 +148,20 @@
       "when": 1771654678406,
       "tag": "0020_unusual_rogue",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1772991893220,
+      "tag": "0021_tiresome_hellion",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1772991974319,
+      "tag": "0022_curvy_guardsmen",
+      "breakpoints": true
     }
   ]
 }
