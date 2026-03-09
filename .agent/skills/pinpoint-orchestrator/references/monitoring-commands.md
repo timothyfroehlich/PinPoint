@@ -64,8 +64,10 @@ done
 | {beads_id} | #{pr_number} | {ci_summary} | {comment_count}  |
 
 ### PRs Ready for Review
+
 - #{pr}: {title} - All checks passing
 
 ### PRs Needing Attention
+
 - #{pr}: {title} - {issue_description}
 ```

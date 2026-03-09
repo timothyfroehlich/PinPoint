@@ -49,27 +49,34 @@ Task(
 **Prompt template:**
 
 ```markdown
-Start by loading the `pinpoint-teammate-guide` skill (or read .claude/skills/pinpoint-teammate-guide/SKILL.md directly).
+Start by loading the `pinpoint-teammate-guide` skill (or read .agent/skills/pinpoint-teammate-guide/SKILL.md directly).
 
 ## Task: <issue title>
+
 <beads issue ID and description>
 
 ## Task Contract
+
 Write this to `.claude-task-contract` in your worktree root:
 <contract from Step 1>
 
 ## Files to Modify
+
 <specific files and what to change>
 
 ## Notes
+
 <any task-specific context>
 
 ## Quality Gates
+
 Run `pnpm run check` before returning. Check off all contract items.
 If Copilot review doesn't arrive within 5 minutes, note timeout and return.
 
 ## Return Format
+
 Report back with:
+
 - **Branch**: <branch name>
 - **PR**: #<number>
 - **CI**: passing/failing/pending
@@ -104,6 +111,7 @@ Resume the subagent with follow-up work (Copilot comments, CI fixes, review feed
 ## Step 5: Cleanup
 
 Once the PR merges:
+
 ```bash
 python3 ./pinpoint-wt.py remove feat/<branch-name>
 bd close <issue-id> --reason="Fixed in PR #NNN"
