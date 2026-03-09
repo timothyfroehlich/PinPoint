@@ -1,4 +1,5 @@
 import sanitizeHtml from "sanitize-html";
+import { escapeHtml } from "~/lib/markdown";
 import {
   type ProseMirrorDoc,
   type ProseMirrorMark,
@@ -14,17 +15,6 @@ function attrStr(value: unknown, fallback = ""): string {
   if (typeof value === "string") return value;
   if (typeof value === "number") return value.toString();
   return fallback;
-}
-
-/**
- * Escape HTML special characters in text content.
- */
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 type MentionRenderer = (id: string, label: string) => string;
@@ -197,6 +187,7 @@ export function renderDocToEmailHtml(
     return sanitizeHtml(html, SANITIZE_OPTIONS);
   } catch (e) {
     console.error("renderDocToEmailHtml failed", e);
+    console.error("Input was:", JSON.stringify(doc));
     return "";
   }
 }

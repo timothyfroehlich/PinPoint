@@ -37,16 +37,8 @@ import type { AccessLevel } from "~/lib/permissions/matrix";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 import { getLoginUrl } from "~/lib/login-url";
 import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
-import dynamic from "next/dynamic";
+import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
-
-const RichTextEditor = dynamic(
-  () =>
-    import("~/components/editor/RichTextEditor").then(
-      (mod) => mod.RichTextEditor
-    ),
-  { ssr: false }
-);
 
 interface Machine {
   id: string;

@@ -12,16 +12,8 @@ import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { type ImageMetadata } from "~/types/images";
-import dynamic from "next/dynamic";
+import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
-
-const RichTextEditor = dynamic(
-  () =>
-    import("~/components/editor/RichTextEditor").then(
-      (mod) => mod.RichTextEditor
-    ),
-  { ssr: false }
-);
 
 interface AddCommentFormProps {
   issueId: string;

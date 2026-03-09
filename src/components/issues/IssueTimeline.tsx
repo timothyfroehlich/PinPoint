@@ -41,16 +41,8 @@ import {
 import { type AccessLevel } from "~/lib/permissions/matrix";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
-import dynamic from "next/dynamic";
+import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import { type ProseMirrorDoc, docToPlainText } from "~/lib/tiptap/types";
-
-const RichTextEditor = dynamic(
-  () =>
-    import("~/components/editor/RichTextEditor").then(
-      (mod) => mod.RichTextEditor
-    ),
-  { ssr: false }
-);
 
 // ----------------------------------------------------------------------
 // Types
