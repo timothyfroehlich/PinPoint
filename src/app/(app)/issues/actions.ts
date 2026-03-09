@@ -38,6 +38,12 @@ import {
 } from "~/services/issues";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { userProfiles, issueComments, issueImages } from "~/server/db/schema";
+import {
+  type ProseMirrorDoc,
+  plainTextToDoc,
+  docToPlainText,
+  proseMirrorDocSchema,
+} from "~/lib/tiptap/types";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -644,9 +650,28 @@ export async function addCommentAction(
 
   const {
     issueId,
-    comment,
+    comment: commentJson,
     imagesMetadata: imagesMetadataStr,
   } = validation.data;
+
+  // Parse comment JSON
+  let comment: ProseMirrorDoc;
+  try {
+    comment = JSON.parse(commentJson) as ProseMirrorDoc;
+  } catch (e) {
+    log.error({ e, commentJson }, "Failed to parse comment JSON");
+    return err("VALIDATION", "Invalid comment format");
+  }
+
+  if (!proseMirrorDocSchema.safeParse(comment).success) {
+    return err("VALIDATION", "Invalid comment format");
+  }
+  if (docToPlainText(comment).length === 0) {
+    return err("VALIDATION", "Comment cannot be empty");
+  }
+  if (JSON.stringify(comment).length > 100_000) {
+    return err("VALIDATION", "Comment is too long.");
+  }
 
   let imagesMetadata: z.infer<typeof imagesMetadataArraySchema> = [];
   if (imagesMetadataStr) {
@@ -722,7 +747,26 @@ export async function editCommentAction(
     );
   }
 
-  const { commentId, comment } = validation.data;
+  const { commentId, comment: commentJson } = validation.data;
+
+  // Parse comment JSON
+  let comment: ProseMirrorDoc;
+  try {
+    comment = JSON.parse(commentJson) as ProseMirrorDoc;
+  } catch (e) {
+    log.error({ e, commentJson }, "Failed to parse comment JSON");
+    return err("VALIDATION", "Invalid comment format");
+  }
+
+  if (!proseMirrorDocSchema.safeParse(comment).success) {
+    return err("VALIDATION", "Invalid comment format");
+  }
+  if (docToPlainText(comment).length === 0) {
+    return err("VALIDATION", "Comment cannot be empty");
+  }
+  if (JSON.stringify(comment).length > 100_000) {
+    return err("VALIDATION", "Comment is too long.");
+  }
 
   try {
     const existingComment = await db.query.issueComments.findFirst({
@@ -848,7 +892,7 @@ export async function deleteCommentAction(
       .set({
         isSystem: true,
         authorId: null,
-        content,
+        content: plainTextToDoc(content),
         updatedAt: now,
       })
       .where(eq(issueComments.id, commentId));

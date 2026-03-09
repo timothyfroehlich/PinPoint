@@ -11,7 +11,7 @@ export const publicIssueSchema = z.object({
   description: z
     .string()
     .trim()
-    .max(5000, "Description is too long")
+    .max(20000, "Description is too long")
     .optional(),
   severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
     message: "Select a severity",

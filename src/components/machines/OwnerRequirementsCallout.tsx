@@ -1,9 +1,11 @@
 import type React from "react";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
+import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 
 interface OwnerRequirementsCalloutProps {
-  ownerRequirements: string;
+  ownerRequirements: ProseMirrorDoc;
   machineName: string;
 }
 
@@ -19,8 +21,8 @@ export function OwnerRequirementsCallout({
     <Alert variant="warning" data-testid="owner-requirements-callout">
       <AlertTriangle className="size-4" />
       <AlertTitle>Owner&apos;s Requirements for {machineName}</AlertTitle>
-      <AlertDescription className="whitespace-pre-wrap">
-        {ownerRequirements}
+      <AlertDescription>
+        <RichTextDisplay content={ownerRequirements} />
       </AlertDescription>
     </Alert>
   );

@@ -1,0 +1,2 @@
+ALTER TABLE "notification_preferences" ADD COLUMN "email_notify_on_mentioned" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "notification_preferences" ADD COLUMN "in_app_notify_on_mentioned" boolean DEFAULT true NOT NULL;

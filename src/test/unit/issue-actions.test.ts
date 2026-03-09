@@ -105,16 +105,25 @@ describe("addCommentAction", () => {
   });
 
   it("should successfully add a comment", async () => {
+    const commentObj = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Test comment" }],
+        },
+      ],
+    };
     const formData = new FormData();
     formData.append("issueId", validUuid);
-    formData.append("comment", "Test comment");
+    formData.append("comment", JSON.stringify(commentObj));
 
     const result = await addCommentAction(initialState, formData);
 
     expect(result.ok).toBe(true);
     expect(addIssueComment).toHaveBeenCalledWith({
       issueId: validUuid,
-      content: "Test comment",
+      content: commentObj,
       userId: mockUser.id,
       imagesMetadata: [],
     });
@@ -158,9 +167,18 @@ describe("addCommentAction", () => {
     // Mock service error
     vi.mocked(addIssueComment).mockRejectedValue(new Error("Service Error"));
 
+    const commentObj = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Test comment" }],
+        },
+      ],
+    };
     const formData = new FormData();
     formData.append("issueId", validUuid);
-    formData.append("comment", "Test comment");
+    formData.append("comment", JSON.stringify(commentObj));
 
     const result = await addCommentAction(initialState, formData);
 

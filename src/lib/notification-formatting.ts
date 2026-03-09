@@ -21,6 +21,8 @@ export function getEmailSubject(
       return `${prefix}Status Changed ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     case "new_comment":
       return `${prefix}New Comment on ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
+    case "mentioned":
+      return `${prefix}You were mentioned in ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     case "machine_ownership_changed":
       return newStatus === "removed"
         ? `${prefix}Ownership Update: You have been removed as an owner`
@@ -104,6 +106,13 @@ export function getEmailHtml(
         ? sanitizeHtml(commentContent)
         : "";
       body = `New comment:<br/><blockquote>${sanitizedComment}</blockquote>`;
+      break;
+    }
+    case "mentioned": {
+      const sanitizedComment = commentContent
+        ? sanitizeHtml(commentContent)
+        : "";
+      body = `You were mentioned in an issue${sanitizedComment ? `:<br/><blockquote>${sanitizedComment}</blockquote>` : "."}`;
       break;
     }
     case "machine_ownership_changed":

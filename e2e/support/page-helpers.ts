@@ -83,7 +83,12 @@ export async function fillReportForm(
   await page.getByLabel("Issue Title *").fill(title);
 
   if (description) {
-    await page.getByLabel("Description").fill(description);
+    // Wait for the RichTextEditor (ProseMirror) to load — dynamic import with ssr: false.
+    // Use .ProseMirror selector + keyboard.type() since that's reliable for contenteditable.
+    const descriptionEditor = page.locator(".ProseMirror").first();
+    await descriptionEditor.waitFor({ timeout: 15000 });
+    await descriptionEditor.click();
+    await page.keyboard.type(description);
   }
 
   await selectOption(page, "issue-severity-select", severity);

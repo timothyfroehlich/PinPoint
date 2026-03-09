@@ -1,11 +1,14 @@
+// src/components/inline-editable-field.tsx
 "use client";
 
 import type React from "react";
-import { useState, useRef, useEffect, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
-import { Textarea } from "~/components/ui/textarea";
 import { Pencil } from "lucide-react";
 import { cn } from "~/lib/utils";
+import { type ProseMirrorDoc, docToPlainText } from "~/lib/tiptap/types";
+import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
+import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 
 export interface InlineEditSaveResult {
   ok: boolean;
@@ -16,9 +19,12 @@ interface InlineEditableFieldProps {
   /** The field label displayed above the content */
   label: string;
   /** Current value (null/undefined/empty treated as empty) */
-  value: string | null | undefined;
+  value: ProseMirrorDoc | null | undefined;
   /** Server action to save the updated value */
-  onSave: (machineId: string, value: string) => Promise<InlineEditSaveResult>;
+  onSave: (
+    machineId: string,
+    value: ProseMirrorDoc | null
+  ) => Promise<InlineEditSaveResult>;
   /** Machine ID to pass to the save action */
   machineId: string;
   /** Whether the current user can edit this field */
@@ -39,47 +45,48 @@ export function InlineEditableField({
   testId,
 }: InlineEditableFieldProps): React.JSX.Element | null {
   const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value ?? "");
+  const [editValue, setEditValue] = useState<ProseMirrorDoc | null>(
+    value ?? null
+  );
   const [optimisticValue, setOptimisticValue] = useState(value);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const displayValue = optimisticValue ?? value;
-  const isEmpty = !displayValue || displayValue.trim() === "";
-
-  // Auto-focus textarea when entering edit mode
-  useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-      // Move cursor to end
-      const len = textareaRef.current.value.length;
-      textareaRef.current.setSelectionRange(len, len);
-    }
-  }, [isEditing]);
+  const firstNode = displayValue?.content[0];
+  const isEmpty =
+    !displayValue ||
+    displayValue.content.length === 0 ||
+    (displayValue.content.length === 1 &&
+      firstNode?.type === "paragraph" &&
+      !firstNode.content);
 
   function handleEdit(): void {
-    setEditValue(displayValue ?? "");
+    setEditValue(displayValue ?? null);
     setError(null);
     setIsEditing(true);
   }
 
   function handleCancel(): void {
     setIsEditing(false);
-    setEditValue(displayValue ?? "");
+    setEditValue(displayValue ?? null);
     setError(null);
   }
 
   function handleSave(): void {
     setError(null);
 
+    // Normalize empty Tiptap doc (e.g. { type: "doc", content: [{ type: "paragraph" }] }) to null
+    // so clearing a field persists NULL to the DB rather than a semantically-empty JSON blob.
+    const valueToSave =
+      editValue && docToPlainText(editValue) ? editValue : null;
+
     // Optimistic update
-    const newValue = editValue.trim() === "" ? null : editValue.trim();
-    setOptimisticValue(newValue);
+    setOptimisticValue(valueToSave);
     setIsEditing(false);
 
     startTransition(async () => {
-      const result = await onSave(machineId, editValue);
+      const result = await onSave(machineId, valueToSave);
       if (!result.ok) {
         // Revert optimistic update
         setOptimisticValue(value);
@@ -102,14 +109,14 @@ export function InlineEditableField({
 
       {isEditing ? (
         <div className="space-y-2">
-          <Textarea
-            ref={textareaRef}
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
+          <RichTextEditor
+            content={editValue}
+            onChange={setEditValue}
+            mentionsEnabled={true}
             placeholder={placeholder}
-            className="min-h-[80px] resize-y text-sm"
-            maxLength={5000}
-            data-testid={testId ? `${testId}-textarea` : undefined}
+            ariaLabel={label}
+            compact
+            className="min-h-[40px]"
           />
           {error && (
             <p className="text-xs text-destructive" role="alert">
@@ -139,10 +146,18 @@ export function InlineEditableField({
       ) : (
         <div
           className={cn(
-            "group relative",
+            "group relative min-h-[1.5rem]",
             canEdit && "cursor-pointer rounded-md hover:bg-surface-variant/50"
           )}
-          onClick={canEdit ? handleEdit : undefined}
+          onClick={
+            canEdit
+              ? (e) => {
+                  // Don't enter edit mode when clicking a link (e.g. mention profiles)
+                  if ((e.target as HTMLElement).closest("a")) return;
+                  handleEdit();
+                }
+              : undefined
+          }
           onKeyDown={
             canEdit
               ? (e) => {
@@ -162,9 +177,7 @@ export function InlineEditableField({
               {placeholder ?? `Add ${label.toLowerCase()}...`}
             </p>
           ) : (
-            <p className="whitespace-pre-wrap py-1 text-sm text-on-surface">
-              {displayValue}
-            </p>
+            <RichTextDisplay content={displayValue} className="py-1" />
           )}
           {canEdit && (
             <Pencil

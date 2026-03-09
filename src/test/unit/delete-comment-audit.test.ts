@@ -157,7 +157,15 @@ describe("deleteCommentAction - Audit Trail", () => {
       expect(mockSet).toHaveBeenCalledWith({
         isSystem: true,
         authorId: null,
-        content: "User deleted their comment",
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "User deleted their comment" }],
+            },
+          ],
+        },
         updatedAt: expect.any(Date),
       });
 
@@ -221,7 +229,15 @@ describe("deleteCommentAction - Audit Trail", () => {
       expect(mockSet).toHaveBeenCalledWith({
         isSystem: true,
         authorId: null,
-        content: "Comment removed by admin",
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Comment removed by admin" }],
+            },
+          ],
+        },
         updatedAt: expect.any(Date),
       });
 
