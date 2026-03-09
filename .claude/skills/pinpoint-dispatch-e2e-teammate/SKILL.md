@@ -84,9 +84,11 @@ Report back with:
 ## Step 3: Monitor
 
 ```bash
-./scripts/workflow/pr-dashboard.sh          # overview of open PRs
-./scripts/workflow/copilot-comments.sh <PR> # check review status
-gh pr checks <PR>                              # CI status
+# PR overview
+gh pr list --state open --json number,title,headRefName,isDraft --jq '.[] | "#\(.number) \(.title | .[0:40]) [\(.headRefName)]"'
+# Copilot comments: use MCP pull_request_read(method: "get_review_comments")
+# CI status
+gh pr checks <PR>
 ```
 
 ---

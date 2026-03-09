@@ -21,12 +21,12 @@ gh pr view <PR_NUMBER> --json statusCheckRollup \
 ## Copilot Review Comments
 
 ```bash
-# Preferred (uses project scripts)
-./scripts/workflow/copilot-comments.sh <PR>
+# Preferred: MCP tools (called by agents directly)
+# pull_request_read(method: "get_review_comments", owner: "timothyfroehlich", repo: "PinPoint", pullNumber: <PR>)
+# add_reply_to_pull_request_comment(owner: "timothyfroehlich", repo: "PinPoint", pullNumber: <PR>, commentId: <ID>, body: "...")
 
-# Raw API
-gh api repos/timothyfroehlich/PinPoint/pulls/<PR_NUMBER>/comments \
-  --jq '.[] | select(.user.login == "Copilot") | "File: \(.path):\(.line // .original_line)\n\(.body)\n---"'
+# Resolve threads (MCP gap stopgap):
+./scripts/workflow/resolve-thread.sh <PRRT_thread-node-id>
 ```
 
 ## Worktree Status
