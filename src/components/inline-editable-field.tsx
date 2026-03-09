@@ -79,7 +79,7 @@ export function InlineEditableField({
     // Normalize empty Tiptap doc (e.g. { type: "doc", content: [{ type: "paragraph" }] }) to null
     // so clearing a field persists NULL to the DB rather than a semantically-empty JSON blob.
     const valueToSave =
-      editValue && docToPlainText(editValue).trim() ? editValue : null;
+      editValue && docToPlainText(editValue) ? editValue : null;
 
     // Optimistic update
     setOptimisticValue(valueToSave);

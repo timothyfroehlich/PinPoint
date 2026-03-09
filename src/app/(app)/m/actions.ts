@@ -23,7 +23,11 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
 import { createNotification } from "~/lib/notifications";
-import { type ProseMirrorDoc, docToPlainText } from "~/lib/tiptap/types";
+import {
+  type ProseMirrorDoc,
+  docToPlainText,
+  proseMirrorDocSchema,
+} from "~/lib/tiptap/types";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -532,10 +536,6 @@ async function updateMachineTextField(
   }
 
   // Validate ProseMirror payload: must be null or a well-formed doc with type:"doc"
-  const proseMirrorDocSchema = z.object({
-    type: z.literal("doc"),
-    content: z.array(z.unknown()).optional(),
-  });
   if (value !== null) {
     if (!proseMirrorDocSchema.safeParse(value).success) {
       return err("VALIDATION", "Invalid rich text payload.");

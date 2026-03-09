@@ -5,6 +5,8 @@
  * stored in JSONB columns.
  */
 
+import { z } from "zod";
+
 export interface ProseMirrorMark {
   type: string;
   attrs?: Record<string, unknown>;
@@ -22,6 +24,15 @@ export interface ProseMirrorDoc {
   type: "doc";
   content: ProseMirrorNode[];
 }
+
+/**
+ * Minimal Zod schema for validating ProseMirror document payloads.
+ * Validates the top-level shape — content validation is handled by Tiptap.
+ */
+export const proseMirrorDocSchema = z.object({
+  type: z.literal("doc"),
+  content: z.array(z.unknown()).optional(),
+});
 
 /**
  * Convert plain text to a minimal ProseMirror document.

@@ -662,7 +662,7 @@ export async function addCommentAction(
     return err("VALIDATION", "Invalid comment format");
   }
 
-  if (docToPlainText(comment).trim().length === 0) {
+  if (docToPlainText(comment).length === 0) {
     return err("VALIDATION", "Comment cannot be empty");
   }
 
@@ -751,7 +751,7 @@ export async function editCommentAction(
     return err("VALIDATION", "Invalid comment format");
   }
 
-  if (docToPlainText(comment).trim().length === 0) {
+  if (docToPlainText(comment).length === 0) {
     return err("VALIDATION", "Comment cannot be empty");
   }
 
