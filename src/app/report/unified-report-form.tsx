@@ -373,9 +373,7 @@ export function UnifiedReportForm({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="description" className="text-on-surface">
-                    Description
-                  </Label>
+                  <Label className="text-on-surface">Description</Label>
                   <RichTextEditor
                     content={description}
                     onChange={setDescription}

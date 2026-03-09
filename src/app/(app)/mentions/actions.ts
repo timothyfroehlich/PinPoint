@@ -14,7 +14,7 @@ interface MentionableUser {
 
 /**
  * Search for mentionable users by name.
- * Returns active registered users (excludes invited).
+ * Returns registered users with profiles (up to 10 results).
  * Requires authentication — anonymous users cannot search.
  */
 export async function searchMentionableUsers(
@@ -32,15 +32,16 @@ export async function searchMentionableUsers(
   const trimmed = query.trim();
   if (trimmed.length === 0) {
     // Return a default list of users (limited)
-    return db.query.userProfiles.findMany({
+    const users = await db.query.userProfiles.findMany({
       columns: { id: true, name: true, avatarUrl: true },
       orderBy: (profile, { asc }) => [asc(profile.name)],
       limit: 10,
-    }) as Promise<MentionableUser[]>;
+    });
+    return users;
   }
 
   const pattern = `%${trimmed}%`;
-  return db.query.userProfiles.findMany({
+  const users = await db.query.userProfiles.findMany({
     where: or(
       ilike(userProfiles.name, pattern),
       ilike(userProfiles.firstName, pattern),
@@ -49,5 +50,6 @@ export async function searchMentionableUsers(
     columns: { id: true, name: true, avatarUrl: true },
     orderBy: (profile, { asc }) => [asc(profile.name)],
     limit: 10,
-  }) as Promise<MentionableUser[]>;
+  });
+  return users;
 }

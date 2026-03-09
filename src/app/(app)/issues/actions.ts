@@ -38,7 +38,11 @@ import {
 } from "~/services/issues";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { userProfiles, issueComments, issueImages } from "~/server/db/schema";
-import { type ProseMirrorDoc, plainTextToDoc } from "~/lib/tiptap/types";
+import {
+  type ProseMirrorDoc,
+  plainTextToDoc,
+  docToPlainText,
+} from "~/lib/tiptap/types";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -658,6 +662,10 @@ export async function addCommentAction(
     return err("VALIDATION", "Invalid comment format");
   }
 
+  if (docToPlainText(comment).trim().length === 0) {
+    return err("VALIDATION", "Comment cannot be empty");
+  }
+
   let imagesMetadata: z.infer<typeof imagesMetadataArraySchema> = [];
   if (imagesMetadataStr) {
     try {
@@ -741,6 +749,10 @@ export async function editCommentAction(
   } catch (e) {
     log.error({ e, commentJson }, "Failed to parse comment JSON");
     return err("VALIDATION", "Invalid comment format");
+  }
+
+  if (docToPlainText(comment).trim().length === 0) {
+    return err("VALIDATION", "Comment cannot be empty");
   }
 
   try {
