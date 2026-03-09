@@ -1,16 +1,17 @@
 import { test, expect } from "@playwright/test";
 import { loginAs, logout } from "../support/actions";
+import { TEST_USERS } from "../support/constants";
 
 test.describe("Change Password", () => {
   test("user can change password from settings page", async ({
     page,
   }, testInfo) => {
-    const originalPassword = "TestPassword123";
+    const originalPassword = TEST_USERS.member.password;
     const newPassword = "NewTestPassword456";
 
     // Login with original password
     await loginAs(page, testInfo, {
-      email: "member@test.com",
+      email: TEST_USERS.member.email,
       password: originalPassword,
     });
 
@@ -39,7 +40,7 @@ test.describe("Change Password", () => {
 
     // Login with new password
     await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
+    await page.getByLabel("Email").fill(TEST_USERS.member.email);
     await page.getByLabel("Password", { exact: true }).fill(newPassword);
     await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });

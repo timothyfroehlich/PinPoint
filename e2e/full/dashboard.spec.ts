@@ -27,7 +27,7 @@ function ensureCardsOrEmpty(
   }
 }
 
-test.describe.serial("Member Dashboard", () => {
+test.describe("Member Dashboard", () => {
   test("dashboard loads with all sections", async ({ page }, testInfo) => {
     await ensureLoggedIn(page, testInfo);
 
@@ -176,13 +176,8 @@ test.describe.serial("Member Dashboard", () => {
         /(\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+)|(login\?next=%2Fm%2F.+)/
       );
 
-      // Add a small delay to allow the page to stabilize
-      await page.waitForTimeout(500);
-
       // Use filter to find the specific h1 containing the title, avoiding strict mode violation
       // with the Dashboard h1 or the Austin Pinball Collective logo
-      // Verify title matches
-      // Replace all spaces with \s+ in the regex for flexibility
       const titlePattern = issueTitle
         .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
         .replace(/\s+/g, "\\s+");

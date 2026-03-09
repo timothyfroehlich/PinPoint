@@ -8,7 +8,7 @@ import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions.js";
 import { TEST_USERS } from "../support/constants.js";
 
-test.describe.serial("Navigation", () => {
+test.describe("Navigation", () => {
   test("unauthenticated navigation - show Sign In and Sign Up buttons", async ({
     page,
   }, testInfo) => {
@@ -93,7 +93,7 @@ test.describe.serial("Navigation", () => {
   });
 });
 
-test.describe.serial("Bottom Tab Bar (mobile only)", () => {
+test.describe("Bottom Tab Bar (mobile only)", () => {
   test("tab bar is visible on mobile and links to correct routes", async ({
     page,
   }, testInfo) => {

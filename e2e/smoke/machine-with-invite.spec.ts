@@ -14,8 +14,6 @@ const testMachines = new Set<string>();
 const testEmails = new Set<string>();
 
 test.describe("Machine with Inline Invite (Smoke)", () => {
-  test.describe.configure({ mode: "serial" });
-
   test.beforeEach(async ({ page }, testInfo) => {
     await ensureLoggedIn(page, testInfo, {
       email: TEST_USERS.admin.email,

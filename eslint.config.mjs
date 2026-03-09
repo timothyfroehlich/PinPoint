@@ -201,6 +201,25 @@ export default [
 
       // Allow disabling rules in tests if needed (mocking often requires it)
       "eslint-comments/no-restricted-disable": "off",
+
+      // E2E anti-patterns
+      "no-restricted-properties": [
+        "warn",
+        {
+          object: "page",
+          property: "waitForTimeout",
+          message:
+            "Use Playwright assertions (auto-wait) instead of waitForTimeout",
+        },
+      ],
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector: "Literal[value=/.*@test\\.com/]",
+          message:
+            "Use TEST_USERS constants or getTestEmail() instead of hardcoded @test.com emails",
+        },
+      ],
     },
   },
   {

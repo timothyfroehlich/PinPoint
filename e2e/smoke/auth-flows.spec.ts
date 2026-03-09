@@ -6,6 +6,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { TEST_USERS } from "../support/constants";
 
 test.describe("Authentication Smoke", () => {
   test("password toggle switches input type on login page", async ({
@@ -30,8 +31,8 @@ test.describe("Authentication Smoke", () => {
     page,
   }, testInfo) => {
     // Use test user created by seed.sql
-    const testEmail = "member@test.com";
-    const testPassword = "TestPassword123";
+    const testEmail = TEST_USERS.member.email;
+    const testPassword = TEST_USERS.member.password;
 
     // Navigate to login page via header sign-in button (mobile or desktop)
     await page.goto("/");
