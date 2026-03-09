@@ -45,8 +45,8 @@ function isTabActive(
   pathname: string,
   resolvedIssuesPath: string
 ): boolean {
-  // Issue detail pages (/m/[initials]/i/[number]) belong to the Issues tab
-  const isIssuePage = /^\/m\/[^/]+\/i\//.test(pathname);
+  // Issue detail pages (/m/[initials]/i and /m/[initials]/i/[number]) belong to the Issues tab
+  const isIssuePage = /^\/m\/[^/]+\/i(\/|$)/.test(pathname);
 
   const href = tabHref === "/issues" ? resolvedIssuesPath : tabHref;
   const basePath = href.split("?")[0] ?? href;

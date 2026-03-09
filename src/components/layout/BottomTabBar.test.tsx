@@ -1,7 +1,14 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, type MockedFunction } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  type MockedFunction,
+} from "vitest";
 import { usePathname } from "next/navigation";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { BottomTabBar } from "./BottomTabBar";
@@ -28,6 +35,10 @@ vi.mock("~/components/feedback/FeedbackWidget", () => ({
 }));
 
 describe("BottomTabBar", () => {
+  beforeEach(() => {
+    vi.mocked(usePathname).mockReturnValue("/dashboard");
+  });
+
   it("renders the four main tabs with correct links", () => {
     render(<BottomTabBar />);
 
@@ -121,6 +132,20 @@ describe("BottomTabBar", () => {
 
   it("highlights Issues tab (not Machines) when viewing an issue detail page", () => {
     vi.mocked(usePathname).mockReturnValue("/m/BB/i/4");
+    render(<BottomTabBar />);
+
+    expect(screen.getByRole("link", { name: /issues/i })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    expect(screen.getByRole("link", { name: /machines/i })).not.toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
+
+  it("highlights Issues tab (not Machines) when on the issues list for a machine (no trailing slash)", () => {
+    vi.mocked(usePathname).mockReturnValue("/m/BB/i");
     render(<BottomTabBar />);
 
     expect(screen.getByRole("link", { name: /issues/i })).toHaveAttribute(
