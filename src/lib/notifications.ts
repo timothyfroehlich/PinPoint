@@ -163,7 +163,11 @@ export async function createNotification(
         }
       }
     }
-  } else if (resourceType === "issue" && type !== "issue_assigned") {
+  } else if (
+    resourceType === "issue" &&
+    type !== "issue_assigned" &&
+    type !== "mentioned"
+  ) {
     const watchers = await tx.query.issueWatchers.findMany({
       where: eq(issueWatchers.issueId, resourceId),
     });

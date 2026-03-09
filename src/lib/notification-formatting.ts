@@ -112,7 +112,7 @@ export function getEmailHtml(
       const sanitizedComment = commentContent
         ? sanitizeHtml(commentContent)
         : "";
-      body = `You were mentioned in a comment:<br/><blockquote>${sanitizedComment}</blockquote>`;
+      body = `You were mentioned in an issue${sanitizedComment ? `:<br/><blockquote>${sanitizedComment}</blockquote>` : "."}`;
       break;
     }
     case "machine_ownership_changed":
