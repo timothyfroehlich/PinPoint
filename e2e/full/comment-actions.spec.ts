@@ -168,15 +168,14 @@ test.describe.serial("Comment Edit and Delete", () => {
       // Click Edit
       await page.getByRole("menuitem", { name: "Edit" }).click();
 
-      // The textarea should appear with the comment content
-      // Scope to the specific comment card to avoid matching the "Add Comment" textarea
-      const commentCard = getCommentCard(page, testCommentText);
-      const editTextarea = commentCard.locator("textarea[name='comment']");
-      await expect(editTextarea).toBeVisible();
+      // The rich text editor should appear — use aria-label to find it
+      const editEditor = page.getByLabel("Edit comment", { exact: true });
+      await expect(editEditor).toBeVisible();
 
-      // Clear and enter new content
-      await editTextarea.clear();
-      await editTextarea.fill(editedCommentText);
+      // Select all existing content and replace with new text
+      await editEditor.click();
+      await page.keyboard.press("ControlOrMeta+a");
+      await page.keyboard.type(editedCommentText);
 
       // Save
       await page.getByRole("button", { name: "Save" }).click();
