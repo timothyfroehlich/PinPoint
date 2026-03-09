@@ -170,7 +170,6 @@ export function renderDocToHtml(
     return sanitizeHtml(html, SANITIZE_OPTIONS);
   } catch (e) {
     console.error("renderDocToHtml failed", e);
-    console.error("Input was:", JSON.stringify(doc));
     return "";
   }
 }
@@ -190,7 +189,6 @@ export function renderDocToEmailHtml(
     return sanitizeHtml(html, SANITIZE_OPTIONS);
   } catch (e) {
     console.error("renderDocToEmailHtml failed", e);
-    console.error("Input was:", JSON.stringify(doc));
     return "";
   }
 }

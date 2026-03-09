@@ -149,7 +149,15 @@ export function InlineEditableField({
             "group relative min-h-[1.5rem]",
             canEdit && "cursor-pointer rounded-md hover:bg-surface-variant/50"
           )}
-          onClick={canEdit ? handleEdit : undefined}
+          onClick={
+            canEdit
+              ? (e) => {
+                  // Don't enter edit mode when clicking a link (e.g. mention profiles)
+                  if ((e.target as HTMLElement).closest("a")) return;
+                  handleEdit();
+                }
+              : undefined
+          }
           onKeyDown={
             canEdit
               ? (e) => {

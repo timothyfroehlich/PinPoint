@@ -543,6 +543,9 @@ async function updateMachineTextField(
     if (docToPlainText(value).length > 10_000) {
       return err("VALIDATION", "Text is too long.");
     }
+    if (JSON.stringify(value).length > 100_000) {
+      return err("VALIDATION", "Text is too long.");
+    }
   }
 
   try {

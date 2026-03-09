@@ -35,13 +35,15 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
     };
 
     const upHandler = (): void => {
+      if (props.items.length === 0) return;
       setSelectedIndex(
-        (selectedIndex + props.items.length - 1) % props.items.length
+        (prev) => (prev + props.items.length - 1) % props.items.length
       );
     };
 
     const downHandler = (): void => {
-      setSelectedIndex((selectedIndex + 1) % props.items.length);
+      if (props.items.length === 0) return;
+      setSelectedIndex((prev) => (prev + 1) % props.items.length);
     };
 
     const enterHandler = (): void => {

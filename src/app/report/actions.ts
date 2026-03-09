@@ -31,6 +31,7 @@ import {
   type ProseMirrorDoc,
   plainTextToDoc,
   docToPlainText,
+  proseMirrorDocSchema,
 } from "~/lib/tiptap/types";
 import type {
   IssueStatus,
@@ -137,8 +138,15 @@ export async function submitPublicIssueAction(
       );
       description = plainTextToDoc(descriptionJson);
     }
-    // Enforce a plain-text size limit to prevent arbitrarily large JSONB blobs
+    if (!proseMirrorDocSchema.safeParse(description).success) {
+      return { error: "Invalid description format." };
+    }
+    // Enforce size limits: plain-text length (catches large visible content)
+    // and serialized JSON size (prevents oversized JSONB with minimal text)
     if (docToPlainText(description).length > 20_000) {
+      return { error: "Description is too long." };
+    }
+    if (JSON.stringify(description).length > 200_000) {
       return { error: "Description is too long." };
     }
   }

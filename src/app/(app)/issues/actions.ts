@@ -42,6 +42,7 @@ import {
   type ProseMirrorDoc,
   plainTextToDoc,
   docToPlainText,
+  proseMirrorDocSchema,
 } from "~/lib/tiptap/types";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
@@ -662,8 +663,14 @@ export async function addCommentAction(
     return err("VALIDATION", "Invalid comment format");
   }
 
+  if (!proseMirrorDocSchema.safeParse(comment).success) {
+    return err("VALIDATION", "Invalid comment format");
+  }
   if (docToPlainText(comment).length === 0) {
     return err("VALIDATION", "Comment cannot be empty");
+  }
+  if (JSON.stringify(comment).length > 100_000) {
+    return err("VALIDATION", "Comment is too long.");
   }
 
   let imagesMetadata: z.infer<typeof imagesMetadataArraySchema> = [];
@@ -751,8 +758,14 @@ export async function editCommentAction(
     return err("VALIDATION", "Invalid comment format");
   }
 
+  if (!proseMirrorDocSchema.safeParse(comment).success) {
+    return err("VALIDATION", "Invalid comment format");
+  }
   if (docToPlainText(comment).length === 0) {
     return err("VALIDATION", "Comment cannot be empty");
+  }
+  if (JSON.stringify(comment).length > 100_000) {
+    return err("VALIDATION", "Comment is too long.");
   }
 
   try {
