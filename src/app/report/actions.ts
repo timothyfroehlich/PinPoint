@@ -27,7 +27,11 @@ import { imagesMetadataArraySchema } from "../(app)/issues/schemas";
 import { deleteFromBlob } from "~/lib/blob/client";
 import { z } from "zod";
 import { ok, err, type Result } from "~/lib/result";
-import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  type ProseMirrorDoc,
+  plainTextToDoc,
+  docToPlainText,
+} from "~/lib/tiptap/types";
 import type {
   IssueStatus,
   IssueSeverity,
@@ -127,9 +131,15 @@ export async function submitPublicIssueAction(
     try {
       description = JSON.parse(descriptionJson) as ProseMirrorDoc;
     } catch (e) {
-      log.error({ e, descriptionJson }, "Failed to parse description JSON");
-      // Fallback or error? For now, we'll try to treat it as plain text if it's not valid JSON
-      // but the editor should always send JSON.
+      log.error(
+        { e },
+        "Failed to parse description JSON — falling back to plain text"
+      );
+      description = plainTextToDoc(descriptionJson);
+    }
+    // Enforce a plain-text size limit to prevent arbitrarily large JSONB blobs
+    if (docToPlainText(description).length > 20_000) {
+      return { error: "Description is too long." };
     }
   }
 
