@@ -217,7 +217,12 @@ export default [
         {
           selector: "Literal[value=/.*@test\\.com/]",
           message:
-            "Use TEST_USERS constants or getTestEmail() instead of hardcoded @test.com emails",
+            "Use TEST_USERS constants instead of hardcoded @test.com emails (getTestEmail() args are a known false positive)",
+        },
+        {
+          selector: "TemplateElement[value.raw=/.*@test\\.com/]",
+          message:
+            "Use TEST_USERS constants instead of hardcoded @test.com emails",
         },
       ],
     },
