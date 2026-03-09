@@ -80,16 +80,14 @@ export async function fillReportForm(
     watchIssue = true,
   } = options;
 
-  // Wait for the RichTextEditor to load (dynamic import with ssr: false)
-  // before interacting with any form elements to avoid detachment
-  const descriptionEditor = page.getByRole("textbox", {
-    name: "Description",
-  });
-  await descriptionEditor.waitFor({ timeout: 15000 });
-
   await page.getByLabel("Issue Title *").fill(title);
 
   if (description) {
+    // Wait for the RichTextEditor to load (dynamic import with ssr: false)
+    const descriptionEditor = page.getByRole("textbox", {
+      name: "Description",
+    });
+    await descriptionEditor.waitFor({ timeout: 15000 });
     await descriptionEditor.click();
     await descriptionEditor.fill(description);
   }
