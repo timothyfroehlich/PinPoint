@@ -5,20 +5,21 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
 
-test.describe("About Page", () => {
+test.describe("About Page - Authenticated", () => {
+  test.use({ storageState: STORAGE_STATE.member });
+
   test("authenticated user can navigate to About via sidebar", async ({
     page,
   }, testInfo) => {
-    await loginAs(page, testInfo);
-
     const isMobile = testInfo.project.name.includes("Mobile");
 
     if (isMobile) {
-      // Mobile: no sidebar drawer — navigate directly (bottom tab bar coming in next PR)
+      // Mobile: no sidebar — navigate directly
       await page.goto("/about");
     } else {
+      await page.goto("/dashboard");
       const desktopSidebar = page.locator("aside [data-testid='sidebar']");
       await expect(desktopSidebar).toBeVisible();
       await desktopSidebar.getByRole("link", { name: "About" }).click();
@@ -37,7 +38,9 @@ test.describe("About Page", () => {
       page.getByRole("link", { name: "Terms of Service" })
     ).toBeVisible();
   });
+});
 
+test.describe("About Page - Public", () => {
   test("unauthenticated user can access About page directly", async ({
     page,
   }) => {

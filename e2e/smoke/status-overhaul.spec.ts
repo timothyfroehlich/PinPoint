@@ -1,17 +1,15 @@
 import { test, expect } from "@playwright/test";
-import {
-  loginAs,
-  updateIssueField,
-  visibleIssueFieldControl,
-} from "../support/actions";
+import { updateIssueField, visibleIssueFieldControl } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { seededMachines, TEST_USERS } from "../support/constants";
 import { fillReportForm } from "../support/page-helpers";
+import { STORAGE_STATE } from "../support/auth-state";
 
 test.describe("Status Overhaul E2E", () => {
-  test.beforeEach(async ({ page }, testInfo) => {
+  test.use({ storageState: STORAGE_STATE.member });
+
+  test.beforeEach(() => {
     test.setTimeout(60000);
-    await loginAs(page, testInfo);
   });
 
   test.afterEach(async ({ request }) => {

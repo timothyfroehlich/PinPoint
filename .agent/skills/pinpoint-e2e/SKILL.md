@@ -53,27 +53,67 @@ If a test fails in CI or parallel mode:
 1.  **Crosstalk?**: Is it seeing data from another worker? (Check screenshots for other prefixes).
     - _Fix_: Use `getTestPrefix()` filtering and unique resources.
 2.  **Session Lost?**: Redirecting to `/report/success` or `/login` unexpectedly?
-    - _Fix_: Ensure `x-skip-autologin` is NOT interfering, use `ensureLoggedIn`, and check `test.describe.serial` if tests share a user.
+    - _Fix_: Ensure `x-skip-autologin` is NOT interfering. Add `test.use({ storageState: STORAGE_STATE.<role> })` to the describe block, or use `loginAs` for mid-test role switches. Check `test.describe.serial` if tests share a user.
 3.  **Timeout?**: Waiting for a toast or email?
     - _Fix_: Use `waitForLoadState("networkidle")` before assertions. Increase timeouts for emails.
 4.  **Mobile?**: Can't find the sidebar?
-    - _Fix_: Use `ensureLoggedIn` (handles mobile menu).
+    - _Fix_: Use `testInfo.project.name.includes("Mobile")` to branch between mobile/desktop selectors. With storageState, navigate directly to the target page instead of the dashboard.
+
+## Authentication Strategy
+
+**Decision tree for new tests:**
+
+| Test type                                   | Auth approach                                      |
+| :------------------------------------------ | :------------------------------------------------- |
+| Tests one role throughout                   | `test.use({ storageState: STORAGE_STATE.<role> })` |
+| Switches roles mid-test                     | `loginAs(page, testInfo, { email, password })`     |
+| Tests login/signup/password reset           | No auth — start unauthenticated                    |
+| Tests public routes                         | No auth — omit `test.use()`                        |
+| Dynamic user (created via `createTestUser`) | `loginAs` after creating the user                  |
+
+**Available roles:**
+
+```typescript
+import { STORAGE_STATE } from "../support/auth-state"; // adjust path to e2e root
+
+// STORAGE_STATE.admin      → admin@test.com
+// STORAGE_STATE.member     → member@test.com
+// STORAGE_STATE.technician → technician@test.com
+```
+
+No auth needed for unauthenticated tests — simply omit `test.use()`.
 
 ## Creating a New Test
 
-1.  **Scaffold**:
+1.  **Scaffold** (single-role — preferred):
 
     ```typescript
     import { test, expect } from "@playwright/test";
-    import { ensureLoggedIn } from "../support/actions";
+    import { STORAGE_STATE } from "../support/auth-state";
     import { getTestIssueTitle } from "../support/test-isolation";
 
-    test("my feature works", async ({ page }, testInfo) => {
-      await ensureLoggedIn(page, testInfo);
-      const title = getTestIssueTitle("Feature Test");
-      // ...
+    test.describe("My Feature", () => {
+      test.use({ storageState: STORAGE_STATE.member });
+
+      test("my feature works", async ({ page }) => {
+        const title = getTestIssueTitle("Feature Test");
+        await page.goto("/dashboard");
+        // ...
+      });
     });
     ```
 
-2.  **Isolate**: If modifying global state, create a temp user/machine in `beforeAll`.
-3.  **Cleanup**: Delete created resources in `afterAll`.
+2.  **Scaffold** (multi-role or auth flow — use loginAs):
+
+    ```typescript
+    import { test, expect } from "@playwright/test";
+    import { loginAs } from "../support/actions";
+
+    test("role-switch works", async ({ page }, testInfo) => {
+      await loginAs(page, testInfo); // logs in as member
+      // ... do member actions
+    });
+    ```
+
+3.  **Isolate**: If modifying global state, create a temp user/machine in `beforeAll`.
+4.  **Cleanup**: Delete created resources in `afterAll`.
