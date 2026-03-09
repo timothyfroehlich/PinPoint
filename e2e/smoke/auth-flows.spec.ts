@@ -2,7 +2,8 @@
  * E2E Tests: Authentication Flows (Smoke)
  *
  * Tests login functionality only.
- * Signup, logout, and password reset are in e2e/full/auth-flows-extended.spec.ts.
+ * Signup, logout, and protected-route tests are in e2e/full/auth-flows-extended.spec.ts.
+ * Password reset email test is in e2e/full/email-and-notifications.spec.ts.
  */
 
 import { test, expect } from "@playwright/test";
