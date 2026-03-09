@@ -66,9 +66,11 @@ async function createTestIssue(
 
 async function addComment(page: Page, content: string): Promise<void> {
   // Wait for comment form to be interactive (Firefox may need extra time under parallel load)
-  const commentTextarea = page.getByRole("textbox", { name: "Comment" });
-  await expect(commentTextarea).toBeVisible({ timeout: 10000 });
-  await commentTextarea.fill(content);
+  // Use getByLabel since ProseMirror contenteditable doesn't reliably match getByRole("textbox")
+  const commentEditor = page.getByLabel("Comment", { exact: true });
+  await expect(commentEditor).toBeVisible({ timeout: 10000 });
+  await commentEditor.click();
+  await page.keyboard.type(content);
 
   const addButton = page.getByRole("button", { name: "Add Comment" });
   await expect(addButton).toBeEnabled({ timeout: 5000 });
