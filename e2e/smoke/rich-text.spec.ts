@@ -80,7 +80,7 @@ test.describe("Rich Text and Mentions", () => {
       .first()
       .click();
     await expect(
-      page.locator(`text=Mentioned in ${machine.initials}-01`)
+      page.getByText(`Mentioned in ${machine.initials}-01`)
     ).toBeVisible();
   });
 

@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
 import { Pencil } from "lucide-react";
 import { cn } from "~/lib/utils";
-import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import { type ProseMirrorDoc, docToPlainText } from "~/lib/tiptap/types";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 
@@ -76,12 +76,17 @@ export function InlineEditableField({
   function handleSave(): void {
     setError(null);
 
+    // Normalize empty Tiptap doc (e.g. { type: "doc", content: [{ type: "paragraph" }] }) to null
+    // so clearing a field persists NULL to the DB rather than a semantically-empty JSON blob.
+    const valueToSave =
+      editValue && docToPlainText(editValue).trim() ? editValue : null;
+
     // Optimistic update
-    setOptimisticValue(editValue);
+    setOptimisticValue(valueToSave);
     setIsEditing(false);
 
     startTransition(async () => {
-      const result = await onSave(machineId, editValue ?? null);
+      const result = await onSave(machineId, valueToSave);
       if (!result.ok) {
         // Revert optimistic update
         setOptimisticValue(value);

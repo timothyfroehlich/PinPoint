@@ -13,6 +13,8 @@ import { db } from "~/server/db";
 import { createNotification } from "~/lib/notifications";
 import { createTimelineEvent } from "~/lib/timeline/events";
 
+import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+
 vi.mock("~/server/db", () => ({
   db: mockDeep(),
 }));
@@ -132,7 +134,7 @@ describe("Issue Service", () => {
       };
       const params = {
         title: "New Issue",
-        description: description as any,
+        description: description satisfies ProseMirrorDoc,
         machineInitials: "MM",
         severity: "minor" as const,
         reportedBy: "user-1",
@@ -209,7 +211,7 @@ describe("Issue Service", () => {
       };
       const params = {
         issueId: "issue-1",
-        content: content as any,
+        content: content satisfies ProseMirrorDoc,
         userId: "user-1",
       };
 
