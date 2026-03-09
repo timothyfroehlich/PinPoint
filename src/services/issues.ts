@@ -218,25 +218,23 @@ export async function createIssue({
       if (description) {
         const mentions = extractMentions(description);
         if (mentions.length > 0) {
-          await Promise.all(
-            mentions.map((mentionedUserId) =>
-              createNotification(
-                {
-                  type: "mentioned",
-                  resourceId: issue.id,
-                  resourceType: "issue",
-                  actorId: reportedBy ?? undefined,
-                  includeActor: false,
-                  additionalRecipientIds: [mentionedUserId],
-                  issueTitle: title,
-                  machineName: updatedMachine.name,
-                  formattedIssueId: formattedId,
-                  commentContent: docToPlainText(description),
-                },
-                tx
-              )
-            )
-          );
+          for (const mentionedUserId of mentions) {
+            await createNotification(
+              {
+                type: "mentioned",
+                resourceId: issue.id,
+                resourceType: "issue",
+                actorId: reportedBy ?? undefined,
+                includeActor: false,
+                additionalRecipientIds: [mentionedUserId],
+                issueTitle: title,
+                machineName: updatedMachine.name,
+                formattedIssueId: formattedId,
+                commentContent: docToPlainText(description),
+              },
+              tx
+            );
+          }
         }
       }
     } catch (error) {
@@ -427,25 +425,23 @@ export async function addIssueComment({
       // Extract and notify mentions
       const mentions = extractMentions(content);
       if (mentions.length > 0) {
-        await Promise.all(
-          mentions.map((mentionedUserId) =>
-            createNotification(
-              {
-                type: "mentioned",
-                resourceId: issueId,
-                resourceType: "issue",
-                actorId: userId,
-                includeActor: false,
-                additionalRecipientIds: [mentionedUserId],
-                issueTitle: issue?.title ?? undefined,
-                machineName: issue?.machine.name ?? undefined,
-                formattedIssueId: formattedId,
-                commentContent: plainTextContent,
-              },
-              tx
-            )
-          )
-        );
+        for (const mentionedUserId of mentions) {
+          await createNotification(
+            {
+              type: "mentioned",
+              resourceId: issueId,
+              resourceType: "issue",
+              actorId: userId,
+              includeActor: false,
+              additionalRecipientIds: [mentionedUserId],
+              issueTitle: issue?.title ?? undefined,
+              machineName: issue?.machine.name ?? undefined,
+              formattedIssueId: formattedId,
+              commentContent: plainTextContent,
+            },
+            tx
+          );
+        }
       }
     } catch (error) {
       log.error(

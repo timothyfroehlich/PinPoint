@@ -2,6 +2,7 @@
 import { test, expect } from "@playwright/test";
 import { loginAs, logout } from "../support/actions";
 import { createTestUser, createTestMachine } from "../support/supabase-admin";
+import { getTestPrefix } from "../support/test-isolation";
 
 /**
  * E2E tests for Rich Text Editor and @Mentions
@@ -17,15 +18,19 @@ test.describe("Rich Text and Mentions", () => {
   test("allows creating an issue with rich text and mentions", async ({
     page,
   }, testInfo) => {
-    // 1. Setup users — unique timestamp per test run to avoid DB conflicts
-    const timestamp = Date.now();
-    const reporterEmail = `reporter-${timestamp}@example.com`;
-    const mentionedEmail = `mentioned-${timestamp}@example.com`;
+    // 1. Setup users — unique prefix per test run to avoid DB conflicts in parallel
+    const prefix = getTestPrefix();
+    const reporterEmail = `reporter-${prefix}@example.com`;
+    const mentionedEmail = `mentioned-${prefix}@example.com`;
 
-    const reporter = await createTestUser(reporterEmail);
+    // Unique display names prevent mention autocomplete from matching other parallel test users
+    const reporter = await createTestUser(reporterEmail, undefined, {
+      firstName: `Reporter${prefix}`,
+      lastName: "RT",
+    });
     // Give the mentioned user a distinct name so autocomplete can target them unambiguously
     await createTestUser(mentionedEmail, undefined, {
-      firstName: "Mentioned",
+      firstName: `Mention${prefix}`,
       lastName: "Person",
     });
 
@@ -33,7 +38,7 @@ test.describe("Rich Text and Mentions", () => {
     await loginAs(page, testInfo, { email: reporterEmail });
 
     // 3. Create machine with unique initials to avoid DB unique constraint collisions
-    const initials = `T${String(timestamp).slice(-2)}`;
+    const initials = `T${prefix.slice(-2).toUpperCase()}`;
     const machine = await createTestMachine(reporter.id, initials);
 
     // 4. Go to report page
@@ -47,18 +52,19 @@ test.describe("Rich Text and Mentions", () => {
     await editor.click();
     await page.keyboard.type("Hello ");
 
-    // 7. Trigger mention — type @Mentioned to uniquely target the mentioned user
-    await page.keyboard.type("@Mentioned");
+    // 7. Trigger mention — type unique prefix so autocomplete unambiguously targets this test's user
+    const mentionedDisplayName = `Mention${prefix} Person`;
+    await page.keyboard.type(`@Mention${prefix}`);
 
     // Wait for autocomplete and select the specific user
     const mentionItem = page
-      .locator('button:has-text("Mentioned Person")')
+      .locator(`button:has-text("${mentionedDisplayName}")`)
       .first();
     await expect(mentionItem).toBeVisible();
     await page.keyboard.press("Enter");
 
     // Verify mention is in the editor
-    await expect(editor).toContainText("@Mentioned Person");
+    await expect(editor).toContainText(`@${mentionedDisplayName}`);
 
     // 8. Add some formatting via toolbar (cross-platform select-all)
     await editor.click();
@@ -76,7 +82,7 @@ test.describe("Rich Text and Mentions", () => {
     const description = page.locator(".prose");
     await expect(description.locator("strong").first()).toBeVisible();
     await expect(description.locator(".mention")).toContainText(
-      "@Mentioned Person"
+      `@${mentionedDisplayName}`
     );
 
     // 12. Check notification for mentioned user via the Bell dropdown
@@ -94,12 +100,15 @@ test.describe("Rich Text and Mentions", () => {
   });
 
   test("allows adding comments with rich text", async ({ page }, testInfo) => {
-    const timestamp = Date.now();
-    const userEmail = `user-${timestamp}@example.com`;
-    const user = await createTestUser(userEmail);
+    const prefix = getTestPrefix();
+    const userEmail = `user-${prefix}@example.com`;
+    const user = await createTestUser(userEmail, undefined, {
+      firstName: `User${prefix}`,
+      lastName: "RT",
+    });
 
     // Unique initials to avoid collisions
-    const initials = `C${String(timestamp).slice(-2)}`;
+    const initials = `C${prefix.slice(-2).toUpperCase()}`;
     const machine = await createTestMachine(user.id, initials);
 
     await loginAs(page, testInfo, { email: userEmail });
