@@ -1,11 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn } from "./support/actions";
 import { seededMachines } from "./support/constants";
+import { STORAGE_STATE } from "./support/auth-state";
 
 test.describe("Machine Filtering and Sorting", () => {
-  test.beforeEach(async ({ page }, testInfo) => {
-    await ensureLoggedIn(page, testInfo);
-  });
+  test.use({ storageState: STORAGE_STATE.member });
 
   test("user can search and filter machines", async ({ page }) => {
     // Navigate to machines page

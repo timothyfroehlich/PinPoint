@@ -100,7 +100,7 @@ minimum_password_length = 6
 email_sent = 100  # Increased for local development testing
 token_refresh = 150
 sign_in_sign_ups = 30
-token_verifications = 30
+token_verifications = 3600  # Effectively unlimited for local dev (storageState shares tokens across tests)
 
 [auth.email]
 enable_signup = true
