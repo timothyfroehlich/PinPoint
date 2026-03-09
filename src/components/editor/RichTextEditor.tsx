@@ -131,6 +131,7 @@ export function RichTextEditor({
     extensions,
     content,
     editable: !disabled,
+    immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getJSON() as ProseMirrorDoc);
     },
