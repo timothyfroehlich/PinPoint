@@ -207,7 +207,7 @@ async function seedUsersAndData() {
     }
     await sql`
       UPDATE machines
-      SET owner_requirements = 'Check the bridge lock opto alignment before opening the building assembly. Document any broken plastics with a photo.'
+      SET owner_requirements = ${wrapTextInProseMirror("Check the bridge lock opto alignment before opening the building assembly. Document any broken plastics with a photo.")}
       WHERE initials = 'GDZ'
     `;
     console.log("✅ Machines seeded with distributed ownership.");
