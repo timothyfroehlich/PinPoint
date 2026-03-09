@@ -80,7 +80,7 @@ node_modules/
 /playwright/.cache/
 /trace/
 /e2e/fixtures/*.dump
-/e2e/.auth/user.json
+/e2e/.auth/
 
 # Supabase
 supabase/.temp/

@@ -6,20 +6,14 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
-import { TEST_USERS } from "../support/constants.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
 
 const testMachines = new Set<string>();
 const testEmails = new Set<string>();
 
 test.describe("Machine with Inline Invite (Smoke)", () => {
-  test.beforeEach(async ({ page }, testInfo) => {
-    await ensureLoggedIn(page, testInfo, {
-      email: TEST_USERS.admin.email,
-      password: TEST_USERS.admin.password,
-    });
-  });
+  test.use({ storageState: STORAGE_STATE.admin });
 
   test.afterEach(async ({ request }) => {
     if (testMachines.size > 0 || testEmails.size > 0) {

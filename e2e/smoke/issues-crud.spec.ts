@@ -7,13 +7,13 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import {
-  loginAs,
   updateIssueField,
   visibleIssueFieldControl,
 } from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
 import { fillReportForm } from "../support/page-helpers.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
 
 const createdIssueIds = new Set<string>();
 
@@ -25,11 +25,11 @@ const rememberIssueId = (page: Page): void => {
 };
 
 test.describe("Issues System", () => {
-  test.beforeEach(async ({ page }, testInfo) => {
+  test.use({ storageState: STORAGE_STATE.member });
+
+  test.beforeEach(() => {
     // Increase timeout for local execution where compilation can be slow
     test.setTimeout(60000);
-    // Login as member before each test
-    await loginAs(page, testInfo);
   });
 
   test.afterEach(async ({ request }) => {

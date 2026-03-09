@@ -45,11 +45,19 @@ function isTabActive(
   pathname: string,
   resolvedIssuesPath: string
 ): boolean {
+  // Issue detail pages (/m/[initials]/i and /m/[initials]/i/[number]) belong to the Issues tab
+  const isIssuePage = /^\/m\/[^/]+\/i(\/|$)/.test(pathname);
+
   const href = tabHref === "/issues" ? resolvedIssuesPath : tabHref;
   const basePath = href.split("?")[0] ?? href;
-  // Use prefix matching for paths that have sub-routes
-  if (basePath === "/m" || basePath.startsWith("/issues")) {
-    return pathname.startsWith(basePath);
+
+  if (basePath === "/m") {
+    // Machines tab: match /m/* but NOT issue detail pages
+    return pathname.startsWith("/m") && !isIssuePage;
+  }
+  if (basePath.startsWith("/issues")) {
+    // Issues tab: match /issues/* OR issue detail pages
+    return pathname.startsWith(basePath) || isIssuePage;
   }
   return pathname === basePath;
 }

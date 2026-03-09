@@ -1,27 +1,36 @@
 #!/bin/bash
 # scripts/workflow/monitor-gh-actions.sh
-# Monitors all currently active (queued or in-progress) workflow runs.
+# Monitors active (queued or in-progress) workflow runs for a given PR.
+# Usage: monitor-gh-actions.sh [PR_NUMBER]
+#   PR_NUMBER - optional; when provided, filters runs to the PR's branch.
+#               When omitted, monitors all active runs repo-wide.
 
 set -euo pipefail
 
 LOG_DIR="tmp/monitor-gh-actions"
 ARTIFACT="$LOG_DIR/action-failure.md"
 SIGNAL="$LOG_DIR/MONITOR_FAILED"
-REQUESTED_RUN_ID="${1:-}"
+PR_NUMBER="${1:-}"
 
 mkdir -p "$LOG_DIR"
 rm -f "$SIGNAL" "$ARTIFACT"
 
-# Find all active runs (queued or in_progress)
-# Query recent runs once, then filter by status in jq.
-ACTIVE_RUNS=$(gh run list --limit 100 --json databaseId,status --jq '.[] | select(.status == "in_progress" or .status == "queued") | .databaseId')
+# Find active runs (queued or in_progress), scoped to the PR's branch when possible.
+if [ -n "$PR_NUMBER" ]; then
+    BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+    ACTIVE_RUNS=$(gh run list --limit 100 --branch "$BRANCH" --json databaseId,status \
+        --jq '.[] | select(.status == "in_progress" or .status == "queued") | .databaseId')
+else
+    ACTIVE_RUNS=$(gh run list --limit 100 --json databaseId,status \
+        --jq '.[] | select(.status == "in_progress" or .status == "queued") | .databaseId')
+fi
 
 if [ -z "$ACTIVE_RUNS" ]; then
-    # Fallback: if user specified an ID, use it. Otherwise, look for the absolute latest run.
-    if [ -n "$REQUESTED_RUN_ID" ]; then
-        ACTIVE_RUNS=$REQUESTED_RUN_ID
+    # Fallback: show the most recent completed run (so the agent sees the result).
+    if [ -n "$PR_NUMBER" ]; then
+        ACTIVE_RUNS=$(gh run list --status completed --limit 1 --branch "$BRANCH" --json databaseId --jq '.[0].databaseId')
     else
-        ACTIVE_RUNS=$(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
+        ACTIVE_RUNS=$(gh run list --status completed --limit 1 --json databaseId --jq '.[0].databaseId')
     fi
 fi
 
@@ -31,8 +40,6 @@ if [ -z "$ACTIVE_RUNS" ]; then
 fi
 
 echo "Monitoring runs: $ACTIVE_RUNS"
-
-PR_NUMBER="${2:-}"
 
 # Use an array to track background PIDs and their corresponding Run IDs
 declare -a PIDS

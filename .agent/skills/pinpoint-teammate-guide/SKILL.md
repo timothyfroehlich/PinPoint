@@ -12,6 +12,7 @@ audience: dispatched subagent
 ## Standalone Subagent Mode
 
 If you were launched without `team_name` (no `SendMessage` available):
+
 - Quality gates are YOUR responsibility — run `pnpm run check` before returning
 - Self-check `.claude-task-contract` items before returning
 - Return a structured report: branch, PR#, CI status, Copilot status, blockers
@@ -33,6 +34,7 @@ supabase start    # required before E2E tests
 ```
 
 **Troubleshooting** if `supabase start` fails:
+
 1. `supabase stop` — stop this worktree's instance only (**NEVER** `supabase stop --all` — that kills every other agent's environment too)
 2. `docker ps` — check for orphaned containers on conflicting ports
 3. `python3 pinpoint-wt.py sync` — regenerate config if mismatched
@@ -49,7 +51,9 @@ Your worktree root should contain `.claude-task-contract` — your obligation ch
 ```
 - [ ] Code changes implemented and tests pass (pnpm run check)
 ```
+
 becomes:
+
 ```
 - [x] Code changes implemented and tests pass (pnpm run check)
 ```
@@ -74,6 +78,7 @@ PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 ```
 
 Or after creation:
+
 ```bash
 PR_NUMBER=$(gh pr list --head "$(git branch --show-current)" --json number --jq '.[0].number')
 ```
@@ -90,11 +95,11 @@ After creating the PR, run the full CI → Copilot → label sequence.
 
 ## Quality Gates
 
-| Command | When | Supabase needed? |
-|---------|------|-----------------|
-| `pnpm run check` | During development, frequently | No |
-| `pnpm run preflight` | Before final push | No |
-| `pnpm run e2e:full` | After `supabase start` | Yes |
+| Command              | When                           | Supabase needed? |
+| -------------------- | ------------------------------ | ---------------- |
+| `pnpm run check`     | During development, frequently | No               |
+| `pnpm run preflight` | Before final push              | No               |
+| `pnpm run e2e:full`  | After `supabase start`         | Yes              |
 
 ---
 
