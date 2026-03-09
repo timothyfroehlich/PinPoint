@@ -2,11 +2,36 @@
  * E2E Tests: Authentication Flows (Smoke)
  *
  * Tests login functionality only.
- * Signup, logout, and password reset are in e2e/full/auth-flows-extended.spec.ts.
+ * Signup, logout, and protected-route tests are in e2e/full/auth-flows-extended.spec.ts.
+ * Password reset email test is in e2e/full/email-and-notifications.spec.ts.
  */
 
 import { test, expect } from "@playwright/test";
 import { TEST_USERS } from "../support/constants";
+
+test.describe("Username Account Login", () => {
+  test("login with username (no @) redirects to dashboard", async ({
+    page,
+  }, testInfo) => {
+    await page.goto("/login");
+
+    // Type just the username, not the email
+    await page.getByLabel("Email").fill("testuser");
+    await page.getByLabel("Password", { exact: true }).fill("TestPassword123");
+    await page.getByRole("button", { name: "Sign In" }).click();
+
+    // Should redirect to dashboard
+    await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+
+    // Verify we're logged in
+    const isMobile = testInfo.project.name.includes("Mobile");
+    if (isMobile) {
+      await expect(page.getByTestId("mobile-header")).toBeVisible();
+    } else {
+      await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
+    }
+  });
+});
 
 test.describe("Authentication Smoke", () => {
   test("password toggle switches input type on login page", async ({
