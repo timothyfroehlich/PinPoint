@@ -461,6 +461,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -513,6 +514,9 @@ jobs:
 
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Reset database to clean state
+        run: pnpm run db:fast-reset
 
       - name: Run Smoke Tests (Chromium)
         env:
@@ -593,6 +597,9 @@ jobs:
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
 
+      - name: Reset database to clean state
+        run: pnpm run db:fast-reset
+
       - name: Run Smoke Tests (Mobile Chrome)
         env:
           MOCK_BLOB_STORAGE: "true"
@@ -618,6 +625,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -670,6 +678,9 @@ jobs:
 
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Reset database to clean state
+        run: pnpm run db:fast-reset
 
       - name: Run Full Tests (Chromium)
         env:
@@ -691,11 +702,13 @@ jobs:
     # E2E Full Tests (Mobile Chrome)
     #
     # Runs full test suite with Mobile Chrome browser.
+    # Moved to post-merge only — superseded by test-e2e-comprehensive on PRs.
     # ==============================================================================
     name: E2E Full Tests (Mobile Chrome)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -748,6 +761,9 @@ jobs:
 
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Reset database to clean state
+        run: pnpm run db:fast-reset
 
       - name: Run Full Tests (Mobile Chrome)
         env:
@@ -775,6 +791,7 @@ jobs:
     # WebKit is slow and flaky — only run on pushes to main, not on PRs or feature branches
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -831,6 +848,9 @@ jobs:
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
 
+      - name: Reset database to clean state
+        run: pnpm run db:fast-reset
+
       - name: Run Full Tests (Mobile Safari)
         env:
           MOCK_BLOB_STORAGE: "true"
@@ -843,6 +863,113 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: playwright-report-full-mobile-safari
+          path: playwright-report/
+          retention-days: 7
+
+  test-e2e-comprehensive:
+    # ==============================================================================
+    # E2E Comprehensive Tests (Post-Merge)
+    #
+    # Runs the full E2E suite across all browsers after merging to main.
+    # Not a required check for PR merge — runs only on push to main.
+    # ==============================================================================
+    name: E2E Comprehensive Tests (Post-Merge)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Restore node_modules
+        id: cache-restore
+        uses: actions/cache/restore@v5
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-all-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-all-
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright system dependencies (WebKit)
+        run: pnpm exec playwright install-deps webkit
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Generate config.toml from template
+        run: cp supabase/config.toml.template supabase/config.toml
+
+      - name: Make E2E script executable
+        run: chmod +x ./scripts/supabase-init-for-tests.sh
+
+      - name: Initialize Supabase
+        run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Reset database to clean state
+        run: pnpm run db:fast-reset
+
+      - name: Run Comprehensive Tests (Chromium)
+        env:
+          MOCK_BLOB_STORAGE: "true"
+          PLAYWRIGHT_STDOUT: "pipe"
+          PLAYWRIGHT_STDERR: "pipe"
+        run: |
+          pnpm exec playwright test e2e/smoke e2e/full \
+            --project=chromium --workers=3 --reporter=dot
+
+      - name: Run Comprehensive Tests (Mobile Chrome)
+        env:
+          MOCK_BLOB_STORAGE: "true"
+          PLAYWRIGHT_STDOUT: "pipe"
+          PLAYWRIGHT_STDERR: "pipe"
+        run: |
+          pnpm exec playwright test e2e/smoke e2e/full \
+            --project="Mobile Chrome" --workers=3 --reporter=dot
+
+      - name: Run Comprehensive Tests (Mobile Safari)
+        env:
+          MOCK_BLOB_STORAGE: "true"
+          PLAYWRIGHT_STDOUT: "pipe"
+          PLAYWRIGHT_STDERR: "pipe"
+        run: |
+          pnpm exec playwright test e2e/smoke e2e/full \
+            --project="Mobile Safari" --workers=3 --reporter=dot
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report-comprehensive
           path: playwright-report/
           retention-days: 7
 
