@@ -92,7 +92,10 @@ function renderNode(
     case "paragraph":
       return `<p>${children}</p>`;
     case "heading": {
-      const level = Number(node.attrs?.["level"]) || 2;
+      const level = Math.min(
+        3,
+        Math.max(2, Number(node.attrs?.["level"]) || 2)
+      );
       return `<h${String(level)}>${children}</h${String(level)}>`;
     }
     case "bulletList":
