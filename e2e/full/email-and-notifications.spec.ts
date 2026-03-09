@@ -1,7 +1,22 @@
+/**
+ * E2E Tests: Email and Notifications (Full Suite)
+ *
+ * Merged from notifications.spec.ts, email-notifications.spec.ts,
+ * and password reset test from auth-flows-extended.spec.ts.
+ */
+
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn, updateIssueField } from "../support/actions.js";
-import { fillReportForm } from "../support/page-helpers.js";
-import { seededMachines } from "../support/constants.js";
+import { MailpitClient } from "../support/mailpit.js";
+import {
+  ensureLoggedIn,
+  logout,
+  updateIssueField,
+} from "../support/actions.js";
+import {
+  fillReportForm,
+  submitFormAndWaitForRedirect,
+} from "../support/page-helpers.js";
+import { seededMachines, TEST_USERS } from "../support/constants.js";
 import {
   createTestUser,
   createTestMachine,
@@ -9,9 +24,15 @@ import {
   deleteTestMachine,
   updateUserRole,
   updateNotificationPreferences,
-} from "../support/supabase-admin.js";
-import { getTestIssueTitle, getTestEmail } from "../support/test-isolation.js";
-
+  generateUnsubscribeTokenForTest,
+  getNotificationPreferences,
+} from "e2e/support/supabase-admin.js";
+import {
+  getTestIssueTitle,
+  getTestEmail,
+  getTestMachineInitials,
+} from "../support/test-isolation.js";
+import { getPasswordResetLink } from "../support/mailpit.js";
 const cleanupUserIds: string[] = [];
 const cleanupMachineIds: string[] = [];
 
@@ -466,5 +487,305 @@ test.describe("Notifications", () => {
     await expect(notification).toBeVisible();
 
     await memberContext.close();
+  });
+});
+
+test.describe.serial("Email Notifications", () => {
+  const mailpit = new MailpitClient();
+  const cleanupUserIds: string[] = [];
+  const cleanupMachineIds: string[] = [];
+  let testAdminEmail: string;
+  let testAdminUserId: string;
+  let testMachineInitials: string;
+
+  test.beforeAll(async () => {
+    // Create a unique admin user for this worker
+    testAdminEmail = getTestEmail("worker-admin@test.com");
+    const user = await createTestUser(testAdminEmail);
+    testAdminUserId = user.id;
+    await updateUserRole(user.id, "admin");
+    cleanupUserIds.push(user.id);
+
+    // Create a unique machine for this worker
+    const initials = getTestMachineInitials();
+    const machine = await createTestMachine(user.id, initials);
+    testMachineInitials = machine.initials;
+    cleanupMachineIds.push(machine.id);
+
+    // Enable email notifications for status changes (default is OFF after overhaul)
+    await updateNotificationPreferences(user.id, {
+      emailNotifyOnStatusChange: true,
+    });
+  });
+
+  test.afterAll(async () => {
+    for (const machineId of cleanupMachineIds) {
+      await deleteTestMachine(machineId).catch(() => undefined);
+    }
+    for (const userId of cleanupUserIds) {
+      await deleteTestUser(userId).catch(() => undefined);
+    }
+  });
+
+  // Skip this test in Safari due to Next.js Issue #48309
+  // Safari fails to process Server Action redirects to dynamic pages
+  // This is a known Next.js/WebKit bug, not our application code
+  test.skip(
+    ({ browserName }) => browserName === "webkit",
+    "Next.js Issue #48309: Safari Server Action redirect timing"
+  );
+
+  test("should send email when issue is created", async ({
+    page,
+  }, testInfo) => {
+    const issueTitle = getTestIssueTitle("Test Issue for Email");
+
+    // Clear mailbox before test
+    mailpit.clearMailbox(testAdminEmail);
+
+    // Login as unique test admin
+    await ensureLoggedIn(page, testInfo, {
+      email: testAdminEmail,
+      password: TEST_USERS.admin.password,
+    });
+
+    // Create an issue for the unique machine
+    await page.goto(`/report?machine=${testMachineInitials}`);
+    await fillReportForm(page, {
+      title: issueTitle,
+      description: "Testing email notifications",
+    });
+
+    // Submit form and wait for Server Action redirect (Safari-defensive)
+    await submitFormAndWaitForRedirect(
+      page,
+      page.getByRole("button", { name: "Submit Issue Report" }),
+      { awayFrom: "/report" }
+    );
+
+    // Verify we're on the issue page (or success page + navigation)
+    // Worker isolation should prevent /report/success, but we keep the fallback for robustness
+    const issueUrlPattern = new RegExp(
+      `\\/m\\/${testMachineInitials}\\/i\\/[0-9]+`
+    );
+    await expect(page).toHaveURL(
+      new RegExp(`(${issueUrlPattern.source})|(\\/report\\/success)`)
+    );
+
+    if (page.url().includes("/report/success")) {
+      await page.goto("/dashboard");
+      await page
+        .getByTestId("recent-issue-card")
+        .filter({ hasText: issueTitle })
+        .first()
+        .click();
+    }
+
+    await expect(page).toHaveURL(issueUrlPattern);
+
+    // Wait for email to arrive in Mailpit
+    const email = await mailpit.waitForEmail(testAdminEmail, {
+      subjectContains: issueTitle,
+      timeout: 30000,
+      pollIntervalMs: 750,
+    });
+
+    // Verify email was sent
+    expect(email).not.toBeNull();
+    expect(email?.subject).toContain(issueTitle);
+    expect(email?.to).toContain(testAdminEmail);
+  });
+
+  // Skip this test in Safari due to Next.js Issue #48309
+  // Safari fails to process Server Action redirects to dynamic pages
+  // This is a known Next.js/WebKit bug, not our application code
+  test.skip(
+    ({ browserName }) => browserName === "webkit",
+    "Next.js Issue #48309: Safari Server Action redirect timing"
+  );
+
+  test("should send email when status changes", async ({ page }, testInfo) => {
+    const issueTitle = getTestIssueTitle("Status Change Test");
+
+    // Clear mailbox
+    mailpit.clearMailbox(testAdminEmail);
+
+    // Login
+    await ensureLoggedIn(page, testInfo, {
+      email: testAdminEmail,
+      password: TEST_USERS.admin.password,
+    });
+
+    // Create issue for the unique machine
+    await page.goto(`/report?machine=${testMachineInitials}`);
+    await fillReportForm(page, { title: issueTitle });
+
+    // Submit form and wait for Server Action redirect (Safari-defensive)
+    await submitFormAndWaitForRedirect(
+      page,
+      page.getByRole("button", { name: "Submit Issue Report" }),
+      { awayFrom: "/report" }
+    );
+
+    // Accept either direct issue page OR success page
+    const issueUrlPattern = new RegExp(
+      `\\/m\\/${testMachineInitials}\\/i\\/[0-9]+`
+    );
+    await expect(page).toHaveURL(
+      new RegExp(`(${issueUrlPattern.source})|(\\/report\\/success)`)
+    );
+
+    // If we landed on success page, we need to go to dashboard or recent issues to find the new issue
+    if (page.url().includes("/report/success")) {
+      await page.goto("/dashboard");
+      await page
+        .getByTestId("recent-issue-card")
+        .filter({ hasText: issueTitle })
+        .first()
+        .click();
+    }
+
+    await expect(page).toHaveURL(issueUrlPattern);
+
+    // Ensure we are on the page before interacting with sidebar
+    const titlePattern = issueTitle
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\s+/g, "\\s+");
+    await expect(
+      page
+        .getByRole("main")
+        .getByRole("heading", { level: 1, name: new RegExp(titlePattern) })
+    ).toBeVisible();
+
+    // Clear the "new issue" email
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    mailpit.clearMailbox(testAdminEmail);
+
+    // Update status (uses viewport-aware helper — works on both desktop and mobile)
+    await updateIssueField(page, "status", "in_progress");
+    // Wait for the server action to complete before checking email delivery
+    await page.waitForLoadState("networkidle");
+
+    // Wait for status change email - filter by "Status Changed" prefix since
+    // clearMailbox() is a no-op and the "New Issue" email (also containing
+    // issueTitle) is still in the mailbox.
+    const emailAfterStatusChange = await mailpit.waitForEmail(testAdminEmail, {
+      subjectContains: "Status Changed",
+      timeout: 30000,
+      pollIntervalMs: 750,
+    });
+
+    expect(emailAfterStatusChange).not.toBeNull();
+    expect(emailAfterStatusChange?.subject).toContain("Status Changed");
+    expect(emailAfterStatusChange?.subject).toContain(issueTitle);
+  });
+
+  test("should unsubscribe via confirmation page", async ({ page }) => {
+    // Generate a valid unsubscribe token for the test admin
+    const token = generateUnsubscribeTokenForTest(testAdminUserId);
+
+    // Navigate to the unsubscribe confirmation page (GET — non-mutating)
+    await page.goto(
+      `/api/unsubscribe?uid=${encodeURIComponent(testAdminUserId)}&token=${encodeURIComponent(token)}`
+    );
+
+    // Verify confirmation page renders
+    await expect(
+      page.getByText("Unsubscribe from PinPoint emails?")
+    ).toBeVisible();
+    await expect(
+      page.getByText("This will turn off all email notifications")
+    ).toBeVisible();
+
+    // Click the confirm button
+    await page.getByRole("button", { name: "Confirm unsubscribe" }).click();
+
+    // Verify success message
+    await expect(page.getByText("You have been unsubscribed")).toBeVisible();
+
+    // Verify all email preferences are now disabled in the database
+    const prefs = await getNotificationPreferences(testAdminUserId);
+    expect(prefs.email_enabled).toBe(false);
+    expect(prefs.email_notify_on_assigned).toBe(false);
+    expect(prefs.email_notify_on_status_change).toBe(false);
+    expect(prefs.email_notify_on_new_comment).toBe(false);
+    expect(prefs.email_notify_on_new_issue).toBe(false);
+    expect(prefs.email_watch_new_issues_global).toBe(false);
+    expect(prefs.email_notify_on_machine_ownership_change).toBe(false);
+
+    // Restore email prefs so cleanup/other tests aren't affected
+    await updateNotificationPreferences(testAdminUserId, {
+      emailEnabled: true,
+      emailNotifyOnStatusChange: true,
+    });
+  });
+});
+
+test.describe("Password Reset Email", () => {
+  test("password reset flow - user journey only", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(40000);
+    const testEmail = `reset-e2e-extended-${Date.now()}@example.com`;
+    const oldPassword = "OldPassword123!";
+    const newPassword = "NewPassword456!";
+
+    // Create account
+    await page.goto("/signup");
+    await page.getByLabel("First Name").fill("Password Reset");
+    await page.getByLabel("Last Name").fill("Test");
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByLabel("Password", { exact: true }).fill(oldPassword);
+    await page.getByLabel("Confirm Password").fill(oldPassword);
+    await page.getByLabel(/terms of service/i).check();
+    await page.getByRole("button", { name: "Create Account" }).click();
+
+    // Local env has enable_confirmations = false, so we are redirected to dashboard immediately
+    await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+
+    // Sign out to start reset journey
+    await logout(page, testInfo);
+
+    // Request reset
+    await page.goto("/forgot-password");
+    await expect(
+      page.getByRole("heading", { name: "Reset Password" })
+    ).toBeVisible();
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByRole("button", { name: "Send Reset Link" }).click();
+    await expect(
+      page.getByText(/you will receive a password reset link/i)
+    ).toBeVisible();
+
+    // Follow reset link from email
+    const resetLink = await getPasswordResetLink(testEmail);
+    expect(resetLink).toBeTruthy();
+    await page.goto(resetLink, { waitUntil: "networkidle" });
+    await expect(page).toHaveURL(/\/reset-password/, { timeout: 15000 });
+    await expect(
+      page.getByRole("heading", { name: "Set New Password" })
+    ).toBeVisible();
+
+    // Set new password and submit
+    await page.getByLabel("New Password").fill(newPassword);
+    await page.getByLabel("Confirm Password").fill(newPassword);
+    await page.getByRole("button", { name: "Update Password" }).click();
+
+    // The action redirects to /login after successful password update
+    await expect(page).toHaveURL("/login", { timeout: 15000 });
+
+    await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible({
+      timeout: 20000,
+    });
+
+    // Now log in with the new password
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByLabel("Password", { exact: true }).fill(newPassword);
+    await page.getByRole("button", { name: "Sign In" }).click();
+    await expect(page).toHaveURL("/dashboard");
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
+
+    // Cleanup
+    await logout(page, testInfo);
   });
 });
