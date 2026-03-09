@@ -36,8 +36,10 @@ for arg in "$@"; do
     esac
 done
 
-# Get branch and draft status
-pr_data=$(gh pr view "$PR" --json headRefName,isDraft 2>/dev/null) || { echo "FAIL: Could not fetch PR #${PR}."; exit 1; }
+pr_data=$(gh pr view "$PR" --json headRefName,isDraft,statusCheckRollup 2>/dev/null) || {
+    echo "FAIL: Could not fetch PR #${PR}."
+    exit 1
+}
 branch=$(echo "$pr_data" | jq -r '.headRefName')
 is_draft=$(echo "$pr_data" | jq -r '.isDraft')
 
@@ -49,8 +51,8 @@ if [ "$is_draft" = "true" ]; then
     exit 1
 fi
 
-# Check CI
-checks=$(gh pr checks "$PR" --json name,state 2>&1) || { echo "FAIL: Could not fetch CI checks for PR #${PR}."; exit 1; }
+# CI status from statusCheckRollup (same data, one fewer API call)
+checks=$(echo "$pr_data" | jq '[.statusCheckRollup[] | {name: .name, state: .conclusion // .status}]')
 total=$(echo "$checks" | jq 'length')
 failed=$(echo "$checks" | jq '[.[] | select((.state != "SUCCESS") and (.state != "IN_PROGRESS") and (.state != "QUEUED") and (.state != "PENDING") and (.state != "CANCELLED") and (.state != "SKIPPED") and (.name | startswith("codecov/") | not))] | length')
 pending=$(echo "$checks" | jq '[.[] | select(.state == "IN_PROGRESS" or .state == "QUEUED" or .state == "PENDING")] | length')
