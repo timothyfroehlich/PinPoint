@@ -28,8 +28,7 @@ async function fastReset() {
         "machines",
         "notifications",
         "notification_preferences",
-        "user_profiles",
-        "auth"."users"
+        "user_profiles"
       CASCADE;
     `;
     console.log("✅ Tables truncated.");
