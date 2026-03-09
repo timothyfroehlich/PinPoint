@@ -1,7 +1,7 @@
 // src/components/editor/RichTextEditor.tsx
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import {
   useEditor,
   EditorContent,
@@ -145,6 +145,14 @@ export function RichTextEditor({
       },
     },
   });
+
+  // Sync external content changes (e.g. when restoring draft from localStorage)
+  // We only set it if the editor is currently empty to prevent overwriting user input
+  useEffect(() => {
+    if (editor && content && editor.isEmpty) {
+      editor.commands.setContent(content);
+    }
+  }, [editor, content]);
 
   return (
     <div

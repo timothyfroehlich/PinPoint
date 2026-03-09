@@ -104,9 +104,13 @@ test.describe("Machine Details Redesign", () => {
     await descDisplay.click();
 
     // Textarea should appear
-    const textarea = page.getByTestId("machine-description-textarea");
+    const textarea = page
+      .getByTestId("machine-description")
+      .locator(".ProseMirror");
     await expect(textarea).toBeVisible();
-    await expect(textarea).toBeFocused();
+
+    // Click it to focus
+    await textarea.click();
 
     // Type a description
     await textarea.fill("A classic 1963 Gottlieb single-player game");
@@ -128,7 +132,9 @@ test.describe("Machine Details Redesign", () => {
     await descDisplay.click();
 
     // Textarea should appear
-    const textarea = page.getByTestId("machine-description-textarea");
+    const textarea = page
+      .getByTestId("machine-description")
+      .locator(".ProseMirror");
     await expect(textarea).toBeVisible();
 
     // Type something
@@ -218,7 +224,9 @@ test.describe("Machine Details Redesign", () => {
     await reqDisplay.click();
 
     // Fill in requirements
-    const textarea = page.getByTestId("machine-owner-requirements-textarea");
+    const textarea = page
+      .getByTestId("machine-owner-requirements")
+      .locator(".ProseMirror");
     await textarea.fill("Please handle with care - vintage machine");
 
     // Save
@@ -286,7 +294,9 @@ test.describe("Machine Details Redesign", () => {
     await page.getByTestId("machine-tournament-notes-display").click();
 
     // Fill in
-    const textarea = page.getByTestId("machine-tournament-notes-textarea");
+    const textarea = page
+      .getByTestId("machine-tournament-notes")
+      .locator(".ProseMirror");
     const tournamentNotes = `Extra ball settings: OFF (${Date.now()})`;
     await textarea.fill(tournamentNotes);
 

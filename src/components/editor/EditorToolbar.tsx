@@ -51,7 +51,10 @@ export function EditorToolbar({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-1 border-b p-1 bg-muted/30">
+    <div
+      className="flex flex-wrap items-center gap-1 border-b p-1 bg-muted/30"
+      onMouseDown={(e) => e.preventDefault()}
+    >
       <Toggle
         size="sm"
         pressed={editor.isActive("bold")}

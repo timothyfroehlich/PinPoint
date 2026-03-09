@@ -61,6 +61,7 @@ test.describe("Rich Text and Mentions", () => {
     await expect(editor).toContainText("@Mentioned Person");
 
     // 8. Add some formatting via toolbar (cross-platform select-all)
+    await editor.click();
     await page.keyboard.press("ControlOrMeta+a");
     await page.click('button[aria-label="Toggle bold"]');
 
@@ -73,13 +74,13 @@ test.describe("Rich Text and Mentions", () => {
 
     // 11. Verify rich text rendering
     const description = page.locator(".prose");
-    await expect(description.locator("strong")).toBeVisible();
+    await expect(description.locator("strong").first()).toBeVisible();
     await expect(description.locator(".mention")).toContainText(
       "@Mentioned Person"
     );
 
     // 12. Check notification for mentioned user via the Bell dropdown
-    await logout(page);
+    await logout(page, testInfo);
     await loginAs(page, testInfo, { email: mentionedEmail });
 
     // Open notification bell dropdown
@@ -88,7 +89,7 @@ test.describe("Rich Text and Mentions", () => {
       .first()
       .click();
     await expect(
-      page.getByText(`Mentioned in ${machine.initials}-01`)
+      page.getByText(`Mentioned in ${machine.initials}-1`)
     ).toBeVisible();
   });
 
