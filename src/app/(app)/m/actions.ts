@@ -536,15 +536,22 @@ async function updateMachineTextField(
   }
 
   // Validate ProseMirror payload: must be null or a well-formed doc with type:"doc"
+  // Normalize empty docs to null so the DB stores NULL rather than a semantically-empty JSON blob.
+  let normalizedValue: ProseMirrorDoc | null = value;
   if (value !== null) {
     if (!proseMirrorDocSchema.safeParse(value).success) {
       return err("VALIDATION", "Invalid rich text payload.");
     }
-    if (docToPlainText(value).length > 10_000) {
+    const plainText = docToPlainText(value);
+    if (plainText.length > 10_000) {
       return err("VALIDATION", "Text is too long.");
     }
     if (JSON.stringify(value).length > 100_000) {
       return err("VALIDATION", "Text is too long.");
+    }
+    // Normalize empty doc to null
+    if (plainText.trim().length === 0) {
+      normalizedValue = null;
     }
   }
 
@@ -595,7 +602,7 @@ async function updateMachineTextField(
     // Update the field
     await db
       .update(machines)
-      .set({ [field]: value })
+      .set({ [field]: normalizedValue })
       .where(eq(machines.id, machine.id));
 
     revalidatePath(`/m/${machine.initials}`);
