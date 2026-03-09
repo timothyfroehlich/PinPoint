@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions.js";
 import {
   createTestUser,
+  deleteTestUser,
   updateUserRole,
   createInvitedUser,
 } from "../support/supabase-admin.js";
@@ -16,6 +17,10 @@ test.describe("Admin Remove Invited User", () => {
     const adminUser = await createTestUser(adminEmail);
     adminId = adminUser.id;
     await updateUserRole(adminId, "admin");
+  });
+
+  test.afterAll(async () => {
+    await deleteTestUser(adminId);
   });
 
   test("admin can remove a pending invited user", async ({

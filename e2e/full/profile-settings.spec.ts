@@ -5,6 +5,24 @@ import { STORAGE_STATE } from "../support/auth-state";
 test.describe("Profile Settings", () => {
   test.use({ storageState: STORAGE_STATE.member });
 
+  // Capture the original member first name once so afterEach can restore it
+  let originalFirstName: string | undefined;
+
+  test.afterEach(async ({ page }) => {
+    if (originalFirstName === undefined) return;
+    await page.goto("/settings");
+    const profileForm = page.getByTestId("profile-form");
+    const firstNameInput = profileForm.getByLabel("First Name");
+    const currentName = await firstNameInput.inputValue();
+    if (currentName === originalFirstName) return;
+    await firstNameInput.fill(originalFirstName);
+    await profileForm.getByRole("button", { name: "Update Profile" }).click();
+    await expect(
+      profileForm.getByRole("button", { name: "Saved!" })
+    ).toBeVisible();
+    originalFirstName = undefined;
+  });
+
   test("should display user email in settings", async ({ page }) => {
     await page.goto("/settings");
 
@@ -23,7 +41,7 @@ test.describe("Profile Settings", () => {
     // 1. Update Profile
     const profileForm = page.getByTestId("profile-form");
     const firstNameInput = profileForm.getByLabel("First Name");
-    const originalName = await firstNameInput.inputValue();
+    originalFirstName = await firstNameInput.inputValue();
     const newName = `Updated ${Date.now()}`;
 
     await firstNameInput.fill(newName);
@@ -45,11 +63,6 @@ test.describe("Profile Settings", () => {
     // Verify reset
     await expect(firstNameInput).toHaveValue(newName);
 
-    // Cleanup: Revert name
-    await firstNameInput.fill(originalName);
-    await profileForm.getByRole("button", { name: "Update Profile" }).click();
-    await expect(
-      profileForm.getByRole("button", { name: "Saved!" })
-    ).toBeVisible();
+    // Revert is handled by afterEach
   });
 });

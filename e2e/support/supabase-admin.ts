@@ -239,6 +239,51 @@ export function generateUnsubscribeTokenForTest(userId: string): string {
 }
 
 /**
+ * Clear a rich-text field on a machine (sets it to null).
+ * Useful for restoring ownerRequirements / ownerNotes / description after tests.
+ */
+export async function clearMachineField(
+  machineInitials: string,
+  field:
+    | "owner_requirements"
+    | "owner_notes"
+    | "description"
+    | "tournament_notes"
+) {
+  const { error } = await supabaseAdmin
+    .from("machines")
+    .update({ [field]: null })
+    .eq("initials", machineInitials);
+  if (error) throw error;
+}
+
+/**
+ * Get the Supabase auth user ID for a given email address.
+ */
+export async function getUserIdByEmail(email: string): Promise<string> {
+  const { data: users, error } = await supabaseAdmin.auth.admin.listUsers();
+  if (error) throw error;
+  const user = users.users.find((u) => u.email === email);
+  if (!user) throw new Error(`User not found: ${email}`);
+  return user.id;
+}
+
+/**
+ * Set the owner of a machine by machine initials.
+ * Pass null to clear the owner.
+ */
+export async function setMachineOwner(
+  machineInitials: string,
+  ownerIdOrNull: string | null
+) {
+  const { error } = await supabaseAdmin
+    .from("machines")
+    .update({ owner_id: ownerIdOrNull })
+    .eq("initials", machineInitials);
+  if (error) throw error;
+}
+
+/**
  * Fetch notification preferences for a test user.
  */
 export async function getNotificationPreferences(userId: string) {
