@@ -61,6 +61,7 @@ python3 ./pinpoint-wt.py sync [--all]              # Regenerate config files
 ### Standalone Subagents (Primary) — Self-Enforced
 
 Hooks don't fire for standalone subagents. Include in every prompt:
+
 - `pnpm run check` before returning
 - Self-check `.claude-task-contract` items
 - Structured return format with CI/Copilot status
@@ -73,13 +74,13 @@ Hooks don't fire for standalone subagents. Include in every prompt:
 
 ### Coverage Expectations by Change Type
 
-| Change Type | Unit | Integration | E2E |
-|-------------|------|-------------|-----|
-| New server action | Required | Required | Required (UI that calls it) |
-| New UI component | — | — | Required (click every interactive element) |
-| Permission changes | Required (matrix) | — | Required (visible/hidden/disabled states) |
-| Bug fix | Required (regression) | If data-related | If UI-related |
-| Config/middleware | — | Required | Required (route behavior) |
+| Change Type        | Unit                  | Integration     | E2E                                        |
+| ------------------ | --------------------- | --------------- | ------------------------------------------ |
+| New server action  | Required              | Required        | Required (UI that calls it)                |
+| New UI component   | —                     | —               | Required (click every interactive element) |
+| Permission changes | Required (matrix)     | —               | Required (visible/hidden/disabled states)  |
+| Bug fix            | Required (regression) | If data-related | If UI-related                              |
+| Config/middleware  | —                     | Required        | Required (route behavior)                  |
 
 ---
 
@@ -91,6 +92,7 @@ bd list --status=open       # All open issues
 ```
 
 Present options to user. Before proceeding, verify tasks are independent:
+
 - No task blocks another (`bd show <id>`)
 - Tasks don't modify the same files
 
@@ -128,6 +130,7 @@ Task(
 Do NOT set `team_name` or `name` — these activate Agent Teams where `isolation: "worktree"` is broken.
 
 **Prompt requirements** — each subagent prompt MUST include:
+
 1. Load `pinpoint-teammate-guide` skill
 2. Beads issue context (`bd show` output)
 3. Specific files to modify and what to change
@@ -170,6 +173,7 @@ Task(
 ### Resume for Follow-Up
 
 Common resume scenarios:
+
 - Subagent returns "Copilot pending" → lead waits for review → resumes with comments
 - CI fails → lead gets failure logs → resumes with failure context
 - User requests changes → resumes with review feedback
@@ -177,16 +181,19 @@ Common resume scenarios:
 ### Handle Failures
 
 **CI fails** → Get context, then resume subagent:
+
 ```bash
 gh run view <run-id> --log-failed | tail -50
 ```
 
 **Copilot comments** → Get details, then resume subagent:
+
 ```bash
 ./scripts/workflow/copilot-comments.sh <PR>
 ```
 
 **Infrastructure failures**:
+
 ```bash
 gh run rerun <run-id> --failed
 ```
@@ -206,11 +213,11 @@ gh run rerun <run-id> --failed
 
 **Do NOT close beads issues when a PR is created.** Issues stay `in_progress` until PR **merges**.
 
-| Event | Beads Action |
-|-------|-------------|
-| Agent creates PR | Issue stays `in_progress` |
-| PR merges | `bd close <id> --reason="PR #N merged"` |
-| PR closed without merge | `bd update <id> --status=open` |
+| Event                   | Beads Action                            |
+| ----------------------- | --------------------------------------- |
+| Agent creates PR        | Issue stays `in_progress`               |
+| PR merges               | `bd close <id> --reason="PR #N merged"` |
+| PR closed without merge | `bd update <id> --status=open`          |
 
 ### Final Summary
 
@@ -269,6 +276,7 @@ Subagents should load **`pinpoint-teammate-guide`** at the start.
 ## Lead Orchestrator Role
 
 You are a **coordinator, not an implementer**:
+
 - **DO** launch subagents, review their output, resume them with corrections
 - **DO** check CI dashboards, manage beads
 - **DON'T** directly fix code in worktrees — resume the subagent instead
@@ -284,12 +292,12 @@ If a subagent can't be resumed (GC'd), spawn a new one on the same branch.
 
 ## Error Recovery
 
-| Problem | Fix |
-|---------|-----|
-| Subagent fails to create PR | Check output, verify worktree state, resume with context |
-| Permission denied on worktree | Add paths to `.claude/settings.json`, restart session |
-| Worktree creation fails | `python3 ./pinpoint-wt.py sync`, `supabase stop` (current worktree only — **never** `--all`), retry |
-| Agent Teams isolation broken | Known bug. Use standalone subagents (Option A) instead |
-| Hooks fire from wrong directory | Hooks skip for non-worktree CWD. Safeword: `touch .claude-hook-bypass` |
-| Session dies with active team | `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>` |
-| Husky post-checkout hook fails | Check `.husky/post-checkout` for merge conflict markers |
+| Problem                         | Fix                                                                                                 |
+| ------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Subagent fails to create PR     | Check output, verify worktree state, resume with context                                            |
+| Permission denied on worktree   | Add paths to `.claude/settings.json`, restart session                                               |
+| Worktree creation fails         | `python3 ./pinpoint-wt.py sync`, `supabase stop` (current worktree only — **never** `--all`), retry |
+| Agent Teams isolation broken    | Known bug. Use standalone subagents (Option A) instead                                              |
+| Hooks fire from wrong directory | Hooks skip for non-worktree CWD. Safeword: `touch .claude-hook-bypass`                              |
+| Session dies with active team   | `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>`                                              |
+| Husky post-checkout hook fails  | Check `.husky/post-checkout` for merge conflict markers                                             |

@@ -3,7 +3,7 @@
 ## Standalone Subagent (Primary)
 
 ```markdown
-Start by loading the `pinpoint-teammate-guide` skill (or read .claude/skills/pinpoint-teammate-guide/SKILL.md directly).
+Start by loading the `pinpoint-teammate-guide` skill (or read .agent/skills/pinpoint-teammate-guide/SKILL.md directly).
 
 ## Task: {task_title}
 
@@ -33,6 +33,7 @@ If Copilot review doesn't arrive within 5 minutes, note the timeout.
 ### Environment Setup
 
 If tests fail with `POSTGRES_URL is not set`:
+
 - Verify changes pass typecheck and lint: `pnpm exec tsc --noEmit && pnpm exec eslint .`
 - CI will have proper env vars — proceed with commit if typecheck/lint pass
 
@@ -63,6 +64,7 @@ If tests fail with `POSTGRES_URL is not set`:
 ## Agent Teams (Fallback)
 
 Add to the prompt:
+
 - `**Worktree**: {absolute_worktree_path}` (required — isolation broken with `team_name`)
 - `**Team**: {team_name}` / `**Your Name**: {agent_name}`
 - Replace return format with `SendMessage` instructions
