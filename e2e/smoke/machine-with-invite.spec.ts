@@ -13,7 +13,6 @@ const testMachines = new Set<string>();
 const testEmails = new Set<string>();
 
 test.describe("Machine with Inline Invite (Smoke)", () => {
-  test.describe.configure({ mode: "serial" });
   test.use({ storageState: STORAGE_STATE.admin });
 
   test.afterEach(async ({ request }) => {

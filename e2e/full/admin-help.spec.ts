@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions";
+import { TEST_USERS } from "../support/constants";
 
 test.describe("Admin Help Page", () => {
   test("admin can navigate to admin help page from help page", async ({
@@ -7,8 +8,8 @@ test.describe("Admin Help Page", () => {
   }, testInfo) => {
     // Login as admin
     await loginAs(page, testInfo, {
-      email: "admin@test.com",
-      password: "TestPassword123",
+      email: TEST_USERS.admin.email,
+      password: TEST_USERS.admin.password,
     });
 
     await page.goto("/help");

@@ -6,6 +6,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { TEST_USERS } from "../support/constants";
 
 test.describe("Authentication Smoke", () => {
   test("password toggle switches input type on login page", async ({
@@ -29,10 +30,6 @@ test.describe("Authentication Smoke", () => {
   test("login flow - sign in with existing account", async ({
     page,
   }, testInfo) => {
-    // Use test user created by seed.sql
-    const testEmail = "member@test.com";
-    const testPassword = "TestPassword123";
-
     // Navigate to login page via header sign-in button (mobile or desktop)
     await page.goto("/");
     const signInLink = page
@@ -46,8 +43,10 @@ test.describe("Authentication Smoke", () => {
     await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
 
     // Fill out login form
-    await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password", { exact: true }).fill(testPassword);
+    await page.getByLabel("Email").fill(TEST_USERS.member.email);
+    await page
+      .getByLabel("Password", { exact: true })
+      .fill(TEST_USERS.member.password);
 
     // Verify "Remember Me" checkbox is checked by default
     const rememberMeCheckbox = page.getByLabel(/Remember me/i);

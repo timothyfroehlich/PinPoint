@@ -18,8 +18,6 @@ import { getSignupLink } from "../support/mailpit.js";
 const testEmails = new Set<string>();
 
 test.describe("User Invitation & Signup Flow", () => {
-  test.describe.configure({ mode: "serial" });
-
   test.beforeEach(async ({ page }, testInfo) => {
     // Login as admin before each test
     await ensureLoggedIn(page, testInfo, {

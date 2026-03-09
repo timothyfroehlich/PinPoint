@@ -10,8 +10,6 @@ import { ensureLoggedIn, logout, loginAs } from "../support/actions";
 import { seededMachines, TEST_USERS } from "../support/constants";
 
 test.describe("Machine Details Redesign", () => {
-  test.describe.configure({ mode: "serial" });
-
   test.beforeEach(async ({ page }, testInfo) => {
     await ensureLoggedIn(page, testInfo);
   });
