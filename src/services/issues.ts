@@ -214,27 +214,27 @@ export async function createIssue({
         tx
       );
 
-      // Extract and notify mentions
+      // Extract and notify mentions — batch all mentioned users into one call
+      // to avoid O(N) round-trips inside the transaction.
       if (description) {
         const mentions = extractMentions(description);
         if (mentions.length > 0) {
-          for (const mentionedUserId of mentions) {
-            await createNotification(
-              {
-                type: "mentioned",
-                resourceId: issue.id,
-                resourceType: "issue",
-                actorId: reportedBy ?? undefined,
-                includeActor: false,
-                additionalRecipientIds: [mentionedUserId],
-                issueTitle: title,
-                machineName: updatedMachine.name,
-                formattedIssueId: formattedId,
-                commentContent: docToPlainText(description),
-              },
-              tx
-            );
-          }
+          const commentContent = docToPlainText(description);
+          await createNotification(
+            {
+              type: "mentioned",
+              resourceId: issue.id,
+              resourceType: "issue",
+              actorId: reportedBy ?? undefined,
+              includeActor: false,
+              additionalRecipientIds: mentions,
+              issueTitle: title,
+              machineName: updatedMachine.name,
+              formattedIssueId: formattedId,
+              commentContent,
+            },
+            tx
+          );
         }
       }
     } catch (error) {
@@ -422,26 +422,25 @@ export async function addIssueComment({
         tx
       );
 
-      // Extract and notify mentions
+      // Extract and notify mentions — batch all mentioned users into one call
+      // to avoid O(N) round-trips inside the transaction.
       const mentions = extractMentions(content);
       if (mentions.length > 0) {
-        for (const mentionedUserId of mentions) {
-          await createNotification(
-            {
-              type: "mentioned",
-              resourceId: issueId,
-              resourceType: "issue",
-              actorId: userId,
-              includeActor: false,
-              additionalRecipientIds: [mentionedUserId],
-              issueTitle: issue?.title ?? undefined,
-              machineName: issue?.machine.name ?? undefined,
-              formattedIssueId: formattedId,
-              commentContent: plainTextContent,
-            },
-            tx
-          );
-        }
+        await createNotification(
+          {
+            type: "mentioned",
+            resourceId: issueId,
+            resourceType: "issue",
+            actorId: userId,
+            includeActor: false,
+            additionalRecipientIds: mentions,
+            issueTitle: issue?.title ?? undefined,
+            machineName: issue?.machine.name ?? undefined,
+            formattedIssueId: formattedId,
+            commentContent: plainTextContent,
+          },
+          tx
+        );
       }
     } catch (error) {
       log.error(
