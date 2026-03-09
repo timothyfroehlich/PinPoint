@@ -9,9 +9,32 @@
 
 import { test, expect } from "@playwright/test";
 import { STORAGE_STATE } from "../support/auth-state";
+import { seededMachines } from "../support/constants";
 
 test.describe("Technician Role Permissions", () => {
   test.use({ storageState: STORAGE_STATE.technician });
+
+  // Restore the TAF machine name after each test in case it was renamed
+  test.afterEach(async ({ page }) => {
+    await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
+    const heading = page.getByRole("heading", {
+      name: seededMachines.addamsFamily.name,
+    });
+    if (await heading.isVisible()) {
+      // Name is already correct — nothing to do
+      return;
+    }
+    // Name was changed — restore it
+    const editButton = page.getByTestId("edit-machine-button");
+    await expect(editButton).toBeVisible();
+    await editButton.click();
+    const nameInput = page.getByLabel("Machine Name");
+    await nameInput.fill(seededMachines.addamsFamily.name);
+    await page.getByRole("button", { name: "Update Machine" }).click();
+    await expect(
+      page.getByRole("heading", { name: seededMachines.addamsFamily.name })
+    ).toBeVisible();
+  });
 
   test("Technician can see Add Machine button on list page", async ({
     page,

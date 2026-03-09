@@ -1,10 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { loginAs, logout } from "../support/actions.js";
-import { createTestUser, updateUserRole } from "../support/supabase-admin.js";
+import {
+  createTestUser,
+  deleteTestUser,
+  updateUserRole,
+} from "../support/supabase-admin.js";
 
 test.describe("Privilege Reset on Account Switch", () => {
   let adminEmail: string;
   let memberEmail: string;
+  const createdUserIds: string[] = [];
 
   test.beforeAll(async () => {
     const ts = Date.now();
@@ -12,11 +17,19 @@ test.describe("Privilege Reset on Account Switch", () => {
     // Create Admin
     adminEmail = `admin_switch_${ts}@example.com`;
     const adminUser = await createTestUser(adminEmail);
+    createdUserIds.push(adminUser.id);
     await updateUserRole(adminUser.id, "admin");
 
     // Create Member
     memberEmail = `member_switch_${ts}@example.com`;
-    await createTestUser(memberEmail);
+    const memberUser = await createTestUser(memberEmail);
+    createdUserIds.push(memberUser.id);
+  });
+
+  test.afterAll(async () => {
+    for (const userId of createdUserIds) {
+      await deleteTestUser(userId);
+    }
   });
 
   test("should reset privileges when switching from admin to member", async ({

@@ -13,6 +13,15 @@
 // Worker index from Playwright (0-based index of the worker)
 const workerIndex = process.env.TEST_PARALLEL_INDEX ?? "0";
 
+// Stable run ID for this worker process — generated once at module load so
+// that every call to getTestPrefix() / hasTestPrefix() returns the same value
+// within a single worker. Previously this was computed inside getTestPrefix(),
+// which meant two calls produced *different* runIds and hasTestPrefix() would
+// never match getTestPrefix().
+const timestampPart = Date.now().toString(36).slice(-4);
+const randomPart = Math.random().toString(36).slice(2, 6);
+const runId = `${timestampPart}${randomPart}`;
+
 /**
  * Get a unique prefix for this test worker/run combination
  *
@@ -22,9 +31,6 @@ const workerIndex = process.env.TEST_PARALLEL_INDEX ?? "0";
  * randomness-based suffix to avoid collisions when workers start together.
  */
 export function getTestPrefix(): string {
-  const timestampPart = Date.now().toString(36).slice(-4);
-  const randomPart = Math.random().toString(36).slice(2, 6);
-  const runId = `${timestampPart}${randomPart}`;
   return `w${workerIndex}_${runId}`;
 }
 

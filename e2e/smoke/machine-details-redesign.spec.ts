@@ -8,10 +8,20 @@
 import { test, expect } from "@playwright/test";
 import { ensureLoggedIn, logout, loginAs } from "../support/actions";
 import { seededMachines, TEST_USERS } from "../support/constants";
+import { clearMachineField } from "../support/supabase-admin";
 
 test.describe("Machine Details Redesign", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     await ensureLoggedIn(page, testInfo);
+  });
+
+  // The ownerRequirements test writes to Medieval Madness. Always clear it so
+  // subsequent runs don't see stale data.
+  test.afterEach(async () => {
+    await clearMachineField(
+      seededMachines.medievalMadness.initials,
+      "owner_requirements"
+    );
   });
 
   test("should display full-width details card with two-column layout", async ({

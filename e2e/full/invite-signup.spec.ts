@@ -12,10 +12,17 @@
 import { test, expect } from "@playwright/test";
 import { ensureLoggedIn, logout } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
-import { TEST_USERS } from "../support/constants.js";
+import { seededMachines, TEST_USERS } from "../support/constants.js";
 import { getSignupLink } from "../support/mailpit.js";
+import {
+  getUserIdByEmail,
+  setMachineOwner,
+} from "../support/supabase-admin.js";
 
 const testEmails = new Set<string>();
+// Track whether the HD machine owner was changed during a test so afterEach
+// can restore it to the admin user.
+let hdOwnerChanged = false;
 
 test.describe("User Invitation & Signup Flow", () => {
   test.beforeEach(async ({ page }, testInfo) => {
@@ -27,6 +34,14 @@ test.describe("User Invitation & Signup Flow", () => {
   });
 
   test.afterEach(async ({ request }) => {
+    // Restore HD machine owner to admin before deleting the test user so the
+    // foreign key is valid when the user row is removed.
+    if (hdOwnerChanged) {
+      const adminId = await getUserIdByEmail(TEST_USERS.admin.email);
+      await setMachineOwner(seededMachines.humptyDumpty.initials, adminId);
+      hdOwnerChanged = false;
+    }
+
     if (testEmails.size > 0) {
       await cleanupTestEntities(request, {
         userEmails: Array.from(testEmails),
@@ -165,6 +180,7 @@ test.describe("User Invitation & Signup Flow", () => {
     // Save the machine (dialog closes on success)
     await page.getByRole("button", { name: /Update Machine/i }).click();
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 10000 });
+    hdOwnerChanged = true;
 
     // 3. Logout and complete signup
     await logout(page, testInfo);

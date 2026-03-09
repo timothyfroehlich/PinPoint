@@ -1,11 +1,17 @@
 import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions.js";
-import { createTestUser, updateUserRole } from "../support/supabase-admin.js";
+import {
+  createTestUser,
+  deleteTestUser,
+  updateUserRole,
+} from "../support/supabase-admin.js";
 
 test.describe("Admin User Management", () => {
   let adminEmail: string;
   let adminId: string;
   let targetEmail: string;
+  let memberEmail: string | undefined;
+  const createdUserIds: string[] = [];
 
   test.beforeAll(async () => {
     // Create Admin User
@@ -13,12 +19,21 @@ test.describe("Admin User Management", () => {
     adminEmail = `admin_${adminTimestamp}@example.com`;
     const adminUser = await createTestUser(adminEmail);
     adminId = adminUser.id;
+    createdUserIds.push(adminId);
     await updateUserRole(adminId, "admin");
 
     // Create Target User
     const targetTimestamp = Date.now();
     targetEmail = `target_${targetTimestamp}@example.com`;
-    await createTestUser(targetEmail);
+    const targetUser = await createTestUser(targetEmail);
+    createdUserIds.push(targetUser.id);
+  });
+
+  test.afterAll(async () => {
+    // Delete all users created during this describe block
+    for (const userId of createdUserIds) {
+      await deleteTestUser(userId);
+    }
   });
 
   test("admin can view users and change roles", async ({ page }, testInfo) => {
@@ -79,8 +94,9 @@ test.describe("Admin User Management", () => {
 
   test("non-admin cannot access admin page", async ({ page }, testInfo) => {
     // Create a member user to test access control be safe.
-    const memberEmail = `member_${Date.now()}@example.com`;
-    await createTestUser(memberEmail);
+    memberEmail = `member_${Date.now()}@example.com`;
+    const memberUser = await createTestUser(memberEmail);
+    createdUserIds.push(memberUser.id);
 
     await loginAs(page, testInfo, {
       email: memberEmail,
