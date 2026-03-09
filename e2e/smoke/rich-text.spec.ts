@@ -17,19 +17,20 @@ test.describe("Rich Text and Mentions", () => {
   test("allows creating an issue with rich text and mentions", async ({
     page,
   }, testInfo) => {
-    // 1. Setup users
+    // 1. Setup users — unique timestamp per test run to avoid DB conflicts
     const timestamp = Date.now();
     const reporterEmail = `reporter-${timestamp}@example.com`;
     const mentionedEmail = `mentioned-${timestamp}@example.com`;
 
     const reporter = await createTestUser(reporterEmail);
-    const mentioned = await createTestUser(mentionedEmail);
+    const _mentioned = await createTestUser(mentionedEmail);
 
     // 2. Login as reporter
     await loginAs(page, testInfo, { email: reporterEmail });
 
-    // 3. Create a machine using helper
-    const machine = await createTestMachine(reporter.id, "TTM");
+    // 3. Create machine with unique initials to avoid DB unique constraint collisions
+    const initials = `T${String(timestamp).slice(-2)}`;
+    const machine = await createTestMachine(reporter.id, initials);
 
     // 4. Go to report page
     await page.goto(`/report?machine=${machine.initials}`);
@@ -42,10 +43,10 @@ test.describe("Rich Text and Mentions", () => {
     await editor.click();
     await page.keyboard.type("Hello ");
 
-    // 7. Trigger mention
-    await page.keyboard.type("@Test"); // createTestUser uses "Test User" name
+    // 7. Trigger mention — type @Test to trigger autocomplete
+    await page.keyboard.type("@Test");
 
-    // Wait for autocomplete and select
+    // Wait for autocomplete and select first match
     const mentionItem = page.locator('button:has-text("Test User")').first();
     await expect(mentionItem).toBeVisible();
     await page.keyboard.press("Enter");
@@ -53,8 +54,8 @@ test.describe("Rich Text and Mentions", () => {
     // Verify mention is in the editor
     await expect(editor).toContainText("@Test User");
 
-    // 8. Add some formatting via toolbar
-    await page.keyboard.press("Control+a");
+    // 8. Add some formatting via toolbar (cross-platform select-all)
+    await page.keyboard.press("ControlOrMeta+a");
     await page.click('button[aria-label="Toggle bold"]');
 
     // 9. Submit issue
@@ -69,14 +70,18 @@ test.describe("Rich Text and Mentions", () => {
     await expect(description.locator("strong")).toBeVisible();
     await expect(description.locator(".mention")).toContainText("@Test User");
 
-    // 12. Check notification for mentioned user
+    // 12. Check notification for mentioned user via the Bell dropdown
     await logout(page);
     await loginAs(page, testInfo, { email: mentionedEmail });
 
-    // Go to notifications
-    await page.goto("/notifications");
-    await expect(page.locator("text=mentioned you")).toBeVisible();
-    await expect(page.locator(`text=${machine.initials}-01`)).toBeVisible();
+    // Open notification bell dropdown
+    await page
+      .getByRole("button", { name: /notifications/i })
+      .first()
+      .click();
+    await expect(
+      page.locator(`text=Mentioned in ${machine.initials}-01`)
+    ).toBeVisible();
   });
 
   test("allows adding comments with rich text", async ({ page }, testInfo) => {
@@ -84,7 +89,9 @@ test.describe("Rich Text and Mentions", () => {
     const userEmail = `user-${timestamp}@example.com`;
     const user = await createTestUser(userEmail);
 
-    const machine = await createTestMachine(user.id, "CTM");
+    // Unique initials to avoid collisions
+    const initials = `C${String(timestamp).slice(-2)}`;
+    const machine = await createTestMachine(user.id, initials);
 
     await loginAs(page, testInfo, { email: userEmail });
     await page.goto(`/report?machine=${machine.initials}`);

@@ -324,7 +324,12 @@ function TimelineItem({
             {isEditing ? (
               <CommentEditForm
                 commentId={event.id}
-                initialContent={event.content ?? { type: "doc", content: [] }}
+                initialContent={
+                  event.content ?? {
+                    type: "doc",
+                    content: [{ type: "paragraph" }],
+                  }
+                }
                 onCancel={() => setIsEditing(false)}
               />
             ) : (
