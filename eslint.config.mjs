@@ -202,7 +202,7 @@ export default [
       // Allow disabling rules in tests if needed (mocking often requires it)
       "eslint-comments/no-restricted-disable": "off",
 
-      // E2E anti-patterns
+      // E2E anti-patterns (page.waitForTimeout — harmless rule for non-E2E tests since they don't use Playwright's page)
       "no-restricted-properties": [
         "warn",
         {
@@ -212,6 +212,12 @@ export default [
             "Use Playwright assertions (auto-wait) instead of waitForTimeout",
         },
       ],
+    },
+  },
+  {
+    // E2E-only anti-patterns (rules specific to e2e/ that reference E2E helpers like TEST_USERS)
+    files: ["e2e/**/*"],
+    rules: {
       "no-restricted-syntax": [
         "warn",
         {
