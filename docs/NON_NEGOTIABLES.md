@@ -335,6 +335,87 @@ trigger: always_on
 - **Do:** Use Tailwind utility classes or CSS variables
 - **Don't:** `style={{ marginTop: '10px' }}` (unless dynamic coordinates)
 
+**CORE-UI-005:** Semantic color tokens only — no raw Tailwind palette colors in app code
+
+- **Severity:** High
+- **Do:** `text-warning`, `text-primary`, `text-muted-foreground`, `bg-card`, `bg-success-container`
+- **Don't:** `text-amber-500`, `text-purple-900`, `text-cyan-600`, `bg-green-800`
+
+**CORE-UI-006:** Standard page container for all authenticated pages
+
+- **Severity:** High
+- **Do:** `<div className="max-w-6xl mx-auto py-10 space-y-6">`
+- **Don't:** `max-w-4xl`, `max-w-screen-xl`, custom padding variations, extra horizontal padding
+
+**CORE-UI-007:** Section heading override in app pages
+
+- **Severity:** High
+- **Why:** Bare `<h2>` in app pages renders at `text-3xl` (MDX scale) — too large for in-page sections
+- **Do:** `<h2 className="text-xl font-semibold text-foreground mb-4">Section</h2>`
+- **Don't:** Bare `<h2>Section</h2>` in app pages, or using `<p>` for semantic headings
+
+**CORE-UI-008:** Card composition — always use shadcn/ui Card, never raw bordered divs
+
+- **Severity:** High
+- **Do:** `<Card><CardHeader><CardTitle>...</CardTitle></CardHeader><CardContent>...</CardContent></Card>`
+- **Don't:** `<div className="border rounded-lg bg-card p-4">`
+
+**CORE-UI-009:** 5 canonical card variants only — never invent new border/glow combinations
+
+- **Severity:** High
+- **Variants:** neutral (`border-border bg-card`), primary (`border-primary/20 glow-primary`), success (`border-success/30 bg-success/10 glow-success`), warning (`border-warning/30 bg-warning/10 glow-warning`), destructive (`border-destructive/30 bg-destructive/10 glow-destructive`)
+
+**CORE-UI-010:** Standard empty state for every list/grid — no blank screens
+
+- **Severity:** Required
+- **Do:** `<CardContent className="py-12 text-center">` + `size-12` icon (muted) + `text-lg text-muted-foreground` message
+- **Don't:** Leave an empty list with no feedback, or invent ad-hoc empty state layouts
+
+**CORE-UI-011:** shadcn/ui Button variants only — no custom button styling
+
+- **Severity:** High
+- **Variants:** `default`, `destructive`, `outline`, `secondary`, `ghost`, `link`
+- **Sizes:** default, `sm`, `lg`, `icon` (icon buttons always need `aria-label`)
+
+**CORE-UI-012:** Irreversible actions require AlertDialog confirmation
+
+- **Severity:** Critical
+- **Do:** Wrap destructive buttons in `<AlertDialog>` with title + description + cancel/confirm
+- **Don't:** Single-click destructive actions without confirmation
+
+**CORE-UI-013:** Icons from `lucide-react` only, at standard sizes
+
+- **Severity:** High
+- **Sizes:** `size-4` (inline), `size-5` (standalone), `size-12` (empty state)
+- **Don't:** Import from heroicons, react-icons, or other libraries; use arbitrary pixel sizes
+
+**CORE-UI-014:** `Skeleton` component for loading states — no custom spinners
+
+- **Severity:** Required
+- **Do:** `<Skeleton className="h-4 w-48" />` shaped to match actual content
+- **Don't:** `animate-spin` spinners, text-only "Loading..." indicators
+
+**CORE-UI-015:** `IssueBadge` for all status/severity/priority/frequency values
+
+- **Severity:** High
+- **Do:** `<IssueBadge type="status" value={issue.status} />`
+- **Don't:** Ad-hoc colored spans, hardcoded badge colors for domain values
+
+**CORE-UI-016:** Glow effects match semantic meaning — only on interactive surfaces
+
+- **Severity:** Required
+- **Do:** `glow-primary` on primary action cards, `glow-success` on success cards, etc.
+- **Don't:** Glow on static decorative elements; mismatched glow/border colors
+
+**CORE-UI-017:** Mobile-first responsive design — all layouts start single-column
+
+- **Severity:** High
+- **Do:** `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` (add columns at breakpoints)
+- **Don't:** Desktop-first layouts (`grid-cols-3 md:grid-cols-1`), adding horizontal padding to page container (MainLayout handles it), desktop-only pages
+
+**Full UI rules with examples:** `docs/UI_NON_NEGOTIABLES.md`
+**Live style guide (dev only):** `/debug/`
+
 ---
 
 ## Forbidden Patterns
@@ -367,6 +448,15 @@ trigger: always_on
 - **Over-serialization to client**: Don't pass full domain objects to Client Components; map to minimal shapes at the server→client boundary (especially user/account data)
 - **Email display outside admin**: Never display `reporterEmail` in non-admin UI, timeline text, or seed data (use names or "Anonymous")
 - **Permissions matrix drift**: Never change server action auth checks without updating `matrix.ts` (help page auto-generates from it)
+- **Raw Tailwind palette colors**: `text-amber-500`, `bg-purple-900`, `text-cyan-600` in app code (use semantic tokens: `text-warning`, `text-secondary`, etc.)
+- **Bare h2 in app pages**: `<h2>Title</h2>` without explicit size override renders too large — always override with `text-xl font-semibold`
+- **Raw bordered divs as cards**: `<div className="border rounded-lg bg-card">` — use the Card component
+- **New card border/glow combos**: inventing card styles outside the 5 canonical variants
+- **Single-click destructive actions**: no confirmation dialog for irreversible operations
+- **Non-Lucide icons**: importing from heroicons, react-icons, or other libraries
+- **Custom spinner components**: use Skeleton component for loading states
+- **Ad-hoc domain badges**: colored spans for status/severity/priority/frequency — use IssueBadge
+- **Desktop-only layouts**: not accounting for mobile (MainLayout provides shell but page grids must be mobile-first)
 
 ---
 
@@ -402,6 +492,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑PERF‑001..002: Performance
 - CORE‑TEST‑001..005: Testing
 - CORE‑ARCH‑001..008: Architecture
+- CORE‑UI‑001..017: UI & styling (001..004 here; 005..017 in `docs/UI_NON_NEGOTIABLES.md`)
 
 **Cross-References:**
 
@@ -409,3 +500,5 @@ If all Yes → ship it. Perfect is the enemy of done.
 - Product features: `docs/PRODUCT_SPEC.md`
 - Technical architecture: `docs/TECH_SPEC.md`
 - Discipline guidelines: `docs/DISCIPLINE.md`
+- UI patterns (extended): `docs/UI_NON_NEGOTIABLES.md`
+- Live style guide (dev): `/debug/`
