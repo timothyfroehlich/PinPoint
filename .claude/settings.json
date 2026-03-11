@@ -96,7 +96,8 @@
     "beads@beads-marketplace": true,
     "superpowers@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true,
-    "explanatory-output-style@claude-plugins-official": true
+    "explanatory-output-style@claude-plugins-official": true,
+    "superpowers@superpowers-marketplace": true
   },
   "outputStyle": "Explanatory"
 }
