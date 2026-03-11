@@ -52,9 +52,10 @@ if [ "$is_draft" = "true" ]; then
 fi
 
 # CI status from statusCheckRollup (same data, one fewer API call)
-checks=$(echo "$pr_data" | jq '[.statusCheckRollup[] | {name: .name, state: .conclusion // .status}]')
+# Filter out ghost entries (null name/status from third-party integrations)
+checks=$(echo "$pr_data" | jq '[.statusCheckRollup[] | select(.name != null) | {name: .name, state: .conclusion // .status}]')
 total=$(echo "$checks" | jq 'length')
-failed=$(echo "$checks" | jq '[.[] | select((.state != "SUCCESS") and (.state != "IN_PROGRESS") and (.state != "QUEUED") and (.state != "PENDING") and (.state != "CANCELLED") and (.state != "SKIPPED") and (.name | startswith("codecov/") | not))] | length')
+failed=$(echo "$checks" | jq '[.[] | select((.state != "SUCCESS") and (.state != "IN_PROGRESS") and (.state != "QUEUED") and (.state != "PENDING") and (.state != "CANCELLED") and (.state != "SKIPPED") and ((.name | startswith("codecov/")) | not))] | length')
 pending=$(echo "$checks" | jq '[.[] | select(.state == "IN_PROGRESS" or .state == "QUEUED" or .state == "PENDING")] | length')
 
 if [ "$total" -eq 0 ]; then
@@ -68,7 +69,7 @@ if [ "$pending" -gt 0 ]; then
 fi
 
 if [ "$failed" -gt 0 ]; then
-    failed_names=$(echo "$checks" | jq -r '.[] | select((.state != "SUCCESS") and (.state != "IN_PROGRESS") and (.state != "QUEUED") and (.state != "PENDING") and (.state != "CANCELLED") and (.state != "SKIPPED") and (.name | startswith("codecov/") | not)) | "\(.name) (\(.state))"' | paste -sd ", ")
+    failed_names=$(echo "$checks" | jq -r '.[] | select((.state != "SUCCESS") and (.state != "IN_PROGRESS") and (.state != "QUEUED") and (.state != "PENDING") and (.state != "CANCELLED") and (.state != "SKIPPED") and ((.name | startswith("codecov/")) | not)) | "\(.name) (\(.state))"' | paste -sd ", ")
     echo "FAIL: ${failed} checks failed: ${failed_names}"
     exit 1
 fi
