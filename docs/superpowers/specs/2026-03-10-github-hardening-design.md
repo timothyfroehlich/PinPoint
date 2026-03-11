@@ -17,10 +17,10 @@ Single PR covering six hardening layers:
 
 ### 1. Workflow Permissions Lockdown
 
-Add `permissions: read-all` at the workflow level for `ci.yml`,
-`pr-screenshots.yml`, and `cleanup-screenshots.yml`. Jobs that need write
-access declare it explicitly at job level (screenshots needs `contents: write`,
-`pull-requests: write`).
+Add `permissions: read-all` at the workflow level for `ci.yml` and
+`pr-screenshots.yml`. `cleanup-screenshots.yml` keeps its workflow-level
+`permissions: contents: write` (no broader scopes needed). Jobs that need
+additional write access declare it explicitly at job level.
 
 Delete `claude.yml` (unused, had `id-token: write`).
 
@@ -55,7 +55,8 @@ Sensitive paths require Tim's review:
 - `supabase/`, `drizzle/`
 - `src/middleware.ts`, `src/lib/permissions/`
 
-Everything else auto-merges on CI green.
+Changes outside these paths follow standard branch protection; no
+additional CODEOWNER review is required.
 
 ### 7. Stale package-lock.json Cleanup
 

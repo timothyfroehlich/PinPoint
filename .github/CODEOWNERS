@@ -1,5 +1,5 @@
 # Sensitive paths require owner review before merge.
-# Everything else auto-merges on CI green.
+# Changes outside these paths follow standard branch protection.
 
 # CI pipeline and workflow configuration
 .github/workflows/ @timothyfroehlich

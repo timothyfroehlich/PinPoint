@@ -257,8 +257,8 @@ jobs:
           dl="https://raw.githubusercontent.com/rhysd/actionlint"
           dl="${dl}/main/scripts/download-actionlint.bash"
           bash <(curl -sL "$dl") "$ACTIONLINT_VERSION"
-          find .github/workflows -name '*.yml' ! -name '*.lock.yml' \
-            -print0 | xargs -0 ./actionlint
+          find .github/workflows \( -name '*.yml' -o -name '*.yaml' \) \
+            ! -name '*.lock.yml' -print0 | xargs -0 ./actionlint
 
       - name: Ruff check
         run: ruff check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py
@@ -271,20 +271,17 @@ jobs:
 
       - name: Install zizmor
         run: |
-          pipx install zizmor
+          pipx install "zizmor==1.23.1"
 
       - name: Zizmor (GitHub Actions security)
         run: |
-          find .github/workflows -name '*.yml' ! -name '*.lock.yml' \
-            -print0 | xargs -0 zizmor --min-severity low --format plain
+          find .github/workflows \( -name '*.yml' -o -name '*.yaml' \) \
+            ! -name '*.lock.yml' -print0 | xargs -0 zizmor --min-severity low --format plain
 
       - name: Verify pinned actions (pinact)
-        run: |
-          PINACT_VERSION="3.9.0"
-          dl="https://github.com/suzuki-shunsuke/pinact/releases/download"
-          dl="${dl}/v${PINACT_VERSION}/pinact_linux_amd64.tar.gz"
-          curl -sL "$dl" | tar xz -C /usr/local/bin pinact
-          pinact run --verify
+        uses: suzuki-shunsuke/pinact-action@1081f5ad49ac904b7d977784f338145150a32112  # v1.4.0
+        with:
+          version: v3.9.0
 
   build:
     name: Build
