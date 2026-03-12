@@ -527,7 +527,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: playwright-report-smoke-chromium
           path: playwright-report/
@@ -609,7 +609,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: playwright-report-smoke-mobile-chrome
           path: playwright-report/
@@ -691,7 +691,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: playwright-report-full-chromium
           path: playwright-report/
@@ -791,7 +791,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: playwright-report-comprehensive
           path: playwright-report/
