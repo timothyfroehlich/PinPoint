@@ -1,0 +1,15 @@
+# Sensitive paths require owner review before merge.
+# Changes outside these paths follow standard branch protection.
+
+# CI pipeline and workflow configuration
+.github/workflows/ @timothyfroehlich
+.github/dependabot.yml @timothyfroehlich
+.github/CODEOWNERS @timothyfroehlich
+
+# Database schema and migrations
+supabase/ @timothyfroehlich
+drizzle/ @timothyfroehlich
+
+# Auth, routing, and permission enforcement
+src/middleware.ts @timothyfroehlich
+src/lib/permissions/ @timothyfroehlich
