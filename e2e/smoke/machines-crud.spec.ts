@@ -17,8 +17,6 @@ import {
 const createdMachineIds = new Set<string>();
 
 test.describe("Machines CRUD", () => {
-  test.describe.configure({ mode: "serial" });
-
   // Login before each test (required for protected routes)
   test.beforeEach(async ({ page }, testInfo) => {
     await ensureLoggedIn(page, testInfo);
@@ -105,8 +103,7 @@ test.describe("Machines CRUD", () => {
       expect(Number.isNaN(Number.parseInt(countText, 10))).toBe(false);
     }
 
-    // Use the stable TAF route instead of the display name: an earlier serial
-    // test intentionally renames the machine.
+    // Use the stable TAF route instead of the display name
     const addamsCard = page.locator(
       `a[href="/m/${seededMachines.addamsFamily.initials}"]`
     );
@@ -121,8 +118,7 @@ test.describe("Machines CRUD", () => {
   test("should display machine issues on detail page via expando", async ({
     page,
   }) => {
-    // Navigate to TAF. Earlier serial tests can rename the machine, so key
-    // this test off the stable initials/route instead of the display name.
+    // Navigate to TAF using stable initials route
     await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
 
     // Should show machine details

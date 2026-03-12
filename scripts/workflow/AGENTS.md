@@ -54,4 +54,4 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 ## Related Docs
 
 - `AGENTS.md` — "GitHub Copilot Reviews" section defines the MCP-first reply protocol
-- `.claude/skills/pinpoint-orchestrator/SKILL.md` — Full orchestrator workflow
+- `.agent/skills/pinpoint-orchestrator/SKILL.md` — Full orchestrator workflow

@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36  # v3
         with:
           predicate-quantifier: "every"
           filters: |
@@ -44,7 +44,7 @@ jobs:
       # Separate filter for dependency changes using default "some" quantifier
       # so deps=true when ANY changed file is a dependency file (not ALL).
       - id: deps-filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36  # v3
         with:
           filters: |
             deps:
@@ -461,6 +461,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -513,6 +514,9 @@ jobs:
 
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Reset database to clean state
+        run: pnpm run db:fast-reset
 
       - name: Run Smoke Tests (Chromium)
         env:
@@ -593,6 +597,9 @@ jobs:
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
 
+      - name: Reset database to clean state
+        run: pnpm run db:fast-reset
+
       - name: Run Smoke Tests (Mobile Chrome)
         env:
           MOCK_BLOB_STORAGE: "true"
@@ -618,6 +625,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -670,6 +678,9 @@ jobs:
 
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Reset database to clean state
+        run: pnpm run db:fast-reset
 
       - name: Run Full Tests (Chromium)
         env:
@@ -686,16 +697,18 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
-  test-e2e-full-mobile-chrome:
+  test-e2e-comprehensive:
     # ==============================================================================
-    # E2E Full Tests (Mobile Chrome)
+    # E2E Comprehensive Tests (Post-Merge)
     #
-    # Runs full test suite with Mobile Chrome browser.
+    # Runs the full E2E suite across all browsers after merging to main.
+    # Not a required check for PR merge — runs only on push to main.
     # ==============================================================================
-    name: E2E Full Tests (Mobile Chrome)
+    name: E2E Comprehensive Tests (Post-Merge)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -732,95 +745,17 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-playwright-all-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
+            ${{ runner.os }}-playwright-all-
             ${{ runner.os }}-playwright-chromium-
 
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Generate config.toml from template
-        run: cp supabase/config.toml.template supabase/config.toml
-
-      - name: Make E2E script executable
-        run: chmod +x ./scripts/supabase-init-for-tests.sh
-
-      - name: Initialize Supabase
-        run: ./scripts/supabase-init-for-tests.sh
-
-      - name: Run Full Tests (Mobile Chrome)
-        env:
-          MOCK_BLOB_STORAGE: "true"
-          PLAYWRIGHT_STDOUT: "pipe"
-          PLAYWRIGHT_STDERR: "pipe"
-        run: pnpm exec playwright test --config=playwright.config.full.ts --project="Mobile Chrome" --reporter=dot
-
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v6
-        with:
-          name: playwright-report-full-mobile-chrome
-          path: playwright-report/
-          retention-days: 7
-
-  test-e2e-full-mobile-safari:
-    # ==============================================================================
-    # E2E Full Tests (Mobile Safari)
-    #
-    # Runs full test suite with Mobile Safari (WebKit) browser.
-    # ==============================================================================
-    name: E2E Full Tests (Mobile Safari)
-    runs-on: ubuntu-latest
-    # WebKit is slow and flaky — only run on pushes to main, not on PRs
-    if: ${{ github.event_name == 'push' }}
-    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: "pnpm"
-
-      - name: Restore node_modules
-        id: cache-restore
-        uses: actions/cache/restore@v5
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install dependencies (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-webkit-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-webkit-
-
-      - name: Install Playwright system dependencies
+      - name: Install Playwright system dependencies (WebKit)
         run: pnpm exec playwright install-deps webkit
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install webkit
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Generate config.toml from template
         run: cp supabase/config.toml.template supabase/config.toml
@@ -831,18 +766,34 @@ jobs:
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
 
-      - name: Run Full Tests (Mobile Safari)
+      - name: Reset database to clean state
+        run: pnpm run db:fast-reset
+
+      - name: Run Comprehensive Smoke Tests (all browsers)
         env:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
-        run: pnpm exec playwright test --config=playwright.config.full.ts --project="Mobile Safari" --reporter=dot
+        run: |
+          pnpm exec playwright test --config=playwright.config.smoke.ts \
+            --project=chromium --project="Mobile Chrome" \
+            --project="Mobile Safari" --workers=3 --reporter=dot
+
+      - name: Run Comprehensive Full Tests (all browsers)
+        env:
+          MOCK_BLOB_STORAGE: "true"
+          PLAYWRIGHT_STDOUT: "pipe"
+          PLAYWRIGHT_STDERR: "pipe"
+        run: |
+          pnpm exec playwright test --config=playwright.config.full.ts \
+            --project=chromium --project="Mobile Chrome" \
+            --project="Mobile Safari" --workers=3 --reporter=dot
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: playwright-report-full-mobile-safari
+          name: playwright-report-comprehensive
           path: playwright-report/
           retention-days: 7
 
@@ -923,8 +874,6 @@ jobs:
       - test-e2e-smoke
       - test-e2e-smoke-mobile-chrome
       - test-e2e-full-chromium
-      - test-e2e-full-mobile-chrome
-      - test-e2e-full-mobile-safari
       - pnpm-audit
     runs-on: ubuntu-latest
     steps:
@@ -936,8 +885,7 @@ jobs:
                    "${{ needs.test-unit.result }}" "${{ needs.test-integration.result }}" \
                    "${{ needs.test-migrations.result }}" "${{ needs.test-integration-supabase.result }}" \
                    "${{ needs.test-e2e-smoke.result }}" "${{ needs.test-e2e-smoke-mobile-chrome.result }}" \
-                   "${{ needs.test-e2e-full-chromium.result }}" "${{ needs.test-e2e-full-mobile-chrome.result }}" \
-                   "${{ needs.test-e2e-full-mobile-safari.result }}" "${{ needs.pnpm-audit.result }}")
+                   "${{ needs.test-e2e-full-chromium.result }}" "${{ needs.pnpm-audit.result }}")
           for r in "${results[@]}"; do
             if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then
               echo "::error::One or more required jobs failed or were cancelled"

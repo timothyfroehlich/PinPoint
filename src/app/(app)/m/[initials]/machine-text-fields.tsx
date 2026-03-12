@@ -12,6 +12,7 @@ import {
   updateMachineOwnerNotes,
   type UpdateMachineFieldResult,
 } from "~/app/(app)/m/actions";
+import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 /** Adapt the Result<T, C> discriminated union to the simpler { ok, message } shape */
 function adaptResult(result: UpdateMachineFieldResult): InlineEditSaveResult {
@@ -20,17 +21,20 @@ function adaptResult(result: UpdateMachineFieldResult): InlineEditSaveResult {
 }
 
 function wrapAction(
-  action: (id: string, value: string) => Promise<UpdateMachineFieldResult>
-): (id: string, value: string) => Promise<InlineEditSaveResult> {
+  action: (
+    id: string,
+    value: ProseMirrorDoc | null
+  ) => Promise<UpdateMachineFieldResult>
+): (id: string, value: ProseMirrorDoc | null) => Promise<InlineEditSaveResult> {
   return async (id, value) => adaptResult(await action(id, value));
 }
 
 interface MachineTextFieldsProps {
   machineId: string;
-  description: string | null;
-  tournamentNotes: string | null;
-  ownerRequirements: string | null;
-  ownerNotes: string | null;
+  description: ProseMirrorDoc | null;
+  tournamentNotes: ProseMirrorDoc | null;
+  ownerRequirements: ProseMirrorDoc | null;
+  ownerNotes: ProseMirrorDoc | null;
   canEditGeneral: boolean;
   canEditOwnerNotes: boolean;
   canViewOwnerRequirements: boolean;

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { IssueWithAllRelations } from "~/lib/types";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { UpdateIssueStatusForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-status-form";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
@@ -28,12 +29,21 @@ vi.mock("~/components/issues/SidebarActions", () => ({
 function createIssue(
   overrides?: Partial<IssueWithAllRelations>
 ): IssueWithAllRelations {
+  const description: ProseMirrorDoc = {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "Left flipper is stuck up." }],
+      },
+    ],
+  };
   return {
     id: "issue-1",
     machineInitials: "AFM",
     issueNumber: 1,
     title: "Flipper stuck",
-    description: "Left flipper is stuck up.",
+    description,
     status: "new",
     severity: "major",
     priority: "medium",

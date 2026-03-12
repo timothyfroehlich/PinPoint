@@ -2,10 +2,36 @@
  * E2E Tests: Authentication Flows (Smoke)
  *
  * Tests login functionality only.
- * Signup, logout, and password reset are in e2e/full/auth-flows-extended.spec.ts.
+ * Signup, logout, and protected-route tests are in e2e/full/auth-flows-extended.spec.ts.
+ * Password reset email test is in e2e/full/email-and-notifications.spec.ts.
  */
 
 import { test, expect } from "@playwright/test";
+import { TEST_USERS } from "../support/constants";
+
+test.describe("Username Account Login", () => {
+  test("login with username (no @) redirects to dashboard", async ({
+    page,
+  }, testInfo) => {
+    await page.goto("/login");
+
+    // Type just the username, not the email
+    await page.getByLabel("Email").fill("testuser");
+    await page.getByLabel("Password", { exact: true }).fill("TestPassword123");
+    await page.getByRole("button", { name: "Sign In" }).click();
+
+    // Should redirect to dashboard
+    await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+
+    // Verify we're logged in
+    const isMobile = testInfo.project.name.includes("Mobile");
+    if (isMobile) {
+      await expect(page.getByTestId("mobile-header")).toBeVisible();
+    } else {
+      await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
+    }
+  });
+});
 
 test.describe("Authentication Smoke", () => {
   test("password toggle switches input type on login page", async ({
@@ -29,10 +55,6 @@ test.describe("Authentication Smoke", () => {
   test("login flow - sign in with existing account", async ({
     page,
   }, testInfo) => {
-    // Use test user created by seed.sql
-    const testEmail = "member@test.com";
-    const testPassword = "TestPassword123";
-
     // Navigate to login page via header sign-in button (mobile or desktop)
     await page.goto("/");
     const signInLink = page
@@ -46,8 +68,10 @@ test.describe("Authentication Smoke", () => {
     await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
 
     // Fill out login form
-    await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password", { exact: true }).fill(testPassword);
+    await page.getByLabel("Email").fill(TEST_USERS.member.email);
+    await page
+      .getByLabel("Password", { exact: true })
+      .fill(TEST_USERS.member.password);
 
     // Verify "Remember Me" checkbox is checked by default
     const rememberMeCheckbox = page.getByLabel(/Remember me/i);

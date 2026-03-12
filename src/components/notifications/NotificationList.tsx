@@ -74,6 +74,8 @@ export function NotificationList({
         return `New report ${issueId}`;
       case "new_comment":
         return `New comment on ${issueId}`;
+      case "mentioned":
+        return `Mentioned in ${issueId}`;
       default:
         return "New notification";
     }

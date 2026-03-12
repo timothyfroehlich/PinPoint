@@ -25,12 +25,17 @@ import {
   getIssueSeverityLabel,
   getIssueStatusLabel,
 } from "~/lib/issues/status";
+import {
+  type ProseMirrorDoc,
+  extractMentions,
+  docToPlainText,
+} from "~/lib/tiptap/types";
 
 // --- Types ---
 
 export interface CreateIssueParams {
   title: string;
-  description?: string | null;
+  description?: ProseMirrorDoc | null;
   machineInitials: string;
   severity: IssueSeverity;
   priority?: IssuePriority | undefined;
@@ -51,7 +56,7 @@ export interface UpdateIssueStatusParams {
 
 export interface AddIssueCommentParams {
   issueId: string;
-  content: string;
+  content: ProseMirrorDoc;
   userId: string;
   imagesMetadata?: {
     blobUrl: string;
@@ -88,7 +93,7 @@ export interface UpdateIssueFrequencyParams {
 
 export interface UpdateIssueCommentParams {
   commentId: string;
-  content: string;
+  content: ProseMirrorDoc;
 }
 
 export type Issue = InferSelectModel<typeof issues>;
@@ -194,6 +199,7 @@ export async function createIssue({
 
     // 5. Notifications
     try {
+      const formattedId = formatIssueId(machineInitials, issueNumber);
       // Trigger Notification (actorId optional for public reports)
       await createNotification(
         {
@@ -203,10 +209,34 @@ export async function createIssue({
           ...(reportedBy ? { actorId: reportedBy } : {}),
           issueTitle: title,
           machineName: updatedMachine.name,
-          formattedIssueId: formatIssueId(machineInitials, issueNumber),
+          formattedIssueId: formattedId,
         },
         tx
       );
+
+      // Extract and notify mentions — batch all mentioned users into one call
+      // to avoid O(N) round-trips inside the transaction.
+      if (description) {
+        const mentions = extractMentions(description);
+        if (mentions.length > 0) {
+          const commentContent = docToPlainText(description);
+          await createNotification(
+            {
+              type: "mentioned",
+              resourceId: issue.id,
+              resourceType: "issue",
+              actorId: reportedBy ?? undefined,
+              includeActor: false,
+              additionalRecipientIds: mentions,
+              issueTitle: title,
+              machineName: updatedMachine.name,
+              formattedIssueId: formattedId,
+              commentContent,
+            },
+            tx
+          );
+        }
+      }
     } catch (error) {
       log.error(
         { error, action: "createIssue.notifications" },
@@ -373,6 +403,11 @@ export async function addIssueComment({
         with: { machine: true },
       });
 
+      const formattedId = issue
+        ? formatIssueId(issue.machineInitials, issue.issueNumber)
+        : undefined;
+      const plainTextContent = docToPlainText(content);
+
       await createNotification(
         {
           type: "new_comment",
@@ -381,13 +416,32 @@ export async function addIssueComment({
           actorId: userId,
           issueTitle: issue?.title ?? undefined,
           machineName: issue?.machine.name ?? undefined,
-          formattedIssueId: issue
-            ? formatIssueId(issue.machineInitials, issue.issueNumber)
-            : undefined,
-          commentContent: content,
+          formattedIssueId: formattedId,
+          commentContent: plainTextContent,
         },
         tx
       );
+
+      // Extract and notify mentions — batch all mentioned users into one call
+      // to avoid O(N) round-trips inside the transaction.
+      const mentions = extractMentions(content);
+      if (mentions.length > 0) {
+        await createNotification(
+          {
+            type: "mentioned",
+            resourceId: issueId,
+            resourceType: "issue",
+            actorId: userId,
+            includeActor: false,
+            additionalRecipientIds: mentions,
+            issueTitle: issue?.title ?? undefined,
+            machineName: issue?.machine.name ?? undefined,
+            formattedIssueId: formattedId,
+            commentContent: plainTextContent,
+          },
+          tx
+        );
+      }
     } catch (error) {
       log.error(
         { error, action: "addIssueComment.notifications" },

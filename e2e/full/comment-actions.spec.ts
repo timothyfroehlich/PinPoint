@@ -66,9 +66,11 @@ async function createTestIssue(
 
 async function addComment(page: Page, content: string): Promise<void> {
   // Wait for comment form to be interactive (Firefox may need extra time under parallel load)
-  const commentTextarea = page.getByRole("textbox", { name: "Comment" });
-  await expect(commentTextarea).toBeVisible({ timeout: 10000 });
-  await commentTextarea.fill(content);
+  // Use getByLabel since ProseMirror contenteditable doesn't reliably match getByRole("textbox")
+  const commentEditor = page.getByLabel("Comment", { exact: true });
+  await expect(commentEditor).toBeVisible({ timeout: 10000 });
+  await commentEditor.click();
+  await page.keyboard.type(content);
 
   const addButton = page.getByRole("button", { name: "Add Comment" });
   await expect(addButton).toBeEnabled({ timeout: 5000 });
@@ -166,15 +168,14 @@ test.describe.serial("Comment Edit and Delete", () => {
       // Click Edit
       await page.getByRole("menuitem", { name: "Edit" }).click();
 
-      // The textarea should appear with the comment content
-      // Scope to the specific comment card to avoid matching the "Add Comment" textarea
-      const commentCard = getCommentCard(page, testCommentText);
-      const editTextarea = commentCard.locator("textarea[name='comment']");
-      await expect(editTextarea).toBeVisible();
+      // The rich text editor should appear — use aria-label to find it
+      const editEditor = page.getByLabel("Edit comment", { exact: true });
+      await expect(editEditor).toBeVisible();
 
-      // Clear and enter new content
-      await editTextarea.clear();
-      await editTextarea.fill(editedCommentText);
+      // Select all existing content and replace with new text
+      await editEditor.click();
+      await page.keyboard.press("ControlOrMeta+a");
+      await page.keyboard.type(editedCommentText);
 
       // Save
       await page.getByRole("button", { name: "Save" }).click();

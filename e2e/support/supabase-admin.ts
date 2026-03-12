@@ -74,15 +74,16 @@ export async function confirmUserEmail(email: string): Promise<void> {
  */
 export async function createTestUser(
   email: string,
-  password = "TestPassword123"
+  password = "TestPassword123",
+  options?: { firstName?: string; lastName?: string }
 ) {
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
     user_metadata: {
-      first_name: "Test",
-      last_name: "User",
+      first_name: options?.firstName ?? "Test",
+      last_name: options?.lastName ?? "User",
     },
   });
 
@@ -235,6 +236,51 @@ export function generateUnsubscribeTokenForTest(userId: string): string {
   return createHmac("sha256", SUPABASE_SERVICE_ROLE_KEY)
     .update(userId + ":unsubscribe")
     .digest("hex");
+}
+
+/**
+ * Clear a rich-text field on a machine (sets it to null).
+ * Useful for restoring ownerRequirements / ownerNotes / description after tests.
+ */
+export async function clearMachineField(
+  machineInitials: string,
+  field:
+    | "owner_requirements"
+    | "owner_notes"
+    | "description"
+    | "tournament_notes"
+) {
+  const { error } = await supabaseAdmin
+    .from("machines")
+    .update({ [field]: null })
+    .eq("initials", machineInitials);
+  if (error) throw error;
+}
+
+/**
+ * Get the Supabase auth user ID for a given email address.
+ */
+export async function getUserIdByEmail(email: string): Promise<string> {
+  const { data: users, error } = await supabaseAdmin.auth.admin.listUsers();
+  if (error) throw error;
+  const user = users.users.find((u) => u.email === email);
+  if (!user) throw new Error(`User not found: ${email}`);
+  return user.id;
+}
+
+/**
+ * Set the owner of a machine by machine initials.
+ * Pass null to clear the owner.
+ */
+export async function setMachineOwner(
+  machineInitials: string,
+  ownerIdOrNull: string | null
+) {
+  const { error } = await supabaseAdmin
+    .from("machines")
+    .update({ owner_id: ownerIdOrNull })
+    .eq("initials", machineInitials);
+  if (error) throw error;
 }
 
 /**

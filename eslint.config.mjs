@@ -204,6 +204,34 @@ export default [
     },
   },
   {
+    // E2E-only anti-patterns
+    files: ["e2e/**/*"],
+    rules: {
+      "no-restricted-properties": [
+        "warn",
+        {
+          object: "page",
+          property: "waitForTimeout",
+          message:
+            "Use Playwright assertions (auto-wait) instead of waitForTimeout",
+        },
+      ],
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector: "Literal[value=/.*@test\\.com/]",
+          message:
+            "Use TEST_USERS constants instead of hardcoded @test.com emails (getTestEmail() args are a known false positive)",
+        },
+        {
+          selector: "TemplateElement[value.raw=/.*@test\\.com/]",
+          message:
+            "Use TEST_USERS constants instead of hardcoded @test.com emails",
+        },
+      ],
+    },
+  },
+  {
     // Relaxed rules for config files
     files: [
       "*.config.ts",

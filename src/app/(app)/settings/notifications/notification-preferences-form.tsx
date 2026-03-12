@@ -22,6 +22,8 @@ export interface NotificationPreferencesData {
   inAppNotifyOnStatusChange: boolean;
   emailNotifyOnNewComment: boolean;
   inAppNotifyOnNewComment: boolean;
+  emailNotifyOnMentioned: boolean;
+  inAppNotifyOnMentioned: boolean;
   emailNotifyOnNewIssue: boolean;
   inAppNotifyOnNewIssue: boolean;
   emailWatchNewIssuesGlobal: boolean;
@@ -108,6 +110,11 @@ export function NotificationPreferencesForm({
             type="hidden"
             name="emailNotifyOnNewComment"
             value={preferences.emailNotifyOnNewComment ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="emailNotifyOnMentioned"
+            value={preferences.emailNotifyOnMentioned ? "on" : ""}
           />
           <input
             type="hidden"
@@ -277,6 +284,17 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnNewComment"
               emailDefault={preferences.emailNotifyOnNewComment}
               inAppDefault={preferences.inAppNotifyOnNewComment}
+              emailDisabled={!emailMainEnabled}
+              inAppDisabled={!inAppMainEnabled}
+              hideEmail={isInternalAccount}
+            />
+            <PreferenceRow
+              label="Mentions"
+              description="When someone @mentions you in a comment"
+              emailId="emailNotifyOnMentioned"
+              inAppId="inAppNotifyOnMentioned"
+              emailDefault={preferences.emailNotifyOnMentioned}
+              inAppDefault={preferences.inAppNotifyOnMentioned}
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}

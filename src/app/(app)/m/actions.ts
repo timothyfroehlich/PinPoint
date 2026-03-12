@@ -23,6 +23,11 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
 import { createNotification } from "~/lib/notifications";
+import {
+  type ProseMirrorDoc,
+  docToPlainText,
+  proseMirrorDocSchema,
+} from "~/lib/tiptap/types";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -450,17 +455,6 @@ export async function deleteMachineAction(
 
 // --- Machine Text Field Update Actions ---
 
-/**
- * Schema for updating a machine text field
- */
-const updateMachineTextFieldSchema = z.object({
-  machineId: z.string().uuid("Invalid machine ID"),
-  value: z
-    .string()
-    .max(5000, "Text must be less than 5000 characters")
-    .transform((v) => (v.trim() === "" ? null : v.trim())),
-});
-
 export type UpdateMachineFieldResult = Result<
   { machineId: string },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
@@ -473,7 +467,7 @@ export type UpdateMachineFieldResult = Result<
  */
 export async function updateMachineDescription(
   machineId: string,
-  value: string
+  value: ProseMirrorDoc | null
 ): Promise<UpdateMachineFieldResult> {
   return updateMachineTextField(machineId, value, "description");
 }
@@ -485,7 +479,7 @@ export async function updateMachineDescription(
  */
 export async function updateMachineTournamentNotes(
   machineId: string,
-  value: string
+  value: ProseMirrorDoc | null
 ): Promise<UpdateMachineFieldResult> {
   return updateMachineTextField(machineId, value, "tournamentNotes");
 }
@@ -497,7 +491,7 @@ export async function updateMachineTournamentNotes(
  */
 export async function updateMachineOwnerRequirements(
   machineId: string,
-  value: string
+  value: ProseMirrorDoc | null
 ): Promise<UpdateMachineFieldResult> {
   return updateMachineTextField(machineId, value, "ownerRequirements");
 }
@@ -509,7 +503,7 @@ export async function updateMachineOwnerRequirements(
  */
 export async function updateMachineOwnerNotes(
   machineId: string,
-  value: string
+  value: ProseMirrorDoc | null
 ): Promise<UpdateMachineFieldResult> {
   return updateMachineTextField(machineId, value, "ownerNotes");
 }
@@ -523,7 +517,7 @@ export async function updateMachineOwnerNotes(
  */
 async function updateMachineTextField(
   machineId: string,
-  value: string,
+  value: ProseMirrorDoc | null,
   field: "description" | "tournamentNotes" | "ownerRequirements" | "ownerNotes"
 ): Promise<UpdateMachineFieldResult> {
   // Auth check (CORE-SEC-001)
@@ -536,14 +530,29 @@ async function updateMachineTextField(
     return err("UNAUTHORIZED", "Unauthorized. Please log in.");
   }
 
-  // Validate input (CORE-SEC-002)
-  const validation = updateMachineTextFieldSchema.safeParse({
-    machineId,
-    value,
-  });
-  if (!validation.success) {
-    const firstError = validation.error.issues[0];
-    return err("VALIDATION", firstError?.message ?? "Invalid input");
+  // Simple validation for machineId
+  if (!z.string().uuid().safeParse(machineId).success) {
+    return err("VALIDATION", "Invalid machine ID");
+  }
+
+  // Validate ProseMirror payload: must be null or a well-formed doc with type:"doc"
+  // Normalize empty docs to null so the DB stores NULL rather than a semantically-empty JSON blob.
+  let normalizedValue: ProseMirrorDoc | null = value;
+  if (value !== null) {
+    if (!proseMirrorDocSchema.safeParse(value).success) {
+      return err("VALIDATION", "Invalid rich text payload.");
+    }
+    const plainText = docToPlainText(value);
+    if (plainText.length > 10_000) {
+      return err("VALIDATION", "Text is too long.");
+    }
+    if (JSON.stringify(value).length > 100_000) {
+      return err("VALIDATION", "Text is too long.");
+    }
+    // Normalize empty doc to null
+    if (plainText.trim().length === 0) {
+      normalizedValue = null;
+    }
   }
 
   try {
@@ -554,7 +563,7 @@ async function updateMachineTextField(
         columns: { role: true },
       }),
       db.query.machines.findFirst({
-        where: eq(machines.id, validation.data.machineId),
+        where: eq(machines.id, machineId),
         columns: { id: true, ownerId: true, initials: true },
       }),
     ]);
@@ -593,7 +602,7 @@ async function updateMachineTextField(
     // Update the field
     await db
       .update(machines)
-      .set({ [field]: validation.data.value })
+      .set({ [field]: normalizedValue })
       .where(eq(machines.id, machine.id));
 
     revalidatePath(`/m/${machine.initials}`);
