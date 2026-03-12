@@ -59,7 +59,11 @@ if [ "$SHOW_PRS" = "true" ]; then
     echo " PR Dashboard"
     echo "========================================"
     echo ""
-    bash "$SCRIPT_DIR/pr-dashboard.sh" 2>/dev/null || echo "  (no open PRs or error fetching)"
+    # PR data is now fetched via GitHub MCP tools (pull_request_read).
+    # Fallback: gh pr list for non-MCP contexts.
+    gh pr list --state open --json number,title,headRefName,isDraft,mergeable \
+        --jq '.[] | "#\(.number) \(.title | .[0:40]) [\(.headRefName)] draft=\(.isDraft) merge=\(.mergeable)"' \
+        2>/dev/null || echo "  (no open PRs or error fetching)"
     echo ""
 fi
 

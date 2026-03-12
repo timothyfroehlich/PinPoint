@@ -22,16 +22,10 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 ./scripts/workflow/orchestration-status.sh --prs-only    # Just PR dashboard
 ./scripts/workflow/orchestration-status.sh --security-only  # Just Dependabot alerts
 
-# PR monitoring
-./scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + Copilot + merge status table (all open PRs if no args)
-./scripts/workflow/copilot-comments.sh <PR> [PR...]      # Copilot details (accepts multiple PRs)
-./scripts/workflow/copilot-comments.sh <PR> --raw        # JSON output for parsing
-
-# Copilot thread management (see AGENTS.md "GitHub Copilot Reviews" for full protocol)
-./scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg> # Reply + resolve one thread
-./scripts/workflow/resolve-copilot-threads.sh <PR>              # Bulk-resolve addressed threads
-./scripts/workflow/resolve-copilot-threads.sh <PR> --dry-run    # Preview without resolving
-./scripts/workflow/resolve-copilot-threads.sh <PR> --all        # Resolve ALL unresolved threads
+# Copilot review management (MCP-first — see AGENTS.md "GitHub Copilot Reviews" for full protocol)
+# Fetch comments:  MCP pull_request_read(method: "get_review_comments")
+# Reply:           MCP add_reply_to_pull_request_comment
+# Resolve threads: ./scripts/workflow/resolve-thread.sh <PRRT_thread-node-id> [id...]
 
 # Readiness + cleanup
 ./scripts/workflow/label-ready.sh <PR>                   # Label ready-for-review (checks CI + Copilot + draft)
@@ -166,8 +160,9 @@ Task(
 ### Dashboard
 
 ```bash
-./scripts/workflow/pr-dashboard.sh 940 941 942       # Specific PRs
-./scripts/workflow/pr-dashboard.sh                    # All open PRs
+# PR overview (use MCP pull_request_read for detailed data, or:)
+gh pr list --state open --json number,title,headRefName,isDraft,mergeable \
+  --jq '.[] | "#\(.number) \(.title | .[0:40]) [\(.headRefName)] draft=\(.isDraft) merge=\(.mergeable)"'
 ```
 
 ### Resume for Follow-Up
@@ -186,11 +181,8 @@ Common resume scenarios:
 gh run view <run-id> --log-failed | tail -50
 ```
 
-**Copilot comments** → Get details, then resume subagent:
-
-```bash
-./scripts/workflow/copilot-comments.sh <PR>
-```
+**Copilot comments** → Fetch via MCP, then resume subagent:
+Use `pull_request_read(method: "get_review_comments")` to get thread details.
 
 **Infrastructure failures**:
 

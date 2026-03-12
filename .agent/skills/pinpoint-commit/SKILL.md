@@ -567,17 +567,13 @@ View: gh pr checks <pr-number>
 
 ### 6.2 Address Copilot Comments (if any)
 
-After CI completes, check for Copilot review comments:
+After CI completes, check for Copilot review comments using MCP:
 
-```bash
-./scripts/workflow/copilot-comments.sh <PR>
-```
-
-If comments exist, address each one and resolve the thread:
-
-```bash
-./scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <description>. —Claude"
-```
+1. Call `pull_request_read(method: "get_review_comments", owner: "timothyfroehlich", repo: "PinPoint", pullNumber: <PR>)`
+2. Filter to unresolved threads where the first comment author contains `copilot`
+3. For each comment, fix the code, then reply via MCP and resolve:
+   - Reply: `add_reply_to_pull_request_comment(owner: "timothyfroehlich", repo: "PinPoint", pullNumber: <PR>, commentId: <ID>, body: "Fixed: <description>. —Claude")`
+   - Resolve: `./scripts/workflow/resolve-thread.sh <PRRT_thread-node-id>`
 
 ### 6.3 Label Ready for Review
 

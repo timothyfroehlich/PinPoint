@@ -232,29 +232,33 @@ When merging branches with competing migrations (both created same number):
 
 ### GitHub Copilot Reviews
 
-**MANDATORY**: When addressing Copilot review comments on a PR, you MUST resolve each thread as you go.
+**MANDATORY**: When addressing Copilot review comments on a PR, you MUST reply to and resolve each thread.
 
-**Workflow for each comment:**
+**Workflow (MCP-first):**
 
-1. Read the comment via `./scripts/workflow/copilot-comments.sh <PR>`
-2. Fix the code (or decide to ignore with justification)
-3. Reply and resolve the thread:
+1. **Fetch comments** — spawn a lightweight subagent (Haiku / Gemini Flash) to call
+   `pull_request_read(method: "get_review_comments")` and return a structured summary
+   of unresolved Copilot threads (file:line, comment ID, thread node ID, body preview).
+   This protects main context from large API responses.
 
-```bash
-./scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <what you did>. —Claude"
-./scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Ignored: <why this is wrong/unnecessary>. —Claude"
-```
+2. **Fix the code** (or decide to ignore with justification)
 
-Sign replies with your agent name (`—Gemini`, `—Antigravity`, `—Claude`, `—Codex`, etc.).
+3. **Reply** via MCP:
 
-**Scripts:**
+   ```
+   add_reply_to_pull_request_comment(
+     owner: "timothyfroehlich", repo: "PinPoint",
+     pullNumber: <PR>, commentId: <ID>,
+     body: "Fixed: <what you did>. —<AgentName>"
+   )
+   ```
 
-```bash
-./scripts/workflow/copilot-comments.sh <PR>              # Show UNRESOLVED comments only
-./scripts/workflow/copilot-comments.sh <PR> --all         # Include resolved
-./scripts/workflow/resolve-copilot-threads.sh <PR>        # Bulk-resolve addressed threads
-./scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + resolve one thread
-```
+4. **Resolve** via script (MCP gap — will be removed when github-mcp-server PR #1919 merges):
+   ```bash
+   ./scripts/workflow/resolve-thread.sh <PRRT_thread-node-id>
+   ```
+
+Sign replies with your agent name (`—Claude`, `—Gemini`, `—Codex`, etc.).
 
 **Rules:**
 
