@@ -173,7 +173,6 @@
       "rollup": ">=4.59.0",
       "serialize-javascript": ">=7.0.3",
       "flatted": ">=3.4.0",
-      "undici@^6": ">=6.24.0",
       "webpack": ">=5.104.1"
     }
   },
