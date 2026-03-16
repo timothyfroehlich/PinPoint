@@ -615,9 +615,6 @@ jobs:
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
 
-      - name: Reset database to clean state
-        run: pnpm run db:fast-reset
-
       - name: Run Smoke Tests (Chromium)
         env:
           MOCK_BLOB_STORAGE: "true"
@@ -704,9 +701,6 @@ jobs:
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
 
-      - name: Reset database to clean state
-        run: pnpm run db:fast-reset
-
       - name: Run Smoke Tests (Mobile Chrome)
         env:
           MOCK_BLOB_STORAGE: "true"
@@ -792,9 +786,6 @@ jobs:
 
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
-
-      - name: Reset database to clean state
-        run: pnpm run db:fast-reset
 
       - name: Run Full Tests (Chromium)
         env:
@@ -886,9 +877,6 @@ jobs:
 
       - name: Initialize Supabase
         run: ./scripts/supabase-init-for-tests.sh
-
-      - name: Reset database to clean state
-        run: pnpm run db:fast-reset
 
       - name: Run Comprehensive Smoke Tests (all browsers)
         env:

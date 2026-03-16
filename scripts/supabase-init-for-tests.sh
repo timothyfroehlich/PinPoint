@@ -8,8 +8,8 @@
 # and seeds both tables and test users.
 #
 # Used by:
-#   - scripts/run-e2e-with-supabase.sh
 #   - scripts/run-supabase-integration-tests.sh
+#   - .github/workflows/ci.yml (E2E jobs)
 # ==============================================================================
 
 set -euo pipefail
@@ -22,7 +22,7 @@ supabase start -x "studio,realtime,storage-api,edge-runtime,logflare,vector,imgp
 
 echo "⏳ Waiting for Supabase Auth service to be ready..."
 for i in $(seq 1 60); do
-  if curl -s --fail "http://localhost:54321/auth/v1/health" >/dev/null 2>&1; then
+  if curl -s --fail "${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}/auth/v1/health" >/dev/null 2>&1; then
     echo "✅ Supabase Auth service is ready!"
     break
   fi

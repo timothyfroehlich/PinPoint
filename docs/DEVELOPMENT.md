@@ -42,7 +42,7 @@ If you’re trying to understand how to implement something, read:
 3. **Start Dev Server**
 
    ```bash
-   pnpm run dev    # automatically ensures Supabase is running
+   pnpm run dev    # checks Supabase is running (fails fast if not)
    ```
 
 4. **Run Fast Checks While Iterating**

@@ -1,80 +1,111 @@
 import { execSync } from "child_process";
+import postgres from "postgres";
+
+function redactUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.password = "***";
+    return parsed.toString();
+  } catch {
+    return "(unparseable URL)";
+  }
+}
 
 /**
  * Playwright Global Setup
  *
- * Runs once before all tests to ensure clean database state.
- * This prevents test data contamination between test runs.
+ * Single orchestrator for test environment readiness.
+ * Runs once before all tests. Flow:
+ *   1. Pre-flight: verify Supabase and Postgres are reachable
+ *   2. Run migrations (idempotent — handles fresh checkout & post-merge)
+ *   3. Fast-reset database (truncate + seed)
+ *   4. Full reset fallback if fast-reset fails
  */
 export default async function globalSetup(): Promise<void> {
-  console.log("🔄 Resetting database to clean state...");
-
-  // Satisfy @typescript-eslint/require-await
-  await Promise.resolve();
-
   if (process.env.SKIP_SUPABASE_RESET === "true") {
-    console.log("⏭️  SKIP_SUPABASE_RESET=true, skipping Supabase reset/seed.");
+    console.log("⏭️  SKIP_SUPABASE_RESET=true, skipping database setup.");
     return;
   }
 
-  // Note: .env.local is now loaded in playwright.config.ts before this runs
-  // All environment variables are already available in process.env
+  // ── Pre-flight checks ──────────────────────────────────────────────
 
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost:54321";
+  const postgresUrl =
+    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+
+  // 1. Supabase API health
+  console.log("🔍 Checking Supabase...");
   try {
-    console.log("⚡ Attempting fast reset (pnpm run db:fast-reset)...");
-    execSync("pnpm run db:fast-reset", {
-      stdio: "inherit",
-      env: process.env,
+    const res = await fetch(`${supabaseUrl}/auth/v1/health`, {
+      signal: AbortSignal.timeout(3000),
     });
-    console.log("✅ Fast reset complete");
-    return;
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
   } catch (error) {
-    console.warn(
-      "⚠️  Fast reset failed, falling back to full Supabase reset...",
-      error
+    const msg = error instanceof Error ? error.message : "connection failed";
+    throw new Error(
+      `Supabase is not reachable at ${supabaseUrl} (${msg}).\n` +
+        `  Start it with: supabase start\n` +
+        `  Or check that you're in the right worktree directory.`,
+      { cause: error }
     );
   }
 
+  // 2. Postgres connectivity
+  if (!postgresUrl) {
+    throw new Error(
+      "POSTGRES_URL is not set. Check your .env.local file.\n" +
+        `  Run: ./pinpoint-wt.py sync`
+    );
+  }
+  console.log("🔍 Checking Postgres...");
+  const client = postgres(postgresUrl, { connect_timeout: 3 });
   try {
-    // Step 1: Reset Supabase database - clears everything
-    // Use local reset (not --db-url) to avoid TLS connection issues
-    execSync("supabase db reset --yes", {
-      stdio: "inherit",
-      env: process.env,
-    });
-    console.log("✅ Database reset complete");
+    await client`SELECT 1`;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "connection failed";
+    throw new Error(
+      `Cannot connect to Postgres (${msg}).\n` +
+        `  URL: ${redactUrl(postgresUrl)}\n` +
+        `  Is Supabase running? Try: supabase status`,
+      { cause: error }
+    );
+  } finally {
+    await client.end();
+  }
 
-    // Step 2: Apply Drizzle migrations - creates tables via migration files
-    console.log("📋 Applying Drizzle migrations...");
-    execSync("pnpm run db:migrate", {
-      stdio: "inherit",
-      env: process.env,
-    });
-    console.log("✅ Migrations applied");
+  console.log("✅ Pre-flight checks passed");
 
-    console.log("🧪 Regenerating test schema...");
+  // ── Database setup ─────────────────────────────────────────────────
+  // All commands below are static strings (no user input) — execSync is safe here.
+
+  // 3. Run migrations (idempotent — no-ops if up-to-date, applies new ones if needed)
+  console.log("📋 Running migrations...");
+  execSync("pnpm run db:migrate", { stdio: "inherit", env: process.env });
+
+  // 4. Fast reset: truncate tables + re-seed
+  try {
+    console.log("⚡ Fast-resetting database...");
+    execSync("pnpm run db:fast-reset", { stdio: "inherit", env: process.env });
+    console.log("✅ Database ready");
+    return;
+  } catch {
+    console.warn("⚠️  Fast reset failed, falling back to full reset...");
+  }
+
+  // 5. Full reset fallback (fresh checkout with empty database)
+  try {
+    execSync("supabase db reset --yes", { stdio: "inherit", env: process.env });
+    execSync("pnpm run db:migrate", { stdio: "inherit", env: process.env });
     execSync("pnpm run test:_generate-schema", {
       stdio: "inherit",
       env: process.env,
     });
-    console.log("✅ Test schema regenerated");
-
-    // Step 3: Seed test data (machines and issues)
-    console.log("🌱 Seeding test data...");
-    execSync("pnpm run db:_seed", {
-      stdio: "inherit",
-      env: process.env,
-    });
-    console.log("✅ Test data seeded");
-
-    // Step 4: Create test users via Supabase Auth API
-    // Note: Users must be created this way (not via SQL) so passwords work with signInWithPassword()
-    console.log("👤 Creating test users...");
-    execSync("pnpm run db:_seed-users", {
-      stdio: "inherit",
-      env: process.env,
-    });
-    console.log("✅ Test users created");
+    execSync("pnpm run db:_seed", { stdio: "inherit", env: process.env });
+    execSync("pnpm run db:_seed-users", { stdio: "inherit", env: process.env });
+    console.log("✅ Database ready (full reset)");
   } catch (error) {
     console.error("❌ Failed to setup database:", error);
     throw error;
