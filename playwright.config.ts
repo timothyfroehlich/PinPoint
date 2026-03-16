@@ -1,162 +1,50 @@
-import { execSync } from "child_process";
+import nextEnv from "@next/env";
+const { loadEnvConfig } = nextEnv;
 import { defineConfig, devices } from "@playwright/test";
-import { readFileSync } from "fs";
-import { join } from "path";
 
-// Load .env.local BEFORE reading process.env.PORT
-// This ensures PORT from .env.local is available when config is evaluated
-try {
-  const envPath = join(process.cwd(), ".env.local");
-  const envContent = readFileSync(envPath, "utf-8");
-  for (const line of envContent.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const [key, ...valueParts] = trimmed.split("=");
-    if (key && valueParts.length > 0 && process.env[key.trim()] === undefined) {
-      process.env[key.trim()] = valueParts.join("=").trim();
-    }
-  }
-} catch (e) {
-  console.error("Failed to read .env.local:", e);
-  // .env.local not found - use defaults
-}
+// Load .env.local using the same loader Next.js uses at runtime.
+// Idempotent — safe if Playwright re-evaluates this config per project.
+loadEnvConfig(process.cwd());
 
-// Default port matches main worktree (3000)
-// Other worktrees should set PORT in .env.local (3100, 3200, 3300)
-// See AGENTS.md for port allocation table
+// Worktree-aware: PORT is set per-worktree in .env.local by pinpoint-wt.py
+// (3000 main, 3100 secondary, 3200 review, 3300 antigravity, 3400+ ephemeral)
 const port = Number(process.env["PORT"] ?? "3000");
-// Keep host consistent with Supabase site_url to avoid cookie host mismatches
 const hostname = process.env["PLAYWRIGHT_HOST"] ?? "localhost";
 const baseURL = `http://${hostname}:${port}`;
 const webServerStdout = process.env["PLAYWRIGHT_STDOUT"] ?? "ignore";
 const webServerStderr = process.env["PLAYWRIGHT_STDERR"] ?? "pipe";
-const healthCheckTimeoutMs = process.env["CI"] ? 1500 : 1000;
 
-console.log(`[playwright.config.ts] Resolved PORT: ${port}`);
 console.log(`[playwright.config.ts] Resolved baseURL: ${baseURL}`);
-
-function listPidsOnPort(targetPort: number): string[] {
-  try {
-    const output = execSync(`lsof -i :${targetPort} -sTCP:LISTEN -Fp`, {
-      stdio: "pipe",
-      encoding: "utf-8",
-    });
-    return output
-      .split("\n")
-      .filter((line) => line.startsWith("p"))
-      .map((line) => line.slice(1))
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-function isServerHealthy(url: string): boolean {
-  const script = [
-    `const url = ${JSON.stringify(url)};`,
-    `const controller = new AbortController();`,
-    `const timeout = setTimeout(() => controller.abort(), ${healthCheckTimeoutMs});`,
-    `fetch(url, { signal: controller.signal })`,
-    `  .then((res) => { clearTimeout(timeout); process.exit(res.ok ? 0 : 1); })`,
-    `  .catch(() => { clearTimeout(timeout); process.exit(1); });`,
-  ].join(" ");
-
-  const escapedScript = script.replace(/'/g, "'\\''");
-
-  try {
-    execSync(`node -e '${escapedScript}'`, { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function clearStaleServerIfNeeded(targetPort: number, url: string): void {
-  const pids = listPidsOnPort(targetPort);
-  if (pids.length === 0) return;
-
-  if (isServerHealthy(url)) {
-    // Healthy dev server already running; Playwright will reuse it.
-    return;
-  }
-
-  for (const pid of pids) {
-    try {
-      execSync(`kill ${pid}`);
-      console.warn(
-        `[playwright] Killed stale dev server on port ${targetPort} (pid ${pid}).`
-      );
-    } catch {
-      // If we cannot kill it, let Playwright surface the bind error.
-    }
-  }
-}
-
-/**
- * Playwright E2E Test Configuration
- *
- * Simplified config for smoke tests. Keep it minimal.
- * See https://playwright.dev/docs/test-configuration
- */
-
-clearStaleServerIfNeeded(port, baseURL);
 
 export default defineConfig({
   testDir: "./e2e",
-
-  // Global setup: Reset database before all tests
   globalSetup: "./e2e/global-setup.ts",
 
-  // Run tests in parallel - tests use unique prefixes from e2e/support/test-isolation.ts
-  // to avoid conflicts when sharing the same database
   fullyParallel: true,
 
-  // Increased timeouts for stability in heavy load environments
-  timeout: process.env["CI"] ? 60 * 1000 : 30 * 1000, // per-test timeout
+  timeout: process.env["CI"] ? 60 * 1000 : 30 * 1000,
   expect: {
-    timeout: process.env["CI"] ? 30 * 1000 : 10 * 1000, // assertion timeout
+    timeout: process.env["CI"] ? 30 * 1000 : 10 * 1000,
   },
 
-  // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env["CI"],
-
-  // Retry on CI only
   retries: process.env["CI"] ? 2 : 0,
-
-  // Parallel workers: 2 in CI (conservative for shared DB), 1 locally for easier debugging
-  // Each worker gets a unique TEST_PARALLEL_INDEX for test isolation
   workers: process.env["CI"] ? 2 : 1,
 
-  // Reporters: print progress locally; keep CI quiet; never block on HTML
   reporter: process.env["CI"]
     ? [["dot"], ["html", { open: "never" }]]
     : [["line"], ["html", { open: "never" }]],
 
-  // Shared settings for all the projects below
   use: {
-    // Base URL to use in actions like `await page.goto('/')`
     baseURL,
-
-    // Disable DEV_AUTOLOGIN in E2E — tests manage their own auth
-    // via storageState or loginAs(). Without this, a revoked session
-    // would silently autologin as admin instead of failing visibly.
     extraHTTPHeaders: { "x-skip-autologin": "true" },
-
-    // Collect trace when retrying the failed test
     trace: "on-first-retry",
-
-    // Screenshot on failure
     screenshot: "only-on-failure",
-
-    // Keep interactions snappy during dev but allow buffer
     actionTimeout: 10 * 1000,
     navigationTimeout: 20 * 1000,
   },
 
-  // Configure projects for major browsers (Safari only enabled in CI by default)
   projects: [
-    // Runs once before all browser projects: logs in as each role and saves
-    // storageState to e2e/.auth/*.json. Tests opt in via test.use({ storageState }).
     {
       name: "auth-setup",
       testDir: "./e2e",
@@ -178,48 +66,36 @@ export default defineConfig({
       use: { ...devices["Pixel 5"] },
       dependencies: ["auth-setup"],
     },
-    // Safari is disabled by default locally to avoid dependency issues on Linux
     ...(!process.env["CI"] && process.env["PLAYWRIGHT_ENABLE_SAFARI"] !== "true"
       ? []
       : [
           {
             name: "Mobile Safari",
             use: {
-              // Start from iPhone 12 descriptor for correct Mobile Safari emulation
-              // (userAgent, deviceScaleFactor, screen) and override viewport to
-              // iPhone 13 Mini (375x812) — the smallest modern iPhone.
               ...devices["iPhone 12"],
               viewport: { width: 375, height: 812 },
             },
-            // Increase retries for WebKit due to known flakiness
             retries: process.env["CI"] ? 3 : 1,
-            // Increase timeout for WebKit (2x base timeout, CI-aware)
             timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
             dependencies: ["auth-setup"],
           },
         ]),
   ],
 
-  // Run your local dev server before starting the tests
   webServer: {
     command: `PORT=${port} pnpm run dev`,
     url: `${baseURL}/api/health`,
     reuseExistingServer: !process.env["CI"],
     timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
-
-    // Default quiet output; override via PLAYWRIGHT_STDOUT/STDERR when debugging
     stdout: (webServerStdout === "inherit" ? "pipe" : webServerStdout) as
       | "pipe"
       | "ignore",
     stderr: (webServerStderr === "inherit" ? "pipe" : webServerStderr) as
       | "pipe"
       | "ignore",
-
-    // Ignore HTTPS errors for local development
     ignoreHTTPSErrors: true,
     env: {
       PORT: String(port),
-      // Explicitly forward mock storage flag if present
       MOCK_BLOB_STORAGE: process.env["MOCK_BLOB_STORAGE"] ?? "",
     },
   },

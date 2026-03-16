@@ -1,46 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
-# Check if supabase CLI is installed
-if ! command -v supabase &> /dev/null; then
-    echo "Error: supabase CLI is not installed."
-    exit 1
+# Guard: verify Supabase is running before the dev server starts.
+# Does NOT auto-start — in multi-worktree setups, auto-starting from the
+# wrong directory would use the wrong ports/config. Start explicitly.
+
+if ! command -v supabase &>/dev/null; then
+  echo "Error: supabase CLI is not installed." >&2
+  exit 1
 fi
 
-# Check if supabase is running by checking the status
-# We redirect both stdout and stderr because 'supabase status' can be noisy 
-# or report errors when stopped.
-if ! supabase status &> /dev/null; then
-    echo "Supabase is not running. Starting..."
-    if ! supabase start; then
-        echo "Error: Failed to start Supabase."
-        exit 1
-    fi
+# Use worktree-specific URL (set in .env.local by pinpoint-wt.py)
+SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}"
 
-    # Wait for Supabase Auth service to become healthy to avoid race conditions
-    echo "Waiting for Supabase Auth service to become ready..."
-    MAX_RETRIES=30
-    SLEEP_SECONDS=2
-    RETRY_COUNT=0
-
-    # Use the worktree-specific Supabase URL when available.
-    SUPABASE_BASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}"
-    SUPABASE_AUTH_HEALTH_URL="${SUPABASE_BASE_URL%/}/auth/v1/health"
-
-    while true; do
-        if curl -fsS --max-time 2 "${SUPABASE_AUTH_HEALTH_URL}" > /dev/null 2>&1; then
-            echo "Supabase Auth service is ready."
-            break
-        fi
-
-        RETRY_COUNT=$((RETRY_COUNT + 1))
-        if [ "${RETRY_COUNT}" -ge "${MAX_RETRIES}" ]; then
-            echo "Error: Supabase Auth service did not become ready after $((MAX_RETRIES * SLEEP_SECONDS)) seconds."
-            exit 1
-        fi
-
-        sleep "${SLEEP_SECONDS}"
-    done
-else
-    echo "Supabase is already running."
+if ! curl -fsS --max-time 2 "${SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1; then
+  echo "Error: Supabase is not running at ${SUPABASE_URL}." >&2
+  echo "  Start it with: supabase start" >&2
+  exit 1
 fi
+
+echo "Supabase is running at ${SUPABASE_URL}."
