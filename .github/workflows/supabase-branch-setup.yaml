@@ -77,8 +77,12 @@ jobs:
 
       - name: Validate credentials
         run: |
-          if [[ -z "$POSTGRES_URL" ]]; then
-            echo "::error::POSTGRES_URL not set. The 'Get branch credentials' step likely failed."
+          missing=()
+          for var in POSTGRES_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            [[ -z "${!var}" ]] && missing+=("$var")
+          done
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::Missing env vars: ${missing[*]}. The 'Get branch credentials' step likely failed."
             echo "Common causes:"
             echo "  - SUPABASE_ACCESS_TOKEN expired (90-day default). Regenerate at:"
             echo "    https://supabase.com/dashboard/account/tokens"
