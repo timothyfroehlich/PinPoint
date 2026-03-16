@@ -1,6 +1,16 @@
 import { execSync } from "child_process";
 import postgres from "postgres";
 
+function redactUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.password = "***";
+    return parsed.toString();
+  } catch {
+    return "(unparseable URL)";
+  }
+}
+
 /**
  * Playwright Global Setup
  *
@@ -58,7 +68,7 @@ export default async function globalSetup(): Promise<void> {
     const msg = error instanceof Error ? error.message : "connection failed";
     throw new Error(
       `Cannot connect to Postgres (${msg}).\n` +
-        `  URL: ${postgresUrl.replace(/:[^:@]+@/, ":***@")}\n` +
+        `  URL: ${redactUrl(postgresUrl)}\n` +
         `  Is Supabase running? Try: supabase status`,
       { cause: error }
     );
