@@ -12,9 +12,18 @@ PORT="${PORT:-3000}"
 SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}"
 POSTGRES_URL="${POSTGRES_URL_NON_POOLING:-${POSTGRES_URL:-}}"
 
-TIMEOUT=60
+TIMEOUT=90
 POLL_INTERVAL=0.5
 SUMMARY_INTERVAL=5
+
+# Preflight: fail fast if Supabase hasn't been started at all
+if command -v supabase &>/dev/null; then
+  sb_status=$(supabase status 2>&1 || true)
+  if ! echo "$sb_status" | grep -q "is running"; then
+    echo "❌ Supabase is not started. Run: supabase start"
+    exit 1
+  fi
+fi
 
 nextjs_up=false
 supabase_up=false
@@ -37,7 +46,7 @@ while true; do
 
   # Check Next.js
   if [ "$nextjs_up" = false ]; then
-    if curl -fsS --max-time 1 "http://localhost:${PORT}" >/dev/null 2>&1; then
+    if curl -sS --max-time 1 -o /dev/null "http://localhost:${PORT}" 2>/dev/null; then
       nextjs_up=true
       echo "✅ Next.js        http://localhost:${PORT} [${elapsed}s]"
     fi
