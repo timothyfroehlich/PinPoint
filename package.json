@@ -172,7 +172,7 @@
       "minimatch": ">=10.2.3",
       "rollup": ">=4.59.0",
       "serialize-javascript": ">=7.0.3",
-      "flatted": ">=3.4.0",
+      "flatted": ">=3.4.2",
       "webpack": ">=5.104.1"
     }
   },
