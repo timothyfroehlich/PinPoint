@@ -19,6 +19,16 @@ SUMMARY_INTERVAL=5
 nextjs_up=false
 supabase_up=false
 postgres_up=false
+
+# Skip Postgres check if URL is not set or pg_isready is not installed
+if [ -z "$POSTGRES_URL" ]; then
+  postgres_up=true
+  echo "⚠️  Postgres       skipped (POSTGRES_URL not set)"
+elif ! command -v pg_isready &>/dev/null; then
+  postgres_up=true
+  echo "⚠️  Postgres       skipped (pg_isready not installed)"
+fi
+
 start_time=$SECONDS
 last_summary=0
 
@@ -43,7 +53,7 @@ while true; do
 
   # Check Postgres
   if [ "$postgres_up" = false ]; then
-    if [ -n "$POSTGRES_URL" ] && pg_isready -d "$POSTGRES_URL" -t 1 >/dev/null 2>&1; then
+    if pg_isready -d "$POSTGRES_URL" -t 1 >/dev/null 2>&1; then
       postgres_up=true
       echo "✅ Postgres       [${elapsed}s]"
     fi
@@ -61,7 +71,6 @@ while true; do
     nj="❌"; [ "$nextjs_up" = true ] && nj="✅"
     sb="❌"; [ "$supabase_up" = true ] && sb="✅"
     pg="❌"; [ "$postgres_up" = true ] && pg="✅"
-    if [ -z "$POSTGRES_URL" ]; then pg="⚠️ "; fi
     echo "⏳ Waiting... Next.js $nj | Supabase $sb | Postgres $pg [${elapsed}s]"
     last_summary=$elapsed
   fi

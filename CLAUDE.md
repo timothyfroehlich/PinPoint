@@ -18,7 +18,8 @@
 ### Sandbox & Playwright
 
 - The macOS sandbox blocks Chromium's Mach port IPC, causing `MachPortRendezvousServer: Permission denied` crashes.
-- **Always** use `dangerouslyDisableSandbox: true` when running Playwright commands (`pnpm exec playwright`, `pnpm run smoke`, `pnpm run e2e:*`).
+- Playwright commands are excluded from sandboxing via `excludedCommands` in `.claude/settings.local.json`. If you see Mach port errors, verify the command prefix matches an entry there (env var prefixes like `SKIP_SUPABASE_RESET=true` need separate entries).
+- `gh` CLI TLS errors are fixed by `enableWeakerNetworkIsolation: true` in the same file.
 - Use `pnpm run dev:status` to check if Next.js/Supabase/Postgres are running — don't hand-roll curl health checks.
 
 ### Working Style
