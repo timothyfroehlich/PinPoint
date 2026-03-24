@@ -340,16 +340,17 @@ export async function submitPublicIssueAction(
     revalidatePath(`/m/${machine.initials}/i/${issue.issueNumber}`);
 
     // Redirect logic:
-    // 1. Authenticated users go directly to the issue detail page
+    // 1. Authenticated users: return redirectTo so the client can clear
+    //    localStorage before navigating (server-side redirect() throws
+    //    before ActionState reaches the client, so the cleanup effect
+    //    in the form never fires).
     if (reportedBy) {
+      const target = `/m/${machine.initials}/i/${issue.issueNumber}`;
       log.info(
-        {
-          reportedBy,
-          target: `/m/${machine.initials}/i/${issue.issueNumber}`,
-        },
-        "Redirecting authenticated user to issue page"
+        { reportedBy, target },
+        "Returning redirect target for authenticated user"
       );
-      redirect(`/m/${machine.initials}/i/${issue.issueNumber}`);
+      return { success: true, redirectTo: target };
     }
 
     // 2. Anonymous users go to success page
