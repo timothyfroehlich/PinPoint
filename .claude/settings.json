@@ -24,7 +24,7 @@
           },
           {
             "type": "command",
-            "command": "node .claude/hooks/block-manual-ci-polling.cjs",
+            "command": "node .claude/hooks/block-bad-shell-patterns.cjs",
             "timeout": 5000
           }
         ]

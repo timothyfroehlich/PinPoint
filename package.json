@@ -6,6 +6,7 @@
   "description": "Pinball machine issue tracking for Austin Pinball Collective",
   "scripts": {
     "dev": "bash -lc 'set -a; source .env.local; set +a; bash scripts/ensure-supabase.sh && exec ./node_modules/.bin/next dev --port \"$PORT\"'",
+    "dev:status": "bash scripts/dev-status.sh",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
