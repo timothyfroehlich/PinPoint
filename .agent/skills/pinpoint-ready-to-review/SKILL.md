@@ -5,8 +5,10 @@ description: Use when a PR exists and needs to be verified and labeled ready for
 
 # PinPoint: Ready-to-Review
 
-**Prerequisites:** Load the `gha-ready-to-review` skill first for the base workflow
+**Prerequisites:** Install and load the `gha-ready-to-review` skill for the base workflow
 (MCP-primary instructions, monitor script, review handling patterns).
+
+Install: `npx skills add timothyfroehlich/gha-workflow-skills`
 
 This skill adds PinPoint-specific behavior on top of the generic workflow.
 
@@ -14,18 +16,19 @@ This skill adds PinPoint-specific behavior on top of the generic workflow.
 
 ## Overview
 
-Three steps: CI must pass, review comments must be addressed, then label ready.
+Three steps: CI must pass, Copilot review comments must be addressed, then label ready.
 Follow the `gha-ready-to-review` skill for each step, with these PinPoint additions:
 
 ---
 
 ## Step 1: Monitor CI
 
-Use the monitor script from `gha-ready-to-review`:
+Use the monitor script from `gha-ready-to-review` (installed at
+`~/.agents/skills/gha-ready-to-review/scripts/monitor-gh-actions.sh`):
 
 ```bash
 # Background (preferred — lets you work on reviews while CI runs):
-<gha-ready-to-review skill path>/scripts/monitor-gh-actions.sh <PR> \
+~/.agents/skills/gha-ready-to-review/scripts/monitor-gh-actions.sh <PR> \
   --output /tmp/gha-monitor-<PR>.md &
 
 # Check status anytime:
@@ -42,7 +45,7 @@ Follow `gha-ready-to-review` for MCP-first or shell-fallback review handling.
 
 ### PinPoint additions:
 
-- **Sign all replies** with your agent name: `"Fixed: <description>. --Claude"` (or `--Gemini`, `--Antigravity`, etc.)
+- **Sign all replies** with your agent name: `"Fixed: <description>. —Claude"` (or `—Gemini`, `—Antigravity`, etc.)
 - **Keep replies to one sentence**
 - **Every comment gets a reply** — no silent fixes or silent ignores
 - **Evaluate critically** — not all Copilot suggestions are correct. If wrong, say why.
@@ -53,7 +56,7 @@ Follow `gha-ready-to-review` for MCP-first or shell-fallback review handling.
 
 ## Step 3: Label Ready
 
-Once CI is green and review comments are resolved:
+Once CI is green and Copilot review comments are resolved:
 
 ```bash
 # PinPoint's label-ready script (validates CI + reviews + draft status):
