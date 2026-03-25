@@ -5,67 +5,74 @@ description: Use when a PR exists and needs to be verified and labeled ready for
 
 # PinPoint: Ready-to-Review
 
-Three steps must complete before a PR is ready for human review: CI must pass, Copilot comments must be addressed, then `label-ready.sh` applies the label.
+**Prerequisites:** Install and load the `gha-ready-to-review` skill for the base workflow
+(MCP-primary instructions, monitor script, review handling patterns).
+
+Install: `npx skills add timothyfroehlich/gha-workflow-skills`
+
+This skill adds PinPoint-specific behavior on top of the generic workflow.
 
 ---
 
-## Step 1: Watch CI
+## Overview
 
-**ALWAYS use the dedicated monitoring script — never write a manual polling loop:**
-
-```bash
-./scripts/workflow/monitor-gh-actions.sh <PR>
-```
-
-This script polls, formats output, and exits cleanly. Manual `for`/`while` + `sleep` loops are blocked by a pre-tool-use hook.
-
-| Exit condition   | Action                                       |
-| ---------------- | -------------------------------------------- |
-| All passing      | Proceed to Step 2                            |
-| Any failed       | Stop — investigate and fix before continuing |
-| Timeout (10 min) | Report to user, leave PR open                |
+Three steps: CI must pass, Copilot review comments must be addressed, then label ready.
+Follow the `gha-ready-to-review` skill for each step, with these PinPoint additions:
 
 ---
 
-## Step 2: Copilot Review Loop
+## Step 1: Monitor CI
 
-After CI passes, wait for Copilot to review:
-
-```bash
-./scripts/workflow/copilot-comments.sh <PR>
-```
-
-**Poll loop (up to 5 minutes):**
+Use the monitor script from `gha-ready-to-review` (installed at
+`~/.agents/skills/gha-ready-to-review/scripts/monitor-gh-actions.sh`):
 
 ```bash
-for i in $(seq 1 5); do
-    output=$(./scripts/workflow/copilot-comments.sh $PR_NUMBER)
-    echo "$output"
-    echo "$output" | grep -q "⏳" || break
-    sleep 60
-done
+# Background (preferred — lets you work on reviews while CI runs):
+~/.agents/skills/gha-ready-to-review/scripts/monitor-gh-actions.sh <PR> \
+  --output /tmp/gha-monitor-<PR>.md &
+
+# Check status anytime:
+cat /tmp/gha-monitor-<PR>.md
 ```
 
-| Output                         | Meaning                 |
-| ------------------------------ | ----------------------- |
-| `⏳ Copilot review pending`    | Wait and retry          |
-| `✅ Copilot review is current` | Review is up to date    |
-| No review after 5 min          | Mark timed out, proceed |
+Manual polling loops are blocked by a pre-tool-use hook. Always use the script.
 
-**If comments exist:**
+---
 
-1. Evaluate each critically — not all Copilot suggestions are correct
-2. Reply and resolve: `./scripts/workflow/respond-to-copilot.sh <PR> "path:line" "Fixed: ... —Claude"`
-3. Push fix, then poll again — Copilot may re-review after the push
+## Step 2: Handle Review Comments
+
+Follow `gha-ready-to-review` for MCP-first or shell-fallback review handling.
+
+### PinPoint additions:
+
+- **Sign all replies** with your agent name: `"Fixed: <description>. —Claude"` (or `—Gemini`, `—Antigravity`, etc.)
+- **Keep replies to one sentence**
+- **Every comment gets a reply** — no silent fixes or silent ignores
+- **Evaluate critically** — not all Copilot suggestions are correct. If wrong, say why.
+- **Filter to Copilot threads** using reviewer login allowlist:
+  `copilot-pull-request-reviewer` or `copilot-pull-request-reviewer[bot]`
 
 ---
 
 ## Step 3: Label Ready
 
-Once CI is green and Copilot comments are resolved:
+Once CI is green and Copilot review comments are resolved:
 
 ```bash
+# PinPoint's label-ready script (validates CI + reviews + draft status):
 ./scripts/workflow/label-ready.sh <PR>
 ```
 
-This script verifies CI + Copilot status + draft state before applying the label. Use `--dry-run` to preview without acting.
+Use `--dry-run` to preview. Use `--force` to skip Copilot check.
+
+### Optional: Clean up worktree
+
+```bash
+./scripts/workflow/label-ready.sh <PR> --cleanup
+# Or manually:
+./pinpoint-wt.py remove <branch>
+```
+
+### Optional: Update beads
+
+If the PR is tracked by a beads issue, update its status after labeling.
