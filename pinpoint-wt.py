@@ -247,6 +247,28 @@ def write_protected_file(path: Path, content: str) -> None:
     path.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
 
 
+def generate_launch_json(worktree_path: Path, port_config: PortConfig) -> None:
+    """Generate .claude/launch.json with the worktree's Next.js port."""
+    claude_dir = worktree_path / ".claude"
+    claude_dir.mkdir(exist_ok=True)
+    launch_path = claude_dir / "launch.json"
+    content = json.dumps(
+        {
+            "version": "0.0.1",
+            "configurations": [
+                {
+                    "name": "next-dev",
+                    "runtimeExecutable": "pnpm",
+                    "runtimeArgs": ["run", "dev"],
+                    "port": port_config.nextjs_port,
+                }
+            ],
+        },
+        indent=2,
+    )
+    launch_path.write_text(content + "\n")
+
+
 # =============================================================================
 # Commands
 # =============================================================================
@@ -373,6 +395,10 @@ def cmd_create(args: argparse.Namespace) -> int:
     env_content = merge_env_local(worktree_dir, port_config)
     env_path = worktree_dir / ".env.local"
     write_protected_file(env_path, env_content)
+
+    # Generate .claude/launch.json
+    log("  🚀 Generating .claude/launch.json...")
+    generate_launch_json(worktree_dir, port_config)
 
     # Install dependencies
     log("  📦 Installing dependencies (pnpm install)...")
@@ -631,6 +657,13 @@ def cmd_sync(args: argparse.Namespace) -> int:
             )
         except Exception as e:
             print(f"    ❌ .env.local: {e}")
+
+        # Generate .claude/launch.json
+        try:
+            generate_launch_json(path, port_config)
+            print(f"    ✅ launch.json (Next.js={port_config.nextjs_port})")
+        except Exception as e:
+            print(f"    ❌ launch.json: {e}")
 
         # Ensure beads redirect exists for non-main worktrees
         main_beads = Path.cwd() / ".beads"
