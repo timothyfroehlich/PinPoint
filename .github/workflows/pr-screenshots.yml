@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # v2.15.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
         with:
           egress-policy: audit
 
@@ -49,25 +49,25 @@ jobs:
           echo "ref=$(echo "$PR_DATA" | jq -r .head.ref)" >> "$GITHUB_OUTPUT"
 
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # ratchet:actions/checkout@v6.0.2
         with:
           persist-credentials: false
           ref: ${{ steps.pr.outputs.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # v4
+        uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # ratchet:pnpm/action-setup@v4
         with:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # v6.3.0
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f  # ratchet:actions/setup-node@v6.3.0
         with:
           node-version: "22"
           cache: "pnpm"
 
       - name: Restore node_modules cache
         id: cache-restore
-        uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
+        uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # ratchet:actions/cache/restore@v5.0.3
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -77,12 +77,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@b60b5899c73b63a2d2d651b1e90db8d4c9392f51  # v1.6.0
+        uses: supabase/setup-cli@b60b5899c73b63a2d2d651b1e90db8d4c9392f51  # ratchet:supabase/setup-cli@v1.6.0
         with:
           version: latest
 
       - name: Cache Playwright browsers (chromium + webkit)
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # ratchet:actions/cache@v5.0.3
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -116,7 +116,7 @@ jobs:
 
       - name: Deploy report to GitHub Pages
         if: always()
-        uses: peaceiris/actions-gh-pages@e9c66a37f080288a11235e32cbe2dc5fb3a679cc  # v4
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e  # ratchet:peaceiris/actions-gh-pages@v4.0.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./playwright-report
