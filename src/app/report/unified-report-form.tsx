@@ -13,7 +13,7 @@ import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "~/lib/utils";
 import {
   submitPublicIssueAction,
@@ -49,6 +49,7 @@ interface Machine {
 export interface ActionState {
   error?: string;
   success?: boolean;
+  redirectTo?: string;
 }
 
 interface Assignee {
@@ -78,6 +79,7 @@ export function UnifiedReportForm({
   initialMachineInitials,
 }: UnifiedReportFormProps): React.JSX.Element {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const hasRestored = useRef(false);
   const [selectedMachineId, setSelectedMachineId] = useState(
     defaultMachineId ?? ""
@@ -116,12 +118,15 @@ export function UnifiedReportForm({
     [machinesList, selectedMachineId]
   );
 
-  // Clear localStorage on successful submission
+  // Clear localStorage on successful submission, then redirect client-side
   useEffect(() => {
     if (state.success) {
       window.localStorage.removeItem("report_form_state");
+      if (state.redirectTo) {
+        router.push(state.redirectTo);
+      }
     }
-  }, [state.success]);
+  }, [state.success, state.redirectTo, router]);
 
   // Persistence: Restore from localStorage on mount
   useEffect(() => {
@@ -178,9 +183,10 @@ export function UnifiedReportForm({
     }
   }, [defaultMachineId, machinesList, searchParams]);
 
-  // Persistence: Save to localStorage on change
+  // Persistence: Save to localStorage on change (skip after successful submission)
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (state.success) return;
     const stateToSave = {
       machineId: selectedMachineId,
       title,
@@ -202,6 +208,7 @@ export function UnifiedReportForm({
     priority,
     frequency,
     watchIssue,
+    state.success,
   ]);
 
   // Sync with defaultMachineId prop when it changes (from URL)
