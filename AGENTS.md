@@ -138,7 +138,7 @@ conflicts across worktrees and force-push requirements on open PRs.
 - After code changes, run `pnpm run preflight` before considering work complete.
   For trivial changes (comments, docs), `pnpm run check` is sufficient.
 - **Required checks for merge**: Only `CI Gate` is required by the GitHub ruleset (ruleset `6326455`). Vercel is NOT a required check. `mergeStateStatus: BLOCKED` while E2E tests are still running is normal — it unblocks automatically once `CI Gate` passes.
-- **Vercel preview failures**: `CREATE SCHEMA IF NOT EXISTS "drizzle"` errors on Vercel preview builds (shown as `fail` at 0s duration) are a **pre-existing infra issue** with Supabase preview branch DBs lacking `CREATE SCHEMA` permissions. These are NOT caused by code changes and do NOT block `CI Gate` or auto-merge. Safe to ignore.
+- **Vercel preview migrations**: Preview deployments skip `migrate:production` entirely (exit 0). The Supabase integration triggers a redeployment with branch DB credentials, but that DB user lacks `CREATE SCHEMA` privileges. Migrations are handled by the GHA "Supabase Branch Setup" workflow instead. Production deployments still run migrations normally.
 
 ### Key Commands
 
