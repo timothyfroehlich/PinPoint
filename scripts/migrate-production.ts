@@ -19,6 +19,19 @@ interface MigrationJournal {
   entries: MigrationEntry[];
 }
 
+// Skip migrations on Vercel preview deployments.
+// The Supabase integration triggers a redeployment with preview branch DB
+// credentials, but that DB user lacks CREATE SCHEMA privileges, causing
+// `CREATE SCHEMA IF NOT EXISTS "drizzle"` to fail. This is harmless because
+// the GHA "Supabase Branch Setup" workflow already runs drizzle-kit migrate
+// on the branch DB before the preview deployment needs it.
+if (process.env["VERCEL_ENV"] === "preview") {
+  console.log(
+    "⏭️  Skipping migrations on Vercel preview (handled by GHA Supabase Branch Setup)"
+  );
+  process.exit(0);
+}
+
 // Prefer non-pooled connections for DDL
 const connectionString =
   process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
