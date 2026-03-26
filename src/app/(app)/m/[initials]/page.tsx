@@ -32,6 +32,7 @@ import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
 import { MachineTextFields } from "./machine-text-fields";
 import { IssuesExpando } from "./issues-expando";
+import { PbmStatusSection } from "./pbm-status-section";
 import {
   getAccessLevel,
   checkPermission,
@@ -167,6 +168,11 @@ export default async function MachineDetailPage({
   );
   const canViewOwnerNotes = checkPermission(
     "machines.view.ownerNotes",
+    accessLevel,
+    ownershipContext
+  );
+  const canManagePbm = checkPermission(
+    "pinball_map.manage",
     accessLevel,
     ownershipContext
   );
@@ -321,6 +327,17 @@ export default async function MachineDetailPage({
                     allUsers={allUsers}
                     canEditAnyMachine={canEditAnyMachine}
                     isOwner={isOwner}
+                  />
+                )}
+
+                {/* Pinball Map status - shown to owner/tech/admin */}
+                {canManagePbm && (
+                  <PbmStatusSection
+                    machineId={machine.id}
+                    presenceStatus={machine.presenceStatus}
+                    pbmMachineId={machine.pbmMachineId}
+                    pbmMachineName={machine.pbmMachineName}
+                    pbmLocationMachineXrefId={machine.pbmLocationMachineXrefId}
                   />
                 )}
 

@@ -140,6 +140,10 @@ export const machines = pgTable(
     })
       .notNull()
       .default("on_the_floor"),
+    // Pinball Map integration fields
+    pbmMachineId: integer("pbm_machine_id"),
+    pbmMachineName: text("pbm_machine_name"),
+    pbmLocationMachineXrefId: integer("pbm_location_machine_xref_id"),
   },
   (t) => ({
     initialsCheck: check("initials_check", sql`initials ~ '^[A-Z0-9]{2,6}$'`),
@@ -152,6 +156,29 @@ export const machines = pgTable(
       t.invitedOwnerId
     ),
     nameIdx: index("idx_machines_name").on(t.name),
+  })
+);
+
+/**
+ * Pinball Map Config Table
+ *
+ * Single-row table storing Pinball Map API credentials.
+ * CHECK(id = 1) enforces exactly one configuration row.
+ * RLS restricts all access to admin role (see migration).
+ */
+export const pinballMapConfig = pgTable(
+  "pinball_map_config",
+  {
+    id: integer("id").primaryKey().default(1),
+    locationId: integer("location_id").notNull(),
+    userEmail: text("user_email").notNull(),
+    userToken: text("user_token").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (_t) => ({
+    singleRowCheck: check("single_row_check", sql`id = 1`),
   })
 );
 

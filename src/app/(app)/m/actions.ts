@@ -60,8 +60,16 @@ export type CreateMachineResult = Result<
   "VALIDATION" | "UNAUTHORIZED" | "SERVER"
 >;
 
+/** Metadata for bidirectional PBM sync suggestions */
+export interface PbmSuggestionMeta {
+  /** Suggest adding to PBM (moved to floor, linked, not on PBM) */
+  suggestAddToPbm: boolean;
+  /** Suggest removing from PBM (moved off floor, linked, on PBM) */
+  suggestRemoveFromPbm: boolean;
+}
+
 export type UpdateMachineResult = Result<
-  { machineId: string },
+  { machineId: string; pbmSuggestion?: PbmSuggestionMeta },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
 
@@ -117,6 +125,7 @@ export async function createMachineAction(
   }
 
   // Extract form data
+  const pbmMachineIdRaw = formData.get("pbmMachineId");
   const rawData = {
     name: formData.get("name"),
     initials: formData.get("initials"),
@@ -124,6 +133,15 @@ export async function createMachineAction(
       typeof formData.get("ownerId") === "string" &&
       (formData.get("ownerId") as string).length > 0
         ? (formData.get("ownerId") as string)
+        : undefined,
+    pbmMachineId:
+      typeof pbmMachineIdRaw === "string" && pbmMachineIdRaw.length > 0
+        ? Number(pbmMachineIdRaw)
+        : undefined,
+    pbmMachineName:
+      typeof formData.get("pbmMachineName") === "string" &&
+      (formData.get("pbmMachineName") as string).length > 0
+        ? (formData.get("pbmMachineName") as string)
         : undefined,
   };
 
@@ -134,7 +152,8 @@ export async function createMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { name, initials, ownerId } = validation.data;
+  const { name, initials, ownerId, pbmMachineId, pbmMachineName } =
+    validation.data;
 
   // Resolve owner type
   let finalOwnerId: string | undefined = undefined;
@@ -171,6 +190,8 @@ export async function createMachineAction(
         initials,
         ownerId: finalOwnerId,
         invitedOwnerId: finalInvitedOwnerId,
+        ...(pbmMachineId !== undefined && { pbmMachineId }),
+        ...(pbmMachineName !== undefined && { pbmMachineName }),
       })
       .returning();
 
@@ -245,6 +266,8 @@ export async function updateMachineAction(
     return err("UNAUTHORIZED", "User profile not found.");
   }
 
+  const updatePbmMachineIdRaw = formData.get("pbmMachineId");
+  const updatePbmMachineNameRaw = formData.get("pbmMachineName");
   const rawData = {
     id: formData.get("id"),
     name: formData.get("name"),
@@ -258,6 +281,20 @@ export async function updateMachineAction(
       (formData.get("presenceStatus") as string).length > 0
         ? (formData.get("presenceStatus") as string)
         : undefined,
+    pbmMachineId:
+      updatePbmMachineIdRaw === ""
+        ? null // Explicitly cleared
+        : typeof updatePbmMachineIdRaw === "string" &&
+            updatePbmMachineIdRaw.length > 0
+          ? Number(updatePbmMachineIdRaw)
+          : undefined, // Not provided
+    pbmMachineName:
+      updatePbmMachineNameRaw === ""
+        ? null
+        : typeof updatePbmMachineNameRaw === "string" &&
+            updatePbmMachineNameRaw.length > 0
+          ? updatePbmMachineNameRaw
+          : undefined,
   };
 
   const validation = updateMachineSchema.safeParse(rawData);
@@ -266,7 +303,8 @@ export async function updateMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { id, name, ownerId, presenceStatus } = validation.data;
+  const { id, name, ownerId, presenceStatus, pbmMachineId, pbmMachineName } =
+    validation.data;
 
   try {
     // Admins and technicians can update any machine, non-privileged users can only update their own machines
@@ -276,10 +314,16 @@ export async function updateMachineAction(
       ? eq(machines.id, id)
       : and(eq(machines.id, id), eq(machines.ownerId, user.id));
 
-    // Get current machine state to check for owner change
+    // Get current machine state to check for owner change and PBM suggestion context
     const currentMachine = await db.query.machines.findFirst({
       where: whereConditions,
-      columns: { ownerId: true, name: true },
+      columns: {
+        ownerId: true,
+        name: true,
+        presenceStatus: true,
+        pbmMachineId: true,
+        pbmLocationMachineXrefId: true,
+      },
     });
 
     if (!currentMachine) {
@@ -324,6 +368,8 @@ export async function updateMachineAction(
           ownerId: finalOwnerId,
           invitedOwnerId: finalInvitedOwnerId,
         }),
+        ...(pbmMachineId !== undefined && { pbmMachineId }),
+        ...(pbmMachineName !== undefined && { pbmMachineName }),
       })
       .where(whereConditions)
       .returning();
@@ -393,7 +439,16 @@ export async function updateMachineAction(
     revalidatePath("/m");
     revalidatePath(`/m/${machine.initials}`);
 
-    return ok({ machineId: machine.id });
+    // Build PBM suggestion context for bidirectional sync hints
+    const pbmSuggestion = buildPbmSuggestion(
+      currentMachine,
+      presenceStatus ?? currentMachine.presenceStatus
+    );
+
+    return ok({
+      machineId: machine.id,
+      ...(pbmSuggestion && { pbmSuggestion }),
+    });
   } catch (error: unknown) {
     if (isNextRedirectError(error)) {
       throw error;
@@ -404,6 +459,28 @@ export async function updateMachineAction(
     );
     return err("SERVER", "Failed to update machine. Please try again.");
   }
+}
+
+function buildPbmSuggestion(
+  currentMachine: {
+    presenceStatus: string;
+    pbmMachineId: number | null;
+    pbmLocationMachineXrefId: number | null;
+  },
+  newPresenceStatus: string
+): PbmSuggestionMeta | undefined {
+  // No suggestion if not linked to PBM
+  if (!currentMachine.pbmMachineId) return undefined;
+  // No suggestion if presence didn't change
+  if (newPresenceStatus === currentMachine.presenceStatus) return undefined;
+
+  const isNowOnFloor = newPresenceStatus === "on_the_floor";
+  const isOnPbm = currentMachine.pbmLocationMachineXrefId !== null;
+
+  return {
+    suggestAddToPbm: isNowOnFloor && !isOnPbm,
+    suggestRemoveFromPbm: !isNowOnFloor && isOnPbm,
+  };
 }
 
 /**

@@ -425,6 +425,51 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
       },
     ],
   },
+  {
+    id: "pinball_map",
+    label: "Pinball Map",
+    permissions: [
+      {
+        id: "pinball_map.view",
+        label: "View Pinball Map sync",
+        description:
+          "View the Pinball Map sync status page and per-machine PBM status",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "pinball_map.manage",
+        label: "Manage Pinball Map listings",
+        description:
+          "Link machines to Pinball Map models, add/remove from the public listing",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: "owner",
+          technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "pinball_map.config",
+        label: "Manage Pinball Map credentials",
+        description:
+          "View and update Pinball Map API credentials and location ID",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: false,
+          admin: true,
+        },
+      },
+    ],
+  },
 ];
 
 /**

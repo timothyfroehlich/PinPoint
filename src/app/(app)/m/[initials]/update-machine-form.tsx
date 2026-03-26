@@ -43,8 +43,14 @@ import {
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
 import { Pencil } from "lucide-react";
+import { toast } from "sonner";
 
 import type { OwnerSelectUser } from "~/components/machines/OwnerSelect";
+import { PbmMachineSearch } from "~/components/machines/PbmMachineSearch";
+import {
+  addToPinballMapAction,
+  removeFromPinballMapAction,
+} from "~/app/(app)/m/pinball-map-actions";
 
 // --- Edit Machine Dialog ---
 
@@ -65,6 +71,9 @@ interface EditMachineDialogProps {
       id: string;
       name: string;
     } | null;
+    pbmMachineId: number | null;
+    pbmMachineName: string | null;
+    pbmLocationMachineXrefId: number | null;
   };
   allUsers: OwnerSelectUser[];
   canEditAnyMachine: boolean;
@@ -91,12 +100,35 @@ export function EditMachineDialog({
     FormData
   >(updateMachineAction, undefined);
 
-  // Close dialog on successful update
+  // Close dialog on successful update + show PBM suggestion toast
   useEffect(() => {
     if (state?.ok) {
       setOpen(false);
+
+      const suggestion = state.value.pbmSuggestion;
+      if (suggestion?.suggestAddToPbm) {
+        toast("Machine is on the floor", {
+          description: "Add to Pinball Map so players can find it?",
+          action: {
+            label: "Add to PBM",
+            onClick: () => {
+              void addToPinballMapAction(machine.id);
+            },
+          },
+        });
+      } else if (suggestion?.suggestRemoveFromPbm) {
+        toast("Machine is off the floor", {
+          description: "Remove from Pinball Map?",
+          action: {
+            label: "Remove from PBM",
+            onClick: () => {
+              void removeFromPinballMapAction(machine.id);
+            },
+          },
+        });
+      }
     }
-  }, [state]);
+  }, [state, machine.id]);
 
   // Reset selectedOwnerId when dialog reopens to avoid stale selection
   useEffect(() => {
@@ -277,6 +309,24 @@ export function EditMachineDialog({
                 </p>
               </div>
             )}
+
+            {/* Pinball Map Link */}
+            <div className="space-y-2">
+              <Label className="text-on-surface">Pinball Map Game Model</Label>
+              <PbmMachineSearch
+                defaultValue={
+                  machine.pbmMachineId && machine.pbmMachineName
+                    ? {
+                        id: machine.pbmMachineId,
+                        name: machine.pbmMachineName,
+                      }
+                    : null
+                }
+              />
+              <p className="text-xs text-on-surface-variant">
+                Optional. Link to a game model on Pinball Map.
+              </p>
+            </div>
 
             <DialogFooter>
               <Button

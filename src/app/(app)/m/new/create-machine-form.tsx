@@ -16,6 +16,7 @@ import {
   OwnerSelect,
   type OwnerSelectUser,
 } from "~/components/machines/OwnerSelect";
+import { PbmMachineSearch } from "~/components/machines/PbmMachineSearch";
 
 interface CreateMachineFormProps {
   allUsers: OwnerSelectUser[];
@@ -97,6 +98,15 @@ export function CreateMachineForm({
         {canSelectOwner && (
           <OwnerSelect users={users} onUsersChange={setUsers} />
         )}
+
+        {/* Pinball Map Link (Optional) */}
+        <div className="space-y-2">
+          <Label className="text-on-surface">Pinball Map Game Model</Label>
+          <PbmMachineSearch />
+          <p className="text-xs text-on-surface-variant">
+            Optional. Link to a game model on Pinball Map for sync.
+          </p>
+        </div>
 
         {/* Actions */}
         <div className="flex gap-3 pt-4">

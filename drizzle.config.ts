@@ -75,6 +75,7 @@ export default defineConfig({
     "notification_preferences",
     "invited_users",
     "machine_watchers",
+    "pinball_map_config",
   ],
   schemaFilter: ["public"],
   verbose: true,

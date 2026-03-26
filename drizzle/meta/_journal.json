@@ -162,6 +162,20 @@
       "when": 1772991974319,
       "tag": "0022_curvy_guardsmen",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1774588800000,
+      "tag": "0023_pinball_map_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1774588801000,
+      "tag": "0024_pinball_map_config_rls",
+      "breakpoints": true
     }
   ]
 }

@@ -16,6 +16,7 @@ import {
   HelpCircle,
   Info,
   Sparkles,
+  MapPin,
 } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
@@ -223,6 +224,16 @@ export function Sidebar({
           {sidebarItems.map((item) => (
             <NavItem key={item.href} item={item} />
           ))}
+
+          {(role === "admin" || role === "technician") && (
+            <NavItem
+              item={{
+                title: "Pinball Map",
+                href: "/pinball-map",
+                icon: MapPin,
+              }}
+            />
+          )}
 
           {role === "admin" && (
             <NavItem
