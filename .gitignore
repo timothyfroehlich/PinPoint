@@ -36,9 +36,6 @@ next-env.d.ts
 logs/
 *.jsonl
 
-# Beads issue tracker JSONL files (must be tracked)
-!.beads/*.jsonl
-
 # Environment variable files
 # Strategy: Ignore every .env* variant by default, then explicitly allow safe templates.
 # Only the base `.env` (shared non‑secret defaults) and `.env.example` (template) are tracked.
@@ -157,3 +154,11 @@ supabase/migrations/
 
 # bv (beads viewer) local config and caches
 .bv/
+
+# Beads issue tracker (Dolt-backed)
+.beads/
+.dolt/
+.beads-credential-key
+
+# Superpowers plugin ephemeral files
+.superpowers/
