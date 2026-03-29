@@ -1,3 +1,5 @@
 set -e
 
-bd hooks run pre-push "$@" || true
+if command -v bd >/dev/null 2>&1; then
+  bd hooks run pre-push "$@" || true
+fi
