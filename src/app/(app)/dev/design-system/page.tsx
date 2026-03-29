@@ -17,7 +17,7 @@ import { Separator } from "~/components/ui/separator";
  */
 export default function DesignSystemPage(): React.JSX.Element {
   // Gate to development only
-  if (process.env.NODE_ENV === "production") {
+  if (process.env["VERCEL_ENV"] === "production") {
     redirect("/dashboard");
   }
 

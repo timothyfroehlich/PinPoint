@@ -114,23 +114,34 @@ export function PreviewClient(): React.JSX.Element {
     setInputValue(state.path);
   }, [state.path]);
 
-  const injectStyles = useCallback(
+  /** Inject or remove the chrome-hiding stylesheet in an iframe */
+  const syncChromeStyle = useCallback(
     (iframe: HTMLIFrameElement | null) => {
-      if (!iframe || !state.hideChrome) return;
+      if (!iframe) return;
       try {
         const doc = iframe.contentDocument;
         if (!doc) return;
-        doc.getElementById("embed-styles")?.remove();
-        const style = doc.createElement("style");
-        style.id = "embed-styles";
-        style.textContent = EMBED_CSS;
-        doc.head.appendChild(style);
+        const existing = doc.getElementById("embed-styles");
+        if (state.hideChrome && !existing) {
+          const style = doc.createElement("style");
+          style.id = "embed-styles";
+          style.textContent = EMBED_CSS;
+          doc.head.appendChild(style);
+        } else if (!state.hideChrome && existing) {
+          existing.remove();
+        }
       } catch {
         // Cross-origin — can't inject
       }
     },
     [state.hideChrome]
   );
+
+  // Toggle chrome styles in-place without reloading iframes
+  useEffect(() => {
+    syncChromeStyle(desktopRef.current);
+    syncChromeStyle(mobileRef.current);
+  }, [syncChromeStyle]);
 
   const presets = [
     { label: "Design System", path: "/dev/design-system" },
@@ -265,11 +276,11 @@ export function PreviewClient(): React.JSX.Element {
             </div>
             <iframe
               ref={desktopRef}
-              key={`desktop-${path}-${hideChrome}`}
+              key={`desktop-${path}`}
               src={path}
               title="Desktop preview"
               className="flex-1 w-full border border-outline-variant rounded-b-lg bg-background"
-              onLoad={() => injectStyles(desktopRef.current)}
+              onLoad={() => syncChromeStyle(desktopRef.current)}
             />
           </div>
         )}
@@ -288,12 +299,12 @@ export function PreviewClient(): React.JSX.Element {
             </div>
             <iframe
               ref={mobileRef}
-              key={`mobile-${path}-${hideChrome}`}
+              key={`mobile-${path}`}
               src={path}
               title="Mobile preview"
               className="flex-1 border border-outline-variant rounded-b-lg bg-background"
               style={{ width: mobileWidth }}
-              onLoad={() => injectStyles(mobileRef.current)}
+              onLoad={() => syncChromeStyle(mobileRef.current)}
             />
           </div>
         )}
