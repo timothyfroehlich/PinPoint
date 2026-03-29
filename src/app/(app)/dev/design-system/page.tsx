@@ -120,7 +120,7 @@ function ColorPaletteSection(): React.JSX.Element {
     <section className="space-y-6">
       <SectionHeading
         title="Color Palette"
-        description="All theme tokens from globals.css — the single source of truth."
+        description="Theme tokens from globals.css. Hex values are manually mirrored here — the CSS variables are the source of truth."
       />
 
       {/* Core Colors */}
