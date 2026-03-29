@@ -36,8 +36,9 @@ next-env.d.ts
 logs/
 *.jsonl
 
-# Beads issue tracker JSONL files (must be tracked)
-!.beads/*.jsonl
+# Beads issue tracker (Dolt DB — not tracked in git)
+.beads/
+.dolt/
 
 # Environment variable files
 # Strategy: Ignore every .env* variant by default, then explicitly allow safe templates.
