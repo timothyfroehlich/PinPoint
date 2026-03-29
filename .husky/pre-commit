@@ -1,5 +1,15 @@
 set -e
 
+# Block direct commits to main — all changes must go through PRs
+branch="$(git rev-parse --abbrev-ref HEAD)"
+if [ "$branch" = "main" ]; then
+  echo "❌ Direct commits to main are not allowed. Create a feature branch first."
+  exit 1
+fi
+
 pnpm exec lint-staged
 pnpm run typecheck
 pnpm run format
+if command -v bd >/dev/null 2>&1; then
+  bd hooks run pre-commit
+fi

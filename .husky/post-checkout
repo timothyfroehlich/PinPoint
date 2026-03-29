@@ -3,6 +3,10 @@ set -e
 # Args: previous HEAD, new HEAD, branch flag (1=branch change, 0=file checkout)
 BRANCH_CHECKOUT=$3
 
+if command -v bd >/dev/null 2>&1; then
+  bd hooks run post-checkout "$@" || true
+fi
+
 if [ "$BRANCH_CHECKOUT" = "1" ]; then
   # Only sync if we're in a pinpoint worktree with a config template
   if [ -f "supabase/config.toml.template" ]; then

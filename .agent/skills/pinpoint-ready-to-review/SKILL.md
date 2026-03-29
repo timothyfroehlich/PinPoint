@@ -47,7 +47,8 @@ Follow `gha-ready-to-review` for MCP-first or shell-fallback review handling.
 
 - **Sign all replies** with your agent name: `"Fixed: <description>. —Claude"` (or `—Gemini`, `—Antigravity`, etc.)
 - **Keep replies to one sentence**
-- **Every comment gets a reply** — no silent fixes or silent ignores
+- **Applied suggestions auto-resolve** — Copilot detects your fix commit and closes the thread automatically
+- **Declined comments need a manual reply** — no silent ignores. Use `respond-to-copilot.sh` only for these.
 - **Evaluate critically** — not all Copilot suggestions are correct. If wrong, say why.
 - **Filter to Copilot threads** using reviewer login allowlist:
   `copilot-pull-request-reviewer` or `copilot-pull-request-reviewer[bot]`
