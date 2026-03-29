@@ -573,10 +573,11 @@ After CI completes, check for Copilot review comments:
 ./scripts/workflow/copilot-comments.sh <PR>
 ```
 
-If comments exist, address each one and resolve the thread:
+If comments exist, fix the code. Applied suggestions are auto-resolved by Copilot when it detects your commit.
+For declined suggestions only, reply and resolve manually:
 
 ```bash
-./scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <description>. —Claude"
+./scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Ignored: <why>. —Claude"
 ```
 
 ### 6.3 Label Ready for Review
