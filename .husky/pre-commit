@@ -10,4 +10,6 @@ fi
 pnpm exec lint-staged
 pnpm run typecheck
 pnpm run format
-bd hooks run pre-commit
+if command -v bd >/dev/null 2>&1; then
+  bd hooks run pre-commit
+fi
