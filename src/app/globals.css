@@ -168,7 +168,22 @@
 html,
 body {
   max-width: 100vw;
-  overflow-x: hidden;
+}
+
+/* Desktop browsers (mouse/trackpad): never collapse to mobile layout.
+   Phones (pointer: coarse) still get the mobile shell normally. */
+@media (pointer: fine) {
+  body {
+    min-width: 768px;
+  }
+}
+
+/* Mobile devices: prevent horizontal overflow from wide content */
+@media (pointer: coarse) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
 }
 
 body {
