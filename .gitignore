@@ -158,6 +158,7 @@ supabase/migrations/
 # Beads issue tracker (Dolt-backed)
 .beads/
 .dolt/
+*.db
 .beads-credential-key
 
 # Superpowers plugin ephemeral files
