@@ -94,15 +94,12 @@ export function getEmailHtml(
   const sanitizedDescription = issueDescription
     ? sanitizeHtml(issueDescription)
     : "";
-  const descriptionBlock = sanitizedDescription
-    ? `<br/><blockquote>${sanitizedDescription}</blockquote>`
-    : "";
   switch (type) {
     case "new_issue":
-      body = `A new issue has been reported.${descriptionBlock}`;
+      body = "A new issue has been reported.";
       break;
     case "issue_assigned":
-      body = `You have been assigned to this issue.${descriptionBlock}`;
+      body = "You have been assigned to this issue.";
       break;
     case "issue_status_changed":
       body = `Status changed to: <strong>${newStatus ? sanitizeHtml(newStatus) : ""}</strong>`;
@@ -159,9 +156,15 @@ export function getEmailHtml(
     }
   }
 
+  const showDescription =
+    (type === "new_issue" || type === "issue_assigned") && sanitizedDescription;
+  const descriptionBlock = showDescription
+    ? `\n      <blockquote>${sanitizedDescription}</blockquote>`
+    : "";
+
   return `
       <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
-      <p>${body}</p>
+      <p>${body}</p>${descriptionBlock}
       <p><a href="${issueUrl}">View Issue</a></p>
       ${getEmailFooter(userId)}
     `;

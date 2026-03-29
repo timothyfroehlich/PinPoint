@@ -200,6 +200,9 @@ export async function createIssue({
     // 5. Notifications
     try {
       const formattedId = formatIssueId(machineInitials, issueNumber);
+      const plainDescription = description
+        ? docToPlainText(description)
+        : undefined;
       // Trigger Notification (actorId optional for public reports)
       await createNotification(
         {
@@ -210,9 +213,7 @@ export async function createIssue({
           issueTitle: title,
           machineName: updatedMachine.name,
           formattedIssueId: formattedId,
-          issueDescription: description
-            ? docToPlainText(description)
-            : undefined,
+          issueDescription: plainDescription,
         },
         tx
       );
@@ -222,7 +223,7 @@ export async function createIssue({
       if (description) {
         const mentions = extractMentions(description);
         if (mentions.length > 0) {
-          const commentContent = docToPlainText(description);
+          const commentContent = plainDescription;
           await createNotification(
             {
               type: "mentioned",
