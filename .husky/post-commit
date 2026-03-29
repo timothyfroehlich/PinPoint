@@ -1,0 +1,3 @@
+set -e
+
+bd hooks run post-commit

@@ -10,3 +10,4 @@ fi
 pnpm exec lint-staged
 pnpm run typecheck
 pnpm run format
+bd hooks run pre-commit
