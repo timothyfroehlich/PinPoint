@@ -53,7 +53,12 @@ function loadSavedState(): PreviewState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULTS;
-    return { ...DEFAULTS, ...(JSON.parse(raw) as Partial<PreviewState>) };
+    const parsed = JSON.parse(raw) as Partial<PreviewState>;
+    return {
+      ...DEFAULTS,
+      ...parsed,
+      path: sanitizePath(parsed.path ?? DEFAULTS.path),
+    };
   } catch {
     return DEFAULTS;
   }

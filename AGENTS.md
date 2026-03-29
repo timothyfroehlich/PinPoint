@@ -34,6 +34,7 @@ If your tool does not support skills, read the file path directly.
 | Category       | Skill Name                       | Path                                                    | When to Use                                                                                   |
 | :------------- | :------------------------------- | :------------------------------------------------------ | :-------------------------------------------------------------------------------------------- |
 | **UI**         | `pinpoint-ui`                    | `.agent/skills/pinpoint-ui/SKILL.md`                    | Components, shadcn/ui, forms, responsive design.                                              |
+| **UI**         | `pinpoint-design-bible`          | `.agent/skills/pinpoint-design-bible/SKILL.md`          | Design system rules, page archetypes, spacing, surfaces. Use for any new UI work.             |
 | **TypeScript** | `pinpoint-typescript`            | `.agent/skills/pinpoint-typescript/SKILL.md`            | Type errors, generics, strict mode, Drizzle types.                                            |
 | **Testing**    | `pinpoint-testing`               | `.agent/skills/pinpoint-testing/SKILL.md`               | Writing tests, PGlite setup, Playwright.                                                      |
 | **Testing**    | `pinpoint-e2e`                   | `.agent/skills/pinpoint-e2e/SKILL.md`                   | E2E tests, worker isolation, stability patterns.                                              |

@@ -104,7 +104,7 @@ function ColorSwatch({
     <div className="space-y-1.5">
       <div
         className={`h-16 rounded-lg border border-outline-variant ${className ?? ""}`}
-        style={{ backgroundColor: hex }}
+        style={{ backgroundColor: `var(${cssVar})` }}
       />
       <div className="space-y-0.5">
         <p className="text-xs font-medium">{name}</p>
