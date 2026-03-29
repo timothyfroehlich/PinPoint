@@ -155,10 +155,5 @@ supabase/migrations/
 # bv (beads viewer) local config and caches
 .bv/
 
-# Beads issue tracker (Dolt-backed)
-.beads/
-.dolt/
-.beads-credential-key
-
 # Superpowers plugin ephemeral files
 .superpowers/
