@@ -54,14 +54,15 @@ Pick the surface level based on the element's role:
 
 These values are fixed. Do not deviate.
 
-| Element        | Value                                                 |
-| :------------- | :---------------------------------------------------- |
-| Header height  | 52px, `sticky`, `z-20`                                |
-| Bottom tab bar | 56px min-height, `fixed`, `z-50`                      |
-| Tab bar safe   | `env(safe-area-inset-bottom)` padding                 |
-| Content bottom | `pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0` |
-| Scroll padding | `scroll-pt-[52px] md:scroll-pt-0`                     |
-| Mobile/desktop | `md:` (768px) is THE breakpoint                       |
+| Element           | Value                                                                                                                                      |
+| :---------------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
+| Header height     | 52px, `sticky`, `z-20`                                                                                                                     |
+| Bottom tab bar    | 56px min-height, `fixed`, `z-50`                                                                                                           |
+| Tab bar safe      | `env(safe-area-inset-bottom)` padding                                                                                                      |
+| Content bottom    | `pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0`                                                                                      |
+| Scroll padding    | `scroll-pt-[52px] md:scroll-pt-0`                                                                                                          |
+| Mobile/desktop    | `md:` (768px) is THE breakpoint                                                                                                            |
+| Desktop min-width | `@media (pointer: fine)` enforces `min-width: 768px` on body. Desktop browsers never hit the mobile breakpoint regardless of window width. |
 
 **If you add a new page:** it MUST include the content bottom padding or content will be hidden behind the tab bar on mobile.
 
@@ -78,6 +79,7 @@ These values are fixed. Do not deviate.
 - When hiding/showing for mobile vs desktop, use `md:hidden` / `hidden md:block`.
 - NEVER use `lg:` as the primary layout shift -- `md:` is always the pivot.
 - Mobile-first: write the mobile layout, then add `md:` overrides.
+- **Desktop never goes mobile:** A `@media (pointer: fine)` rule in `globals.css` sets `min-width: 768px` on body, so desktop browsers always show the sidebar/desktop header even if the window is narrower than 768px (horizontal scroll kicks in instead). Phones (`pointer: coarse`) are unaffected and still get the mobile shell.
 
 ## 5. Page Archetypes
 
