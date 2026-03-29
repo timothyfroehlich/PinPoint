@@ -12,11 +12,12 @@ import { useSearchParams } from "next/navigation";
 /** Validate that a path is a safe same-origin relative path */
 function sanitizePath(input: string): string {
   const trimmed = input.trim();
-  // Must start with / and not contain protocol schemes
+  // Must start with / and not be protocol-relative (//example.com)
+  // or contain a protocol scheme (javascript:, data:, etc.)
   if (
     !trimmed.startsWith("/") ||
     trimmed.startsWith("//") ||
-    trimmed.includes(":")
+    /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)
   ) {
     return "/dev/design-system";
   }
