@@ -79,21 +79,28 @@ function getEmailFooter(userId?: string): string {
   `;
 }
 
-export function getEmailHtml(
-  type: NotificationType,
-  issueTitle?: string,
-  machineName?: string,
-  formattedIssueId?: string,
-  commentContent?: string,
-  newStatus?: string,
-  userId?: string,
-  issueDescription?: string
-): string {
-  // Basic HTML for MVP
+export interface EmailHtmlOptions {
+  type: NotificationType;
+  issueTitle?: string | undefined;
+  machineName?: string | undefined;
+  formattedIssueId?: string | undefined;
+  commentContent?: string | undefined;
+  newStatus?: string | undefined;
+  userId?: string | undefined;
+  issueDescription?: string | undefined;
+}
+
+export function getEmailHtml({
+  type,
+  issueTitle,
+  machineName,
+  formattedIssueId,
+  commentContent,
+  newStatus,
+  userId,
+  issueDescription,
+}: EmailHtmlOptions): string {
   let body = "";
-  const sanitizedDescription = issueDescription
-    ? sanitizeHtml(issueDescription)
-    : "";
   switch (type) {
     case "new_issue":
       body = "A new issue has been reported.";
@@ -105,7 +112,6 @@ export function getEmailHtml(
       body = `Status changed to: <strong>${newStatus ? sanitizeHtml(newStatus) : ""}</strong>`;
       break;
     case "new_comment": {
-      // Sanitize comment content to prevent XSS
       const sanitizedComment = commentContent
         ? sanitizeHtml(commentContent)
         : "";
@@ -156,15 +162,16 @@ export function getEmailHtml(
     }
   }
 
-  const showDescription =
-    (type === "new_issue" || type === "issue_assigned") && sanitizedDescription;
-  const descriptionBlock = showDescription
-    ? `\n      <blockquote>${sanitizedDescription}</blockquote>`
-    : "";
+  const sanitizedDescription =
+    (type === "new_issue" || type === "issue_assigned") && issueDescription
+      ? sanitizeHtml(issueDescription)
+      : "";
+  const showDescription = !!sanitizedDescription;
 
   return `
       <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
-      <p>${body}</p>${descriptionBlock}
+      <p>${body}</p>
+      ${showDescription ? `<blockquote>${sanitizedDescription}</blockquote>` : ""}
       <p><a href="${issueUrl}">View Issue</a></p>
       ${getEmailFooter(userId)}
     `;

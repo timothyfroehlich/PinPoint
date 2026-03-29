@@ -303,16 +303,16 @@ export async function createNotification(
             resolvedFormattedIssueId,
             newStatus
           ),
-          html: getEmailHtml(
+          html: getEmailHtml({
             type,
-            resolvedIssueTitle,
-            resolvedMachineName,
-            resolvedFormattedIssueId,
+            issueTitle: resolvedIssueTitle,
+            machineName: resolvedMachineName,
+            formattedIssueId: resolvedFormattedIssueId,
             commentContent,
             newStatus,
             userId,
-            issueDescription
-          ),
+            issueDescription,
+          }),
         });
       }
     }

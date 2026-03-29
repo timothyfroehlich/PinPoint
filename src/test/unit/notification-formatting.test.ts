@@ -15,13 +15,13 @@ describe("Notification Formatting", () => {
     it("should sanitize comment content to prevent XSS", () => {
       const maliciousContent =
         '<script>alert("xss")</script>Hello <img src=x onerror=alert(1)>';
-      const html = getEmailHtml(
-        "new_comment",
-        "Test Issue",
-        "Test Machine",
-        "MM-01", // formattedIssueId
-        maliciousContent // commentContent
-      );
+      const html = getEmailHtml({
+        type: "new_comment",
+        issueTitle: "Test Issue",
+        machineName: "Test Machine",
+        formattedIssueId: "MM-01",
+        commentContent: maliciousContent,
+      });
 
       // Should not contain script tags or onerror handlers
       expect(html).not.toContain("<script>");
@@ -33,26 +33,25 @@ describe("Notification Formatting", () => {
 
     it("should preserve safe HTML in comments", () => {
       const safeContent = "<b>Bold</b> and <i>Italic</i>";
-      const html = getEmailHtml(
-        "new_comment",
-        "Test Issue",
-        "Test Machine",
-        "MM-01",
-        safeContent
-      );
+      const html = getEmailHtml({
+        type: "new_comment",
+        issueTitle: "Test Issue",
+        machineName: "Test Machine",
+        formattedIssueId: "MM-01",
+        commentContent: safeContent,
+      });
 
       expect(html).toContain("<b>Bold</b>");
       expect(html).toContain("<i>Italic</i>");
     });
 
     it("should handle empty comment content", () => {
-      const html = getEmailHtml(
-        "new_comment",
-        "Test Issue",
-        "Test Machine",
-        "MM-01",
-        undefined
-      );
+      const html = getEmailHtml({
+        type: "new_comment",
+        issueTitle: "Test Issue",
+        machineName: "Test Machine",
+        formattedIssueId: "MM-01",
+      });
 
       expect(html).toContain("<blockquote></blockquote>");
     });
@@ -60,16 +59,13 @@ describe("Notification Formatting", () => {
 
   describe("Issue Description in Emails", () => {
     it("should include description in new_issue emails", () => {
-      const html = getEmailHtml(
-        "new_issue",
-        "Broken flipper",
-        "Medieval Madness",
-        "MM-01",
-        undefined,
-        undefined,
-        undefined,
-        "Left flipper is stuck and won't return"
-      );
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Broken flipper",
+        machineName: "Medieval Madness",
+        formattedIssueId: "MM-01",
+        issueDescription: "Left flipper is stuck and won't return",
+      });
 
       expect(html).toContain("A new issue has been reported.");
       expect(html).toContain(
@@ -78,28 +74,25 @@ describe("Notification Formatting", () => {
     });
 
     it("should include description in issue_assigned emails", () => {
-      const html = getEmailHtml(
-        "issue_assigned",
-        "Broken flipper",
-        "Medieval Madness",
-        "MM-01",
-        undefined,
-        undefined,
-        undefined,
-        "Left flipper is stuck"
-      );
+      const html = getEmailHtml({
+        type: "issue_assigned",
+        issueTitle: "Broken flipper",
+        machineName: "Medieval Madness",
+        formattedIssueId: "MM-01",
+        issueDescription: "Left flipper is stuck",
+      });
 
       expect(html).toContain("You have been assigned to this issue.");
       expect(html).toContain("<blockquote>Left flipper is stuck</blockquote>");
     });
 
     it("should not include description block when description is undefined", () => {
-      const html = getEmailHtml(
-        "new_issue",
-        "Broken flipper",
-        "Medieval Madness",
-        "MM-01"
-      );
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Broken flipper",
+        machineName: "Medieval Madness",
+        formattedIssueId: "MM-01",
+      });
 
       expect(html).toContain("A new issue has been reported.");
       expect(html).not.toContain("<blockquote>");
@@ -108,32 +101,27 @@ describe("Notification Formatting", () => {
     it("should sanitize description content to prevent XSS", () => {
       const maliciousDescription =
         '<script>alert("xss")</script>Flipper broken';
-      const html = getEmailHtml(
-        "new_issue",
-        "Test Issue",
-        "Test Machine",
-        "MM-01",
-        undefined,
-        undefined,
-        undefined,
-        maliciousDescription
-      );
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Test Issue",
+        machineName: "Test Machine",
+        formattedIssueId: "MM-01",
+        issueDescription: maliciousDescription,
+      });
 
       expect(html).not.toContain("<script>");
       expect(html).toContain("Flipper broken");
     });
 
     it("should not include description in other notification types", () => {
-      const html = getEmailHtml(
-        "issue_status_changed",
-        "Test Issue",
-        "Test Machine",
-        "MM-01",
-        undefined,
-        "resolved",
-        undefined,
-        "This description should not appear"
-      );
+      const html = getEmailHtml({
+        type: "issue_status_changed",
+        issueTitle: "Test Issue",
+        machineName: "Test Machine",
+        formattedIssueId: "MM-01",
+        newStatus: "resolved",
+        issueDescription: "This description should not appear",
+      });
 
       expect(html).not.toContain("This description should not appear");
     });
@@ -141,97 +129,145 @@ describe("Notification Formatting", () => {
 
   describe("Issue Link Generation", () => {
     it("should generate a deep link to the specific issue in email", () => {
-      const html = getEmailHtml(
-        "new_issue",
-        "Something is broken",
-        "Twilight Zone",
-        "TZ-42"
-      );
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Something is broken",
+        machineName: "Twilight Zone",
+        formattedIssueId: "TZ-42",
+      });
 
       // Assert the correct link format: /m/[initials]/i/[number]
       expect(html).toContain('href="http://test.com/m/TZ/i/42"');
     });
 
     it("should fallback to generic link if ID is missing", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+      });
       expect(html).toContain('href="http://test.com/issues"');
     });
 
     it("should fallback to generic link for issue ID without a dash", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "TZ42");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "TZ42",
+      });
       expect(html).toContain('href="http://test.com/issues"');
     });
 
     it("should fallback to generic link for issue ID with non-numeric suffix", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "TZ-ABC");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "TZ-ABC",
+      });
       expect(html).toContain('href="http://test.com/issues"');
     });
 
     it("should fallback to generic link for empty string issue ID", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "",
+      });
       expect(html).toContain('href="http://test.com/issues"');
     });
 
     it("should fallback to generic link for issue ID with only initials", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "TZ-");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "TZ-",
+      });
       expect(html).toContain('href="http://test.com/issues"');
     });
 
     it("should fallback to generic link for issue ID with only number", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "-42");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "-42",
+      });
       expect(html).toContain('href="http://test.com/issues"');
     });
 
     it("should fallback to generic link for initials with invalid characters", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "T-Z-42");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "T-Z-42",
+      });
       expect(html).toContain('href="http://test.com/issues"');
     });
 
     it("should fallback to generic link for initials too short", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "T-42");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "T-42",
+      });
       expect(html).toContain('href="http://test.com/issues"');
     });
 
     it("should fallback to generic link for initials too long", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "TOOLONG-42");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "TOOLONG-42",
+      });
       expect(html).toContain('href="http://test.com/issues"');
     });
 
     it("should handle valid issue IDs with numeric initials", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "2K-42");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "2K-42",
+      });
       expect(html).toContain('href="http://test.com/m/2K/i/42"');
     });
 
     it("should fall back to issues page for invalid initials", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "A+B-42");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "A+B-42",
+      });
       expect(html).toContain('href="http://test.com/issues"');
     });
   });
 
   describe("Machine Ownership Changed Email", () => {
     it("should render added-as-owner body", () => {
-      const html = getEmailHtml(
-        "machine_ownership_changed",
-        undefined,
-        "Medieval Madness",
-        undefined,
-        undefined,
-        "added"
-      );
+      const html = getEmailHtml({
+        type: "machine_ownership_changed",
+        machineName: "Medieval Madness",
+        newStatus: "added",
+      });
       expect(html).toContain("<strong>added</strong>");
       expect(html).toContain("Medieval Madness");
       expect(html).toContain("receive notifications for new issues");
     });
 
     it("should render removed-as-owner body", () => {
-      const html = getEmailHtml(
-        "machine_ownership_changed",
-        undefined,
-        "Twilight Zone",
-        undefined,
-        undefined,
-        "removed"
-      );
+      const html = getEmailHtml({
+        type: "machine_ownership_changed",
+        machineName: "Twilight Zone",
+        newStatus: "removed",
+      });
       expect(html).toContain("<strong>removed</strong>");
       expect(html).toContain("Twilight Zone");
       expect(html).toContain("no longer receive notifications");
@@ -266,7 +302,12 @@ describe("Notification Formatting", () => {
 
   describe("Email Footer", () => {
     it("should include settings link in email footer", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "TZ-01");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "TZ-01",
+      });
       expect(html).toContain("Manage notification settings");
       expect(html).toContain('href="http://test.com/settings"');
     });
@@ -274,15 +315,13 @@ describe("Notification Formatting", () => {
     it("should include unsubscribe link when userId and secret are provided", () => {
       vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret-key");
 
-      const html = getEmailHtml(
-        "new_issue",
-        "Title",
-        "Machine",
-        "TZ-01",
-        undefined,
-        undefined,
-        "user-123"
-      );
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "TZ-01",
+        userId: "user-123",
+      });
       expect(html).toContain("Unsubscribe from all emails");
       expect(html).toContain("/api/unsubscribe?uid=user-123&token=");
 
@@ -290,7 +329,12 @@ describe("Notification Formatting", () => {
     });
 
     it("should not include unsubscribe link when no userId is provided", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "TZ-01");
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Title",
+        machineName: "Machine",
+        formattedIssueId: "TZ-01",
+      });
       expect(html).not.toContain("Unsubscribe from all emails");
     });
   });
