@@ -51,6 +51,7 @@ export interface CreateNotificationProps {
   formattedIssueId?: string | undefined;
   commentContent?: string | undefined;
   newStatus?: string | undefined;
+  issueDescription?: string | undefined;
   additionalRecipientIds?: string[] | undefined;
 }
 
@@ -66,6 +67,7 @@ export async function createNotification(
     formattedIssueId,
     commentContent,
     newStatus,
+    issueDescription,
     additionalRecipientIds,
   }: CreateNotificationProps,
   tx: DbTransaction = db
@@ -301,15 +303,16 @@ export async function createNotification(
             resolvedFormattedIssueId,
             newStatus
           ),
-          html: getEmailHtml(
+          html: getEmailHtml({
             type,
-            resolvedIssueTitle,
-            resolvedMachineName,
-            resolvedFormattedIssueId,
+            issueTitle: resolvedIssueTitle,
+            machineName: resolvedMachineName,
+            formattedIssueId: resolvedFormattedIssueId,
             commentContent,
             newStatus,
-            userId
-          ),
+            userId,
+            issueDescription,
+          }),
         });
       }
     }

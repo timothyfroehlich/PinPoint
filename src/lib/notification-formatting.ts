@@ -79,29 +79,39 @@ function getEmailFooter(userId?: string): string {
   `;
 }
 
-export function getEmailHtml(
-  type: NotificationType,
-  issueTitle?: string,
-  machineName?: string,
-  formattedIssueId?: string,
-  commentContent?: string,
-  newStatus?: string,
-  userId?: string
-): string {
-  // Basic HTML for MVP
+export interface EmailHtmlOptions {
+  type: NotificationType;
+  issueTitle?: string | undefined;
+  machineName?: string | undefined;
+  formattedIssueId?: string | undefined;
+  commentContent?: string | undefined;
+  newStatus?: string | undefined;
+  userId?: string | undefined;
+  issueDescription?: string | undefined;
+}
+
+export function getEmailHtml({
+  type,
+  issueTitle,
+  machineName,
+  formattedIssueId,
+  commentContent,
+  newStatus,
+  userId,
+  issueDescription,
+}: EmailHtmlOptions): string {
   let body = "";
   switch (type) {
     case "new_issue":
-      body = `A new issue has been reported.`;
+      body = "A new issue has been reported.";
       break;
     case "issue_assigned":
-      body = `You have been assigned to this issue.`;
+      body = "You have been assigned to this issue.";
       break;
     case "issue_status_changed":
       body = `Status changed to: <strong>${newStatus ? sanitizeHtml(newStatus) : ""}</strong>`;
       break;
     case "new_comment": {
-      // Sanitize comment content to prevent XSS
       const sanitizedComment = commentContent
         ? sanitizeHtml(commentContent)
         : "";
@@ -152,9 +162,16 @@ export function getEmailHtml(
     }
   }
 
+  const sanitizedDescription =
+    (type === "new_issue" || type === "issue_assigned") && issueDescription
+      ? sanitizeHtml(issueDescription)
+      : "";
+  const showDescription = !!sanitizedDescription;
+
   return `
       <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
-      <p>${body}</p>
+      <div>${body}</div>
+      ${showDescription ? `<blockquote>${sanitizedDescription}</blockquote>` : ""}
       <p><a href="${issueUrl}">View Issue</a></p>
       ${getEmailFooter(userId)}
     `;

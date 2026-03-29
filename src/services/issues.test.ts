@@ -119,6 +119,50 @@ describe("Issue Service", () => {
         expect.anything()
       );
     });
+
+    it("passes issue description to notification when present", async () => {
+      const issueId = "issue-123";
+      const assigneeId = "user-456";
+      const actorId = "admin-789";
+      const description = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Left flipper is stuck" }],
+          },
+        ],
+      };
+
+      mockDb.query.issues.findFirst.mockResolvedValue({
+        id: issueId,
+        machineInitials: "MM",
+        issueNumber: 1,
+        title: "Broken flipper",
+        description,
+        machine: { name: "Medieval Madness" },
+        assignedToUser: null,
+        reportedBy: "reporter-1",
+      } as unknown as Awaited<
+        ReturnType<typeof mockDb.query.issues.findFirst>
+      >);
+
+      mockDb.query.userProfiles.findFirst.mockResolvedValue({
+        name: "New Assignee",
+      } as unknown as Awaited<
+        ReturnType<typeof mockDb.query.userProfiles.findFirst>
+      >);
+
+      await assignIssue({ issueId, assignedTo: assigneeId, actorId });
+
+      expect(createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "issue_assigned",
+          issueDescription: "Left flipper is stuck",
+        }),
+        expect.anything()
+      );
+    });
   });
 
   describe("createIssue", () => {
@@ -167,6 +211,7 @@ describe("Issue Service", () => {
           issueTitle: "New Issue",
           machineName: "Test Machine",
           formattedIssueId: "MM-01",
+          issueDescription: "New Issue Description",
         },
         expect.anything()
       );
