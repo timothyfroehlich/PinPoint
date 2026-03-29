@@ -232,16 +232,14 @@ When merging branches with competing migrations (both created same number):
 
 ### GitHub Copilot Reviews
 
-**MANDATORY**: When addressing Copilot review comments on a PR, you MUST resolve each thread as you go.
-
 **Workflow for each comment:**
 
-1. Read the comment via `./scripts/workflow/copilot-comments.sh <PR>`
-2. Fix the code (or decide to ignore with justification)
-3. Reply and resolve the thread:
+1. Read unresolved comments via `./scripts/workflow/copilot-comments.sh <PR>`
+2. Fix the code, or decide to decline with justification
+3. **Applied suggestions**: Copilot auto-resolves the thread when it detects your fix commit — no action needed
+4. **Declined suggestions**: reply and resolve manually:
 
 ```bash
-./scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <what you did>. —Claude"
 ./scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Ignored: <why this is wrong/unnecessary>. —Claude"
 ```
 
@@ -252,16 +250,14 @@ Sign replies with your agent name (`—Gemini`, `—Antigravity`, `—Claude`, `
 ```bash
 ./scripts/workflow/copilot-comments.sh <PR>              # Show UNRESOLVED comments only
 ./scripts/workflow/copilot-comments.sh <PR> --all         # Include resolved
-./scripts/workflow/resolve-copilot-threads.sh <PR>        # Bulk-resolve addressed threads
 ./scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + resolve one thread
 ```
 
 **Rules:**
 
-- Every Copilot comment gets a reply — no silent fixes or silent ignores
+- Declined comments must get a reply explaining why — no silent ignores
 - Keep replies to one sentence
 - If Copilot is wrong, say why (helps future reviews)
-- Resolve threads immediately after replying, not in bulk at the end
 
 ### Parallel Subagent Workflow
 
