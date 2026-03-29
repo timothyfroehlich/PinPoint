@@ -16,6 +16,8 @@ import {
   HelpCircle,
   Info,
   Sparkles,
+  Palette,
+  MonitorSmartphone,
 } from "lucide-react";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
@@ -261,6 +263,25 @@ export function Sidebar({
               }}
             />
           </div>
+
+          {process.env.NODE_ENV === "development" && (
+            <div className="space-y-1 border-t border-border pt-2">
+              <NavItem
+                item={{
+                  title: "Design System",
+                  href: "/dev/design-system",
+                  icon: Palette,
+                }}
+              />
+              <NavItem
+                item={{
+                  title: "Preview",
+                  href: "/dev/preview",
+                  icon: MonitorSmartphone,
+                }}
+              />
+            </div>
+          )}
 
           {!isMobile && (
             <Button
