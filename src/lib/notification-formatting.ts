@@ -170,7 +170,7 @@ export function getEmailHtml({
 
   return `
       <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
-      <p>${body}</p>
+      <div>${body}</div>
       ${showDescription ? `<blockquote>${sanitizedDescription}</blockquote>` : ""}
       <p><a href="${issueUrl}">View Issue</a></p>
       ${getEmailFooter(userId)}
