@@ -167,6 +167,7 @@ describe("Issue Service", () => {
           issueTitle: "New Issue",
           machineName: "Test Machine",
           formattedIssueId: "MM-01",
+          issueDescription: "New Issue Description",
         },
         expect.anything()
       );

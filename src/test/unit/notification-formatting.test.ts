@@ -58,6 +58,87 @@ describe("Notification Formatting", () => {
     });
   });
 
+  describe("Issue Description in Emails", () => {
+    it("should include description in new_issue emails", () => {
+      const html = getEmailHtml(
+        "new_issue",
+        "Broken flipper",
+        "Medieval Madness",
+        "MM-01",
+        undefined,
+        undefined,
+        undefined,
+        "Left flipper is stuck and won't return"
+      );
+
+      expect(html).toContain("A new issue has been reported.");
+      expect(html).toContain(
+        "<blockquote>Left flipper is stuck and won't return</blockquote>"
+      );
+    });
+
+    it("should include description in issue_assigned emails", () => {
+      const html = getEmailHtml(
+        "issue_assigned",
+        "Broken flipper",
+        "Medieval Madness",
+        "MM-01",
+        undefined,
+        undefined,
+        undefined,
+        "Left flipper is stuck"
+      );
+
+      expect(html).toContain("You have been assigned to this issue.");
+      expect(html).toContain("<blockquote>Left flipper is stuck</blockquote>");
+    });
+
+    it("should not include description block when description is undefined", () => {
+      const html = getEmailHtml(
+        "new_issue",
+        "Broken flipper",
+        "Medieval Madness",
+        "MM-01"
+      );
+
+      expect(html).toContain("A new issue has been reported.");
+      expect(html).not.toContain("<blockquote>");
+    });
+
+    it("should sanitize description content to prevent XSS", () => {
+      const maliciousDescription =
+        '<script>alert("xss")</script>Flipper broken';
+      const html = getEmailHtml(
+        "new_issue",
+        "Test Issue",
+        "Test Machine",
+        "MM-01",
+        undefined,
+        undefined,
+        undefined,
+        maliciousDescription
+      );
+
+      expect(html).not.toContain("<script>");
+      expect(html).toContain("Flipper broken");
+    });
+
+    it("should not include description in other notification types", () => {
+      const html = getEmailHtml(
+        "issue_status_changed",
+        "Test Issue",
+        "Test Machine",
+        "MM-01",
+        undefined,
+        "resolved",
+        undefined,
+        "This description should not appear"
+      );
+
+      expect(html).not.toContain("This description should not appear");
+    });
+  });
+
   describe("Issue Link Generation", () => {
     it("should generate a deep link to the specific issue in email", () => {
       const html = getEmailHtml(

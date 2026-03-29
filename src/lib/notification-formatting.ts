@@ -86,16 +86,23 @@ export function getEmailHtml(
   formattedIssueId?: string,
   commentContent?: string,
   newStatus?: string,
-  userId?: string
+  userId?: string,
+  issueDescription?: string
 ): string {
   // Basic HTML for MVP
   let body = "";
+  const sanitizedDescription = issueDescription
+    ? sanitizeHtml(issueDescription)
+    : "";
+  const descriptionBlock = sanitizedDescription
+    ? `<br/><blockquote>${sanitizedDescription}</blockquote>`
+    : "";
   switch (type) {
     case "new_issue":
-      body = `A new issue has been reported.`;
+      body = `A new issue has been reported.${descriptionBlock}`;
       break;
     case "issue_assigned":
-      body = `You have been assigned to this issue.`;
+      body = `You have been assigned to this issue.${descriptionBlock}`;
       break;
     case "issue_status_changed":
       body = `Status changed to: <strong>${newStatus ? sanitizeHtml(newStatus) : ""}</strong>`;

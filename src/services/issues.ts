@@ -210,6 +210,9 @@ export async function createIssue({
           issueTitle: title,
           machineName: updatedMachine.name,
           formattedIssueId: formattedId,
+          issueDescription: description
+            ? docToPlainText(description)
+            : undefined,
         },
         tx
       );
@@ -507,6 +510,7 @@ export async function assignIssue({
         machineInitials: true,
         issueNumber: true,
         title: true,
+        description: true,
         reportedBy: true,
         assignedTo: true,
       },
@@ -579,6 +583,9 @@ export async function assignIssue({
             additionalRecipientIds: [assignedTo],
             issueTitle: currentIssue.title,
             machineName: currentIssue.machine.name,
+            issueDescription: currentIssue.description
+              ? docToPlainText(currentIssue.description)
+              : undefined,
             formattedIssueId: formatIssueId(
               currentIssue.machineInitials,
               currentIssue.issueNumber
