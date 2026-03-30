@@ -250,3 +250,22 @@ export async function updateIssueField(
 
   await selectOption(page, testId, value);
 }
+
+/**
+ * Asserts no horizontal overflow on the current page.
+ *
+ * Compares document.scrollWidth to document.clientWidth. If content is wider
+ * than the viewport, the assertion fails with a diagnostic message showing
+ * the overflow amount and viewport width.
+ */
+export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
+  const result = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(
+    result.scrollWidth,
+    `Horizontal overflow detected: content is ${result.scrollWidth}px wide ` +
+      `but viewport is only ${result.clientWidth}px (${result.scrollWidth - result.clientWidth}px overflow)`
+  ).toBeLessThanOrEqual(result.clientWidth);
+}

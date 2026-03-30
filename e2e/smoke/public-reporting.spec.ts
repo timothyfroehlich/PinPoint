@@ -5,6 +5,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { assertNoHorizontalOverflow } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { TEST_USERS } from "../support/constants";
 import { fillReportForm } from "../support/page-helpers";
@@ -33,6 +34,9 @@ test.describe("Public Issue Reporting", () => {
     await select.selectOption({ index: 1 });
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
+
+    // Verify no horizontal overflow on report page
+    await assertNoHorizontalOverflow(page);
 
     const issueTitle = `${PUBLIC_PREFIX} ${Date.now()}`;
     await fillReportForm(page, {

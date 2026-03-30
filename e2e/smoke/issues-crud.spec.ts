@@ -7,6 +7,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import {
+  assertNoHorizontalOverflow,
   updateIssueField,
   visibleIssueFieldControl,
 } from "../support/actions.js";
@@ -198,6 +199,9 @@ test.describe("Issues System", () => {
           page.getByRole("link", { name: /Back to Issues/i })
         ).toBeVisible();
       }
+
+      // Verify no horizontal overflow on issue detail page
+      await assertNoHorizontalOverflow(page);
     });
 
     // Update tests moved to integration/full suite

@@ -67,19 +67,20 @@ These values are fixed. Do not deviate.
 
 ## 4. Responsive Strategy
 
-| Breakpoint | Role                  | Example                            |
-| :--------- | :-------------------- | :--------------------------------- |
-| `md:`      | Primary layout shift  | Single column to multi-column      |
-| `sm:`      | Secondary tweaks only | Padding adjustments, minor spacing |
-| `lg:`      | Optional enhancements | Extra grid column, wider panels    |
+| Breakpoint | Role                 | Example                                      |
+| :--------- | :------------------- | :------------------------------------------- |
+| `md:`      | Primary layout shift | Single column → multi-column, show nav icons |
+| `lg:`      | Nav text expansion   | Icon-only nav → icon+text, APC logo appears  |
+| `sm:`      | Secondary tweaks     | Padding adjustments, minor spacing           |
 
 **Rules:**
 
 - When hiding/showing for mobile vs desktop, use `md:hidden` / `hidden md:block`.
-- NEVER use `lg:` as the primary layout shift -- `md:` is always the pivot.
+- `md:` is the primary layout pivot. `lg:` expands compact elements (icon-only → icon+text).
 - Mobile-first: write the mobile layout, then add `md:` overrides.
-- AppHeader adapts -- nav links use `hidden md:flex`, logo + auth actions always visible.
+- AppHeader uses a **two-tier** pattern: nav items appear at `md:` (icon-only), text labels expand at `lg:`. See Section 8.
 - Content layout uses `@container` queries for container-width-aware component layout.
+- **Overflow testing:** Every page must pass `assertNoHorizontalOverflow()` in its smoke test — `document.scrollWidth <= document.clientWidth` at both mobile (375px) and desktop (1024px) viewports.
 
 ## 5. Page Archetypes
 
@@ -162,12 +163,14 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 
 ## 8. Navigation Patterns
 
-### AppHeader (always rendered)
+### AppHeader (always rendered, two-tier responsive)
 
-- **Desktop (>= md):** Logo, nav links (Dashboard, Issues, Machines), spacer, Report Issue CTA, HelpMenu dropdown, NotificationList, UserMenu.
+- **Wide desktop (>= lg):** Logo, APC logo, nav links (icon+text), spacer, Report Issue (icon+text), HelpMenu, NotificationList, UserMenu.
+- **Tablet (md–lg):** Logo, nav links (icon-only), spacer, Report Issue (icon-only), HelpMenu, NotificationList, UserMenu. APC logo hidden.
 - **Mobile (< md):** Logo, spacer, NotificationList, UserMenu. Nav links and Report Issue use `hidden md:flex`.
 - **Unauthenticated:** NotificationList + UserMenu replaced by Sign In / Sign Up buttons.
 - **Admin link:** Inside UserMenu dropdown (role-gated, not a top-level nav item).
+- **Icon-only pattern:** Nav text uses `hidden lg:inline` on `<span>`. Icons always visible with `title` for tooltip/a11y.
 
 ### HelpMenu (desktop only, in AppHeader)
 
@@ -221,19 +224,19 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 
 Before building something new, check if one of these already exists:
 
-| Component                             | Purpose                                                                                                  |
-| :------------------------------------ | :------------------------------------------------------------------------------------------------------- |
-| `AppHeader`                           | Unified responsive header. Always rendered. Nav links `hidden md:flex`. Replaces Sidebar + MobileHeader. |
-| `HelpMenu`                            | Dropdown with Feedback, What's New, Help, About. Badge dot for unread changelog.                         |
-| `BottomTabBar`                        | Mobile tab bar (`md:hidden`). Dashboard, Issues, Machines, Report, More.                                 |
-| `IssueBadgeGrid`                      | Status/severity/priority/frequency display                                                               |
-| `IssueBadge`                          | Individual status badge with color                                                                       |
-| `IssueCard`                           | Issue summary card (normal/compact)                                                                      |
-| `IssueRow`                            | Table row variant of issue display                                                                       |
-| `SidebarActions`                      | Issue metadata editing (compact/full, rowLayout)                                                         |
-| `SaveCancelButtons`                   | Form action buttons                                                                                      |
-| `Card` / `CardHeader` / `CardContent` | shadcn/ui card                                                                                           |
-| `Sheet`                               | Bottom drawer (mobile "More" menu)                                                                       |
-| `NotificationList`                    | Notification bell + dropdown                                                                             |
-| `UserMenu`                            | Avatar + dropdown menu (includes Admin link for admin role)                                              |
-| `BackToIssuesLink`                    | Breadcrumb back navigation                                                                               |
+| Component                             | Purpose                                                                                         |
+| :------------------------------------ | :---------------------------------------------------------------------------------------------- |
+| `AppHeader`                           | Two-tier responsive header. Icon-only nav at `md:`, icon+text at `lg:`. APC logo at `lg:` only. |
+| `HelpMenu`                            | Dropdown with Feedback, What's New, Help, About. Badge dot for unread changelog.                |
+| `BottomTabBar`                        | Mobile tab bar (`md:hidden`). Dashboard, Issues, Machines, Report, More.                        |
+| `IssueBadgeGrid`                      | Status/severity/priority/frequency display                                                      |
+| `IssueBadge`                          | Individual status badge with color                                                              |
+| `IssueCard`                           | Issue summary card (normal/compact)                                                             |
+| `IssueRow`                            | Table row variant of issue display                                                              |
+| `SidebarActions`                      | Issue metadata editing (compact/full, rowLayout)                                                |
+| `SaveCancelButtons`                   | Form action buttons                                                                             |
+| `Card` / `CardHeader` / `CardContent` | shadcn/ui card                                                                                  |
+| `Sheet`                               | Bottom drawer (mobile "More" menu)                                                              |
+| `NotificationList`                    | Notification bell + dropdown                                                                    |
+| `UserMenu`                            | Avatar + dropdown menu (includes Admin link for admin role)                                     |
+| `BackToIssuesLink`                    | Breadcrumb back navigation                                                                      |

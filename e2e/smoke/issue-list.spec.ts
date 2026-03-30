@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { assertNoHorizontalOverflow } from "../support/actions";
 import { seededIssues } from "../support/constants";
 import { STORAGE_STATE } from "../support/auth-state";
 
@@ -59,6 +60,9 @@ test.describe("Issue List Features", () => {
     await expect(clearButton).toBeVisible();
     await clearButton.waitFor({ state: "visible" });
     await clearButton.click();
+
+    // Verify no horizontal overflow on issues list page
+    await assertNoHorizontalOverflow(page);
   });
 
   test("should handle status group toggling in filters", async ({ page }) => {

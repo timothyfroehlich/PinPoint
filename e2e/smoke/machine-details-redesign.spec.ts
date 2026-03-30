@@ -7,7 +7,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn } from "../support/actions";
+import { assertNoHorizontalOverflow, ensureLoggedIn } from "../support/actions";
 import { seededMachines } from "../support/constants";
 import { clearMachineField } from "../support/supabase-admin";
 
@@ -42,6 +42,9 @@ test.describe("Machine Details Redesign", () => {
     // Status and issues counts should be visible
     await expect(page.getByTestId("detail-open-issues")).toBeVisible();
     await expect(page.getByTestId("detail-open-issues-count")).toBeVisible();
+
+    // Verify no horizontal overflow on machine detail page
+    await assertNoHorizontalOverflow(page);
   });
 
   test("should show issues expando collapsed by default", async ({ page }) => {

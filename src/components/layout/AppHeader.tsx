@@ -40,8 +40,9 @@ const navItems = [
 /**
  * Unified application header that replaces Sidebar + MobileHeader.
  *
- * Desktop (>= md): Logo, nav links, Report Issue, HelpMenu, notifications, user menu.
- * Mobile (< md): Logo, notifications, user menu. Nav handled by BottomTabBar.
+ * Desktop (>= lg): Logo, APC logo, nav links (icon+text), Report Issue (icon+text), HelpMenu, auth.
+ * Tablet (md–lg): Logo, nav links (icon-only), Report Issue (icon-only), HelpMenu, auth.
+ * Mobile (< md): Logo, auth. Nav handled by BottomTabBar.
  */
 export function AppHeader({
   isAuthenticated,
@@ -79,13 +80,13 @@ export function AppHeader({
         </span>
       </Link>
 
-      {/* APC logo -- desktop only */}
+      {/* APC logo -- wide desktop only (saves ~80px at md:) */}
       <a
         href="https://austinpinballcollective.org"
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Austin Pinball Collective"
-        className="hidden md:block"
+        className="hidden lg:block"
         data-testid="apc-logo-link"
       >
         <Image
@@ -111,16 +112,17 @@ export function AppHeader({
               key={item.href}
               href={href}
               className={cn(
-                "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors lg:px-3",
                 active
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
               )}
               aria-current={active ? "page" : undefined}
               data-testid={`nav-${item.title.toLowerCase()}`}
+              title={item.title}
             >
-              <item.icon className="size-4" aria-hidden="true" />
-              <span>{item.title}</span>
+              <item.icon className="size-4 shrink-0" aria-hidden="true" />
+              <span className="hidden lg:inline">{item.title}</span>
             </Link>
           );
         })}
@@ -139,8 +141,8 @@ export function AppHeader({
           data-testid="nav-report-issue"
         >
           <Link href="/report">
-            <AlertCircle className="size-4" aria-hidden="true" />
-            <span>Report Issue</span>
+            <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
+            <span className="hidden lg:inline">Report Issue</span>
           </Link>
         </Button>
         <HelpMenu newChangelogCount={newChangelogCount} />

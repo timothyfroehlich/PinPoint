@@ -5,7 +5,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions.js";
+import { assertNoHorizontalOverflow, loginAs } from "../support/actions.js";
 import { TEST_USERS } from "../support/constants.js";
 
 test.describe("Navigation", () => {
@@ -76,6 +76,10 @@ test.describe("Navigation", () => {
     await expect(
       menuContent.getByRole("menuitem", { name: "Sign Out" })
     ).toBeVisible();
+
+    // Close menu, then verify no horizontal overflow on dashboard
+    await page.keyboard.press("Escape");
+    await assertNoHorizontalOverflow(page);
   });
 });
 
