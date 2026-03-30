@@ -67,20 +67,57 @@ These values are fixed. Do not deviate.
 
 ## 4. Responsive Strategy
 
-| Breakpoint | Role                 | Example                                      |
-| :--------- | :------------------- | :------------------------------------------- |
-| `md:`      | Primary layout shift | Single column → multi-column, show nav icons |
-| `lg:`      | Nav text expansion   | Icon-only nav → icon+text, APC logo appears  |
-| `sm:`      | Secondary tweaks     | Padding adjustments, minor spacing           |
+PinPoint uses a **two-layer responsive framework**. Each layer has a distinct job. Never use both layers to solve the same layout problem.
 
-**Rules:**
+### Layer 1 — Viewport Breakpoints (page structure)
 
-- When hiding/showing for mobile vs desktop, use `md:hidden` / `hidden md:block`.
-- `md:` is the primary layout pivot. `lg:` expands compact elements (icon-only → icon+text).
-- Mobile-first: write the mobile layout, then add `md:` overrides.
+Use viewport breakpoints when the decision depends on the browser window size — showing or hiding entire sections, switching page-level grid columns, top-level padding.
+
+| Breakpoint | Viewport | Role                 | Example                                       |
+| :--------- | :------- | :------------------- | :-------------------------------------------- |
+| `md:`      | 768px    | Primary layout pivot | Single column → multi-column, show nav icons  |
+| `lg:`      | 1024px   | Element enrichment   | Icon-only nav → icon+text, APC logo appears   |
+| `sm:`      | 640px    | Padding/spacing only | `sm:px-8`, `sm:gap-4` — no structural changes |
+
+**`sm:` is padding only.** Never use `sm:grid-cols-2`, `sm:flex-row`, or `hidden sm:block`.
+
+### Layer 2 — Container Queries (component internals)
+
+Use container queries when the decision depends on the component's available width — not the viewport. A component inside a sidebar has less space than the same component full-width, regardless of screen size.
+
+**These are NOT viewport sizes.** They are the width of the nearest `@container` ancestor.
+
+| Query   | Container width | Typical use                                     |
+| :------ | :-------------- | :---------------------------------------------- |
+| `@lg:`  | 512px           | First internal layout shift (e.g., stack → row) |
+| `@xl:`  | 576px           | Expanded row layout, additional columns         |
+| `@2xl:` | 672px           | Further enrichment, multi-column grids          |
+| `@3xl:` | 768px           | Full-featured component layout                  |
+
+### Decision Tree
+
+```
+"Show/hide entire section?" → Viewport (md: / lg:)
+"Component internal layout?" → Container query (@lg: / @xl:) if variable-width parent, else viewport
+```
+
+### z-index Hierarchy
+
+| Element        | Value |
+| :------------- | :---- |
+| App header     | z-20  |
+| Bottom tab bar | z-50  |
+| Modals (Radix) | z-50+ |
+
+### Rules
+
+- Mobile-first: write the mobile layout, then add `md:` / `@lg:` overrides.
+- `md:` shows/hides sections and sets page structure. `lg:` enriches elements (icon → icon+text).
 - AppHeader uses a **two-tier** pattern: nav items appear at `md:` (icon-only), text labels expand at `lg:`. See Section 8.
-- Content layout uses `@container` queries for container-width-aware component layout.
-- **Overflow testing:** Every page must pass `assertNoHorizontalOverflow()` in its smoke test — `document.scrollWidth <= document.clientWidth` at both mobile (375px) and desktop (1024px) viewports.
+- **No JavaScript viewport detection.** No `window.innerWidth`, `useMediaQuery`, or `matchMedia` — use CSS. These cause hydration mismatches and duplicate CSS's job.
+- **`@container` propagation:** Adding `@container` to a parent changes how all descendant container queries resolve. Audit children before adding it to an existing element.
+- **Overflow testing:** Every page must pass `assertNoHorizontalOverflow()` in its smoke test — `document.scrollWidth <= document.clientWidth` at both mobile (375px) and desktop (1024px) viewports. Add new pages to `e2e/smoke/responsive-overflow.spec.ts`.
+- **Documented exception:** `use-table-responsive-columns` for IssueList (PP-rs9) uses a JS hook — this is the sole approved exception.
 
 ## 5. Page Archetypes
 
@@ -187,6 +224,12 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 - **Active state:** `text-primary`.
 - **Inactive state:** `text-muted-foreground hover:text-primary`.
 - Active detection uses `isNavItemActive()` from `nav-utils.ts` with pathname matching and special cases (e.g., issue detail highlights the Issues tab).
+
+### Testing Responsive Behavior
+
+- **Overflow assertions:** `assertNoHorizontalOverflow(page)` in `e2e/support/actions.ts` checks `document.scrollWidth <= document.clientWidth`. Every new page must be added to `e2e/smoke/responsive-overflow.spec.ts`.
+- **Container query testing:** Playwright can force a container width: `await page.evaluate(() => { document.querySelector('[data-testid="content-wrapper"]')!.style.width = '576px'; })` — triggers `@xl:` breakpoints independently of viewport.
+- **Chrome DevTools:** Container query overlays available in Elements panel → "container" badge on `@container` elements.
 
 ## 9. Typography Scale
 
