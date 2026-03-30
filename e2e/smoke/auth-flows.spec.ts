@@ -12,7 +12,7 @@ import { TEST_USERS } from "../support/constants";
 test.describe("Username Account Login", () => {
   test("login with username (no @) redirects to dashboard", async ({
     page,
-  }, testInfo) => {
+  }) => {
     await page.goto("/login");
 
     // Type just the username, not the email
@@ -23,13 +23,8 @@ test.describe("Username Account Login", () => {
     // Should redirect to dashboard
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
-    // Verify we're logged in
-    const isMobile = testInfo.project.name.includes("Mobile");
-    if (isMobile) {
-      await expect(page.getByTestId("mobile-header")).toBeVisible();
-    } else {
-      await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
-    }
+    // Verify we're logged in — AppHeader is always visible
+    await expect(page.getByTestId("app-header")).toBeVisible();
   });
 });
 
@@ -52,14 +47,10 @@ test.describe("Authentication Smoke", () => {
     await expect(passwordInput).toHaveAttribute("type", "password");
   });
 
-  test("login flow - sign in with existing account", async ({
-    page,
-  }, testInfo) => {
-    // Navigate to login page via header sign-in button (mobile or desktop)
+  test("login flow - sign in with existing account", async ({ page }) => {
+    // Navigate to login page via header sign-in button (unified AppHeader)
     await page.goto("/");
-    const signInLink = page
-      .locator('[data-testid="nav-signin"],[data-testid="mobile-nav-signin"]')
-      .filter({ visible: true });
+    const signInLink = page.getByTestId("nav-signin");
     await expect(signInLink).toBeVisible();
     await signInLink.click();
 
@@ -83,15 +74,8 @@ test.describe("Authentication Smoke", () => {
     // Should redirect to dashboard after successful login
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
-    // Use project name to determine mobile vs desktop layout
-    const isMobile = testInfo.project.name.includes("Mobile");
-
-    // Verify dashboard content based on device type
-    if (isMobile) {
-      await expect(page.getByTestId("mobile-header")).toBeVisible();
-    } else {
-      await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
-    }
+    // Verify dashboard content — AppHeader is always visible
+    await expect(page.getByTestId("app-header")).toBeVisible();
 
     await expect(page.getByTestId("quick-stats")).toBeVisible();
     await expect(page.getByTestId("stat-open-issues-value")).toBeVisible();

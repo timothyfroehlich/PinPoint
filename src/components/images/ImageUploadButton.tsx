@@ -104,7 +104,7 @@ export function ImageUploadButton({
         <Button
           type="button"
           variant="outline"
-          className="flex-1 gap-2 desktop:hidden"
+          className="flex-1 gap-2 md:hidden"
           disabled={(disabled ?? false) || isUploading || isAtLimit}
           onClick={() => {
             if (fileInputRef.current) {

@@ -24,6 +24,7 @@ import {
   SheetDescription,
 } from "~/components/ui/sheet";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
+import { isNavItemActive } from "./nav-utils";
 import type { UserRole } from "~/lib/types";
 
 interface BottomTabBarProps {
@@ -39,28 +40,7 @@ const mainTabs = [
   { title: "Report", href: "/report", icon: Plus },
 ] as const;
 
-/** Returns true when the given tab should appear active for the current pathname. */
-function isTabActive(
-  tabHref: string,
-  pathname: string,
-  resolvedIssuesPath: string
-): boolean {
-  // Issue detail pages (/m/[initials]/i and /m/[initials]/i/[number]) belong to the Issues tab
-  const isIssuePage = /^\/m\/[^/]+\/i(\/|$)/.test(pathname);
-
-  const href = tabHref === "/issues" ? resolvedIssuesPath : tabHref;
-  const basePath = href.split("?")[0] ?? href;
-
-  if (basePath === "/m") {
-    // Machines tab: match /m/* but NOT issue detail pages
-    return pathname.startsWith("/m") && !isIssuePage;
-  }
-  if (basePath.startsWith("/issues")) {
-    // Issues tab: match /issues/* OR issue detail pages
-    return pathname.startsWith(basePath) || isIssuePage;
-  }
-  return pathname === basePath;
-}
+// Active state logic extracted to nav-utils.ts (shared with AppHeader)
 
 export function BottomTabBar({
   role,
@@ -79,12 +59,16 @@ export function BottomTabBar({
         role="navigation"
         aria-label="mobile navigation"
         data-testid="bottom-tab-bar"
-        className="desktop:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t border-primary/50 bg-card/90 backdrop-blur-sm shadow-[0_-4px_15px_color-mix(in_srgb,var(--color-primary)_25%,transparent)]"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t border-primary/50 bg-card/90 backdrop-blur-sm shadow-[0_-4px_15px_color-mix(in_srgb,var(--color-primary)_25%,transparent)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {mainTabs.map((tab) => {
           const href = tab.href === "/issues" ? resolvedIssuesPath : tab.href;
-          const active = isTabActive(tab.href, pathname, resolvedIssuesPath);
+          const active = isNavItemActive(
+            tab.href,
+            pathname,
+            resolvedIssuesPath
+          );
           return (
             <Link
               key={tab.href}

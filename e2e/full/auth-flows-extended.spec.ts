@@ -14,13 +14,10 @@ import { seededMember } from "../support/constants.js";
 test.describe("Extended Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({
     page,
-  }, testInfo) => {
-    // Navigate to signup page via visible sign-up button (mobile or desktop header)
+  }) => {
+    // Navigate to signup page via sign-up button (unified AppHeader — same testid on all viewports)
     await page.goto("/");
-    const isMobile = testInfo.project.name.includes("Mobile");
-    const signupBtn = isMobile
-      ? page.getByTestId("mobile-nav-signup")
-      : page.getByTestId("nav-signup");
+    const signupBtn = page.getByTestId("nav-signup");
     await expect(signupBtn).toBeVisible({ timeout: 5000 });
     await signupBtn.click();
 
@@ -105,11 +102,7 @@ test.describe("Extended Authentication", () => {
     // Sign out via header
     await logout(page, testInfo);
 
-    // Verify we're logged out (sign-in button visible in mobile or desktop header)
-    const isMobile = testInfo.project.name.includes("Mobile");
-    const signIn = isMobile
-      ? page.getByTestId("mobile-nav-signin")
-      : page.getByTestId("nav-signin");
-    await expect(signIn).toBeVisible();
+    // Verify we're logged out (unified AppHeader — same testid on all viewports)
+    await expect(page.getByTestId("nav-signin")).toBeVisible();
   });
 });

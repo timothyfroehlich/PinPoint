@@ -122,11 +122,8 @@ test.describe("User Invitation & Signup Flow", () => {
       page.getByRole("heading", { name: /Quick Stats/i })
     ).toBeVisible();
 
-    // Verify user profile in menu (mobile or desktop header depending on viewport)
-    const isMobile = testInfo.project.name.includes("Mobile");
-    const userMenu = isMobile
-      ? page.getByTestId("mobile-user-menu-button")
-      : page.getByTestId("user-menu-button");
+    // Verify user profile in menu (unified AppHeader — same testid on all viewports)
+    const userMenu = page.getByTestId("user-menu-button");
     await expect(userMenu).toBeVisible();
     await userMenu.click();
     await expect(page.getByText("Full Flow")).toBeVisible();

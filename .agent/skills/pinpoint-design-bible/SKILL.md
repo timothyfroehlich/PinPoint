@@ -40,30 +40,28 @@ PinPoint uses a **dark neon aesthetic** -- deep charcoal backgrounds with neon g
 
 Pick the surface level based on the element's role:
 
-| When building...                      | Use                               |
-| :------------------------------------ | :-------------------------------- |
-| Page background                       | `bg-background` (#0f0f11)         |
-| Full-width content section            | `bg-surface` (#0f0f11)            |
-| Card, popover, elevated container     | `bg-card` (#18151b, fully opaque) |
-| Header, sidebar, tab bar (nav chrome) | `bg-card/85 backdrop-blur-sm`     |
-| Closed/archived/dimmed item           | `bg-surface-variant/30`           |
+| When building...                         | Use                               |
+| :--------------------------------------- | :-------------------------------- |
+| Page background                          | `bg-background` (#0f0f11)         |
+| Full-width content section               | `bg-surface` (#0f0f11)            |
+| Card, popover, elevated container        | `bg-card` (#18151b, fully opaque) |
+| Header, app header, tab bar (nav chrome) | `bg-card/85 backdrop-blur-sm`     |
+| Closed/archived/dimmed item              | `bg-surface-variant/30`           |
 
 **Key distinction:** Navigation chrome gets the frosted glass treatment (opacity + blur). Content cards are always fully opaque `bg-card`.
 
-## 3. Mobile Shell Contract
+## 3. Shell Contract
 
 These values are fixed. Do not deviate.
 
-| Element           | Value                                                                                                                                    |
-| :---------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
-| Header height     | 52px, `sticky`, `z-20`                                                                                                                   |
-| Bottom tab bar    | 56px min-height, `fixed`, `z-50`                                                                                                         |
-| Tab bar safe      | `env(safe-area-inset-bottom)` padding                                                                                                    |
-| Content bottom    | `pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0`                                                                                    |
-| Scroll padding    | `scroll-pt-[52px] md:scroll-pt-0`                                                                                                        |
-| Mobile/desktop    | `md:` (768px) is THE breakpoint. Only applies on phones (`pointer: coarse`).                                                             |
-| Desktop min-width | `@media (pointer: fine)` enforces `min-width: 1088px` on `html`. Desktop never hits the mobile breakpoint — horizontal scroll instead.   |
-| Sidebar collapse  | Sidebar auto-collapses at viewport < 1280px (1024px content + 256px open sidebar). Below 1088px (1024px + 64px collapsed), page scrolls. |
+| Element        | Value                                                         |
+| :------------- | :------------------------------------------------------------ |
+| App header     | 56px (`h-14`), `sticky`, `z-20`, frosted glass                |
+| Bottom tab bar | 56px min-height, `fixed`, `z-50`, `md:hidden`                 |
+| Tab bar safe   | `env(safe-area-inset-bottom)` padding                         |
+| Content bottom | `pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0`         |
+| Scroll padding | `scroll-pt-14 md:scroll-pt-14`                                |
+| Mobile/desktop | `md:` (768px) is THE breakpoint (standard viewport, no hacks) |
 
 **If you add a new page:** it MUST include the content bottom padding or content will be hidden behind the tab bar on mobile.
 
@@ -73,14 +71,15 @@ These values are fixed. Do not deviate.
 | :--------- | :-------------------- | :--------------------------------- |
 | `md:`      | Primary layout shift  | Single column to multi-column      |
 | `sm:`      | Secondary tweaks only | Padding adjustments, minor spacing |
-| `lg:`      | Optional enhancements | Extra grid column, wider sidebar   |
+| `lg:`      | Optional enhancements | Extra grid column, wider panels    |
 
 **Rules:**
 
 - When hiding/showing for mobile vs desktop, use `md:hidden` / `hidden md:block`.
 - NEVER use `lg:` as the primary layout shift -- `md:` is always the pivot.
 - Mobile-first: write the mobile layout, then add `md:` overrides.
-- **Desktop never goes mobile:** `globals.css` sets `min-width: 1088px` on `html` for `pointer: fine` devices. Desktop browsers always show sidebar + desktop header. Sidebar auto-collapses below 1280px viewport; below 1088px, horizontal scroll. Phones (`pointer: coarse`) are unaffected.
+- AppHeader adapts -- nav links use `hidden md:flex`, logo + auth actions always visible.
+- Content layout uses `@container` queries for container-width-aware component layout.
 
 ## 5. Page Archetypes
 
@@ -163,11 +162,28 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 
 ## 8. Navigation Patterns
 
-- **Mobile primary nav:** Bottom tab bar (Dashboard, Issues, Machines, Report).
-- **Overflow items:** `Sheet` component (bottom drawer) triggered by "More" tab.
-- **Active tab:** `text-primary`.
-- **Inactive tab:** `text-muted-foreground hover:text-primary`.
-- Tab active detection uses pathname matching with special cases (e.g., issue detail highlights the Issues tab).
+### AppHeader (always rendered)
+
+- **Desktop (>= md):** Logo, nav links (Dashboard, Issues, Machines), spacer, Report Issue CTA, HelpMenu dropdown, NotificationList, UserMenu.
+- **Mobile (< md):** Logo, spacer, NotificationList, UserMenu. Nav links and Report Issue use `hidden md:flex`.
+- **Unauthenticated:** NotificationList + UserMenu replaced by Sign In / Sign Up buttons.
+- **Admin link:** Inside UserMenu dropdown (role-gated, not a top-level nav item).
+
+### HelpMenu (desktop only, in AppHeader)
+
+- Trigger: `HelpCircle` icon button with badge dot when unread changelog entries exist.
+- Items: Feedback (Sentry widget), What's New (`/whats-new`), Help (`/help`), About (`/about`).
+
+### BottomTabBar (mobile only, `md:hidden`)
+
+- **Primary tabs:** Dashboard, Issues, Machines, Report Issue.
+- **More tab:** Opens `Sheet` (bottom drawer) with Feedback, What's New, Help, About, Admin (role-gated).
+
+### Shared rules
+
+- **Active state:** `text-primary`.
+- **Inactive state:** `text-muted-foreground hover:text-primary`.
+- Active detection uses `isNavItemActive()` from `nav-utils.ts` with pathname matching and special cases (e.g., issue detail highlights the Issues tab).
 
 ## 9. Typography Scale
 
@@ -205,17 +221,19 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 
 Before building something new, check if one of these already exists:
 
-| Component                             | Purpose                                          |
-| :------------------------------------ | :----------------------------------------------- |
-| `IssueBadgeGrid`                      | Status/severity/priority/frequency display       |
-| `IssueBadge`                          | Individual status badge with color               |
-| `IssueCard`                           | Issue summary card (normal/compact)              |
-| `IssueRow`                            | Table row variant of issue display               |
-| `SidebarActions`                      | Issue metadata editing (compact/full, rowLayout) |
-| `SaveCancelButtons`                   | Form action buttons                              |
-| `Card` / `CardHeader` / `CardContent` | shadcn/ui card                                   |
-| `Sheet`                               | Bottom drawer (mobile "More" menu)               |
-| `NotificationList`                    | Notification bell + dropdown                     |
-| `UserMenu`                            | Avatar + dropdown menu                           |
-| `FeedbackWidget`                      | Feedback button + form                           |
-| `BackToIssuesLink`                    | Breadcrumb back navigation                       |
+| Component                             | Purpose                                                                                                  |
+| :------------------------------------ | :------------------------------------------------------------------------------------------------------- |
+| `AppHeader`                           | Unified responsive header. Always rendered. Nav links `hidden md:flex`. Replaces Sidebar + MobileHeader. |
+| `HelpMenu`                            | Dropdown with Feedback, What's New, Help, About. Badge dot for unread changelog.                         |
+| `BottomTabBar`                        | Mobile tab bar (`md:hidden`). Dashboard, Issues, Machines, Report, More.                                 |
+| `IssueBadgeGrid`                      | Status/severity/priority/frequency display                                                               |
+| `IssueBadge`                          | Individual status badge with color                                                                       |
+| `IssueCard`                           | Issue summary card (normal/compact)                                                                      |
+| `IssueRow`                            | Table row variant of issue display                                                                       |
+| `SidebarActions`                      | Issue metadata editing (compact/full, rowLayout)                                                         |
+| `SaveCancelButtons`                   | Form action buttons                                                                                      |
+| `Card` / `CardHeader` / `CardContent` | shadcn/ui card                                                                                           |
+| `Sheet`                               | Bottom drawer (mobile "More" menu)                                                                       |
+| `NotificationList`                    | Notification bell + dropdown                                                                             |
+| `UserMenu`                            | Avatar + dropdown menu (includes Admin link for admin role)                                              |
+| `BackToIssuesLink`                    | Breadcrumb back navigation                                                                               |

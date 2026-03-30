@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import {
   LAST_ISSUES_PATH_KEY,
-  SIDEBAR_COLLAPSED_KEY,
   CHANGELOG_SEEN_KEY,
   DEFAULT_ISSUES_PATH,
   PREFERENCE_MAX_AGE_SECONDS,
@@ -35,30 +34,6 @@ export async function getLastIssuesPath(): Promise<string> {
 export async function setLastIssuesPathCookie(path: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(LAST_ISSUES_PATH_KEY, path, PREFERENCE_COOKIE_OPTIONS);
-}
-
-/**
- * Reads the sidebar collapsed state from cookies (server-side).
- * Returns true if collapsed, false otherwise.
- */
-export async function getSidebarCollapsed(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const stored = cookieStore.get(SIDEBAR_COLLAPSED_KEY);
-  return stored?.value === "true";
-}
-
-/**
- * Sets the sidebar collapsed cookie (server-side, for use in server actions).
- */
-export async function setSidebarCollapsedCookie(
-  collapsed: boolean
-): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.set(
-    SIDEBAR_COLLAPSED_KEY,
-    collapsed.toString(),
-    PREFERENCE_COOKIE_OPTIONS
-  );
 }
 
 /**

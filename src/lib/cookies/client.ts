@@ -3,7 +3,6 @@
 import {
   COOKIE_CONSENT_KEY,
   LAST_ISSUES_PATH_KEY,
-  SIDEBAR_COLLAPSED_KEY,
   CHANGELOG_SEEN_KEY,
   PREFERENCE_MAX_AGE_SECONDS,
 } from "./constants";
@@ -25,17 +24,6 @@ function setClientCookie(name: string, value: string, maxAge: number): void {
  */
 export function storeLastIssuesPath(path: string): void {
   setClientCookie(LAST_ISSUES_PATH_KEY, path, PREFERENCE_MAX_AGE_SECONDS);
-}
-
-/**
- * Stores the sidebar collapsed state in a cookie (client-side, synchronous).
- */
-export function storeSidebarCollapsed(collapsed: boolean): void {
-  setClientCookie(
-    SIDEBAR_COLLAPSED_KEY,
-    collapsed.toString(),
-    PREFERENCE_MAX_AGE_SECONDS
-  );
 }
 
 /**

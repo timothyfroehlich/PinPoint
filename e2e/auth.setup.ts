@@ -44,7 +44,7 @@ async function loginAndSave(
 
   await page.waitForLoadState("networkidle");
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
-  await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
+  await expect(page.getByTestId("app-header")).toBeVisible();
   await expect(page.getByTestId("user-menu-button")).toBeVisible();
 
   // Force a full server round-trip to settle Supabase cookie rotation.

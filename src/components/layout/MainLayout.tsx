@@ -1,5 +1,4 @@
 import type React from "react";
-import { Sidebar } from "./Sidebar";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import {
@@ -9,24 +8,12 @@ import {
   machines,
 } from "~/server/db/schema";
 import { eq, desc, inArray } from "drizzle-orm";
-import {
-  NotificationList,
-  type EnrichedNotification,
-} from "~/components/notifications/NotificationList";
-import { UserMenu } from "./user-menu-client";
+import { type EnrichedNotification } from "~/components/notifications/NotificationList";
 import { ensureUserProfile } from "~/lib/auth/profile";
-import Link from "next/link";
-import { Button } from "~/components/ui/button";
-import { MobileHeader } from "./MobileHeader";
-import { FeedbackWidget } from "~/components/feedback/FeedbackWidget";
+import { AppHeader } from "./AppHeader";
 import { BottomTabBar } from "./BottomTabBar";
 import changelogMeta from "@content/changelog-meta.json";
-import { HeaderSignInButton } from "./header-sign-in-button";
-import {
-  getLastIssuesPath,
-  getSidebarCollapsed,
-  getChangelogSeen,
-} from "~/lib/cookies/preferences";
+import { getLastIssuesPath, getChangelogSeen } from "~/lib/cookies/preferences";
 
 export async function MainLayout({
   children,
@@ -34,9 +21,8 @@ export async function MainLayout({
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
   // Read user preferences from cookies (server-side)
-  const [issuesPath, sidebarCollapsed, changelogSeen] = await Promise.all([
+  const [issuesPath, changelogSeen] = await Promise.all([
     getLastIssuesPath(),
-    getSidebarCollapsed(),
     getChangelogSeen(),
   ]);
 
@@ -133,67 +119,23 @@ export async function MainLayout({
   }
 
   return (
-    <div className="flex h-full bg-background text-foreground">
-      {/* Sidebar - Desktop only */}
-      <aside className="hidden desktop:block h-full">
-        <Sidebar
-          role={userProfile?.role}
-          issuesPath={issuesPath}
-          initialCollapsed={sidebarCollapsed}
-          newChangelogCount={newChangelogCount}
-        />
-      </aside>
+    <div className="flex h-full flex-col bg-background text-foreground">
+      {/* Unified AppHeader — always rendered, adapts at md: breakpoint */}
+      <AppHeader
+        isAuthenticated={!!user}
+        userName={userProfile?.name ?? "User"}
+        role={userProfile?.role}
+        notifications={enrichedNotifications}
+        issuesPath={issuesPath}
+        newChangelogCount={newChangelogCount}
+      />
 
       {/* Main Content */}
-      {/* scroll-pt-[52px]: reserves space for the 52px sticky mobile header so
+      {/* scroll-pt-14: reserves space for the 56px sticky AppHeader so
           browser scroll-into-view doesn't place interactive elements under it. */}
-      <main className="flex-1 overflow-y-auto scroll-pt-[52px] desktop:scroll-pt-0">
-        {/* Mobile Header — compact sticky header (md:hidden) */}
-        {user ? (
-          <MobileHeader
-            isAuthenticated={true}
-            userName={userProfile?.name ?? "User"}
-            notifications={enrichedNotifications}
-          />
-        ) : (
-          <MobileHeader isAuthenticated={false} />
-        )}
-
-        {/* Desktop Header — hidden on mobile */}
-        <header className="hidden desktop:flex h-16 items-center justify-between border-b border-border px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-          {/* Left spacer */}
-          <div className="flex-1" />
-
-          <div className="flex items-center gap-4">
-            <FeedbackWidget />
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-              data-testid="nav-report-issue"
-            >
-              <Link href="/report">Report Issue</Link>
-            </Button>
-
-            {user ? (
-              <div className="flex items-center gap-4">
-                <NotificationList notifications={enrichedNotifications} />
-                <UserMenu userName={userProfile?.name ?? "User"} />
-              </div>
-            ) : (
-              <div className="flex items-center gap-4">
-                <div className="h-4 w-px bg-border mx-1 hidden lg:block" />
-                <HeaderSignInButton />
-                <Button asChild size="sm" data-testid="nav-signup">
-                  <Link href="/signup">Sign Up</Link>
-                </Button>
-              </div>
-            )}
-          </div>
-        </header>
-
+      <main className="flex-1 overflow-y-auto scroll-pt-14">
         {/* Extra bottom padding on mobile so content isn't hidden behind the fixed tab bar */}
-        <div className="@container px-4 sm:px-8 lg:px-10 pb-[calc(88px+env(safe-area-inset-bottom))] desktop:pb-0">
+        <div className="@container px-4 sm:px-8 lg:px-10 pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
           {children}
         </div>
       </main>

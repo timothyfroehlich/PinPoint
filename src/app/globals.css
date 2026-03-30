@@ -1,10 +1,5 @@
 @import "tailwindcss";
 
-/* Desktop device variant — matches mouse/trackpad devices.
-   Use `desktop:` for mobile/desktop shell toggles instead of `md:`.
-   Phones (pointer: coarse) never match, so they get the mobile shell. */
-@custom-variant desktop (@media (pointer: fine));
-
 /* Material Design 3 Color System - Tailwind v4 */
 @theme {
   /* Base Colors - Deep Charcoal & Crisp White */
@@ -170,22 +165,10 @@
   }
 }
 
-/* Mobile: constrain to viewport, no horizontal scroll */
-@media (pointer: coarse) {
-  html,
-  body {
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
-}
-
-/* Desktop (mouse/trackpad): enforce minimum width so the layout never
-   collapses to mobile shell. Below this width the page scrolls horizontally.
-   1088px = 1024px min content + 64px collapsed sidebar. */
-@media (pointer: fine) {
-  html {
-    min-width: 1088px;
-  }
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 body {

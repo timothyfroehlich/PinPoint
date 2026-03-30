@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   getLastIssuesPath,
   setLastIssuesPathCookie,
-  getSidebarCollapsed,
-  setSidebarCollapsedCookie,
   getChangelogSeen,
 } from "./preferences";
 
@@ -65,67 +63,6 @@ describe("server-side cookie preferences", () => {
           path: "/",
           maxAge: 31536000, // 1 year
         })
-      );
-    });
-  });
-
-  describe("getSidebarCollapsed", () => {
-    it("returns true when cookie value is 'true'", async () => {
-      mockGet.mockReturnValue({ value: "true" });
-
-      const result = await getSidebarCollapsed();
-
-      expect(mockGet).toHaveBeenCalledWith("sidebarCollapsed");
-      expect(result).toBe(true);
-    });
-
-    it("returns false when cookie value is 'false'", async () => {
-      mockGet.mockReturnValue({ value: "false" });
-
-      const result = await getSidebarCollapsed();
-
-      expect(result).toBe(false);
-    });
-
-    it("returns false when cookie is missing", async () => {
-      mockGet.mockReturnValue(undefined);
-
-      const result = await getSidebarCollapsed();
-
-      expect(result).toBe(false);
-    });
-
-    it("returns false for any non-'true' value", async () => {
-      mockGet.mockReturnValue({ value: "yes" });
-
-      const result = await getSidebarCollapsed();
-
-      expect(result).toBe(false);
-    });
-  });
-
-  describe("setSidebarCollapsedCookie", () => {
-    it("sets cookie with true value", async () => {
-      await setSidebarCollapsedCookie(true);
-
-      expect(mockSet).toHaveBeenCalledWith(
-        "sidebarCollapsed",
-        "true",
-        expect.objectContaining({
-          httpOnly: false,
-          sameSite: "lax",
-          path: "/",
-        })
-      );
-    });
-
-    it("sets cookie with false value", async () => {
-      await setSidebarCollapsedCookie(false);
-
-      expect(mockSet).toHaveBeenCalledWith(
-        "sidebarCollapsed",
-        "false",
-        expect.any(Object)
       );
     });
   });

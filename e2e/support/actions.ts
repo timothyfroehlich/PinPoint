@@ -3,27 +3,13 @@ import { expect, type Page, type TestInfo } from "@playwright/test";
 import { TEST_USERS } from "./constants.js";
 
 /**
- * Returns the user-menu trigger based on viewport.
+ * Returns the user-menu trigger.
  *
- * On desktop the trigger lives in the desktop header (data-testid="user-menu-button").
- * On mobile it lives in the compact header (data-testid="mobile-user-menu-button").
- * Providing isMobile ensures we target the exact intended element without relying
- * on Playwright's visibility filter which can be flaky during hydration/layout.
+ * AppHeader is now unified — the same user-menu-button is rendered at all viewports.
+ * The isMobile parameter is retained for API compatibility but no longer changes behaviour.
  */
-function visibleUserMenu(page: Page, isMobile?: boolean) {
-  if (isMobile === true) {
-    return page.getByTestId("mobile-user-menu-button");
-  }
-  if (isMobile === false) {
-    return page.getByTestId("user-menu-button");
-  }
-
-  // Fallback: Use combined locator if isMobile is not known
-  return page
-    .locator(
-      '[data-testid="user-menu-button"],[data-testid="mobile-user-menu-button"]'
-    )
-    .filter({ visible: true });
+function visibleUserMenu(page: Page, _isMobile?: boolean) {
+  return page.getByTestId("user-menu-button");
 }
 
 interface LoginOptions {
@@ -76,11 +62,8 @@ export async function loginAs(
   await page.waitForLoadState("networkidle");
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
-  if (isMobile) {
-    await expect(page.getByTestId("mobile-header")).toBeVisible();
-  } else {
-    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
-  }
+  // AppHeader is always rendered (mobile and desktop) — just verify it's visible
+  await expect(page.getByTestId("app-header")).toBeVisible();
 
   // Wait for user menu to hydrate before continuing
   await expect(visibleUserMenu(page, isMobile)).toBeVisible();
@@ -98,21 +81,12 @@ export async function loginAs(
 }
 
 /**
- * Asserts the dashboard layout (sidebar/header + user menu) is ready.
+ * Asserts the dashboard layout (app header + user menu) is ready.
  */
-async function assertLayoutReady(
-  page: Page,
-  testInfo: TestInfo
-): Promise<void> {
-  const isMobile = testInfo.project.name.includes("Mobile");
-
-  if (isMobile) {
-    await expect(page.getByTestId("mobile-header")).toBeVisible();
-  } else {
-    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
-  }
-
-  await expect(visibleUserMenu(page, isMobile)).toBeVisible();
+async function assertLayoutReady(page: Page): Promise<void> {
+  // AppHeader is unified — same check on all viewports
+  await expect(page.getByTestId("app-header")).toBeVisible();
+  await expect(visibleUserMenu(page)).toBeVisible();
 }
 
 /**
@@ -125,14 +99,10 @@ export async function ensureLoggedIn(
 ): Promise<void> {
   await page.goto("/dashboard");
 
-  // Use project name to determine mobile vs desktop layout
-  const isMobile = testInfo.project.name.includes("Mobile");
-
   // Define semantic locators for both states (logged-in vs logged-out)
-  const menu = visibleUserMenu(page, isMobile);
-  const signIn = isMobile
-    ? page.getByTestId("mobile-nav-signin")
-    : page.getByTestId("nav-signin");
+  // AppHeader is unified — same testids on all viewports
+  const menu = visibleUserMenu(page);
+  const signIn = page.getByTestId("nav-signin");
 
   // Use a semantic wait: wait for the UI to settle into either state.
   // This avoids false-negatives from hydration races where visibleUserMenu
@@ -146,16 +116,14 @@ export async function ensureLoggedIn(
   }
 
   // Final assertion: verify we are truly logged in and layout is stable
-  await assertLayoutReady(page, testInfo);
+  await assertLayoutReady(page);
 }
 
 /**
  * Logs out the current user via the User Menu.
  */
 export async function logout(page: Page, testInfo: TestInfo): Promise<void> {
-  const isMobile = testInfo.project.name.includes("Mobile");
-
-  const userMenu = visibleUserMenu(page, isMobile);
+  const userMenu = visibleUserMenu(page);
   await expect(userMenu).toBeVisible();
   await userMenu.click();
 
@@ -167,16 +135,13 @@ export async function logout(page: Page, testInfo: TestInfo): Promise<void> {
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
   // Wait for the UI to settle into logged-out state (Sign In button visible)
-  const signIn = isMobile
-    ? page.getByTestId("mobile-nav-signin")
-    : page.getByTestId("nav-signin");
-  await expect(signIn).toBeVisible({ timeout: 15000 });
+  // AppHeader is unified — same testid on all viewports
+  await expect(page.getByTestId("nav-signin")).toBeVisible({ timeout: 15000 });
 }
 
 /**
- * No-op: The hamburger sidebar has been replaced by a bottom tab bar
- * on mobile (see design/phase3-bottom-tabs). Navigation links are now
- * accessible directly via the tab bar without opening a drawer.
+ * No-op: Navigation uses AppHeader (desktop nav links) + BottomTabBar (mobile).
+ * There is no sidebar to open.
  */
 export async function openSidebarIfMobile(
   _page: Page,

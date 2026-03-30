@@ -104,7 +104,7 @@ test.describe("Public Issue Reporting", () => {
 
   test("should preserve draft when logging in from header sign-in link", async ({
     page,
-  }, testInfo) => {
+  }) => {
     await page.goto("/report");
     await page.getByTestId("machine-select").selectOption({ index: 1 });
     await expect(page).toHaveURL(/machine=/);
@@ -123,11 +123,8 @@ test.describe("Public Issue Reporting", () => {
       includePriority: false,
     });
 
-    const isMobile = testInfo.project.name.includes("Mobile");
-    const signIn = isMobile
-      ? page.getByTestId("mobile-nav-signin")
-      : page.getByTestId("nav-signin");
-    await signIn.click();
+    // AppHeader is unified — same testid on all viewports
+    await page.getByTestId("nav-signin").click();
     await expect(page).toHaveURL(/\/login\?/);
 
     const next = new URL(page.url()).searchParams.get("next");

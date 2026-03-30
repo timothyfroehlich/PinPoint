@@ -164,14 +164,14 @@ export default async function IssueDetailPage({
 
   return (
     <div className="py-4 sm:py-10 space-y-4 sm:space-y-8">
-      <div className="hidden desktop:block">
+      <div className="hidden md:block">
         <BackToIssuesLink href={issuesPath} />
       </div>
 
       <div className="space-y-4">
         {/* Mobile Header Breadcrumbs */}
         <div
-          className="flex items-center gap-2 desktop:hidden"
+          className="flex items-center gap-2 md:hidden"
           data-testid="mobile-nav-row"
         >
           <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 font-mono text-xs font-bold text-muted-foreground">
@@ -187,7 +187,7 @@ export default async function IssueDetailPage({
         </div>
 
         {/* Desktop Header Breadcrumbs */}
-        <div className="hidden flex-wrap items-center gap-2 desktop:flex">
+        <div className="hidden flex-wrap items-center gap-2 md:flex">
           <span className="font-mono font-bold text-muted-foreground">
             {formatIssueId(initials, issue.issueNumber)}
           </span>
@@ -220,11 +220,11 @@ export default async function IssueDetailPage({
           issueId={issue.id}
           title={issue.title}
           canEdit={userCanEditTitle}
-          className="text-xl font-extrabold tracking-tight desktop:text-3xl"
+          className="text-xl font-extrabold tracking-tight md:text-3xl"
         />
 
         {/* Mobile Metadata Row (compressed) */}
-        <div className="space-y-2 desktop:hidden">
+        <div className="space-y-2 md:hidden">
           <div className="flex items-center gap-2 border-y py-2">
             <div className="min-w-0 flex-1">
               <SidebarActions
@@ -273,11 +273,11 @@ export default async function IssueDetailPage({
         </div>
       </div>
 
-      <div className="grid gap-8 desktop:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_320px]">
         <section className="@container space-y-5 lg:pr-4">
           {/* Activity Section */}
           <div className="space-y-5">
-            <h2 className="hidden desktop:block text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <h2 className="hidden md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Activity
             </h2>
             <IssueTimeline
@@ -294,7 +294,7 @@ export default async function IssueDetailPage({
         </section>
 
         {/* Desktop Sidebar */}
-        <div className="hidden desktop:block">
+        <div className="hidden md:block">
           <IssueSidebar
             issue={issueWithRelations}
             allUsers={allUsers}
