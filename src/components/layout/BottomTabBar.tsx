@@ -5,9 +5,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Home,
-  AlertTriangle,
-  Gamepad2,
   Plus,
   MoreVertical,
   HelpCircle,
@@ -25,6 +22,7 @@ import {
 } from "~/components/ui/sheet";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { isNavItemActive } from "./nav-utils";
+import { NAV_ITEMS } from "~/components/layout/nav-config";
 import type { UserRole } from "~/lib/types";
 
 interface BottomTabBarProps {
@@ -33,14 +31,10 @@ interface BottomTabBarProps {
   issuesPath?: string | undefined;
 }
 
-const mainTabs = [
-  { title: "Dashboard", href: "/dashboard", icon: Home },
-  { title: "Issues", href: "/issues", icon: AlertTriangle },
-  { title: "Machines", href: "/m", icon: Gamepad2 },
+const bottomTabs = [
+  ...NAV_ITEMS,
   { title: "Report", href: "/report", icon: Plus },
 ] as const;
-
-// Active state logic extracted to nav-utils.ts (shared with AppHeader)
 
 export function BottomTabBar({
   role,
@@ -62,7 +56,7 @@ export function BottomTabBar({
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t border-primary/50 bg-card/90 backdrop-blur-sm shadow-[0_-4px_15px_color-mix(in_srgb,var(--color-primary)_25%,transparent)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        {mainTabs.map((tab) => {
+        {bottomTabs.map((tab) => {
           const href = tab.href === "/issues" ? resolvedIssuesPath : tab.href;
           const active = isNavItemActive(
             tab.href,
