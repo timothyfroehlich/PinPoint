@@ -3,11 +3,7 @@
 /* Desktop device variant — matches mouse/trackpad devices.
    Use `desktop:` for mobile/desktop shell toggles instead of `md:`.
    Phones (pointer: coarse) never match, so they get the mobile shell. */
-@custom-variant desktop {
-  @media (pointer: fine) {
-    @slot;
-  }
-}
+@custom-variant desktop (@media (pointer: fine));
 
 /* Material Design 3 Color System - Tailwind v4 */
 @theme {

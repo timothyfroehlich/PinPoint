@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -65,38 +65,38 @@ export function Sidebar({
   /** Number of unread changelog entries, computed in MainLayout */
   newChangelogCount?: number;
 }): React.JSX.Element {
-  // User's explicit preference (persisted via cookie)
-  const [userCollapsed, setUserCollapsed] = useState(initialCollapsed);
+  // Whether the user has manually collapsed the sidebar this session
+  const [manualCollapse, setManualCollapse] = useState(false);
   // Whether the viewport is too narrow for an open sidebar
   // 1280px = 1024px min content + 256px open sidebar
   const [viewportForceCollapse, setViewportForceCollapse] = useState(false);
-  const initialCheckDone = useRef(false);
   const pathname = usePathname();
   // Default to /issues if no path provided
   const resolvedIssuesPath = issuesPath ?? "/issues";
 
-  // Sidebar is collapsed if the user chose it OR the viewport forces it
-  const collapsed = userCollapsed || viewportForceCollapse;
+  // Viewport controls collapse: narrow = always collapsed, wide = user's choice
+  const collapsed = viewportForceCollapse || manualCollapse;
 
   useEffect(() => {
     if (isMobile) return;
 
     const COLLAPSE_THRESHOLD = 1280;
     const check = (): void => {
-      setViewportForceCollapse(window.innerWidth < COLLAPSE_THRESHOLD);
+      const narrow = window.innerWidth < COLLAPSE_THRESHOLD;
+      setViewportForceCollapse(narrow);
+      // When viewport goes wide, reset manual collapse so sidebar opens
+      if (!narrow) setManualCollapse(false);
     };
 
-    // Run immediately so the sidebar doesn't flash open then collapse
     check();
-    initialCheckDone.current = true;
 
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, [isMobile]);
 
   const toggleSidebar = (): void => {
-    const newState = !userCollapsed;
-    setUserCollapsed(newState);
+    const newState = !manualCollapse;
+    setManualCollapse(newState);
     // Persist to cookie synchronously
     storeSidebarCollapsed(newState);
   };
