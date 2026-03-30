@@ -30,6 +30,12 @@ vi.mock("~/lib/cookies/client", () => ({
 
 describe("Sidebar Accessibility", () => {
   it("provides accessible names for links when collapsed", async () => {
+    // Simulate a wide desktop viewport so the collapse button is visible
+    Object.defineProperty(window, "innerWidth", {
+      value: 1400,
+      writable: true,
+    });
+
     const user = userEvent.setup();
     render(<Sidebar />);
 

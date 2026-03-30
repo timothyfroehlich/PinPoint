@@ -135,7 +135,7 @@ export async function MainLayout({
   return (
     <div className="flex h-full bg-background text-foreground">
       {/* Sidebar - Desktop only */}
-      <aside className="hidden md:block h-full">
+      <aside className="hidden desktop:block h-full">
         <Sidebar
           role={userProfile?.role}
           issuesPath={issuesPath}
@@ -147,7 +147,7 @@ export async function MainLayout({
       {/* Main Content */}
       {/* scroll-pt-[52px]: reserves space for the 52px sticky mobile header so
           browser scroll-into-view doesn't place interactive elements under it. */}
-      <main className="flex-1 overflow-y-auto scroll-pt-[52px] md:scroll-pt-0">
+      <main className="flex-1 overflow-y-auto scroll-pt-[52px] desktop:scroll-pt-0">
         {/* Mobile Header — compact sticky header (md:hidden) */}
         {user ? (
           <MobileHeader
@@ -160,7 +160,7 @@ export async function MainLayout({
         )}
 
         {/* Desktop Header — hidden on mobile */}
-        <header className="hidden md:flex h-16 items-center justify-between border-b border-border px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+        <header className="hidden desktop:flex h-16 items-center justify-between border-b border-border px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
           {/* Left spacer */}
           <div className="flex-1" />
 
@@ -193,7 +193,7 @@ export async function MainLayout({
         </header>
 
         {/* Extra bottom padding on mobile so content isn't hidden behind the fixed tab bar */}
-        <div className="px-4 sm:px-8 lg:px-10 pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
+        <div className="@container px-4 sm:px-8 lg:px-10 pb-[calc(88px+env(safe-area-inset-bottom))] desktop:pb-0">
           {children}
         </div>
       </main>

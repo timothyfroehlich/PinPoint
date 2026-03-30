@@ -79,7 +79,7 @@ export function BottomTabBar({
         role="navigation"
         aria-label="mobile navigation"
         data-testid="bottom-tab-bar"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t border-primary/50 bg-card/90 backdrop-blur-sm shadow-[0_-4px_15px_color-mix(in_srgb,var(--color-primary)_25%,transparent)]"
+        className="desktop:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t border-primary/50 bg-card/90 backdrop-blur-sm shadow-[0_-4px_15px_color-mix(in_srgb,var(--color-primary)_25%,transparent)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {mainTabs.map((tab) => {

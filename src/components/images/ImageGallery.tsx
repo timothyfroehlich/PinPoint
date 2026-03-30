@@ -15,7 +15,7 @@ export function ImageGallery({
   if (images.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 @lg:grid-cols-3 @2xl:grid-cols-4">
       {images.map((image) => {
         // Only bypass Next.js optimization for localhost URLs (MOCK_BLOB_STORAGE)
         const isLocalhost = (() => {

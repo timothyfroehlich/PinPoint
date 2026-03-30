@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -65,14 +65,38 @@ export function Sidebar({
   /** Number of unread changelog entries, computed in MainLayout */
   newChangelogCount?: number;
 }): React.JSX.Element {
-  const [collapsed, setCollapsed] = useState(initialCollapsed);
+  // User's explicit preference (persisted via cookie)
+  const [userCollapsed, setUserCollapsed] = useState(initialCollapsed);
+  // Whether the viewport is too narrow for an open sidebar
+  // 1280px = 1024px min content + 256px open sidebar
+  const [viewportForceCollapse, setViewportForceCollapse] = useState(false);
+  const initialCheckDone = useRef(false);
   const pathname = usePathname();
   // Default to /issues if no path provided
   const resolvedIssuesPath = issuesPath ?? "/issues";
 
+  // Sidebar is collapsed if the user chose it OR the viewport forces it
+  const collapsed = userCollapsed || viewportForceCollapse;
+
+  useEffect(() => {
+    if (isMobile) return;
+
+    const COLLAPSE_THRESHOLD = 1280;
+    const check = (): void => {
+      setViewportForceCollapse(window.innerWidth < COLLAPSE_THRESHOLD);
+    };
+
+    // Run immediately so the sidebar doesn't flash open then collapse
+    check();
+    initialCheckDone.current = true;
+
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [isMobile]);
+
   const toggleSidebar = (): void => {
-    const newState = !collapsed;
-    setCollapsed(newState);
+    const newState = !userCollapsed;
+    setUserCollapsed(newState);
     // Persist to cookie synchronously
     storeSidebarCollapsed(newState);
   };
@@ -283,7 +307,7 @@ export function Sidebar({
             </div>
           )}
 
-          {!isMobile && (
+          {!isMobile && !viewportForceCollapse && (
             <Button
               variant="ghost"
               size="sm"

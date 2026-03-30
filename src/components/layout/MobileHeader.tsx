@@ -34,7 +34,7 @@ type MobileHeaderProps = MobileHeaderAuthProps | MobileHeaderUnauthProps;
 export function MobileHeader(props: MobileHeaderProps): React.JSX.Element {
   return (
     <header
-      className="md:hidden flex h-[52px] items-center gap-3 px-4 border-b border-border bg-card/85 backdrop-blur-sm sticky top-0 z-20"
+      className="desktop:hidden flex h-[52px] items-center gap-3 px-4 border-b border-border bg-card/85 backdrop-blur-sm sticky top-0 z-20"
       data-testid="mobile-header"
     >
       {/* Logo — left side */}
