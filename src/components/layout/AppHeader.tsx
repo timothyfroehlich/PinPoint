@@ -44,7 +44,7 @@ export function AppHeader({
   newChangelogCount,
 }: AppHeaderProps): React.JSX.Element {
   const pathname = usePathname();
-  const resolvedIssuesPath = issuesPath || "/issues";
+  const resolvedIssuesPath = issuesPath;
 
   const navLinks = useMemo(
     () =>

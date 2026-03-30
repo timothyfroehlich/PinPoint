@@ -21,7 +21,7 @@ import {
   SheetDescription,
 } from "~/components/ui/sheet";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
-import { isNavItemActive } from "./nav-utils";
+import { isNavItemActive } from "~/components/layout/nav-utils";
 import { NAV_ITEMS } from "~/components/layout/nav-config";
 import type { UserRole } from "~/lib/types";
 
@@ -44,6 +44,8 @@ export function BottomTabBar({
   const pathname = usePathname();
   const resolvedIssuesPath = issuesPath ?? "/issues";
 
+  const tabBaseClass =
+    "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors min-h-[56px]";
   const sheetItemClass =
     "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary";
 
@@ -68,7 +70,7 @@ export function BottomTabBar({
               key={tab.href}
               href={href}
               className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors min-h-[56px]",
+                tabBaseClass,
                 active
                   ? "text-primary"
                   : "text-muted-foreground hover:text-primary"
@@ -86,7 +88,7 @@ export function BottomTabBar({
           type="button"
           onClick={() => setMoreOpen(true)}
           className={cn(
-            "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors min-h-[56px]",
+            tabBaseClass,
             moreOpen
               ? "text-primary"
               : "text-muted-foreground hover:text-primary"
