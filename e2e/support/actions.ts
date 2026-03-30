@@ -2,13 +2,8 @@ import { expect, type Page, type TestInfo } from "@playwright/test";
 
 import { TEST_USERS } from "./constants.js";
 
-/**
- * Returns the user-menu trigger.
- *
- * AppHeader is now unified — the same user-menu-button is rendered at all viewports.
- * The isMobile parameter is retained for API compatibility but no longer changes behaviour.
- */
-function visibleUserMenu(page: Page, _isMobile?: boolean) {
+/** Returns the user-menu trigger (unified across all viewports). */
+function visibleUserMenu(page: Page) {
   return page.getByTestId("user-menu-button");
 }
 
@@ -32,14 +27,12 @@ export async function loginAs(
     password = TEST_USERS.member.password,
   }: LoginOptions = {}
 ): Promise<void> {
-  const isMobile = testInfo.project.name.includes("Mobile");
-
   // Navigate to login page
   await page.goto("/login");
 
   // Define possible settled states for the login page
   const emailInput = page.getByLabel("Email");
-  const menu = visibleUserMenu(page, isMobile);
+  const menu = visibleUserMenu(page);
 
   // Wait for the UI to settle into either "ready to login" or "already logged in"
   await expect(emailInput.or(menu)).toBeVisible();
@@ -66,7 +59,7 @@ export async function loginAs(
   await expect(page.getByTestId("app-header")).toBeVisible();
 
   // Wait for user menu to hydrate before continuing
-  await expect(visibleUserMenu(page, isMobile)).toBeVisible();
+  await expect(visibleUserMenu(page)).toBeVisible();
 
   // Force a full server round-trip to ensure auth cookies are settled.
   // Under concurrent load (3+ Playwright workers), Supabase cookie rotation
@@ -77,7 +70,7 @@ export async function loginAs(
 
   // Confirm the reload kept us on /dashboard (not redirected to /login by middleware).
   await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
-  await expect(visibleUserMenu(page, isMobile)).toBeVisible();
+  await expect(visibleUserMenu(page)).toBeVisible();
 }
 
 /**

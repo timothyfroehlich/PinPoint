@@ -55,15 +55,6 @@ export function DateRangePicker({
     onChange({ from: undefined, to: undefined });
   };
 
-  const [isMobile, setIsMobile] = React.useState(false);
-
-  React.useEffect(() => {
-    const checkMobile = (): void => setIsMobile(window.innerWidth < 640);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
   return (
     <div className={cn("grid gap-2", className)}>
       <Popover>
@@ -110,7 +101,7 @@ export function DateRangePicker({
             {...(date?.from ? { defaultMonth: date.from } : {})}
             selected={date}
             onSelect={handleSelect}
-            numberOfMonths={isMobile ? 1 : 2}
+            numberOfMonths={2}
           />
         </PopoverContent>
       </Popover>

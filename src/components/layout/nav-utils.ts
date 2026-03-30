@@ -5,6 +5,9 @@
  * identical logic for determining which nav item is active.
  */
 
+/** Matches issue detail pages: /m/[initials]/i or /m/[initials]/i/[number] */
+const ISSUE_DETAIL_PATTERN = /^\/m\/[^/]+\/i(\/|$)/;
+
 /**
  * Returns true when the given nav item should appear active for the current pathname.
  *
@@ -18,7 +21,7 @@ export function isNavItemActive(
   resolvedIssuesPath: string
 ): boolean {
   // Issue detail pages (/m/[initials]/i and /m/[initials]/i/[number]) belong to the Issues tab
-  const isIssuePage = /^\/m\/[^/]+\/i(\/|$)/.test(pathname);
+  const isIssuePage = ISSUE_DETAIL_PATTERN.test(pathname);
 
   const href = tabHref === "/issues" ? resolvedIssuesPath : tabHref;
   const basePath = href.split("?")[0] ?? href;
