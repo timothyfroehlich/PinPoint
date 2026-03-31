@@ -407,7 +407,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: false,
-          technician: false,
+          technician: true,
           admin: true,
         },
       },
