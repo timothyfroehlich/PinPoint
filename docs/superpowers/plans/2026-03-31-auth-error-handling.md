@@ -1280,3 +1280,202 @@ git commit -m "chore: preflight fixes"
 ```bash
 git push -u origin worktree/user-creation-failure
 ```
+
+---
+
+## Adversarial Review Amendments
+
+Two adversarial review agents (security + correctness) reviewed this plan. The following amendments are **mandatory** — they override the code shown in the tasks above. Implementing agents must apply these changes when reaching the relevant task step.
+
+### Amendment A: Remove `email_not_confirmed` from Login (Security — HIGH)
+
+**Overrides:** Task 3, Step 2
+
+Surfacing `EMAIL_NOT_CONFIRMED` on the login path enables account enumeration — an attacker can distinguish "account exists but unconfirmed" from "wrong credentials." This contradicts the plan's stated goal.
+
+**Fix:** In the login error handler (Task 3, Step 2), do NOT surface `email_not_confirmed`. Remove the `EMAIL_NOT_CONFIRMED` case from the login switch and remove it from `LoginResult`. The `email_not_confirmed` mapping should remain in the shared utility (it's useful for other contexts) but login must not use it.
+
+Updated `LoginResult` type:
+
+```typescript
+export type LoginResult = Result<
+  { userId: string },
+  "VALIDATION" | "AUTH" | "CAPTCHA" | "SERVER" | "RATE_LIMIT",
+  { submittedEmail: string }
+>;
+```
+
+Updated login switch (remove the `EMAIL_NOT_CONFIRMED` case entirely):
+
+```typescript
+if (mapped) {
+  switch (mapped.code) {
+    case "CAPTCHA":
+      return err("CAPTCHA", mapped.message, { submittedEmail });
+    case "RATE_LIMIT":
+      return err("RATE_LIMIT", mapped.message, { submittedEmail });
+    // All other mapped codes fall through to generic message
+  }
+}
+```
+
+Also remove the `loginAction should return EMAIL_NOT_CONFIRMED` test from Task 3, Step 3.
+
+### Amendment B: Use Explicit Allowlist Instead of `as` Cast (Security — MEDIUM)
+
+**Overrides:** Task 2 Step 2, Task 3 Step 2, Task 4 Step 3
+
+The `mapped.code as <union>` cast is type-unsafe — if the mapping utility returns a code not in the Result union (e.g., `"SAME_PASSWORD"` hitting signup), TypeScript is silenced. Use a runtime allowlist guard instead.
+
+**Fix:** In each action, validate `mapped.code` against the expected set before returning:
+
+For `signupAction`:
+
+```typescript
+if (error) {
+  log.warn(
+    authErrorLogContext(error, "signup"),
+    "Signup failed: Supabase error"
+  );
+
+  const mapped = getUserMessageForAuthError(error);
+  if (mapped) {
+    const signupCodes = new Set<string>([
+      "WEAK_PASSWORD",
+      "EMAIL_TAKEN",
+      "CAPTCHA",
+      "RATE_LIMIT",
+      "SERVER",
+      "VALIDATION",
+    ]);
+    if (signupCodes.has(mapped.code)) {
+      return err(
+        mapped.code as
+          | "WEAK_PASSWORD"
+          | "EMAIL_TAKEN"
+          | "CAPTCHA"
+          | "RATE_LIMIT"
+          | "SERVER"
+          | "VALIDATION",
+        mapped.message
+      );
+    }
+  }
+
+  return err("SERVER", "An unexpected error occurred during signup");
+}
+```
+
+Apply the same pattern to `loginAction` (with `loginCodes: "CAPTCHA" | "RATE_LIMIT"`) and `resetPasswordAction` (with `resetCodes: "WEAK_PASSWORD" | "SAME_PASSWORD" | "SERVER" | "VALIDATION"`).
+
+### Amendment C: Handle `AuthRetryableFetchError` in Login (Correctness — MEDIUM)
+
+**Overrides:** Task 3, Step 2
+
+`AuthUnknownError` and `AuthRetryableFetchError` don't set `error.status`, so the `error.status >= 500` check misses network-level failures (Supabase unreachable). Users with correct credentials see "Invalid email or password" during outages.
+
+**Fix:** Add an `isAuthRetryableFetchError` check before the status check in loginAction:
+
+```typescript
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
+
+// Network-level failures (Supabase unreachable) — not a credential error
+if (isAuthRetryableFetchError(error)) {
+  return err("SERVER", "Something went wrong. Please try again later.", {
+    submittedEmail,
+  });
+}
+
+// Server errors (status >= 500) — not a credential error
+if (error.status !== undefined && error.status >= 500) {
+  return err("SERVER", "Something went wrong. Please try again later.", {
+    submittedEmail,
+  });
+}
+```
+
+Also add a test:
+
+```typescript
+it("loginAction should return SERVER for network failures (AuthRetryableFetchError)", async () => {
+  const { AuthRetryableFetchError } = await import("@supabase/supabase-js");
+  vi.mocked(createClient).mockResolvedValue({
+    auth: {
+      signInWithPassword: vi.fn().mockResolvedValue({
+        error: new AuthRetryableFetchError("Network error", 0),
+        data: { user: null },
+      }),
+    },
+  } as any);
+
+  const formData = new FormData();
+  formData.set("email", "test@example.com");
+  formData.set("password", "Password123!");
+
+  const result = await loginAction(undefined, formData);
+
+  expect(result.ok).toBe(false);
+  if (!result.ok) {
+    expect(result.code).toBe("SERVER");
+    expect(result.message).toContain("Something went wrong");
+  }
+});
+```
+
+### Amendment D: Disable Submit While Token Is Empty (Security — LOW)
+
+**Overrides:** Task 5
+
+During the Turnstile auto-refresh window (between `onExpire` clearing the token and `onSuccess` providing a new one), the submit button should be disabled. This is NOT a TurnstileWidget change — it's a form-level concern.
+
+**Fix:** In each form that uses TurnstileWidget (`signup-form.tsx`, `login-form.tsx`, `forgot-password-form.tsx`), the submit button should already be gated on `isPending` from `useActionState`. Since the token state is local to the form, the form can additionally disable submit when `turnstileToken === ""`. The simplest approach:
+
+```tsx
+<button
+  type="submit"
+  disabled={isPending || (hasTurnstile && !turnstileToken)}
+>
+```
+
+Where `hasTurnstile` is `!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
+
+**Note:** This is a LOW priority enhancement. The auto-refresh window is 1-3 seconds and the CAPTCHA error message ("Verification failed. Please refresh the page") handles this case adequately. Implement if time allows.
+
+### Amendment E: Add `createClient()` Rejection Test (Correctness — MEDIUM)
+
+**Overrides:** Task 6 (add before preflight)
+
+No test currently covers the code path where `createClient()` throws (e.g., missing env vars). Add one:
+
+```typescript
+it("signupAction should return SERVER when createClient() throws", async () => {
+  vi.mocked(createClient).mockRejectedValue(new Error("Missing SUPABASE_URL"));
+
+  const formData = new FormData();
+  formData.set("email", "test@example.com");
+  formData.set("password", "StrongUniquePass99!");
+  formData.set("confirmPassword", "StrongUniquePass99!");
+  formData.set("firstName", "John");
+  formData.set("lastName", "Doe");
+  formData.set("termsAccepted", "on");
+
+  const result = await signupAction(undefined, formData);
+
+  expect(result.ok).toBe(false);
+  if (!result.ok) {
+    expect(result.code).toBe("SERVER");
+    expect(result.message).not.toContain("SUPABASE_URL"); // No leak
+  }
+});
+```
+
+### Accepted Risks (No Action Needed)
+
+| Finding                                                         | Severity | Why Accepted                                                                                                                                |
+| --------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EMAIL_TAKEN` on signup confirms account existence              | MEDIUM   | Standard UX pattern, mitigated by rate limiting. Would require "check your email for all outcomes" UX to fix, which hurts legitimate users. |
+| SERVER vs AUTH response difference on login                     | MEDIUM   | UX benefit (users know it's not their credentials during outages) outweighs the fingerprinting risk for a community pinball app.            |
+| Forgot-password timing side-channel                             | LOW      | Would require artificial delays to fix. Response-body enumeration is already closed.                                                        |
+| SMTP failures silently return success in forgot-password        | MEDIUM   | Intentional anti-enumeration. Users who don't receive an email will retry or contact support.                                               |
+| No rate limiting on reset-password                              | LOW      | Requires valid session via reset link. Token creation is already rate-limited.                                                              |
+| Missing error codes (`user_banned`, `flow_state_expired`, etc.) | LOW      | All fall through to safe generic messages. Not relevant to email/password auth.                                                             |
