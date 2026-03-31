@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState, useRef, useEffect } from "react";
+import {
+  useState,
+  useActionState,
+  useRef,
+  useEffect,
+  startTransition,
+} from "react";
 import {
   updateIssueFrequencyAction,
   type UpdateIssueFrequencyResult,
@@ -79,7 +85,10 @@ export function UpdateIssueFrequencyForm({
   // Auto-submit form when pending frequency changes
   useEffect(() => {
     if (pendingFrequency !== null && formRef.current) {
-      formRef.current.requestSubmit();
+      const form = formRef.current;
+      startTransition(() => {
+        form.requestSubmit();
+      });
       setPendingFrequency(null);
     }
   }, [pendingFrequency]);

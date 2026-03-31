@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState, useRef, useEffect } from "react";
+import {
+  useState,
+  useActionState,
+  useRef,
+  useEffect,
+  startTransition,
+} from "react";
 import {
   updateIssueSeverityAction,
   type UpdateIssueSeverityResult,
@@ -81,7 +87,10 @@ export function UpdateIssueSeverityForm({
   // Auto-submit form when pending severity changes
   useEffect(() => {
     if (pendingSeverity !== null && formRef.current) {
-      formRef.current.requestSubmit();
+      const form = formRef.current;
+      startTransition(() => {
+        form.requestSubmit();
+      });
       setPendingSeverity(null);
     }
   }, [pendingSeverity]);

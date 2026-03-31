@@ -44,6 +44,7 @@ export function RichTextEditor({
     const list: AnyExtension[] = [
       StarterKit.configure({
         heading: { levels: [2, 3] },
+        link: false, // Disabled here — configured explicitly below with custom options
       }),
       Link.configure({
         openOnClick: false,
