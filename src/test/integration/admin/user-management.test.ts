@@ -174,6 +174,47 @@ describe("Admin User Management Integration", () => {
       );
     });
 
+    it("should allow technician to invite a new user", async () => {
+      // Create a technician user
+      const techId = randomUUID();
+      const techEmail = `technician-${Date.now()}@test.com`;
+      await (
+        await getTestDb()
+      ).execute(
+        `INSERT INTO auth.users (id, email) VALUES ('${techId}', '${techEmail}')`
+      );
+      const techProfileData = createTestUser({
+        id: techId,
+        email: techEmail,
+        firstName: "Tech",
+        lastName: "User",
+        role: "technician",
+      });
+      await (await getTestDb()).insert(userProfiles).values(techProfileData);
+
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: techId, email: techEmail } },
+      });
+
+      const formData = new FormData();
+      formData.append("firstName", "TechInvited");
+      formData.append("lastName", "Person");
+      formData.append("email", "tech-invite@test.com");
+      formData.append("role", "member");
+
+      const result = await inviteUser(formData);
+      expect(result.ok).toBe(true);
+      expect(result.userId).toBeDefined();
+
+      const invited = await (
+        await getTestDb()
+      ).query.invitedUsers.findFirst({
+        where: eq(invitedUsers.email, "tech-invite@test.com"),
+      });
+      expect(invited).toBeDefined();
+      expect(invited?.role).toBe("member");
+    });
+
     it("should reject invite for existing active user", async () => {
       mockGetUser.mockResolvedValue({ data: { user: adminUser! } });
 

@@ -112,10 +112,10 @@ export async function inviteUser(
   }
 
   try {
-    // Permission check via matrix (admin.users.invite allows technician+admin)
+    // Fetch role + name in one query (reused for permission check and email personalization)
     const currentUserProfile = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, user.id),
-      columns: { role: true },
+      columns: { role: true, name: true },
     });
 
     const accessLevel = getAccessLevel(currentUserProfile?.role);
@@ -178,14 +178,10 @@ export async function inviteUser(
       // Security: Use configured site URL to prevent Host Header Injection
       const siteUrl = requireSiteUrl("invite-user");
 
-      const currentUser = await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-      });
-
       const emailResult = await sendInviteEmail({
         to: validated.email,
         firstName: validated.firstName,
-        inviterName: currentUser?.name ?? "An administrator",
+        inviterName: currentUserProfile?.name ?? "An administrator",
         siteUrl,
       });
 
