@@ -15,6 +15,7 @@ import { sendInviteEmail } from "~/lib/email/invite";
 import { requireSiteUrl } from "~/lib/url";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 import { log } from "~/lib/logger";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 async function verifyAdmin(userId: string): Promise<void> {
   const currentUserProfile = await db.query.userProfiles.findFirst({
@@ -111,7 +112,16 @@ export async function inviteUser(
   }
 
   try {
-    await verifyAdmin(user.id);
+    // Fetch role + name in one query (reused for permission check and email personalization)
+    const currentUserProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true, name: true },
+    });
+
+    const accessLevel = getAccessLevel(currentUserProfile?.role);
+    if (!checkPermission("admin.users.invite", accessLevel)) {
+      throw new Error("Forbidden: You do not have permission to invite users");
+    }
 
     const rawData = {
       firstName: formData.get("firstName"),
@@ -168,14 +178,10 @@ export async function inviteUser(
       // Security: Use configured site URL to prevent Host Header Injection
       const siteUrl = requireSiteUrl("invite-user");
 
-      const currentUser = await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-      });
-
       const emailResult = await sendInviteEmail({
         to: validated.email,
         firstName: validated.firstName,
-        inviterName: currentUser?.name ?? "An administrator",
+        inviterName: currentUserProfile?.name ?? "An administrator",
         siteUrl,
       });
 
