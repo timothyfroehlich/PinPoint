@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState, useRef, useEffect } from "react";
+import {
+  useState,
+  useActionState,
+  useRef,
+  useEffect,
+  startTransition,
+} from "react";
 import {
   updateIssueStatusAction,
   type UpdateIssueStatusResult,
@@ -84,7 +90,10 @@ export function UpdateIssueStatusForm({
   // Auto-submit form when pending status changes
   useEffect(() => {
     if (pendingStatus !== null && formRef.current) {
-      formRef.current.requestSubmit();
+      const form = formRef.current;
+      startTransition(() => {
+        form.requestSubmit();
+      });
       setPendingStatus(null);
     }
   }, [pendingStatus]);

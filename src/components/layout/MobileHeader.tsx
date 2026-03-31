@@ -68,8 +68,9 @@ export function MobileHeader(props: MobileHeaderProps): React.JSX.Element {
           src="/apc-logo.png"
           alt="Austin Pinball Collective"
           width={64}
-          height={38}
-          className="h-6 w-auto object-contain shrink-0"
+          height={48}
+          className="object-contain shrink-0"
+          style={{ height: "1.5rem", width: "auto" }}
         />
       </a>
 
