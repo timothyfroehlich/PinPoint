@@ -90,6 +90,12 @@ let redisClient: Redis | null | undefined;
 function getRedis(): Redis | null {
   if (redisClient === undefined) {
     redisClient = createRedisClient();
+    if (!redisClient && !isProductionEnv()) {
+      log.info(
+        { action: "rate-limit" },
+        "Redis not configured — rate limiting disabled in development"
+      );
+    }
   }
   return redisClient;
 }
@@ -259,10 +265,6 @@ export async function checkLoginIpLimit(ip: string): Promise<RateLimitResult> {
       );
       return failClosedResult();
     }
-    log.warn(
-      { action: "rate-limit" },
-      "Redis not configured - rate limiting disabled in development"
-    );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 
@@ -323,10 +325,6 @@ export async function checkPublicIssueLimit(
       );
       return failClosedResult();
     }
-    log.warn(
-      { action: "rate-limit" },
-      "Redis not configured - rate limiting disabled in development"
-    );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 
@@ -387,10 +385,6 @@ export async function checkImageUploadLimit(
       );
       return failClosedResult();
     }
-    log.warn(
-      { action: "rate-limit" },
-      "Redis not configured - rate limiting disabled in development"
-    );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 
@@ -435,10 +429,6 @@ export async function checkLoginAccountLimit(
       );
       return failClosedResult();
     }
-    log.warn(
-      { action: "rate-limit" },
-      "Redis not configured - rate limiting disabled in development"
-    );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 
@@ -501,10 +491,6 @@ export async function checkSignupLimit(ip: string): Promise<RateLimitResult> {
       );
       return failClosedResult();
     }
-    log.warn(
-      { action: "rate-limit" },
-      "Redis not configured - rate limiting disabled in development"
-    );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 
@@ -549,10 +535,6 @@ export async function checkForgotPasswordLimit(
       );
       return failClosedResult();
     }
-    log.warn(
-      { action: "rate-limit" },
-      "Redis not configured - rate limiting disabled in development"
-    );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 
