@@ -93,7 +93,7 @@ function getRedis(): Redis | null {
     if (!redisClient && !isProductionEnv()) {
       log.info(
         { action: "rate-limit" },
-        "Redis not configured — rate limiting disabled in development"
+        "Redis not configured — rate limiting disabled in non-production environment"
       );
     }
   }
