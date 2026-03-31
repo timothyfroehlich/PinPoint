@@ -401,7 +401,7 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("admin.access", "admin")).toBe(true);
 
       expect(getPermission("admin.users.invite", "member")).toBe(false);
-      expect(getPermission("admin.users.invite", "technician")).toBe(false);
+      expect(getPermission("admin.users.invite", "technician")).toBe(true);
       expect(getPermission("admin.users.invite", "admin")).toBe(true);
 
       expect(getPermission("admin.users.roles", "member")).toBe(false);

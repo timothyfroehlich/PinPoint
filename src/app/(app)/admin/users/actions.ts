@@ -15,6 +15,7 @@ import { sendInviteEmail } from "~/lib/email/invite";
 import { requireSiteUrl } from "~/lib/url";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 import { log } from "~/lib/logger";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 async function verifyAdmin(userId: string): Promise<void> {
   const currentUserProfile = await db.query.userProfiles.findFirst({
@@ -111,7 +112,16 @@ export async function inviteUser(
   }
 
   try {
-    await verifyAdmin(user.id);
+    // Permission check via matrix (admin.users.invite allows technician+admin)
+    const currentUserProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    const accessLevel = getAccessLevel(currentUserProfile?.role);
+    if (!checkPermission("admin.users.invite", accessLevel)) {
+      throw new Error("Forbidden: You do not have permission to invite users");
+    }
 
     const rawData = {
       firstName: formData.get("firstName"),
