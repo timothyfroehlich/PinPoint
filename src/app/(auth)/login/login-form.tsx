@@ -31,6 +31,8 @@ export function LoginForm({
     FormData
   >(loginAction, undefined);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const hasTurnstile = Boolean(process.env["NEXT_PUBLIC_TURNSTILE_SITE_KEY"]);
+  const enforceCaptcha = hasTurnstile && process.env.NODE_ENV !== "test";
 
   const handleTurnstileVerify = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -121,6 +123,7 @@ export function LoginForm({
           className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
           size="lg"
           loading={isPending}
+          disabled={isPending || (enforceCaptcha && !turnstileToken)}
         >
           Sign In
         </Button>
