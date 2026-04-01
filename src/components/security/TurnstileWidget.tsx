@@ -46,7 +46,11 @@ export function TurnstileWidget({
       onSuccess={handleVerify}
       onExpire={handleExpire}
       onError={handleExpire}
-      options={{ size: "flexible", appearance: "interaction-only" }}
+      options={{
+        size: "flexible",
+        appearance: "interaction-only",
+        refreshExpired: "auto",
+      }}
       className={className}
     />
   );

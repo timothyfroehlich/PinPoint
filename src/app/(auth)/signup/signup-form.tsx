@@ -32,6 +32,8 @@ export function SignupForm({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
+  const hasTurnstile = Boolean(process.env["NEXT_PUBLIC_TURNSTILE_SITE_KEY"]);
+  const enforceCaptcha = hasTurnstile && process.env.NODE_ENV !== "test";
 
   const handleTurnstileVerify = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -204,6 +206,7 @@ export function SignupForm({
         className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
         size="lg"
         loading={isPending}
+        disabled={isPending || (enforceCaptcha && !turnstileToken)}
       >
         Create Account
       </Button>
