@@ -108,11 +108,13 @@ export function AppHeader({
                 : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
             )}
             aria-current={item.active ? "page" : undefined}
+            aria-label={item.title}
             data-testid={`nav-${item.title.toLowerCase()}`}
-            title={item.title}
           >
             <item.icon className="size-4 shrink-0" aria-hidden="true" />
-            <span className="hidden lg:inline">{item.title}</span>
+            <span className="hidden lg:inline" aria-hidden="true">
+              {item.title}
+            </span>
           </Link>
         ))}
       </nav>
@@ -127,9 +129,11 @@ export function AppHeader({
           className="text-muted-foreground hover:text-primary gap-2"
           data-testid="nav-report-issue"
         >
-          <Link href="/report">
+          <Link href="/report" aria-label="Report Issue">
             <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
-            <span className="hidden lg:inline">Report Issue</span>
+            <span className="hidden lg:inline" aria-hidden="true">
+              Report Issue
+            </span>
           </Link>
         </Button>
         <HelpMenu newChangelogCount={newChangelogCount} />

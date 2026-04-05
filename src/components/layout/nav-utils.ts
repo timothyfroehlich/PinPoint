@@ -5,7 +5,7 @@
  * identical logic for determining which nav item is active.
  */
 
-/** Matches issue detail pages: /m/[initials]/i or /m/[initials]/i/[number] */
+/** Matches machine issues routes: /m/[initials]/i (list) or /m/[initials]/i/[number] (detail) */
 const ISSUE_DETAIL_PATTERN = /^\/m\/[^/]+\/i(\/|$)/;
 
 /**
