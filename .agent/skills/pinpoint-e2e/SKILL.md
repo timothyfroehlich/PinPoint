@@ -56,8 +56,8 @@ If a test fails in CI or parallel mode:
     - _Fix_: Ensure `x-skip-autologin` is NOT interfering. Add `test.use({ storageState: STORAGE_STATE.<role> })` to the describe block, or use `loginAs` for mid-test role switches. Check `test.describe.serial` if tests share a user.
 3.  **Timeout?**: Waiting for a toast or email?
     - _Fix_: Use `waitForLoadState("networkidle")` before assertions. Increase timeouts for emails.
-4.  **Mobile?**: Can't find the sidebar?
-    - _Fix_: Use `testInfo.project.name.includes("Mobile")` to branch between mobile/desktop selectors. With storageState, navigate directly to the target page instead of the dashboard.
+4.  **Mobile layout different?**: Nav links not visible on mobile?
+    - _Fix_: AppHeader is unified — same `data-testid="app-header"` on all viewports. Nav links hide below `md:`, BottomTabBar handles mobile navigation. Use `testInfo.project.name.includes("Mobile")` only when testing layout-specific behavior (e.g., checking BottomTabBar visibility).
 
 ## Authentication Strategy
 

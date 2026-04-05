@@ -115,7 +115,7 @@ export async function ensureLoggedIn(
 /**
  * Logs out the current user via the User Menu.
  */
-export async function logout(page: Page, testInfo: TestInfo): Promise<void> {
+export async function logout(page: Page, _testInfo: TestInfo): Promise<void> {
   const userMenu = visibleUserMenu(page);
   await expect(userMenu).toBeVisible();
   await userMenu.click();

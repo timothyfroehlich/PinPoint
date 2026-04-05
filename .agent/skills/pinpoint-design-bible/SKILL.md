@@ -83,7 +83,7 @@ Use viewport breakpoints when the decision depends on the browser window size �
 
 ### Layer 2 — Container Queries (component internals)
 
-Use container queries when the decision depends on the component's available width — not the viewport. A component inside a sidebar has less space than the same component full-width, regardless of screen size.
+Use container queries when the decision depends on the component's available width — not the viewport. A component inside the issue detail content column has less space than the same component full-width, regardless of screen size.
 
 **These are NOT viewport sizes.** They are the width of the nearest `@container` ancestor.
 

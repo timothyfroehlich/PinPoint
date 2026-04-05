@@ -75,10 +75,13 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 
 ### Layout
 
-| File                                   | What It Teaches                                            |
-| :------------------------------------- | :--------------------------------------------------------- |
-| `src/components/layout/MainLayout.tsx` | App shell, header, sidebar, mobile nav, horizontal padding |
-| `src/components/layout/Sidebar.tsx`    | Navigation, collapsed state, mobile sheet pattern          |
+| File                                     | What It Teaches                                                    |
+| :--------------------------------------- | :----------------------------------------------------------------- |
+| `src/components/layout/MainLayout.tsx`   | App shell (AppHeader + content + BottomTabBar), horizontal padding |
+| `src/components/layout/AppHeader.tsx`    | Unified responsive header (icon-only at md:, icon+text at lg:)     |
+| `src/components/layout/BottomTabBar.tsx` | Mobile tab bar (md:hidden), More sheet with secondary nav          |
+| `src/components/layout/nav-config.ts`    | Shared NAV_ITEMS array used by AppHeader and BottomTabBar          |
+| `src/components/layout/HelpMenu.tsx`     | Help dropdown (Feedback, What's New, Help, About) with badge       |
 
 ## Label Standards (Decided)
 

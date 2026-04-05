@@ -44,16 +44,15 @@ export function AppHeader({
   newChangelogCount,
 }: AppHeaderProps): React.JSX.Element {
   const pathname = usePathname();
-  const resolvedIssuesPath = issuesPath;
 
   const navLinks = useMemo(
     () =>
       NAV_ITEMS.map((item) => {
-        const href = item.href === "/issues" ? resolvedIssuesPath : item.href;
-        const active = isNavItemActive(item.href, pathname, resolvedIssuesPath);
+        const href = item.href === "/issues" ? issuesPath : item.href;
+        const active = isNavItemActive(item.href, pathname, issuesPath);
         return { ...item, href, active };
       }),
-    [pathname, resolvedIssuesPath]
+    [pathname, issuesPath]
   );
 
   return (

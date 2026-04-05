@@ -36,6 +36,11 @@ const bottomTabs = [
   { title: "Report", href: "/report", icon: Plus },
 ] as const;
 
+const tabBaseClass =
+  "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors min-h-[56px]";
+const sheetItemClass =
+  "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary";
+
 export function BottomTabBar({
   role,
   issuesPath,
@@ -43,11 +48,6 @@ export function BottomTabBar({
   const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
   const resolvedIssuesPath = issuesPath ?? "/issues";
-
-  const tabBaseClass =
-    "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors min-h-[56px]";
-  const sheetItemClass =
-    "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary";
 
   return (
     <>
@@ -130,16 +130,6 @@ export function BottomTabBar({
             </button>
 
             <Link
-              href="/help"
-              onClick={() => setMoreOpen(false)}
-              className={sheetItemClass}
-              data-testid="more-sheet-help"
-            >
-              <HelpCircle className="size-5 shrink-0" aria-hidden="true" />
-              <span>Help</span>
-            </Link>
-
-            <Link
               href="/whats-new"
               onClick={() => setMoreOpen(false)}
               className={sheetItemClass}
@@ -147,6 +137,16 @@ export function BottomTabBar({
             >
               <Sparkles className="size-5 shrink-0" aria-hidden="true" />
               <span>What&apos;s New</span>
+            </Link>
+
+            <Link
+              href="/help"
+              onClick={() => setMoreOpen(false)}
+              className={sheetItemClass}
+              data-testid="more-sheet-help"
+            >
+              <HelpCircle className="size-5 shrink-0" aria-hidden="true" />
+              <span>Help</span>
             </Link>
 
             <Link

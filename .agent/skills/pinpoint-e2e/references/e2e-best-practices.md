@@ -85,10 +85,11 @@ Server Actions in Next.js can be slow to revalidate.
 
 ### 2. Mobile Stability
 
-Mobile viewports (e.g., Pixel 5) hide the sidebar and use a hamburger menu.
+Mobile viewports use the BottomTabBar for navigation. Desktop uses AppHeader nav links.
 
-- **DO**: Use `ensureLoggedIn` which handles both desktop and mobile navigation checks.
-- **DO**: Be aware that "Click Sidebar" actions might need to open the mobile menu first.
+- **DO**: Use `ensureLoggedIn` which handles auth checks on all viewports (unified AppHeader).
+- **DO**: Use `data-testid="app-header"` for header assertions — same testid on mobile and desktop.
+- **DO**: Use `data-testid="bottom-tab-bar"` for mobile-only tab bar assertions.
 
 ### 3. Mailpit & Emails
 
