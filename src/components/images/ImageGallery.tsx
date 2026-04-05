@@ -2,7 +2,13 @@
 import React from "react";
 
 import Image from "next/image";
-import { Dialog, DialogContent, DialogTrigger } from "~/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog";
 import { type GalleryImage } from "~/types/images";
 
 interface ImageGalleryProps {
@@ -48,6 +54,12 @@ export function ImageGallery({
               className="max-w-3xl border-none bg-transparent p-0 shadow-none"
               aria-label={`View image: ${image.originalFilename ?? "Issue image"}`}
             >
+              <DialogTitle className="sr-only">
+                {image.originalFilename ?? "Issue image"}
+              </DialogTitle>
+              <DialogDescription className="sr-only">
+                Full-size view of {image.originalFilename ?? "issue image"}
+              </DialogDescription>
               <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black/90">
                 <Image
                   src={image.fullImageUrl}

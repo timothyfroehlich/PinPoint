@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState, useRef, useEffect } from "react";
+import {
+  useState,
+  useActionState,
+  useRef,
+  useEffect,
+  startTransition,
+} from "react";
 import {
   updateIssuePriorityAction,
   type UpdateIssuePriorityResult,
@@ -80,7 +86,10 @@ export function UpdateIssuePriorityForm({
   // Auto-submit form when pending priority changes
   useEffect(() => {
     if (pendingPriority !== null && formRef.current) {
-      formRef.current.requestSubmit();
+      const form = formRef.current;
+      startTransition(() => {
+        form.requestSubmit();
+      });
       setPendingPriority(null);
     }
   }, [pendingPriority]);

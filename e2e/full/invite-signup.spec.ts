@@ -2,7 +2,7 @@
  * E2E Full Test: User Invitation and Signup Flow
  *
  * Verifies the complete lifecycle:
- * 1. Admin invites a guest user.
+ * 1. Technician invites a user from the machine creation page.
  * 2. User receives invitation email in Mailpit.
  * 3. User follows signup link.
  * 4. User completes signup with a password.
@@ -26,10 +26,10 @@ let hdOwnerChanged = false;
 
 test.describe("User Invitation & Signup Flow", () => {
   test.beforeEach(async ({ page }, testInfo) => {
-    // Login as admin before each test
+    // Login as technician — technicians can invite users (admin.users.invite)
     await ensureLoggedIn(page, testInfo, {
-      email: TEST_USERS.admin.email,
-      password: TEST_USERS.admin.password,
+      email: TEST_USERS.technician.email,
+      password: TEST_USERS.technician.password,
     });
   });
 
@@ -60,14 +60,14 @@ test.describe("User Invitation & Signup Flow", () => {
 
     console.log(`[test] Starting flow for ${userEmail}`);
 
-    // 1. Navigate to admin users page and invite user
+    // 1. Navigate to machine creation page and invite user via OwnerSelect
 
-    console.log("[test] Navigating to /admin/users");
-    await page.goto("/admin/users");
-    console.log("[test] Navigated to /admin/users");
+    console.log("[test] Navigating to /m/new");
+    await page.goto("/m/new");
+    console.log("[test] Navigated to /m/new");
 
-    await page.getByRole("button", { name: /Invite User/i }).click();
-    console.log("[test] Clicked Invite User button");
+    await page.getByRole("button", { name: /Invite New/i }).click();
+    console.log("[test] Clicked Invite New button");
 
     await page.getByLabel(/First Name/i).fill("Full");
     await page.getByLabel(/Last Name/i).fill("Flow");
@@ -138,9 +138,9 @@ test.describe("User Invitation & Signup Flow", () => {
     const userEmail = `owner-invite-${testId}@example.com`;
     testEmails.add(userEmail);
 
-    // 1. Invite user via admin panel
-    await page.goto("/admin/users");
-    await page.getByRole("button", { name: /Invite User/i }).click();
+    // 1. Invite user via machine creation page
+    await page.goto("/m/new");
+    await page.getByRole("button", { name: /Invite New/i }).click();
     await page.getByLabel(/First Name/i).fill("Owner");
     await page.getByLabel(/Last Name/i).fill("Transfer");
     await page.getByRole("textbox", { name: "Email" }).fill(userEmail);

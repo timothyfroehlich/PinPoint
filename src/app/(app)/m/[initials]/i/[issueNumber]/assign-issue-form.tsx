@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useActionState } from "react";
+import { useActionState, startTransition } from "react";
 import {
   assignIssueAction,
   type AssignIssueResult,
@@ -82,7 +82,9 @@ export function AssignIssueForm({
         const formData = new FormData();
         formData.append("issueId", issueId);
         formData.append("assignedTo", userId ?? "");
-        formAction(formData);
+        startTransition(() => {
+          formAction(formData);
+        });
       }}
     />
   );

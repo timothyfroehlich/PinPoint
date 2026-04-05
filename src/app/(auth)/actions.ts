@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { createClient } from "~/lib/supabase/server";
 import { type Result, ok, err } from "~/lib/result";
 import {
@@ -23,6 +24,11 @@ import { usernameToInternalEmail } from "~/lib/auth/internal-accounts";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
+import {
+  authErrorLogContext,
+  extractCaptchaToken,
+  getUserMessageForAuthError,
+} from "~/lib/auth/errors";
 
 /**
  * Result Types
@@ -30,7 +36,7 @@ import { eq } from "drizzle-orm";
 
 export type LoginResult = Result<
   { userId: string },
-  "VALIDATION" | "AUTH" | "SERVER" | "RATE_LIMIT",
+  "VALIDATION" | "AUTH" | "CAPTCHA" | "SERVER" | "RATE_LIMIT",
   { submittedEmail: string }
 >;
 
@@ -38,6 +44,8 @@ export type SignupResult = Result<
   { userId: string },
   | "VALIDATION"
   | "EMAIL_TAKEN"
+  | "WEAK_PASSWORD"
+  | "CAPTCHA"
   | "SERVER"
   | "CONFIRMATION_REQUIRED"
   | "RATE_LIMIT"
@@ -45,9 +53,15 @@ export type SignupResult = Result<
 
 export type LogoutResult = Result<void, "SERVER">;
 
-export type ForgotPasswordResult = Result<void, "VALIDATION" | "SERVER">;
+export type ForgotPasswordResult = Result<
+  void,
+  "VALIDATION" | "CAPTCHA" | "SERVER"
+>;
 
-export type ResetPasswordResult = Result<void, "VALIDATION" | "SERVER">;
+export type ResetPasswordResult = Result<
+  void,
+  "VALIDATION" | "WEAK_PASSWORD" | "SAME_PASSWORD" | "SERVER"
+>;
 
 /**
  * Login Action
@@ -129,9 +143,7 @@ export async function loginAction(
     const supabase = await createClient();
 
     // Extract Turnstile CAPTCHA token for Supabase built-in verification
-    const captchaTokenEntry = formData.get("captchaToken");
-    const captchaToken =
-      typeof captchaTokenEntry === "string" ? captchaTokenEntry : undefined;
+    const captchaToken = extractCaptchaToken(formData);
 
     // Sign in with Supabase Auth
     // Note: Remember Me is for UX only - SSR sessions persist via cookies
@@ -146,10 +158,45 @@ export async function loginAction(
     // but we check both for safety
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Supabase types guarantee user exists if no error, but defensive check remains
     if (error || !data.user) {
-      log.warn(
-        { action: "login", error: error?.message },
-        "Login authentication failed"
-      );
+      if (error) {
+        log.warn(
+          authErrorLogContext(error, "login"),
+          "Login authentication failed"
+        );
+
+        const mapped = getUserMessageForAuthError(error);
+        if (mapped) {
+          const loginCodes = new Set<string>(["CAPTCHA", "RATE_LIMIT"]);
+          if (loginCodes.has(mapped.code)) {
+            return err(
+              mapped.code as "CAPTCHA" | "RATE_LIMIT",
+              mapped.message,
+              { submittedEmail }
+            );
+          }
+        }
+
+        if (isAuthRetryableFetchError(error)) {
+          return err(
+            "SERVER",
+            "Something went wrong. Please try again later.",
+            { submittedEmail }
+          );
+        }
+
+        if (error.status !== undefined && error.status >= 500) {
+          return err(
+            "SERVER",
+            "Something went wrong. Please try again later.",
+            { submittedEmail }
+          );
+        }
+      } else {
+        log.warn(
+          { action: "login" },
+          "Login failed: no user returned without error"
+        );
+      }
 
       return err("AUTH", "Invalid email or password", {
         submittedEmail,
@@ -256,9 +303,7 @@ export async function signupAction(
     const supabase = await createClient();
 
     // Extract Turnstile CAPTCHA token for Supabase built-in verification
-    const captchaTokenEntry = formData.get("captchaToken");
-    const captchaToken =
-      typeof captchaTokenEntry === "string" ? captchaTokenEntry : undefined;
+    const captchaToken = extractCaptchaToken(formData);
 
     // Create user with Supabase Auth
     const { data, error } = await supabase.auth.signUp({
@@ -274,20 +319,34 @@ export async function signupAction(
     });
 
     if (error) {
-      // Check for duplicate email
-      if (error.message.includes("already registered")) {
-        log.warn(
-          { action: "signup", error: error.message },
-          "Signup failed: email already registered"
-        );
-
-        return err("EMAIL_TAKEN", "This email is already registered");
-      }
-
-      log.error(
-        { action: "signup", error: error.message },
+      log.warn(
+        authErrorLogContext(error, "signup"),
         "Signup failed: Supabase error"
       );
+
+      const mapped = getUserMessageForAuthError(error);
+      if (mapped) {
+        const signupCodes = new Set<string>([
+          "WEAK_PASSWORD",
+          "EMAIL_TAKEN",
+          "CAPTCHA",
+          "RATE_LIMIT",
+          "SERVER",
+          "VALIDATION",
+        ]);
+        if (signupCodes.has(mapped.code)) {
+          return err(
+            mapped.code as
+              | "WEAK_PASSWORD"
+              | "EMAIL_TAKEN"
+              | "CAPTCHA"
+              | "RATE_LIMIT"
+              | "SERVER"
+              | "VALIDATION",
+            mapped.message
+          );
+        }
+      }
 
       return err("SERVER", "An unexpected error occurred during signup");
     }
@@ -472,9 +531,7 @@ export async function forgotPasswordAction(
     const supabase = await createClient();
 
     // Extract Turnstile CAPTCHA token for Supabase built-in verification
-    const captchaTokenEntry = formData.get("captchaToken");
-    const captchaToken =
-      typeof captchaTokenEntry === "string" ? captchaTokenEntry : undefined;
+    const captchaToken = extractCaptchaToken(formData);
 
     const siteUrl = requireSiteUrl("forgot-password");
 
@@ -488,11 +545,19 @@ export async function forgotPasswordAction(
     });
 
     if (error) {
-      log.error(
-        { action: "forgot-password", error: error.message },
+      log.warn(
+        authErrorLogContext(error, "forgot-password"),
         "Password reset email failed"
       );
-      return err("SERVER", "Failed to send password reset email");
+
+      if (error.code === "captcha_failed") {
+        const mapped = getUserMessageForAuthError(error);
+        if (mapped) {
+          return err("CAPTCHA", mapped.message);
+        }
+      }
+
+      return ok(undefined);
     }
 
     log.info(
@@ -567,10 +632,30 @@ export async function resetPasswordAction(
     });
 
     if (error) {
-      log.error(
-        { userId: user.id, action: "reset-password", error: error.message },
+      log.warn(
+        authErrorLogContext(error, "reset-password"),
         "Password update failed"
       );
+
+      const mapped = getUserMessageForAuthError(error);
+      if (mapped) {
+        const resetCodes = new Set<string>([
+          "WEAK_PASSWORD",
+          "SAME_PASSWORD",
+          "SERVER",
+          "VALIDATION",
+        ]);
+        if (resetCodes.has(mapped.code)) {
+          return err(
+            mapped.code as
+              | "WEAK_PASSWORD"
+              | "SAME_PASSWORD"
+              | "SERVER"
+              | "VALIDATION",
+            mapped.message
+          );
+        }
+      }
 
       return err("SERVER", "Failed to update password");
     }

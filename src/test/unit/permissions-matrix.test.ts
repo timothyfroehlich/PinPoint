@@ -394,19 +394,22 @@ describe("Specific permission rules from design", () => {
   });
 
   describe("Admin", () => {
-    it("should only allow admin to access admin features", () => {
+    it("should only allow admin to access admin panel and manage roles", () => {
       expect(getPermission("admin.access", "guest")).toBe(false);
       expect(getPermission("admin.access", "member")).toBe(false);
       expect(getPermission("admin.access", "technician")).toBe(false);
       expect(getPermission("admin.access", "admin")).toBe(true);
 
-      expect(getPermission("admin.users.invite", "member")).toBe(false);
-      expect(getPermission("admin.users.invite", "technician")).toBe(false);
-      expect(getPermission("admin.users.invite", "admin")).toBe(true);
-
       expect(getPermission("admin.users.roles", "member")).toBe(false);
       expect(getPermission("admin.users.roles", "technician")).toBe(false);
       expect(getPermission("admin.users.roles", "admin")).toBe(true);
+    });
+
+    it("should allow technician and admin to invite users", () => {
+      expect(getPermission("admin.users.invite", "guest")).toBe(false);
+      expect(getPermission("admin.users.invite", "member")).toBe(false);
+      expect(getPermission("admin.users.invite", "technician")).toBe(true);
+      expect(getPermission("admin.users.invite", "admin")).toBe(true);
     });
   });
 });
