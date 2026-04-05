@@ -209,11 +209,11 @@ function TimelineItem({
 
   return (
     <div
-      className="group relative flex gap-3 md:gap-4"
+      className="group relative flex gap-3 @xl:gap-4"
       data-testid={`timeline-item-${event.id}`}
     >
       {/* Left: Marker (Fixed width track) */}
-      <div className="hidden w-16 flex-none flex-col items-center md:flex">
+      <div className="hidden w-16 flex-none flex-col items-center @xl:flex">
         {isSystem ? (
           <div className="relative z-10 flex size-10 items-center justify-center">
             <div className="size-2.5 rounded-full bg-border ring-4 ring-background" />
@@ -230,7 +230,7 @@ function TimelineItem({
       {/* Right: Content */}
       <div className="min-w-0 flex-1">
         {isSystem ? (
-          <div className="flex flex-col gap-0.5 py-1 pl-4 text-xs text-muted-foreground sm:pl-6">
+          <div className="flex flex-col gap-0.5 py-1 pl-4 text-xs text-muted-foreground @lg:pl-6">
             <div className="flex items-center gap-1.5">
               {event.author.id && (
                 <span
@@ -259,7 +259,7 @@ function TimelineItem({
         ) : (
           <div
             className={cn(
-              "rounded-lg border bg-card p-4 shadow-sm sm:p-6",
+              "rounded-lg border bg-card p-4 shadow-sm @lg:p-6",
               isIssue && "border-primary/30"
             )}
           >
@@ -441,10 +441,10 @@ export function IssueTimeline({
     <div className="flex-1 space-y-6" data-testid="issue-timeline">
       <div className="relative">
         {/* Continuous Vertical Line */}
-        <div className="absolute bottom-0 left-[34px] top-4 hidden w-px -translate-x-1/2 bg-border md:block" />
+        <div className="absolute bottom-0 left-[34px] top-4 hidden w-px -translate-x-1/2 bg-border @xl:block" />
 
         {/* Events List */}
-        <div className="relative flex flex-col space-y-4 md:space-y-6">
+        <div className="relative flex flex-col space-y-4 @xl:space-y-6">
           {allEvents.map((event, index) => (
             <React.Fragment key={event.id}>
               <TimelineItem
@@ -453,7 +453,7 @@ export function IssueTimeline({
                 userContext={userContext}
               />
               {index === 0 && ownerRequirements && machineName && (
-                <div className="hidden md:ml-20 md:block">
+                <div className="hidden @xl:ml-20 @xl:block">
                   <OwnerRequirementsCallout
                     ownerRequirements={ownerRequirements}
                     machineName={machineName}
@@ -465,7 +465,7 @@ export function IssueTimeline({
 
           {/* Delightful Empty State when no comments yet */}
           {noComments && (
-            <div className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center animate-in fade-in zoom-in duration-300 md:ml-20">
+            <div className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center animate-in fade-in zoom-in duration-300 @xl:ml-20">
               <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-muted">
                 <MessageSquare className="size-5 text-muted-foreground" />
               </div>
@@ -485,14 +485,14 @@ export function IssueTimeline({
         className="relative flex gap-4 pt-2"
         data-testid="issue-comment-form"
       >
-        <div className="hidden w-16 flex-none flex-col items-center md:flex">
+        <div className="hidden w-16 flex-none flex-col items-center @xl:flex">
           <Avatar className="relative z-10 size-10 border border-border/60 ring-4 ring-background">
             <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
               {currentUserInitials}
             </AvatarFallback>
           </Avatar>
         </div>
-        <div className="flex-1 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+        <div className="flex-1 rounded-lg border bg-card p-4 shadow-sm @lg:p-6">
           {currentUserRole === "unauthenticated" ? (
             <div
               className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-3 text-sm text-muted-foreground"

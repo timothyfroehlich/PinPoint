@@ -5,9 +5,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Home,
-  AlertTriangle,
-  Gamepad2,
   Plus,
   MoreVertical,
   HelpCircle,
@@ -24,6 +21,8 @@ import {
   SheetDescription,
 } from "~/components/ui/sheet";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
+import { isNavItemActive } from "~/components/layout/nav-utils";
+import { NAV_ITEMS } from "~/components/layout/nav-config";
 import type { UserRole } from "~/lib/types";
 
 interface BottomTabBarProps {
@@ -32,35 +31,15 @@ interface BottomTabBarProps {
   issuesPath?: string | undefined;
 }
 
-const mainTabs = [
-  { title: "Dashboard", href: "/dashboard", icon: Home },
-  { title: "Issues", href: "/issues", icon: AlertTriangle },
-  { title: "Machines", href: "/m", icon: Gamepad2 },
+const bottomTabs = [
+  ...NAV_ITEMS,
   { title: "Report", href: "/report", icon: Plus },
 ] as const;
 
-/** Returns true when the given tab should appear active for the current pathname. */
-function isTabActive(
-  tabHref: string,
-  pathname: string,
-  resolvedIssuesPath: string
-): boolean {
-  // Issue detail pages (/m/[initials]/i and /m/[initials]/i/[number]) belong to the Issues tab
-  const isIssuePage = /^\/m\/[^/]+\/i(\/|$)/.test(pathname);
-
-  const href = tabHref === "/issues" ? resolvedIssuesPath : tabHref;
-  const basePath = href.split("?")[0] ?? href;
-
-  if (basePath === "/m") {
-    // Machines tab: match /m/* but NOT issue detail pages
-    return pathname.startsWith("/m") && !isIssuePage;
-  }
-  if (basePath.startsWith("/issues")) {
-    // Issues tab: match /issues/* OR issue detail pages
-    return pathname.startsWith(basePath) || isIssuePage;
-  }
-  return pathname === basePath;
-}
+const tabBaseClass =
+  "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors min-h-[56px]";
+const sheetItemClass =
+  "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary";
 
 export function BottomTabBar({
   role,
@@ -69,9 +48,6 @@ export function BottomTabBar({
   const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
   const resolvedIssuesPath = issuesPath ?? "/issues";
-
-  const sheetItemClass =
-    "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary";
 
   return (
     <>
@@ -82,15 +58,19 @@ export function BottomTabBar({
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t border-primary/50 bg-card/90 backdrop-blur-sm shadow-[0_-4px_15px_color-mix(in_srgb,var(--color-primary)_25%,transparent)]"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        {mainTabs.map((tab) => {
+        {bottomTabs.map((tab) => {
           const href = tab.href === "/issues" ? resolvedIssuesPath : tab.href;
-          const active = isTabActive(tab.href, pathname, resolvedIssuesPath);
+          const active = isNavItemActive(
+            tab.href,
+            pathname,
+            resolvedIssuesPath
+          );
           return (
             <Link
               key={tab.href}
               href={href}
               className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors min-h-[56px]",
+                tabBaseClass,
                 active
                   ? "text-primary"
                   : "text-muted-foreground hover:text-primary"
@@ -108,7 +88,7 @@ export function BottomTabBar({
           type="button"
           onClick={() => setMoreOpen(true)}
           className={cn(
-            "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors min-h-[56px]",
+            tabBaseClass,
             moreOpen
               ? "text-primary"
               : "text-muted-foreground hover:text-primary"
@@ -150,16 +130,6 @@ export function BottomTabBar({
             </button>
 
             <Link
-              href="/help"
-              onClick={() => setMoreOpen(false)}
-              className={sheetItemClass}
-              data-testid="more-sheet-help"
-            >
-              <HelpCircle className="size-5 shrink-0" aria-hidden="true" />
-              <span>Help</span>
-            </Link>
-
-            <Link
               href="/whats-new"
               onClick={() => setMoreOpen(false)}
               className={sheetItemClass}
@@ -167,6 +137,16 @@ export function BottomTabBar({
             >
               <Sparkles className="size-5 shrink-0" aria-hidden="true" />
               <span>What&apos;s New</span>
+            </Link>
+
+            <Link
+              href="/help"
+              onClick={() => setMoreOpen(false)}
+              className={sheetItemClass}
+              data-testid="more-sheet-help"
+            >
+              <HelpCircle className="size-5 shrink-0" aria-hidden="true" />
+              <span>Help</span>
             </Link>
 
             <Link

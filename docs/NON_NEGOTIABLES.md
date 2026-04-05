@@ -337,6 +337,38 @@ trigger: always_on
 
 ---
 
+## Responsive Framework
+
+**CORE-RESP-001:** Two-layer responsive system
+
+- **Severity:** Critical
+- **Why:** Mixing viewport and container queries for the same layout decision creates unpredictable behavior and debugging complexity
+- **Do:** Viewport breakpoints (`md:`, `lg:`) for page structure; container queries (`@lg:`, `@xl:`) for component internals
+- **Don't:** `md:flex-row` on a component inside a variable-width container (use `@xl:flex-row`)
+
+**CORE-RESP-002:** No JavaScript viewport detection
+
+- **Severity:** High
+- **Why:** JS viewport checks create hydration mismatches, add resize listeners, and duplicate CSS's job
+- **Do:** Use Tailwind breakpoint classes or container queries
+- **Don't:** `window.innerWidth`, `window.matchMedia`, `useMediaQuery` hooks
+
+**CORE-RESP-003:** sm: is padding only
+
+- **Severity:** High
+- **Why:** `sm:` (640px) is too narrow for reliable layout shifts; `md:` (768px) is the primary pivot
+- **Do:** `sm:px-8`, `sm:gap-4`
+- **Don't:** `sm:grid-cols-2`, `sm:flex-row`, `hidden sm:block`
+
+**CORE-RESP-004:** Overflow testing required
+
+- **Severity:** High
+- **Why:** Horizontal overflow is invisible to Playwright visibility assertions but breaks the user experience
+- **Do:** Add route to `e2e/smoke/responsive-overflow.spec.ts` when creating a new page
+- **Don't:** Ship a new page without overflow coverage at both mobile and desktop viewports
+
+---
+
 ## Forbidden Patterns
 
 **Never Do These:**
@@ -402,6 +434,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑PERF‑001..002: Performance
 - CORE‑TEST‑001..005: Testing
 - CORE‑ARCH‑001..008: Architecture
+- CORE‑RESP‑001..004: Responsive framework
 
 **Cross-References:**
 

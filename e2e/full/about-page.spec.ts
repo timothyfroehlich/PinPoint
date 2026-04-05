@@ -10,19 +10,20 @@ import { STORAGE_STATE } from "../support/auth-state.js";
 test.describe("About Page - Authenticated", () => {
   test.use({ storageState: STORAGE_STATE.member });
 
-  test("authenticated user can navigate to About via sidebar", async ({
+  test("authenticated user can navigate to About via HelpMenu", async ({
     page,
   }, testInfo) => {
     const isMobile = testInfo.project.name.includes("Mobile");
 
     if (isMobile) {
-      // Mobile: no sidebar — navigate directly
+      // Mobile: no HelpMenu in header — navigate directly
       await page.goto("/about");
     } else {
+      // Desktop: About is in the HelpMenu dropdown
       await page.goto("/dashboard");
-      const desktopSidebar = page.locator("aside [data-testid='sidebar']");
-      await expect(desktopSidebar).toBeVisible();
-      await desktopSidebar.getByRole("link", { name: "About" }).click();
+      await expect(page.getByTestId("app-header")).toBeVisible();
+      await page.getByTestId("help-menu-trigger").click();
+      await page.getByRole("menuitem", { name: "About" }).click();
     }
 
     await expect(page).toHaveURL("/about");

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { User, Settings, LogOut, ChevronDown } from "lucide-react";
+import { User, Settings, LogOut, ChevronDown, Shield } from "lucide-react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import {
   DropdownMenu,
@@ -11,11 +11,14 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { logoutAction } from "~/app/(auth)/actions";
+import type { UserRole } from "~/lib/types/user";
 
 interface UserMenuProps {
   userName: string;
   /** Override the trigger's data-testid. Useful when rendered in multiple layout regions. */
   testId?: string;
+  /** User role — when "admin", shows Admin Panel link in dropdown. */
+  role?: UserRole | undefined;
 }
 
 /**
@@ -29,6 +32,7 @@ interface UserMenuProps {
 export function UserMenu({
   userName,
   testId = "user-menu-button",
+  role,
 }: UserMenuProps): React.JSX.Element {
   // Get user initials for avatar fallback
   const initials = userName
@@ -80,6 +84,23 @@ export function UserMenu({
           <span>Profile</span>
           <span className="ml-auto text-xs">(Soon)</span>
         </DropdownMenuItem>
+
+        {/* Admin Panel — visible to admins only */}
+        {role === "admin" && (
+          <>
+            <DropdownMenuItem asChild>
+              <a
+                href="/admin/users"
+                className="flex items-center cursor-pointer"
+                data-testid="user-menu-admin"
+              >
+                <Shield className="mr-2 size-4" />
+                <span>Admin Panel</span>
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-outline-variant" />
+          </>
+        )}
 
         {/* Settings */}
         <DropdownMenuItem asChild>

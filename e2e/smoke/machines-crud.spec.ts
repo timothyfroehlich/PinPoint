@@ -5,7 +5,12 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn, logout, loginAs } from "../support/actions";
+import {
+  assertNoHorizontalOverflow,
+  ensureLoggedIn,
+  logout,
+  loginAs,
+} from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import {
   seededMachines,
@@ -51,6 +56,9 @@ test.describe("Machines CRUD", () => {
     await expect(
       page.getByRole("link", { name: /Add Machine/i })
     ).toBeVisible();
+
+    // Verify no horizontal overflow on machines list page
+    await assertNoHorizontalOverflow(page);
 
     // Restore default user for subsequent tests to maintain isolation
     await logout(page, testInfo);

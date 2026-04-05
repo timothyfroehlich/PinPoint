@@ -25,6 +25,7 @@
 13. **Permissions Matrix Accuracy**: The permissions matrix (`matrix.ts`) must match actual server action enforcement. The help page auto-generates from the matrix — if it drifts, users see wrong information. Update both when changing auth logic.
 14. **Matrix-Only Permissions**: All permission checks MUST use `checkPermission()` from the matrix system (`~/lib/permissions/helpers`). No standalone permission functions outside `src/lib/permissions/`. The help page auto-generates from the matrix — if enforcement diverges, users see wrong information.
 15. **Process Safety**: NEVER kill processes system-wide. Do NOT run `pkill`, `killall`, use `kill` with PIDs obtained from broad selectors like `pgrep`, run `supabase stop --all`, or use any command that terminates services beyond your current worktree. Only stop services you explicitly started in your current session. Violating this destroys other agents' environments and the user's running work.
+16. **Two-Layer Responsive Framework**: Viewport breakpoints (`md:`, `lg:`) for page structure (show/hide sections, grid columns). Container queries (`@lg:`, `@xl:`) for component internals (flex direction, padding, column count). Never mix both for the same layout decision. No `window.innerWidth`, `useMediaQuery`, or `matchMedia` — use CSS. `sm:` is padding/spacing only. The sole documented exception is `use-table-responsive-columns` for IssueList (PP-rs9).
 
 ## 3. Agent Skills (Progressive Disclosure)
 

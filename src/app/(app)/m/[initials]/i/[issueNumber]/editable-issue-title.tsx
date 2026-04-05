@@ -84,7 +84,7 @@ export function EditableIssueTitle({
       <h1
         className={cn(
           "font-extrabold tracking-tight",
-          className ?? "text-3xl lg:text-4xl"
+          className ?? "text-3xl @3xl:text-4xl"
         )}
         title={title.length > 60 ? title : undefined}
       >
@@ -118,7 +118,7 @@ export function EditableIssueTitle({
           maxLength={100}
           className={cn(
             "h-auto py-1 font-extrabold tracking-tight",
-            className ?? "text-2xl lg:text-3xl"
+            className ?? "text-2xl @3xl:text-3xl"
           )}
           aria-label="Edit issue title"
           disabled={isPending}
@@ -135,7 +135,7 @@ export function EditableIssueTitle({
       <h1
         className={cn(
           "font-extrabold tracking-tight",
-          className ?? "text-3xl lg:text-4xl"
+          className ?? "text-3xl @3xl:text-4xl"
         )}
         title={title.length > 60 ? title : undefined}
       >

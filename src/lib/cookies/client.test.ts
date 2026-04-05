@@ -4,7 +4,6 @@ import {
   storeChangelogSeen,
   storeCookieConsent,
   storeLastIssuesPath,
-  storeSidebarCollapsed,
 } from "./client";
 
 describe("client cookie utilities", () => {
@@ -82,22 +81,6 @@ describe("client cookie utilities", () => {
     });
   });
 
-  describe("storeSidebarCollapsed", () => {
-    it("stores true as string", () => {
-      storeSidebarCollapsed(true);
-
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
-      expect(cookieString).toContain("sidebarCollapsed=true");
-    });
-
-    it("stores false as string", () => {
-      storeSidebarCollapsed(false);
-
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
-      expect(cookieString).toContain("sidebarCollapsed=false");
-    });
-  });
-
   describe("storeCookieConsent", () => {
     it("sets cookie with correct name and value", () => {
       storeCookieConsent();
@@ -134,8 +117,7 @@ describe("client cookie utilities", () => {
     it("returns true when consent cookie exists among other cookies", () => {
       Object.defineProperty(document, "cookie", {
         set: cookieSetter,
-        get: () =>
-          "sidebarCollapsed=false; cookieConsent=true; lastIssuesPath=%2Fissues",
+        get: () => "cookieConsent=true; lastIssuesPath=%2Fissues",
         configurable: true,
       });
 

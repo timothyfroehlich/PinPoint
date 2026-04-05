@@ -647,7 +647,7 @@ test.describe.serial("Email Notifications", () => {
 
     await expect(page).toHaveURL(issueUrlPattern);
 
-    // Ensure we are on the page before interacting with sidebar
+    // Ensure we are on the page before interacting with issue detail
     const titlePattern = issueTitle
       .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
       .replace(/\s+/g, "\\s+");

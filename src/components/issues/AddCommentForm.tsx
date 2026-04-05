@@ -78,12 +78,8 @@ export function AddCommentForm({
         </div>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <Button type="submit" size="sm" loading={isPending}>
-          Add Comment
-        </Button>
-
-        <div className="min-w-0 sm:max-w-[200px]">
+      <div className="flex flex-col gap-3 @xl:flex-row @xl:items-center @xl:justify-between @xl:gap-4">
+        <div className="min-w-0 @xl:max-w-[200px]">
           <ImageUploadButton
             issueId={issueId}
             currentCount={uploadedImages.length}
@@ -92,6 +88,10 @@ export function AddCommentForm({
             disabled={isPending}
           />
         </div>
+
+        <Button type="submit" size="sm" loading={isPending}>
+          Add Comment
+        </Button>
       </div>
       {state && !state.ok && (
         <p className="text-sm text-destructive">{state.message}</p>

@@ -274,7 +274,7 @@ export default async function IssueDetailPage({
       </div>
 
       <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="space-y-5 lg:pr-4">
+        <section className="@container space-y-5 lg:pr-4">
           {/* Activity Section */}
           <div className="space-y-5">
             <h2 className="hidden md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground">

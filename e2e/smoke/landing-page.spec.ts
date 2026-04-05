@@ -33,17 +33,9 @@ test.describe("Landing Page", () => {
     // Verify dashboard link
     await expect(page.getByTestId("cta-dashboard")).toBeVisible();
 
-    // Verify navigation elements in header (mobile or desktop header depending on viewport)
-    await expect(
-      page
-        .locator('[data-testid="nav-signup"],[data-testid="mobile-nav-signup"]')
-        .filter({ visible: true })
-    ).toBeVisible();
-    await expect(
-      page
-        .locator('[data-testid="nav-signin"],[data-testid="mobile-nav-signin"]')
-        .filter({ visible: true })
-    ).toBeVisible();
+    // Verify navigation elements in header (unified AppHeader — same testids on all viewports)
+    await expect(page.getByTestId("nav-signup")).toBeVisible();
+    await expect(page.getByTestId("nav-signin")).toBeVisible();
   });
 
   test("Browse Machines CTA is clickable and navigates", async ({ page }) => {

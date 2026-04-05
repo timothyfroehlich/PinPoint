@@ -5,13 +5,13 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions.js";
+import { assertNoHorizontalOverflow, loginAs } from "../support/actions.js";
 import { TEST_USERS } from "../support/constants.js";
 
 test.describe("Navigation", () => {
   test("unauthenticated navigation - show Sign In and Sign Up buttons", async ({
     page,
-  }, testInfo) => {
+  }) => {
     // Navigate to home page (landing page for unauthenticated users)
     await page.goto("/");
 
@@ -20,18 +20,9 @@ test.describe("Navigation", () => {
       page.getByRole("heading", { name: /Welcome to PinPoint/i })
     ).toBeVisible();
 
-    // Mobile shows compact header; desktop shows full header
-    const isMobile = testInfo.project.name.includes("Mobile");
-
-    if (isMobile) {
-      // Mobile header shows Sign In / Sign Up with mobile-specific test ids
-      await expect(page.getByTestId("mobile-nav-signin")).toBeVisible();
-      await expect(page.getByTestId("mobile-nav-signup")).toBeVisible();
-    } else {
-      // Desktop header Sign In / Sign Up
-      await expect(page.getByTestId("nav-signin")).toBeVisible();
-      await expect(page.getByTestId("nav-signup")).toBeVisible();
-    }
+    // AppHeader is unified — same testids on all viewports
+    await expect(page.getByTestId("nav-signin")).toBeVisible();
+    await expect(page.getByTestId("nav-signup")).toBeVisible();
 
     // Verify Report Issue CTA is available on landing page
     await expect(page.getByTestId("cta-report-issue")).toBeVisible();
@@ -46,40 +37,35 @@ test.describe("Navigation", () => {
     // Use project name to determine mobile vs desktop layout
     const isMobile = testInfo.project.name.includes("Mobile");
 
+    // AppHeader is always visible
+    const appHeader = page.getByTestId("app-header");
+    await expect(appHeader).toBeVisible();
+
     if (isMobile) {
-      // On mobile, verify the compact mobile header is visible
-      await expect(page.getByTestId("mobile-header")).toBeVisible();
       // Verify the notification bell is accessible on mobile
       await expect(
         page.getByRole("button", { name: "Notifications" })
       ).toBeVisible();
     } else {
-      // On desktop, sidebar should already be visible with nav links
-      const desktopSidebar = page.locator("aside [data-testid='sidebar']");
-      await expect(desktopSidebar).toBeVisible();
+      // On desktop, AppHeader should show nav links
       await expect(
-        desktopSidebar.getByRole("link", { name: "Dashboard" })
+        appHeader.getByRole("link", { name: "Dashboard" })
       ).toBeVisible();
       await expect(
-        desktopSidebar.getByRole("link", { name: "Issues" })
+        appHeader.getByRole("link", { name: "Issues" })
       ).toBeVisible();
       await expect(
-        desktopSidebar.getByRole("link", { name: "Machines" })
+        appHeader.getByRole("link", { name: "Machines" })
       ).toBeVisible();
 
-      // Verify Report Issue button is visible in desktop header
+      // Verify Report Issue button is visible in AppHeader on desktop
       await expect(
         page.getByRole("link", { name: "Report Issue" })
       ).toBeVisible();
     }
 
-    // Verify User Menu works on both mobile and desktop
-    // Mobile uses mobile-user-menu-button; desktop uses user-menu-button
-    const userMenu = page
-      .locator(
-        '[data-testid="user-menu-button"],[data-testid="mobile-user-menu-button"]'
-      )
-      .filter({ visible: true });
+    // Verify User Menu works on both mobile and desktop (unified AppHeader)
+    const userMenu = page.getByTestId("user-menu-button");
     await expect(userMenu).toBeVisible();
     await userMenu.click();
 
@@ -90,6 +76,10 @@ test.describe("Navigation", () => {
     await expect(
       menuContent.getByRole("menuitem", { name: "Sign Out" })
     ).toBeVisible();
+
+    // Close menu, then verify no horizontal overflow on dashboard
+    await page.keyboard.press("Escape");
+    await assertNoHorizontalOverflow(page);
   });
 });
 

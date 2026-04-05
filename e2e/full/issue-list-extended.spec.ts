@@ -166,7 +166,7 @@ test.describe("Issue List Features - Extended", () => {
     ).toBeVisible();
   });
 
-  test("should persist filters when using sidebar Issues link", async ({
+  test("should persist filters when using AppHeader Issues link", async ({
     page,
   }, testInfo) => {
     // 1. Go to issues and apply a search filter
@@ -180,8 +180,8 @@ test.describe("Issue List Features - Extended", () => {
     await expect(page).toHaveURL("/dashboard");
 
     // 3. Navigate to Issues - should preserve filters via cookie
-    // Desktop: click sidebar link (which reads issuesPath cookie)
-    // Mobile: navigate directly since sidebar is replaced by bottom tab bar
+    // Desktop: click AppHeader Issues link (which reads issuesPath cookie)
+    // Mobile: navigate directly since AppHeader hides nav links on mobile
     const isMobile = testInfo.project.name.includes("Mobile");
     if (isMobile) {
       await page.goto("/issues?q=Thing");
