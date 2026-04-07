@@ -2,7 +2,14 @@
 
 import type React from "react";
 import Link from "next/link";
-import { HelpCircle, MessageSquare, Sparkles, Info } from "lucide-react";
+import {
+  HelpCircle,
+  MessageSquare,
+  Sparkles,
+  Info,
+  Palette,
+  MonitorSmartphone,
+} from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -95,6 +102,31 @@ export function HelpMenu({
             <span>About</span>
           </Link>
         </DropdownMenuItem>
+        {process.env.NODE_ENV === "development" && (
+          <>
+            <DropdownMenuItem asChild className="cursor-pointer">
+              <Link
+                href="/dev/design-system"
+                className="flex w-full items-center"
+                data-testid="help-menu-design-system"
+              >
+                <Palette className="mr-2 size-4" />
+                <span>Design System</span>
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem asChild className="cursor-pointer">
+              <Link
+                href="/dev/preview"
+                className="flex w-full items-center"
+                data-testid="help-menu-preview"
+              >
+                <MonitorSmartphone className="mr-2 size-4" />
+                <span>Preview</span>
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
