@@ -2,8 +2,13 @@
 set -euo pipefail
 
 # Health check for the local development environment.
-# Polls every 0.5s until all services are up, with progressive output.
-# Times out after 60s.
+# Default: single check, prints status, exits immediately.
+# With --wait: polls every 0.5s until all services are up (timeout 90s).
+
+WAIT_MODE=false
+if [ "${1:-}" = "--wait" ]; then
+  WAIT_MODE=true
+fi
 
 # shellcheck source=/dev/null
 source .env.local 2>/dev/null || true
@@ -38,6 +43,39 @@ elif ! command -v pg_isready &>/dev/null; then
   echo "⚠️  Postgres       skipped (pg_isready not installed)"
 fi
 
+# --- Single-check mode (default) ---
+if [ "$WAIT_MODE" = false ]; then
+  if curl -sS --max-time 1 -o /dev/null "http://localhost:${PORT}" 2>/dev/null; then
+    nextjs_up=true
+    echo "✅ Next.js        http://localhost:${PORT}"
+  else
+    echo "❌ Next.js        http://localhost:${PORT} (start with: pnpm run dev)"
+  fi
+
+  if curl -fsS --max-time 1 "${SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1; then
+    supabase_up=true
+    echo "✅ Supabase API   ${SUPABASE_URL}"
+  else
+    echo "❌ Supabase API   ${SUPABASE_URL}"
+  fi
+
+  if [ "$postgres_up" = false ]; then
+    if pg_isready -d "$POSTGRES_URL" -t 1 >/dev/null 2>&1; then
+      postgres_up=true
+      echo "✅ Postgres"
+    else
+      echo "❌ Postgres       (check POSTGRES_URL)"
+    fi
+  fi
+
+  if [ "$nextjs_up" = true ] && [ "$supabase_up" = true ] && [ "$postgres_up" = true ]; then
+    exit 0
+  else
+    exit 1
+  fi
+fi
+
+# --- Wait mode (--wait) ---
 start_time=$SECONDS
 last_summary=0
 
