@@ -1,12 +1,11 @@
 import type React from "react";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { getLoginUrl } from "~/lib/url";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
-import { ArrowLeft } from "lucide-react";
 import { CreateMachineForm } from "./create-machine-form";
+import { PageContainer } from "~/components/layout/PageContainer";
+import { PageHeader } from "~/components/layout/PageHeader";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -56,28 +55,11 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   }));
 
   return (
-    <div className="max-w-6xl mx-auto py-10 space-y-6">
-      {/* Header */}
-      <div className="border-b border-outline-variant pb-6 flex items-center gap-4">
-        <Link href="/m">
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-outline text-on-surface hover:bg-surface-variant"
-          >
-            <ArrowLeft className="mr-2 size-4" />
-            Back
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold text-on-surface">
-            Add New Machine
-          </h1>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Create a new pinball machine entry
-          </p>
-        </div>
-      </div>
+    <PageContainer size="standard">
+      <PageHeader
+        title="New Machine"
+        breadcrumbs={[{ label: "Machines", href: "/m" }]}
+      />
 
       {/* Form */}
       <Card className="max-w-2xl border-outline-variant">
@@ -93,6 +75,6 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
           />
         </CardContent>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

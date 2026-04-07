@@ -15,10 +15,12 @@ import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
+import { PageContainer } from "~/components/layout/PageContainer";
 
 export const metadata = {
   title: "Help | PinPoint",
@@ -121,36 +123,35 @@ export default async function HelpPage(): Promise<React.JSX.Element> {
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-10">
-      <header className="mb-8 space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Help</h1>
-        <p className="text-sm text-muted-foreground">
-          Learn how to use PinPoint to report issues, track repairs, and keep
-          machines playable at Austin Pinball Collective.
-        </p>
-      </header>
+    <PageContainer size="narrow">
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="text-2xl">Help</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">Getting Started</h2>
+            <HelpCardGrid cards={gettingStartedCards} />
+          </section>
 
-      <section className="mb-8 space-y-4">
-        <h2 className="text-lg font-semibold">Getting Started</h2>
-        <HelpCardGrid cards={gettingStartedCards} />
-      </section>
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">Reference</h2>
+            <HelpCardGrid cards={referenceCards} />
+          </section>
 
-      <section className="mb-8 space-y-4">
-        <h2 className="text-lg font-semibold">Reference</h2>
-        <HelpCardGrid cards={referenceCards} />
-      </section>
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">Support</h2>
+            <HelpCardGrid cards={supportCards} />
+          </section>
 
-      <section className="mb-8 space-y-4">
-        <h2 className="text-lg font-semibold">Support</h2>
-        <HelpCardGrid cards={supportCards} />
-      </section>
-
-      {isAdmin && (
-        <section className="space-y-4 border-t pt-6">
-          <h2 className="text-lg font-semibold">Admin</h2>
-          <HelpCardGrid cards={adminCards} />
-        </section>
-      )}
-    </div>
+          {isAdmin && (
+            <section className="space-y-4 border-t pt-6">
+              <h2 className="text-lg font-semibold">Admin</h2>
+              <HelpCardGrid cards={adminCards} />
+            </section>
+          )}
+        </CardContent>
+      </Card>
+    </PageContainer>
   );
 }

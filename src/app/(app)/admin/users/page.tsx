@@ -1,5 +1,7 @@
 import { createClient } from "~/lib/supabase/server";
 import type React from "react";
+import { PageContainer } from "~/components/layout/PageContainer";
+import { PageHeader } from "~/components/layout/PageHeader";
 import {
   Table,
   TableBody,
@@ -11,7 +13,6 @@ import {
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { UserRoleSelect } from "./user-role-select";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { UserManagementHeader } from "./user-management-header";
 import { Badge } from "~/components/ui/badge";
 import { ResendInviteButton } from "./resend-invite-button";
 import { RemoveInvitedUserButton } from "./remove-invited-user-button";
@@ -102,8 +103,8 @@ export default async function AdminUsersPage(): Promise<React.JSX.Element> {
   const users = await getUnifiedUsers({ includeEmails: true });
 
   return (
-    <div className="max-w-6xl mx-auto py-10 space-y-6">
-      <UserManagementHeader />
+    <PageContainer size="standard">
+      <PageHeader title="User Management" />
 
       <div className="rounded-md border">
         <Table>
@@ -127,6 +128,6 @@ export default async function AdminUsersPage(): Promise<React.JSX.Element> {
           </TableBody>
         </Table>
       </div>
-    </div>
+    </PageContainer>
   );
 }
