@@ -12,6 +12,7 @@ interface IssuesExpandoProps {
   machineName: string;
   machineInitials: string;
   totalIssuesCount: number;
+  watchButton?: React.ReactNode;
 }
 
 export function IssuesExpando({
@@ -19,6 +20,7 @@ export function IssuesExpando({
   machineName,
   machineInitials,
   totalIssuesCount,
+  watchButton,
 }: IssuesExpandoProps): React.JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -45,6 +47,17 @@ export function IssuesExpando({
         {totalIssuesCount > issues.length && (
           <span className="text-sm text-on-surface-variant">
             of {totalIssuesCount} total
+          </span>
+        )}
+        {watchButton && (
+          <span
+            className="ml-auto"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            {watchButton}
           </span>
         )}
       </summary>

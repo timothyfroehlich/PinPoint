@@ -8,7 +8,6 @@ import React, {
   useCallback,
 } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
@@ -265,378 +264,359 @@ export function UnifiedReportForm({
     accessLevel === "member";
 
   return (
-    <div className="w-full max-w-5xl mx-auto">
-      <Card className="border-outline-variant bg-surface shadow-md">
-        <CardHeader className="space-y-1 pb-3 px-4 md:pb-4 md:px-6 border-b border-outline-variant/50">
-          <CardTitle className="text-xl md:text-2xl font-bold text-on-surface">
-            Report an Issue
-          </CardTitle>
-          <p className="text-sm text-on-surface-variant">
-            Tell us what&apos;s going on and the maintenance crew will take it
-            from here.
-          </p>
-        </CardHeader>
-        <CardContent className="p-3 md:p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Main Form Column */}
-            <div className="lg:col-span-7 space-y-3 md:space-y-4">
-              {(initialError ?? state.error) && (
-                <div
-                  role="alert"
-                  className="rounded-md border border-red-900/50 bg-red-900/20 px-4 py-2 text-sm text-red-300"
-                >
-                  {initialError ?? state.error}
-                </div>
-              )}
+    <div className="w-full">
+      <p className="text-sm text-on-surface-variant mb-6">
+        Tell us what&apos;s going on and the maintenance crew will take it from
+        here.
+      </p>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Main Form Column */}
+        <div className="lg:col-span-7 space-y-3 md:space-y-4">
+          {(initialError ?? state.error) && (
+            <div
+              role="alert"
+              className="rounded-md border border-red-900/50 bg-red-900/20 px-4 py-2 text-sm text-red-300"
+            >
+              {initialError ?? state.error}
+            </div>
+          )}
 
-              <form action={formAction} className="space-y-3 md:space-y-4">
-                {/* Honeypot field for bot detection */}
-                <input
-                  type="text"
-                  name="website"
-                  className="hidden"
-                  tabIndex={-1}
-                  autoComplete="off"
-                />
-                <div className="space-y-1.5">
-                  <Label htmlFor="machineId" className="text-on-surface">
-                    Machine *
-                  </Label>
-                  <select
-                    id="machineId"
-                    name="machineId"
-                    data-testid="machine-select"
-                    aria-label="Select Machine"
-                    required
-                    value={selectedMachineId}
-                    onChange={(e) => {
-                      const newId = e.target.value;
-                      setSelectedMachineId(newId);
-                      // Update URL silently without triggering navigation
-                      const machine = machinesList.find((m) => m.id === newId);
-                      if (machine) {
-                        const params = new URLSearchParams(
-                          searchParams.toString()
-                        );
-                        params.set("machine", machine.initials);
-                        window.history.replaceState(
-                          null,
-                          "",
-                          `?${params.toString()}`
-                        );
-                      }
-                    }}
-                    className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                  >
-                    <option value="" disabled>
-                      Select a machine...
-                    </option>
-                    {machinesList.map((machine) => (
-                      <option key={machine.id} value={machine.id}>
-                        {machine.name} ({machine.initials})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Mobile Recent Issues (Compact) - Visible only on small screens */}
-                <div className="lg:hidden">
-                  <RecentIssuesPanelClient
-                    machineInitials={selectedMachine?.initials ?? ""}
-                    issues={issues}
-                    isLoading={isLoadingIssues}
-                    isError={issuesError}
-                    className="border-0 bg-surface-container-low/50 shadow-none p-3"
-                    limit={3}
-                    defaultOpen
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="title" className="text-on-surface">
-                      Issue Title *
-                    </Label>
-                    <span
-                      className={cn(
-                        "text-xs text-muted-foreground transition-opacity duration-200",
-                        title.length < 40 && "opacity-0 select-none"
-                      )}
-                      aria-hidden={title.length < 40}
-                    >
-                      {60 - title.length}/60
-                    </span>
-                  </div>
-                  <Input
-                    id="title"
-                    name="title"
-                    required
-                    maxLength={60}
-                    placeholder="e.g., Left flipper not responding"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="h-9 border-outline-variant bg-surface text-on-surface focus:border-primary"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-on-surface">Description</Label>
-                  <RichTextEditor
-                    content={description}
-                    onChange={setDescription}
-                    mentionsEnabled={userAuthenticated}
-                    placeholder="Tell us what happened, and how often it occurs."
-                    ariaLabel="Description"
-                    className="min-h-[80px]"
-                  />
-                  <input
-                    type="hidden"
-                    name="description"
-                    value={description ? JSON.stringify(description) : ""}
-                  />
-                </div>
-
-                {/* Severity + Frequency: always side-by-side */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="severity" className="text-on-surface">
-                      Severity *
-                    </Label>
-                    <input type="hidden" name="severity" value={severity} />
-                    <SeveritySelect
-                      value={severity}
-                      onValueChange={setSeverity}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="frequency" className="text-on-surface">
-                      Frequency *
-                    </Label>
-                    <input type="hidden" name="frequency" value={frequency} />
-                    <FrequencySelect
-                      value={frequency}
-                      onValueChange={setFrequency}
-                      testId="issue-frequency-select"
-                    />
-                  </div>
-                </div>
-
-                {/* Priority + Status: always side-by-side when visible */}
-                {canSetWorkflowFields && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="priority" className="text-on-surface">
-                        Priority *
-                      </Label>
-                      <input type="hidden" name="priority" value={priority} />
-                      <PrioritySelect
-                        value={priority}
-                        onValueChange={setPriority}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="status" className="text-on-surface">
-                        Status *
-                      </Label>
-                      <input type="hidden" name="status" value={status} />
-                      <StatusSelect value={status} onValueChange={setStatus} />
-                    </div>
-                  </div>
-                )}
-
-                {/* Assign To: full-width */}
-                {canSetWorkflowFields && assignees.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="assignedTo" className="text-on-surface">
-                      Assign To
-                    </Label>
-                    <select
-                      id="assignedTo"
-                      name="assignedTo"
-                      data-testid="assigned-to-select"
-                      value={assignedTo}
-                      onChange={(e) => setAssignedTo(e.target.value)}
-                      className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                    >
-                      <option value="">Unassigned</option>
-                      {assignees.map((assignee) => (
-                        <option key={assignee.id} value={assignee.id}>
-                          {assignee.name ?? "Unnamed User"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Divider before photos */}
-                <div className="border-t border-outline-variant/30 pt-3 md:pt-4">
-                  <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <ImageUploadButton
-                        issueId="new"
-                        currentCount={uploadedImages.length}
-                        maxCount={userAuthenticated ? 4 : 2}
-                        onUploadComplete={(img) =>
-                          setUploadedImages((prev) => [...prev, img])
-                        }
-                        disabled={isPending}
-                      />
-                    </div>
-
-                    {uploadedImages.length > 0 && (
-                      <div>
-                        <ImageGallery
-                          images={uploadedImages.map((img) => ({
-                            id: img.blobPathname,
-                            fullImageUrl: img.blobUrl,
-                            originalFilename: img.originalFilename,
-                          }))}
-                        />
-                      </div>
-                    )}
-                    <input
-                      type="hidden"
-                      name="imagesMetadata"
-                      value={JSON.stringify(uploadedImages)}
-                    />
-                  </div>
-                </div>
-
-                {/* Reporter Info (Only if NOT logged in) */}
-                {!userAuthenticated && (
-                  <div className="space-y-2 pt-2">
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-semibold text-on-surface">
-                        Your Information (Optional)
-                      </h3>
-                    </div>
-                    <div className="space-y-2 rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label
-                            htmlFor="firstName"
-                            className="text-xs text-on-surface"
-                          >
-                            First Name
-                          </Label>
-                          <Input
-                            id="firstName"
-                            name="firstName"
-                            className="h-8 border-outline-variant bg-surface text-sm text-on-surface"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label
-                            htmlFor="lastName"
-                            className="text-xs text-on-surface"
-                          >
-                            Last Name
-                          </Label>
-                          <Input
-                            id="lastName"
-                            name="lastName"
-                            className="h-8 border-outline-variant bg-surface text-sm text-on-surface"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label
-                          htmlFor="email"
-                          className="text-xs text-on-surface"
-                        >
-                          Email Address
-                        </Label>
-                        <Input
-                          id="email"
-                          name="email"
-                          type="email"
-                          className="h-8 border-outline-variant bg-surface text-sm text-on-surface"
-                        />
-                        <p className="text-[10px] text-on-surface-variant leading-none">
-                          Verified emails link to your profile.
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-sm text-on-surface-variant pb-1">
-                      Already have an account?{" "}
-                      <Link
-                        href={getLoginUrl(
-                          selectedMachine
-                            ? `/report?machine=${selectedMachine.initials}`
-                            : "/report"
-                        )}
-                        className="text-link"
-                      >
-                        Log in
-                      </Link>
-                    </p>
-                  </div>
-                )}
-
-                {userAuthenticated && (
-                  <div className="flex items-start gap-3 py-1">
-                    <Checkbox
-                      id="watchIssue"
-                      checked={watchIssue}
-                      onCheckedChange={(checked) =>
-                        setWatchIssue(checked === true)
-                      }
-                      className="mt-0.5 border-outline-variant data-[state=checked]:border-primary"
-                    />
-                    <div className="space-y-0.5">
-                      <Label
-                        htmlFor="watchIssue"
-                        className="text-sm font-medium text-on-surface cursor-pointer"
-                      >
-                        Watch this issue
-                      </Label>
-                      <p className="text-xs text-on-surface-variant">
-                        Get updates when status or comments change.
-                      </p>
-                    </div>
-                    <input
-                      type="hidden"
-                      name="watchIssue"
-                      value={watchIssue ? "true" : "false"}
-                    />
-                  </div>
-                )}
-
-                <input
-                  type="hidden"
-                  name="cf-turnstile-response"
-                  value={turnstileToken}
-                />
-                <TurnstileWidget
-                  onVerify={handleTurnstileVerify}
-                  onExpire={() => setTurnstileToken("")}
-                />
-
-                <Button
-                  type="submit"
-                  className="w-full bg-primary text-on-primary hover:bg-primary/90 mt-1 h-10 text-sm font-semibold"
-                  loading={isPending}
-                >
-                  Submit Issue Report
-                </Button>
-              </form>
+          <form action={formAction} className="space-y-3 md:space-y-4">
+            {/* Honeypot field for bot detection */}
+            <input
+              type="text"
+              name="website"
+              className="hidden"
+              tabIndex={-1}
+              autoComplete="off"
+            />
+            <div className="space-y-1.5">
+              <Label htmlFor="machineId" className="text-on-surface">
+                Machine *
+              </Label>
+              <select
+                id="machineId"
+                name="machineId"
+                data-testid="machine-select"
+                aria-label="Select Machine"
+                required
+                value={selectedMachineId}
+                onChange={(e) => {
+                  const newId = e.target.value;
+                  setSelectedMachineId(newId);
+                  // Update URL silently without triggering navigation
+                  const machine = machinesList.find((m) => m.id === newId);
+                  if (machine) {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set("machine", machine.initials);
+                    window.history.replaceState(
+                      null,
+                      "",
+                      `?${params.toString()}`
+                    );
+                  }
+                }}
+                className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+              >
+                <option value="" disabled>
+                  Select a machine...
+                </option>
+                {machinesList.map((machine) => (
+                  <option key={machine.id} value={machine.id}>
+                    {machine.name} ({machine.initials})
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* Right Sidebar: Recent Issues (Desktop) */}
-            <div className="hidden lg:block lg:col-span-5 border-l border-outline-variant/50 pl-8">
+            {/* Mobile Recent Issues (Compact) - Visible only on small screens */}
+            <div className="lg:hidden">
               <RecentIssuesPanelClient
                 machineInitials={selectedMachine?.initials ?? ""}
                 issues={issues}
                 isLoading={isLoadingIssues}
                 isError={issuesError}
-                className="border-0 shadow-none bg-transparent p-0"
-                limit={5}
+                className="border-0 bg-surface-container-low/50 shadow-none p-3"
+                limit={3}
+                defaultOpen
               />
             </div>
-          </div>
-        </CardContent>
-      </Card>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="title" className="text-on-surface">
+                  Issue Title *
+                </Label>
+                <span
+                  className={cn(
+                    "text-xs text-muted-foreground transition-opacity duration-200",
+                    title.length < 40 && "opacity-0 select-none"
+                  )}
+                  aria-hidden={title.length < 40}
+                >
+                  {60 - title.length}/60
+                </span>
+              </div>
+              <Input
+                id="title"
+                name="title"
+                required
+                maxLength={60}
+                placeholder="e.g., Left flipper not responding"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="h-9 border-outline-variant bg-surface text-on-surface focus:border-primary"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-on-surface">Description</Label>
+              <RichTextEditor
+                content={description}
+                onChange={setDescription}
+                mentionsEnabled={userAuthenticated}
+                placeholder="Tell us what happened, and how often it occurs."
+                ariaLabel="Description"
+                className="min-h-[80px]"
+              />
+              <input
+                type="hidden"
+                name="description"
+                value={description ? JSON.stringify(description) : ""}
+              />
+            </div>
+
+            {/* Severity + Frequency: always side-by-side */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="severity" className="text-on-surface">
+                  Severity *
+                </Label>
+                <input type="hidden" name="severity" value={severity} />
+                <SeveritySelect value={severity} onValueChange={setSeverity} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="frequency" className="text-on-surface">
+                  Frequency *
+                </Label>
+                <input type="hidden" name="frequency" value={frequency} />
+                <FrequencySelect
+                  value={frequency}
+                  onValueChange={setFrequency}
+                  testId="issue-frequency-select"
+                />
+              </div>
+            </div>
+
+            {/* Priority + Status: always side-by-side when visible */}
+            {canSetWorkflowFields && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="priority" className="text-on-surface">
+                    Priority *
+                  </Label>
+                  <input type="hidden" name="priority" value={priority} />
+                  <PrioritySelect
+                    value={priority}
+                    onValueChange={setPriority}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="status" className="text-on-surface">
+                    Status *
+                  </Label>
+                  <input type="hidden" name="status" value={status} />
+                  <StatusSelect value={status} onValueChange={setStatus} />
+                </div>
+              </div>
+            )}
+
+            {/* Assign To: full-width */}
+            {canSetWorkflowFields && assignees.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="assignedTo" className="text-on-surface">
+                  Assign To
+                </Label>
+                <select
+                  id="assignedTo"
+                  name="assignedTo"
+                  data-testid="assigned-to-select"
+                  value={assignedTo}
+                  onChange={(e) => setAssignedTo(e.target.value)}
+                  className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                >
+                  <option value="">Unassigned</option>
+                  {assignees.map((assignee) => (
+                    <option key={assignee.id} value={assignee.id}>
+                      {assignee.name ?? "Unnamed User"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Divider before photos */}
+            <div className="border-t border-outline-variant/30 pt-3 md:pt-4">
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <ImageUploadButton
+                    issueId="new"
+                    currentCount={uploadedImages.length}
+                    maxCount={userAuthenticated ? 4 : 2}
+                    onUploadComplete={(img) =>
+                      setUploadedImages((prev) => [...prev, img])
+                    }
+                    disabled={isPending}
+                  />
+                </div>
+
+                {uploadedImages.length > 0 && (
+                  <div>
+                    <ImageGallery
+                      images={uploadedImages.map((img) => ({
+                        id: img.blobPathname,
+                        fullImageUrl: img.blobUrl,
+                        originalFilename: img.originalFilename,
+                      }))}
+                    />
+                  </div>
+                )}
+                <input
+                  type="hidden"
+                  name="imagesMetadata"
+                  value={JSON.stringify(uploadedImages)}
+                />
+              </div>
+            </div>
+
+            {/* Reporter Info (Only if NOT logged in) */}
+            {!userAuthenticated && (
+              <div className="space-y-2 pt-2">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-on-surface">
+                    Your Information (Optional)
+                  </h3>
+                </div>
+                <div className="space-y-2 rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="firstName"
+                        className="text-xs text-on-surface"
+                      >
+                        First Name
+                      </Label>
+                      <Input
+                        id="firstName"
+                        name="firstName"
+                        className="h-8 border-outline-variant bg-surface text-sm text-on-surface"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="lastName"
+                        className="text-xs text-on-surface"
+                      >
+                        Last Name
+                      </Label>
+                      <Input
+                        id="lastName"
+                        name="lastName"
+                        className="h-8 border-outline-variant bg-surface text-sm text-on-surface"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email" className="text-xs text-on-surface">
+                      Email Address
+                    </Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      className="h-8 border-outline-variant bg-surface text-sm text-on-surface"
+                    />
+                    <p className="text-[10px] text-on-surface-variant leading-none">
+                      Verified emails link to your profile.
+                    </p>
+                  </div>
+                </div>
+                <p className="text-sm text-on-surface-variant pb-1">
+                  Already have an account?{" "}
+                  <Link
+                    href={getLoginUrl(
+                      selectedMachine
+                        ? `/report?machine=${selectedMachine.initials}`
+                        : "/report"
+                    )}
+                    className="text-link"
+                  >
+                    Log in
+                  </Link>
+                </p>
+              </div>
+            )}
+
+            {userAuthenticated && (
+              <div className="flex items-start gap-3 py-1">
+                <Checkbox
+                  id="watchIssue"
+                  checked={watchIssue}
+                  onCheckedChange={(checked) => setWatchIssue(checked === true)}
+                  className="mt-0.5 border-outline-variant data-[state=checked]:border-primary"
+                />
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="watchIssue"
+                    className="text-sm font-medium text-on-surface cursor-pointer"
+                  >
+                    Watch this issue
+                  </Label>
+                  <p className="text-xs text-on-surface-variant">
+                    Get updates when status or comments change.
+                  </p>
+                </div>
+                <input
+                  type="hidden"
+                  name="watchIssue"
+                  value={watchIssue ? "true" : "false"}
+                />
+              </div>
+            )}
+
+            <input
+              type="hidden"
+              name="cf-turnstile-response"
+              value={turnstileToken}
+            />
+            <TurnstileWidget
+              onVerify={handleTurnstileVerify}
+              onExpire={() => setTurnstileToken("")}
+            />
+
+            <Button
+              type="submit"
+              className="w-full bg-primary text-on-primary hover:bg-primary/90 mt-1 h-10 text-sm font-semibold"
+              loading={isPending}
+            >
+              Submit Issue Report
+            </Button>
+          </form>
+        </div>
+
+        {/* Right Sidebar: Recent Issues (Desktop) */}
+        <div className="hidden lg:block lg:col-span-5 border-l border-outline-variant/50 pl-8">
+          <RecentIssuesPanelClient
+            machineInitials={selectedMachine?.initials ?? ""}
+            issues={issues}
+            isLoading={isLoadingIssues}
+            isError={issuesError}
+            className="border-0 shadow-none bg-transparent p-0"
+            limit={5}
+          />
+        </div>
+      </div>
     </div>
   );
 }

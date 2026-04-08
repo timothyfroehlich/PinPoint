@@ -21,7 +21,9 @@ import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { ArrowLeft, Calendar, Plus } from "lucide-react";
+import { Calendar, Plus } from "lucide-react";
+import { PageContainer } from "~/components/layout/PageContainer";
+import { PageHeader } from "~/components/layout/PageHeader";
 import { headers } from "next/headers";
 import { resolveRequestUrl } from "~/lib/url";
 import { MachineInfoDisplay } from "./machine-info-display";
@@ -209,73 +211,44 @@ export default async function MachineDetailPage({
   const isWatching = !!currentUserWatch;
   const watchMode = currentUserWatch?.watchMode ?? "notify";
 
+  const presenceBadge = !isOnTheFloor(machine.presenceStatus) ? (
+    <Badge
+      className={cn(
+        getMachinePresenceStyles(machine.presenceStatus),
+        "border px-3 py-1 text-sm font-semibold"
+      )}
+    >
+      {getMachinePresenceLabel(machine.presenceStatus)}
+    </Badge>
+  ) : null;
+
+  const watchButton = canWatch ? (
+    <WatchMachineButton
+      machineId={machine.id}
+      initialIsWatching={isWatching}
+      initialWatchMode={watchMode}
+    />
+  ) : null;
+
+  const reportIssueButton = (
+    <Button className="bg-primary text-on-primary hover:bg-primary/90" asChild>
+      <Link
+        href={`/report?machine=${machine.initials}`}
+        data-testid="machine-report-issue"
+      >
+        <Plus className="mr-2 size-4" />
+        Report Issue
+      </Link>
+    </Button>
+  );
+
   return (
-    <div className="max-w-6xl mx-auto py-10 space-y-6">
-      {/* Header */}
-      <div className="border-b border-outline-variant pb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/m">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-outline text-on-surface hover:bg-surface-variant"
-            >
-              <ArrowLeft className="mr-2 size-4" />
-              Back
-            </Button>
-          </Link>
-          <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-bold text-on-surface">
-                {machine.name}
-              </h1>
-              <Badge
-                data-testid="machine-status-badge"
-                className={cn(
-                  getMachineStatusStyles(machineStatus),
-                  "border px-3 py-1 text-sm font-semibold"
-                )}
-              >
-                {getMachineStatusLabel(machineStatus)}
-              </Badge>
-              {!isOnTheFloor(machine.presenceStatus) && (
-                <Badge
-                  className={cn(
-                    getMachinePresenceStyles(machine.presenceStatus),
-                    "border px-3 py-1 text-sm font-semibold"
-                  )}
-                >
-                  {getMachinePresenceLabel(machine.presenceStatus)}
-                </Badge>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-on-surface-variant">
-              Machine details and issue tracking
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          {canWatch && (
-            <WatchMachineButton
-              machineId={machine.id}
-              initialIsWatching={isWatching}
-              initialWatchMode={watchMode}
-            />
-          )}
-          <Button
-            className="bg-primary text-on-primary hover:bg-primary/90"
-            asChild
-          >
-            <Link
-              href={`/report?machine=${machine.initials}`}
-              data-testid="machine-report-issue"
-            >
-              <Plus className="mr-2 size-4" />
-              Report Issue
-            </Link>
-          </Button>
-        </div>
-      </div>
+    <PageContainer size="standard">
+      <PageHeader
+        title={machine.name}
+        titleAdornment={presenceBadge}
+        actions={reportIssueButton}
+      />
 
       {/* Content */}
       <div className="space-y-6">
@@ -410,8 +383,9 @@ export default async function MachineDetailPage({
           machineName={machine.name}
           machineInitials={machine.initials}
           totalIssuesCount={totalIssuesCount}
+          watchButton={watchButton}
         />
       </div>
-    </div>
+    </PageContainer>
   );
 }

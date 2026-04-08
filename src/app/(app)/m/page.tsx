@@ -32,6 +32,8 @@ import {
 } from "~/lib/machines/filters-queries";
 import { MachineFilters } from "~/components/machines/MachineFilters";
 import { getAccessLevel } from "~/lib/permissions/helpers";
+import { PageContainer } from "~/components/layout/PageContainer";
+import { PageHeader } from "~/components/layout/PageHeader";
 
 interface MachinesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -154,33 +156,25 @@ export default async function MachinesPage({
     filters.sort ?? "name_asc"
   );
 
-  return (
-    <div className="max-w-7xl mx-auto py-10 space-y-6">
-      {/* Header */}
-      <div className="border-b border-outline-variant pb-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-on-surface">Machines</h1>
-            <p className="mt-1 text-sm text-on-surface-variant">
-              Manage pinball machines and view their status
-            </p>
-          </div>
-          {(accessLevel === "admin" || accessLevel === "technician") && (
-            <Button
-              asChild
-              className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6"
-              data-testid="add-machine-button"
-            >
-              <Link href="/m/new">
-                <Plus className="mr-2 size-4" />
-                Add Machine
-              </Link>
-            </Button>
-          )}
-        </div>
+  const addMachineButton =
+    accessLevel === "admin" || accessLevel === "technician" ? (
+      <Button
+        asChild
+        className="bg-primary text-on-primary hover:bg-primary/90"
+        data-testid="add-machine-button"
+      >
+        <Link href="/m/new">
+          <Plus className="mr-2 size-4" />
+          Add Machine
+        </Link>
+      </Button>
+    ) : undefined;
 
-        <MachineFilters users={allUsers} filters={filters} />
-      </div>
+  return (
+    <PageContainer size="wide">
+      <PageHeader title="Machines" actions={addMachineButton} />
+
+      <MachineFilters users={allUsers} filters={filters} />
 
       {/* Content */}
       <div>
@@ -217,7 +211,7 @@ export default async function MachinesPage({
                     {(accessLevel === "admin" ||
                       accessLevel === "technician") && (
                       <Link href="/m/new">
-                        <Button className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6">
+                        <Button className="bg-primary text-on-primary hover:bg-primary/90">
                           <Plus className="mr-2 size-4" />
                           Add Your First Machine
                         </Button>
@@ -314,6 +308,6 @@ export default async function MachinesPage({
           </div>
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }

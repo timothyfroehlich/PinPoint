@@ -2,6 +2,7 @@ import type React from "react";
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { TermsContent } from "./terms-content";
+import { PageContainer } from "~/components/layout/PageContainer";
 
 export const metadata: Metadata = {
   title: "Terms of Service - PinPoint",
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
  */
 export default function TermsPage(): React.JSX.Element {
   return (
-    <div className="max-w-3xl mx-auto py-10 space-y-6">
+    <PageContainer size="narrow">
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-2xl">Terms of Service</CardTitle>
@@ -28,6 +29,6 @@ export default function TermsPage(): React.JSX.Element {
           <TermsContent />
         </CardContent>
       </Card>
-    </div>
+    </PageContainer>
   );
 }
