@@ -37,10 +37,11 @@ describe("PageContainer", () => {
     expect(container.firstChild).not.toHaveClass("max-w-7xl");
   });
 
-  it("always applies mx-auto, py-10 and space-y-6", () => {
+  it("always applies mx-auto, pt-6, pb-10 and space-y-6", () => {
     const { container } = render(<PageContainer>content</PageContainer>);
     expect(container.firstChild).toHaveClass("mx-auto");
-    expect(container.firstChild).toHaveClass("py-10");
+    expect(container.firstChild).toHaveClass("pt-6");
+    expect(container.firstChild).toHaveClass("pb-10");
     expect(container.firstChild).toHaveClass("space-y-6");
   });
 

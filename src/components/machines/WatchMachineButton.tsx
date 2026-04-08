@@ -12,7 +12,13 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "~/components/ui/dropdown-menu";
-import { Eye, EyeOff, Loader2, Check } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
+import { Bell, BellRing, BellOff, Loader2 } from "lucide-react";
 import {
   toggleMachineWatcherAction,
   updateMachineWatchModeAction,
@@ -70,45 +76,64 @@ export function WatchMachineButton({
 
   if (!isWatching) {
     return (
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={isPending}
-        onClick={() => {
-          handleToggleWatch();
-        }}
-        className="border-outline text-on-surface hover:bg-surface-variant"
-      >
-        {isPending ? (
-          <Loader2 className="mr-2 size-4 animate-spin" />
-        ) : (
-          <Eye className="mr-2 size-4" />
-        )}
-        Watch Machine
-      </Button>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={isPending}
+              onClick={() => {
+                handleToggleWatch();
+              }}
+              className="text-on-surface-variant hover:bg-surface-variant"
+            >
+              {isPending ? (
+                <Loader2 className="mr-1.5 size-4 animate-spin" />
+              ) : (
+                <Bell className="mr-1.5 size-4" />
+              )}
+              Watch
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Get notified when new issues are reported on this machine</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     );
   }
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={isPending}
-          className="bg-secondary text-on-secondary hover:bg-secondary/90"
-        >
-          {isPending ? (
-            <Loader2 className="mr-2 size-4 animate-spin" />
-          ) : (
-            <Check className="mr-2 size-4" />
-          )}
-          Watching
-          <span className="ml-1 text-[10px] opacity-70">
-            ({watchMode === "subscribe" ? "Full" : "Notify"})
-          </span>
-        </Button>
-      </DropdownMenuTrigger>
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={isPending}
+                className="text-on-surface hover:bg-surface-variant"
+              >
+                {isPending ? (
+                  <Loader2 className="mr-1.5 size-4 animate-spin" />
+                ) : (
+                  <BellRing className="mr-1.5 size-4" />
+                )}
+                Watching
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>
+              {watchMode === "subscribe"
+                ? "Auto-watching all new issues on this machine"
+                : "Notified when new issues are reported"}
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>Watch Mode</DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -145,7 +170,7 @@ export function WatchMachineButton({
           }}
           className="text-destructive focus:text-destructive py-2"
         >
-          <EyeOff className="mr-2 size-4" />
+          <BellOff className="mr-2 size-4" />
           Stop watching
         </DropdownMenuItem>
       </DropdownMenuContent>

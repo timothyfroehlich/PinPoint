@@ -21,7 +21,11 @@ export function PageContainer({
 }: PageContainerProps): React.JSX.Element {
   return (
     <div
-      className={cn("mx-auto py-10 space-y-6", sizeClasses[size], className)}
+      className={cn(
+        "mx-auto pt-6 pb-10 space-y-6",
+        sizeClasses[size],
+        className
+      )}
     >
       {children}
     </div>

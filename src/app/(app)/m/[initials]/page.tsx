@@ -211,18 +211,6 @@ export default async function MachineDetailPage({
   const isWatching = !!currentUserWatch;
   const watchMode = currentUserWatch?.watchMode ?? "notify";
 
-  const statusBadge = (
-    <Badge
-      data-testid="machine-status-badge"
-      className={cn(
-        getMachineStatusStyles(machineStatus),
-        "border px-3 py-1 text-sm font-semibold"
-      )}
-    >
-      {getMachineStatusLabel(machineStatus)}
-    </Badge>
-  );
-
   const presenceBadge = !isOnTheFloor(machine.presenceStatus) ? (
     <Badge
       className={cn(
@@ -258,19 +246,8 @@ export default async function MachineDetailPage({
     <PageContainer size="standard">
       <PageHeader
         title={machine.name}
-        breadcrumbs={[{ label: "Machines", href: "/m" }]}
-        titleAdornment={
-          <>
-            {statusBadge}
-            {presenceBadge}
-          </>
-        }
-        actions={
-          <>
-            {watchButton}
-            {reportIssueButton}
-          </>
-        }
+        titleAdornment={presenceBadge}
+        actions={reportIssueButton}
       />
 
       {/* Content */}
@@ -406,6 +383,7 @@ export default async function MachineDetailPage({
           machineName={machine.name}
           machineInitials={machine.initials}
           totalIssuesCount={totalIssuesCount}
+          watchButton={watchButton}
         />
       </div>
     </PageContainer>

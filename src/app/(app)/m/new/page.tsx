@@ -56,10 +56,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
 
   return (
     <PageContainer size="standard">
-      <PageHeader
-        title="New Machine"
-        breadcrumbs={[{ label: "Machines", href: "/m" }]}
-      />
+      <PageHeader title="New Machine" />
 
       {/* Form */}
       <Card className="max-w-2xl border-outline-variant">

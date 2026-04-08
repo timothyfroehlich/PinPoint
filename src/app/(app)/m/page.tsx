@@ -160,7 +160,7 @@ export default async function MachinesPage({
     accessLevel === "admin" || accessLevel === "technician" ? (
       <Button
         asChild
-        className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6"
+        className="bg-primary text-on-primary hover:bg-primary/90"
         data-testid="add-machine-button"
       >
         <Link href="/m/new">
