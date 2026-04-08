@@ -47,9 +47,9 @@ Shows the last 5 completed runs on main. Flag any `conclusion == "failure"`.
 ### Group D: New GitHub Issues (last 5 days)
 
 ```bash
-gh issue list --state open --sort created --limit 20 \
-  --json number,title,createdAt,body \
-  --jq '[.[] | select(.createdAt > (now - 432000 | todate))]'
+gh issue list --state open --limit 20 \
+  --json number,title,createdAt \
+  --jq '[.[] | select(.createdAt > ((now - 432000) | todate))] | .[] | "#\(.number) \(.title) (\(.createdAt | split("T")[0]))"'
 ```
 
 User-reported bugs and feature requests. Cross-reference with beads — flag any not yet tracked.
