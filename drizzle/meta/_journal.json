@@ -162,6 +162,13 @@
       "when": 1772991974319,
       "tag": "0022_curvy_guardsmen",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1775619436307,
+      "tag": "0023_glorious_warbound",
+      "breakpoints": true
     }
   ]
 }
