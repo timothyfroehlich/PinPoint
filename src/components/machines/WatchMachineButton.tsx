@@ -82,12 +82,6 @@ export function WatchMachineButton({
     <Bell className="mr-1.5 size-4" />
   );
 
-  const tooltipText = !isWatching
-    ? "Get notified when new issues are reported on this machine"
-    : watchMode === "subscribe"
-      ? "Auto-watching all new issues on this machine"
-      : "Notified when new issues are reported";
-
   if (!isWatching) {
     return (
       <TooltipProvider delayDuration={300}>
@@ -105,7 +99,7 @@ export function WatchMachineButton({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{tooltipText}</p>
+            <p>Get notified when new issues are reported on this machine</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -113,63 +107,54 @@ export function WatchMachineButton({
   }
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={isPending}
-                className="text-on-surface hover:bg-surface-variant"
-              >
-                {icon}
-                Watching
-              </Button>
-            </DropdownMenuTrigger>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{tooltipText}</p>
-          </TooltipContent>
-        </Tooltip>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>Watch Mode</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuRadioGroup
-            value={watchMode}
-            onValueChange={handleModeChange}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={isPending}
+          className="text-on-surface hover:bg-surface-variant"
+        >
+          {icon}
+          Watching
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Watch Mode</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup
+          value={watchMode}
+          onValueChange={handleModeChange}
+        >
+          <DropdownMenuRadioItem
+            value="notify"
+            className="flex flex-col items-start gap-0.5 py-2"
           >
-            <DropdownMenuRadioItem
-              value="notify"
-              className="flex flex-col items-start gap-0.5 py-2"
-            >
-              <span className="font-medium">Notify only</span>
-              <span className="text-[10px] text-muted-foreground">
-                New issues only
-              </span>
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem
-              value="subscribe"
-              className="flex flex-col items-start gap-0.5 py-2"
-            >
-              <span className="font-medium">Full subscribe</span>
-              <span className="text-[10px] text-muted-foreground">
-                Auto-watch all new issues
-              </span>
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
+            <span className="font-medium">Notify only</span>
+            <span className="text-[10px] text-muted-foreground">
+              New issues only
+            </span>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem
+            value="subscribe"
+            className="flex flex-col items-start gap-0.5 py-2"
+          >
+            <span className="font-medium">Full subscribe</span>
+            <span className="text-[10px] text-muted-foreground">
+              Auto-watch all new issues
+            </span>
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
 
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={handleToggleWatch}
-            className="text-destructive focus:text-destructive py-2"
-          >
-            <BellOff className="mr-2 size-4" />
-            Stop watching
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </TooltipProvider>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={handleToggleWatch}
+          className="text-destructive focus:text-destructive py-2"
+        >
+          <BellOff className="mr-2 size-4" />
+          Stop watching
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
