@@ -43,4 +43,23 @@ describe("generateCsv", () => {
     const result = generateCsv(["A", "B"], [["", "val"]]);
     expect(result).toContain(",val");
   });
+
+  it("neutralizes formula injection characters", () => {
+    const result = generateCsv(
+      ["Col"],
+      [["=SUM(A1)"], ["+cmd"], ["-data"], ["@import"]]
+    );
+    const lines = result.split("\r\n");
+    expect(lines[1]).toBe("'=SUM(A1)");
+    expect(lines[2]).toBe("'+cmd");
+    expect(lines[3]).toBe("'-data");
+    expect(lines[4]).toBe("'@import");
+  });
+
+  it("does not prefix normal fields with single quote", () => {
+    const result = generateCsv(["Col"], [["normal text"], ["123"]]);
+    const lines = result.split("\r\n");
+    expect(lines[1]).toBe("normal text");
+    expect(lines[2]).toBe("123");
+  });
 });

@@ -77,14 +77,15 @@ export async function exportIssuesAction(input: {
   // 3. Parse filters
   let filters: IssueFilters = {};
   if (filtersJson) {
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(filtersJson) as unknown;
-      const filterValidation = exportFiltersSchema.safeParse(parsed);
-      if (filterValidation.success) {
-        filters = filterValidation.data;
-      }
+      parsed = JSON.parse(filtersJson) as unknown;
     } catch {
-      // Invalid JSON — proceed with no filters (export all)
+      return err("VALIDATION", "Invalid filter data.");
+    }
+    const filterValidation = exportFiltersSchema.safeParse(parsed);
+    if (filterValidation.success) {
+      filters = filterValidation.data;
     }
   }
 
@@ -94,6 +95,8 @@ export async function exportIssuesAction(input: {
     // Machine page exports ALL issues (no default status filter)
     // Set status to empty array to mean "all statuses"
     filters.status = [];
+    // Machine detail pages can show machines regardless of presence status
+    filters.includeInactiveMachines = true;
   }
 
   // Add currentUserId for watching filter

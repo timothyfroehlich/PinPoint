@@ -5,20 +5,34 @@
 const BOM = "\uFEFF";
 
 /**
+ * Neutralize spreadsheet formula injection.
+ * Cells starting with =, +, -, or @ can be interpreted as formulas
+ * by Excel/Google Sheets. Prefix with a single quote to force text mode.
+ */
+function sanitizeFormulaInjection(field: string): string {
+  if (field.length > 0 && "=+-@".includes(field[0]!)) {
+    return `'${field}`;
+  }
+  return field;
+}
+
+/**
  * Escape a single CSV field per RFC 4180:
+ * - Neutralize formula injection for spreadsheet safety
  * - If the field contains a comma, double-quote, or newline, wrap it in double quotes
  * - Double any existing double quotes
  */
 function escapeField(field: string): string {
+  const sanitized = sanitizeFormulaInjection(field);
   if (
-    field.includes(",") ||
-    field.includes('"') ||
-    field.includes("\n") ||
-    field.includes("\r")
+    sanitized.includes(",") ||
+    sanitized.includes('"') ||
+    sanitized.includes("\n") ||
+    sanitized.includes("\r")
   ) {
-    return `"${field.replace(/"/g, '""')}"`;
+    return `"${sanitized.replace(/"/g, '""')}"`;
   }
-  return field;
+  return sanitized;
 }
 
 /**
