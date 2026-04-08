@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
 import { ilike, inArray, or, type SQL } from "drizzle-orm";
-
-import { db } from "~/server/db";
-
-export const dynamic = "force-dynamic";
 import { log } from "~/lib/logger";
 import {
   issues,
@@ -12,6 +8,8 @@ import {
   userProfiles,
   authUsers,
 } from "~/server/db/schema";
+
+export const dynamic = "force-dynamic";
 
 interface CleanupPayload {
   issueIds?: unknown;
@@ -57,6 +55,9 @@ export async function POST(request: Request): Promise<Response> {
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  // Lazy import to avoid loading db module during build
+  const { db } = await import("~/server/db");
 
   let payload: CleanupPayload;
   try {
