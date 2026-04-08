@@ -13,6 +13,7 @@ interface IssuesExpandoProps {
   machineName: string;
   machineInitials: string;
   totalIssuesCount: number;
+  watchButton?: React.ReactNode;
 }
 
 export function IssuesExpando({
@@ -20,6 +21,7 @@ export function IssuesExpando({
   machineName,
   machineInitials,
   totalIssuesCount,
+  watchButton,
 }: IssuesExpandoProps): React.JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -49,12 +51,19 @@ export function IssuesExpando({
           </span>
         )}
         <div
-          className="ml-auto"
-          onClick={(e) => e.stopPropagation()}
+          className="ml-auto flex items-center gap-2"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+            }
           }}
         >
+          {watchButton}
           <ExportButton machineInitials={machineInitials} />
         </div>
       </summary>

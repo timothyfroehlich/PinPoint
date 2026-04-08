@@ -4,6 +4,8 @@ import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
 import { MainLayout } from "~/components/layout/MainLayout";
 import { resolveDefaultMachineId } from "./default-machine";
+import { PageContainer } from "~/components/layout/PageContainer";
+import { PageHeader } from "~/components/layout/PageHeader";
 import { UnifiedReportForm } from "./unified-report-form";
 import { createClient } from "~/lib/supabase/server";
 import { getAccessLevel } from "~/lib/permissions/helpers";
@@ -80,7 +82,8 @@ export default async function PublicReportPage({
 
   return (
     <MainLayout>
-      <div className="container mx-auto max-w-5xl py-4 px-2 md:py-8 md:px-4">
+      <PageContainer size="standard">
+        <PageHeader title="Report an Issue" />
         {/* CORE-SEC-006: Pass minimal user shape, not full Supabase user */}
         <UnifiedReportForm
           machinesList={machinesList}
@@ -92,7 +95,7 @@ export default async function PublicReportPage({
           initialIssues={initialIssues}
           initialMachineInitials={selectedMachine?.initials ?? ""}
         />
-      </div>
+      </PageContainer>
     </MainLayout>
   );
 }

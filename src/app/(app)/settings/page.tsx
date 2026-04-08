@@ -15,6 +15,8 @@ import { NotificationPreferencesForm } from "./notifications/notification-prefer
 import { ChangePasswordSection } from "./change-password-section";
 import { DeleteAccountSection } from "./delete-account-section";
 import { Separator } from "~/components/ui/separator";
+import { PageContainer } from "~/components/layout/PageContainer";
+import { PageHeader } from "~/components/layout/PageHeader";
 export default async function SettingsPage(): Promise<React.JSX.Element> {
   const supabase = await createClient();
   const {
@@ -79,13 +81,8 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     )[0]?.count === 0;
 
   return (
-    <div className="max-w-3xl mx-auto py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your profile and application preferences.
-        </p>
-      </div>
+    <PageContainer size="narrow">
+      <PageHeader title="Settings" />
 
       <div className="space-y-6">
         <div>
@@ -154,6 +151,6 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
           />
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

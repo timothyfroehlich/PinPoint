@@ -26,6 +26,8 @@ import type { Issue } from "~/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { IssueCard } from "~/components/issues/IssueCard";
 import { OrganizationBanner } from "~/components/dashboard/OrganizationBanner";
+import { PageContainer } from "~/components/layout/PageContainer";
+import { PageHeader } from "~/components/layout/PageHeader";
 
 /**
  * Cached dashboard data fetcher (CORE-PERF-001)
@@ -268,7 +270,8 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
   } = data;
 
   return (
-    <div className="max-w-6xl mx-auto py-10 space-y-6">
+    <PageContainer size="standard">
+      <PageHeader title="Dashboard" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Stats + Organization Banner Row */}
         <div className="lg:col-span-3">
@@ -510,6 +513,6 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
           )}
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }
