@@ -83,7 +83,7 @@ test.describe("Machines CRUD", () => {
     await expect(page.getByText("403")).toBeVisible();
     await expect(page.getByText("Access Denied")).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Add New Machine" })
+      page.getByRole("heading", { name: "New Machine" })
     ).not.toBeVisible();
   });
 
