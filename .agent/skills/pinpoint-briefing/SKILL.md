@@ -29,8 +29,9 @@ Covers: open PRs (CI + Copilot + merge), worktree health, beads ready/in-progres
 ### Group B: Security Audit
 
 ```bash
+bash -c 'set -o pipefail
 pnpm audit --audit-level=moderate 2>&1 | tail -20
-pnpm outdated 2>&1 | head -30
+pnpm outdated 2>&1 | head -30'
 ```
 
 `pnpm audit` catches CVEs not yet in Dependabot. `pnpm outdated` flags major bumps worth a scheduled update.
@@ -38,8 +39,8 @@ pnpm outdated 2>&1 | head -30
 ### Group C: Main Branch CI
 
 ```bash
-gh run list --branch main --limit 10 --json status,conclusion,name,createdAt,url \
-  --jq '[.[] | select(.status == "completed")] | .[0:5]'
+gh run list --branch main --status completed --limit 5 \
+  --json status,conclusion,name,createdAt,url
 ```
 
 Shows the last 5 completed runs on main. Flag any `conclusion == "failure"`.
