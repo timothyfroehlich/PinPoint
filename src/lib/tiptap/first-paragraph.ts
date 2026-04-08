@@ -33,8 +33,9 @@ export function extractFirstParagraph(
 }
 
 /**
- * Recursively extract plain text from ProseMirror nodes,
+ * Extract plain text from ProseMirror nodes,
  * ignoring all marks (bold, italic, links, etc.).
+ * Handles text, mentions, and hard breaks in the given node array.
  */
 function extractTextFromNodes(nodes: ProseMirrorNode[]): string {
   const parts: string[] = [];
