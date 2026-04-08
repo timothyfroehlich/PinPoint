@@ -41,6 +41,7 @@ If your tool does not support skills, read the file path directly.
 | **Testing**    | `pinpoint-e2e`                   | `.agent/skills/pinpoint-e2e/SKILL.md`                   | E2E tests, worker isolation, stability patterns.                                              |
 | **Security**   | `pinpoint-security`              | `.agent/skills/pinpoint-security/SKILL.md`              | Auth flows, CSP, Zod validation, Supabase SSR.                                                |
 | **Patterns**   | `pinpoint-patterns`              | `.agent/skills/pinpoint-patterns/SKILL.md`              | Server Actions, architecture, data fetching.                                                  |
+| **Workflow**   | `pinpoint-briefing`              | `.agent/skills/pinpoint-briefing/SKILL.md`              | Session start health review: Sentry, PRs, main CI, new issues, audit, beads triage.           |
 | **Workflow**   | `pinpoint-commit`                | `.agent/skills/pinpoint-commit/SKILL.md`                | Intelligent commit-to-PR workflow and CI monitoring.                                          |
 | **Workflow**   | `pinpoint-ready-to-review`       | `.agent/skills/pinpoint-ready-to-review/SKILL.md`       | CI green + Copilot comments addressed + label applied. Use standalone when PR already exists. |
 | **Workflow**   | `pinpoint-github-monitor`        | `.agent/skills/pinpoint-github-monitor/SKILL.md`        | Monitoring GitHub Actions and build status.                                                   |
