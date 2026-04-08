@@ -158,6 +158,10 @@ export default async function IssuesPage({
     <PageContainer size="wide">
       <PageHeader title="All Issues" />
 
+      <p className="text-sm text-muted-foreground">
+        Showing {issuesList.length} of {totalCount} issues
+      </p>
+
       <div className="space-y-6">
         {/* Filters */}
         <IssueFilters
