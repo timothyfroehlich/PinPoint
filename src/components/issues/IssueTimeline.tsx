@@ -46,7 +46,7 @@ import { type ProseMirrorDoc, docToPlainText } from "~/lib/tiptap/types";
 import {
   formatTimelineEvent,
   type TimelineEventData,
-} from "~/lib/timeline/events";
+} from "~/lib/timeline/types";
 
 // ----------------------------------------------------------------------
 // Types
