@@ -43,6 +43,10 @@ import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirement
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import { type ProseMirrorDoc, docToPlainText } from "~/lib/tiptap/types";
+import {
+  formatTimelineEvent,
+  type TimelineEventData,
+} from "~/lib/timeline/events";
 
 // ----------------------------------------------------------------------
 // Types
@@ -62,6 +66,7 @@ interface TimelineEvent {
   createdAt: Date;
   updatedAt: Date;
   content: ProseMirrorDoc | null;
+  eventData?: TimelineEventData | null;
   images?: IssueImage[];
   isSystem: boolean;
 }
@@ -250,11 +255,13 @@ function TimelineItem({
                 {formatDistanceToNow(event.createdAt, { addSuffix: true })}
               </span>
             </div>
-            {event.content && (
-              <div className="leading-relaxed text-foreground/80">
-                {docToPlainText(event.content)}
-              </div>
-            )}
+            <div className="leading-relaxed text-foreground/80">
+              {event.eventData
+                ? formatTimelineEvent(event.eventData)
+                : event.content
+                  ? docToPlainText(event.content)
+                  : null}
+            </div>
           </div>
         ) : (
           <div
@@ -426,6 +433,7 @@ export function IssueTimeline({
       createdAt: new Date(c.createdAt),
       updatedAt: new Date(c.updatedAt),
       content: c.content,
+      eventData: c.eventData,
       images: c.images,
       isSystem: c.isSystem,
     };
