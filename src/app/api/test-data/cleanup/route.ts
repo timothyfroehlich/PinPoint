@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { ilike, inArray, or, type SQL } from "drizzle-orm";
 
 import { db } from "~/server/db";
+
+export const dynamic = "force-dynamic";
 import { log } from "~/lib/logger";
 import {
   issues,
