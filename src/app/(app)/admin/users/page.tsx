@@ -2,6 +2,7 @@ import { createClient } from "~/lib/supabase/server";
 import type React from "react";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
+import { InviteUserButton } from "./invite-user-button";
 import {
   Table,
   TableBody,
@@ -104,7 +105,7 @@ export default async function AdminUsersPage(): Promise<React.JSX.Element> {
 
   return (
     <PageContainer size="standard">
-      <PageHeader title="User Management" />
+      <PageHeader title="User Management" actions={<InviteUserButton />} />
 
       <div className="rounded-md border">
         <Table>

@@ -21,7 +21,7 @@ export function PageHeader({
           <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
           {titleAdornment}
         </div>
-        {actions !== undefined && (
+        {actions != null && (
           <div className="flex items-center gap-3">{actions}</div>
         )}
       </div>

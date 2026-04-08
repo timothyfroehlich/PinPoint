@@ -41,6 +41,11 @@ describe("PageHeader", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("does not render actions container when actions is null", () => {
+    render(<PageHeader title="My Page" actions={null} />);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
   it("merges additional className", () => {
     const { container } = render(
       <PageHeader title="Test" className="extra-class" />

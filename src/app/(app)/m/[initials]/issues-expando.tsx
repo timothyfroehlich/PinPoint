@@ -50,7 +50,13 @@ export function IssuesExpando({
           </span>
         )}
         {watchButton && (
-          <span className="ml-auto" onClick={(e) => e.stopPropagation()}>
+          <span
+            className="ml-auto"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
             {watchButton}
           </span>
         )}
