@@ -3,6 +3,7 @@
 import type React from "react";
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
+import { ExportButton } from "~/components/issues/ExportButton";
 import { IssueCard, type IssueCardIssue } from "~/components/issues/IssueCard";
 import { MachineEmptyState } from "~/components/machines/MachineEmptyState";
 import { cn } from "~/lib/utils";
@@ -47,6 +48,15 @@ export function IssuesExpando({
             of {totalIssuesCount} total
           </span>
         )}
+        <div
+          className="ml-auto"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+          }}
+        >
+          <ExportButton machineInitials={machineInitials} />
+        </div>
       </summary>
 
       <div className="border-t border-outline-variant px-6 py-4">
