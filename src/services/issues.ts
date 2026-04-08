@@ -8,7 +8,10 @@ import {
   userProfiles,
   issueImages,
 } from "~/server/db/schema";
-import { createTimelineEvent } from "~/lib/timeline/events";
+import {
+  createTimelineEvent,
+  type TimelineEventData,
+} from "~/lib/timeline/events";
 import { createNotification } from "~/lib/notifications";
 import { log } from "~/lib/logger";
 import { formatIssueId } from "~/lib/issues/utils";
@@ -18,13 +21,7 @@ import {
   type IssueFrequency,
   type IssueStatus,
 } from "~/lib/types";
-import {
-  CLOSED_STATUSES,
-  getIssueFrequencyLabel,
-  getIssuePriorityLabel,
-  getIssueSeverityLabel,
-  getIssueStatusLabel,
-} from "~/lib/issues/status";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
 import {
   type ProseMirrorDoc,
   extractMentions,
@@ -179,7 +176,11 @@ export async function createIssue({
         columns: { name: true },
       });
       const assigneeName = assignee?.name ?? "Unknown User";
-      await createTimelineEvent(issue.id, `Assigned to ${assigneeName}`, tx);
+      await createTimelineEvent(
+        issue.id,
+        { type: "assigned", assigneeName },
+        tx
+      );
 
       // Auto-watch for assignee
       await tx
@@ -304,11 +305,9 @@ export async function updateIssueStatus({
       .where(eq(issues.id, issueId));
 
     // 2. Create Timeline Event
-    const oldLabel = getIssueStatusLabel(oldStatus);
-    const newLabel = getIssueStatusLabel(status);
     await createTimelineEvent(
       issueId,
-      `Status changed from ${oldLabel} to ${newLabel}`,
+      { type: "status_changed", from: oldStatus, to: status },
       tx,
       userId
     );
@@ -560,10 +559,10 @@ export async function assignIssue({
     }
 
     // Create timeline event
-    const eventMessage = assignedTo
-      ? `Assigned to ${assigneeName}`
-      : "Unassigned";
-    await createTimelineEvent(issueId, eventMessage, tx, actorId);
+    const event: TimelineEventData = assignedTo
+      ? { type: "assigned", assigneeName }
+      : { type: "unassigned" };
+    await createTimelineEvent(issueId, event, tx, actorId);
 
     log.info(
       { issueId, assignedTo, assigneeName, action: "assignIssue" },
@@ -643,11 +642,9 @@ export async function updateIssueSeverity({
     .where(eq(issues.id, issueId));
 
   // Create timeline event
-  const oldLabel = getIssueSeverityLabel(oldSeverity as IssueSeverity);
-  const newLabel = getIssueSeverityLabel(severity);
   await createTimelineEvent(
     issueId,
-    `Severity changed from ${oldLabel} to ${newLabel}`,
+    { type: "severity_changed", from: oldSeverity, to: severity },
     db,
     userId
   );
@@ -704,11 +701,9 @@ export async function updateIssuePriority({
     .where(eq(issues.id, issueId));
 
   // Create timeline event
-  const oldLabel = getIssuePriorityLabel(oldPriority as IssuePriority);
-  const newLabel = getIssuePriorityLabel(priority);
   await createTimelineEvent(
     issueId,
-    `Priority changed from ${oldLabel} to ${newLabel}`,
+    { type: "priority_changed", from: oldPriority, to: priority },
     db,
     userId
   );
@@ -765,11 +760,9 @@ export async function updateIssueFrequency({
     .where(eq(issues.id, issueId));
 
   // Create timeline event
-  const oldLabel = getIssueFrequencyLabel(oldFrequency as IssueFrequency);
-  const newLabel = getIssueFrequencyLabel(frequency);
   await createTimelineEvent(
     issueId,
-    `Frequency changed from ${oldLabel} to ${newLabel}`,
+    { type: "frequency_changed", from: oldFrequency, to: frequency },
     db,
     userId
   );
