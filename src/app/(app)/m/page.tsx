@@ -211,7 +211,7 @@ export default async function MachinesPage({
                     {(accessLevel === "admin" ||
                       accessLevel === "technician") && (
                       <Link href="/m/new">
-                        <Button className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6">
+                        <Button className="bg-primary text-on-primary hover:bg-primary/90">
                           <Plus className="mr-2 size-4" />
                           Add Your First Machine
                         </Button>

@@ -50,13 +50,7 @@ export function IssuesExpando({
           </span>
         )}
         {watchButton && (
-          <span
-            className="ml-auto"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") e.stopPropagation();
-            }}
-          >
+          <span className="ml-auto" onClick={(e) => e.stopPropagation()}>
             {watchButton}
           </span>
         )}

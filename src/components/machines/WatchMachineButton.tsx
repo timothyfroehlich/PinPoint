@@ -74,6 +74,20 @@ export function WatchMachineButton({
     });
   };
 
+  const icon = isPending ? (
+    <Loader2 className="mr-1.5 size-4 animate-spin" />
+  ) : isWatching ? (
+    <BellRing className="mr-1.5 size-4" />
+  ) : (
+    <Bell className="mr-1.5 size-4" />
+  );
+
+  const tooltipText = !isWatching
+    ? "Get notified when new issues are reported on this machine"
+    : watchMode === "subscribe"
+      ? "Auto-watching all new issues on this machine"
+      : "Notified when new issues are reported";
+
   if (!isWatching) {
     return (
       <TooltipProvider delayDuration={300}>
@@ -83,21 +97,15 @@ export function WatchMachineButton({
               variant="ghost"
               size="sm"
               disabled={isPending}
-              onClick={() => {
-                handleToggleWatch();
-              }}
+              onClick={handleToggleWatch}
               className="text-on-surface-variant hover:bg-surface-variant"
             >
-              {isPending ? (
-                <Loader2 className="mr-1.5 size-4 animate-spin" />
-              ) : (
-                <Bell className="mr-1.5 size-4" />
-              )}
+              {icon}
               Watch
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Get notified when new issues are reported on this machine</p>
+            <p>{tooltipText}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -105,8 +113,8 @@ export function WatchMachineButton({
   }
 
   return (
-    <DropdownMenu>
-      <TooltipProvider delayDuration={300}>
+    <TooltipProvider delayDuration={300}>
+      <DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
@@ -116,64 +124,52 @@ export function WatchMachineButton({
                 disabled={isPending}
                 className="text-on-surface hover:bg-surface-variant"
               >
-                {isPending ? (
-                  <Loader2 className="mr-1.5 size-4 animate-spin" />
-                ) : (
-                  <BellRing className="mr-1.5 size-4" />
-                )}
+                {icon}
                 Watching
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent>
-            <p>
-              {watchMode === "subscribe"
-                ? "Auto-watching all new issues on this machine"
-                : "Notified when new issues are reported"}
-            </p>
+            <p>{tooltipText}</p>
           </TooltipContent>
         </Tooltip>
-      </TooltipProvider>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Watch Mode</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuRadioGroup
-          value={watchMode}
-          onValueChange={(val) => {
-            handleModeChange(val);
-          }}
-        >
-          <DropdownMenuRadioItem
-            value="notify"
-            className="flex flex-col items-start gap-0.5 py-2"
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>Watch Mode</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuRadioGroup
+            value={watchMode}
+            onValueChange={handleModeChange}
           >
-            <span className="font-medium">Notify only</span>
-            <span className="text-[10px] text-muted-foreground">
-              New issues only
-            </span>
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem
-            value="subscribe"
-            className="flex flex-col items-start gap-0.5 py-2"
-          >
-            <span className="font-medium">Full subscribe</span>
-            <span className="text-[10px] text-muted-foreground">
-              Auto-watch all new issues
-            </span>
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
+            <DropdownMenuRadioItem
+              value="notify"
+              className="flex flex-col items-start gap-0.5 py-2"
+            >
+              <span className="font-medium">Notify only</span>
+              <span className="text-[10px] text-muted-foreground">
+                New issues only
+              </span>
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem
+              value="subscribe"
+              className="flex flex-col items-start gap-0.5 py-2"
+            >
+              <span className="font-medium">Full subscribe</span>
+              <span className="text-[10px] text-muted-foreground">
+                Auto-watch all new issues
+              </span>
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
 
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => {
-            handleToggleWatch();
-          }}
-          className="text-destructive focus:text-destructive py-2"
-        >
-          <BellOff className="mr-2 size-4" />
-          Stop watching
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={handleToggleWatch}
+            className="text-destructive focus:text-destructive py-2"
+          >
+            <BellOff className="mr-2 size-4" />
+            Stop watching
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </TooltipProvider>
   );
 }
