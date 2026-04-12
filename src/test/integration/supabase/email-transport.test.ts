@@ -42,7 +42,7 @@ describe("Email Transport Integration", () => {
       mailpitSmtpPort = mailpitSmtpPort ?? ports.smtpPort ?? "57325";
       mailpitApiUrl = `http://127.0.0.1:${mailpitApiPort}/api/v1`;
 
-      // Static worktrees: 54xxx-57xxx, ephemeral worktrees: 58xxx-63xxx
+      // Main: 54xxx, worktrees: 54xxx-63xxx (slot 1-96)
       expect(mailpitApiPort).toMatch(/^(5[4-9]\d{3}|6[0-3]\d{3})$/);
     })();
   });

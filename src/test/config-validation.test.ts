@@ -3,33 +3,9 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 describe("Configuration Validation", () => {
-  it("should have all required ports in config.toml.template", () => {
-    // Read config.toml.template to extract redirect URLs
-    const configPath = join(process.cwd(), "supabase/config.toml.template");
-    const configContent = readFileSync(configPath, "utf-8");
-
-    // Extract additional_redirect_urls array
-    const redirectMatch = /additional_redirect_urls = \[([\s\S]*?)\]/.exec(
-      configContent
-    );
-    expect(redirectMatch).toBeTruthy();
-
-    const redirectStr = redirectMatch?.[1] ?? "";
-    const redirectPorts = [...redirectStr.matchAll(/localhost:(\d+)/g)].map(
-      (m) => m[1]
-    );
-
-    const redirectUnique = [...new Set(redirectPorts)].sort();
-
-    // Verify expected worktree ports are present in Supabase config
-    expect(redirectUnique).toContain("3000"); // main
-    expect(redirectUnique).toContain("3100"); // secondary
-    expect(redirectUnique).toContain("3200"); // review
-    expect(redirectUnique).toContain("3300"); // antigravity
-  });
-
-  it("should have all redirect URL variants for each port", () => {
-    // Read config.toml.template
+  it("should have default port redirect URLs in config.toml.template", () => {
+    // Template uses default port 3000. Worktree-specific ports are
+    // substituted by scripts/worktree_setup.py at post-checkout time.
     const configPath = join(process.cwd(), "supabase/config.toml.template");
     const configContent = readFileSync(configPath, "utf-8");
 
@@ -40,18 +16,9 @@ describe("Configuration Validation", () => {
 
     const redirectStr = redirectMatch?.[1] ?? "";
 
-    // For each port, we should have 3 variants:
-    // - http://localhost:PORT
-    // - http://localhost:PORT/*
-    // - http://localhost:PORT/auth/callback
-
-    const expectedPorts = ["3000", "3100", "3200", "3300"];
-
-    for (const port of expectedPorts) {
-      expect(redirectStr).toContain(`http://localhost:${port}"`);
-      expect(redirectStr).toContain(`http://localhost:${port}/*`);
-      expect(redirectStr).toContain(`http://localhost:${port}/auth/callback`);
-    }
+    expect(redirectStr).toContain('http://localhost:3000"');
+    expect(redirectStr).toContain("http://localhost:3000/*");
+    expect(redirectStr).toContain("http://localhost:3000/auth/callback");
   });
 
   it("should have required environment variables defined in .env.example", () => {

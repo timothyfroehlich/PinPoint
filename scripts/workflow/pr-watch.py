@@ -6,7 +6,7 @@ and polls for new Copilot reviews. One Monitor call handles both.
 
 Usage: ./scripts/workflow/pr-watch.py <PR_NUMBER>
 Exit 0: all checks passed, or stopped for new Copilot review
-Exit 1: one or more checks failed
+Exit 1: one or more checks failed, or no matching runs found
 """
 
 from __future__ import annotations
@@ -100,7 +100,7 @@ def watch_reviews(
             count = int(
                 gh(
                     "api",
-                    f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews",
+                    f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews?per_page=100",
                     "--jq",
                     _COPILOT_JQ,
                 )
@@ -224,7 +224,7 @@ def main() -> int:
             emit("All checks passed ✓")
             return 0
         emit(f"No runs found for current commit on PR #{pr}.")
-        return 0
+        return 1
 
     emit(f"Watching PR #{pr} — branch: {branch} — {len(active)} run(s)")
     for run in active:
@@ -236,7 +236,7 @@ def main() -> int:
         baseline = int(
             gh(
                 "api",
-                f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews",
+                f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews?per_page=100",
                 "--jq",
                 _COPILOT_JQ,
             )

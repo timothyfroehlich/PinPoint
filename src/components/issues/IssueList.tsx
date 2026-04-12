@@ -52,6 +52,7 @@ import {
   useTableResponsiveColumns,
   type ColumnConfig,
 } from "~/hooks/use-table-responsive-columns";
+import { ExportButton } from "~/components/issues/ExportButton";
 
 export type SortDirection = "asc" | "desc" | null;
 
@@ -226,6 +227,8 @@ export function IssueList({
               </Button>
             </div>
           </div>
+
+          <ExportButton filters={filters} />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

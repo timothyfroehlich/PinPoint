@@ -44,7 +44,7 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 - `gh` CLI (authenticated)
 - `jq` for JSON processing
-- `python3` + `pinpoint-wt.py` (only for `label-ready.sh --cleanup`)
+- `python3` + `scripts/worktree_cleanup.py` (only for `label-ready.sh --cleanup`)
 
 ## Related Docs
 

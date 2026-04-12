@@ -169,4 +169,23 @@ test.describe("Issue List Features", () => {
     expect(machineParam).toContain("HD");
     expect(machineParam).toContain("MM");
   });
+
+  test("should export issues to CSV", async ({ page }) => {
+    await page.goto("/issues");
+
+    // Wait for issue list to load
+    await expect(page.getByText(/Showing \d+ of \d+ issues/)).toBeVisible();
+
+    // Set up download listener before clicking
+    const downloadPromise = page.waitForEvent("download");
+
+    // Click the export button
+    await page.getByTestId("export-csv-button").click();
+
+    // Verify download was triggered
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(
+      /^pinpoint-issues-\d{4}-\d{2}-\d{2}\.csv$/
+    );
+  });
 });
