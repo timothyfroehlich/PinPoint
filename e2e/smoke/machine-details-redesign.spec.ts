@@ -86,4 +86,26 @@ test.describe("Machine Details Redesign", () => {
     await expect(reportButton).toBeVisible();
     await expect(reportButton).toContainText("Report Issue");
   });
+
+  test("should export machine issues to CSV", async ({ page }) => {
+    // Navigate to TAF (The Addams Family) which has seeded issues
+    await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
+
+    // Wait for page to load
+    await expect(
+      page.getByRole("heading", { name: "Machine Information" })
+    ).toBeVisible();
+
+    // Set up download listener before clicking
+    const downloadPromise = page.waitForEvent("download");
+
+    // Click the export button (it's in the issues expando header)
+    await page.getByTestId("export-csv-button").click();
+
+    // Verify download was triggered
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(
+      /^pinpoint-TAF-issues-\d{4}-\d{2}-\d{2}\.csv$/
+    );
+  });
 });
