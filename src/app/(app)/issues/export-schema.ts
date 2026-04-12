@@ -39,5 +39,9 @@ export const exportFiltersSchema = z.object({
   reporter: z.array(z.string()).optional(),
   watching: z.boolean().optional(),
   includeInactiveMachines: z.boolean().optional(),
+  createdFrom: z.coerce.date().optional().catch(undefined),
+  createdTo: z.coerce.date().optional().catch(undefined),
+  updatedFrom: z.coerce.date().optional().catch(undefined),
+  updatedTo: z.coerce.date().optional().catch(undefined),
   sort: z.string().optional(),
 });
