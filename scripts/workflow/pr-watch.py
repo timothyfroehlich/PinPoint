@@ -57,6 +57,11 @@ def watch_run(
         while proc.poll() is None:
             if stop.is_set():
                 proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
                 return
             time.sleep(0.5)
 
@@ -67,16 +72,27 @@ def watch_run(
             emit(f"✓  {name} — passed")
         else:
             emit(f"✗  {name} — failed")
-            failures.append(run_id)
+            with _lock:
+                failures.append(run_id)
+
+
+_COPILOT_JQ = (
+    '[.[] | select(.user.login == "copilot-pull-request-reviewer"'
+    ' or .user.login == "copilot-pull-request-reviewer[bot]")] | length'
+)
 
 
 def watch_reviews(
     pr: int,
-    baseline: int,
+    baseline: int | None,
     stop: threading.Event,
     review_seen: threading.Event,
 ) -> None:
-    """Poll for new Copilot reviews every REVIEW_POLL_INTERVAL seconds."""
+    """Poll for new Copilot-only reviews every REVIEW_POLL_INTERVAL seconds.
+
+    baseline=None means the initial fetch failed; the first successful poll
+    establishes the baseline instead of comparing against zero.
+    """
     while not stop.wait(REVIEW_POLL_INTERVAL):
         try:
             count = int(
@@ -84,11 +100,14 @@ def watch_reviews(
                     "api",
                     f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews",
                     "--jq",
-                    "length",
+                    _COPILOT_JQ,
                 )
             )
         except Exception:  # noqa: BLE001
             continue  # transient API failure — skip cycle
+        if baseline is None:
+            baseline = count  # establish baseline on first successful poll
+            continue
         if count > baseline:
             emit("📝 New Copilot review posted")
             emit(f"Run: ./scripts/workflow/copilot-comments.sh {pr}")
@@ -168,17 +187,18 @@ def main() -> int:
         icon = "▶ " if run["status"] == "in_progress" else "⏳"
         emit(f"{icon} {run['name']}")
 
+    baseline: int | None
     try:
         baseline = int(
             gh(
                 "api",
                 f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews",
                 "--jq",
-                "length",
+                _COPILOT_JQ,
             )
         )
     except Exception:  # noqa: BLE001
-        baseline = 0
+        baseline = None  # established on first successful poll in watch_reviews
 
     stop = threading.Event()
     review_seen = threading.Event()
