@@ -136,7 +136,7 @@ def write_failure_artifact(run_id: int) -> str:
     log_tail = "\n".join(log.stdout.splitlines()[-100:]) or "(no log available)"
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write("# GitHub Actions Failure Report\n")
         f.write(f"Run ID: {run_id}\nGenerated: {now}\n\n")
         f.write(f"## Failed Steps Log\n\n```text\n{log_tail}\n```\n\n")
@@ -154,16 +154,15 @@ def main() -> int:
     pr = int(sys.argv[1])
 
     try:
-        branch = gh(
-            "pr", "view", str(pr), "--json", "headRefName", "--jq", ".headRefName"
+        pr_data = json.loads(
+            gh("pr", "view", str(pr), "--json", "headRefName,headRefOid")
         )
-    except RuntimeError as exc:
+    except (RuntimeError, json.JSONDecodeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    head_sha = subprocess.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True, text=True
-    ).stdout.strip()
+    branch = pr_data["headRefName"]
+    head_sha = pr_data["headRefOid"]
 
     active: list[dict] = []
     for attempt in range(STARTUP_RETRIES):
@@ -191,6 +190,39 @@ def main() -> int:
             time.sleep(STARTUP_WAIT)
 
     if not active:
+        # Fall back to recently completed runs for the same SHA — they may have
+        # finished before we started watching (e.g., fast lint jobs).
+        all_runs: list[dict] = json.loads(
+            gh(
+                "run",
+                "list",
+                "--limit",
+                "50",
+                "--branch",
+                branch,
+                "--json",
+                "databaseId,status,conclusion,name,headSha",
+            )
+        )
+        completed = [
+            r
+            for r in all_runs
+            if r["headSha"] == head_sha and r["status"] == "completed"
+        ]
+        if completed:
+            failures = [
+                r["databaseId"]
+                for r in completed
+                if r.get("conclusion") not in ("success", "skipped", "neutral")
+            ]
+            if failures:
+                for run_id in failures:
+                    path = write_failure_artifact(run_id)
+                    emit(f"Failure details: {path}")
+                emit(f"{len(failures)} failure(s) detected — check artifact for logs")
+                return 1
+            emit("All checks passed ✓")
+            return 0
         emit(f"No runs found for current commit on PR #{pr}.")
         return 0
 
@@ -260,3 +292,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n[interrupted]", file=sys.stderr)
         sys.exit(130)
+    except (RuntimeError, json.JSONDecodeError) as err:
+        print(f"[error] {err}", file=sys.stderr)
+        sys.exit(1)
