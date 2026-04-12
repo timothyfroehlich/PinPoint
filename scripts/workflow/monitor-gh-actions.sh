@@ -1,4 +1,8 @@
 #!/bin/bash
+# DEPRECATED: Use ./scripts/workflow/pr-watch.py instead.
+# pr-watch.py is Monitor-tool compatible (streams one line per event) and avoids
+# the 20s review-polling loop that caused 403 rate-limit errors (see commit 8f522a21).
+#
 # scripts/workflow/monitor-gh-actions.sh
 # Monitors active (queued or in-progress) workflow runs for a given PR.
 # Usage: monitor-gh-actions.sh [PR_NUMBER]

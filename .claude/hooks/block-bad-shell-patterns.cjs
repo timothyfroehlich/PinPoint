@@ -3,7 +3,7 @@
  * PreToolUse hook: block known bad shell patterns and redirect to proper tools.
  *
  * Rules:
- * 1. Manual CI polling loops → use ./scripts/workflow/monitor-gh-actions.sh
+ * 1. Manual CI polling loops → use ./scripts/workflow/pr-watch.py
  * 2. Ad-hoc curl health checks → use `pnpm run dev:status`
  */
 
@@ -17,7 +17,7 @@ const rules = [
       return hasLoop && hasGhWatch;
     },
     reason:
-      "Manual CI polling loop detected. Use ./scripts/workflow/monitor-gh-actions.sh <PR_NUMBER> instead, or invoke the pinpoint-github-monitor skill.",
+      "Manual CI polling loop detected. Use ./scripts/workflow/pr-watch.py <PR_NUMBER> instead, or invoke the pinpoint-github-monitor skill.",
   },
   {
     name: "curl-health-check",

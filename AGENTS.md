@@ -151,7 +151,7 @@ conflicts across worktrees and force-push requirements on open PRs.
 - `pnpm run db:seed:from-prod`: Reset local DB and seed from the latest production backup.
 - `pnpm run e2e:full`: Full E2E suite (Don't run Safari locally on Linux).
 - `ruff check <file> && ruff format <file>`: Lint and format Python files (`pinpoint-wt.py`, scripts). Ruff is installed globally — no venv needed.
-- `./scripts/workflow/monitor-gh-actions.sh <PR>`: Watch GitHub Actions CI for a PR. **Always use this — never write a manual polling loop.**
+- `./scripts/workflow/pr-watch.py <PR>`: Watch GitHub Actions CI for a PR (Monitor-tool compatible, streams one line per event). **Always use this — never write a manual polling loop.**
 
 ### Which Tests to Run (Decision Tree)
 
