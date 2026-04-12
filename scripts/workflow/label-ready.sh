@@ -132,8 +132,8 @@ if [ "$CLEANUP" = "true" ]; then
             echo "DRY RUN: Would remove worktree at ${worktree_path}"
         else
             echo "Removing worktree: ${worktree_path}"
-            if [ -x "./pinpoint-wt.py" ]; then
-                ./pinpoint-wt.py remove "$branch" || echo "WARN: pinpoint-wt.py remove failed."
+            if [ -f "./scripts/worktree_cleanup.py" ]; then
+                python3 ./scripts/worktree_cleanup.py "$worktree_path" || echo "WARN: worktree cleanup failed."
             fi
             if [ -d "$worktree_path" ]; then
                 git worktree remove "$worktree_path" 2>/dev/null || \

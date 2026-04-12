@@ -10,7 +10,7 @@ if ! command -v supabase &>/dev/null; then
   exit 1
 fi
 
-# Use worktree-specific URL (set in .env.local by pinpoint-wt.py)
+# Use worktree-specific URL (set in .env.local by post-checkout hook)
 SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}"
 
 if ! curl -fsS --max-time 2 "${SUPABASE_URL}/auth/v1/health" >/dev/null 2>&1; then

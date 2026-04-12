@@ -6,8 +6,7 @@ import { defineConfig, devices } from "@playwright/test";
 // Idempotent — safe if Playwright re-evaluates this config per project.
 loadEnvConfig(process.cwd());
 
-// Worktree-aware: PORT is set per-worktree in .env.local by pinpoint-wt.py
-// (3000 main, 3100 secondary, 3200 review, 3300 antigravity, 3400+ ephemeral)
+// Worktree-aware: PORT is set per-worktree in .env.local by post-checkout hook
 const port = Number(process.env["PORT"] ?? "3000");
 const hostname = process.env["PLAYWRIGHT_HOST"] ?? "localhost";
 const baseURL = `http://${hostname}:${port}`;
