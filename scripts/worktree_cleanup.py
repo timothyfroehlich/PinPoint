@@ -94,15 +94,20 @@ def main() -> None:
             subprocess.run(["docker", "volume", "rm"] + volumes, capture_output=True)
             print(f"Removed {len(volumes)} Docker volume(s)", file=sys.stderr)
 
-    # Deallocate manifest slot
-    deallocate_slot(str(worktree_path))
-
-    # Remove git worktree
-    subprocess.run(
+    # Remove git worktree first — only deallocate slot if removal succeeds
+    result = subprocess.run(
         ["git", "worktree", "remove", "--force", str(worktree_path)],
         capture_output=True,
+        text=True,
     )
-    subprocess.run(["git", "worktree", "prune"], capture_output=True)
+    if result.returncode != 0:
+        print(
+            f"Warning: git worktree remove failed: {result.stderr.strip()}",
+            file=sys.stderr,
+        )
+    else:
+        subprocess.run(["git", "worktree", "prune"], capture_output=True)
+        deallocate_slot(str(worktree_path))
 
     print(f"Cleaned up worktree: {worktree_path}", file=sys.stderr)
 
