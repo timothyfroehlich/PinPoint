@@ -16,7 +16,6 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pr-dashboard.sh [PR...]` | Status table: CI checks, unresolved Copilot thread count, draft state. All open PRs if no args.                                                                        |
 | `pr-watch.py <PR>`        | Stream CI run events + poll for Copilot reviews. One timestamped line per event. Use with the Claude Code Monitor tool. Writes failure artifacts to `tmp/gh-monitor/`. |
-| `monitor-gh-actions.sh`   | _(Deprecated — use `pr-watch.py`)_ Blocking parallel watcher using `gh run watch`. Kept for compatibility.                                                             |
 
 ### Copilot Thread Management
 

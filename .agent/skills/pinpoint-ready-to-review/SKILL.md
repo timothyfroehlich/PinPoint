@@ -5,35 +5,29 @@ description: Use when a PR exists and needs to be verified and labeled ready for
 
 # PinPoint: Ready-to-Review
 
-**Prerequisites:** Install and load the `gha-ready-to-review` skill for the base workflow
-(MCP-primary instructions, monitor script, review handling patterns).
-
-Install: `npx skills add timothyfroehlich/gha-workflow-skills`
-
-This skill adds PinPoint-specific behavior on top of the generic workflow.
+This skill is self-contained. No external skill prerequisites.
 
 ---
 
 ## Overview
 
 Three steps: CI must pass, Copilot review comments must be addressed, then label ready.
-Follow the `gha-ready-to-review` skill for each step, with these PinPoint additions:
 
 ---
 
 ## Step 1: Monitor CI
 
-Use the monitor script from `gha-ready-to-review` (installed at
-`~/.agents/skills/gha-ready-to-review/scripts/monitor-gh-actions.sh`):
+Use `pr-watch.py` via the Monitor tool (Claude Code / Antigravity) or directly (Gemini CLI):
 
-```bash
-# Background (preferred — lets you work on reviews while CI runs):
-~/.agents/skills/gha-ready-to-review/scripts/monitor-gh-actions.sh <PR> \
-  --output /tmp/gha-monitor-<PR>.md &
-
-# Check status anytime:
-cat /tmp/gha-monitor-<PR>.md
 ```
+# Claude Code / Antigravity — Monitor tool (one notification per event):
+Monitor(command="./scripts/workflow/pr-watch.py <PR>", description="CI watch for PR #<PR>", persistent=false, timeout_ms=3600000)
+
+# Gemini CLI / terminal — foreground blocking:
+./scripts/workflow/pr-watch.py <PR>
+```
+
+Exit 0 = all passed (or Copilot review interrupt). Exit 1 = failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
 
 Manual polling loops are blocked by a pre-tool-use hook. Always use the script.
 
@@ -41,14 +35,17 @@ Manual polling loops are blocked by a pre-tool-use hook. Always use the script.
 
 ## Step 2: Handle Review Comments
 
-Follow `gha-ready-to-review` for MCP-first or shell-fallback review handling.
+```bash
+./scripts/workflow/copilot-comments.sh <PR>              # Show unresolved Copilot threads
+./scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + resolve one thread
+```
 
-### PinPoint additions:
+**Rules:**
 
 - **Sign all replies** with your agent name: `"Fixed: <description>. —Claude"` (or `—Gemini`, `—Antigravity`, etc.)
 - **Keep replies to one sentence**
-- **Applied suggestions auto-resolve** — Copilot detects your fix commit and closes the thread automatically
-- **Declined comments need a manual reply** — no silent ignores. Use `respond-to-copilot.sh` only for these.
+- **Applied suggestions auto-resolve** — Copilot detects your fix commit and closes the thread automatically. No reply needed.
+- **Declined comments need a manual reply** — no silent ignores. Explain why in one sentence.
 - **Evaluate critically** — not all Copilot suggestions are correct. If wrong, say why.
 - **Filter to Copilot threads** using reviewer login allowlist:
   `copilot-pull-request-reviewer` or `copilot-pull-request-reviewer[bot]`
