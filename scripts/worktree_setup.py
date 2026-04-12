@@ -157,35 +157,54 @@ def prune_manifest(slots: dict[str, int]) -> dict[str, int]:
     return {path: slot for path, slot in slots.items() if Path(path).is_dir()}
 
 
+MAX_SLOT = 96  # slot 96 → offset 9600 → max port 63921 (within integration test range)
+
+
+def _read_manifest_locked(f: object) -> dict[str, int]:
+    """Read and parse manifest from a locked file handle, tolerating corruption."""
+    try:
+        data = json.loads(f.read())  # type: ignore[union-attr]
+        return data.get("slots", {})
+    except (json.JSONDecodeError, KeyError):
+        return {}
+
+
+def _write_manifest_locked(f: object, slots: dict[str, int]) -> None:
+    """Rewrite the manifest file from a locked file handle."""
+    f.seek(0)  # type: ignore[union-attr]
+    f.truncate()  # type: ignore[union-attr]
+    f.write(json.dumps({"version": 1, "slots": slots}, indent=2) + "\n")  # type: ignore[union-attr]
+
+
 def allocate_slot(worktree_path: str) -> int:
-    """Allocate the lowest free slot (1-99) for a worktree, with file locking."""
+    """Allocate the lowest free slot for a worktree, with file locking."""
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    # Ensure file exists before opening for locking
     if not MANIFEST_PATH.exists():
         MANIFEST_PATH.write_text(json.dumps({"version": 1, "slots": {}}, indent=2))
 
     with open(MANIFEST_PATH, "r+") as f:
         fcntl.flock(f, fcntl.LOCK_EX)
         try:
-            data = json.loads(f.read())
-            slots = data.get("slots", {})
-            slots = prune_manifest(slots)
+            slots = _read_manifest_locked(f)
+            pruned = prune_manifest(slots)
+            changed = pruned != slots
+            slots = pruned
 
-            # Check if this worktree already has a slot
+            # Return existing slot (persist prune if needed)
             if worktree_path in slots:
+                if changed:
+                    _write_manifest_locked(f, slots)
                 return slots[worktree_path]
 
             used = set(slots.values())
-            for candidate in range(1, 100):
+            for candidate in range(1, MAX_SLOT + 1):
                 if candidate not in used:
                     slots[worktree_path] = candidate
-                    f.seek(0)
-                    f.truncate()
-                    f.write(json.dumps({"version": 1, "slots": slots}, indent=2) + "\n")
+                    _write_manifest_locked(f, slots)
                     return candidate
 
-            raise RuntimeError("No free port slots (all 99 in use)")
+            raise RuntimeError(f"No free port slots (all {MAX_SLOT} in use)")
         finally:
             fcntl.flock(f, fcntl.LOCK_UN)
 
@@ -441,11 +460,16 @@ def main() -> None:
 
     # Install dependencies if this is a fresh worktree
     if not (worktree_path / "node_modules").exists():
-        subprocess.run(
+        result = subprocess.run(
             ["pnpm", "install", "--frozen-lockfile"],
             cwd=worktree_path,
-            capture_output=True,
         )
+        if result.returncode != 0:
+            print(
+                f"worktree_setup: warning: pnpm install failed "
+                f"(exit {result.returncode}) in {worktree_path}",
+                file=sys.stderr,
+            )
 
     # Set up beads redirect
     main_beads = main_wt / ".beads"

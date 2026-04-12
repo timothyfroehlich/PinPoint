@@ -116,6 +116,13 @@ conflicts across worktrees and force-push requirements on open PRs.
 - Only use when user explicitly requests it
 - Never add `gh pr merge` or broad wildcard tool patterns without explicit user approval.
 
+### Merge Ban
+
+- **Agents MUST NOT run merge commands** (`gh pr merge`, `git merge` into main, etc.)
+- When a PR is ready to merge, present the exact command to the user and let them run it directly
+- This applies to all agents — lead, teammates, and subagents
+- The user has merge commands auto-denied; attempting to run them wastes time
+
 ### CI Workflow
 
 - When investigating CI failures, check for merge conflicts FIRST:

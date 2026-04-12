@@ -6,6 +6,7 @@ Stops Supabase, removes Docker volumes, deallocates the manifest slot,
 and removes the git worktree. One argument: the worktree path.
 """
 
+import fcntl
 import json
 import re
 import subprocess
@@ -23,16 +24,26 @@ def branch_to_project_id(branch_name: str) -> str:
 
 
 def deallocate_slot(worktree_path: str) -> None:
-    """Remove a worktree's entry from the manifest."""
+    """Remove a worktree's entry from the manifest, with file locking."""
     if not MANIFEST_PATH.exists():
         return
-    data = json.loads(MANIFEST_PATH.read_text())
-    slots = data.get("slots", {})
-    if worktree_path in slots:
-        del slots[worktree_path]
-        MANIFEST_PATH.write_text(
-            json.dumps({"version": 1, "slots": slots}, indent=2) + "\n"
-        )
+
+    with open(MANIFEST_PATH, "r+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            try:
+                data = json.loads(f.read())
+                slots = data.get("slots", {})
+            except (json.JSONDecodeError, KeyError):
+                slots = {}
+
+            if worktree_path in slots:
+                del slots[worktree_path]
+                f.seek(0)
+                f.truncate()
+                f.write(json.dumps({"version": 1, "slots": slots}, indent=2) + "\n")
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def main() -> None:

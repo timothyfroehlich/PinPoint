@@ -233,10 +233,12 @@ class TestPortConfig:
         assert config.db_port == 58322
         assert config.site_url == "http://localhost:3400"
 
-    def test_slot_99(self) -> None:
-        config = PortConfig(slot=99, project_id="test", name="test")
-        assert config.nextjs_port == 3990
-        assert config.api_port == 64221
+    def test_slot_96_max(self) -> None:
+        config = PortConfig(slot=96, project_id="test", name="test")
+        assert config.nextjs_port == 3960
+        assert config.api_port == 63921
+        # All ports stay within the 54xxx-63xxx range expected by integration tests
+        assert config.inbucket_port == 63924
 
 
 class TestManifest:
