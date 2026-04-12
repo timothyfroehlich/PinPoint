@@ -8,20 +8,12 @@ if command -v bd >/dev/null 2>&1; then
 fi
 
 if [ "$BRANCH_CHECKOUT" = "1" ]; then
-  # Only sync if we're in a pinpoint worktree with a config template
   if [ -f "supabase/config.toml.template" ]; then
-    # Find pinpoint-wt.py relative to repo root
-    REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || true)
-    WT_SCRIPT="$REPO_ROOT/pinpoint-wt.py"
-
-    # For worktrees, the script lives in the main repo
-    if [ ! -f "$WT_SCRIPT" ]; then
-      MAIN_WT=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
-      WT_SCRIPT="$MAIN_WT/pinpoint-wt.py"
-    fi
-
-    if [ -f "$WT_SCRIPT" ]; then
-      python3 "$WT_SCRIPT" sync 2>/dev/null || true
+    # Find worktree_setup.py in the main worktree
+    MAIN_WT=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+    SETUP="$MAIN_WT/scripts/worktree_setup.py"
+    if [ -f "$SETUP" ]; then
+      python3 "$SETUP" || true
     fi
   fi
 fi

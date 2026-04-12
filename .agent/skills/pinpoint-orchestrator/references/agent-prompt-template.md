@@ -3,8 +3,6 @@
 ## Standalone Subagent (Primary)
 
 ```markdown
-Start by loading the `pinpoint-teammate-guide` skill (or read .agent/skills/pinpoint-teammate-guide/SKILL.md directly).
-
 ## Task: {task_title}
 
 **Beads Issue**: {beads_id}

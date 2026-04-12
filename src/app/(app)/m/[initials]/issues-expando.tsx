@@ -3,6 +3,7 @@
 import type React from "react";
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
+import { ExportButton } from "~/components/issues/ExportButton";
 import { IssueCard, type IssueCardIssue } from "~/components/issues/IssueCard";
 import { MachineEmptyState } from "~/components/machines/MachineEmptyState";
 import { cn } from "~/lib/utils";
@@ -12,6 +13,7 @@ interface IssuesExpandoProps {
   machineName: string;
   machineInitials: string;
   totalIssuesCount: number;
+  watchButton?: React.ReactNode;
 }
 
 export function IssuesExpando({
@@ -19,6 +21,7 @@ export function IssuesExpando({
   machineName,
   machineInitials,
   totalIssuesCount,
+  watchButton,
 }: IssuesExpandoProps): React.JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -47,6 +50,22 @@ export function IssuesExpando({
             of {totalIssuesCount} total
           </span>
         )}
+        <div
+          className="ml-auto flex items-center gap-2"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
+        >
+          {watchButton}
+          <ExportButton machineInitials={machineInitials} />
+        </div>
       </summary>
 
       <div className="border-t border-outline-variant px-6 py-4">

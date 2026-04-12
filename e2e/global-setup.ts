@@ -57,7 +57,7 @@ export default async function globalSetup(): Promise<void> {
   if (!postgresUrl) {
     throw new Error(
       "POSTGRES_URL is not set. Check your .env.local file.\n" +
-        `  Run: ./pinpoint-wt.py sync`
+        `  Check your .env.local or switch branches to regenerate it.`
     );
   }
   console.log("🔍 Checking Postgres...");

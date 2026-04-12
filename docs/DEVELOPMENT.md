@@ -34,10 +34,9 @@ If you’re trying to understand how to implement something, read:
 
    ```bash
    pnpm install
-   python3 scripts/sync_worktrees.py
    ```
 
-   This generates `supabase/config.toml` and `.env.local` from templates. These files are ignored by git to keep your local environment clean.
+   For non-main worktrees, the `post-checkout` hook automatically generates `supabase/config.toml` and `.env.local` with unique ports. The main worktree uses default ports without auto-generation. These files are ignored by git.
 
 3. **Start Dev Server**
 

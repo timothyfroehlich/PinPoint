@@ -32,7 +32,7 @@ gh api repos/timothyfroehlich/PinPoint/pulls/<PR_NUMBER>/comments \
 ## Worktree Status
 
 ```bash
-./pinpoint-wt.py list
+git worktree list
 ./scripts/workflow/stale-worktrees.sh           # Report status
 ./scripts/workflow/stale-worktrees.sh --clean    # Auto-remove stale
 ```

@@ -148,7 +148,7 @@ if [ "$CLEAN" = "true" ] && [ "$stale_count" -gt 0 ] && [ "$JSON_OUTPUT" = "fals
 
         if [ "$has_pr" = "false" ] && [ -z "$changes" ]; then
             echo "  Removing: $branch"
-            python3 "$REPO_ROOT/pinpoint-wt.py" remove "$branch" 2>/dev/null || echo "    WARN: Failed to remove $branch"
+            python3 "$REPO_ROOT/scripts/worktree_cleanup.py" "$wt_path" 2>/dev/null || echo "    WARN: Failed to remove $branch"
         fi
     done
     echo "Done."

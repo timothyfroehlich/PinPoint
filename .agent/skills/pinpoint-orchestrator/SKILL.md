@@ -47,11 +47,10 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 ./scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
 ./scripts/workflow/stale-worktrees.sh --clean            # Auto-remove stale worktrees
 
-# Worktree management (paths are flat: feat/x → feat-x)
-python3 ./pinpoint-wt.py create <branch>           # Create worktree (new or existing branch)
-python3 ./pinpoint-wt.py list                      # Show all worktrees with port assignments
-python3 ./pinpoint-wt.py remove <branch>           # Clean teardown (Supabase + Docker + worktree)
-python3 ./pinpoint-wt.py sync [--all]              # Regenerate config files
+# Worktree management (post-checkout hook auto-configures ports + Supabase)
+git worktree add ../pinpoint-worktrees/<branch> -b <branch>  # Create worktree (hook runs scripts/worktree_setup.py)
+git worktree list                                             # Show all worktrees
+python3 scripts/worktree_cleanup.py ../pinpoint-worktrees/<branch>  # Full cleanup (Supabase stop, Docker volumes, manifest, worktree removal)
 ```
 
 ---
@@ -100,14 +99,14 @@ Present options to user. Before proceeding, verify tasks are independent:
 
 ## Phase 2: Worktree Setup
 
-`isolation: "worktree"` handles creation automatically via the `WorktreeCreate` hook (delegates to `pinpoint-wt.py`).
+`isolation: "worktree"` handles creation automatically. The Husky `post-checkout` hook runs `scripts/worktree_setup.py` to allocate ports and generate configs.
 
-> **Known bug**: `isolation: "worktree"` is silently ignored when `team_name` is set. For Agent Teams, create worktrees manually with `pinpoint-wt.py`.
+> **Known bug**: `isolation: "worktree"` is silently ignored when `team_name` is set. For Agent Teams, create worktrees manually with `git worktree add`.
 
-Manual `pinpoint-wt.py` is for the lead's own use or Agent Teams worktree setup:
+Manual worktree creation is for the lead's own use or Agent Teams worktree setup:
 
 ```bash
-python3 ./pinpoint-wt.py create <branch-name>
+git worktree add ../pinpoint-worktrees/<branch-name> -b <branch-name>
 ```
 
 ---
@@ -131,12 +130,11 @@ Do NOT set `team_name` or `name` — these activate Agent Teams where `isolation
 
 **Prompt requirements** — each subagent prompt MUST include:
 
-1. Load `pinpoint-teammate-guide` skill
-2. Beads issue context (`bd show` output)
-3. Specific files to modify and what to change
-4. Quality self-enforcement: "Run `pnpm run check` before returning. Verify all contract items."
-5. Full PR lifecycle: "Create PR, poll for Copilot review, address comments, verify CI green."
-6. Structured return format: branch, PR#, CI status, Copilot status, blockers
+1. Beads issue context (`bd show` output)
+2. Specific files to modify and what to change
+3. Quality self-enforcement: "Run `pnpm run check` before returning. Verify all contract items."
+4. Full PR lifecycle: "Create PR, poll for Copilot review, address comments, verify CI green."
+5. Structured return format: branch, PR#, CI status, Copilot status, blockers
 
 ### Option B: Agent Teams (Fallback)
 
@@ -145,7 +143,7 @@ Use when you need bidirectional real-time communication (dependent tasks, mid-fl
 Create worktrees manually (isolation is broken with `team_name`), then spawn:
 
 ```bash
-python3 ./pinpoint-wt.py create feat/<branch-name>
+git worktree add ../pinpoint-worktrees/feat-<branch-name> -b feat/<branch-name>
 ```
 
 ```
@@ -237,7 +235,7 @@ Remaining Worktrees:
 ### Cleanup
 
 ```bash
-python3 ./pinpoint-wt.py remove <branch>
+git worktree remove ../pinpoint-worktrees/<branch>
 ```
 
 ---
@@ -269,8 +267,6 @@ python3 ./pinpoint-wt.py remove <branch>
 
 For full lifecycle tasks, use the **`pinpoint-dispatch-e2e-teammate`** skill. It covers worktree creation, task contract, and prompt template.
 
-Subagents should load **`pinpoint-teammate-guide`** at the start.
-
 ---
 
 ## Lead Orchestrator Role
@@ -296,7 +292,7 @@ If a subagent can't be resumed (GC'd), spawn a new one on the same branch.
 | ------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Subagent fails to create PR     | Check output, verify worktree state, resume with context                                            |
 | Permission denied on worktree   | Add paths to `.claude/settings.json`, restart session                                               |
-| Worktree creation fails         | `python3 ./pinpoint-wt.py sync`, `supabase stop` (current worktree only — **never** `--all`), retry |
+| Worktree creation fails         | `supabase stop` (current worktree only — **never** `--all`), then re-create with `git worktree add` |
 | Agent Teams isolation broken    | Known bug. Use standalone subagents (Option A) instead                                              |
 | Hooks fire from wrong directory | Hooks skip for non-worktree CWD. Safeword: `touch .claude-hook-bypass`                              |
 | Session dies with active team   | `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>`                                              |

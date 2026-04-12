@@ -17,7 +17,7 @@ describe("Mailpit Integration", () => {
   const mailpitUrl = `http://127.0.0.1:${mailpitPort}/api/v1/messages`;
 
   beforeAll(() => {
-    // Ensure we're testing against local Mailpit (static: 54xxx-57xxx, ephemeral: 58xxx-63xxx)
+    // Ensure we're testing against local Mailpit (main: 54xxx, worktrees: 54xxx-63xxx)
     expect(mailpitPort).toMatch(/^(5[4-9]\d{3}|6[0-3]\d{3})$/);
   });
 

@@ -49,7 +49,7 @@ test.describe("Technician Role Permissions", () => {
     await page.goto("/m/new");
     await expect(page).toHaveURL(/\/m\/new/);
     await expect(
-      page.getByRole("heading", { name: "Add New Machine" })
+      page.getByRole("heading", { name: "New Machine" })
     ).toBeVisible();
     await expect(page.getByLabel("Machine Name")).toBeVisible();
 
