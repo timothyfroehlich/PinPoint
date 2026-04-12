@@ -5,7 +5,6 @@ audience: lead agent coordinating work
 ---
 
 > **Audience**: This skill is for the **lead agent** dispatching subagents.
-> If you are a dispatched subagent, load `pinpoint-teammate-guide` instead.
 
 ## When to Use
 
@@ -49,8 +48,6 @@ Task(
 **Prompt template:**
 
 ```markdown
-Start by loading the `pinpoint-teammate-guide` skill (or read .agent/skills/pinpoint-teammate-guide/SKILL.md directly).
-
 ## Task: <issue title>
 
 <beads issue ID and description>

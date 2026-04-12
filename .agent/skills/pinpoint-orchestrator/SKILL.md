@@ -131,12 +131,11 @@ Do NOT set `team_name` or `name` — these activate Agent Teams where `isolation
 
 **Prompt requirements** — each subagent prompt MUST include:
 
-1. Load `pinpoint-teammate-guide` skill
-2. Beads issue context (`bd show` output)
-3. Specific files to modify and what to change
-4. Quality self-enforcement: "Run `pnpm run check` before returning. Verify all contract items."
-5. Full PR lifecycle: "Create PR, poll for Copilot review, address comments, verify CI green."
-6. Structured return format: branch, PR#, CI status, Copilot status, blockers
+1. Beads issue context (`bd show` output)
+2. Specific files to modify and what to change
+3. Quality self-enforcement: "Run `pnpm run check` before returning. Verify all contract items."
+4. Full PR lifecycle: "Create PR, poll for Copilot review, address comments, verify CI green."
+5. Structured return format: branch, PR#, CI status, Copilot status, blockers
 
 ### Option B: Agent Teams (Fallback)
 
@@ -268,8 +267,6 @@ python3 ./pinpoint-wt.py remove <branch>
 ## Task Contract (End-to-End Dispatch)
 
 For full lifecycle tasks, use the **`pinpoint-dispatch-e2e-teammate`** skill. It covers worktree creation, task contract, and prompt template.
-
-Subagents should load **`pinpoint-teammate-guide`** at the start.
 
 ---
 
