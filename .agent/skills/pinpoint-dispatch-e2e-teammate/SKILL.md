@@ -84,7 +84,7 @@ Report back with:
 - **Blockers**: none or description
 ```
 
-> **Agent Teams fallback**: Add `team_name`, `name`, absolute worktree path (created manually via `pinpoint-wt.py`), and replace return format with SendMessage instructions.
+> **Agent Teams fallback**: Add `team_name`, `name`, absolute worktree path (created manually via `git worktree add`), and replace return format with SendMessage instructions.
 
 ---
 
@@ -113,6 +113,6 @@ Resume the subagent with follow-up work (Copilot comments, CI fixes, review feed
 Once the PR merges:
 
 ```bash
-python3 ./pinpoint-wt.py remove feat/<branch-name>
+git worktree remove ../pinpoint-worktrees/feat-<branch-name>
 bd close <issue-id> --reason="Fixed in PR #NNN"
 ```

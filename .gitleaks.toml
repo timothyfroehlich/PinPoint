@@ -7,7 +7,7 @@
 [[allowlists]]
 description = "Local Supabase demo keys in worktree env management"
 paths = [
-  '''scripts/pinpoint_wt_lib\.py''',
+  '''scripts/worktree_setup\.py''',
   '''\.env\.local''',
   '''\.env\.ci''',
   '''\.env\.example''',

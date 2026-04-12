@@ -126,7 +126,7 @@ PROJECT_INDEX.json
 .claude/hooks/.quality-check.json.swp
 .claude/hooks/tsconfig-cache.json
 .claude/settings.local.json
-# Generated per-worktree by pinpoint-wt.py (port varies per worktree)
+# Generated per-worktree by post-checkout hook (port varies per worktree)
 .claude/launch.json
 .betterer.results.backup
 .worktree-ports

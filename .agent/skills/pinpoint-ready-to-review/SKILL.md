@@ -71,7 +71,7 @@ Use `--dry-run` to preview. Use `--force` to skip Copilot check.
 ```bash
 ./scripts/workflow/label-ready.sh <PR> --cleanup
 # Or manually:
-./pinpoint-wt.py remove <branch>
+git worktree remove ../pinpoint-worktrees/<branch>
 ```
 
 ### Optional: Update beads

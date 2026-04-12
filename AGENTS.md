@@ -68,43 +68,27 @@ If your tool does not support skills, read the file path directly.
 
 ### Worktrees & Ports
 
-We use git worktrees for parallel environments. There are two types:
+We use git worktrees for parallel environments. Each worktree gets unique Supabase ports automatically.
 
-**Static Worktrees** (4 permanent environments with fixed ports):
+**How it works**: The Husky `post-checkout` hook calls `scripts/worktree_setup.py` after every `git worktree add`. It allocates a slot (1-99) from a manifest (`~/.config/pinpoint/worktree-slots.json`), then generates `config.toml`, `.env.local`, and `.claude/launch.json` with the correct ports. No special CLI tools needed — just use `git worktree add`.
 
-| Worktree    | Next.js | Supabase API | Postgres | Purpose                   |
-| :---------- | :------ | :----------- | :------- | :------------------------ |
-| Main (root) | 3000    | 54321        | 54322    | Primary development       |
-| Secondary   | 3100    | 55321        | 55322    | Parallel feature work     |
-| Review      | 3200    | 56321        | 56322    | PR reviews                |
-| AntiGravity | 3300    | 57321        | 57322    | Experimental/long-running |
+**Main worktree** uses default ports (Next.js 3000, API 54321, DB 54322). All other worktrees get dynamically allocated ports:
 
-**Ephemeral Worktrees** (on-demand, port offsets 4000-9900 → Next.js 3400-3990, API 58321-63821):
-
-Created with `./pinpoint-wt.py` for quick PR reviews or parallel development. Ports are hash-allocated to avoid conflicts.
-
-**Worktree Path Resolution**: Branch slashes are replaced with dashes in directory names (flat naming). Branch `feat/my-feature` creates directory `pinpoint-worktrees/feat-my-feature`. Example: branch `feat/f3r-rename-env-vars` lives at `/home/froeht/Code/pinpoint-worktrees/feat-f3r-rename-env-vars`. The `remove` command has a fallback for old nested paths (`pinpoint-worktrees/feat/f3r-rename-env-vars`).
-
-**Commands**:
-
-```bash
-./pinpoint-wt.py create feat/my-feature   # Create ephemeral worktree
-./pinpoint-wt.py list                     # Show all worktrees with ports
-./pinpoint-wt.py sync [--all]             # Regenerate config files
-./pinpoint-wt.py remove feat/my-feature   # Clean teardown (Supabase + Docker + worktree)
 ```
+slot N → Next.js 3000+(N*10), API 54321+(N*100), DB 54322+(N*100)
+```
+
+**Creating a worktree**: `git worktree add /path -b branch origin/main` — post-checkout handles everything.
+
+**Claude Code**: `isolation: "worktree"` works out of the box — Claude Code creates the worktree, post-checkout configures it.
+
+**Cleanup**: Claude Code's `WorktreeRemove` hook runs `scripts/worktree_cleanup.py` (stops Supabase, removes Docker volumes, deallocates slot). For manual removal, `git worktree remove /path` works but Docker volumes may leak (clean with `docker volume prune`).
 
 **Config Management**:
 
-- `supabase/config.toml` and `.env.local` are auto-generated from templates
-- Generated files are **read-only** (chmod 444) with warning headers
-- To modify: Edit templates, then run `./pinpoint-wt.py sync`
-
-**Troubleshooting**:
-
-- _Config Mismatch_: Run `./pinpoint-wt.py sync` to regenerate
+- `supabase/config.toml` and `.env.local` are auto-generated, **read-only** (chmod 444)
+- To modify: Edit `supabase/config.toml.template`, then switch branches to regenerate
 - _Supabase Failures_: Run `supabase stop` (current worktree only — never `--all`) then restart
-- _Template Changes_: Edit `supabase/config.toml.template`, then `./pinpoint-wt.py sync --all`
 
 ### Branch Management
 
@@ -150,7 +134,7 @@ conflicts across worktrees and force-push requirements on open PRs.
 - `pnpm run db:backup`: Manual production data dump to `~/.pinpoint/db-backups` (verifies Supabase CLI link matches expected production project).
 - `pnpm run db:seed:from-prod`: Reset local DB and seed from the latest production backup.
 - `pnpm run e2e:full`: Full E2E suite (Don't run Safari locally on Linux).
-- `ruff check <file> && ruff format <file>`: Lint and format Python files (`pinpoint-wt.py`, scripts). Ruff is installed globally — no venv needed.
+- `ruff check <file> && ruff format <file>`: Lint and format Python files (in `scripts/`). Ruff is installed globally — no venv needed.
 - `./scripts/workflow/monitor-gh-actions.sh <PR>`: Watch GitHub Actions CI for a PR. **Always use this — never write a manual polling loop.**
 
 ### Which Tests to Run (Decision Tree)
@@ -265,9 +249,9 @@ Sign replies with your agent name (`—Gemini`, `—Antigravity`, `—Claude`, `
 
 For multiple independent tasks, use worktree-isolated subagents.
 
-**Primary**: Standalone subagents with `isolation: "worktree"` + `run_in_background: true`. Use `resume` for follow-up (Copilot comments, CI fixes). The `WorktreeCreate` hook delegates to `pinpoint-wt.py` for port allocation and Supabase config.
+**Primary**: Standalone subagents with `isolation: "worktree"` + `run_in_background: true`. Use `resume` for follow-up (Copilot comments, CI fixes). The `post-checkout` hook automatically allocates ports and generates configs.
 
-**Fallback**: Agent Teams for bidirectional real-time communication. Note: `isolation: "worktree"` is broken when `team_name` is set — teammates land in the lead's repo. Create worktrees manually with `pinpoint-wt.py`.
+**Fallback**: Agent Teams for bidirectional real-time communication. Note: `isolation: "worktree"` is broken when `team_name` is set — teammates land in the lead's repo. Create worktrees manually with `git worktree add`.
 
 **Quality Enforcement**:
 

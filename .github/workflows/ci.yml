@@ -261,10 +261,10 @@ jobs:
             ! -name '*.lock.yml' -print0 | xargs -0 ./actionlint
 
       - name: Ruff check
-        run: ruff check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py
+        run: ruff check scripts/ .agent/skills/*/scripts/*.py
 
       - name: Ruff format check
-        run: ruff format --check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py
+        run: ruff format --check scripts/ .agent/skills/*/scripts/*.py
 
       - name: ShellCheck
         run: find scripts/ .agent/skills/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck
