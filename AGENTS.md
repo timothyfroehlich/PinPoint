@@ -121,7 +121,8 @@ conflicts across worktrees and force-push requirements on open PRs.
 - **Agents MUST NOT run merge commands** (`gh pr merge`, `git merge` into main, etc.)
 - When a PR is ready to merge, present the exact command to the user and let them run it directly
 - This applies to all agents — lead, teammates, and subagents
-- The user has merge commands auto-denied; attempting to run them wastes time
+- We use **squash merges only**: `gh pr merge --squash <PR>`
+- A PreToolUse hook blocks merge commands and reminds you of this rule
 
 ### CI Workflow
 
