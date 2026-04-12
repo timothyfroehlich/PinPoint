@@ -44,38 +44,67 @@ def gh(*args: str) -> str:
     return result.stdout.strip()
 
 
+_PASSING_CONCLUSIONS = {"success", "skipped", "neutral"}
+
+
+def _run_conclusion(run_id: int) -> tuple[str, str]:
+    """Return (status, conclusion) for a run. Returns ("", "") on error."""
+    try:
+        data = json.loads(gh("run", "view", str(run_id), "--json", "status,conclusion"))
+        return data.get("status", ""), data.get("conclusion", "")
+    except (RuntimeError, json.JSONDecodeError):
+        return "", ""
+
+
 def watch_run(
     run_id: int,
     name: str,
     stop: threading.Event,
     failures: list[int],
 ) -> None:
-    """Watch one CI run via gh run watch. Blocks until done or stop is set."""
-    with subprocess.Popen(
-        ["gh", "run", "watch", str(run_id), "--exit-status"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ) as proc:
-        while proc.poll() is None:
-            if stop.is_set():
-                proc.terminate()
-                try:
-                    proc.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.wait()
-                return
-            time.sleep(0.5)
+    """Watch one CI run via gh run watch. Retries if watcher exits prematurely."""
+    while not stop.is_set():
+        with subprocess.Popen(
+            ["gh", "run", "watch", str(run_id), "--exit-status"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ) as proc:
+            while proc.poll() is None:
+                if stop.is_set():
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait()
+                    return
+                time.sleep(0.5)
 
         if stop.is_set():
             return
 
         if proc.returncode == 0:
             emit(f"✓  {name} — passed")
-        else:
-            emit(f"✗  {name} — failed")
-            with _lock:
-                failures.append(run_id)
+            return
+
+        # gh run watch exited non-zero — verify via API before declaring failure.
+        # It can crash or disconnect while the run is still in progress.
+        status, conclusion = _run_conclusion(run_id)
+
+        if status in ("queued", "in_progress"):
+            # Watcher crashed prematurely — restart it.
+            emit(f"↻  {name} — watcher restarted (run still in progress)")
+            continue
+
+        if conclusion in _PASSING_CONCLUSIONS:
+            emit(f"✓  {name} — passed")
+            return
+
+        # Confirmed failure (or unrecognised conclusion — fail safe).
+        emit(f"✗  {name} — failed")
+        with _lock:
+            failures.append(run_id)
+        return
 
 
 _COPILOT_JQ = (
