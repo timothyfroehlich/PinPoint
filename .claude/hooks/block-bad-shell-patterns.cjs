@@ -41,10 +41,8 @@ const rules = [
         .replace(/\$\(cat <<'EOF'[\s\S]*?EOF\s*\)/g, "")
         .replace(/"[^"]*"/g, '""')
         .replace(/'[^']*'/g, "''");
-      return (
-        /\bgh\s+pr\s+merge\b/.test(stripped) ||
-        /\bgit\s+merge\b.*\b(main|master)\b/.test(stripped)
-      );
+      // Block `gh pr merge` (merging a PR). Allow `git merge origin/main` (syncing from main).
+      return /\bgh\s+pr\s+merge\b/.test(stripped);
     },
     reason:
       "Merge commands are banned for agents. Present the exact command to the user and let them run it directly. We use squash merges only (gh pr merge --squash).",
