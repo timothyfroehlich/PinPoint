@@ -20,6 +20,8 @@ import time
 from datetime import datetime, timezone
 
 REVIEW_POLL_INTERVAL = 60  # seconds — GitHub rate limit friendly
+STARTUP_RETRIES = 6  # attempts to find runs for current SHA
+STARTUP_WAIT = 10  # seconds between startup retries
 LOG_DIR = "tmp/gh-monitor"
 
 _lock = threading.Lock()
@@ -159,27 +161,37 @@ def main() -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    runs: list[dict] = json.loads(
-        gh(
-            "run",
-            "list",
-            "--limit",
-            "50",
-            "--branch",
-            branch,
-            "--json",
-            "databaseId,status,name",
+    head_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+
+    active: list[dict] = []
+    for attempt in range(STARTUP_RETRIES):
+        runs: list[dict] = json.loads(
+            gh(
+                "run",
+                "list",
+                "--limit",
+                "50",
+                "--branch",
+                branch,
+                "--json",
+                "databaseId,status,name,headSha",
+            )
         )
-    )
+        active = [
+            r
+            for r in runs
+            if r["headSha"] == head_sha and r["status"] in ("queued", "in_progress")
+        ]
+        if active:
+            break
+        if attempt < STARTUP_RETRIES - 1:
+            emit(f"Waiting for CI to start... ({attempt + 1}/{STARTUP_RETRIES})")
+            time.sleep(STARTUP_WAIT)
 
-    active = [r for r in runs if r["status"] in ("queued", "in_progress")]
     if not active:
-        completed = [r for r in runs if r["status"] == "completed"]
-        if completed:
-            active = [completed[0]]
-
-    if not active:
-        emit(f"No workflow runs found for PR #{pr}.")
+        emit(f"No runs found for current commit on PR #{pr}.")
         return 0
 
     emit(f"Watching PR #{pr} — branch: {branch} — {len(active)} run(s)")
