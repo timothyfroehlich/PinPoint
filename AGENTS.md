@@ -47,7 +47,6 @@ If your tool does not support skills, read the file path directly.
 | **Workflow**   | `pinpoint-github-monitor`        | `.agent/skills/pinpoint-github-monitor/SKILL.md`        | Monitoring GitHub Actions and build status.                                                   |
 | **Workflow**   | `pinpoint-orchestrator`          | `.agent/skills/pinpoint-orchestrator/SKILL.md`          | Parallel subagent work in worktrees (background agents or Claude Teams).                      |
 | **Workflow**   | `pinpoint-dispatch-e2e-teammate` | `.agent/skills/pinpoint-dispatch-e2e-teammate/SKILL.md` | Dispatching a teammate end-to-end (worktree + contract + prompt).                             |
-| **Workflow**   | `pinpoint-teammate-guide`        | `.agent/skills/pinpoint-teammate-guide/SKILL.md`        | For dispatched teammates: environment, contract, Copilot loop, CI.                            |
 
 ## 4. Environment & Workflow
 
