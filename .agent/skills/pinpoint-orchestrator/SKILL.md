@@ -50,7 +50,7 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 # Worktree management (post-checkout hook auto-configures ports + Supabase)
 git worktree add ../pinpoint-worktrees/<branch> -b <branch>  # Create worktree (hook runs scripts/worktree_setup.py)
 git worktree list                                             # Show all worktrees
-git worktree remove ../pinpoint-worktrees/<branch>            # Remove worktree (WorktreeRemove hook runs scripts/worktree_cleanup.py)
+python3 scripts/worktree_cleanup.py ../pinpoint-worktrees/<branch>  # Full cleanup (Supabase stop, Docker volumes, manifest, worktree removal)
 ```
 
 ---

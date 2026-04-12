@@ -10,7 +10,7 @@ with unique Supabase ports — no manual setup needed.
 
 1. `git worktree add /path branch` creates the worktree
 2. Husky's `post-checkout` hook fires → calls `scripts/worktree_setup.py`
-3. A slot (1-99) is allocated from `~/.config/pinpoint/worktree-slots.json`
+3. A slot (1-96) is allocated from `~/.config/pinpoint/worktree-slots.json`
 4. `supabase/config.toml`, `.env.local`, and `.claude/launch.json` are generated with unique ports
 5. `pnpm install` runs if `node_modules/` doesn't exist
 

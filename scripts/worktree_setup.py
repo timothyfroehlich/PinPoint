@@ -136,16 +136,19 @@ class PortConfig:
 
 
 def load_manifest() -> dict[str, int]:
-    """Load the slot manifest, creating it if missing."""
+    """Load the slot manifest, creating it if missing. Tolerates corruption."""
     if not MANIFEST_PATH.exists():
         MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
         MANIFEST_PATH.write_text(json.dumps({"version": 1, "slots": {}}, indent=2))
-    data = json.loads(MANIFEST_PATH.read_text())
-    return data.get("slots", {})
+    try:
+        data = json.loads(MANIFEST_PATH.read_text())
+        return data.get("slots", {})
+    except (json.JSONDecodeError, KeyError):
+        return {}
 
 
 def save_manifest(slots: dict[str, int]) -> None:
-    """Write the slot manifest atomically."""
+    """Write the slot manifest (not atomic — callers use flock for safety)."""
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
     MANIFEST_PATH.write_text(
         json.dumps({"version": 1, "slots": slots}, indent=2) + "\n"

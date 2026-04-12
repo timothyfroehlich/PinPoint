@@ -70,7 +70,7 @@ If your tool does not support skills, read the file path directly.
 
 We use git worktrees for parallel environments. Each worktree gets unique Supabase ports automatically.
 
-**How it works**: The Husky `post-checkout` hook calls `scripts/worktree_setup.py` after every `git worktree add`. It allocates a slot (1-99) from a manifest (`~/.config/pinpoint/worktree-slots.json`), then generates `config.toml`, `.env.local`, and `.claude/launch.json` with the correct ports. No special CLI tools needed — just use `git worktree add`.
+**How it works**: The Husky `post-checkout` hook calls `scripts/worktree_setup.py` after every `git worktree add`. It allocates a slot (1-96) from a manifest (`~/.config/pinpoint/worktree-slots.json`), then generates `config.toml`, `.env.local`, and `.claude/launch.json` with the correct ports. No special CLI tools needed — just use `git worktree add`.
 
 **Main worktree** uses default ports (Next.js 3000, API 54321, DB 54322). All other worktrees get dynamically allocated ports:
 

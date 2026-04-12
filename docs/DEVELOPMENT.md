@@ -36,7 +36,7 @@ If you’re trying to understand how to implement something, read:
    pnpm install
    ```
 
-   The `post-checkout` hook automatically generates `supabase/config.toml` and `.env.local` with unique ports for each worktree. These files are ignored by git to keep your local environment clean.
+   For non-main worktrees, the `post-checkout` hook automatically generates `supabase/config.toml` and `.env.local` with unique ports. The main worktree uses default ports without auto-generation. These files are ignored by git.
 
 3. **Start Dev Server**
 
