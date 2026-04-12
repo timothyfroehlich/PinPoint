@@ -204,14 +204,25 @@ def main() -> int:
                 "--branch",
                 branch,
                 "--json",
-                "databaseId,status,name,headSha",
+                "databaseId,status,conclusion,name,headSha",
             )
         )
-        active = [
-            r
-            for r in runs
-            if r["headSha"] == head_sha and r["status"] in ("queued", "in_progress")
+        sha_runs = [r for r in runs if r["headSha"] == head_sha]
+        active = [r for r in sha_runs if r["status"] in ("queued", "in_progress")]
+
+        # Fail fast if any run for this SHA already completed with a non-passing
+        # conclusion (e.g., a fast lint job failed before we started watching).
+        completed = [r for r in sha_runs if r["status"] == "completed"]
+        early_failures = [
+            r for r in completed if r.get("conclusion") not in _PASSING_CONCLUSIONS
         ]
+        if early_failures:
+            for r in early_failures:
+                path = write_failure_artifact(r["databaseId"])
+                emit(f"Failure details: {path}")
+            emit(f"{len(early_failures)} failure(s) detected before watching started")
+            return 1
+
         if active:
             break
         if attempt < STARTUP_RETRIES - 1:
