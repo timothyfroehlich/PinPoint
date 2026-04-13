@@ -873,8 +873,8 @@ jobs:
             echo '## E2E Test Failures'
             echo ''
             echo '```'
-            cat playwright-report/results.json 2>/dev/null \
-              | jq -r '.suites[].specs[] | select(.ok == false) | "FAIL: [\(.tests[0].projectName)] \(.title)"' \
+            jq -r '.suites[].specs[] | select(.ok == false) | "FAIL: [\(.tests[0].projectName)] \(.title)"' \
+              playwright-report/results.json \
               2>/dev/null \
               || echo "No structured results found — check Playwright report artifact"
             echo '```'
