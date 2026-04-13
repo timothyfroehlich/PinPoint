@@ -36,7 +36,7 @@ runs:
     - name: Export Supabase env vars
       shell: bash
       run: |
-        supabase status --output json | jq -r '
+        env_lines=$(supabase status --output json | jq -r '
           "NEXT_PUBLIC_SUPABASE_URL="              + (.API_URL | gsub("127\\.0\\.0\\.1";"localhost")),
           "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="  + .ANON_KEY,
           "SUPABASE_SERVICE_ROLE_KEY="             + .SERVICE_ROLE_KEY,
@@ -46,12 +46,19 @@ runs:
           "PORT=3000",
           "MAILPIT_PORT="  + (.INBUCKET_URL | split(":") | last),
           "INBUCKET_PORT=" + (.INBUCKET_URL | split(":") | last)
-        ' >> "$GITHUB_ENV"
+        ')
 
         # SMTP port is not in status output — read from config.toml
         smtp_port=$(grep smtp_port supabase/config.toml | grep -oE '[0-9]+')
-        echo "MAILPIT_SMTP_PORT=${smtp_port}" >> "$GITHUB_ENV"
-        echo "INBUCKET_SMTP_PORT=${smtp_port}" >> "$GITHUB_ENV"
+        env_lines+=$'\n'"MAILPIT_SMTP_PORT=${smtp_port}"
+        env_lines+=$'\n'"INBUCKET_SMTP_PORT=${smtp_port}"
+        env_lines+=$'\n'"EMAIL_TRANSPORT=smtp"
+
+        # Write to $GITHUB_ENV (available to subsequent workflow steps)
+        echo "$env_lines" >> "$GITHUB_ENV"
+
+        # Write .env.local — required by npm scripts using `node --env-file=.env.local`
+        echo "$env_lines" > .env.local
 
     - name: Initialize database
       if: inputs.seed == 'true'
