@@ -73,9 +73,7 @@ export async function submitFormAndWaitForRedirect(
       const responseBody = await actionResponse.text();
       const redirectToMatch =
         responseBody.match(/"redirectTo":"(\/m\/[^/"\\]+\/i\/\d+)"/) ??
-        responseBody.match(
-          /\\"redirectTo\\":\\"(\/m\/[^/"\\]+\/i\/\d+)\\"/
-        );
+        responseBody.match(/\\"redirectTo\\":\\"(\/m\/[^/"\\]+\/i\/\d+)\\"/);
       if (redirectToMatch?.[1]) {
         await page.goto(redirectToMatch[1]);
         return;
