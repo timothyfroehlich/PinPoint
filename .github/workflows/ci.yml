@@ -30,7 +30,7 @@ jobs:
       deps: ${{ steps.deps-filter.outputs.deps }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -75,7 +75,7 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -110,7 +110,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -150,7 +150,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -190,7 +190,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -230,7 +230,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -293,7 +293,7 @@ jobs:
     needs: [setup, typecheck, lint, format, linters, test-unit, test-integration]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -338,7 +338,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -383,7 +383,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -434,7 +434,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -470,18 +470,10 @@ jobs:
         with:
           version: latest
 
-      - name: Generate config.toml from template
-        run: cp supabase/config.toml.template supabase/config.toml
-
-      - name: Start Supabase (minimal services for migrations)
-        run: |
-          supabase start -x "studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta"
-
-      - name: Export Supabase environment
-        run: |
-          eval "$(supabase status -o env | sed 's/=/=\"/;s/$/\"/')"
-          echo "POSTGRES_URL=${DB_URL}" >> "$GITHUB_ENV"
-          echo "POSTGRES_URL_NON_POOLING=${DB_URL}" >> "$GITHUB_ENV"
+      - name: Setup Supabase
+        uses: ./.github/actions/setup-supabase
+        with:
+          seed: "false"
 
       - name: Apply migrations to fresh database
         run: pnpm run db:migrate
@@ -503,7 +495,7 @@ jobs:
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -539,14 +531,11 @@ jobs:
         with:
           version: latest
 
-      - name: Generate config.toml from template
-        run: cp supabase/config.toml.template supabase/config.toml
-
-      - name: Make Supabase integration script executable
-        run: chmod +x ./scripts/run-supabase-integration-tests.sh ./scripts/supabase-init-for-tests.sh
+      - name: Setup Supabase
+        uses: ./.github/actions/setup-supabase
 
       - name: Run Supabase integration tests
-        run: ./scripts/run-supabase-integration-tests.sh
+        run: pnpm run test:integration:supabase -- --reporter=verbose
 
   test-e2e-smoke:
     # ==============================================================================
@@ -561,7 +550,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -610,14 +599,8 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Generate config.toml from template
-        run: cp supabase/config.toml.template supabase/config.toml
-
-      - name: Make E2E script executable
-        run: chmod +x ./scripts/supabase-init-for-tests.sh
-
-      - name: Initialize Supabase
-        run: ./scripts/supabase-init-for-tests.sh
+      - name: Setup Supabase
+        uses: ./.github/actions/setup-supabase
 
       - name: Run Smoke Tests (Chromium)
         env:
@@ -647,7 +630,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -696,14 +679,8 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Generate config.toml from template
-        run: cp supabase/config.toml.template supabase/config.toml
-
-      - name: Make E2E script executable
-        run: chmod +x ./scripts/supabase-init-for-tests.sh
-
-      - name: Initialize Supabase
-        run: ./scripts/supabase-init-for-tests.sh
+      - name: Setup Supabase
+        uses: ./.github/actions/setup-supabase
 
       - name: Run Smoke Tests (Mobile Chrome)
         env:
@@ -733,7 +710,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -782,14 +759,8 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Generate config.toml from template
-        run: cp supabase/config.toml.template supabase/config.toml
-
-      - name: Make E2E script executable
-        run: chmod +x ./scripts/supabase-init-for-tests.sh
-
-      - name: Initialize Supabase
-        run: ./scripts/supabase-init-for-tests.sh
+      - name: Setup Supabase
+        uses: ./.github/actions/setup-supabase
 
       - name: Run Full Tests (Chromium)
         env:
@@ -820,7 +791,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -873,14 +844,8 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium webkit
 
-      - name: Generate config.toml from template
-        run: cp supabase/config.toml.template supabase/config.toml
-
-      - name: Make E2E script executable
-        run: chmod +x ./scripts/supabase-init-for-tests.sh
-
-      - name: Initialize Supabase
-        run: ./scripts/supabase-init-for-tests.sh
+      - name: Setup Supabase
+        uses: ./.github/actions/setup-supabase
 
       - name: Run Comprehensive Smoke Tests (all browsers)
         env:
@@ -915,7 +880,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -936,7 +901,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -1004,7 +969,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 

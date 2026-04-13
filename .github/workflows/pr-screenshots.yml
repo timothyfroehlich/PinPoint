@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc  # ratchet:step-security/harden-runner@v2.15.1
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # ratchet:step-security/harden-runner@v2.17.0
         with:
           egress-policy: audit
 
@@ -98,14 +98,8 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium webkit
 
-      - name: Generate config.toml from template
-        run: cp supabase/config.toml.template supabase/config.toml
-
-      - name: Make E2E script executable
-        run: chmod +x ./scripts/supabase-init-for-tests.sh
-
-      - name: Initialize Supabase
-        run: ./scripts/supabase-init-for-tests.sh
+      - name: Setup Supabase
+        uses: ./.github/actions/setup-supabase
 
       - name: Capture screenshots
         env:
