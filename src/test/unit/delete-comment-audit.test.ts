@@ -152,20 +152,13 @@ describe("deleteCommentAction - Audit Trail", () => {
       const mockUpdate = getMockUpdate();
       expect(mockUpdate).toHaveBeenCalled();
 
-      // Verify the set call has correct audit trail fields
+      // Verify the set call has correct structured audit trail event
       const mockSet = getMockSet();
       expect(mockSet).toHaveBeenCalledWith({
         isSystem: true,
         authorId: null,
-        content: {
-          type: "doc",
-          content: [
-            {
-              type: "paragraph",
-              content: [{ type: "text", text: "User deleted their comment" }],
-            },
-          ],
-        },
+        content: null,
+        eventData: { type: "comment_deleted", deletedBy: "author" },
         updatedAt: expect.any(Date),
       });
 
@@ -224,20 +217,13 @@ describe("deleteCommentAction - Audit Trail", () => {
 
       expect(result.ok).toBe(true);
 
-      // Verify the set call has correct admin message
+      // Verify the set call has correct structured admin audit event
       const mockSet = getMockSet();
       expect(mockSet).toHaveBeenCalledWith({
         isSystem: true,
         authorId: null,
-        content: {
-          type: "doc",
-          content: [
-            {
-              type: "paragraph",
-              content: [{ type: "text", text: "Comment removed by admin" }],
-            },
-          ],
-        },
+        content: null,
+        eventData: { type: "comment_deleted", deletedBy: "admin" },
         updatedAt: expect.any(Date),
       });
 

@@ -22,7 +22,8 @@ export type TimelineEventData =
   | { type: "status_changed"; from: string; to: string }
   | { type: "severity_changed"; from: string; to: string }
   | { type: "priority_changed"; from: string; to: string }
-  | { type: "frequency_changed"; from: string; to: string };
+  | { type: "frequency_changed"; from: string; to: string }
+  | { type: "comment_deleted"; deletedBy: "author" | "admin" };
 
 /**
  * Convert a structured timeline event to a human-readable string.
@@ -42,6 +43,10 @@ export function formatTimelineEvent(event: TimelineEventData): string {
       return `Priority changed from ${priorityLabel(event.from)} to ${priorityLabel(event.to)}`;
     case "frequency_changed":
       return `Frequency changed from ${frequencyLabel(event.from)} to ${frequencyLabel(event.to)}`;
+    case "comment_deleted":
+      return event.deletedBy === "author"
+        ? "User deleted their comment"
+        : "Comment removed by admin";
   }
 }
 

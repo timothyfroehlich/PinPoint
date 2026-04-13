@@ -323,14 +323,18 @@ describe("Issues CRUD Operations (PGlite)", () => {
         .insert(issueComments)
         .values({
           issueId: testIssue.id,
-          content: "Status changed from new to in_progress",
+          eventData: { type: "status_changed", from: "new", to: "in_progress" },
           isSystem: true,
           authorId: null,
         })
         .returning();
 
       expect(event).toBeDefined();
-      expect(event.content).toBe("Status changed from new to in_progress");
+      expect(event.eventData).toEqual({
+        type: "status_changed",
+        from: "new",
+        to: "in_progress",
+      });
       expect(event.isSystem).toBe(true);
       expect(event.authorId).toBeNull();
     });
@@ -341,7 +345,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
       // Create system event
       await db.insert(issueComments).values({
         issueId: testIssue.id,
-        content: "Status changed from new to in_progress",
+        eventData: { type: "status_changed", from: "new", to: "in_progress" },
         isSystem: true,
       });
 
@@ -372,9 +376,11 @@ describe("Issues CRUD Operations (PGlite)", () => {
       if (!userComment) throw new Error("User comment not found");
       if (!systemEvent) throw new Error("System event not found");
 
-      expect(systemEvent.comment.content).toBe(
-        "Status changed from new to in_progress"
-      );
+      expect(systemEvent.comment.eventData).toEqual({
+        type: "status_changed",
+        from: "new",
+        to: "in_progress",
+      });
       expect(systemEvent.comment.authorId).toBeNull();
       expect(userComment.author?.name).toBe("Test User");
     });
@@ -387,19 +393,23 @@ describe("Issues CRUD Operations (PGlite)", () => {
       await db.insert(issueComments).values([
         {
           issueId: testIssue.id,
-          content: "Priority changed",
+          eventData: { type: "priority_changed", from: "low", to: "high" },
           isSystem: true,
           createdAt: new Date(now - 3_000),
         },
         {
           issueId: testIssue.id,
-          content: "Status changed",
+          eventData: { type: "status_changed", from: "new", to: "in_progress" },
           isSystem: true,
           createdAt: new Date(now - 2_000),
         },
         {
           issueId: testIssue.id,
-          content: "Severity changed",
+          eventData: {
+            type: "severity_changed",
+            from: "minor",
+            to: "unplayable",
+          },
           isSystem: true,
           createdAt: new Date(now - 1_000),
         },
@@ -412,7 +422,11 @@ describe("Issues CRUD Operations (PGlite)", () => {
 
       expect(timeline).toHaveLength(3);
       // Most recent first when using desc
-      expect(timeline[0]?.content).toBe("Severity changed");
+      expect(timeline[0]?.eventData).toEqual({
+        type: "severity_changed",
+        from: "minor",
+        to: "unplayable",
+      });
     });
   });
 
@@ -520,7 +534,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
       // Create timeline event
       await db.insert(issueComments).values({
         issueId: issue.id,
-        content: "Status changed from new to in_progress",
+        eventData: { type: "status_changed", from: "new", to: "in_progress" },
         isSystem: true,
       });
 

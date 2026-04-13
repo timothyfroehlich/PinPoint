@@ -259,10 +259,8 @@ describe("Issue Service Functions (Integration)", () => {
         orderBy: desc(issueComments.createdAt),
       });
 
-      const reportEvent = events.find(
-        (e: any) => e.isSystem && e.content.includes("Issue reported by")
-      );
-      expect(reportEvent).toBeUndefined();
+      const systemEvents = events.filter((e) => e.isSystem);
+      expect(systemEvents).toHaveLength(0);
     });
 
     it("should create an anonymous issue", async () => {
@@ -287,10 +285,8 @@ describe("Issue Service Functions (Integration)", () => {
         orderBy: desc(issueComments.createdAt),
       });
 
-      const reportEvent = events.find(
-        (e: any) => e.isSystem && e.content.includes("Issue reported by")
-      );
-      expect(reportEvent).toBeUndefined();
+      const systemEvents = events.filter((e) => e.isSystem);
+      expect(systemEvents).toHaveLength(0);
     });
 
     it("should create a member issue", async () => {
@@ -315,10 +311,8 @@ describe("Issue Service Functions (Integration)", () => {
         orderBy: desc(issueComments.createdAt),
       });
 
-      const reportEvent = events.find(
-        (e: any) => e.isSystem && e.content.includes("Issue reported by")
-      );
-      expect(reportEvent).toBeUndefined();
+      const systemEvents = events.filter((e) => e.isSystem);
+      expect(systemEvents).toHaveLength(0);
     });
   });
 });

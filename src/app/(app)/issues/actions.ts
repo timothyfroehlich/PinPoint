@@ -40,7 +40,6 @@ import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { userProfiles, issueComments, issueImages } from "~/server/db/schema";
 import {
   type ProseMirrorDoc,
-  plainTextToDoc,
   docToPlainText,
   proseMirrorDocSchema,
 } from "~/lib/tiptap/types";
@@ -868,11 +867,8 @@ export async function deleteCommentAction(
       );
     }
 
-    // Instead of deleting, convert to an audit trail message
+    // Instead of deleting, convert to an audit trail event
     const isOwnComment = existingComment.authorId === user.id;
-    const content = isOwnComment
-      ? "User deleted their comment"
-      : "Comment removed by admin";
 
     const now = new Date();
 
@@ -886,13 +882,17 @@ export async function deleteCommentAction(
       })
       .where(eq(issueImages.commentId, commentId));
 
-    // Convert comment to audit trail message
+    // Convert comment to structured audit trail event
     await db
       .update(issueComments)
       .set({
         isSystem: true,
         authorId: null,
-        content: plainTextToDoc(content),
+        content: null,
+        eventData: {
+          type: "comment_deleted",
+          deletedBy: isOwnComment ? "author" : "admin",
+        },
         updatedAt: now,
       })
       .where(eq(issueComments.id, commentId));

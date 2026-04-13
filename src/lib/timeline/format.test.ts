@@ -59,6 +59,22 @@ describe("formatTimelineEvent", () => {
     );
   });
 
+  it("formats comment_deleted by author", () => {
+    const event: TimelineEventData = {
+      type: "comment_deleted",
+      deletedBy: "author",
+    };
+    expect(formatTimelineEvent(event)).toBe("User deleted their comment");
+  });
+
+  it("formats comment_deleted by admin", () => {
+    const event: TimelineEventData = {
+      type: "comment_deleted",
+      deletedBy: "admin",
+    };
+    expect(formatTimelineEvent(event)).toBe("Comment removed by admin");
+  });
+
   it("handles unknown status enum values gracefully", () => {
     const event: TimelineEventData = {
       type: "status_changed",
