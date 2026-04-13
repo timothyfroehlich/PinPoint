@@ -7,7 +7,6 @@
 
 import { db, type DbTransaction } from "~/server/db";
 import { issueComments } from "~/server/db/schema";
-import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 // Re-export types and formatting from the client-safe module
 export {
@@ -44,7 +43,6 @@ export async function createTimelineEvent(
   await tx.insert(issueComments).values({
     issueId,
     eventData: event,
-    content: { type: "doc", content: [] } satisfies ProseMirrorDoc,
     isSystem: true,
     authorId: actorId ?? null,
   });

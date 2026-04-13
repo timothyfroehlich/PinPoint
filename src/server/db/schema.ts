@@ -297,7 +297,7 @@ export const issueComments = pgTable(
       .notNull()
       .references(() => issues.id, { onDelete: "cascade" }),
     authorId: uuid("author_id").references(() => userProfiles.id),
-    content: jsonb("content").$type<ProseMirrorDoc>().notNull(),
+    content: jsonb("content").$type<ProseMirrorDoc>(),
     isSystem: boolean("is_system").notNull().default(false),
     eventData: jsonb("event_data").$type<TimelineEventData>(),
     createdAt: timestamp("created_at", { withTimezone: true })
