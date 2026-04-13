@@ -40,7 +40,7 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 ./scripts/workflow/label-ready.sh <PR> --dry-run         # Preview without acting
 
 # CI watching
-./scripts/workflow/monitor-gh-actions.sh                 # Watch all active CI runs in parallel, report failures
+./scripts/workflow/pr-watch.py <PR>                      # Stream CI + review events (Monitor-tool compatible)
 ./.agent/skills/pinpoint-commit/scripts/watch-ci.sh <PR> [timeout]  # Poll single PR CI (default 10min)
 
 # Worktree health

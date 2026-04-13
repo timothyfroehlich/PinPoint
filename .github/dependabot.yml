@@ -6,7 +6,7 @@ updates:
     schedule:
       interval: "daily"
     target-branch: "main"
-    versioning-strategy: increase
+    versioning-strategy: increase-if-necessary
     open-pull-requests-limit: 5
     rebase-strategy: "auto"
     commit-message:
