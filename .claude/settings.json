@@ -1,8 +1,6 @@
 {
   "permissions": {
     "deny": [
-      "Bash(find:*)",
-      "Bash(psql:*)",
       "Bash(supabase db push:*)"
     ]
   },
