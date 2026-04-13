@@ -4,7 +4,7 @@ import baseConfig from "./playwright.config";
 /**
  * Smoke tests most likely to surface cross-browser regressions locally.
  * Chromium/Mobile Chrome run the full smoke suite; Firefox/Mobile Safari run a
- * targeted subset unless CI explicitly requests all files.
+ * targeted subset locally and the full smoke suite in CI.
  */
 const CROSS_BROWSER_SUBSET = [
   "**/responsive-overflow.spec.ts",
