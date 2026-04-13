@@ -68,7 +68,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const shouldUseLoadingScreen = next === "/reset-password";
   const redirectPath = shouldUseLoadingScreen
-    ? `/auth/loading?next=${encodeURIComponent(next)}`
+    ? `/auth/callback-loading?next=${encodeURIComponent(next)}`
     : next;
 
   // Ensure redirectPath starts with / to avoid double slashes if siteUrl has trailing slash

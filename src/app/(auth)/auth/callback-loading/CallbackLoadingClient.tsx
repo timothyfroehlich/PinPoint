@@ -6,7 +6,7 @@ import type React from "react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export function LoadingClient({
+export function CallbackLoadingClient({
   nextPath,
 }: {
   nextPath: string;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { publicIssueSchema } from "~/app/report/schemas";
+import { publicIssueSchema } from "~/app/(app)/report/schemas";
 
 describe("publicIssueSchema", () => {
   const validUuid = "123e4567-e89b-12d3-a456-426614174000";

@@ -23,7 +23,7 @@ import {
 import { eq, desc } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
-import { imagesMetadataArraySchema } from "../(app)/issues/schemas";
+import { imagesMetadataArraySchema } from "../issues/schemas";
 import { deleteFromBlob } from "~/lib/blob/client";
 import { z } from "zod";
 import { ok, err, type Result } from "~/lib/result";

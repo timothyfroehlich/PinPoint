@@ -1,6 +1,6 @@
 import type React from "react";
 
-import { LoadingClient } from "./LoadingClient";
+import { CallbackLoadingClient } from "./CallbackLoadingClient";
 
 function isInternalPath(path: string): boolean {
   return path.startsWith("/") && !path.startsWith("//");
@@ -15,5 +15,5 @@ export default async function AuthLoadingPage({
   const rawNext = Array.isArray(params.next) ? params.next[0] : params.next;
   const nextPath = rawNext && isInternalPath(rawNext) ? rawNext : "/";
 
-  return <LoadingClient nextPath={nextPath} />;
+  return <CallbackLoadingClient nextPath={nextPath} />;
 }

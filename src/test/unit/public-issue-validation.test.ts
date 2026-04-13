@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parsePublicIssueForm } from "~/app/report/validation";
+import { parsePublicIssueForm } from "~/app/(app)/report/validation";
 
 const buildFormData = (
   entries: Record<string, string | undefined>

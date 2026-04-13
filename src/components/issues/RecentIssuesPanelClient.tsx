@@ -7,7 +7,7 @@ import { cn } from "~/lib/utils";
 import { AlertCircle, CheckCircle2, ChevronDown } from "lucide-react";
 import { Skeleton } from "~/components/ui/skeleton";
 import { getIssueStatusLabel } from "~/lib/issues/status";
-import type { RecentIssueData } from "~/app/report/actions";
+import type { RecentIssueData } from "~/app/(app)/report/actions";
 
 interface RecentIssuesPanelClientProps {
   machineInitials: string;
