@@ -183,6 +183,13 @@
       "when": 1776044216028,
       "tag": "0025_shiny_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776090705956,
+      "tag": "0026_premium_katie_power",
+      "breakpoints": true
     }
   ]
 }

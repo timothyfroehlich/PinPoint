@@ -1,0 +1,1 @@
+ALTER TABLE "issue_comments" ADD CONSTRAINT "chk_system_event_data" CHECK (NOT "issue_comments"."is_system" OR "issue_comments"."event_data" IS NOT NULL);

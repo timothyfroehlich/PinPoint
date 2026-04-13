@@ -88,6 +88,12 @@ export interface UpdateIssueFrequencyParams {
   userId: string;
 }
 
+export interface UpdateIssueTitleParams {
+  issueId: string;
+  title: string;
+  userId: string;
+}
+
 export interface UpdateIssueCommentParams {
   commentId: string;
   content: ProseMirrorDoc;
@@ -179,7 +185,8 @@ export async function createIssue({
       await createTimelineEvent(
         issue.id,
         { type: "assigned", assigneeName },
-        tx
+        tx,
+        reportedBy ?? null
       );
 
       // Auto-watch for assignee
@@ -778,6 +785,55 @@ export async function updateIssueFrequency({
   );
 
   return { issueId, oldFrequency, newFrequency: frequency };
+}
+
+/**
+ * Update issue title
+ */
+export async function updateIssueTitle({
+  issueId,
+  title,
+  userId,
+}: UpdateIssueTitleParams): Promise<{
+  issueId: string;
+  oldTitle: string;
+  newTitle: string;
+}> {
+  return await db.transaction(async (tx) => {
+    const currentIssue = await tx.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: { title: true },
+    });
+
+    if (!currentIssue) {
+      throw new Error("Issue not found");
+    }
+
+    const oldTitle = currentIssue.title;
+
+    if (oldTitle === title) {
+      return { issueId, oldTitle, newTitle: title };
+    }
+
+    await tx
+      .update(issues)
+      .set({ title, updatedAt: new Date() })
+      .where(eq(issues.id, issueId));
+
+    await createTimelineEvent(
+      issueId,
+      { type: "title_changed", from: oldTitle, to: title },
+      tx,
+      userId
+    );
+
+    log.info(
+      { issueId, oldTitle, newTitle: title, action: "updateIssueTitle" },
+      "Issue title updated"
+    );
+
+    return { issueId, oldTitle, newTitle: title };
+  });
 }
 
 /**

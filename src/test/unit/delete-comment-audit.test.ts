@@ -296,7 +296,8 @@ describe("deleteCommentAction - Audit Trail", () => {
         id: validCommentId,
         issueId: validIssueId,
         authorId: null,
-        content: "Status changed to in_progress",
+        eventData: { type: "status_changed", from: "new", to: "in_progress" },
+        content: null,
         isSystem: true,
       } as any);
 

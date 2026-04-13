@@ -23,7 +23,8 @@ export type TimelineEventData =
   | { type: "severity_changed"; from: string; to: string }
   | { type: "priority_changed"; from: string; to: string }
   | { type: "frequency_changed"; from: string; to: string }
-  | { type: "comment_deleted"; deletedBy: "author" | "admin" };
+  | { type: "comment_deleted"; deletedBy: "author" | "admin" }
+  | { type: "title_changed"; from: string; to: string };
 
 /**
  * Convert a structured timeline event to a human-readable string.
@@ -47,6 +48,10 @@ export function formatTimelineEvent(event: TimelineEventData): string {
       return event.deletedBy === "author"
         ? "User deleted their comment"
         : "Comment removed by admin";
+    case "title_changed":
+      return `Title changed from "${event.from}" to "${event.to}"`;
+    default:
+      return `Unknown event: ${(event satisfies never as { type: string }).type}`;
   }
 }
 

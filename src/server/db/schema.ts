@@ -313,6 +313,10 @@ export const issueComments = pgTable(
       t.createdAt
     ),
     authorIdIdx: index("idx_issue_comments_author_id").on(t.authorId),
+    systemEventDataCheck: check(
+      "chk_system_event_data",
+      sql`NOT ${t.isSystem} OR ${t.eventData} IS NOT NULL`
+    ),
   })
 );
 

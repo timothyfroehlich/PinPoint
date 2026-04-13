@@ -75,6 +75,17 @@ describe("formatTimelineEvent", () => {
     expect(formatTimelineEvent(event)).toBe("Comment removed by admin");
   });
 
+  it("formats title_changed event", () => {
+    const event: TimelineEventData = {
+      type: "title_changed",
+      from: "Old Title",
+      to: "New Title",
+    };
+    expect(formatTimelineEvent(event)).toBe(
+      'Title changed from "Old Title" to "New Title"'
+    );
+  });
+
   it("handles unknown status enum values gracefully", () => {
     const event: TimelineEventData = {
       type: "status_changed",

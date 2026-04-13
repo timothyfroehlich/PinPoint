@@ -35,6 +35,7 @@ import {
   updateIssuePriority,
   updateIssueFrequency,
   updateIssueComment,
+  updateIssueTitle,
 } from "~/services/issues";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { userProfiles, issueComments, issueImages } from "~/server/db/schema";
@@ -998,10 +999,7 @@ export async function updateIssueTitleAction(
       );
     }
 
-    await db
-      .update(issues)
-      .set({ title, updatedAt: new Date() })
-      .where(eq(issues.id, issueId));
+    await updateIssueTitle({ issueId, title, userId: user.id });
 
     const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
     revalidatePath(issuePath);
