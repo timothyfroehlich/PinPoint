@@ -44,7 +44,7 @@ export async function createTimelineEvent(
   await tx.insert(issueComments).values({
     issueId,
     eventData: event,
-    content: { type: "doc", content: [] } as ProseMirrorDoc,
+    content: { type: "doc", content: [] } satisfies ProseMirrorDoc,
     isSystem: true,
     authorId: actorId ?? null,
   });

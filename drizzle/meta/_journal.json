@@ -169,6 +169,13 @@
       "when": 1775619436307,
       "tag": "0023_glorious_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1776042866989,
+      "tag": "0024_cleanup_orphaned_schema_drift",
+      "breakpoints": true
     }
   ]
 }

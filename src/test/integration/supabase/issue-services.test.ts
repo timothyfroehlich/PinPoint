@@ -136,10 +136,7 @@ describe("Issue Service Functions (Integration)", () => {
     });
 
     const statusEvent = events.find(
-      (e) =>
-        e.isSystem &&
-        e.eventData !== null &&
-        (e.eventData as Record<string, unknown>).type === "status_changed"
+      (e) => e.isSystem && e.eventData?.type === "status_changed"
     );
     expect(statusEvent).toBeDefined();
     expect(statusEvent?.eventData).toEqual({

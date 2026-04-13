@@ -36,41 +36,48 @@ WITH sys_events AS (
   WHERE is_system = true
     AND event_data IS NULL
     AND content->'content'->0->'content'->0->>'text' ~ '^Status changed from .+ to .+$'
+),
+mapped AS (
+  SELECT
+    id,
+    CASE
+      WHEN txt LIKE 'Status changed from New to %' THEN 'new'
+      WHEN txt LIKE 'Status changed from Confirmed to %' THEN 'confirmed'
+      WHEN txt LIKE 'Status changed from In Progress to %' THEN 'in_progress'
+      WHEN txt LIKE 'Status changed from Need Parts to %' THEN 'need_parts'
+      WHEN txt LIKE 'Status changed from Need Help to %' THEN 'need_help'
+      WHEN txt LIKE 'Status changed from Pending Owner to %' THEN 'wait_owner'
+      WHEN txt LIKE 'Status changed from Fixed to %' THEN 'fixed'
+      WHEN txt LIKE 'Status changed from As Intended to %' THEN 'wai'
+      WHEN txt LIKE 'Status changed from Won''t Fix to %' THEN 'wont_fix'
+      WHEN txt LIKE 'Status changed from No Repro to %' THEN 'no_repro'
+      WHEN txt LIKE 'Status changed from Duplicate to %' THEN 'duplicate'
+    END AS from_val,
+    CASE
+      WHEN txt LIKE '% to New' THEN 'new'
+      WHEN txt LIKE '% to Confirmed' THEN 'confirmed'
+      WHEN txt LIKE '% to In Progress' THEN 'in_progress'
+      WHEN txt LIKE '% to Need Parts' THEN 'need_parts'
+      WHEN txt LIKE '% to Need Help' THEN 'need_help'
+      WHEN txt LIKE '% to Pending Owner' THEN 'wait_owner'
+      WHEN txt LIKE '% to Fixed' THEN 'fixed'
+      WHEN txt LIKE '% to As Intended' THEN 'wai'
+      WHEN txt LIKE '% to Won''t Fix' THEN 'wont_fix'
+      WHEN txt LIKE '% to No Repro' THEN 'no_repro'
+      WHEN txt LIKE '% to Duplicate' THEN 'duplicate'
+    END AS to_val
+  FROM sys_events
 )
 UPDATE "issue_comments" ic
 SET event_data = jsonb_build_object(
   'type', 'status_changed',
-  'from', CASE
-    WHEN e.txt LIKE 'Status changed from New to %' THEN 'new'
-    WHEN e.txt LIKE 'Status changed from Confirmed to %' THEN 'confirmed'
-    WHEN e.txt LIKE 'Status changed from In Progress to %' THEN 'in_progress'
-    WHEN e.txt LIKE 'Status changed from Need Parts to %' THEN 'need_parts'
-    WHEN e.txt LIKE 'Status changed from Need Help to %' THEN 'need_help'
-    WHEN e.txt LIKE 'Status changed from Pending Owner to %' THEN 'wait_owner'
-    WHEN e.txt LIKE 'Status changed from Fixed to %' THEN 'fixed'
-    WHEN e.txt LIKE 'Status changed from As Intended to %' THEN 'wai'
-    WHEN e.txt LIKE 'Status changed from Won''t Fix to %' THEN 'wont_fix'
-    WHEN e.txt LIKE 'Status changed from No Repro to %' THEN 'no_repro'
-    WHEN e.txt LIKE 'Status changed from Duplicate to %' THEN 'duplicate'
-    ELSE 'unknown'
-  END,
-  'to', CASE
-    WHEN e.txt LIKE '% to New' THEN 'new'
-    WHEN e.txt LIKE '% to Confirmed' THEN 'confirmed'
-    WHEN e.txt LIKE '% to In Progress' THEN 'in_progress'
-    WHEN e.txt LIKE '% to Need Parts' THEN 'need_parts'
-    WHEN e.txt LIKE '% to Need Help' THEN 'need_help'
-    WHEN e.txt LIKE '% to Pending Owner' THEN 'wait_owner'
-    WHEN e.txt LIKE '% to Fixed' THEN 'fixed'
-    WHEN e.txt LIKE '% to As Intended' THEN 'wai'
-    WHEN e.txt LIKE '% to Won''t Fix' THEN 'wont_fix'
-    WHEN e.txt LIKE '% to No Repro' THEN 'no_repro'
-    WHEN e.txt LIKE '% to Duplicate' THEN 'duplicate'
-    ELSE 'unknown'
-  END
+  'from', m.from_val,
+  'to', m.to_val
 )
-FROM sys_events e
-WHERE ic.id = e.id;
+FROM mapped m
+WHERE ic.id = m.id
+  AND m.from_val IS NOT NULL
+  AND m.to_val IS NOT NULL;
 
 -- statement-breakpoint
 

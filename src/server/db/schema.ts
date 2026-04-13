@@ -16,7 +16,7 @@ import {
 import { citext } from "~/server/db/citext";
 import { ISSUE_STATUS_VALUES, type IssueStatus } from "~/lib/issues/status";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
-import { type TimelineEventData } from "~/lib/timeline/events";
+import { type TimelineEventData } from "~/lib/timeline/types";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,

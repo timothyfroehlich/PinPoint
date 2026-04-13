@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   formatTimelineEvent,
   type TimelineEventData,
-} from "~/lib/timeline/events";
+} from "~/lib/timeline/types";
 
 describe("formatTimelineEvent", () => {
   it("formats assigned event", () => {
