@@ -606,7 +606,7 @@ jobs:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
-        run: pnpm exec playwright test e2e/smoke --project=chromium --reporter=dot
+        run: pnpm exec playwright test e2e/smoke --project=chromium --reporter=dot --reporter=github
 
       - name: Upload Playwright report
         if: failure()
@@ -686,7 +686,7 @@ jobs:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
-        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome" --reporter=dot
+        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome" --reporter=dot --reporter=github
 
       - name: Upload Playwright report
         if: failure()
@@ -766,7 +766,7 @@ jobs:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
-        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium --reporter=dot
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium --reporter=dot --reporter=github
 
       - name: Upload Playwright report
         if: failure()
@@ -854,7 +854,7 @@ jobs:
         run: |
           pnpm exec playwright test --config=playwright.config.smoke.ts \
             --project=chromium --project="Mobile Chrome" \
-            --project="Mobile Safari" --workers=3 --reporter=dot
+            --project="Mobile Safari" --workers=3 --reporter=dot --reporter=github
 
       - name: Run Comprehensive Full Tests (all browsers)
         env:
@@ -864,7 +864,21 @@ jobs:
         run: |
           pnpm exec playwright test --config=playwright.config.full.ts \
             --project=chromium --project="Mobile Chrome" \
-            --project="Mobile Safari" --workers=3 --reporter=dot
+            --project="Mobile Safari" --workers=3 --reporter=dot --reporter=github
+
+      - name: Summarize test failures
+        if: failure()
+        run: |
+          {
+            echo '## E2E Test Failures'
+            echo ''
+            echo '```'
+            cat playwright-report/results.json 2>/dev/null \
+              | jq -r '.suites[].specs[] | select(.ok == false) | "FAIL: [\(.tests[0].projectName)] \(.title)"' \
+              2>/dev/null \
+              || echo "No structured results found — check Playwright report artifact"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Playwright report
         if: failure()
