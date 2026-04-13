@@ -22,7 +22,7 @@ import {
   updateIssueFrequency,
   createIssue,
 } from "~/services/issues";
-import { docToPlainText, plainTextToDoc } from "~/lib/tiptap/types";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 
 // Mock the database to use the PGlite instance
 vi.mock("~/server/db", () => ({
@@ -135,14 +135,15 @@ describe("Issue Service Functions (Integration)", () => {
       orderBy: desc(issueComments.createdAt),
     });
 
-    const statusEvent = events.find((e) =>
-      docToPlainText(e.content).includes("Status changed")
+    const statusEvent = events.find(
+      (e) => e.isSystem && e.eventData?.type === "status_changed"
     );
     expect(statusEvent).toBeDefined();
-    expect(docToPlainText(statusEvent!.content)).toContain(
-      "from New to In Progress"
-    );
-    expect(statusEvent?.isSystem).toBe(true);
+    expect(statusEvent?.eventData).toEqual({
+      type: "status_changed",
+      from: "new",
+      to: "in_progress",
+    });
     expect(statusEvent?.authorId).toBe(testUser.id);
   });
 
@@ -167,10 +168,11 @@ describe("Issue Service Functions (Integration)", () => {
       orderBy: desc(issueComments.createdAt),
     });
 
-    expect(docToPlainText(event!.content)).toContain("Severity changed");
-    expect(docToPlainText(event!.content)).toContain(
-      "from Minor to Unplayable"
-    );
+    expect(event?.eventData).toEqual({
+      type: "severity_changed",
+      from: "minor",
+      to: "unplayable",
+    });
     expect(event?.authorId).toBe(testUser.id);
   });
 
@@ -195,8 +197,11 @@ describe("Issue Service Functions (Integration)", () => {
       orderBy: desc(issueComments.createdAt),
     });
 
-    expect(docToPlainText(event!.content)).toContain("Priority changed");
-    expect(docToPlainText(event!.content)).toContain("from Low to High");
+    expect(event?.eventData).toEqual({
+      type: "priority_changed",
+      from: "low",
+      to: "high",
+    });
     expect(event?.authorId).toBe(testUser.id);
   });
 
@@ -221,10 +226,11 @@ describe("Issue Service Functions (Integration)", () => {
       orderBy: desc(issueComments.createdAt),
     });
 
-    expect(docToPlainText(event!.content)).toContain("Frequency changed");
-    expect(docToPlainText(event!.content)).toContain(
-      "from Intermittent to Constant"
-    );
+    expect(event?.eventData).toEqual({
+      type: "frequency_changed",
+      from: "intermittent",
+      to: "constant",
+    });
     expect(event?.authorId).toBe(testUser.id);
   });
 

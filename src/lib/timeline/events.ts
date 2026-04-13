@@ -7,35 +7,42 @@
 
 import { db, type DbTransaction } from "~/server/db";
 import { issueComments } from "~/server/db/schema";
-import { plainTextToDoc } from "~/lib/tiptap/types";
+
+// Re-export types and formatting from the client-safe module
+export {
+  type TimelineEventData,
+  formatTimelineEvent,
+} from "~/lib/timeline/types";
+import { type TimelineEventData } from "~/lib/timeline/types";
 
 /**
  * Create a system timeline event for an issue
  *
  * System events appear in the timeline as single-line entries,
- * not as full comment boxes.
+ * not as full comment boxes. The structured event is stored in
+ * the `event_data` column and rendered via `formatTimelineEvent`.
  *
  * @param issueId - The issue to add the event to
- * @param content - The event description (e.g., "Status changed from new to in_progress")
+ * @param event - The structured event payload (discriminated union on `type`)
  * @param tx - Optional database transaction
  * @param actorId - Optional user ID of the person who performed the action
  *
  * @example
  * ```ts
- * await createTimelineEvent(issueId, "Status changed from new to in_progress", db, userId);
- * await createTimelineEvent(issueId, "Assigned to John Doe", tx, actorId);
- * await createTimelineEvent(issueId, "Marked as closed");
+ * await createTimelineEvent(issueId, { type: "status_changed", from: "new", to: "in_progress" }, db, userId);
+ * await createTimelineEvent(issueId, { type: "assigned", assigneeName: "John Doe" }, tx, actorId);
+ * await createTimelineEvent(issueId, { type: "unassigned" });
  * ```
  */
 export async function createTimelineEvent(
   issueId: string,
-  content: string,
+  event: TimelineEventData,
   tx: DbTransaction = db,
   actorId?: string | null
 ): Promise<void> {
   await tx.insert(issueComments).values({
     issueId,
-    content: plainTextToDoc(content),
+    eventData: event,
     isSystem: true,
     authorId: actorId ?? null,
   });
