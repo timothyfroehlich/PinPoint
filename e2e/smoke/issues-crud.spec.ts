@@ -102,6 +102,15 @@ test.describe("Issues System", () => {
         seededMachines.addamsFamily.initials
       );
 
+      // Wait for the search to update the URL before clicking results — the
+      // fill() triggers a debounced search + re-render, and clicking during the
+      // re-render can miss the navigation.
+      await expect
+        .poll(() => new URL(page.url()).searchParams.get("q"), {
+          timeout: 10000,
+        })
+        .toBe(seededMachines.addamsFamily.initials);
+
       // Click the stable machine detail link by initials. The display name can
       // change earlier in the serial suite, but the route remains /m/TAF.
       const addamsFamilyLink = page.locator(
