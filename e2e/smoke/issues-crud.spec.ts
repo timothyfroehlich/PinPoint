@@ -13,7 +13,10 @@ import {
 } from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
-import { fillReportForm } from "../support/page-helpers.js";
+import {
+  fillReportForm,
+  submitFormAndWaitForRedirect,
+} from "../support/page-helpers.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
 const createdIssueIds = new Set<string>();
@@ -27,10 +30,11 @@ const rememberIssueId = (page: Page): void => {
 
 test.describe("Issues System", () => {
   test.use({ storageState: STORAGE_STATE.member });
-
-  test.beforeEach(() => {
-    // Increase timeout for local execution where compilation can be slow
-    test.setTimeout(60000);
+  test.beforeEach(({}, testInfo) => {
+    // Mobile Safari can take longer to settle Server Action redirects.
+    test.setTimeout(
+      testInfo.project.name.includes("Mobile Safari") ? 120000 : 60000
+    );
   });
 
   test.afterEach(async ({ request }) => {
@@ -59,7 +63,14 @@ test.describe("Issues System", () => {
       });
 
       // Submit form
-      await page.getByRole("button", { name: "Submit Issue Report" }).click();
+      await submitFormAndWaitForRedirect(
+        page,
+        page.getByRole("button", { name: "Submit Issue Report" }),
+        {
+          awayFrom: "/report",
+          expectedIssueTitle: "Test flipper not working",
+        }
+      );
 
       // Should redirect to issue detail page in new format
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
@@ -83,12 +94,12 @@ test.describe("Issues System", () => {
         page.getByRole("heading", { name: "Machines" })
       ).toBeVisible();
 
-      await page
-        .getByPlaceholder("Search machines by name or initials...")
-        .fill(seededMachines.addamsFamily.initials);
-      await page.waitForURL(
-        (url) =>
-          url.searchParams.get("q") === seededMachines.addamsFamily.initials
+      const machineSearchInput = page.getByPlaceholder(
+        "Search machines by name or initials..."
+      );
+      await machineSearchInput.fill(seededMachines.addamsFamily.initials);
+      await expect(machineSearchInput).toHaveValue(
+        seededMachines.addamsFamily.initials
       );
 
       // Click the stable machine detail link by initials. The display name can
@@ -110,7 +121,14 @@ test.describe("Issues System", () => {
       await fillReportForm(page, { title: "Display flickering" });
 
       // Submit
-      await page.getByRole("button", { name: "Submit Issue Report" }).click();
+      await submitFormAndWaitForRedirect(
+        page,
+        page.getByRole("button", { name: "Submit Issue Report" }),
+        {
+          awayFrom: "/report",
+          expectedIssueTitle: "Display flickering",
+        }
+      );
 
       // Verify creation
       await expect(page).toHaveURL(/\/m\/TAF\/i\/[0-9]+/);
@@ -134,10 +152,17 @@ test.describe("Issues System", () => {
     test.beforeEach(async ({ page }) => {
       // Create an issue first to navigate to via UI interaction
       machineInitials = seededMachines.addamsFamily.initials;
-      issueTitle = `Test Issue for Details ${Date.now()}`;
+      issueTitle = `Details ${Date.now()}`;
       await page.goto(`/report?machine=${machineInitials}`);
       await fillReportForm(page, { title: issueTitle, priority: "medium" });
-      await page.getByRole("button", { name: "Submit Issue Report" }).click();
+      await submitFormAndWaitForRedirect(
+        page,
+        page.getByRole("button", { name: "Submit Issue Report" }),
+        {
+          awayFrom: "/report",
+          expectedIssueTitle: issueTitle,
+        }
+      );
 
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
       issueUrl = page.url();
@@ -214,10 +239,17 @@ test.describe("Issues System", () => {
     test.beforeEach(async ({ page }) => {
       // Create a fresh issue for this worker to avoid parallel test conflicts
       const machineInitials = seededMachines.humptyDumpty.initials;
-      issueTitle = `Assignee Test ${Date.now()}`;
+      issueTitle = `Assignee ${Date.now()}`;
       await page.goto(`/report?machine=${machineInitials}`);
       await fillReportForm(page, { title: issueTitle, priority: "medium" });
-      await page.getByRole("button", { name: "Submit Issue Report" }).click();
+      await submitFormAndWaitForRedirect(
+        page,
+        page.getByRole("button", { name: "Submit Issue Report" }),
+        {
+          awayFrom: "/report",
+          expectedIssueTitle: issueTitle,
+        }
+      );
 
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
       issueUrl = page.url();

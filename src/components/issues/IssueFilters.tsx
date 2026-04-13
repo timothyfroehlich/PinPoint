@@ -464,8 +464,9 @@ export function IssueFilters({
           className="flex items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
+            const submittedSearch = inputRef.current?.value ?? search;
             startTransition(() => {
-              pushFilters({ q: search, page: 1 });
+              pushFilters({ q: submittedSearch, page: 1 });
             });
           }}
         >
