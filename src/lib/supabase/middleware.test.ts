@@ -228,7 +228,7 @@ describe("updateSession public route access", () => {
     "/settings",
     "/admin/users",
     "/notifications",
-    "/debug/badges",
+    "/dev/badges",
   ];
 
   it.each(protectedRoutes)(

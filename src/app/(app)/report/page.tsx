@@ -2,7 +2,6 @@ import type React from "react";
 import { asc, eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
-import { MainLayout } from "~/components/layout/MainLayout";
 import { resolveDefaultMachineId } from "./default-machine";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -81,21 +80,19 @@ export default async function PublicReportPage({
   }
 
   return (
-    <MainLayout>
-      <PageContainer size="standard">
-        <PageHeader title="Report an Issue" />
-        {/* CORE-SEC-006: Pass minimal user shape, not full Supabase user */}
-        <UnifiedReportForm
-          machinesList={machinesList}
-          defaultMachineId={defaultMachineId}
-          userAuthenticated={Boolean(user)}
-          accessLevel={accessLevel}
-          assignees={assignees}
-          initialError={errorMessage}
-          initialIssues={initialIssues}
-          initialMachineInitials={selectedMachine?.initials ?? ""}
-        />
-      </PageContainer>
-    </MainLayout>
+    <PageContainer size="standard">
+      <PageHeader title="Report an Issue" />
+      {/* CORE-SEC-006: Pass minimal user shape, not full Supabase user */}
+      <UnifiedReportForm
+        machinesList={machinesList}
+        defaultMachineId={defaultMachineId}
+        userAuthenticated={Boolean(user)}
+        accessLevel={accessLevel}
+        assignees={assignees}
+        initialError={errorMessage}
+        initialIssues={initialIssues}
+        initialMachineInitials={selectedMachine?.initials ?? ""}
+      />
+    </PageContainer>
   );
 }

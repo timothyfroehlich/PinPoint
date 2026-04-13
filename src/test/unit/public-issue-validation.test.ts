@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parsePublicIssueForm } from "~/app/report/validation";
+import { parsePublicIssueForm } from "~/app/(app)/report/validation";
 
 const buildFormData = (
   entries: Record<string, string | undefined>
@@ -36,7 +36,8 @@ describe("parsePublicIssueForm", () => {
   it("returns error when required fields are missing", () => {
     const formData = buildFormData({
       title: "Missing machine",
-      severity: "playable",
+      severity: "minor",
+      frequency: "intermittent",
     });
 
     const result = parsePublicIssueForm(formData);
@@ -52,6 +53,7 @@ describe("parsePublicIssueForm", () => {
       machineId: "123e4567-e89b-12d3-a456-426614174000",
       title: "Bad severity",
       severity: "critical",
+      frequency: "intermittent",
     });
 
     const result = parsePublicIssueForm(formData);
