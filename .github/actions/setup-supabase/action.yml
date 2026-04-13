@@ -1,0 +1,70 @@
+name: Setup Supabase
+description: >-
+  Start local Supabase with retry, export env vars via jq,
+  and optionally seed the database for CI tests.
+
+inputs:
+  seed:
+    description: Run migrations + seed after starting (set to 'false' for migration-only jobs)
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Generate config.toml from template
+      shell: bash
+      run: cp supabase/config.toml.template supabase/config.toml
+
+    - name: Start Supabase (with retry)
+      shell: bash
+      run: |
+        exclude="studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta"
+        for attempt in 1 2 3; do
+          if supabase start -x "$exclude"; then
+            echo "::notice::Supabase started successfully (attempt $attempt/3)"
+            exit 0
+          fi
+          echo "::warning::supabase start failed (attempt $attempt/3)"
+          supabase stop --no-backup 2>/dev/null || true
+          docker rm -f $(docker ps -aq --filter "label=com.supabase.cli.project=pinpoint") 2>/dev/null || true
+          sleep 10
+        done
+        echo "::error::supabase start failed after 3 attempts"
+        exit 1
+
+    - name: Export Supabase env vars
+      shell: bash
+      run: |
+        env_lines=$(supabase status --output json | jq -r '
+          "NEXT_PUBLIC_SUPABASE_URL="              + (.API_URL | gsub("127\\.0\\.0\\.1";"localhost")),
+          "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="  + .ANON_KEY,
+          "SUPABASE_SERVICE_ROLE_KEY="             + .SERVICE_ROLE_KEY,
+          "POSTGRES_URL="                          + (.DB_URL | gsub("127\\.0\\.0\\.1";"localhost")),
+          "POSTGRES_URL_NON_POOLING="              + (.DB_URL | gsub("127\\.0\\.0\\.1";"localhost")),
+          "NEXT_PUBLIC_SITE_URL=http://localhost:3000",
+          "PORT=3000",
+          "MAILPIT_PORT="  + (.INBUCKET_URL | split(":") | last),
+          "INBUCKET_PORT=" + (.INBUCKET_URL | split(":") | last)
+        ')
+
+        # SMTP port is not in status output — read from config.toml
+        smtp_port=$(grep smtp_port supabase/config.toml | grep -oE '[0-9]+')
+        env_lines+=$'\n'"MAILPIT_SMTP_PORT=${smtp_port}"
+        env_lines+=$'\n'"INBUCKET_SMTP_PORT=${smtp_port}"
+        env_lines+=$'\n'"EMAIL_TRANSPORT=smtp"
+
+        # Write to $GITHUB_ENV (available to subsequent workflow steps)
+        echo "$env_lines" >> "$GITHUB_ENV"
+
+        # Write .env.local — required by npm scripts using `node --env-file=.env.local`
+        echo "$env_lines" > .env.local
+
+    - name: Initialize database
+      if: inputs.seed == 'true'
+      shell: bash
+      run: |
+        pnpm run db:migrate
+        pnpm run test:_generate-schema
+        pnpm run db:_seed
+        pnpm run db:_seed-users
