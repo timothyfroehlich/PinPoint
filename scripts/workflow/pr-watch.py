@@ -83,13 +83,18 @@ def watch_run(
         if stop.is_set():
             return
 
-        if proc.returncode == 0:
-            emit(f"✓  {name} — passed")
-            return
+        # Verify via API regardless of exit code — gh run watch can exit 0
+        # prematurely if jobs haven't been assigned yet when the watcher starts.
+        status, conclusion = _run_conclusion(run_id)
+
+        if proc.returncode == 0 and status not in ("queued", "in_progress"):
+            if conclusion in _PASSING_CONCLUSIONS:
+                emit(f"✓  {name} — passed")
+                return
+            # Exited 0 but API says non-passing — fall through to failure handling.
 
         # gh run watch exited non-zero — verify via API before declaring failure.
         # It can crash or disconnect while the run is still in progress.
-        status, conclusion = _run_conclusion(run_id)
 
         if status in ("queued", "in_progress"):
             # Watcher crashed prematurely — restart it.
