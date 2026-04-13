@@ -87,7 +87,7 @@ export async function submitFormAndWaitForRedirect(
       const issueLink = page
         .getByRole("link", {
           name: new RegExp(
-            `^View issue: ${escapeRegex(expectedIssueTitle)}\\b`
+            `^View issue: ${escapeRegex(expectedIssueTitle)}\\s-\\s`
           ),
         })
         .first();
