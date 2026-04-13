@@ -28,7 +28,8 @@ describe("publicIssueSchema", () => {
   it("should reject missing machineId", () => {
     const result = publicIssueSchema.safeParse({
       title: "Public Report",
-      severity: "playable",
+      severity: "minor",
+      frequency: "intermittent",
     });
     expect(result.success).toBe(false);
   });
@@ -37,7 +38,8 @@ describe("publicIssueSchema", () => {
     const result = publicIssueSchema.safeParse({
       machineId: "not-a-uuid",
       title: "Public Report",
-      severity: "playable",
+      severity: "minor",
+      frequency: "intermittent",
     });
     expect(result.success).toBe(false);
   });
@@ -46,7 +48,8 @@ describe("publicIssueSchema", () => {
     const result = publicIssueSchema.safeParse({
       machineId: validUuid,
       title: "",
-      severity: "playable",
+      severity: "minor",
+      frequency: "intermittent",
     });
     expect(result.success).toBe(false);
   });
@@ -54,8 +57,9 @@ describe("publicIssueSchema", () => {
   it("should reject too long title", () => {
     const result = publicIssueSchema.safeParse({
       machineId: validUuid,
-      title: "a".repeat(201),
-      severity: "playable",
+      title: "a".repeat(61),
+      severity: "minor",
+      frequency: "intermittent",
     });
     expect(result.success).toBe(false);
   });
@@ -64,8 +68,9 @@ describe("publicIssueSchema", () => {
     const result = publicIssueSchema.safeParse({
       machineId: validUuid,
       title: "Public Report",
-      description: "a".repeat(5001),
-      severity: "playable",
+      description: "a".repeat(20001),
+      severity: "minor",
+      frequency: "intermittent",
     });
     expect(result.success).toBe(false);
   });
@@ -75,6 +80,7 @@ describe("publicIssueSchema", () => {
       machineId: validUuid,
       title: "Public Report",
       severity: "bad",
+      frequency: "intermittent",
     });
     expect(result.success).toBe(false);
   });
