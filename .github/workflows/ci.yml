@@ -851,20 +851,22 @@ jobs:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
         run: |
           pnpm exec playwright test --config=playwright.config.smoke.ts \
             --project=chromium --project="Mobile Chrome" \
-            --project="Mobile Safari" --workers=3 --reporter=dot --reporter=github
+            --project="Mobile Safari" --workers=3 --reporter=dot --reporter=github --reporter=json
 
       - name: Run Comprehensive Full Tests (all browsers)
         env:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
         run: |
           pnpm exec playwright test --config=playwright.config.full.ts \
             --project=chromium --project="Mobile Chrome" \
-            --project="Mobile Safari" --workers=3 --reporter=dot --reporter=github
+            --project="Mobile Safari" --workers=3 --reporter=dot --reporter=github --reporter=json
 
       - name: Summarize test failures
         if: failure()
