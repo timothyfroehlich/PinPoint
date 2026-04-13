@@ -162,6 +162,27 @@
       "when": 1772991974319,
       "tag": "0022_curvy_guardsmen",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1775619436307,
+      "tag": "0023_glorious_warbound",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1776042866989,
+      "tag": "0024_cleanup_orphaned_schema_drift",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1776044216028,
+      "tag": "0025_shiny_switch",
+      "breakpoints": true
     }
   ]
 }

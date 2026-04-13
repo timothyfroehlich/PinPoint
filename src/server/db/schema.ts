@@ -16,6 +16,7 @@ import {
 import { citext } from "~/server/db/citext";
 import { ISSUE_STATUS_VALUES, type IssueStatus } from "~/lib/issues/status";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import { type TimelineEventData } from "~/lib/timeline/types";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -296,8 +297,9 @@ export const issueComments = pgTable(
       .notNull()
       .references(() => issues.id, { onDelete: "cascade" }),
     authorId: uuid("author_id").references(() => userProfiles.id),
-    content: jsonb("content").$type<ProseMirrorDoc>().notNull(),
+    content: jsonb("content").$type<ProseMirrorDoc>(),
     isSystem: boolean("is_system").notNull().default(false),
+    eventData: jsonb("event_data").$type<TimelineEventData>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

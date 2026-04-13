@@ -8,7 +8,7 @@ import type {
 
 export type IssueCommentWithAuthor = Pick<
   IssueComment,
-  "id" | "content" | "createdAt" | "updatedAt" | "isSystem"
+  "id" | "content" | "createdAt" | "updatedAt" | "isSystem" | "eventData"
 > & {
   author?: Pick<UserProfile, "id" | "name"> | null;
   images: IssueImage[];
