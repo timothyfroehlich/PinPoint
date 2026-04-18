@@ -5,6 +5,7 @@ import { StatusSelect } from "./StatusSelect";
 import { PrioritySelect } from "./PrioritySelect";
 import { FrequencySelect } from "./FrequencySelect";
 import React from "react";
+import { TooltipProvider } from "~/components/ui/tooltip";
 
 // Mock ResizeObserver for Radix UI
 globalThis.ResizeObserver = vi.fn().mockImplementation(() => ({
@@ -26,7 +27,11 @@ describe("Issue Field Selects Accessibility", () => {
 
   it("StatusSelect has dynamic accessible name", () => {
     const onValueChange = vi.fn();
-    render(<StatusSelect value="in_progress" onValueChange={onValueChange} />);
+    render(
+      <TooltipProvider>
+        <StatusSelect value="in_progress" onValueChange={onValueChange} />
+      </TooltipProvider>
+    );
     const trigger = screen.getByRole("combobox");
     expect(trigger).toHaveAttribute("aria-label", "Status: In Progress");
   });

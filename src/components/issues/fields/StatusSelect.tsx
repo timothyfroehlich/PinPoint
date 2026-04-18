@@ -13,7 +13,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import {
@@ -93,22 +92,20 @@ export function StatusSelect({
             const config = STATUS_CONFIG[status];
             const Icon = config.icon;
             return (
-              <TooltipProvider key={status} delayDuration={300}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <SelectItem
-                      value={status}
-                      data-testid={`status-option-${status}`}
-                    >
-                      <Icon className={`size-4 ${config.iconColor}`} />
-                      <span>{config.label}</span>
-                    </SelectItem>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="text-xs">
-                    {config.description}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip key={status}>
+                <TooltipTrigger asChild>
+                  <SelectItem
+                    value={status}
+                    data-testid={`status-option-${status}`}
+                  >
+                    <Icon className={`size-4 ${config.iconColor}`} />
+                    <span>{config.label}</span>
+                  </SelectItem>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs">
+                  {config.description}
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </SelectGroup>
@@ -124,22 +121,20 @@ export function StatusSelect({
             const config = STATUS_CONFIG[status];
             const Icon = config.icon;
             return (
-              <TooltipProvider key={status} delayDuration={300}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <SelectItem
-                      value={status}
-                      data-testid={`status-option-${status}`}
-                    >
-                      <Icon className={`size-4 ${config.iconColor}`} />
-                      <span>{config.label}</span>
-                    </SelectItem>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="text-xs">
-                    {config.description}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip key={status}>
+                <TooltipTrigger asChild>
+                  <SelectItem
+                    value={status}
+                    data-testid={`status-option-${status}`}
+                  >
+                    <Icon className={`size-4 ${config.iconColor}`} />
+                    <span>{config.label}</span>
+                  </SelectItem>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs">
+                  {config.description}
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </SelectGroup>
@@ -155,22 +150,20 @@ export function StatusSelect({
             const config = STATUS_CONFIG[status];
             const Icon = config.icon;
             return (
-              <TooltipProvider key={status} delayDuration={300}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <SelectItem
-                      value={status}
-                      data-testid={`status-option-${status}`}
-                    >
-                      <Icon className={`size-4 ${config.iconColor}`} />
-                      <span>{config.label}</span>
-                    </SelectItem>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="text-xs">
-                    {config.description}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip key={status}>
+                <TooltipTrigger asChild>
+                  <SelectItem
+                    value={status}
+                    data-testid={`status-option-${status}`}
+                  >
+                    <Icon className={`size-4 ${config.iconColor}`} />
+                    <span>{config.label}</span>
+                  </SelectItem>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs">
+                  {config.description}
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </SelectGroup>

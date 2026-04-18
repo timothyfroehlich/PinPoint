@@ -15,7 +15,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { Bell, BellRing, BellOff, Loader2 } from "lucide-react";
@@ -84,25 +83,23 @@ export function WatchMachineButton({
 
   if (!isWatching) {
     return (
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={isPending}
-              onClick={handleToggleWatch}
-              className="text-on-surface-variant hover:bg-surface-variant"
-            >
-              {icon}
-              Watch
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Get notified when new issues are reported on this machine</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={isPending}
+            onClick={handleToggleWatch}
+            className="text-on-surface-variant hover:bg-surface-variant"
+          >
+            {icon}
+            Watch
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Get notified when new issues are reported on this machine</p>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 

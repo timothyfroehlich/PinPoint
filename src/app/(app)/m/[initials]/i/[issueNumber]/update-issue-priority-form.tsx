@@ -26,7 +26,6 @@ import { type AccessLevel } from "~/lib/permissions/matrix";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
@@ -166,14 +165,12 @@ export function UpdateIssuePriorityForm({
         {permissionState.allowed ? (
           control
         ) : (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                {compact ? <span className="block">{control}</span> : control}
-              </TooltipTrigger>
-              <TooltipContent>{deniedReason}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {compact ? <span className="block">{control}</span> : control}
+            </TooltipTrigger>
+            <TooltipContent>{deniedReason}</TooltipContent>
+          </Tooltip>
         )}
       </div>
     </form>
