@@ -1,9 +1,11 @@
 /**
- * Truncate application data tables without re-seeding.
+ * Truncate application content tables without re-seeding.
  *
  * Used when a reviewer wants to eyeball empty-state UIs in the dev server.
- * Keeps the schema and Supabase auth users in place; callers typically follow
- * up with `pnpm run db:_seed-users` if they need a test account.
+ * Leaves schema, Supabase auth users, AND user_profiles intact so test
+ * accounts stay usable and no follow-up seed step is required. Running
+ * supabase/seed-users.mjs afterwards would re-populate fixture data —
+ * that script seeds users plus machines, despite its name.
  */
 
 import postgres from "postgres";
@@ -22,7 +24,7 @@ assertLocalDatabase(databaseUrl);
 const client = postgres(databaseUrl);
 
 async function resetToEmpty() {
-  console.log("🧹 Truncating application tables (no reseed)...");
+  console.log("🧹 Truncating content tables (users preserved, no reseed)...");
 
   await client`
     TRUNCATE TABLE
@@ -32,12 +34,13 @@ async function resetToEmpty() {
       "issues",
       "machines",
       "notifications",
-      "notification_preferences",
-      "user_profiles"
+      "notification_preferences"
     CASCADE;
   `;
 
-  console.log("✅ Tables truncated. App is now empty; auth users untouched.");
+  console.log(
+    "✅ Tables truncated. App content empty; auth users + user_profiles untouched."
+  );
 }
 
 resetToEmpty()
