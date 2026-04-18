@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import React from "react";
+import type { ReactElement } from "react";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { STATUS_GROUPS, OPEN_STATUSES } from "~/lib/issues/status";
 import type { IssueStatus } from "~/lib/types";
@@ -10,7 +10,7 @@ import { TooltipProvider } from "~/components/ui/tooltip";
 
 // Wrap renders in TooltipProvider since the global provider lives in the root
 // layout (ClientProviders) which is not rendered in unit tests.
-function renderWithProviders(ui: React.ReactElement) {
+function renderWithProviders(ui: ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
 }
 
