@@ -114,10 +114,9 @@ test.describe("Issues System - Extended", () => {
             await nextButton.click();
           }
           await expect
-            .poll(
-              () => new URL(page.url()).searchParams.get("page"),
-              { timeout: 3000 }
-            )
+            .poll(() => new URL(page.url()).searchParams.get("page"), {
+              timeout: 3000,
+            })
             .toBe("2");
         }).toPass({ timeout: 30000 });
 
