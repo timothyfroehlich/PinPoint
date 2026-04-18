@@ -617,7 +617,7 @@ export function IssueList({
         </div>
       )}
 
-      {issues.length > 0 && (
+      {totalCount > 0 && (
         <div className="flex items-center justify-end gap-3 pt-2">
           <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
             <span>

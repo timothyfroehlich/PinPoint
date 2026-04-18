@@ -178,6 +178,20 @@ test.describe("Issue List Features", () => {
     expect(machineParam).toContain("MM");
   });
 
+  test("should show bottom pagination on out-of-range page", async ({
+    page,
+  }) => {
+    // Regression test for PP-o9g: bottom pagination used issues.length > 0 instead of
+    // totalCount > 0, hiding navigation controls when landing on an empty out-of-range page.
+    await page.goto("/issues?page=999");
+
+    // The page is empty (no issues on page 999), but totalCount > 0 in seeded data.
+    // Both top and bottom pagination controls must be visible so the user can navigate back.
+    const bottomPrevPage = page.getByTestId("bottom-prev-page");
+    await expect(bottomPrevPage).toHaveCount(1);
+    await expect(bottomPrevPage).toBeVisible();
+  });
+
   test("should export issues to CSV", async ({ page }) => {
     await page.goto("/issues");
 
