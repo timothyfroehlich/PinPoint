@@ -295,6 +295,8 @@ Every page will eventually need one of these three states: empty, loading, error
 
 Use `<EmptyState>` from `~/components/ui/empty-state`. Reach for this whenever a list, collection, or section has zero items to display.
 
+> **Status:** The component doesn't exist yet — extraction is tracked as **PP-yxw.5** (Wave 2a of the consistency pass). The props and structure below are the canonical target; build to this shape when the component lands. Until then, existing inline empty states stay where they are.
+
 | Prop          | Purpose                                                              |
 | :------------ | :------------------------------------------------------------------- |
 | `icon`        | A `lucide-react` icon. Rendered at `size-12` in a muted circle.      |
@@ -376,7 +378,9 @@ When something happens in response to user action, where should they see feedbac
 
 ## 15. Date Formatting Vocabulary
 
-Three canonical helpers live in `src/lib/dates.ts`. Use them. Never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
+Three canonical helpers will live in `src/lib/dates.ts`. Once they exist, use them. Never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
+
+> **Status:** The helpers don't exist yet — extraction is tracked as **PP-yxw.7** (Wave 2c of the consistency pass). Once the module lands, migrate existing callers. Until then, inline date calls stay where they are.
 
 | Helper                 | Output                         | When to use                                                  |
 | :--------------------- | :----------------------------- | :----------------------------------------------------------- |
@@ -396,7 +400,7 @@ All three accept `Date | string | number` input. All three return an empty strin
 
 ## 16. Icon Library
 
-`lucide-react` is the only icon library. Never inline SVG. Never import icons from other libraries.
+`lucide-react` is the only icon library for new work. Do not introduce new inline SVGs, and do not import icons from other libraries. Some existing inline `<svg>` usage is legacy (signup confirmation state, AssigneePicker chevron, NotificationList dismiss icon); when you touch those areas, prefer migrating them to `lucide-react` opportunistically where doing so does not change behavior.
 
 ### Sizing
 
@@ -473,7 +477,12 @@ Two canonical modal patterns. Use shadcn primitives directly; don't extract a co
 
 ### Footer layout
 
-`DialogFooter` uses `flex flex-col-reverse gap-2 sm:flex-row sm:justify-end`. Mobile: Cancel on top, primary action on bottom. Desktop: both on the bottom-right, primary action rightmost.
+`DialogFooter` uses `flex flex-col-reverse gap-2 sm:flex-row sm:justify-end`. Write the buttons in source order as `[Cancel, Save]` (or `[Cancel, Delete]` for AlertDialog). That renders:
+
+- **Mobile** (`flex-col-reverse`): primary action (Save/Delete) on top, Cancel below. The reversal intentionally puts the primary action above the fold / closer to the focus point for small-screen readers.
+- **Desktop** (`sm:flex-row sm:justify-end`): horizontal row on the bottom-right, Cancel left, primary action rightmost — matching the standard "primary action anchors the right edge" convention.
+
+Do not reorder the buttons to try to "fix" the mobile stack — the reversal is by design.
 
 ### Rules
 
