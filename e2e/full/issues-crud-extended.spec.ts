@@ -87,6 +87,9 @@ test.describe("Issues System - Extended", () => {
     }) => {
       // Navigate to issues list page
       await page.goto("/issues");
+      // Wait for React to hydrate before testing button clicks — "load" fires
+      // after all scripts execute, which is when pagination handlers attach.
+      await page.waitForLoadState("load");
 
       // Wait for issues to load
       await expect(
