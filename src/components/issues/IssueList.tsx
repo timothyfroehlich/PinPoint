@@ -11,6 +11,7 @@ import {
   ChevronRight,
   SlidersHorizontal,
 } from "lucide-react";
+import { EmptyState } from "~/components/ui/empty-state";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { formatRelative } from "~/lib/dates";
@@ -588,31 +589,30 @@ export function IssueList({
       </div>
 
       {issues.length === 0 && (
-        <div className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-dashed border-border/60 bg-muted/20">
-          <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
-            <AlertCircle className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <p className="text-base font-semibold text-foreground">
-            {hasActiveIssueFilters(searchParams)
+        <EmptyState
+          icon={AlertCircle}
+          title={
+            hasActiveIssueFilters(searchParams)
               ? "No issues found"
-              : "No issues yet. Report your first issue!"}
-          </p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-[250px] mx-auto">
-            {hasActiveIssueFilters(searchParams)
+              : "No issues yet"
+          }
+          description={
+            hasActiveIssueFilters(searchParams)
               ? "Adjust your filters to see more issues."
-              : "Issues will appear here once they are reported."}
-          </p>
-          {!hasActiveIssueFilters(searchParams) && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4 shadow-sm"
-              asChild
-            >
-              <Link href="/report">Report an Issue</Link>
-            </Button>
-          )}
-        </div>
+              : "Issues will appear here once they are reported."
+          }
+          action={
+            hasActiveIssueFilters(searchParams) ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/issues">Clear filters</Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/report">Report an Issue</Link>
+              </Button>
+            )
+          }
+        />
       )}
 
       {totalCount > 0 && (

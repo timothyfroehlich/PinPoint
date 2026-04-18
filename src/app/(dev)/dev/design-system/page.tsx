@@ -8,6 +8,8 @@ import type { IssueSeverity, IssuePriority, IssueFrequency } from "~/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
+import { EmptyState } from "~/components/ui/empty-state";
+import { Inbox, SearchX, Plus } from "lucide-react";
 
 /**
  * Design System / Style Guide
@@ -1202,22 +1204,68 @@ function PageArchetypesSection(): React.JSX.Element {
    ──────────────────────────────────────────────────────────── */
 
 function UIStatesSection(): React.JSX.Element {
-  // Filled in by PP-yxw.5 (EmptyState) and PP-aag (Alert migration).
-  // Should render:
-  //   - EmptyState variants: card (default) and bare, with/without action
-  //   - Loading: Skeleton shapes at common sizes (row, card, hero)
-  //   - Error: Alert variant="destructive" with AlertTitle + AlertDescription
-  // See pinpoint-design-bible SKILL.md §13 for canonical patterns.
   return (
     <section className="space-y-6">
       <SectionHeading
         title="UI States"
-        description="Canonical empty, loading, and error patterns. Filled in by PP-yxw.5 (EmptyState) and PP-aag (Alert migration) — see design bible §13."
+        description="Canonical empty, loading, and error patterns — see design bible §13. Alert migration (Wave 2b / PP-aag) still pending."
       />
+
+      {/* EmptyState: card variant (default) */}
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-muted-foreground">
+          EmptyState — <code>variant=&quot;card&quot;</code> (default)
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Without action</p>
+            <EmptyState
+              icon={Inbox}
+              title="No items yet"
+              description="Items will appear here once they are added."
+            />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">With action</p>
+            <EmptyState
+              icon={Plus}
+              title="No machines yet"
+              description="Get started by adding your first machine."
+              action={
+                <Button variant="outline" size="sm">
+                  Add Machine
+                </Button>
+              }
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* EmptyState: bare variant */}
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-muted-foreground">
+          EmptyState — <code>variant=&quot;bare&quot;</code> (use inside an
+          existing card)
+        </p>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+              Existing card wrapper
+            </p>
+            <EmptyState
+              variant="bare"
+              icon={SearchX}
+              title="No matches found"
+              description="Try adjusting your filters to see more results."
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Alert showcase reserved for Wave 2b */}
       <div className="rounded-lg border border-dashed border-outline-variant bg-card p-8 text-center">
         <p className="text-sm text-muted-foreground">
-          Reserved for EmptyState / Skeleton / Alert showcases. Filled by Wave
-          2a (PP-yxw.5) and Wave 2b (PP-aag).
+          Alert / error state showcase reserved for Wave 2b (PP-aag).
         </p>
       </div>
     </section>
