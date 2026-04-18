@@ -30,7 +30,7 @@ test.describe("Cookie Consent Banner", () => {
   });
 
   test("appears on first visit and dismisses on click", async ({ page }) => {
-    await page.goto("/m", { waitUntil: "networkidle" });
+    await page.goto("/m", { waitUntil: "domcontentloaded" });
 
     // Banner should be visible after client hydration
     const banner = page.getByRole("region", {
@@ -62,7 +62,7 @@ test.describe("Cookie Consent Banner", () => {
     await expect(banner).not.toBeVisible();
 
     // Reload — banner should stay dismissed (cookie persists)
-    await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
     await expect(banner).not.toBeVisible();
   });
 });

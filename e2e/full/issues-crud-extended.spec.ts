@@ -87,7 +87,6 @@ test.describe("Issues System - Extended", () => {
     }) => {
       // Navigate to issues list page
       await page.goto("/issues");
-      await page.waitForLoadState("networkidle");
 
       // Wait for issues to load
       await expect(

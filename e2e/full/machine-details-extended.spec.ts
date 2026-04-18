@@ -195,9 +195,6 @@ test.describe("Machine Details - Extended", () => {
     const firstIssueCard = page.getByTestId("issue-card").first();
     await firstIssueCard.click();
 
-    // Wait for issue detail page
-    await page.waitForLoadState("networkidle");
-
     // Owner requirements callout should be visible
     const callout = page
       .getByTestId("owner-requirements-callout")

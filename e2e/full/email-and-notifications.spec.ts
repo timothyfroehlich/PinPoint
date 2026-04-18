@@ -264,15 +264,10 @@ test.describe("Notifications", () => {
     await adminPage.goto(`/m/${machine.initials}/i/${issueNumber}`);
     // Use viewport-aware helper — works on both desktop and mobile
     await updateIssueField(adminPage, "status", "in_progress");
-    // Wait for the server action to complete before checking notifications
-    await adminPage.waitForLoadState("networkidle");
 
     // 3. Assertion: Reporter receives notification
     await page.bringToFront();
-    await page.reload();
-
-    // Wait for page to fully load after reload (ensure we're not redirecting)
-    await page.waitForLoadState("networkidle");
+    await page.reload({ waitUntil: "domcontentloaded" });
 
     const bell = page.getByRole("button", { name: /notifications/i });
     await expect(bell).toBeVisible();
@@ -663,8 +658,6 @@ test.describe.serial("Email Notifications", () => {
 
     // Update status (uses viewport-aware helper — works on both desktop and mobile)
     await updateIssueField(page, "status", "in_progress");
-    // Wait for the server action to complete before checking email delivery
-    await page.waitForLoadState("networkidle");
 
     // Wait for status change email - filter by "Status Changed" prefix since
     // clearMailbox() is a no-op and the "New Issue" email (also containing
@@ -760,7 +753,7 @@ test.describe("Password Reset Email", () => {
     // Follow reset link from email
     const resetLink = await getPasswordResetLink(testEmail);
     expect(resetLink).toBeTruthy();
-    await page.goto(resetLink, { waitUntil: "networkidle" });
+    await page.goto(resetLink, { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/reset-password/, { timeout: 15000 });
     await expect(
       page.getByRole("heading", { name: "Set New Password" })

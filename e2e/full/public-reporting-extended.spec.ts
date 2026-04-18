@@ -150,7 +150,9 @@ test.describe("Public Issue Reporting - Extended", () => {
     await page.goto("/issues");
     await page.getByPlaceholder("Search issues...").fill(issueTitle);
     await page.keyboard.press("Enter");
-    await page.waitForURL((url) => url.searchParams.has("q"));
+    await expect
+      .poll(() => new URL(page.url()).searchParams.has("q"), { timeout: 15000 })
+      .toBe(true);
 
     // 4. Verify the issue appears in search results
     const issueRow = page.getByRole("row", { name: new RegExp(issueTitle) });

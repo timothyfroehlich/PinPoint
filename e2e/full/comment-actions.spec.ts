@@ -125,7 +125,6 @@ test.describe.serial("Comment Edit and Delete", () => {
         rememberIssueId(page);
       } else {
         await page.goto(issueUrl);
-        await page.waitForLoadState("networkidle");
       }
 
       // Add a new comment
@@ -155,7 +154,6 @@ test.describe.serial("Comment Edit and Delete", () => {
     test("author can edit their own comment", async ({ page }, testInfo) => {
       await loginAs(page, testInfo);
       await page.goto(issueUrl);
-      await page.waitForLoadState("networkidle");
 
       // Find the comment we created and wait for it to be visible
       await expect(getCommentCard(page, testCommentText)).toBeVisible({
@@ -180,9 +178,6 @@ test.describe.serial("Comment Edit and Delete", () => {
       // Save
       await page.getByRole("button", { name: "Save" }).click();
 
-      // Wait for update
-      await page.waitForLoadState("networkidle");
-
       // Verify the comment is updated
       await expect(page.getByText(editedCommentText)).toBeVisible();
       await expect(page.getByText(/•\s+edited .+ ago/)).toBeVisible();
@@ -193,7 +188,6 @@ test.describe.serial("Comment Edit and Delete", () => {
     }, testInfo) => {
       await loginAs(page, testInfo);
       await page.goto(issueUrl);
-      await page.waitForLoadState("networkidle");
 
       // Find the edited comment and wait for it to be visible
       await expect(getCommentCard(page, editedCommentText)).toBeVisible({
@@ -216,9 +210,6 @@ test.describe.serial("Comment Edit and Delete", () => {
         .getByRole("alertdialog")
         .getByRole("button", { name: "Delete" })
         .click();
-
-      // Wait for deletion
-      await page.waitForLoadState("networkidle");
 
       // Original comment text should be gone
       await expect(page.getByText(editedCommentText)).not.toBeVisible();
@@ -249,7 +240,6 @@ test.describe.serial("Comment Edit and Delete", () => {
       });
 
       await page.goto(issueUrl);
-      await page.waitForLoadState("networkidle");
       await addComment(page, memberComment);
     });
 
@@ -263,7 +253,6 @@ test.describe.serial("Comment Edit and Delete", () => {
       });
 
       await page.goto(issueUrl);
-      await page.waitForLoadState("networkidle");
 
       // Find the member's comment and wait for it to be visible
       await expect(getCommentCard(page, memberComment)).toBeVisible({
@@ -295,7 +284,6 @@ test.describe.serial("Comment Edit and Delete", () => {
       });
 
       await page.goto(issueUrl);
-      await page.waitForLoadState("networkidle");
 
       // Find the member's comment and wait for it to be visible
       await expect(getCommentCard(page, memberComment)).toBeVisible({
@@ -313,9 +301,6 @@ test.describe.serial("Comment Edit and Delete", () => {
         .getByRole("alertdialog")
         .getByRole("button", { name: "Delete" })
         .click();
-
-      // Wait for deletion
-      await page.waitForLoadState("networkidle");
 
       // Original comment text should be gone
       await expect(page.getByText(memberComment)).not.toBeVisible();
@@ -345,7 +330,6 @@ test.describe.serial("Comment Edit and Delete", () => {
       });
 
       await page.goto(issueUrl);
-      await page.waitForLoadState("networkidle");
       await addComment(page, adminComment);
     });
 
@@ -359,7 +343,6 @@ test.describe.serial("Comment Edit and Delete", () => {
       });
 
       await page.goto(issueUrl);
-      await page.waitForLoadState("networkidle");
 
       // Find the admin's comment
       const commentCard = getCommentCard(page, adminComment);
@@ -381,7 +364,6 @@ test.describe.serial("Comment Edit and Delete", () => {
         password: TEST_USERS.admin.password,
       });
       await page.goto(issueUrl);
-      await page.waitForLoadState("networkidle");
 
       await expect(getCommentCard(page, adminComment)).toBeVisible({
         timeout: 10000,
@@ -394,7 +376,6 @@ test.describe.serial("Comment Edit and Delete", () => {
         .getByRole("alertdialog")
         .getByRole("button", { name: "Delete" })
         .click();
-      await page.waitForLoadState("networkidle");
 
       // When admin deletes their OWN comment, it shows "User deleted their comment"
       // (not "Comment removed by admin" since they're the author)
@@ -412,7 +393,6 @@ test.describe.serial("Comment Edit and Delete", () => {
   }, testInfo) => {
     await loginAs(page, testInfo);
     await page.goto(issueUrl);
-    await page.waitForLoadState("networkidle");
 
     // The initial issue report shows "Initial report" label
     const initialReport = page
