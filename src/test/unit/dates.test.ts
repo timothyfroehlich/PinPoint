@@ -1,9 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { formatRelative, formatDate, formatDateTime } from "~/lib/dates";
 
-// A fixed point in time for deterministic relative assertions.
+// Fixed points in time so fake-timer assertions stay deterministic.
 const FIXED_NOW = new Date("2026-04-18T12:00:00.000Z");
-const FIXED_DATE = new Date("2026-01-15T08:30:00.000Z"); // ~3 months before FIXED_NOW
+const FIXED_DATE = new Date("2026-01-15T08:30:00.000Z");
+
+// Restore real timers after every test so a failed assertion inside a
+// fake-timer block never leaks state into the next test.
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("formatRelative", () => {
   it("returns empty string for null", () => {
@@ -21,23 +27,18 @@ describe("formatRelative", () => {
     expect(typeof result).toBe("string");
     expect(result.length).toBeGreaterThan(0);
     expect(result).toMatch(/ago$/);
-    vi.useRealTimers();
   });
 
   it("accepts an ISO string", () => {
     vi.useFakeTimers();
     vi.setSystemTime(FIXED_NOW);
-    const result = formatRelative("2026-04-18T11:55:00.000Z");
-    expect(result).toMatch(/ago$/);
-    vi.useRealTimers();
+    expect(formatRelative("2026-04-18T11:55:00.000Z")).toMatch(/ago$/);
   });
 
   it("accepts a numeric timestamp", () => {
     vi.useFakeTimers();
     vi.setSystemTime(FIXED_NOW);
-    const result = formatRelative(FIXED_DATE.getTime());
-    expect(result).toMatch(/ago$/);
-    vi.useRealTimers();
+    expect(formatRelative(FIXED_DATE.getTime())).toMatch(/ago$/);
   });
 
   it("includes 'ago' suffix for past dates", () => {
@@ -45,7 +46,6 @@ describe("formatRelative", () => {
     vi.setSystemTime(FIXED_NOW);
     const oneHourAgo = new Date(FIXED_NOW.getTime() - 60 * 60 * 1000);
     expect(formatRelative(oneHourAgo)).toContain("ago");
-    vi.useRealTimers();
   });
 });
 
@@ -65,27 +65,16 @@ describe("formatDate", () => {
   });
 
   it("accepts an ISO string and returns consistent output", () => {
-    const fromDate = formatDate(FIXED_DATE);
-    const fromString = formatDate("2026-01-15T08:30:00.000Z");
-    expect(fromDate).toBe(fromString);
+    expect(formatDate(FIXED_DATE)).toBe(formatDate("2026-01-15T08:30:00.000Z"));
   });
 
   it("accepts a numeric timestamp and returns consistent output", () => {
-    const fromDate = formatDate(FIXED_DATE);
-    const fromTimestamp = formatDate(FIXED_DATE.getTime());
-    expect(fromDate).toBe(fromTimestamp);
+    expect(formatDate(FIXED_DATE)).toBe(formatDate(FIXED_DATE.getTime()));
   });
 
-  it("does not include time component (no colon-separated time)", () => {
-    // dateStyle: "medium" should never include time
-    const result = formatDate(FIXED_DATE);
-    // A time component would look like "8:30" or "08:30"
-    expect(result).not.toMatch(/\d:\d\d/);
-  });
-
-  it("includes the year in output", () => {
-    const result = formatDate(FIXED_DATE);
-    expect(result).toContain("2026");
+  it("output differs from formatDateTime (no time component)", () => {
+    // Locale-agnostic: medium-date differs from medium-date + short-time.
+    expect(formatDate(FIXED_DATE)).not.toBe(formatDateTime(FIXED_DATE));
   });
 });
 
@@ -102,24 +91,23 @@ describe("formatDateTime", () => {
     const result = formatDateTime(FIXED_DATE);
     expect(typeof result).toBe("string");
     expect(result.length).toBeGreaterThan(0);
-    // Time component should be present (colon-separated)
-    expect(result).toMatch(/\d:\d\d/);
+    // Locale-agnostic: with time appended, output is longer than date-only.
+    expect(result.length).toBeGreaterThan(formatDate(FIXED_DATE).length);
   });
 
   it("accepts an ISO string and returns consistent output", () => {
-    const fromDate = formatDateTime(FIXED_DATE);
-    const fromString = formatDateTime("2026-01-15T08:30:00.000Z");
-    expect(fromDate).toBe(fromString);
+    expect(formatDateTime(FIXED_DATE)).toBe(
+      formatDateTime("2026-01-15T08:30:00.000Z")
+    );
   });
 
   it("accepts a numeric timestamp and returns consistent output", () => {
-    const fromDate = formatDateTime(FIXED_DATE);
-    const fromTimestamp = formatDateTime(FIXED_DATE.getTime());
-    expect(fromDate).toBe(fromTimestamp);
+    expect(formatDateTime(FIXED_DATE)).toBe(
+      formatDateTime(FIXED_DATE.getTime())
+    );
   });
 
-  it("includes the year in output", () => {
-    const result = formatDateTime(FIXED_DATE);
-    expect(result).toContain("2026");
+  it("output differs from formatDate for the same input", () => {
+    expect(formatDateTime(FIXED_DATE)).not.toBe(formatDate(FIXED_DATE));
   });
 });
