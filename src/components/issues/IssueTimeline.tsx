@@ -42,7 +42,7 @@ import { type AccessLevel } from "~/lib/permissions/matrix";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
-import { type ProseMirrorDoc, docToPlainText } from "~/lib/tiptap/types";
+import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   formatTimelineEvent,
   type TimelineEventData,
@@ -256,11 +256,7 @@ function TimelineItem({
               </span>
             </div>
             <div className="leading-relaxed text-foreground/80">
-              {event.eventData
-                ? formatTimelineEvent(event.eventData)
-                : event.content
-                  ? docToPlainText(event.content)
-                  : null}
+              {event.eventData ? formatTimelineEvent(event.eventData) : null}
             </div>
           </div>
         ) : (

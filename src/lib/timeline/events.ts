@@ -8,12 +8,12 @@
 import { db, type DbTransaction } from "~/server/db";
 import { issueComments } from "~/server/db/schema";
 
-// Re-export types and formatting from the client-safe module
-export {
+// Import then re-export types and formatting from the client-safe module
+import {
   type TimelineEventData,
   formatTimelineEvent,
 } from "~/lib/timeline/types";
-import { type TimelineEventData } from "~/lib/timeline/types";
+export { type TimelineEventData, formatTimelineEvent };
 
 /**
  * Create a system timeline event for an issue

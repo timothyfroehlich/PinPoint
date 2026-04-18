@@ -301,6 +301,9 @@ test.describe("Issues System", () => {
           .filter({ visible: true })
           .first()
       ).toContainText("Member User");
+
+      // Verify assignment timeline event appears
+      await expect(page.getByText("Assigned to Member User")).toBeVisible();
     });
 
     test("should update issue metadata from the detail page", async ({

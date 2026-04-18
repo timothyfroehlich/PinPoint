@@ -490,37 +490,6 @@ async function seedUsersAndData() {
           frequency = EXCLUDED.frequency,
           updated_at = NOW()
       `;
-
-      // Add "Issue reported by..." system comment to match service logic
-      let reporterDesc = issue.reporterName ?? "Anonymous";
-
-      if (issue.reportedBy) {
-        // In real app, we fetch the user name. Here we can check the user map.
-        // Or just default to "Member" if we don't want to lookup.
-        // But to be consistent with new service logic, let's try to be specific if possible.
-        // For seed simplicity, "Member" is often used, but let's try a realistic fallback.
-        const memberRole = Object.keys(userIds).find(
-          (role) => userIds[role] === issue.reportedBy
-        );
-        reporterDesc = memberRole
-          ? `${memberRole.charAt(0).toUpperCase() + memberRole.slice(1)} User`
-          : "Member";
-      } else if (issue.invitedUserId) {
-        // For seeding, we know the invited user is 'Jane Doe'
-        reporterDesc = "Invited User";
-      }
-
-      await sql`
-        INSERT INTO issue_comments (issue_id, author_id, content, is_system, created_at, updated_at)
-        VALUES (
-          ${issue.id},
-          null,
-          ${wrapTextInProseMirror(`Issue reported by ${reporterDesc}`)},
-          true,
-          NOW(),
-          NOW()
-        ) ON CONFLICT DO NOTHING
-      `;
     }
 
     // Update next issue numbers for all machines
@@ -552,8 +521,8 @@ async function seedUsersAndData() {
           },
           {
             author: userIds.admin,
-            content: "Status changed from New to In Progress",
             isSystem: true,
+            eventData: { type: "status_changed", from: "new", to: "in_progress" },
             daysAgo: 2.5,
           },
           {
@@ -585,8 +554,8 @@ async function seedUsersAndData() {
           },
           {
             author: userIds.admin,
-            content: "Status changed from New to Confirmed",
             isSystem: true,
+            eventData: { type: "status_changed", from: "new", to: "confirmed" },
             daysAgo: 1,
           },
         ],
@@ -606,8 +575,8 @@ async function seedUsersAndData() {
           },
           {
             author: userIds.admin,
-            content: "Status changed from New to In Progress",
             isSystem: true,
+            eventData: { type: "status_changed", from: "new", to: "in_progress" },
             daysAgo: 1,
           },
         ],
@@ -636,14 +605,14 @@ async function seedUsersAndData() {
           },
           {
             author: userIds.admin,
-            content: "Status changed from New to In Progress",
             isSystem: true,
+            eventData: { type: "status_changed", from: "new", to: "in_progress" },
             daysAgo: 1.5,
           },
           {
             author: userIds.admin,
-            content: "Assigned to Member User",
             isSystem: true,
+            eventData: { type: "assigned", assigneeName: "Member User" },
             daysAgo: 1.5,
           },
           {
@@ -678,8 +647,8 @@ async function seedUsersAndData() {
           },
           {
             author: userIds.admin,
-            content: "Assigned to Admin User",
             isSystem: true,
+            eventData: { type: "assigned", assigneeName: "Admin User" },
             daysAgo: 3.5,
           },
           {
@@ -690,14 +659,14 @@ async function seedUsersAndData() {
           },
           {
             author: userIds.admin,
-            content: "Priority changed from Medium to High",
             isSystem: true,
+            eventData: { type: "priority_changed", from: "medium", to: "high" },
             daysAgo: 2,
           },
           {
             author: userIds.admin,
-            content: "Status changed from New to Confirmed",
             isSystem: true,
+            eventData: { type: "status_changed", from: "new", to: "confirmed" },
             daysAgo: 1.5,
           },
           {
@@ -712,12 +681,13 @@ async function seedUsersAndData() {
       for (const [issueId, comments] of Object.entries(commentsByIssue)) {
         for (const comment of comments) {
           await sql`
-            INSERT INTO issue_comments (issue_id, author_id, content, is_system, created_at, updated_at)
+            INSERT INTO issue_comments (issue_id, author_id, content, is_system, event_data, created_at, updated_at)
             VALUES (
               ${issueId},
               ${comment.author},
-              ${wrapTextInProseMirror(comment.content)},
+              ${comment.eventData ? null : wrapTextInProseMirror(comment.content)},
               ${comment.isSystem},
+              ${comment.eventData ? JSON.stringify(comment.eventData) : null}::jsonb,
               NOW() - (${comment.daysAgo} || ' days')::INTERVAL,
               NOW() - (${comment.daysAgo} || ' days')::INTERVAL
             )
