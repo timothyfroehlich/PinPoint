@@ -114,7 +114,7 @@
     "react-dom": "^19.2.5",
     "react-hook-form": "^7.72.1",
     "resend": "^6.10.0",
-    "sanitize-html": "^2.17.2",
+    "sanitize-html": "^2.17.3",
     "server-only": "^0.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
