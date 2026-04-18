@@ -4,6 +4,7 @@ import { cn } from "~/lib/utils";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { formatIssueId, resolveIssueReporter } from "~/lib/issues/utils";
+import { formatDate } from "~/lib/dates";
 import type { Issue } from "~/lib/types";
 
 interface IssueRowProps {
@@ -69,9 +70,7 @@ export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
             {issue.machine?.name ?? issue.machineInitials}
           </span>
           <span>•</span>
-          <span>
-            opened on {new Date(issue.createdAt).toLocaleDateString()}
-          </span>
+          <span>opened on {formatDate(issue.createdAt)}</span>
           <span>by {reporter.name}</span>
         </div>
       </div>

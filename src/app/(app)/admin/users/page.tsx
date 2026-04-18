@@ -18,6 +18,7 @@ import { Badge } from "~/components/ui/badge";
 import { ResendInviteButton } from "./resend-invite-button";
 import { RemoveInvitedUserButton } from "./remove-invited-user-button";
 import type { UnifiedUser } from "~/lib/types";
+import { formatDate } from "~/lib/dates";
 
 function UserRow({
   user,
@@ -63,7 +64,7 @@ function UserRow({
             </Badge>
             {user.inviteSentAt && (
               <span className="truncate text-[10px] text-muted-foreground">
-                Sent {new Date(user.inviteSentAt).toLocaleDateString()}
+                Sent {formatDate(user.inviteSentAt)}
               </span>
             )}
           </div>

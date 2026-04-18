@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelative } from "~/lib/dates";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -575,9 +575,7 @@ export function IssueList({
                     {visibleColumns.modified && (
                       <td className="px-4 py-4 text-right min-w-[150px] max-w-[150px]">
                         <span className="text-xs font-medium text-foreground leading-tight line-clamp-2">
-                          {formatDistanceToNow(new Date(issue.updatedAt), {
-                            addSuffix: true,
-                          })}
+                          {formatRelative(issue.updatedAt)}
                         </span>
                       </td>
                     )}

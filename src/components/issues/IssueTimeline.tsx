@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useTransition } from "react";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelative, formatDateTime } from "~/lib/dates";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
 import { OwnerBadge } from "~/components/issues/OwnerBadge";
@@ -250,9 +250,9 @@ function TimelineItem({
               )}
               <span
                 className="text-[11px] text-muted-foreground/60"
-                title={event.createdAt.toLocaleString()}
+                title={formatDateTime(event.createdAt)}
               >
-                {formatDistanceToNow(event.createdAt, { addSuffix: true })}
+                {formatRelative(event.createdAt)}
               </span>
             </div>
             <div className="leading-relaxed text-foreground/80">
@@ -284,19 +284,16 @@ function TimelineItem({
                   <span className="text-muted-foreground/40">&bull;</span>
                   <span
                     className="text-xs text-muted-foreground/60"
-                    title={event.createdAt.toLocaleString()}
+                    title={formatDateTime(event.createdAt)}
                   >
-                    {formatDistanceToNow(event.createdAt, { addSuffix: true })}
+                    {formatRelative(event.createdAt)}
                   </span>
                   {isEdited && !isIssue && (
                     <span
-                      title={event.updatedAt.toLocaleString()}
+                      title={formatDateTime(event.updatedAt)}
                       className="text-xs text-muted-foreground/40"
                     >
-                      &bull; edited{" "}
-                      {formatDistanceToNow(event.updatedAt, {
-                        addSuffix: true,
-                      })}
+                      &bull; edited {formatRelative(event.updatedAt)}
                     </span>
                   )}
                 </div>

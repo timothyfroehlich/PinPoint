@@ -32,6 +32,7 @@ import {
 } from "~/lib/machines/filters-queries";
 import { MachineFilters } from "~/components/machines/MachineFilters";
 import { getAccessLevel } from "~/lib/permissions/helpers";
+import { formatDate } from "~/lib/dates";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 
@@ -295,10 +296,7 @@ export default async function MachinesPage({
                             {machine.initials}
                           </span>
                         </span>
-                        <span>
-                          Added{" "}
-                          {new Date(machine.createdAt).toLocaleDateString()}
-                        </span>
+                        <span>Added {formatDate(machine.createdAt)}</span>
                       </div>
                     </div>
                   </CardContent>
