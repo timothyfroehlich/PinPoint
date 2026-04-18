@@ -38,6 +38,7 @@
     "db:_seed": "node --env-file=.env.local -e 'require(\"child_process\").execFileSync(\"psql\", [process.env.POSTGRES_URL, \"-f\", \"supabase/seed.sql\"], {stdio: \"inherit\"})'",
     "db:_seed-users": "node --env-file=.env.local supabase/seed-users.mjs",
     "db:fast-reset": "node --env-file=.env.local scripts/db-fast-reset.mjs > /dev/null",
+    "db:reset-to-empty": "node --env-file=.env.local scripts/reset-to-empty.mjs",
     "check:config": "python3 scripts/check-config-drift.py > /dev/null",
     "check:migrations": "drizzle-kit check",
     "check:linters": "yamllint .github/workflows/ && actionlint $(find .github/workflows \\( -name '*.yml' -o -name '*.yaml' \\) ! -name '*.lock.yml') && ruff check scripts/ .agent/skills/*/scripts/*.py && ruff format --check scripts/ .agent/skills/*/scripts/*.py && find scripts/ .agent/skills/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck && zizmor --min-severity low --format plain $(find .github/workflows \\( -name '*.yml' -o -name '*.yaml' \\) ! -name '*.lock.yml') && ratchet lint .github/workflows/ci.yml .github/workflows/pr-screenshots.yml .github/workflows/cleanup-screenshots.yml .github/workflows/supabase-branch-setup.yaml",

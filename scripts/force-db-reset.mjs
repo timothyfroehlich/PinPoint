@@ -7,13 +7,17 @@
  */
 
 import postgres from "postgres";
+import { assertLocalDatabase } from "./assert-local-db.mjs";
 
-const databaseUrl = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+const databaseUrl =
+  process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
 
 if (!databaseUrl) {
   console.error("❌ POSTGRES_URL or POSTGRES_URL_NON_POOLING is not defined");
   process.exit(1);
 }
+
+assertLocalDatabase(databaseUrl);
 
 // Tables live in the public schema; order ensures dependent tables drop first.
 const tables = [
