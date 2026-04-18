@@ -23,6 +23,7 @@ import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { Calendar, Plus } from "lucide-react";
 import { PageContainer } from "~/components/layout/PageContainer";
+import { formatDate } from "~/lib/dates";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { headers } from "next/headers";
 import { resolveRequestUrl } from "~/lib/url";
@@ -336,13 +337,7 @@ export default async function MachineDetailPage({
                       <div className="flex items-center gap-1.5 text-on-surface-variant">
                         <Calendar className="size-3" />
                         <p className="text-xs font-medium">
-                          {new Date(machine.createdAt).toLocaleDateString(
-                            undefined,
-                            {
-                              month: "short",
-                              year: "numeric",
-                            }
-                          )}
+                          {formatDate(machine.createdAt)}
                         </p>
                       </div>
                     </div>

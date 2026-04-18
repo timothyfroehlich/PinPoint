@@ -19,6 +19,11 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Button } from "~/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { SaveCancelButtons } from "~/components/save-cancel-buttons";
@@ -248,12 +253,16 @@ function TimelineItem({
               {event.author.id && (
                 <span className="text-muted-foreground/30">&bull;</span>
               )}
-              <span
-                className="text-[11px] text-muted-foreground/60"
-                title={formatDateTime(event.createdAt)}
-              >
-                {formatRelative(event.createdAt)}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-[11px] text-muted-foreground/60">
+                    {formatRelative(event.createdAt)}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {formatDateTime(event.createdAt)}
+                </TooltipContent>
+              </Tooltip>
             </div>
             <div className="leading-relaxed text-foreground/80">
               {event.eventData ? formatTimelineEvent(event.eventData) : null}
@@ -282,19 +291,27 @@ function TimelineItem({
                     </span>
                   )}
                   <span className="text-muted-foreground/40">&bull;</span>
-                  <span
-                    className="text-xs text-muted-foreground/60"
-                    title={formatDateTime(event.createdAt)}
-                  >
-                    {formatRelative(event.createdAt)}
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs text-muted-foreground/60">
+                        {formatRelative(event.createdAt)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {formatDateTime(event.createdAt)}
+                    </TooltipContent>
+                  </Tooltip>
                   {isEdited && !isIssue && (
-                    <span
-                      title={formatDateTime(event.updatedAt)}
-                      className="text-xs text-muted-foreground/40"
-                    >
-                      &bull; edited {formatRelative(event.updatedAt)}
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-xs text-muted-foreground/40">
+                          &bull; edited {formatRelative(event.updatedAt)}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {formatDateTime(event.updatedAt)}
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
               </div>
