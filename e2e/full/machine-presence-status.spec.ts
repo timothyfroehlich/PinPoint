@@ -57,7 +57,9 @@ test.describe("Machine Presence Status", () => {
     await page.goto("/issues");
     await page.getByPlaceholder("Search issues...").fill(issueTitle);
     await page.keyboard.press("Enter");
-    await page.waitForURL((url) => url.searchParams.get("q") === issueTitle);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 15000 })
+      .toBe(issueTitle);
     await expect(page.getByRole("row", { name: issueTitle })).toBeVisible();
   });
 
@@ -128,7 +130,9 @@ test.describe("Machine Presence Status", () => {
     await page.goto("/issues");
     await page.getByPlaceholder("Search issues...").fill(issueTitle);
     await page.keyboard.press("Enter");
-    await page.waitForURL((url) => url.searchParams.get("q") === issueTitle);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 15000 })
+      .toBe(issueTitle);
     await expect(page.getByText("No issues found")).toBeVisible();
   });
 });

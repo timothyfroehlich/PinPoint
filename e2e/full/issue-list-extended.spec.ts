@@ -45,7 +45,9 @@ test.describe("Issue List Features - Extended", () => {
     await page.goto("/issues");
     await page.getByPlaceholder("Search issues...").fill(issueTitle);
     await page.keyboard.press("Enter");
-    await page.waitForURL((url) => url.searchParams.get("q") === issueTitle);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 15000 })
+      .toBe(issueTitle);
     await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
 
     const row = page.getByRole("row", { name: issueTitle });
@@ -69,7 +71,9 @@ test.describe("Issue List Features - Extended", () => {
     await page.reload();
     await page.getByPlaceholder("Search issues...").fill(issueTitle);
     await page.keyboard.press("Enter");
-    await page.waitForURL((url) => url.searchParams.get("q") === issueTitle);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 15000 })
+      .toBe(issueTitle);
 
     const rowAfterReload = page.getByRole("row", { name: issueTitle });
     await expect(

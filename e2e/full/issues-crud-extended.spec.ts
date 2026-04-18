@@ -87,7 +87,6 @@ test.describe("Issues System - Extended", () => {
     }) => {
       // Navigate to issues list page
       await page.goto("/issues");
-      await page.waitForLoadState("networkidle");
 
       // Wait for issues to load
       await expect(
@@ -106,11 +105,20 @@ test.describe("Issues System - Extended", () => {
       const isNextDisabled = await nextButton.isDisabled();
 
       if (!isNextDisabled) {
-        // Click next page
-        await nextButton.click();
-
-        // Wait for URL to change (generous timeout for Mobile Chrome in CI)
-        await page.waitForURL(/page=2/, { timeout: 30000 });
+        // The pagination button is present in the SSR'd DOM before React
+        // attaches its router.push() handler. Retry the click until the URL
+        // changes — this naturally handles any hydration delay without
+        // relying on networkidle.
+        await expect(async () => {
+          if (new URL(page.url()).searchParams.get("page") !== "2") {
+            await nextButton.click();
+          }
+          await expect
+            .poll(() => new URL(page.url()).searchParams.get("page"), {
+              timeout: 3000,
+            })
+            .toBe("2");
+        }).toPass({ timeout: 30000 });
 
         // Previous button should now be enabled
         await expect(bottomPrevButton).toBeEnabled();

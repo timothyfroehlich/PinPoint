@@ -606,7 +606,7 @@ jobs:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
-        run: pnpm exec playwright test e2e/smoke --project=chromium --reporter=dot
+        run: pnpm exec playwright test e2e/smoke --project=chromium
 
       - name: Upload Playwright report
         if: failure()
@@ -686,7 +686,7 @@ jobs:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
-        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome" --reporter=dot
+        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome"
 
       - name: Upload Playwright report
         if: failure()
@@ -766,7 +766,7 @@ jobs:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
-        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium --reporter=dot
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium
 
       - name: Upload Playwright report
         if: failure()
@@ -851,20 +851,36 @@ jobs:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
         run: |
           pnpm exec playwright test --config=playwright.config.smoke.ts \
             --project=chromium --project="Mobile Chrome" \
-            --project="Mobile Safari" --workers=3 --reporter=dot
+            --project="Mobile Safari" --workers=3
 
       - name: Run Comprehensive Full Tests (all browsers)
         env:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
         run: |
           pnpm exec playwright test --config=playwright.config.full.ts \
             --project=chromium --project="Mobile Chrome" \
-            --project="Mobile Safari" --workers=3 --reporter=dot
+            --project="Mobile Safari" --workers=3
+
+      - name: Summarize test failures
+        if: failure()
+        run: |
+          {
+            echo '## E2E Test Failures'
+            echo ''
+            echo '```'
+            jq -r '.suites[].specs[] | select(.ok == false) | "FAIL: [\(.tests[0].projectName)] \(.title)"' \
+              playwright-report/results.json \
+              2>/dev/null \
+              || echo "No structured results found — check Playwright report artifact"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Playwright report
         if: failure()
