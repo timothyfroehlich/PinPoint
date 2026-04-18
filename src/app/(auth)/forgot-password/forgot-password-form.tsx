@@ -4,6 +4,7 @@ import React, { useActionState, useState, useCallback } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import { forgotPasswordAction } from "~/app/(auth)/actions";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 
@@ -24,21 +25,21 @@ export function ForgotPasswordForm(): React.JSX.Element {
     <form action={formAction} className="space-y-4">
       {/* Message */}
       {state && !state.ok && (
-        <div
-          className="rounded-lg bg-error-container px-4 py-3 text-sm text-on-error-container"
-          role="alert"
-        >
-          {state.message}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{state.message}</AlertDescription>
+        </Alert>
       )}
       {state && state.ok && (
-        <div
-          className="rounded-lg px-4 py-3 text-sm bg-primary-container text-on-primary-container"
-          role="alert"
-        >
-          If an account exists with that email, you will receive a password
-          reset link shortly.
-        </div>
+        // Success alert: migrated from bg-primary-container (deprecated MD token)
+        // to default Alert variant. Original used primary-container colors, not
+        // destructive — default variant is closest semantic match in the shadcn
+        // Alert component (no dedicated success variant exists).
+        <Alert>
+          <AlertDescription>
+            If an account exists with that email, you will receive a password
+            reset link shortly.
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Email */}
