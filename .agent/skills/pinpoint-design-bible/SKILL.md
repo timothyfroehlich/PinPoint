@@ -283,3 +283,245 @@ Before building something new, check if one of these already exists:
 | `NotificationList`                    | Notification bell + dropdown                                                                    |
 | `UserMenu`                            | Avatar + dropdown menu (includes Admin link for admin role)                                     |
 | `BackToIssuesLink`                    | Breadcrumb back navigation                                                                      |
+| `EmptyState`                          | Icon + title + optional body + optional action. `variant="card"` (default) or `variant="bare"`. |
+| `Alert` (shadcn)                      | Inline message. `variant="destructive"` for errors. Never hand-roll `<div role="alert">`.       |
+| `Skeleton` (shadcn)                   | Loading placeholder. Shape it like the content that will arrive.                                |
+
+## 13. Cross-Cutting UI States
+
+Every page will eventually need one of these three states: empty, loading, error. Each has a canonical pattern. Reach for the pattern first; don't invent a variant.
+
+### Empty State
+
+> **Status — planned component, not yet implemented.** `<EmptyState>` **will live** at `~/components/ui/empty-state`; the file doesn't exist today. Extraction is tracked as **PP-yxw.5** (Wave 2a of the consistency pass). This section specifies the contract that PR will build to. Until the component lands, existing inline empty states stay where they are; new code should wait for the component rather than hand-rolling another inline variant.
+
+Once the component is in place: use `<EmptyState>` whenever a list, collection, or section has zero items to display.
+
+| Prop          | Purpose                                                              |
+| :------------ | :------------------------------------------------------------------- |
+| `icon`        | A `lucide-react` icon. Rendered at `size-12` in a muted circle.      |
+| `title`       | Short heading (e.g., "No machines yet", "No issues found").          |
+| `description` | Optional body text. Explain what would populate this section.        |
+| `action`      | Optional CTA — typically a `<Button>` or `<Link>` styled as such.    |
+| `variant`     | `"card"` (default, wraps in `<Card>`) or `"bare"` (plain container). |
+
+**When to use each variant:**
+
+- `variant="card"` — the empty state IS the content of the section. Dashboard widgets, standalone "no results" pages.
+- `variant="bare"` — the empty state is rendered inside a list that's already wrapped in a `Card` or container. No double-border effect.
+
+**Rules:**
+
+- Never hand-roll an empty state with a raw `<div>` + icon + heading. Always use `<EmptyState>`.
+- Icon should be a single lucide icon — not a composition or custom SVG.
+- Keep the title under 40 characters. If you need more, use `description`.
+- Provide an `action` only if the user can do something productive from here (e.g., "Report the first issue"). Don't provide dead-end CTAs.
+- For filtered-result empty states ("no matches for your filter"), the action should be "Clear filters" or similar.
+
+### Loading State
+
+Prefer `<Skeleton>` rectangles shaped like the content that will appear. Skeletons reduce layout shift and communicate progress better than spinners.
+
+| Situation                                    | Use                                                         |
+| :------------------------------------------- | :---------------------------------------------------------- |
+| Async data not yet available (lists, tables) | `<Skeleton>` rectangles matching the shape of incoming rows |
+| In-flight form submission                    | `<Button loading>` — handles spinner + disabled state       |
+| Long-running background work                 | Toast with an inline spinner / progress indicator           |
+| Optimistic UI (actions with predictable end) | Update immediately, revert on error                         |
+
+**Rules:**
+
+- **No custom spinners outside Button.** Don't import `<Loader2>` or similar directly into components. If you need one, use Button's `loading` prop.
+- **Skeletons match shape, not count.** Render 3-5 skeleton rows at most; real data decides the true count.
+- **No `loading.tsx` files unless a route takes >500ms to stream initial HTML.** Most pages render fast enough that a skeleton-shaped flicker is worse than the brief "empty for a moment" state.
+- **In-place updates stay silent.** A button that toggles a flag doesn't need a skeleton — just update the UI.
+
+### Error State
+
+Three tiers based on scope. Pick the narrowest one that fits.
+
+| Scope                           | Pattern                                                                |
+| :------------------------------ | :--------------------------------------------------------------------- |
+| Form-level (submission failed)  | `<Alert variant="destructive"><AlertDescription>` at top of form       |
+| Field-level (one field invalid) | `<FormMessage>` (react-hook-form) or inline `text-sm text-destructive` |
+| Inline list edit (cell update)  | `toast.error("Failed to update X")`                                    |
+| Entire route crashed            | `error.tsx` boundary (already implemented)                             |
+| Route not found                 | `not-found.tsx` boundary (already implemented)                         |
+
+**Rules:**
+
+- **Never hand-roll `<div role="alert" className="rounded-md border border-red-900/50...">`.** Use `<Alert variant="destructive">` — it already exists in `~/components/ui/alert`.
+- **Form-level errors should be announced at the top of the form**, not buried near the submit button. Screen reader users need the error to appear above the inputs.
+- **Provide a recovery path.** "Try again" button, a link to contact support, or instructions on what to fix.
+- **Don't use toast for form-level errors.** Toasts dismiss themselves and are easy to miss. Use them only for transient async events.
+
+## 14. Feedback Decision Tree
+
+When something happens in response to user action, where should they see feedback?
+
+| What happened                                     | Where to show feedback                                                                              |
+| :------------------------------------------------ | :-------------------------------------------------------------------------------------------------- |
+| Form submit success → redirect                    | Server Action does the write, then `redirect(...)`; if needed, show success on the destination page |
+| Form submit success → stay on page (settings)     | Return success state from the Server Action; `<SaveCancelButtons>` green flash (3s "Saved!")        |
+| Form submit error                                 | `<Alert variant="destructive">` at top + `<FormMessage>` under fields                               |
+| Field validation error (Zod)                      | Inline `<FormMessage>`                                                                              |
+| Inline list edit (status change, priority change) | `toast` for both success and error                                                                  |
+| Optimistic action (toggle, bookmark)              | Immediate UI update; `toast.error()` on failure                                                     |
+| Long-running background work (uploads)            | Toast with progress indicator                                                                       |
+| Short in-place work (counter increment)           | Immediate UI update, no notification                                                                |
+
+**Why server-side redirect instead of `toast.success() + router.push()`?** The project's progressive-enhancement rule (AGENTS.md #5) requires forms to work without JavaScript. `<form action={serverAction}>` + server-side `redirect(...)` works with JS off; a `toast.success()` + `router.push()` pattern only fires after hydration. If a success toast is genuinely needed on the destination page, persist a one-time success state (e.g., via a search param or short-lived cookie read in the destination route) and render it there.
+
+**Rule of thumb:** If the user initiated it and waited → feedback. If it was instant or invisible → no feedback.
+
+**Why not toast for everything?** Toasts are ephemeral and noisy. Use them for transient events (row updated, file uploaded). Use inline alerts for persistent state (form has errors, save failed, retry needed).
+
+**Why `<SaveCancelButtons>` has its own success flash instead of a toast?** Settings pages don't redirect, so a toast would disappear while the user is still looking at the form. A button that briefly turns green keeps the feedback anchored to the action.
+
+## 15. Date Formatting Vocabulary
+
+> **Status — planned API, not yet implemented.** Three canonical helpers **will live** in `src/lib/dates.ts`; the module doesn't exist today. Extraction is tracked as **PP-yxw.7** (Wave 2c of the consistency pass). This section specifies the contract that PR will build to. Until the module lands, existing inline `formatDistanceToNow` and `toLocaleDateString` callers stay where they are; new code should wait for the helpers rather than adding more inline calls.
+
+Once the module is in place: use the helpers below. Never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
+
+| Helper                 | Output                         | When to use                                                  |
+| :--------------------- | :----------------------------- | :----------------------------------------------------------- |
+| `formatRelative(date)` | `"3 days ago"`, `"in 2 hours"` | Activity timestamps — comments, issue updates, notifications |
+| `formatDate(date)`     | `"Apr 17, 2026"`               | Absolute dates in detail views, created-at fields            |
+| `formatDateTime(date)` | `"Apr 17, 2026, 9:30 PM"`      | Admin audit logs, precise timestamps, debug info             |
+
+All three will accept `Date | string | number` input. For `null` / `undefined` input, all three will return the canonical fallback `"—"` — callers should not have to null-guard before calling.
+
+**Why a vocabulary instead of raw calls?**
+
+- **Consistency.** "2 days ago" and "Apr 17" look the same everywhere.
+- **Locale safety.** `toLocaleDateString()` renders differently per locale, which breaks visual regression tests.
+- **Refactor leverage.** If we ever switch from `date-fns` to `Temporal` or add tooltips showing absolute dates on hover, we change one file.
+
+**Don't:** build custom formatting helpers per feature. If `formatRelative` / `formatDate` / `formatDateTime` don't cover a case, expand the vocabulary rather than inlining a new variant.
+
+## 16. Icon Library
+
+`lucide-react` is the only icon library for new work. Do not introduce new inline SVGs, and do not import icons from other libraries. Some existing inline `<svg>` usage is legacy (signup confirmation state, AssigneePicker chevron, NotificationList dismiss icon); when you touch those areas, prefer migrating them to `lucide-react` opportunistically where doing so does not change behavior.
+
+### Sizing
+
+| Class           | Usage                                                                 |
+| :-------------- | :-------------------------------------------------------------------- |
+| `size-4` (1rem) | Default inline, buttons, nav links, table cells                       |
+| `size-5`        | Heading emphasis (CardTitle/DialogTitle with leading icon)            |
+| `size-6`        | Callouts, prominent indicators                                        |
+| `size-8`        | Section decorative                                                    |
+| `size-10`+      | EmptyState icons (rendered at `size-12` in a muted circle), hero uses |
+
+**Critical rule:** Use `size-*`, never `h-* w-*`. The `size-*` utility is Tailwind v4 canon; `h-4 w-4` is legacy and creates two classes where one would do.
+
+**Buttons auto-size icons.** `<Button>` has `[&_svg:not([class*='size-'])]:size-4` built in, so you don't need to specify `size-4` on an icon child. Only add an explicit size if you're overriding.
+
+**Color:** Icons inherit from parent text color. Add `text-*` to the parent or the icon itself; don't use `fill=` or `stroke=` overrides.
+
+**Accessibility:** Icon-only buttons must have `aria-label` or a visible `<span className="sr-only">`. Nav icons that are part of a labeled nav item (`<Link>` with text that may be hidden at some breakpoints) should have `title` as a tooltip fallback.
+
+## 17. Modal Archetypes
+
+Two canonical modal patterns. Use shadcn primitives directly; don't extract a composite unless duplication exceeds rule-of-three.
+
+### FormDialog pattern (create/edit in a modal)
+
+```tsx
+<Dialog open={open} onOpenChange={setOpen}>
+  <DialogTrigger asChild>
+    <Button variant="outline">Edit</Button>
+  </DialogTrigger>
+  <DialogContent className="sm:max-w-lg">
+    <DialogHeader>
+      <DialogTitle>Edit machine</DialogTitle>
+      <DialogDescription>Update the name and location.</DialogDescription>
+    </DialogHeader>
+    <form action={updateMachine} className="space-y-4">
+      <!-- fields -->
+      <DialogFooter>
+        <Button variant="outline" type="button" onClick={() => setOpen(false)}>Cancel</Button>
+        <Button type="submit">Save</Button>
+      </DialogFooter>
+    </form>
+  </DialogContent>
+</Dialog>
+```
+
+### ConfirmDialog pattern (destructive confirmations)
+
+```tsx
+<AlertDialog>
+  <AlertDialogTrigger asChild>
+    <Button variant="destructive">Delete</Button>
+  </AlertDialogTrigger>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Delete machine?</AlertDialogTitle>
+      <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction onClick={deleteMachine}>Delete</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+```
+
+### Sizing
+
+| Size    | Class                 | Use case                                    |
+| :------ | :-------------------- | :------------------------------------------ |
+| Default | (no override)         | Short confirmation prompts                  |
+| Medium  | `sm:max-w-lg`         | Most forms (2-6 fields)                     |
+| Large   | `sm:max-w-xl` / `2xl` | Forms with rich content (editors, previews) |
+
+### Footer layout
+
+`DialogFooter` uses `flex flex-col-reverse gap-2 sm:flex-row sm:justify-end`. Write the buttons in source order as `[Cancel, Save]` (or `[Cancel, Delete]` for AlertDialog). That renders:
+
+- **Mobile** (`flex-col-reverse`): primary action (Save/Delete) on top, Cancel below. The reversal intentionally puts the primary action above the fold / closer to the focus point for small-screen readers.
+- **Desktop** (`sm:flex-row sm:justify-end`): horizontal row on the bottom-right, Cancel left, primary action rightmost — matching the standard "primary action anchors the right edge" convention.
+
+Do not reorder the buttons to try to "fix" the mobile stack — the reversal is by design.
+
+### Rules
+
+- Never build a custom `Modal` or `Drawer` component — Dialog / AlertDialog / Sheet cover every case.
+- Never put a `<form>` inside a `DropdownMenuItem` — Radix closes the dropdown before the form submits. Use `onSelect={() => serverAction()}` instead.
+- Never wrap a Server Action in an inline async function: `action={async () => await serverAction()}` breaks progressive enhancement. Pass the Server Action directly: `action={serverAction}`.
+- For destructive confirmations, use `AlertDialog` — it has semantics (`role="alertdialog"`) that screen readers announce more urgently.
+
+## 18. Token Canonical Form
+
+`globals.css` defines two parallel token vocabularies. The MD-era tokens predate Tailwind v4's semantic token naming and are kept in CSS for backward compatibility, but new code must use the canonical Tailwind semantic tokens.
+
+| MD-era (deprecated in code) | Canonical Tailwind semantic |
+| :-------------------------- | :-------------------------- |
+| `text-on-surface`           | `text-foreground`           |
+| `text-on-surface-variant`   | `text-muted-foreground`     |
+| `bg-error-container`        | `bg-destructive/10`         |
+| `text-on-error-container`   | `text-destructive`          |
+
+**Rules:**
+
+- **New code uses the canonical tokens.** No exceptions.
+- **When editing a file that uses deprecated tokens, migrate them as part of the change.** Opportunistic cleanup — don't go out of your way, but don't leave deprecated tokens next to your edits.
+- **CSS variable definitions stay.** The deprecated tokens are still defined in `globals.css`; existing code keeps working during migration. Eventually the MD-era tokens will be removed, but not in a single sweep.
+- **Exception: `bg-surface-variant/30`.** The dimmed/closed item surface (Section 2) has no Tailwind-semantic equivalent and is intentional design. Keep it.
+
+### Quick cheatsheet
+
+| Need                        | Use                     |
+| :-------------------------- | :---------------------- |
+| Body text                   | `text-foreground`       |
+| Secondary / helper text     | `text-muted-foreground` |
+| Primary accent (links/CTAs) | `text-primary`          |
+| Error text                  | `text-destructive`      |
+| Primary CTA background      | `bg-primary`            |
+| Subtle background           | `bg-muted`              |
+| Destructive CTA background  | `bg-destructive`        |
+| Destructive container bg    | `bg-destructive/10`     |
+| Card background             | `bg-card`               |
+| Dimmed/closed item          | `bg-surface-variant/30` |

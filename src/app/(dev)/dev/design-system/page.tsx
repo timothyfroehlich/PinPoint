@@ -58,6 +58,12 @@ export default function DesignSystemPage(): React.JSX.Element {
       {/* ── Badge Grid Layouts ────────────────────────────── */}
       <BadgeGridSection />
 
+      {/* ── UI States (PP-vze pre-seeded; filled by PP-yxw.5 + PP-aag) ── */}
+      <UIStatesSection />
+
+      {/* ── Date Formatting (PP-vze pre-seeded; filled by PP-yxw.7) ──── */}
+      <DateFormattingSection />
+
       {/* ── Mobile Shell ──────────────────────────────────── */}
       <MobileShellSection />
 
@@ -1184,6 +1190,59 @@ function PageArchetypesSection(): React.JSX.Element {
             </p>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+   Placeholder sections — pre-seeded by PP-vze (design bible
+   expansion, Wave 1 of the consistency pass). Filled in by
+   subsequent PRs.
+   ──────────────────────────────────────────────────────────── */
+
+function UIStatesSection(): React.JSX.Element {
+  // Filled in by PP-yxw.5 (EmptyState) and PP-aag (Alert migration).
+  // Should render:
+  //   - EmptyState variants: card (default) and bare, with/without action
+  //   - Loading: Skeleton shapes at common sizes (row, card, hero)
+  //   - Error: Alert variant="destructive" with AlertTitle + AlertDescription
+  // See pinpoint-design-bible SKILL.md §13 for canonical patterns.
+  return (
+    <section className="space-y-6">
+      <SectionHeading
+        title="UI States"
+        description="Canonical empty, loading, and error patterns. Filled in by PP-yxw.5 (EmptyState) and PP-aag (Alert migration) — see design bible §13."
+      />
+      <div className="rounded-lg border border-dashed border-outline-variant bg-card p-8 text-center">
+        <p className="text-sm text-muted-foreground">
+          Reserved for EmptyState / Skeleton / Alert showcases. Filled by Wave
+          2a (PP-yxw.5) and Wave 2b (PP-aag).
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function DateFormattingSection(): React.JSX.Element {
+  // Filled in by PP-yxw.7 (date formatting utility).
+  // Should render:
+  //   - formatRelative examples: "just now", "3 minutes ago", "2 days ago"
+  //   - formatDate examples: "Apr 17, 2026"
+  //   - formatDateTime examples: "Apr 17, 2026, 9:30 PM"
+  //   - Null/undefined handling fallback
+  // See pinpoint-design-bible SKILL.md §15 for canonical vocabulary.
+  return (
+    <section className="space-y-6">
+      <SectionHeading
+        title="Date Formatting"
+        description="Canonical helpers from src/lib/dates.ts. Filled in by PP-yxw.7 — see design bible §15."
+      />
+      <div className="rounded-lg border border-dashed border-outline-variant bg-card p-8 text-center">
+        <p className="text-sm text-muted-foreground">
+          Reserved for formatRelative / formatDate / formatDateTime showcases.
+          Filled by Wave 2c (PP-yxw.7).
+        </p>
       </div>
     </section>
   );
