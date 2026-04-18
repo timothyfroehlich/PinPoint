@@ -71,20 +71,16 @@ export default defineConfig({
       use: { ...devices["Pixel 5"] },
       dependencies: ["auth-setup"],
     },
-    ...(!process.env["CI"] && process.env["PLAYWRIGHT_ENABLE_SAFARI"] !== "true"
-      ? []
-      : [
-          {
-            name: "Mobile Safari",
-            use: {
-              ...devices["iPhone 12"],
-              viewport: { width: 375, height: 812 },
-            },
-            retries: process.env["CI"] ? 3 : 1,
-            timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
-            dependencies: ["auth-setup"],
-          },
-        ]),
+    {
+      name: "Mobile Safari",
+      use: {
+        ...devices["iPhone 12"],
+        viewport: { width: 375, height: 812 },
+      },
+      retries: process.env["CI"] ? 3 : 1,
+      timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
+      dependencies: ["auth-setup"],
+    },
   ],
 
   webServer: {
