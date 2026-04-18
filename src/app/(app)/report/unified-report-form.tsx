@@ -12,7 +12,7 @@ import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { cn } from "~/lib/utils";
 import {
   submitPublicIssueAction,
@@ -78,7 +78,6 @@ export function UnifiedReportForm({
   initialMachineInitials,
 }: UnifiedReportFormProps): React.JSX.Element {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const hasRestored = useRef(false);
   const [selectedMachineId, setSelectedMachineId] = useState(
     defaultMachineId ?? ""
@@ -122,10 +121,10 @@ export function UnifiedReportForm({
     if (state.success) {
       window.localStorage.removeItem("report_form_state");
       if (state.redirectTo) {
-        router.push(state.redirectTo);
+        window.location.assign(state.redirectTo);
       }
     }
-  }, [state.success, state.redirectTo, router]);
+  }, [state.success, state.redirectTo]);
 
   // Persistence: Restore from localStorage on mount
   useEffect(() => {

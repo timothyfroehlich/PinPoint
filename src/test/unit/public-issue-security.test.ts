@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { submitPublicIssueAction } from "~/app/report/actions";
+import { submitPublicIssueAction } from "~/app/(app)/report/actions";
 
 // Mock server-only (no-op in test environment)
 vi.mock("server-only", () => ({}));

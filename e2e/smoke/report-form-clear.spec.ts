@@ -49,7 +49,7 @@ test.describe("Report Form Clears After Submission", () => {
     await submitFormAndWaitForRedirect(
       page,
       page.getByRole("button", { name: "Submit Issue Report" }),
-      { awayFrom: "/report" }
+      { awayFrom: "/report", expectedIssueTitle: issueTitle }
     );
 
     // Verify we landed on the issue detail page

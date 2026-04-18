@@ -39,7 +39,7 @@ export default async function ResetPasswordPage({
     const hasRetried = params.retry === "1";
 
     if (hasAuthCookie && !hasRetried) {
-      redirect("/auth/loading?next=/reset-password?retry=1");
+      redirect("/auth/callback-loading?next=/reset-password?retry=1");
     }
 
     redirect("/forgot-password");
