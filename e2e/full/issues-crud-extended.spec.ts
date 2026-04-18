@@ -110,7 +110,7 @@ test.describe("Issues System - Extended", () => {
         // changes — this naturally handles any hydration delay without
         // relying on networkidle.
         await expect(async () => {
-          if (!page.url().includes("page=2")) {
+          if (new URL(page.url()).searchParams.get("page") !== "2") {
             await nextButton.click();
           }
           await expect

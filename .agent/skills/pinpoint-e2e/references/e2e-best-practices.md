@@ -81,7 +81,7 @@ Server Actions in Next.js can be slow to revalidate.
 
 - **DO**: Use `submitFormAndWaitForRedirect` helper for form submissions that redirect.
 - **DO**: Use semantic assertions (`expect(...).toBeVisible()`, `expect(...).toContainText(...)`) as the readiness gate after mutations — these naturally retry until the UI reflects the server response.
-- **DON'T**: Use `waitForLoadState("networkidle")` — it stalls indefinitely on pages with persistent connections (Turnstile widget, SSE, WebSocket). It was removed from all full test specs in Phase 2 of the CI hardening effort.
+- **DON'T**: Use `waitForLoadState("networkidle")` — it stalls indefinitely on pages with persistent connections (Turnstile widget, SSE, WebSocket). Direct usage was removed from full spec files in Phase 2 of the CI hardening effort; shared helpers should also avoid it.
 - **DON'T**: Use `waitForURL(callback)` for search-param checks (e.g. `url.searchParams.get("q")`). On Safari/WebKit, `router.push()` uses `pushState` which doesn't fire Playwright's URL change event. Use `expect.poll()` instead:
 
 ```typescript
