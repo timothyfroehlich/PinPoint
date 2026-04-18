@@ -187,7 +187,9 @@ test.describe("Issue List Features", () => {
 
     // The page is empty (no issues on page 999), but totalCount > 0 in seeded data.
     // Both top and bottom pagination controls must be visible so the user can navigate back.
-    await expect(page.getByTestId("bottom-prev-page").first()).toBeVisible();
+    const bottomPrevPage = page.getByTestId("bottom-prev-page");
+    await expect(bottomPrevPage).toHaveCount(1);
+    await expect(bottomPrevPage).toBeVisible();
   });
 
   test("should export issues to CSV", async ({ page }) => {
