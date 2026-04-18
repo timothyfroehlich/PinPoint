@@ -1,10 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
 import type { IssueWithAllRelations } from "~/lib/types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { UpdateIssueStatusForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-status-form";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
+import { TooltipProvider } from "~/components/ui/tooltip";
+
+// Wrap renders in TooltipProvider since the global provider lives in the root
+// layout (ClientProviders) which is not rendered in unit tests.
+function renderWithProviders(ui: ReactElement) {
+  return render(<TooltipProvider>{ui}</TooltipProvider>);
+}
 
 vi.mock("~/app/(app)/issues/actions", () => ({
   assignIssueAction: vi.fn(),
@@ -74,7 +82,7 @@ function createIssue(
 
 describe("Issue detail permission-aware UI", () => {
   it("renders status as read-only badge for unauthenticated users", () => {
-    render(
+    renderWithProviders(
       <UpdateIssueStatusForm
         issueId="issue-1"
         currentStatus="new"
@@ -88,7 +96,7 @@ describe("Issue detail permission-aware UI", () => {
   });
 
   it("disables status control for guest users on others' issues", () => {
-    render(
+    renderWithProviders(
       <UpdateIssueStatusForm
         issueId="issue-1"
         currentStatus="new"
@@ -107,7 +115,7 @@ describe("Issue detail permission-aware UI", () => {
   it("shows a login prompt instead of the add-comment form when unauthenticated", () => {
     const issue = createIssue();
 
-    render(
+    renderWithProviders(
       <IssueTimeline
         issue={issue}
         currentUserId={null}
@@ -125,7 +133,7 @@ describe("Issue detail permission-aware UI", () => {
   it("hides the watch button in the sidebar for unauthenticated users", () => {
     const issue = createIssue();
 
-    render(
+    renderWithProviders(
       <IssueSidebar
         issue={issue}
         allUsers={[]}

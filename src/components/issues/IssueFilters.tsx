@@ -31,7 +31,6 @@ import type { UserStatus } from "~/lib/types";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 
@@ -479,30 +478,28 @@ export function IssueFilters({
           >
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <div className="flex-1 min-w-0 relative h-full flex items-center">
-              <TooltipProvider delayDuration={300}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <input
-                      ref={inputRef}
-                      placeholder="Search issues..."
-                      data-testid="issue-search"
-                      className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground relative z-10 w-full"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    align="start"
-                    className="max-w-[300px] p-3"
-                  >
-                    <p className="text-xs leading-relaxed text-muted-foreground">
-                      Search across titles, descriptions, IDs (e.g., AFM-101),
-                      machine names, assignees, reporters, and comments.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <input
+                    ref={inputRef}
+                    placeholder="Search issues..."
+                    data-testid="issue-search"
+                    className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground relative z-10 w-full"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  align="start"
+                  className="max-w-[300px] p-3"
+                >
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Search across titles, descriptions, IDs (e.g., AFM-101),
+                    machine names, assignees, reporters, and comments.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
 
               <div
                 data-testid="filter-bar"

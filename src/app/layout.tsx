@@ -7,6 +7,7 @@ import { ClientLogger } from "~/components/dev/client-logger";
 
 import { CookieConsentBanner } from "~/components/CookieConsentBanner";
 import { SentryInitializer } from "~/components/SentryInitializer";
+import { ClientProviders } from "~/components/layout/ClientProviders";
 import { DEV_SHOW_COOKIE_BANNER_KEY } from "~/lib/cookies/constants";
 
 export const metadata: Metadata = {
@@ -41,11 +42,13 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="flex flex-col h-screen overflow-hidden">
-        <SentryInitializer />
-        {isDevelopment && <ClientLogger />}
-        <div className="flex-1 overflow-hidden">{children}</div>
-        <Toaster />
-        {showCookieBanner && <CookieConsentBanner />}
+        <ClientProviders>
+          <SentryInitializer />
+          {isDevelopment && <ClientLogger />}
+          <div className="flex-1 overflow-hidden">{children}</div>
+          <Toaster />
+          {showCookieBanner && <CookieConsentBanner />}
+        </ClientProviders>
       </body>
     </html>
   );

@@ -1,10 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { STATUS_GROUPS, OPEN_STATUSES } from "~/lib/issues/status";
 import type { IssueStatus } from "~/lib/types";
 import "@testing-library/jest-dom/vitest";
+import { TooltipProvider } from "~/components/ui/tooltip";
+
+// Wrap renders in TooltipProvider since the global provider lives in the root
+// layout (ClientProviders) which is not rendered in unit tests.
+function renderWithProviders(ui: ReactElement) {
+  return render(<TooltipProvider>{ui}</TooltipProvider>);
+}
 
 // Mock next/navigation
 const pushMock = vi.fn();
@@ -47,7 +55,7 @@ describe("IssueFilters", () => {
   };
 
   it("shows status badges on landing (default state)", async () => {
-    render(<IssueFilters {...defaultProps} />);
+    renderWithProviders(<IssueFilters {...defaultProps} />);
     // Wait for layout effect
     await new Promise((resolve) => setTimeout(resolve, 0));
     // Default state: Open statuses are selected, so badges should be visible
@@ -56,7 +64,7 @@ describe("IssueFilters", () => {
   });
 
   it("clears 'Open' group statuses when X is clicked", async () => {
-    render(
+    renderWithProviders(
       <IssueFilters
         {...defaultProps}
         filters={{ status: [...OPEN_STATUSES] }}
@@ -92,7 +100,9 @@ describe("IssueFilters", () => {
 
   it("clears individual status when X is clicked", async () => {
     // Setup filter with just "fixed" status (closed group)
-    render(<IssueFilters {...defaultProps} filters={{ status: ["fixed"] }} />);
+    renderWithProviders(
+      <IssueFilters {...defaultProps} filters={{ status: ["fixed"] }} />
+    );
 
     const fixedBadge = await screen.findByText("Fixed");
     const badgeElement = fixedBadge.closest('[data-testid="filter-badge"]');
@@ -126,7 +136,7 @@ describe("IssueFilters - My machines quick-select", () => {
 
   it('shows "My machines" toggle when ownedMachineInitials is non-empty', async () => {
     const user = userEvent.setup();
-    render(
+    renderWithProviders(
       <IssueFilters
         machines={machines}
         users={[]}
@@ -141,7 +151,7 @@ describe("IssueFilters - My machines quick-select", () => {
 
   it('does not show "My machines" toggle when ownedMachineInitials is empty', async () => {
     const user = userEvent.setup();
-    render(
+    renderWithProviders(
       <IssueFilters
         machines={machines}
         users={[]}
@@ -156,7 +166,9 @@ describe("IssueFilters - My machines quick-select", () => {
 
   it('does not show "My machines" toggle when ownedMachineInitials is undefined', async () => {
     const user = userEvent.setup();
-    render(<IssueFilters machines={machines} users={[]} filters={{}} />);
+    renderWithProviders(
+      <IssueFilters machines={machines} users={[]} filters={{}} />
+    );
 
     await user.click(screen.getByTestId("filter-machine"));
     expect(screen.queryByText("My machines")).not.toBeInTheDocument();
@@ -164,7 +176,7 @@ describe("IssueFilters - My machines quick-select", () => {
 
   it('clicking "My machines" selects all owned machine initials (AFM and MM)', async () => {
     const user = userEvent.setup();
-    render(
+    renderWithProviders(
       <IssueFilters
         machines={machines}
         users={[]}
@@ -184,7 +196,7 @@ describe("IssueFilters - My machines quick-select", () => {
 
   it('clicking "My machines" when all owned selected deselects only owned machines', async () => {
     const user = userEvent.setup();
-    render(
+    renderWithProviders(
       <IssueFilters
         machines={machines}
         users={[]}

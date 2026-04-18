@@ -16,7 +16,6 @@ import { type AccessLevel } from "~/lib/permissions/matrix";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 
@@ -95,12 +94,10 @@ export function AssignIssueForm({
       {permissionState.allowed ? (
         picker
       ) : (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>{picker}</TooltipTrigger>
-            <TooltipContent>{deniedReason}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{picker}</TooltipTrigger>
+          <TooltipContent>{deniedReason}</TooltipContent>
+        </Tooltip>
       )}
       {state && !state.ok && (
         <p className="text-sm text-destructive">{state.message}</p>

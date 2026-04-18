@@ -6,7 +6,6 @@ import { Button } from "~/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { toast } from "sonner";
@@ -63,29 +62,27 @@ export function ExportButton({
   }
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 shadow-sm"
-            onClick={handleExport}
-            disabled={isExporting}
-            aria-label="Export to CSV"
-            data-testid="export-csv-button"
-          >
-            {isExporting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Download className="h-3.5 w-3.5" />
-            )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Export to CSV</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0 shadow-sm"
+          onClick={handleExport}
+          disabled={isExporting}
+          aria-label="Export to CSV"
+          data-testid="export-csv-button"
+        >
+          {isExporting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5" />
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Export to CSV</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

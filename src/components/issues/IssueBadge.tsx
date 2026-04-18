@@ -26,7 +26,6 @@ import { cn } from "~/lib/utils";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 
@@ -111,14 +110,12 @@ export function IssueBadge({
   if (!showTooltip) return badgeElement;
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <Tooltip>
-        <TooltipTrigger asChild>{badgeElement}</TooltipTrigger>
-        <TooltipContent side="top" className="text-[10px] py-1 px-2">
-          <span className="font-semibold capitalize">{type}:</span>{" "}
-          <span className="capitalize">{label}</span>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>{badgeElement}</TooltipTrigger>
+      <TooltipContent side="top" className="text-[10px] py-1 px-2">
+        <span className="font-semibold capitalize">{type}:</span>{" "}
+        <span className="capitalize">{label}</span>
+      </TooltipContent>
+    </Tooltip>
   );
 }
