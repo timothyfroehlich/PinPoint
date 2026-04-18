@@ -28,6 +28,7 @@ import { IssueCard } from "~/components/issues/IssueCard";
 import { OrganizationBanner } from "~/components/dashboard/OrganizationBanner";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
+import { EmptyState } from "~/components/ui/empty-state";
 
 /**
  * Cached dashboard data fetcher (CORE-PERF-001)
@@ -367,12 +368,11 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             Newest Games
           </h2>
           {newestMachines.length === 0 ? (
-            <Card className="border-border bg-card">
-              <CardContent className="py-12 text-center">
-                <Sparkles className="mx-auto mb-4 size-12 text-muted-foreground" />
-                <p className="text-lg text-muted-foreground">No machines yet</p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={Sparkles}
+              title="No machines yet"
+              description="Machines will appear here once they are added to the collection."
+            />
           ) : (
             <div
               className="grid grid-cols-1 md:grid-cols-3 gap-4"
@@ -410,14 +410,11 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             Recently Fixed Games
           </h2>
           {recentlyFixedMachines.length === 0 ? (
-            <Card className="border-border bg-card">
-              <CardContent className="py-12 text-center">
-                <CheckCircle2 className="mx-auto mb-4 size-12 text-muted-foreground" />
-                <p className="text-lg text-muted-foreground">
-                  No recently fixed machines
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={CheckCircle2}
+              title="No recently fixed machines"
+              description="Machines will appear here once major or unplayable issues are resolved."
+            />
           ) : (
             <div
               className="grid grid-cols-1 md:grid-cols-3 gap-4"
@@ -454,14 +451,11 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               Issues Assigned to Me
             </h2>
             {assignedIssues.length === 0 ? (
-              <Card className="border-border bg-card">
-                <CardContent className="py-12 text-center">
-                  <CheckCircle2 className="mx-auto mb-4 size-12 text-muted-foreground" />
-                  <p className="text-lg text-muted-foreground">
-                    No issues assigned to you
-                  </p>
-                </CardContent>
-              </Card>
+              <EmptyState
+                icon={CheckCircle2}
+                title="No issues assigned to you"
+                description="Issues assigned to you will appear here."
+              />
             ) : (
               <div
                 className="grid grid-cols-1 md:grid-cols-2 gap-3"
@@ -487,14 +481,11 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             Recently Reported Issues
           </h2>
           {recentIssues.length === 0 ? (
-            <Card className="border-border bg-card">
-              <CardContent className="py-12 text-center">
-                <Clock className="mx-auto mb-4 size-12 text-muted-foreground" />
-                <p className="text-lg text-muted-foreground">
-                  No issues reported yet
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={Clock}
+              title="No issues reported yet"
+              description="Issues will appear here once they are reported."
+            />
           ) : (
             <div
               className="grid grid-cols-1 md:grid-cols-2 gap-3"

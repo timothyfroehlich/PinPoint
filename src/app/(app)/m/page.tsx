@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { Plus, SearchX } from "lucide-react";
+import { EmptyState } from "~/components/ui/empty-state";
 import { cn } from "~/lib/utils";
 import {
   parseMachineFilters,
@@ -179,49 +180,36 @@ export default async function MachinesPage({
       {/* Content */}
       <div>
         {sortedMachines.length === 0 ? (
-          // Empty state
-          <Card className="border-outline-variant border-dashed bg-transparent">
-            <CardContent className="py-16 text-center">
-              <div className="flex flex-col items-center gap-4">
-                {hasFilters ? (
-                  <>
-                    <div className="rounded-full bg-surface-container-highest p-4">
-                      <SearchX className="size-8 text-on-surface-variant" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xl font-semibold text-on-surface">
-                        No matches found
-                      </p>
-                      <p className="text-on-surface-variant">
-                        Try adjusting your filters to find what you're looking
-                        for.
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xl font-semibold text-on-surface">
-                      No machines yet
-                    </p>
-                    <p className="text-on-surface-variant mb-4">
-                      {accessLevel === "admin" || accessLevel === "technician"
-                        ? "Get started by adding your first machine to the collection."
-                        : "No machines have been added to the collection yet."}
-                    </p>
-                    {(accessLevel === "admin" ||
-                      accessLevel === "technician") && (
-                      <Link href="/m/new">
-                        <Button className="bg-primary text-on-primary hover:bg-primary/90">
-                          <Plus className="mr-2 size-4" />
-                          Add Your First Machine
-                        </Button>
-                      </Link>
-                    )}
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          hasFilters ? (
+            <EmptyState
+              icon={SearchX}
+              title="No matches found"
+              description="Try adjusting your filters to find what you're looking for."
+            />
+          ) : (
+            <EmptyState
+              icon={Plus}
+              title="No machines yet"
+              description={
+                accessLevel === "admin" || accessLevel === "technician"
+                  ? "Get started by adding your first machine to the collection."
+                  : "No machines have been added to the collection yet."
+              }
+              action={
+                accessLevel === "admin" || accessLevel === "technician" ? (
+                  <Button
+                    asChild
+                    className="bg-primary text-on-primary hover:bg-primary/90"
+                  >
+                    <Link href="/m/new">
+                      <Plus className="mr-2 size-4" />
+                      Add Your First Machine
+                    </Link>
+                  </Button>
+                ) : undefined
+              }
+            />
+          )
         ) : (
           // Machine grid (responsive: 1 col on mobile, 2 on tablet, 3 on desktop)
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
