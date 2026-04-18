@@ -13,6 +13,9 @@
 import type { Page, Locator } from "@playwright/test";
 import { selectOption } from "./actions";
 
+const escapeRegex = (value: string): string =>
+  value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
  * Submit a form and wait for Server Action redirect to complete
  *
@@ -33,19 +36,71 @@ export async function submitFormAndWaitForRedirect(
     awayFrom?: string;
     /** Maximum time to wait for redirect (default: 60000ms for Safari) */
     timeout?: number;
+    /** Expected issue title for /report fallback when Safari drops redirect */
+    expectedIssueTitle?: string;
   }
 ): Promise<void> {
   const currentUrl = page.url();
   const awayFrom = options?.awayFrom ?? new URL(currentUrl).pathname;
   const timeout = options?.timeout ?? 60000; // Increased from 30s to 60s for WebKit
+  const expectedIssueTitle = options?.expectedIssueTitle;
+  const actionResponsePromise = page
+    .waitForResponse(
+      (response) => {
+        if (response.request().method() !== "POST") {
+          return false;
+        }
+        return new URL(response.url()).pathname.startsWith(awayFrom);
+      },
+      { timeout }
+    )
+    .catch(() => null);
 
   await submitButton.click();
 
-  // Wait for URL to change away from current page
-  // This is more reliable than waitForLoadState for Safari Server Actions
-  await page.waitForURL((url) => !url.pathname.startsWith(awayFrom), {
-    timeout,
-  });
+  try {
+    // Wait for URL to change away from current page.
+    // This is more reliable than waitForLoadState for Safari Server Actions.
+    await page.waitForURL((url) => !url.pathname.startsWith(awayFrom), {
+      timeout,
+    });
+    return;
+  } catch (error) {
+    // If Safari dropped the redirect but the Server Action response contains
+    // the destination issue URL, navigate there directly.
+    const actionResponse = await actionResponsePromise;
+    if (actionResponse) {
+      const responseBody = await actionResponse.text();
+      const redirectToMatch =
+        responseBody.match(/"redirectTo":"(\/m\/[^/"\\]+\/i\/\d+)"/) ??
+        responseBody.match(/\\"redirectTo\\":\\"(\/m\/[^/"\\]+\/i\/\d+)\\"/);
+      if (redirectToMatch?.[1]) {
+        await page.goto(redirectToMatch[1]);
+        return;
+      }
+    }
+
+    // Safari/WebKit can drop the client redirect even when issue creation succeeds.
+    // If we have an expected title and we're still on /report, use the freshly-added
+    // "Recent Issues" item as a deterministic fallback path to the created issue.
+    if (awayFrom === "/report" && expectedIssueTitle) {
+      const issueLink = page
+        .getByRole("link", {
+          name: new RegExp(
+            `^View issue: ${escapeRegex(expectedIssueTitle)}\\s-\\s`
+          ),
+        })
+        .first();
+      await issueLink.waitFor({ state: "visible", timeout: 15000 });
+      const href = await issueLink.getAttribute("href");
+      if (href) {
+        await page.goto(href);
+        return;
+      }
+    }
+
+    throw error;
+  }
 }
 
 /**

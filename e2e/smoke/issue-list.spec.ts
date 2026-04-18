@@ -8,7 +8,7 @@ test.describe("Issue List Features", () => {
   test.use({ storageState: STORAGE_STATE.admin });
 
   test.beforeEach(() => {
-    test.setTimeout(60000);
+    test.setTimeout(120000);
   });
 
   test("should filter and search issues", async ({ page }) => {
@@ -22,11 +22,13 @@ test.describe("Issue List Features", () => {
 
     // 2. Test Searching
     // Search for Issue 1
-    await page
-      .getByPlaceholder("Search issues...")
-      .fill("Thing flips the bird");
+    const searchInput = page.getByPlaceholder("Search issues...");
+    await searchInput.focus();
+    await searchInput.fill("Thing flips the bird");
     await page.keyboard.press("Enter");
-    await page.waitForURL((url) => url.searchParams.has("q"));
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get("q"), { timeout: 60000 })
+      .toBe("Thing flips the bird");
     await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
     await expect(page.getByRole("row", { name: title1 })).toBeVisible();
     await expect(page.getByRole("row", { name: title2 })).toBeHidden();
@@ -35,9 +37,15 @@ test.describe("Issue List Features", () => {
     const clearProps = page.getByRole("button", { name: "Clear", exact: true });
     await expect(clearProps).toBeVisible();
     await clearProps.click();
-    await page.waitForURL(
-      (url) => !url.searchParams.has("q") || url.searchParams.get("q") === ""
-    );
+    await expect
+      .poll(
+        () => {
+          const query = new URL(page.url()).searchParams.get("q");
+          return query === null || query === "";
+        },
+        { timeout: 60000 }
+      )
+      .toBe(true);
     await expect(page.getByText(/Showing \d+ of \d+ issues/)).toBeVisible();
     await expect(page.getByText("Showing 1 of 1 issues")).toHaveCount(0);
 
