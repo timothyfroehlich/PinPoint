@@ -12,6 +12,7 @@ import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import { useSearchParams } from "next/navigation";
 import { cn } from "~/lib/utils";
 import {
@@ -272,12 +273,9 @@ export function UnifiedReportForm({
         {/* Main Form Column */}
         <div className="lg:col-span-7 space-y-3 md:space-y-4">
           {(initialError ?? state.error) && (
-            <div
-              role="alert"
-              className="rounded-md border border-red-900/50 bg-red-900/20 px-4 py-2 text-sm text-red-300"
-            >
-              {initialError ?? state.error}
-            </div>
+            <Alert variant="destructive">
+              <AlertDescription>{initialError ?? state.error}</AlertDescription>
+            </Alert>
           )}
 
           <form action={formAction} className="space-y-3 md:space-y-4">
