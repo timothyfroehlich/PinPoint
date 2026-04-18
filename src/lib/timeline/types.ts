@@ -51,8 +51,12 @@ export function formatTimelineEvent(event: TimelineEventData): string {
     case "title_changed":
       return `Title changed from "${event.from}" to "${event.to}"`;
     default:
-      return `Unknown event: ${(event satisfies never as { type: string }).type}`;
+      return assertUnreachableEvent(event);
   }
+}
+
+function assertUnreachableEvent(_event: never): string {
+  return "Unknown timeline event";
 }
 
 function statusLabel(value: string): string {
