@@ -293,9 +293,9 @@ Every page will eventually need one of these three states: empty, loading, error
 
 ### Empty State
 
-Use `<EmptyState>` from `~/components/ui/empty-state`. Reach for this whenever a list, collection, or section has zero items to display.
+> **Status — planned component, not yet implemented.** `<EmptyState>` **will live** at `~/components/ui/empty-state`; the file doesn't exist today. Extraction is tracked as **PP-yxw.5** (Wave 2a of the consistency pass). This section specifies the contract that PR will build to. Until the component lands, existing inline empty states stay where they are; new code should wait for the component rather than hand-rolling another inline variant.
 
-> **Status:** The component doesn't exist yet — extraction is tracked as **PP-yxw.5** (Wave 2a of the consistency pass). The props and structure below are the canonical target; build to this shape when the component lands. Until then, existing inline empty states stay where they are.
+Once the component is in place: use `<EmptyState>` whenever a list, collection, or section has zero items to display.
 
 | Prop          | Purpose                                                              |
 | :------------ | :------------------------------------------------------------------- |
@@ -359,16 +359,18 @@ Three tiers based on scope. Pick the narrowest one that fits.
 
 When something happens in response to user action, where should they see feedback?
 
-| What happened                                     | Where to show feedback                                                |
-| :------------------------------------------------ | :-------------------------------------------------------------------- |
-| Form submit success → redirect                    | `toast.success("X saved")` + `router.push(...)`                       |
-| Form submit success → stay on page (settings)     | `<SaveCancelButtons>` green flash (3s "Saved!")                       |
-| Form submit error                                 | `<Alert variant="destructive">` at top + `<FormMessage>` under fields |
-| Field validation error (Zod)                      | Inline `<FormMessage>`                                                |
-| Inline list edit (status change, priority change) | `toast` for both success and error                                    |
-| Optimistic action (toggle, bookmark)              | Immediate UI update; `toast.error()` on failure                       |
-| Long-running background work (uploads)            | Toast with progress indicator                                         |
-| Short in-place work (counter increment)           | Immediate UI update, no notification                                  |
+| What happened                                     | Where to show feedback                                                                              |
+| :------------------------------------------------ | :-------------------------------------------------------------------------------------------------- |
+| Form submit success → redirect                    | Server Action does the write, then `redirect(...)`; if needed, show success on the destination page |
+| Form submit success → stay on page (settings)     | Return success state from the Server Action; `<SaveCancelButtons>` green flash (3s "Saved!")        |
+| Form submit error                                 | `<Alert variant="destructive">` at top + `<FormMessage>` under fields                               |
+| Field validation error (Zod)                      | Inline `<FormMessage>`                                                                              |
+| Inline list edit (status change, priority change) | `toast` for both success and error                                                                  |
+| Optimistic action (toggle, bookmark)              | Immediate UI update; `toast.error()` on failure                                                     |
+| Long-running background work (uploads)            | Toast with progress indicator                                                                       |
+| Short in-place work (counter increment)           | Immediate UI update, no notification                                                                |
+
+**Why server-side redirect instead of `toast.success() + router.push()`?** The project's progressive-enhancement rule (AGENTS.md #5) requires forms to work without JavaScript. `<form action={serverAction}>` + server-side `redirect(...)` works with JS off; a `toast.success()` + `router.push()` pattern only fires after hydration. If a success toast is genuinely needed on the destination page, persist a one-time success state (e.g., via a search param or short-lived cookie read in the destination route) and render it there.
 
 **Rule of thumb:** If the user initiated it and waited → feedback. If it was instant or invisible → no feedback.
 
@@ -378,9 +380,9 @@ When something happens in response to user action, where should they see feedbac
 
 ## 15. Date Formatting Vocabulary
 
-Three canonical helpers will live in `src/lib/dates.ts`. Once they exist, use them. Never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
+> **Status — planned API, not yet implemented.** Three canonical helpers **will live** in `src/lib/dates.ts`; the module doesn't exist today. Extraction is tracked as **PP-yxw.7** (Wave 2c of the consistency pass). This section specifies the contract that PR will build to. Until the module lands, existing inline `formatDistanceToNow` and `toLocaleDateString` callers stay where they are; new code should wait for the helpers rather than adding more inline calls.
 
-> **Status:** The helpers don't exist yet — extraction is tracked as **PP-yxw.7** (Wave 2c of the consistency pass). Once the module lands, migrate existing callers. Until then, inline date calls stay where they are.
+Once the module is in place: use the helpers below. Never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
 
 | Helper                 | Output                         | When to use                                                  |
 | :--------------------- | :----------------------------- | :----------------------------------------------------------- |
@@ -388,7 +390,7 @@ Three canonical helpers will live in `src/lib/dates.ts`. Once they exist, use th
 | `formatDate(date)`     | `"Apr 17, 2026"`               | Absolute dates in detail views, created-at fields            |
 | `formatDateTime(date)` | `"Apr 17, 2026, 9:30 PM"`      | Admin audit logs, precise timestamps, debug info             |
 
-All three accept `Date | string | number` input. All three return an empty string (or `"—"`) for null/undefined input — callers should not have to null-guard before calling.
+All three will accept `Date | string | number` input. For `null` / `undefined` input, all three will return the canonical fallback `"—"` — callers should not have to null-guard before calling.
 
 **Why a vocabulary instead of raw calls?**
 
