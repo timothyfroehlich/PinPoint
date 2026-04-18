@@ -8,6 +8,7 @@ import { PasswordInput } from "~/components/ui/password-input";
 import { PasswordMismatch } from "~/components/password-mismatch";
 import { Label } from "~/components/ui/label";
 import { Checkbox } from "~/components/ui/checkbox";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import { PasswordStrength } from "~/components/password-strength";
 import { signupAction, type SignupResult } from "~/app/(auth)/actions";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
@@ -78,12 +79,9 @@ export function SignupForm({
     <form action={formAction} className="space-y-4">
       {/* Error Message */}
       {state && !state.ok && (
-        <div
-          className="rounded-lg bg-error-container px-4 py-3 text-sm text-on-error-container"
-          role="alert"
-        >
-          {state.message}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{state.message}</AlertDescription>
+        </Alert>
       )}
 
       <div className="grid grid-cols-2 gap-4">

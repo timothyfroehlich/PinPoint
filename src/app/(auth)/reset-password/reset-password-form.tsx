@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { PasswordInput } from "~/components/ui/password-input";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import { PasswordMismatch } from "~/components/password-mismatch";
 import { PasswordStrength } from "~/components/password-strength";
 import {
@@ -24,12 +25,9 @@ export function ResetPasswordForm(): React.JSX.Element {
     <form action={formAction} className="space-y-4">
       {/* Message */}
       {state && !state.ok && (
-        <div
-          className="rounded-lg bg-error-container px-4 py-3 text-sm text-on-error-container"
-          role="alert"
-        >
-          {state.message}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{state.message}</AlertDescription>
+        </Alert>
       )}
 
       {/* New Password */}

@@ -8,8 +8,8 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { PasswordInput } from "~/components/ui/password-input";
 import { Label } from "~/components/ui/label";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import { loginAction, type LoginResult } from "~/app/(auth)/actions";
-import { cn } from "~/lib/utils";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 
 // Lazily load TestAdminButton to prevent including test credentials in the production bundle
@@ -42,15 +42,9 @@ export function LoginForm({
     <>
       {/* Flash message */}
       {state && !state.ok && (
-        <div
-          className={cn(
-            "rounded-lg px-4 py-3 text-sm",
-            "border border-destructive/30 bg-destructive/10 text-destructive"
-          )}
-          role="alert"
-        >
-          {state.message}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{state.message}</AlertDescription>
+        </Alert>
       )}
 
       {/* Login form */}
