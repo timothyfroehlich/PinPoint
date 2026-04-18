@@ -30,9 +30,24 @@ export default defineConfig({
   retries: process.env["CI"] ? 2 : 0,
   workers: process.env["CI"] ? 2 : 1,
 
-  reporter: process.env["CI"]
-    ? [["dot"], ["html", { open: "never" }]]
-    : [["line"], ["html", { open: "never" }]],
+  reporter: (() => {
+    // Build reporter list at config-evaluation time so CLI --reporter= flags
+    // are never needed (CLI flags override the config entirely, which drops html).
+    type R = [string] | [string, Record<string, unknown>];
+    if (!process.env["CI"]) {
+      return [["line"], ["html", { open: "never" }]] as R[];
+    }
+    const reporters: R[] = [
+      ["dot"],
+      ["html", { open: "never" }],
+      // GitHub Actions inline annotations — only useful in CI
+      ["github"],
+    ];
+    // JSON reporter for structured failure summaries; enabled only when the
+    // env var is set (comprehensive post-merge job) to avoid stdout noise.
+    if (process.env["PLAYWRIGHT_JSON_OUTPUT_NAME"]) reporters.push(["json"]);
+    return reporters;
+  })(),
 
   use: {
     baseURL,
