@@ -604,11 +604,15 @@ export function IssueList({
               : "Issues will appear here once they are reported."
           }
           action={
-            !hasActiveIssueFilters(searchParams) ? (
+            hasActiveIssueFilters(searchParams) ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/issues">Clear filters</Link>
+              </Button>
+            ) : (
               <Button variant="outline" size="sm" asChild>
                 <Link href="/report">Report an Issue</Link>
               </Button>
-            ) : undefined
+            )
           }
         />
       )}

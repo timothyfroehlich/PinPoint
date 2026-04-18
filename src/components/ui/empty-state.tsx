@@ -30,7 +30,7 @@ export function EmptyState({
   variant = "card",
 }: EmptyStateProps): React.JSX.Element {
   const content = (
-    <div className="flex flex-col items-center py-12 text-center">
+    <div className="flex flex-col items-center px-6 py-12 text-center">
       <div className="mb-4 inline-flex size-24 items-center justify-center rounded-full bg-muted">
         <Icon className="size-12 text-muted-foreground" />
       </div>

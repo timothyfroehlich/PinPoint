@@ -185,6 +185,11 @@ export default async function MachinesPage({
               icon={SearchX}
               title="No matches found"
               description="Try adjusting your filters to find what you're looking for."
+              action={
+                <Button variant="outline" asChild>
+                  <Link href="/m">Clear filters</Link>
+                </Button>
+              }
             />
           ) : (
             <EmptyState
