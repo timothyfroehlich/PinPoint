@@ -6,6 +6,7 @@ import { cn } from "~/lib/utils";
 import { Card, CardHeader, CardTitle } from "~/components/ui/card";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { formatIssueId, resolveIssueReporter } from "~/lib/issues/utils";
+import { formatDate } from "~/lib/dates";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import type { Issue } from "~/lib/types";
 
@@ -88,13 +89,10 @@ export function IssueCard({
                 </span>
                 {showReporter && (
                   <span>
-                    Reported by {reporter.name} •{" "}
-                    {new Date(issue.createdAt).toLocaleDateString()}
+                    Reported by {reporter.name} • {formatDate(issue.createdAt)}
                   </span>
                 )}
-                {!showReporter && (
-                  <span>{new Date(issue.createdAt).toLocaleDateString()}</span>
-                )}
+                {!showReporter && <span>{formatDate(issue.createdAt)}</span>}
               </div>
             </div>
             <div className="shrink-0">

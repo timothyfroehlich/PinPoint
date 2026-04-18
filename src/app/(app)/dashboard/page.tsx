@@ -23,6 +23,7 @@ import {
 } from "drizzle-orm";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import type { Issue } from "~/lib/types";
+import { formatDate } from "~/lib/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { IssueCard } from "~/components/issues/IssueCard";
 import { OrganizationBanner } from "~/components/dashboard/OrganizationBanner";
@@ -388,8 +389,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                             {machine.name}
                           </CardTitle>
                           <p className="text-xs text-muted-foreground">
-                            Added{" "}
-                            {new Date(machine.createdAt).toLocaleDateString()}
+                            Added {formatDate(machine.createdAt)}
                           </p>
                         </div>
                         <span className="text-xs font-mono bg-muted px-2 py-1 rounded">
@@ -433,8 +433,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                             {machine.name}
                           </CardTitle>
                           <p className="text-xs text-success/80">
-                            Fixed{" "}
-                            {new Date(machine.fixedAt).toLocaleDateString()}
+                            Fixed {formatDate(machine.fixedAt)}
                           </p>
                         </div>
                         <CheckCircle2 className="size-5 text-success" />

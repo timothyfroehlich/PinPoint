@@ -7,6 +7,7 @@ import { OwnerBadge } from "~/components/issues/OwnerBadge";
 import { isUserMachineOwner } from "~/lib/issues/owner";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { resolveIssueReporter } from "~/lib/issues/utils";
+import { formatDate } from "~/lib/dates";
 import { type OwnershipContext } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
 
@@ -89,11 +90,7 @@ export function IssueSidebar({
               <div className="grid grid-cols-[110px_1fr] items-center gap-3">
                 <span className="text-sm text-muted-foreground">Created</span>
                 <span className="text-sm text-foreground">
-                  {new Date(issue.createdAt).toLocaleDateString(undefined, {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {formatDate(issue.createdAt)}
                 </span>
               </div>
             </div>
