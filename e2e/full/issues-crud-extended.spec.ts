@@ -87,9 +87,6 @@ test.describe("Issues System - Extended", () => {
     }) => {
       // Navigate to issues list page
       await page.goto("/issues");
-      // Wait for React to hydrate before testing button clicks — "load" fires
-      // after all scripts execute, which is when pagination handlers attach.
-      await page.waitForLoadState("load");
 
       // Wait for issues to load
       await expect(
@@ -108,11 +105,21 @@ test.describe("Issues System - Extended", () => {
       const isNextDisabled = await nextButton.isDisabled();
 
       if (!isNextDisabled) {
-        // Click next page
-        await nextButton.click();
-
-        // Wait for URL to change (generous timeout for Mobile Chrome in CI)
-        await page.waitForURL(/page=2/, { timeout: 30000 });
+        // The pagination button is present in the SSR'd DOM before React
+        // attaches its router.push() handler. Retry the click until the URL
+        // changes — this naturally handles any hydration delay without
+        // relying on networkidle.
+        await expect(async () => {
+          if (!page.url().includes("page=2")) {
+            await nextButton.click();
+          }
+          await expect
+            .poll(
+              () => new URL(page.url()).searchParams.get("page"),
+              { timeout: 3000 }
+            )
+            .toBe("2");
+        }).toPass({ timeout: 30000 });
 
         // Previous button should now be enabled
         await expect(bottomPrevButton).toBeEnabled();
