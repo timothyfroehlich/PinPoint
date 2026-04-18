@@ -25,6 +25,7 @@ export default defineConfig({
       name: "auth-setup",
       testDir: "./e2e",
       testMatch: "auth.setup.ts",
+      fullyParallel: false, // Serialize to prevent Supabase cookie rotation races
       use: { ...devices["Desktop Chrome"] },
     },
     {

@@ -42,14 +42,14 @@ async function loginAndSave(
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign In" }).click();
 
-  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("domcontentloaded");
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
   await expect(page.getByTestId("app-header")).toBeVisible();
   await expect(page.getByTestId("user-menu-button")).toBeVisible();
 
   // Force a full server round-trip to settle Supabase cookie rotation.
   // See the comment in loginAs() in actions.ts for the full explanation.
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
   await page.context().storageState({ path });
