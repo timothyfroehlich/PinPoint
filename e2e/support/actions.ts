@@ -52,7 +52,7 @@ export async function loginAs(
   await page.getByRole("button", { name: "Sign In" }).click();
 
   // Wait for initial dashboard load
-  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("domcontentloaded");
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
   // AppHeader is always rendered (mobile and desktop) — just verify it's visible
@@ -66,7 +66,7 @@ export async function loginAs(
   // (refresh token exchange) may not be fully committed by the time the NEXT
   // navigation fires. Reloading the dashboard forces the browser to send the
   // auth cookie back to the server, completing the rotation cycle.
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
 
   // Confirm the reload kept us on /dashboard (not redirected to /login by middleware).
   await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
