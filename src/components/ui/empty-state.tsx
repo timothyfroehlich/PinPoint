@@ -34,9 +34,11 @@ export function EmptyState({
       <div className="mb-4 inline-flex size-24 items-center justify-center rounded-full bg-muted">
         <Icon className="size-12 text-muted-foreground" />
       </div>
-      <p className="text-base font-semibold text-foreground">{title}</p>
+      <p className="text-base font-semibold text-balance text-foreground">
+        {title}
+      </p>
       {description ? (
-        <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+        <p className="mt-1 max-w-sm text-sm text-pretty text-muted-foreground">
           {description}
         </p>
       ) : null}
