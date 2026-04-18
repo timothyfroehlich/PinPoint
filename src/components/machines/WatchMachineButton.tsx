@@ -90,7 +90,7 @@ export function WatchMachineButton({
             size="sm"
             disabled={isPending}
             onClick={handleToggleWatch}
-            className="text-on-surface-variant hover:bg-surface-variant"
+            className="text-muted-foreground"
           >
             {icon}
             Watch
@@ -106,12 +106,7 @@ export function WatchMachineButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={isPending}
-          className="text-on-surface hover:bg-surface-variant"
-        >
+        <Button variant="ghost" size="sm" disabled={isPending}>
           {icon}
           Watching
         </Button>
