@@ -11,5 +11,9 @@ pnpm exec lint-staged
 pnpm run typecheck
 pnpm run format
 if command -v bd >/dev/null 2>&1; then
-  bd hooks run pre-commit
+  # BD_EXPORT_GIT_ADD=false: prevent beads from force-staging issues.jsonl
+  # at the repo root into every commit. The auto-export still runs (beads
+  # keeps its own copy inside .beads/), but git never sees the file.
+  # See: PP-2pe
+  BD_EXPORT_GIT_ADD=false bd hooks run pre-commit
 fi
