@@ -25,13 +25,13 @@
   /* Accents & Status */
   --color-accent: #27272a;
   --color-accent-foreground: #f8fafc;
-  --color-destructive: #ef4444;
+  --color-destructive: #dc2626; /* red-600 — white on red-500 failed AA (~3.8:1); red-600 passes (~5.3:1) */
   --color-destructive-foreground: #ffffff;
 
   /* Status Specific */
   --color-status-new: #4ade80;
   --color-status-in-progress: #d946ef;
-  --color-status-unplayable: #ef4444;
+  --color-status-unplayable: #dc2626; /* red-600 — kept in sync with --color-destructive */
 
   /* Semantic Status Colors */
   --color-success: #22c55e;
@@ -44,7 +44,7 @@
   --color-warning-container: #713f12;
   --color-on-warning-container: #fef9c3;
 
-  --color-error: #ef4444;
+  --color-error: #dc2626; /* red-600 — kept in sync with --color-destructive */
   --color-error-foreground: #ffffff;
   --color-error-container: #7f1d1d;
   --color-on-error-container: #fee2e2;
@@ -52,7 +52,7 @@
   /* Borders & Inputs */
   --color-border: #27272a;
   --color-input: #27272a;
-  --color-ring: #4ade80;
+  --color-ring: #f8fafc; /* foreground — was primary green, which made focus invisible on primary buttons */
 
   /* Extended Surface Palette */
   --color-surface: #0f0f11;

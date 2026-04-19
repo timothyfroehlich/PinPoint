@@ -35,6 +35,7 @@ PinPoint uses a **dark neon aesthetic** -- deep charcoal backgrounds with neon g
 - Status colors come from `STATUS_CONFIG` -- never freestyle status colors.
 - Glow effects (`glow-primary`, `glow-secondary`) are for interactive hover states only, never static decoration.
 - Frosted glass (bg-card with opacity + `backdrop-blur-sm`) is reserved for navigation chrome.
+- **Never rely on color alone to convey semantics.** Destructive, warning, success, and status cues must ship with an accompanying icon or verb label. Under deuteranopia / protanopia (combined ~8% of men), destructive-red and warning-amber collapse to similar mustard shades and are not distinguishable by hue. Concretely: `<Alert variant="destructive">` and `<Alert variant="warning">` take a leading `AlertOctagon` / `AlertTriangle` (or equivalent) icon child; destructive buttons carry a verb label like "Delete"; status / severity / priority badges pull their icon from `STATUS_CONFIG` / `SEVERITY_CONFIG` / `PRIORITY_CONFIG`.
 
 ## 2. Surface Hierarchy
 
