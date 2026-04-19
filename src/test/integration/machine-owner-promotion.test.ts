@@ -201,6 +201,101 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       });
       expect(unchangedUser?.role).toBe("guest");
     });
+
+    it("should roll back role promotion when machine update fails mid-transaction (atomicity)", async () => {
+      // This test verifies the core atomicity guarantee: role promotion and machine
+      // assignment MUST be atomic. If the machine update fails after the role has
+      // been promoted inside the transaction, the promotion must roll back — the
+      // guest stays a guest.
+      //
+      // Strategy: spy on the PGlite db's transaction() to intercept the tx object,
+      // then throw on the second db.update() call (machines) while letting the first
+      // (userProfiles role update) proceed normally on the real tx. The real Drizzle
+      // transaction then rolls back both changes.
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const guestUser = await createUser("guest");
+      const machine = await createMachine(adminUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      // Spy on the real transaction to intercept the tx object
+      const originalTransaction = db.transaction.bind(db);
+      const transactionSpy = vi
+        .spyOn(db, "transaction")
+        .mockImplementationOnce(
+          async (callback: (tx: typeof db) => Promise<unknown>) => {
+            return originalTransaction(async (realTx: typeof db) => {
+              // Wrap the tx: let the first update (role promotion on userProfiles) go
+              // through, then throw on the second update (machines) to simulate a
+              // constraint violation or infrastructure failure mid-transaction.
+              let updateCallCount = 0;
+              const txProxy = new Proxy(realTx, {
+                get(target, prop, receiver) {
+                  if (prop === "update") {
+                    return (...args: Parameters<typeof target.update>) => {
+                      updateCallCount++;
+                      if (updateCallCount > 1) {
+                        // Simulate the machine update failing (e.g. constraint violation)
+                        throw new Error(
+                          "Simulated mid-transaction constraint violation on machines table"
+                        );
+                      }
+                      return target.update(...args);
+                    };
+                  }
+                  return Reflect.get(target, prop, receiver);
+                },
+              });
+              return callback(txProxy);
+            });
+          }
+        );
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("ownerId", guestUser.id);
+      formData.append("forcePromoteUserId", guestUser.id);
+
+      const result = await updateMachineAction(undefined, formData);
+
+      // The action must return an error
+      expect(result.ok).toBe(false);
+
+      // The guest role must still be "guest" — the promotion was rolled back
+      const guestAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(guestAfter?.role).toBe("guest");
+
+      // The machine owner must not have changed
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerId).toBe(adminUser.id);
+
+      // No machineWatchers row for the guest should have been created
+      const watcherAfter = await db.query.machineWatchers.findFirst({
+        where: eq(machineWatchers.machineId, machine.id),
+      });
+      // The guest was not added as a watcher — either no row exists or it's not the guest
+      if (watcherAfter) {
+        expect(watcherAfter.userId).not.toBe(guestUser.id);
+      }
+
+      // Restore the spy (important: don't leave it active for subsequent tests)
+      transactionSpy.mockRestore();
+    });
   });
 
   describe("createMachineAction — forcePromoteUserId atomicity", () => {
