@@ -44,9 +44,10 @@ import { compareUnifiedUsers } from "~/lib/users/comparators";
  * ## Key Abstractions
  * - `OwnerSelectUser` includes `role`, `machineCount`, and `status` for
  *   metadata display and filtering
- * - After an invite, `setSelectedId` and `onUsersChange` are called together
- *   so React batches them into one render — the new user is visible in the
- *   content and the trigger shows their name immediately
+ * - After an invite, the new user is added to `localExtraUsers` (local state)
+ *   so they appear in `sortedUsers` immediately in the same render — no parent
+ *   re-render required for the trigger to display the correct name. The parent
+ *   is also notified via `onUsersChange` for form-submission purposes.
  * - `compareUnifiedUsers` from `~/lib/users/comparators` drives sort order
  * - The help text below the select explains the notification implication of
  *   owner assignment
@@ -135,11 +136,17 @@ export function OwnerSelect({
   const [showHidden, setShowHidden] = useState(false);
   const [query, setQuery] = useState("");
 
+  // Users added via the inline invite flow are tracked locally so they are
+  // immediately available in sortedUsers within the SAME render cycle as
+  // setSelectedId — no parent re-render required. The parent is also notified
+  // via onUsersChange so the hidden form field submits the correct value.
+  const [localExtraUsers, setLocalExtraUsers] = useState<OwnerSelectUser[]>([]);
+
   // Re-sort users after client-side mutations (e.g., inviting a new user)
   // to maintain consistent ordering: confirmed first, by machine count desc, then by last name
   const sortedUsers = useMemo(
-    () => [...users].sort(compareUnifiedUsers),
-    [users]
+    () => [...users, ...localExtraUsers].sort(compareUnifiedUsers),
+    [users, localExtraUsers]
   );
 
   // Filter and section logic.
@@ -302,13 +309,16 @@ export function OwnerSelect({
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
         onSuccess={(newUserId, newUser) => {
-          // Select the new user and show hidden groups so the invited user
-          // appears in the content. Both state updates are batched with
-          // onUsersChange into a single render — trigger shows correct name.
+          // Add the new user to localExtraUsers so they appear in sortedUsers
+          // immediately — this avoids a render-cycle dependency on the parent
+          // re-rendering with a new `users` prop before the trigger can display
+          // the selected user's name.
+          setLocalExtraUsers((prev) => [...prev, newUser]);
           setSelectedId(newUserId);
           setShowHidden(true);
           onValueChange?.(newUserId);
-          // Add the new user to the list immediately (no server refresh needed)
+          // Also notify parent so it can persist the updated user list
+          // (e.g. for form submission or other UI concerns).
           if (onUsersChange) {
             onUsersChange([...users, newUser]);
           }
