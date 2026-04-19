@@ -166,19 +166,22 @@ async function seedUsersAndData() {
 
     // Machine ownership distribution:
     // Admin: Humpty Dumpty, Black Knight, Medieval Madness, Godzilla
-    // Member: Slick Chick, Eight Ball Deluxe, Attack from Mars
-    // Guest: Fireball, Spider-Man
+    // Member: Slick Chick, Eight Ball Deluxe, Attack from Mars, Fireball, Spider-Man
     // Invited: The Addams Family
+    //
+    // Note: Fireball (FB) and Spider-Man (SM) were previously owned by the guest user.
+    // They are now assigned to the member user because machine owners must be member+
+    // (enforced by the DB trigger from migration 0027_machine_owner_member_invariant).
     const ownerMap = {
       "HD": userIds.admin,
       "SC": userIds.member,
-      "FB": userIds.guest,
+      "FB": userIds.member,
       "BK": userIds.admin,
       "EBD": userIds.member,
       "TAF": null, // Will use invited owner
       "AFM": userIds.member,
       "MM": userIds.admin,
-      "SM": userIds.guest,
+      "SM": userIds.member,
       "GDZ": userIds.admin,
     };
 
