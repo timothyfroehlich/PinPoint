@@ -77,19 +77,22 @@ Capture both stdout and the exit code. Do **not** wrap this in a polling loop of
 
 ### Step 3 — Classify the outcome
 
-Exactly three outcomes are possible:
+Exactly three outcomes from `pr-watch.py` are possible (`error` and `watcher_timeout` are returned by this spec's own logic, not by the script):
 
 #### (a) Exit 1 → CI failure
 
 > ⚠️ **Do not rely on the `✗` line alone.** That line contains the *workflow run* name (usually `CI` in this repo) from `gh run list --json ...,name,...`, **not** the failing job or step. Classifying against it will almost always fall to `unknown`. Get the specific failing job name from the run instead.
 
-1. Scan the captured stdout for the run ID and note the workflow run name from the `✗` line.
-2. Fetch the failing job names from the run itself:
+1. Scan the captured stdout for `RUN_ID`. Two patterns to look for:
+   - `✗  <workflow name> — failed` — extract the run ID from context (the `✗` line appears after the run URL or ID in `pr-watch.py` output)
+   - `Failure details: tmp/gh-monitor/failure-<RUN_ID>.md` — the early-failures path; parse `RUN_ID` directly from this line
+   If `pr-watch.py` reports **multiple** failing runs (multiple `Failure details:` lines), process each. Use the **first** as the primary failure for the top-level summary fields.
+2. For each failing run, fetch the failing job names:
    ```bash
    gh run view <RUN_ID> --json jobs --jq '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | .name'
    ```
-   Use the first name returned as the primary classification signal.
-3. Read `tmp/gh-monitor/failure-<RUN_ID>.md` (written by `pr-watch.py`) for log context. Extract the last ~30 lines of the log excerpt.
+   Use the first name returned as the primary classification signal for that run.
+3. Read `tmp/gh-monitor/failure-<RUN_ID>.md` for the primary run. Extract the last ~30 lines.
 4. Classify using the **Failure Classification** table below. Match in this order until one hits, first-match-wins:
    - the failing **job** name from step 2,
    - then the failing **step** names visible in the artifact (`gh run view <RUN_ID>` summary section),
@@ -101,12 +104,15 @@ Exactly three outcomes are possible:
 pr: <PR_NUMBER>
 result: ci_failed
 category: <one of: format | lint | linters | typecheck | tests | build | e2e | audit | secrets | unknown>
-failing_job: <exact job name from gh run view --json jobs; empty string if unavailable>
-workflow_run: <workflow run name from the ✗ line — informational only>
-run_id: <RUN_ID>
-failure_artifact: tmp/gh-monitor/failure-<RUN_ID>.md
+failing_job: <exact job name for primary run; empty string if unavailable>
+workflow_run: <workflow run name — informational only; omit if unavailable>
+run_id: <primary RUN_ID>
+failure_artifact: tmp/gh-monitor/failure-<primary RUN_ID>.md
+additional_failures:  # omit this field if only one run failed
+  - run_id: <RUN_ID>
+    failure_artifact: tmp/gh-monitor/failure-<RUN_ID>.md
 log_excerpt: |
-  <last ~30 lines of the failure log, verbatim>
+  <last ~30 lines of the primary failure log, verbatim>
 fix_hint: <string from the table>
 ```
 
@@ -187,7 +193,7 @@ Run `copilot-comments.sh` once to check for any lingering unresolved threads fro
 
 5. Go back to **Step 2** and run `pr-watch.py` again.
 
-**Important**: Because this agent runs in the background with `run_in_background: true`, main sees **all emitted YAML blocks at once** when the agent terminates — not in real-time. Main can still act on the results once the agent completes. Each YAML block is prefixed with a cycle number comment (e.g., `# cycle: 1`) so main can distinguish iterations.
+**Important**: This agent may emit multiple YAML blocks across cycles. Each block is independently actionable — treat `ready_for_label`, `ci_failed`, `copilot_review`, `copilot_threads_open`, and `watcher_timeout` blocks as the result for that cycle. Each block is prefixed with a cycle number comment (e.g., `# cycle: 1`) so main can distinguish iterations.
 
 ---
 
