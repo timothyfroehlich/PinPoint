@@ -119,7 +119,7 @@ export default async function HelpPage(): Promise<React.JSX.Element> {
       where: eq(userProfiles.id, user.id),
       columns: { role: true },
     });
-    isAdmin = profile?.role === "admin";
+    isAdmin = profile?.role === "admin"; // permissions-audit-allow: isAdmin flag drives help page section rendering
   }
 
   return (

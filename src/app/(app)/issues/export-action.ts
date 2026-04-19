@@ -107,7 +107,7 @@ export async function exportIssuesAction(input: {
     where: eq(userProfiles.id, user.id),
     columns: { role: true },
   });
-  const isAdmin = userProfile?.role === "admin";
+  const isAdmin = userProfile?.role === "admin"; // permissions-audit-allow: SQL row-level filtering, not a request gate
 
   try {
     // 4. Query issues

@@ -185,6 +185,7 @@ export async function createMachineAction(
     if (!targetActive && !targetInvited) {
       return err("VALIDATION", "Selected user does not exist.");
     }
+    // permissions-audit-allow: business-logic pre-condition for promotion, not a permission gate
     if ((targetActive?.role ?? targetInvited?.role) !== "guest") {
       return err("VALIDATION", "Selected user is not a guest.");
     }
@@ -296,6 +297,7 @@ export async function createMachineAction(
     });
     if (activeOwner) {
       // Validate assignee is not a guest
+      // permissions-audit-allow: business-logic data validation, not a permission gate
       if (activeOwner.role === "guest") {
         return err(
           "ASSIGNEE_NOT_MEMBER",
@@ -320,6 +322,7 @@ export async function createMachineAction(
         return err("VALIDATION", "Selected owner does not exist.");
       }
       // Validate invited assignee is not a guest
+      // permissions-audit-allow: business-logic data validation, not a permission gate
       if (invitedOwner.role === "guest") {
         return err(
           "ASSIGNEE_NOT_MEMBER",
@@ -503,6 +506,7 @@ export async function updateMachineAction(
       if (!targetActive && !targetInvited) {
         return err("VALIDATION", "Selected user does not exist.");
       }
+      // permissions-audit-allow: business-logic pre-condition for promotion, not a permission gate
       if ((targetActive?.role ?? targetInvited?.role) !== "guest") {
         return err("VALIDATION", "Selected user is not a guest.");
       }
@@ -628,6 +632,7 @@ export async function updateMachineAction(
       });
       if (activeOwner) {
         // Validate assignee is not a guest
+        // permissions-audit-allow: business-logic data validation, not a permission gate
         if (activeOwner.role === "guest") {
           return err(
             "ASSIGNEE_NOT_MEMBER",
@@ -653,6 +658,7 @@ export async function updateMachineAction(
           return err("VALIDATION", "Selected owner does not exist.");
         }
         // Validate invited assignee is not a guest
+        // permissions-audit-allow: business-logic data validation, not a permission gate
         if (invitedOwner.role === "guest") {
           return err(
             "ASSIGNEE_NOT_MEMBER",
