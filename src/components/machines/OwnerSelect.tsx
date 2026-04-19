@@ -8,13 +8,14 @@ import {
   SelectLabel,
   SelectSeparator,
   SelectTrigger,
+  SelectValue,
 } from "~/components/ui/select";
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Checkbox } from "~/components/ui/checkbox";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import type { UserStatus, UserRole } from "~/lib/types";
 import { InviteUserDialog } from "~/components/users/InviteUserDialog";
 import { Plus } from "lucide-react";
@@ -43,10 +44,11 @@ import { compareUnifiedUsers } from "~/lib/users/comparators";
  * ## Key Abstractions
  * - `OwnerSelectUser` includes `role`, `machineCount`, and `status` for
  *   metadata display and filtering
- * - After an invite, the new user is added to `localExtraUsers` (local state)
- *   so they appear in `sortedUsers` immediately in the same render — no parent
- *   re-render required for the trigger to display the correct name. The parent
- *   is also notified via `onUsersChange` for form-submission purposes.
+ * - After an invite, `pendingSelectionRef` stores the new user's ID and
+ *   `localExtraUsers` adds them to `sortedUsers` immediately. A `useEffect`
+ *   applies `setSelectedId` once the user appears in `sortedUsers` — by then
+ *   their `SelectItem` is registered in Radix's DocumentFragment collection
+ *   and `SelectValue` can portal the text into the trigger correctly.
  * - `compareUnifiedUsers` from `~/lib/users/comparators` drives sort order
  * - The help text below the select explains the notification implication of
  *   owner assignment
@@ -123,32 +125,6 @@ function UserItem({ user }: { user: OwnerSelectUser }): React.JSX.Element {
   );
 }
 
-/**
- * TriggerDisplay — shows the selected user's name + role badges in the trigger.
- * Used instead of <SelectValue> because Radix Select's SelectValue only
- * renders the selected item's text when the item was registered via
- * SelectPrimitive.ItemText inside an open SelectContent. Programmatic value
- * changes (e.g. after invite) bypass this registry — this component sidesteps
- * that limitation by reading from sortedUsers directly.
- */
-function TriggerDisplay({
-  user,
-}: {
-  user: OwnerSelectUser;
-}): React.JSX.Element {
-  return (
-    <div className="flex items-center gap-2">
-      <span>{user.name}</span>
-      {user.machineCount > 0 && (
-        <span className="text-[10px] text-muted-foreground/70">
-          ({user.machineCount})
-        </span>
-      )}
-      <RoleBadge user={user} />
-    </div>
-  );
-}
-
 export function OwnerSelect({
   users,
   defaultValue,
@@ -162,10 +138,16 @@ export function OwnerSelect({
   const [query, setQuery] = useState("");
 
   // Users added via the inline invite flow are tracked locally so they are
-  // immediately available in sortedUsers within the SAME render cycle as
-  // setSelectedId — no parent re-render required. The parent is also notified
-  // via onUsersChange so the hidden form field submits the correct value.
+  // immediately available in sortedUsers (and thus the SelectContent's
+  // DocumentFragment) before the parent re-renders with the updated users prop.
+  // This ensures the invited user's SelectItem is registered in Radix's item
+  // collection so SelectValue can portal the text into the trigger.
   const [localExtraUsers, setLocalExtraUsers] = useState<OwnerSelectUser[]>([]);
+
+  // Ref to track pending user ID to select after users list updates.
+  // Using a ref (not state) here is intentional: it survives re-renders that
+  // happen before the users prop is updated, without triggering extra renders.
+  const pendingSelectionRef = useRef<string | null>(null);
 
   // Re-sort users after client-side mutations (e.g., inviting a new user)
   // to maintain consistent ordering: confirmed first, by machine count desc, then by last name
@@ -174,13 +156,21 @@ export function OwnerSelect({
     [users, localExtraUsers]
   );
 
-  // The currently selected user object — drives the trigger display directly
-  // instead of relying on Radix SelectValue's internal ItemText registry
-  const selectedUser = useMemo(
-    () =>
-      selectedId ? sortedUsers.find((u) => u.id === selectedId) : undefined,
-    [sortedUsers, selectedId]
-  );
+  // Apply the pending selection once the invited user appears in sortedUsers.
+  // This effect fires after the render where localExtraUsers is updated (adding
+  // the new user) OR after the parent re-renders with the updated users prop.
+  // At that point, Radix's SelectItem for the new user is mounted in the
+  // DocumentFragment and its ItemText is portaled into the SelectValue node.
+  useEffect(() => {
+    if (pendingSelectionRef.current) {
+      const pendingId = pendingSelectionRef.current;
+      if (sortedUsers.some((u) => u.id === pendingId)) {
+        setSelectedId(pendingId);
+        onValueChange?.(pendingId);
+        pendingSelectionRef.current = null;
+      }
+    }
+  }, [sortedUsers, onValueChange]);
 
   // Filter and section logic.
   // When query is empty and showHidden is false: only member+ active users.
@@ -284,22 +274,7 @@ export function OwnerSelect({
           aria-describedby="owner-help"
           data-testid="owner-select"
         >
-          {/*
-           * Render the trigger label manually instead of using <SelectValue>.
-           * Radix Select's SelectValue looks up the selected item text from its
-           * internal ItemText registry, which is only populated when a SelectItem
-           * is rendered inside an open SelectContent. When value is set
-           * programmatically (e.g. after an invite), the content is closed and
-           * unmounted, so the registry has no entry for the new user — causing
-           * the trigger to show "Select an owner" despite value being set.
-           * By looking up the user in sortedUsers directly we bypass this
-           * limitation entirely.
-           */}
-          {selectedUser ? (
-            <TriggerDisplay user={selectedUser} />
-          ) : (
-            <span className="text-muted-foreground">Select an owner</span>
-          )}
+          <SelectValue placeholder="Select an owner" />
         </SelectTrigger>
         <SelectContent>
           {/* Member+ active users (no section header — default group) */}
@@ -357,14 +332,19 @@ export function OwnerSelect({
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
         onSuccess={(newUserId, newUser) => {
-          // Add the new user to localExtraUsers so they appear in sortedUsers
-          // immediately — this avoids a render-cycle dependency on the parent
-          // re-rendering with a new `users` prop before the trigger can display
-          // the selected user's name.
+          // Store the pending selection ID in a ref (survives re-renders
+          // triggered by Next.js router cache updates after the server action).
+          // The useEffect above applies the selection once sortedUsers includes
+          // the new user — at which point Radix's SelectItem is mounted in the
+          // DocumentFragment and SelectValue can display the correct name.
+          pendingSelectionRef.current = newUserId;
+          // Add the new user to localExtraUsers immediately — this makes them
+          // available in sortedUsers (and thus the closed SelectContent's
+          // DocumentFragment) in the NEXT render, without waiting for the
+          // parent to re-render with an updated users prop.
           setLocalExtraUsers((prev) => [...prev, newUser]);
-          setSelectedId(newUserId);
+          // Show hidden groups so the invited user appears in the content.
           setShowHidden(true);
-          onValueChange?.(newUserId);
           // Also notify parent so it can persist the updated user list
           // (e.g. for form submission or other UI concerns).
           if (onUsersChange) {
