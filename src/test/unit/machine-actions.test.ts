@@ -37,55 +37,88 @@ vi.mock("~/lib/logger", () => ({
   },
 }));
 
-// Setup a shared chain for DB mocks
-const chain = {
-  values: vi.fn(),
-  set: vi.fn(),
-  where: vi.fn(),
-  returning: vi.fn(),
-  onConflictDoUpdate: vi.fn(),
-  onConflictDoNothing: vi.fn(),
-} as any;
+// Use vi.hoisted so these variables are available inside vi.mock() factories
+const { chain, dbMock } = vi.hoisted(() => {
+  const chain: any = {
+    values: vi.fn(),
+    set: vi.fn(),
+    where: vi.fn(),
+    returning: vi.fn(),
+    onConflictDoUpdate: vi.fn(),
+    onConflictDoNothing: vi.fn(),
+  };
 
-chain.values.mockReturnValue(chain);
-chain.set.mockReturnValue(chain);
-chain.where.mockReturnValue(chain);
-chain.returning.mockResolvedValue([]);
-chain.onConflictDoUpdate.mockReturnValue(chain);
-chain.onConflictDoNothing.mockReturnValue(chain);
+  chain.values.mockReturnValue(chain);
+  chain.set.mockReturnValue(chain);
+  chain.where.mockReturnValue(chain);
+  chain.returning.mockResolvedValue([]);
+  chain.onConflictDoUpdate.mockReturnValue(chain);
+  chain.onConflictDoNothing.mockReturnValue(chain);
 
-// Mock DB
-vi.mock("~/server/db", () => ({
-  db: {
+  const dbMock = {
     insert: vi.fn(() => chain),
     update: vi.fn(() => chain),
     delete: vi.fn(() => chain),
+    transaction: vi.fn(),
     query: {
-      userProfiles: {
-        findFirst: vi.fn(),
-      },
-      machines: {
-        findFirst: vi.fn(),
-      },
-      machineWatchers: {
-        findFirst: vi.fn(),
-      },
-      invitedUsers: {
-        findFirst: vi.fn(),
-      },
+      userProfiles: { findFirst: vi.fn() },
+      machines: { findFirst: vi.fn() },
+      machineWatchers: { findFirst: vi.fn() },
+      invitedUsers: { findFirst: vi.fn() },
     },
-  },
+  };
+
+  // tx delegates to the same db.insert/update/delete so call counts are shared
+  const txMock = {
+    insert: (...args: any[]) => dbMock.insert(...args),
+    update: (...args: any[]) => dbMock.update(...args),
+    delete: (...args: any[]) => dbMock.delete(...args),
+  };
+
+  dbMock.transaction.mockImplementation((cb: (tx: any) => Promise<any>) =>
+    cb(txMock)
+  );
+
+  return { chain, dbMock };
+});
+
+vi.mock("~/server/db", () => ({
+  db: dbMock,
 }));
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
+function resetChain() {
+  chain.values.mockReturnValue(chain);
+  chain.set.mockReturnValue(chain);
+  chain.where.mockReturnValue(chain);
+  chain.returning.mockResolvedValue([]);
+  chain.onConflictDoUpdate.mockReturnValue(chain);
+  chain.onConflictDoNothing.mockReturnValue(chain);
+  // tx delegates to dbMock
+  const txMock = {
+    insert: (...args: any[]) => dbMock.insert(...args),
+    update: (...args: any[]) => dbMock.update(...args),
+    delete: (...args: any[]) => dbMock.delete(...args),
+  };
+  dbMock.transaction.mockImplementation((cb: (tx: any) => Promise<any>) =>
+    cb(txMock)
+  );
+  dbMock.insert.mockReturnValue(chain);
+  dbMock.update.mockReturnValue(chain);
+  dbMock.delete.mockReturnValue(chain);
+}
+
 describe("createMachineAction", () => {
-  const mockUser = { id: "user-123" };
+  const mockUser = { id: "550e8400-e29b-41d4-a716-446655440000" };
+  const guestUserId = "550e8400-e29b-41d4-a716-446655440010";
+  const memberUserId = "550e8400-e29b-41d4-a716-446655440011";
+  const invitedGuestId = "550e8400-e29b-41d4-a716-446655440012";
   const initialState = undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    chain.returning.mockResolvedValue([]);
+    resetChain();
 
     // Setup default successful auth
     vi.mocked(createClient).mockResolvedValue({
@@ -95,19 +128,25 @@ describe("createMachineAction", () => {
     } as unknown as SupabaseClient);
   });
 
-  it("should successfully create a machine", async () => {
+  it("should successfully create a machine with no owner (ownerId is null)", async () => {
     // Mock profile found
     vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
       role: "admin",
     } as any);
 
     // Mock successful insert
-    const mockMachine = { id: "machine-123", initials: "MM" };
+    const mockMachine = {
+      id: "machine-123",
+      initials: "MM",
+      name: "Medieval Madness",
+    };
     chain.returning.mockResolvedValue([mockMachine]);
 
     const formData = new FormData();
     formData.append("name", "Medieval Madness");
     formData.append("initials", "MM");
+    // No ownerId provided
 
     try {
       await createMachineAction(initialState, formData);
@@ -120,12 +159,39 @@ describe("createMachineAction", () => {
       expect.objectContaining({
         name: "Medieval Madness",
         initials: "MM",
-        ownerId: mockUser.id,
+        ownerId: undefined,
+        invitedOwnerId: undefined,
       })
     );
   });
 
-  it("should reject creation for non-admin users", async () => {
+  it("should NOT default ownerId to caller when field is empty (regression: was defaulting to caller)", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
+      role: "admin",
+    } as any);
+
+    const mockMachine = { id: "machine-123", initials: "MM", name: "Test" };
+    chain.returning.mockResolvedValue([mockMachine]);
+
+    const formData = new FormData();
+    formData.append("name", "Test");
+    formData.append("initials", "TT");
+    // Explicitly empty ownerId
+    formData.append("ownerId", "");
+
+    try {
+      await createMachineAction(initialState, formData);
+    } catch (e: any) {
+      expect(e.message).toBe("NEXT_REDIRECT");
+    }
+
+    expect(chain.values).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerId: undefined })
+    );
+  });
+
+  it("should reject creation for non-admin users (regression: drift fix)", async () => {
     // Mock profile with member role
     vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
       role: "member",
@@ -145,6 +211,24 @@ describe("createMachineAction", () => {
     expect(db.insert).not.toHaveBeenCalled();
   });
 
+  it("should reject creation for guest users (regression: drift fix)", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "guest",
+    } as any);
+
+    const formData = new FormData();
+    formData.append("name", "Medieval Madness");
+    formData.append("initials", "MM");
+
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+    }
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   it("should allow technician to create a machine", async () => {
     // Mock profile with technician role
     vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
@@ -152,7 +236,7 @@ describe("createMachineAction", () => {
     } as any);
 
     // Mock successful insert
-    const mockMachine = { id: "machine-123", initials: "MM" };
+    const mockMachine = { id: "machine-123", initials: "MM", name: "MM" };
     chain.returning.mockResolvedValue([mockMachine]);
 
     const formData = new FormData();
@@ -167,6 +251,214 @@ describe("createMachineAction", () => {
 
     expect(db.insert).toHaveBeenCalled();
   });
+
+  it("should return ASSIGNEE_NOT_MEMBER when active guest is assigned as owner", async () => {
+    // Admin creating machine, assigning a guest user
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        // Caller profile
+        return Promise.resolve({ id: mockUser.id, role: "admin" } as any);
+      }
+      // Assignee lookup — guest
+      return Promise.resolve({
+        id: guestUserId,
+        firstName: "Cory",
+        lastName: "Casual",
+        role: "guest",
+      } as any);
+    });
+
+    const formData = new FormData();
+    formData.append("name", "Medieval Madness");
+    formData.append("initials", "MM");
+    formData.append("ownerId", guestUserId);
+
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ASSIGNEE_NOT_MEMBER");
+      expect(result.meta?.assignee.id).toBe(guestUserId);
+      expect(result.meta?.assignee.name).toBe("Cory Casual");
+      expect(result.meta?.assignee.role).toBe("guest");
+      expect(result.meta?.assignee.type).toBe("active");
+    }
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("should return ASSIGNEE_NOT_MEMBER when invited guest is assigned as owner", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        return Promise.resolve({ id: mockUser.id, role: "admin" } as any);
+      }
+      // No active user found for assignee
+      return Promise.resolve(undefined);
+    });
+
+    vi.mocked(db.query.invitedUsers.findFirst).mockResolvedValue({
+      id: invitedGuestId,
+      firstName: "Invited",
+      lastName: "Guest",
+      role: "guest",
+    } as any);
+
+    const formData = new FormData();
+    formData.append("name", "Medieval Madness");
+    formData.append("initials", "MM");
+    formData.append("ownerId", invitedGuestId);
+
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ASSIGNEE_NOT_MEMBER");
+      expect(result.meta?.assignee.type).toBe("invited");
+    }
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("should atomically promote guest and create machine when forcePromoteUserId provided (admin)", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        // Caller profile
+        return Promise.resolve({ id: mockUser.id, role: "admin" } as any);
+      }
+      // Target user — guest
+      return Promise.resolve({
+        id: guestUserId,
+        firstName: "Cory",
+        lastName: "Casual",
+        role: "guest",
+      } as any);
+    });
+
+    const mockMachine = { id: "machine-123", initials: "MM", name: "MM" };
+    chain.returning.mockResolvedValue([mockMachine]);
+
+    const formData = new FormData();
+    formData.append("name", "Medieval Madness");
+    formData.append("initials", "MM");
+    formData.append("ownerId", guestUserId);
+    formData.append("forcePromoteUserId", guestUserId);
+
+    try {
+      await createMachineAction(initialState, formData);
+    } catch (e: any) {
+      expect(e.message).toBe("NEXT_REDIRECT");
+    }
+
+    // Transaction should have been called
+    expect(db.transaction).toHaveBeenCalled();
+    // Update should have been called (to promote user)
+    expect(db.update).toHaveBeenCalled();
+    // Insert should have been called (machine + watcher)
+    expect(db.insert).toHaveBeenCalled();
+  });
+
+  it("should allow technician to use forcePromoteUserId", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        return Promise.resolve({ id: mockUser.id, role: "technician" } as any);
+      }
+      return Promise.resolve({
+        id: guestUserId,
+        firstName: "Cory",
+        lastName: "Casual",
+        role: "guest",
+      } as any);
+    });
+
+    const mockMachine = { id: "machine-123", initials: "MM", name: "MM" };
+    chain.returning.mockResolvedValue([mockMachine]);
+
+    const formData = new FormData();
+    formData.append("name", "Medieval Madness");
+    formData.append("initials", "MM");
+    formData.append("ownerId", guestUserId);
+    formData.append("forcePromoteUserId", guestUserId);
+
+    try {
+      await createMachineAction(initialState, formData);
+    } catch (e: any) {
+      expect(e.message).toBe("NEXT_REDIRECT");
+    }
+
+    expect(db.transaction).toHaveBeenCalled();
+  });
+
+  it("should reject forcePromoteUserId from member (UNAUTHORIZED)", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
+      role: "member",
+    } as any);
+
+    const formData = new FormData();
+    formData.append("name", "Medieval Madness");
+    formData.append("initials", "MM");
+    formData.append("ownerId", guestUserId);
+    formData.append("forcePromoteUserId", guestUserId);
+
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+    }
+  });
+
+  it("should reject forcePromoteUserId when it does not match ownerId (VALIDATION)", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
+      role: "admin",
+    } as any);
+
+    const differentId = "550e8400-e29b-41d4-a716-446655440099";
+
+    const formData = new FormData();
+    formData.append("name", "Medieval Madness");
+    formData.append("initials", "MM");
+    formData.append("ownerId", guestUserId);
+    formData.append("forcePromoteUserId", differentId);
+
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+  });
+
+  it("should reject forcePromoteUserId pointing at non-guest user (VALIDATION)", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        return Promise.resolve({ id: mockUser.id, role: "admin" } as any);
+      }
+      // Target is a member, not a guest
+      return Promise.resolve({
+        id: memberUserId,
+        role: "member",
+      } as any);
+    });
+
+    const formData = new FormData();
+    formData.append("name", "Medieval Madness");
+    formData.append("initials", "MM");
+    formData.append("ownerId", memberUserId);
+    formData.append("forcePromoteUserId", memberUserId);
+
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+      expect(result.message).toMatch(/not a guest/i);
+    }
+  });
 });
 
 describe("updateMachineAction", () => {
@@ -174,11 +466,14 @@ describe("updateMachineAction", () => {
   const mockAdminUser = { id: "550e8400-e29b-41d4-a716-446655440001" };
   const machineId = "550e8400-e29b-41d4-a716-446655440002";
   const newOwnerId = "550e8400-e29b-41d4-a716-446655440003";
+  const guestUserId = "550e8400-e29b-41d4-a716-446655440010";
+  const memberUserId = "550e8400-e29b-41d4-a716-446655440011";
+  const invitedGuestId = "550e8400-e29b-41d4-a716-446655440012";
   const initialState = undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    chain.returning.mockResolvedValue([]);
+    resetChain();
 
     // Setup default successful auth
     vi.mocked(createClient).mockResolvedValue({
@@ -192,6 +487,7 @@ describe("updateMachineAction", () => {
       id: machineId,
       ownerId: mockUser.id,
       name: "Test Machine",
+      initials: "TM",
     } as any);
   });
 
@@ -208,6 +504,7 @@ describe("updateMachineAction", () => {
       id: machineId,
       ownerId: mockUser.id,
       name: "Test Machine",
+      initials: "TM",
     } as any);
 
     // Mock admin profile
@@ -229,6 +526,16 @@ describe("updateMachineAction", () => {
     formData.append("id", machineId);
     formData.append("name", "Updated Name");
     formData.append("ownerId", newOwnerId);
+
+    // Mock new owner lookup
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        return Promise.resolve({ id: mockAdminUser.id, role: "admin" } as any);
+      }
+      // New owner is a member
+      return Promise.resolve({ id: newOwnerId, role: "member" } as any);
+    });
 
     const result = await updateMachineAction(initialState, formData);
 
@@ -268,8 +575,62 @@ describe("updateMachineAction", () => {
     expect(db.update).toHaveBeenCalled();
   });
 
-  it("should return NOT_FOUND when non-admin tries to update another user's machine", async () => {
-    // Mock member profile (not admin)
+  it("should return UNAUTHORIZED when guest-owner tries to edit (regression: drift fix)", async () => {
+    // Guest user who happens to be stored as owner (bad state, now prevented by DB trigger)
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
+      role: "guest",
+    } as any);
+
+    // Machine has this guest as owner
+    vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+      id: machineId,
+      ownerId: mockUser.id,
+      name: "Test Machine",
+      initials: "TM",
+    } as any);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Updated Name");
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+    }
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("should return UNAUTHORIZED when non-owner member tries to update a machine", async () => {
+    // Mock member profile (not admin, not owner)
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
+      role: "member",
+    } as any);
+
+    // Machine owned by someone else
+    vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+      id: machineId,
+      ownerId: "550e8400-e29b-41d4-a716-446655449999",
+      name: "Test Machine",
+      initials: "TM",
+    } as any);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Updated Name");
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+    }
+  });
+
+  it("should return NOT_FOUND when machine does not exist", async () => {
     vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
       id: mockUser.id,
       role: "member",
@@ -379,16 +740,14 @@ describe("updateMachineAction", () => {
     );
   });
 
-  it("should allow member owner to transfer ownership", async () => {
+  it("should allow member owner to transfer ownership to another member", async () => {
     // Mock member profile (owner, not admin)
     vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
-      // First call: profile lookup for the authenticated user
-      // Second call: checking if newOwnerId is an active user
       const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
       if (calls.length <= 1) {
         return Promise.resolve({ id: mockUser.id, role: "member" } as any);
       }
-      // Second call: the new owner exists as an active user
+      // Second call: the new owner exists as an active member
       return Promise.resolve({ id: newOwnerId, role: "member" } as any);
     });
 
@@ -419,6 +778,237 @@ describe("updateMachineAction", () => {
         invitedOwnerId: null,
       })
     );
+  });
+
+  it("should return ASSIGNEE_NOT_MEMBER when active guest is assigned as owner", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        return Promise.resolve({ id: mockUser.id, role: "admin" } as any);
+      }
+      // Assignee is a guest
+      return Promise.resolve({
+        id: guestUserId,
+        firstName: "Cory",
+        lastName: "Casual",
+        role: "guest",
+      } as any);
+    });
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Test Machine");
+    formData.append("ownerId", guestUserId);
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ASSIGNEE_NOT_MEMBER");
+      expect(result.meta?.assignee.id).toBe(guestUserId);
+      expect(result.meta?.assignee.name).toBe("Cory Casual");
+      expect(result.meta?.assignee.role).toBe("guest");
+      expect(result.meta?.assignee.type).toBe("active");
+    }
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("should return ASSIGNEE_NOT_MEMBER when invited guest is assigned as owner", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        return Promise.resolve({ id: mockUser.id, role: "admin" } as any);
+      }
+      // Not an active user
+      return Promise.resolve(undefined);
+    });
+
+    vi.mocked(db.query.invitedUsers.findFirst).mockResolvedValue({
+      id: invitedGuestId,
+      firstName: "Penny",
+      lastName: "Pending",
+      role: "guest",
+    } as any);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Test Machine");
+    formData.append("ownerId", invitedGuestId);
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("ASSIGNEE_NOT_MEMBER");
+      expect(result.meta?.assignee.type).toBe("invited");
+      expect(result.meta?.assignee.name).toBe("Penny Pending");
+    }
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("should atomically promote guest and assign machine when forcePromoteUserId provided (admin)", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: mockAdminUser } }),
+      },
+    } as unknown as SupabaseClient);
+
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        return Promise.resolve({ id: mockAdminUser.id, role: "admin" } as any);
+      }
+      // Target user — guest
+      return Promise.resolve({
+        id: guestUserId,
+        firstName: "Cory",
+        lastName: "Casual",
+        role: "guest",
+      } as any);
+    });
+
+    const mockMachine = {
+      id: machineId,
+      initials: "TM",
+      name: "Test Machine",
+      ownerId: guestUserId,
+    };
+    chain.returning.mockResolvedValue([mockMachine]);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Test Machine");
+    formData.append("ownerId", guestUserId);
+    formData.append("forcePromoteUserId", guestUserId);
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    // Transaction should have been called for atomic operation
+    expect(db.transaction).toHaveBeenCalled();
+    // Update should be called (promote + machine update)
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it("should allow technician to use forcePromoteUserId (tech has the permission)", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        return Promise.resolve({ id: mockUser.id, role: "technician" } as any);
+      }
+      return Promise.resolve({
+        id: guestUserId,
+        firstName: "Cory",
+        lastName: "Casual",
+        role: "guest",
+      } as any);
+    });
+
+    // Machine not owned by this technician
+    vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+      id: machineId,
+      ownerId: "550e8400-e29b-41d4-a716-446655449999",
+      name: "Test Machine",
+      initials: "TM",
+    } as any);
+
+    const mockMachine = {
+      id: machineId,
+      initials: "TM",
+      name: "Test Machine",
+      ownerId: guestUserId,
+    };
+    chain.returning.mockResolvedValue([mockMachine]);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Test Machine");
+    formData.append("ownerId", guestUserId);
+    formData.append("forcePromoteUserId", guestUserId);
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    expect(db.transaction).toHaveBeenCalled();
+  });
+
+  it("should reject forcePromoteUserId from member (UNAUTHORIZED)", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
+      role: "member",
+    } as any);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Test Machine");
+    formData.append("ownerId", guestUserId);
+    formData.append("forcePromoteUserId", guestUserId);
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+    }
+  });
+
+  it("should reject forcePromoteUserId when it does not match ownerId (VALIDATION)", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: mockAdminUser } }),
+      },
+    } as unknown as SupabaseClient);
+
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockAdminUser.id,
+      role: "admin",
+    } as any);
+
+    const differentId = "550e8400-e29b-41d4-a716-446655440099";
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Test Machine");
+    formData.append("ownerId", guestUserId);
+    formData.append("forcePromoteUserId", differentId);
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+  });
+
+  it("should reject forcePromoteUserId pointing at non-guest user (VALIDATION)", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: mockAdminUser } }),
+      },
+    } as unknown as SupabaseClient);
+
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        return Promise.resolve({ id: mockAdminUser.id, role: "admin" } as any);
+      }
+      // Target is a member, not a guest
+      return Promise.resolve({ id: memberUserId, role: "member" } as any);
+    });
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Test Machine");
+    formData.append("ownerId", memberUserId);
+    formData.append("forcePromoteUserId", memberUserId);
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+      expect(result.message).toMatch(/not a guest/i);
+    }
   });
 
   it("should reject ownerId not found in user_profiles or invited_users", async () => {

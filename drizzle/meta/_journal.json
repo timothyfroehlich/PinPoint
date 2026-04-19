@@ -190,6 +190,13 @@
       "when": 1776090705956,
       "tag": "0026_premium_katie_power",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1776557401077,
+      "tag": "0027_machine_owner_member_invariant",
+      "breakpoints": true
     }
   ]
 }

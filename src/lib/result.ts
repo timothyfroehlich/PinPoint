@@ -22,7 +22,7 @@ export type Result<T, C extends string = string, M = undefined> =
 /**
  * Create a successful Result
  */
-export const ok = <T>(value: T): Result<T, never> => ({
+export const ok = <T>(value: T): { ok: true; value: T } => ({
   ok: true as const,
   value,
 });

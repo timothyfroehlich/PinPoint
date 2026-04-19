@@ -28,6 +28,7 @@ import {
   docToPlainText,
   proseMirrorDocSchema,
 } from "~/lib/tiptap/types";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -55,14 +56,29 @@ const isPostgresError = (error: unknown): error is PostgresError => {
   );
 };
 
+export interface AssigneeNotMemberMeta {
+  assignee: {
+    id: string;
+    name: string;
+    role: "guest";
+    type: "active" | "invited";
+  };
+}
+
 export type CreateMachineResult = Result<
   { machineId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "SERVER"
+  "VALIDATION" | "UNAUTHORIZED" | "SERVER" | "ASSIGNEE_NOT_MEMBER",
+  AssigneeNotMemberMeta
 >;
 
 export type UpdateMachineResult = Result<
   { machineId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  | "VALIDATION"
+  | "UNAUTHORIZED"
+  | "NOT_FOUND"
+  | "SERVER"
+  | "ASSIGNEE_NOT_MEMBER",
+  AssigneeNotMemberMeta
 >;
 
 export type DeleteMachineResult = Result<
@@ -104,8 +120,10 @@ export async function createMachineAction(
     return err("UNAUTHORIZED", "User profile not found.");
   }
 
+  const accessLevel = getAccessLevel(profile.role);
+
   // Access control: only admins or technicians can create machines
-  if (profile.role !== "admin" && profile.role !== "technician") {
+  if (!checkPermission("machines.create", accessLevel)) {
     log.warn(
       { userId: user.id, action: "createMachineAction" },
       "Unauthorized user attempted to create a machine"
@@ -125,6 +143,11 @@ export async function createMachineAction(
       (formData.get("ownerId") as string).length > 0
         ? (formData.get("ownerId") as string)
         : undefined,
+    forcePromoteUserId:
+      typeof formData.get("forcePromoteUserId") === "string" &&
+      (formData.get("forcePromoteUserId") as string).length > 0
+        ? (formData.get("forcePromoteUserId") as string)
+        : undefined,
   };
 
   // Validate input (CORE-SEC-002)
@@ -134,33 +157,176 @@ export async function createMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { name, initials, ownerId } = validation.data;
+  const { name, initials, ownerId, forcePromoteUserId } = validation.data;
+
+  // Handle forcePromoteUserId path: gate, validate, then wrap in transaction
+  if (forcePromoteUserId !== undefined) {
+    if (!checkPermission("admin.users.promote.guestToMember", accessLevel)) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to promote users."
+      );
+    }
+    if (forcePromoteUserId !== ownerId) {
+      return err(
+        "VALIDATION",
+        "forcePromoteUserId must match the selected owner."
+      );
+    }
+    // Verify target user exists and is a guest
+    const targetActive = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, forcePromoteUserId),
+    });
+    const targetInvited = targetActive
+      ? null
+      : await db.query.invitedUsers.findFirst({
+          where: eq(invitedUsers.id, forcePromoteUserId),
+        });
+    if (!targetActive && !targetInvited) {
+      return err("VALIDATION", "Selected user does not exist.");
+    }
+    if ((targetActive?.role ?? targetInvited?.role) !== "guest") {
+      return err("VALIDATION", "Selected user is not a guest.");
+    }
+
+    // Atomic: promote + insert machine + add watcher
+    try {
+      const [machine] = await db.transaction(async (tx) => {
+        // Promote guest to member
+        if (targetActive) {
+          await tx
+            .update(userProfiles)
+            .set({ role: "member" })
+            .where(eq(userProfiles.id, forcePromoteUserId));
+        } else {
+          await tx
+            .update(invitedUsers)
+            .set({ role: "member" })
+            .where(eq(invitedUsers.id, forcePromoteUserId));
+        }
+
+        // Determine owner columns
+        const machineOwnerId = targetActive ? forcePromoteUserId : undefined;
+        const machineInvitedOwnerId = targetInvited
+          ? forcePromoteUserId
+          : undefined;
+
+        // Insert machine
+        const [newMachine] = await tx
+          .insert(machines)
+          .values({
+            name,
+            initials,
+            ownerId: machineOwnerId,
+            invitedOwnerId: machineInvitedOwnerId,
+          })
+          .returning();
+
+        if (!newMachine) {
+          throw new Error("Machine creation failed");
+        }
+
+        // Add owner as watcher
+        if (machineOwnerId) {
+          await tx
+            .insert(machineWatchers)
+            .values({
+              machineId: newMachine.id,
+              userId: machineOwnerId,
+              watchMode: "subscribe",
+            })
+            .onConflictDoUpdate({
+              target: [machineWatchers.machineId, machineWatchers.userId],
+              set: { watchMode: "subscribe" },
+            });
+        }
+
+        return [newMachine];
+      });
+
+      // Notify new owner after transaction commits
+      if (targetActive) {
+        await createNotification({
+          type: "machine_ownership_changed",
+          resourceId: machine.id,
+          resourceType: "machine",
+          actorId: user.id,
+          includeActor: false,
+          machineName: machine.name,
+          newStatus: "added",
+          additionalRecipientIds: [forcePromoteUserId],
+        });
+      }
+
+      revalidatePath("/m");
+      redirect(`/m/${machine.initials}`);
+    } catch (error: unknown) {
+      if (isNextRedirectError(error)) {
+        throw error;
+      }
+      if (isPostgresError(error) && error.code === "23505") {
+        return err("VALIDATION", `Initials '${initials}' are already taken.`);
+      }
+      log.error(
+        { error, action: "createMachineAction" },
+        "createMachineAction (forcePromote) failed"
+      );
+      return err("SERVER", "Failed to create machine. Please try again.");
+    }
+  }
 
   // Resolve owner type
   let finalOwnerId: string | undefined = undefined;
   let finalInvitedOwnerId: string | undefined = undefined;
 
-  // At this point, user is guaranteed to be an admin.
-  // If an owner is specified, we resolve them. Otherwise, the admin is the owner.
   if (ownerId) {
-    const isActive = await db.query.userProfiles.findFirst({
+    const activeOwner = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, ownerId),
     });
-    if (isActive) {
+    if (activeOwner) {
+      // Validate assignee is not a guest
+      if (activeOwner.role === "guest") {
+        return err(
+          "ASSIGNEE_NOT_MEMBER",
+          "Selected owner is a guest and must be promoted to member first.",
+          {
+            assignee: {
+              id: activeOwner.id,
+              name: `${activeOwner.firstName} ${activeOwner.lastName}`,
+              role: "guest",
+              type: "active",
+            },
+          }
+        );
+      }
       finalOwnerId = ownerId;
     } else {
       // Verify the ID exists in invited_users before assigning
-      const isInvited = await db.query.invitedUsers.findFirst({
+      const invitedOwner = await db.query.invitedUsers.findFirst({
         where: eq(invitedUsers.id, ownerId),
       });
-      if (!isInvited) {
+      if (!invitedOwner) {
         return err("VALIDATION", "Selected owner does not exist.");
+      }
+      // Validate invited assignee is not a guest
+      if (invitedOwner.role === "guest") {
+        return err(
+          "ASSIGNEE_NOT_MEMBER",
+          "Selected owner is a guest and must be promoted to member first.",
+          {
+            assignee: {
+              id: invitedOwner.id,
+              name: `${invitedOwner.firstName} ${invitedOwner.lastName}`,
+              role: "guest",
+              type: "invited",
+            },
+          }
+        );
       }
       finalInvitedOwnerId = ownerId;
     }
-  } else {
-    finalOwnerId = user.id;
   }
+  // If no ownerId provided, leave both undefined — DB stores NULL (no defaulting to caller)
 
   // Insert machine
   try {
@@ -245,6 +411,8 @@ export async function updateMachineAction(
     return err("UNAUTHORIZED", "User profile not found.");
   }
 
+  const accessLevel = getAccessLevel(profile.role);
+
   const rawData = {
     id: formData.get("id"),
     name: formData.get("name"),
@@ -258,6 +426,11 @@ export async function updateMachineAction(
       (formData.get("presenceStatus") as string).length > 0
         ? (formData.get("presenceStatus") as string)
         : undefined,
+    forcePromoteUserId:
+      typeof formData.get("forcePromoteUserId") === "string" &&
+      (formData.get("forcePromoteUserId") as string).length > 0
+        ? (formData.get("forcePromoteUserId") as string)
+        : undefined,
   };
 
   const validation = updateMachineSchema.safeParse(rawData);
@@ -266,49 +439,210 @@ export async function updateMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { id, name, ownerId, presenceStatus } = validation.data;
+  const { id, name, ownerId, presenceStatus, forcePromoteUserId } =
+    validation.data;
 
   try {
-    // Admins and technicians can update any machine, non-privileged users can only update their own machines
-    const isPrivileged =
-      profile.role === "admin" || profile.role === "technician";
-    const whereConditions = isPrivileged
-      ? eq(machines.id, id)
-      : and(eq(machines.id, id), eq(machines.ownerId, user.id));
-
-    // Get current machine state to check for owner change
+    // Load current machine by id — permission check is authoritative
     const currentMachine = await db.query.machines.findFirst({
-      where: whereConditions,
-      columns: { ownerId: true, name: true },
+      where: eq(machines.id, id),
+      columns: { id: true, ownerId: true, name: true, initials: true },
     });
 
     if (!currentMachine) {
       return err("NOT_FOUND", "Machine not found.");
     }
 
-    // Resolve owner type if provided
+    // Permission check via matrix
+    if (
+      !checkPermission("machines.edit", accessLevel, {
+        userId: user.id,
+        machineOwnerId: currentMachine.ownerId,
+      })
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to edit this machine."
+      );
+    }
+
+    // Handle forcePromoteUserId path
+    if (forcePromoteUserId !== undefined) {
+      if (!checkPermission("admin.users.promote.guestToMember", accessLevel)) {
+        return err(
+          "UNAUTHORIZED",
+          "You do not have permission to promote users."
+        );
+      }
+      if (forcePromoteUserId !== ownerId) {
+        return err(
+          "VALIDATION",
+          "forcePromoteUserId must match the selected owner."
+        );
+      }
+      // Verify target user exists and is a guest
+      const targetActive = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, forcePromoteUserId),
+      });
+      const targetInvited = targetActive
+        ? null
+        : await db.query.invitedUsers.findFirst({
+            where: eq(invitedUsers.id, forcePromoteUserId),
+          });
+      if (!targetActive && !targetInvited) {
+        return err("VALIDATION", "Selected user does not exist.");
+      }
+      if ((targetActive?.role ?? targetInvited?.role) !== "guest") {
+        return err("VALIDATION", "Selected user is not a guest.");
+      }
+
+      const machineOwnerId = targetActive ? forcePromoteUserId : undefined;
+      const machineInvitedOwnerId = targetInvited
+        ? forcePromoteUserId
+        : undefined;
+      const oldOwnerId = currentMachine.ownerId;
+
+      // Atomic: promote + update machine + update watcher
+      const [machine] = await db.transaction(async (tx) => {
+        // Promote guest to member
+        if (targetActive) {
+          await tx
+            .update(userProfiles)
+            .set({ role: "member" })
+            .where(eq(userProfiles.id, forcePromoteUserId));
+        } else {
+          await tx
+            .update(invitedUsers)
+            .set({ role: "member" })
+            .where(eq(invitedUsers.id, forcePromoteUserId));
+        }
+
+        // Update machine
+        const [updatedMachine] = await tx
+          .update(machines)
+          .set({
+            name,
+            ...(presenceStatus !== undefined && { presenceStatus }),
+            ownerId: machineOwnerId ?? null,
+            invitedOwnerId: machineInvitedOwnerId ?? null,
+          })
+          .where(eq(machines.id, id))
+          .returning();
+
+        if (!updatedMachine) {
+          throw new Error("Machine update failed");
+        }
+
+        // Add new owner as watcher if active user
+        if (machineOwnerId) {
+          await tx
+            .insert(machineWatchers)
+            .values({
+              machineId: id,
+              userId: machineOwnerId,
+              watchMode: "subscribe",
+            })
+            .onConflictDoUpdate({
+              target: [machineWatchers.machineId, machineWatchers.userId],
+              set: { watchMode: "subscribe" },
+            });
+        }
+
+        return [updatedMachine];
+      });
+
+      // Notify old owner (outside transaction)
+      if (oldOwnerId && oldOwnerId !== machineOwnerId) {
+        await db
+          .delete(machineWatchers)
+          .where(
+            and(
+              eq(machineWatchers.machineId, id),
+              eq(machineWatchers.userId, oldOwnerId)
+            )
+          );
+        await createNotification({
+          type: "machine_ownership_changed",
+          resourceId: machine.id,
+          resourceType: "machine",
+          actorId: user.id,
+          includeActor: false,
+          machineName: machine.name,
+          newStatus: "removed",
+          additionalRecipientIds: [oldOwnerId],
+        });
+      }
+
+      // Notify new owner (outside transaction)
+      if (machineOwnerId && machineOwnerId !== oldOwnerId) {
+        await createNotification({
+          type: "machine_ownership_changed",
+          resourceId: machine.id,
+          resourceType: "machine",
+          actorId: user.id,
+          includeActor: false,
+          machineName: machine.name,
+          newStatus: "added",
+          additionalRecipientIds: [machineOwnerId],
+        });
+      }
+
+      revalidatePath("/m");
+      revalidatePath(`/m/${machine.initials}`);
+
+      return ok({ machineId: machine.id });
+    }
+
+    // Resolve owner type if provided (non-forcePromote path)
     let finalOwnerId: string | null | undefined = undefined;
     let finalInvitedOwnerId: string | null | undefined = undefined;
     let shouldUpdateOwner = false;
 
-    // Derive ownership from the actual machine record, not from form fields
-    const isActualOwner = currentMachine.ownerId === user.id;
-    const isOwnerOrPrivileged = isPrivileged || isActualOwner;
-    if (isOwnerOrPrivileged && ownerId) {
+    if (ownerId) {
       shouldUpdateOwner = true;
-      const isActive = await db.query.userProfiles.findFirst({
+      const activeOwner = await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, ownerId),
       });
-      if (isActive) {
+      if (activeOwner) {
+        // Validate assignee is not a guest
+        if (activeOwner.role === "guest") {
+          return err(
+            "ASSIGNEE_NOT_MEMBER",
+            "Selected owner is a guest and must be promoted to member first.",
+            {
+              assignee: {
+                id: activeOwner.id,
+                name: `${activeOwner.firstName} ${activeOwner.lastName}`,
+                role: "guest",
+                type: "active",
+              },
+            }
+          );
+        }
         finalOwnerId = ownerId;
         finalInvitedOwnerId = null; // Reset invited if setting active
       } else {
         // Verify the ID exists in invited_users before assigning
-        const isInvited = await db.query.invitedUsers.findFirst({
+        const invitedOwner = await db.query.invitedUsers.findFirst({
           where: eq(invitedUsers.id, ownerId),
         });
-        if (!isInvited) {
+        if (!invitedOwner) {
           return err("VALIDATION", "Selected owner does not exist.");
+        }
+        // Validate invited assignee is not a guest
+        if (invitedOwner.role === "guest") {
+          return err(
+            "ASSIGNEE_NOT_MEMBER",
+            "Selected owner is a guest and must be promoted to member first.",
+            {
+              assignee: {
+                id: invitedOwner.id,
+                name: `${invitedOwner.firstName} ${invitedOwner.lastName}`,
+                role: "guest",
+                type: "invited",
+              },
+            }
+          );
         }
         finalInvitedOwnerId = ownerId;
         finalOwnerId = null; // Reset active if setting invited
@@ -325,7 +659,7 @@ export async function updateMachineAction(
           invitedOwnerId: finalInvitedOwnerId,
         }),
       })
-      .where(whereConditions)
+      .where(eq(machines.id, id))
       .returning();
 
     if (!machine) {
@@ -512,8 +846,8 @@ export async function updateMachineOwnerNotes(
  * Internal helper for updating a machine text field.
  *
  * Permission logic:
- * - description, tournamentNotes, ownerRequirements: owner + admins
- * - ownerNotes: owner only
+ * - description, tournamentNotes, ownerRequirements: owner + tech + admins
+ * - ownerNotes: owner only (machines.edit.ownerNotes)
  */
 async function updateMachineTextField(
   machineId: string,
@@ -576,27 +910,23 @@ async function updateMachineTextField(
       return err("NOT_FOUND", "Machine not found.");
     }
 
-    // Permission check
-    const isOwner = user.id === machine.ownerId;
-    const isPrivileged =
-      profile.role === "admin" || profile.role === "technician";
+    const accessLevel = getAccessLevel(profile.role);
+    const ctx = { userId: user.id, machineOwnerId: machine.ownerId };
 
-    if (field === "ownerNotes") {
-      // Owner notes: owner only (not even admins)
-      if (!isOwner) {
+    // Permission check via matrix — ownerNotes uses its own permission
+    const permissionId =
+      field === "ownerNotes" ? "machines.edit.ownerNotes" : "machines.edit";
+    if (!checkPermission(permissionId, accessLevel, ctx)) {
+      if (field === "ownerNotes") {
         return err(
           "UNAUTHORIZED",
           "Only the machine owner can edit owner notes."
         );
       }
-    } else {
-      // description, tournamentNotes, ownerRequirements: owner + privileged roles
-      if (!isOwner && !isPrivileged) {
-        return err(
-          "UNAUTHORIZED",
-          "Only the machine owner, technicians, or admins can edit this field."
-        );
-      }
+      return err(
+        "UNAUTHORIZED",
+        "Only the machine owner, technicians, or admins can edit this field."
+      );
     }
 
     // Update the field
