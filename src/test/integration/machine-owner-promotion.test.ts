@@ -220,7 +220,8 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
         },
       } as any);
 
-      const uniqueInitials = `P${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+      machineCounter += 1;
+      const uniqueInitials = `P${String(machineCounter).padStart(3, "0")}`;
       const formData = new FormData();
       formData.append("name", "Test Promote Machine");
       formData.append("initials", uniqueInitials);
@@ -329,7 +330,8 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
         },
       } as any);
 
-      const uniqueInitials = `N${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+      machineCounter += 1;
+      const uniqueInitials = `N${String(machineCounter).padStart(3, "0")}`;
       const formData = new FormData();
       formData.append("name", "No Owner Machine");
       formData.append("initials", uniqueInitials);
