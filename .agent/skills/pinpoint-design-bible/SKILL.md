@@ -34,16 +34,20 @@ primary and secondary read as one green-family pairing rather than two
 competing brands. Do not reintroduce a purple/magenta/fuchsia secondary, or
 raw `purple-*` / `fuchsia-*` / `magenta-*` classes, in new code. The one
 exception is the legacy raw-Tailwind purple used for a handful of entries in
-`src/lib/issues/status.ts` and `PRIORITY_CONFIG` -- those are tracked for
-conversion to semantic tokens and should be migrated opportunistically, not
-extended.
+`STATUS_CONFIG` and `PRIORITY_CONFIG` (both in
+[`src/lib/issues/status.ts`](../../../src/lib/issues/status.ts)) -- those are
+tracked for conversion to semantic tokens and should be migrated
+opportunistically, not extended.
 
 **Rules:**
 
-- When you need a color, use a CSS variable (`text-primary`, `bg-card`) -- never hardcode hex.
-- Status colors come from `STATUS_CONFIG` -- never freestyle status colors.
+- **All color references in component code must use semantic tokens.** Never write raw Tailwind palette classes (`text-purple-400`, `bg-amber-500/20`, `border-fuchsia-500`) or hardcoded hex (`#d946ef`, `bg-[#abcdef]`) anywhere under `src/app/**`, `src/components/**`, or any `.tsx` / `.ts` file that renders or styles UI. Use `text-primary`, `bg-destructive`, `text-muted-foreground`, `border-success/40`, etc.
+- **`dark:` utility classes are forbidden.** PinPoint is dark-only; `dark:` classes are dead code. Remove them when you touch a file that still contains them.
+- **Design-layer config is the only exception.** The four color tables in [`src/lib/issues/status.ts`](../../../src/lib/issues/status.ts) (`STATUS_CONFIG`, `SEVERITY_CONFIG`, `PRIORITY_CONFIG`, `FREQUENCY_CONFIG`) and the equivalent mapping in `src/lib/machines/presence.ts` may use raw Tailwind palette classes — because the raw palette _is_ the design decision being expressed. Component code consumes the resulting class strings via `STATUS_CONFIG[status].styles`; never replicate those class strings at call sites.
+- Status colors come from `STATUS_CONFIG` / `SEVERITY_CONFIG` / `PRIORITY_CONFIG` / `FREQUENCY_CONFIG` -- never freestyle status colors in components.
 - Glow effects (`glow-primary`, `glow-secondary`) are for interactive hover states only, never static decoration.
 - Frosted glass (bg-card with opacity + `backdrop-blur-sm`) is reserved for navigation chrome.
+- **Never rely on color alone to convey semantics.** Destructive, warning, success, and status cues must ship with an accessible text label — either visible, or via `aria-label` / `sr-only`. Decorative icons that accompany the color cue should be marked `aria-hidden="true"` so screen readers receive the label, not the icon. Under deuteranopia / protanopia (combined ~8% of men), destructive-red and warning-amber collapse to similar mustard shades and are not distinguishable by hue. Concretely: `<Alert variant="destructive">` and `<Alert variant="warning">` include a leading `AlertOctagon` / `AlertTriangle` (or equivalent) as `aria-hidden` decoration plus body text that names the condition; destructive buttons carry a verb label like "Delete" (with any icon `aria-hidden`); status / severity / priority badges expose `.label` alongside their icon.
 
 ## 2. Surface Hierarchy
 

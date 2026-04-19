@@ -25,13 +25,15 @@
   /* Accents & Status */
   --color-accent: #27272a;
   --color-accent-foreground: #f8fafc;
-  --color-destructive: #ef4444;
+  --color-destructive: #dc2626; /* red-600 — white on red-500 failed AA (~3.8:1); red-600 passes (~5.3:1) */
   --color-destructive-foreground: #ffffff;
 
   /* Status Specific */
   --color-status-new: #4ade80;
-  --color-status-in-progress: #38bdf8; /* sky-400 — non-palette, reserved for this status */
-  --color-status-unplayable: #ef4444;
+  --color-status-in-progress: #0ea5e9; /* sky-500 — non-palette, aligned with STATUS_CONFIG.in_progress border/bg family */
+  --color-status-unplayable: var(
+    --color-destructive
+  ); /* aliased to keep the three destructive-ish reds in sync */
 
   /* Semantic Status Colors */
   --color-success: #22c55e;
@@ -44,15 +46,17 @@
   --color-warning-container: #713f12;
   --color-on-warning-container: #fef9c3;
 
-  --color-error: #ef4444;
-  --color-error-foreground: #ffffff;
+  --color-error: var(--color-destructive); /* aliased so drift is impossible */
+  --color-error-foreground: var(--color-destructive-foreground);
   --color-error-container: #7f1d1d;
   --color-on-error-container: #fee2e2;
 
   /* Borders & Inputs */
   --color-border: #27272a;
   --color-input: #27272a;
-  --color-ring: #4ade80;
+  --color-ring: var(
+    --color-foreground
+  ); /* was primary green — same color as primary-button fill made focus invisible */
 
   /* Extended Surface Palette */
   --color-surface: #0f0f11;

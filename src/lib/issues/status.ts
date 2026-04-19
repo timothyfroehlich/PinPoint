@@ -141,7 +141,7 @@ export const STATUS_CONFIG: Record<
     label: "In Progress",
     description: "Active repair underway",
     styles: "bg-sky-500/20 text-sky-400 border-sky-500",
-    iconColor: "text-sky-400",
+    iconColor: "text-sky-500",
     icon: CircleDot,
   },
   need_parts: {
