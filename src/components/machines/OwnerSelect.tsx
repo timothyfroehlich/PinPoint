@@ -3,6 +3,7 @@
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectLabel,
   SelectSeparator,
@@ -188,15 +189,6 @@ export function OwnerSelect({
     </SelectItem>
   );
 
-  const SectionDivider = ({ label }: { label: string }): React.JSX.Element => (
-    <>
-      <SelectSeparator />
-      <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </SelectLabel>
-    </>
-  );
-
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -264,27 +256,39 @@ export function OwnerSelect({
         </SelectTrigger>
         <SelectContent>
           {/* Member+ active users (no section header — default group) */}
-          {memberUsers.map((user) => (
-            <UserItem key={user.id} user={user} />
-          ))}
+          <SelectGroup>
+            {memberUsers.map((user) => (
+              <UserItem key={user.id} user={user} />
+            ))}
+          </SelectGroup>
 
           {/* Invited section */}
           {invitedUsers.length > 0 && (
             <>
-              <SectionDivider label="Invited" />
-              {invitedUsers.map((user) => (
-                <UserItem key={user.id} user={user} />
-              ))}
+              <SelectSeparator />
+              <SelectGroup>
+                <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Invited
+                </SelectLabel>
+                {invitedUsers.map((user) => (
+                  <UserItem key={user.id} user={user} />
+                ))}
+              </SelectGroup>
             </>
           )}
 
           {/* Guests section */}
           {guestUsers.length > 0 && (
             <>
-              <SectionDivider label="Guests" />
-              {guestUsers.map((user) => (
-                <UserItem key={user.id} user={user} />
-              ))}
+              <SelectSeparator />
+              <SelectGroup>
+                <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Guests
+                </SelectLabel>
+                {guestUsers.map((user) => (
+                  <UserItem key={user.id} user={user} />
+                ))}
+              </SelectGroup>
             </>
           )}
 
