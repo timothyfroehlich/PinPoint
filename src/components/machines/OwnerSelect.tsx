@@ -8,7 +8,6 @@ import {
   SelectLabel,
   SelectSeparator,
   SelectTrigger,
-  SelectValue,
 } from "~/components/ui/select";
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
@@ -124,6 +123,32 @@ function UserItem({ user }: { user: OwnerSelectUser }): React.JSX.Element {
   );
 }
 
+/**
+ * TriggerDisplay — shows the selected user's name + role badges in the trigger.
+ * Used instead of <SelectValue> because Radix Select's SelectValue only
+ * renders the selected item's text when the item was registered via
+ * SelectPrimitive.ItemText inside an open SelectContent. Programmatic value
+ * changes (e.g. after invite) bypass this registry — this component sidesteps
+ * that limitation by reading from sortedUsers directly.
+ */
+function TriggerDisplay({
+  user,
+}: {
+  user: OwnerSelectUser;
+}): React.JSX.Element {
+  return (
+    <div className="flex items-center gap-2">
+      <span>{user.name}</span>
+      {user.machineCount > 0 && (
+        <span className="text-[10px] text-muted-foreground/70">
+          ({user.machineCount})
+        </span>
+      )}
+      <RoleBadge user={user} />
+    </div>
+  );
+}
+
 export function OwnerSelect({
   users,
   defaultValue,
@@ -147,6 +172,14 @@ export function OwnerSelect({
   const sortedUsers = useMemo(
     () => [...users, ...localExtraUsers].sort(compareUnifiedUsers),
     [users, localExtraUsers]
+  );
+
+  // The currently selected user object — drives the trigger display directly
+  // instead of relying on Radix SelectValue's internal ItemText registry
+  const selectedUser = useMemo(
+    () =>
+      selectedId ? sortedUsers.find((u) => u.id === selectedId) : undefined,
+    [sortedUsers, selectedId]
   );
 
   // Filter and section logic.
@@ -251,7 +284,22 @@ export function OwnerSelect({
           aria-describedby="owner-help"
           data-testid="owner-select"
         >
-          <SelectValue placeholder="Select an owner" />
+          {/*
+           * Render the trigger label manually instead of using <SelectValue>.
+           * Radix Select's SelectValue looks up the selected item text from its
+           * internal ItemText registry, which is only populated when a SelectItem
+           * is rendered inside an open SelectContent. When value is set
+           * programmatically (e.g. after an invite), the content is closed and
+           * unmounted, so the registry has no entry for the new user — causing
+           * the trigger to show "Select an owner" despite value being set.
+           * By looking up the user in sortedUsers directly we bypass this
+           * limitation entirely.
+           */}
+          {selectedUser ? (
+            <TriggerDisplay user={selectedUser} />
+          ) : (
+            <span className="text-muted-foreground">Select an owner</span>
+          )}
         </SelectTrigger>
         <SelectContent>
           {/* Member+ active users (no section header — default group) */}
