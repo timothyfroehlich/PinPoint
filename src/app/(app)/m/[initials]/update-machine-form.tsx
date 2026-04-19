@@ -100,12 +100,19 @@ export function EditMachineDialog({
     }
   }, [state]);
 
-  // Open promote dialog when server returns ASSIGNEE_NOT_MEMBER
+  // Open promote dialog only when server returns ASSIGNEE_NOT_MEMBER
+  // and the current user can actually promote guests (admin/technician).
+  // Non-privileged owners get an inline error instead.
   useEffect(() => {
-    if (state && !state.ok && state.code === "ASSIGNEE_NOT_MEMBER") {
+    if (
+      state &&
+      !state.ok &&
+      state.code === "ASSIGNEE_NOT_MEMBER" &&
+      canEditAnyMachine
+    ) {
       setIsPromoteOpen(true);
     }
-  }, [state]);
+  }, [state, canEditAnyMachine]);
 
   // Reset selectedOwnerId when dialog reopens to avoid stale selection
   useEffect(() => {
@@ -195,17 +202,20 @@ export function EditMachineDialog({
           >
             <input type="hidden" name="id" value={machine.id} />
 
-            {/* Flash message — suppress ASSIGNEE_NOT_MEMBER since it opens a dialog */}
-            {state && !state.ok && state.code !== "ASSIGNEE_NOT_MEMBER" && (
-              <div
-                className={cn(
-                  "rounded-md border p-4",
-                  "border-destructive/20 bg-destructive/10 text-destructive"
-                )}
-              >
-                <p className="text-sm font-medium">{state.message}</p>
-              </div>
-            )}
+            {/* Flash message — suppress ASSIGNEE_NOT_MEMBER when the promote dialog
+                will handle it; show inline if user lacks promote permission */}
+            {state &&
+              !state.ok &&
+              (state.code !== "ASSIGNEE_NOT_MEMBER" || !canEditAnyMachine) && (
+                <div
+                  className={cn(
+                    "rounded-md border p-4",
+                    "border-destructive/20 bg-destructive/10 text-destructive"
+                  )}
+                >
+                  <p className="text-sm font-medium">{state.message}</p>
+                </div>
+              )}
 
             {/* Machine Initials (Read Only) */}
             <div className="space-y-2">
@@ -368,8 +378,8 @@ export function EditMachineDialog({
                 <strong>{assignee.name}</strong>
                 <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground ml-1">
                   {assignee.type === "invited"
-                    ? "(INVITED · GUEST)"
-                    : "(GUEST)"}
+                    ? "(Invited · Guest)"
+                    : "(Guest)"}
                 </span>{" "}
                 is currently a guest. Assigning them as owner of{" "}
                 <strong>{machine.name}</strong> will promote them to member.

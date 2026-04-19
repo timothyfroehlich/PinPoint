@@ -179,8 +179,8 @@ export function CreateMachineForm({
                 <strong>{assignee.name}</strong>
                 <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground ml-1">
                   {assignee.type === "invited"
-                    ? "(INVITED · GUEST)"
-                    : "(GUEST)"}
+                    ? "(Invited · Guest)"
+                    : "(Guest)"}
                 </span>{" "}
                 is currently a guest. Assigning them as owner of this machine
                 will promote them to member.

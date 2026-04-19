@@ -167,6 +167,9 @@ test.describe("User Invitation & Signup Flow", () => {
     await page.getByTestId("edit-machine-button").click();
     await expect(page.getByRole("dialog")).toBeVisible();
 
+    // Show invited users in the picker before opening the dropdown
+    await page.getByTestId("owner-show-hidden-checkbox").click();
+
     // Click the owner dropdown and select the invited user (shown with "(Invited)" suffix)
     const ownerSelect = page.getByTestId("owner-select");
     await ownerSelect.click();

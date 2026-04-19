@@ -4,6 +4,8 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
@@ -104,6 +106,8 @@ export function OwnerSelect({
   // Filter and section logic.
   // When query is empty and showHidden is false: only member+ active users.
   // When query has content: all users matching the search (filter bypassed).
+  // The currently selected user is always included regardless of filter so
+  // Radix Select can display the trigger value correctly.
   const { memberUsers, invitedUsers, guestUsers } = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const isSearching = normalizedQuery.length > 0;
@@ -115,8 +119,10 @@ export function OwnerSelect({
       : showHidden
         ? sortedUsers
         : sortedUsers.filter(
-            // permissions-audit-allow: UI display filter, not a permission gate
-            (u) => u.role !== "guest" && u.status !== "invited"
+            (u) =>
+              u.id === selectedId ||
+              // permissions-audit-allow: UI display filter, not a permission gate
+              (u.role !== "guest" && u.status !== "invited")
           );
 
     const memberGroup = visibleUsers.filter(
@@ -134,7 +140,7 @@ export function OwnerSelect({
       invitedUsers: invitedGroup,
       guestUsers: guestGroup,
     };
-  }, [sortedUsers, query, showHidden]);
+  }, [sortedUsers, query, showHidden, selectedId]);
 
   const RoleBadge = ({
     user,
@@ -147,21 +153,21 @@ export function OwnerSelect({
     if (isGuest && isInvited) {
       return (
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          (INVITED · GUEST)
+          (Invited · Guest)
         </span>
       );
     }
     if (isInvited) {
       return (
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          (INVITED)
+          (Invited)
         </span>
       );
     }
     if (isGuest) {
       return (
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          (GUEST)
+          (Guest)
         </span>
       );
     }
@@ -182,12 +188,13 @@ export function OwnerSelect({
     </SelectItem>
   );
 
-  const SectionHeader = ({ label }: { label: string }): React.JSX.Element => (
-    <div className="px-2 py-1.5">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+  const SectionDivider = ({ label }: { label: string }): React.JSX.Element => (
+    <>
+      <SelectSeparator />
+      <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         {label}
-      </p>
-    </div>
+      </SelectLabel>
+    </>
   );
 
   return (
@@ -264,7 +271,7 @@ export function OwnerSelect({
           {/* Invited section */}
           {invitedUsers.length > 0 && (
             <>
-              <SectionHeader label="Invited" />
+              <SectionDivider label="Invited" />
               {invitedUsers.map((user) => (
                 <UserItem key={user.id} user={user} />
               ))}
@@ -274,7 +281,7 @@ export function OwnerSelect({
           {/* Guests section */}
           {guestUsers.length > 0 && (
             <>
-              <SectionHeader label="Guests" />
+              <SectionDivider label="Guests" />
               {guestUsers.map((user) => (
                 <UserItem key={user.id} user={user} />
               ))}
