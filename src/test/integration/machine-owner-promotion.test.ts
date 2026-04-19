@@ -380,7 +380,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
         }>`SELECT 1 AS exists FROM pg_proc WHERE proname = 'check_machine_owner_not_guest' LIMIT 1`
       );
 
-      if (triggerCheck.length === 0) {
+      if (triggerCheck.rows.length === 0) {
         // Trigger not installed in PGlite schema — skip trigger behavior test.
         // CI verifies this via the actual Supabase branch DB where migrations run.
         return;
@@ -409,7 +409,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
         }>`SELECT 1 AS exists FROM pg_proc WHERE proname = 'check_no_demotion_of_machine_owner' LIMIT 1`
       );
 
-      if (triggerCheck.length === 0) {
+      if (triggerCheck.rows.length === 0) {
         // Trigger not installed in PGlite schema — skip trigger behavior test.
         // CI verifies this via the actual Supabase branch DB where migrations run.
         return;
