@@ -77,7 +77,7 @@ Capture both stdout and the exit code. Do **not** wrap this in a polling loop of
 
 ### Step 3 — Classify the outcome
 
-Exactly three outcomes from `pr-watch.py` are possible (`error` and `watcher_timeout` are returned by this spec's own logic, not by the script):
+Exactly three outcomes are possible:
 
 #### (a) Exit 1 → CI failure
 
@@ -155,46 +155,6 @@ Run `copilot-comments.sh` once to check for any lingering unresolved threads fro
     <verbatim output of copilot-comments.sh>
   ```
 
-### Step 4 — Persistent watch loop
-
-⚠️ **MANDATORY**: After emitting the YAML block from Step 3, you **MUST NOT terminate**. Proceed directly to this step. This agent is a long-running safety net — one classify-and-emit cycle is never the end of the job unless the PR is already merged/closed.
-
-**Loop procedure:**
-
-1. Check whether the PR is still open:
-   ```bash
-   gh pr view "$PR_NUMBER" --json state -q .state
-   ```
-   If the state is `MERGED` or `CLOSED`, print `Watcher exiting: PR is no longer open.` and terminate.
-
-2. On the **first** iteration, record the loop start time:
-   ```bash
-   LOOP_START=$(date +%s)
-   ```
-
-3. On subsequent iterations, check elapsed time before sleeping:
-   ```bash
-   ELAPSED=$(( $(date +%s) - LOOP_START ))
-   if [ "$ELAPSED" -ge 1800 ]; then
-     echo "Watcher timed out after 30 minutes of sleep cycles. PR is still open."
-     # Emit one final YAML block:
-     # pr: <PR_NUMBER>
-     # result: watcher_timeout
-     # note: "Reached 30-minute limit between watch cycles. Dispatch a new watcher if CI is still running."
-     # ...then terminate.
-   fi
-   ```
-
-4. Sleep between cycles:
-   ```bash
-   sleep 300
-   ```
-   This is NOT a tight polling loop — it is a 5-minute cadence between complete `pr-watch.py` runs. The PreToolUse hook blocks loops that repeatedly poll GitHub without waiting; this sleep-separated retry is explicitly permitted.
-
-5. Go back to **Step 2** and run `pr-watch.py` again.
-
-**Important**: This agent may emit multiple YAML blocks across cycles. Each block is independently actionable — treat `ready_for_label`, `ci_failed`, `copilot_review`, `copilot_threads_open`, and `watcher_timeout` blocks as the result for that cycle. Each block is prefixed with a cycle number comment (e.g., `# cycle: 1`) so main can distinguish iterations.
-
 ---
 
 ## Failure Classification
@@ -232,13 +192,8 @@ git status                                     # OK — read-only
 git log --oneline -10                          # OK — read-only
 git diff --stat                                # OK — read-only
 
-# Timing / loop control (for persistent watch loop only)
-date +%s                                       # get current epoch seconds
-sleep 300                                      # 5-minute inter-cycle pause
-
 # GitHub read-only
 gh pr view <PR> --json headRefName,state,isDraft,mergeable
-gh pr view <PR> --json state -q .state         # check merge/close status between cycles
 gh run list --limit 5
 gh run view <RUN_ID>                           # OK — read-only (summary view)
 gh run view <RUN_ID> --json jobs               # OK — per-job classification source
@@ -257,9 +212,7 @@ If a task tempts you outside this list, stop and report back instead.
 
 ## Return Format
 
-Each watch cycle emits one fenced YAML code block. In a multi-cycle run, multiple YAML blocks appear in the output, each prefixed with a comment indicating the cycle number. Main parses all blocks; the `result:` field in each tells it what happened in that cycle.
-
-The final block in the output is the terminal state (PR merged, watcher timed out, or final outcome). After the last block there is no prose.
+Your final message must end with a single fenced YAML code block containing exactly the fields specified for the matched outcome above. No prose after the block. Main parses the block by looking for the `result:` key.
 
 Example — CI failure on format:
 
@@ -307,5 +260,5 @@ Notes for main:
 
 - **No Edit/Write tools** in the whitelist: `Read, Grep, Glob, Bash`. No `Edit`, no `Write`, no `NotebookEdit`. Code files cannot be modified through any tool on this list.
 - **Bash use is restricted** by the explicit prohibition list above. `Bash` itself can technically run anything — the safety here is policy, not tooling. The prohibitions exist to block mutations to git state, GitHub state, filesystem state, database state, and external services even though `Bash` is available.
-- **No tight polling loops**: do not call `gh run list`, `gh pr view`, or similar read commands in a loop without sleeping. The 5-minute `sleep 300` between full `pr-watch.py` invocations (Step 4) is explicitly permitted — it is a cadence timer, not a tight poll. The PreToolUse hook targets tight loops, not sleep-separated retry cycles.
+- **No polling loops**: rely on `pr-watch.py` and exit cleanly — a manual loop would be blocked by the repo's PreToolUse hook.
 - **Haiku-appropriate scope**: classification via a lookup table, no open-ended code judgment. If the right answer is unclear, return `result: ci_failed, category: unknown, fix_hint: requires main agent investigation` and let main take over.
