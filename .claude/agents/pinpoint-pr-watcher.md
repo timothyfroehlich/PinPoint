@@ -151,7 +151,7 @@ Run `copilot-comments.sh` once to check for any lingering unresolved threads fro
 
 ### Step 4 — Persistent watch loop
 
-After emitting the YAML block from Step 3, do **not** terminate immediately. This agent runs as a safety net in case main doesn't re-dispatch it after handling an intermediate result (Copilot comment, CI failure fix, etc.).
+⚠️ **MANDATORY**: After emitting the YAML block from Step 3, you **MUST NOT terminate**. Proceed directly to this step. This agent is a long-running safety net — one classify-and-emit cycle is never the end of the job unless the PR is already merged/closed.
 
 **Loop procedure:**
 
@@ -283,12 +283,14 @@ Agent(
   subagent_type: "pinpoint-pr-watcher",
   description: "Watch PR #<N>",
   prompt: "PR_NUMBER=<N>\nWORKTREE=<absolute path to the PR branch worktree>\n\nWatch and report.",
-  run_in_background: true
+  run_in_background: true,
+  mode: "bypassPermissions"
 )
 ```
 
 Notes for main:
 - `run_in_background: true` lets main keep working while CI runs.
+- `mode: "bypassPermissions"` is **required** — without it the agent blocks waiting for human approval of each Bash call, which defeats background operation.
 - Do **not** pass `isolation: "worktree"` — this agent reuses the PR's existing worktree (safe because read-only).
 - Do **not** pass `team_name` — Agent Teams break worktree isolation in this repo and aren't needed for fire-and-report.
 - On return, parse the trailing YAML block. The `result` field tells main exactly what to do next (apply the label, run an autofix, fetch and address Copilot threads, etc.).
