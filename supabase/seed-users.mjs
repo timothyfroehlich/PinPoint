@@ -164,7 +164,8 @@ async function seedUsersAndData() {
     VALUES ('Invited', 'Member', 'invited.member@example.com', 'member')
     ON CONFLICT (email) DO UPDATE SET
       first_name = 'Invited',
-      last_name = 'Member'
+      last_name = 'Member',
+      role = EXCLUDED.role
     RETURNING id
   `.then((rows) => rows[0]?.id);
 
