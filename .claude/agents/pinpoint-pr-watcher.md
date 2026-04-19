@@ -81,16 +81,28 @@ Exactly three outcomes are possible:
 
 #### (a) Exit 1 → CI failure
 
-1. Scan the captured stdout for a failing job name (the line starting with `✗`) and for a run ID.
-2. Read `tmp/gh-monitor/failure-<RUN_ID>.md` (written by `pr-watch.py`). Extract the last ~30 lines of the log excerpt.
-3. Map the failing job name to a category using the table in **Failure Classification** below.
-4. Return:
+> ⚠️ **Do not rely on the `✗` line alone.** That line contains the *workflow run* name (usually `CI` in this repo) from `gh run list --json ...,name,...`, **not** the failing job or step. Classifying against it will almost always fall to `unknown`. Get the specific failing job name from the run instead.
+
+1. Scan the captured stdout for the run ID and note the workflow run name from the `✗` line.
+2. Fetch the failing job names from the run itself:
+   ```bash
+   gh run view <RUN_ID> --json jobs --jq '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | .name'
+   ```
+   Use the first name returned as the primary classification signal.
+3. Read `tmp/gh-monitor/failure-<RUN_ID>.md` (written by `pr-watch.py`) for log context. Extract the last ~30 lines of the log excerpt.
+4. Classify using the **Failure Classification** table below. Match in this order until one hits, first-match-wins:
+   - the failing **job** name from step 2,
+   - then the failing **step** names visible in the artifact (`gh run view <RUN_ID>` summary section),
+   - then the log content itself.
+   If nothing matches after all three sources, use `unknown`.
+5. Return:
 
 ```yaml
 pr: <PR_NUMBER>
 result: ci_failed
 category: <one of: format | lint | linters | typecheck | tests | build | e2e | audit | secrets | unknown>
-failing_job: <exact job name from pr-watch.py output>
+failing_job: <exact job name from gh run view --json jobs; empty string if unavailable>
+workflow_run: <workflow run name from the ✗ line — informational only>
 run_id: <RUN_ID>
 failure_artifact: tmp/gh-monitor/failure-<RUN_ID>.md
 log_excerpt: |
@@ -141,19 +153,19 @@ Run `copilot-comments.sh` once to check for any lingering unresolved threads fro
 
 ## Failure Classification
 
-Pattern-match the failing job name (case-insensitive substring) against this table. First match wins. If nothing matches, use `unknown`.
+Case-insensitive substring match. First match wins, so the table is ordered **most specific first** — this is load-bearing: `Fast Linters` must appear before `lint`, and `test-e2e`/`smoke`/`playwright` must appear before the generic `test-*` row. If nothing matches, use `unknown`.
 
-| Job name substring | Category | fix_hint |
+| Match substring(s) | Category | fix_hint |
 |---|---|---|
-| `format`, `Prettier` | `format` | `main can run: pnpm run format:fix` |
-| `lint`, `ESLint` (without `:fix`) | `lint` | `main can run: pnpm run lint:fix` |
-| `Fast Linters` | `linters` | `ruff / yamllint / actionlint / shellcheck / zizmor — check log for the specific tool that failed` |
-| `typecheck` | `typecheck` | `requires main agent — do NOT bypass with any, !, or unsafe as (AGENTS.md rule 7)` |
-| `test-unit`, `test-integration`, `test-migrations`, `test-integration-supabase` | `tests` | `requires main agent investigation — real test failure, do not delete assertions` |
-| `build` | `build` | `requires main agent investigation — may indicate config or logic issue` |
+| `Fast Linters`, `ruff`, `yamllint`, `actionlint`, `shellcheck`, `zizmor` | `linters` | `ruff / yamllint / actionlint / shellcheck / zizmor — check log for the specific tool that failed` |
+| `Prettier Check`, `format` | `format` | `main can run: pnpm run format:fix` |
+| `ESLint`, `lint` (excluding `:fix`) | `lint` | `main can run: pnpm run lint:fix` |
+| `typecheck`, `tsc` | `typecheck` | `requires main agent — do NOT bypass with any, !, or unsafe as (AGENTS.md rule 7)` |
 | `test-e2e`, `smoke`, `playwright` | `e2e` | `requires main agent investigation; AGENTS.md rule 11 — every clickable element needs E2E coverage` |
-| `pnpm-audit` | `audit` | `requires main agent — dependency vulnerability, may need version bump` |
-| `gitleaks` | `secrets` | `requires main agent — manual review of the leak report, never auto-commit around it` |
+| `test-unit`, `test-integration`, `test-migrations`, `test-integration-supabase`, `vitest` | `tests` | `requires main agent investigation — real test failure, do not delete assertions` |
+| `build`, `next build` | `build` | `requires main agent investigation — may indicate config or logic issue` |
+| `pnpm-audit`, `audit` | `audit` | `requires main agent — dependency vulnerability, may need version bump` |
+| `gitleaks`, `secret`, `leak` | `secrets` | `requires main agent — manual review of the leak report, never auto-commit around it` |
 | (anything else) | `unknown` | `requires main agent investigation` |
 
 ---
@@ -177,7 +189,11 @@ git diff --stat                                # OK — read-only
 # GitHub read-only
 gh pr view <PR> --json headRefName,state,isDraft,mergeable
 gh run list --limit 5
-gh run view <RUN_ID>                           # OK — read-only
+gh run view <RUN_ID>                           # OK — read-only (summary view)
+gh run view <RUN_ID> --json jobs               # OK — per-job classification source
+gh run view <RUN_ID> --json jobs --jq '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | .name'
+gh api repos/:owner/:repo/commits/<SHA>        # OK — read-only
+gh api -X GET ...                              # OK — GET only; -X POST/PATCH/PUT/DELETE forbidden
 
 # File inspection
 cat tmp/gh-monitor/failure-<RUN_ID>.md
@@ -199,6 +215,7 @@ pr: 1234
 result: ci_failed
 category: format
 failing_job: Prettier Check
+workflow_run: CI
 run_id: 987654321
 failure_artifact: tmp/gh-monitor/failure-987654321.md
 log_excerpt: |
@@ -233,7 +250,7 @@ Notes for main:
 
 ## Safety Guarantees
 
-- **Zero write capability** via the tool whitelist: `Read, Grep, Glob, Bash`. No `Edit`, no `Write`, no `NotebookEdit`.
-- **Bash mutation-free** via the explicit prohibition list above. Everything in the prohibitions section exists to close a specific loophole (git state, GitHub state, filesystem state, database state, external services).
+- **No Edit/Write tools** in the whitelist: `Read, Grep, Glob, Bash`. No `Edit`, no `Write`, no `NotebookEdit`. Code files cannot be modified through any tool on this list.
+- **Bash use is restricted** by the explicit prohibition list above. `Bash` itself can technically run anything — the safety here is policy, not tooling. The prohibitions exist to block mutations to git state, GitHub state, filesystem state, database state, and external services even though `Bash` is available.
 - **No polling loops**: rely on `pr-watch.py` and exit cleanly — a manual loop would be blocked by the repo's PreToolUse hook.
 - **Haiku-appropriate scope**: classification via a lookup table, no open-ended code judgment. If the right answer is unclear, return `result: ci_failed, category: unknown, fix_hint: requires main agent investigation` and let main take over.
