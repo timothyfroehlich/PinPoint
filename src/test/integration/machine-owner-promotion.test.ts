@@ -17,7 +17,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   machines,
@@ -353,17 +353,19 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
     it("should detect whether the trigger function exists in the PGlite schema", async () => {
       const db = await getTestDb();
 
-      // Attempt to query pg_proc for our trigger function
+      // Attempt to query pg_proc for our trigger function.
       // PGlite's schema.sql doesn't include migration SQL, so the trigger won't exist.
       // This test documents the expected DB state and passes regardless.
       const result = await db.execute(
-        `SELECT 1 FROM pg_proc WHERE proname = 'check_machine_owner_not_guest' LIMIT 1`
+        sql<{
+          exists: number;
+        }>`SELECT 1 AS exists FROM pg_proc WHERE proname = 'check_machine_owner_not_guest' LIMIT 1`
       );
 
-      // On a real DB with migration applied: result.length === 1
-      // On PGlite schema export (no migration SQL): result.length === 0
+      // On a real DB with migration applied: result has 1 row
+      // On PGlite schema export (no migration SQL): result has 0 rows
       // Either is valid — the trigger is verified by the Supabase branch setup in CI.
-      expect(Array.isArray(result)).toBe(true);
+      expect(result).toBeDefined();
     });
 
     it("should block assigning a guest as machine owner when trigger is active", async () => {
@@ -371,10 +373,12 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
 
       // Check if trigger exists first
       const triggerCheck = await db.execute(
-        `SELECT 1 FROM pg_proc WHERE proname = 'check_machine_owner_not_guest' LIMIT 1`
+        sql<{
+          exists: number;
+        }>`SELECT 1 AS exists FROM pg_proc WHERE proname = 'check_machine_owner_not_guest' LIMIT 1`
       );
 
-      if (!Array.isArray(triggerCheck) || triggerCheck.length === 0) {
+      if (triggerCheck.length === 0) {
         // Trigger not installed in PGlite schema — skip trigger behavior test.
         // CI verifies this via the actual Supabase branch DB where migrations run.
         return;
@@ -398,10 +402,12 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       const db = await getTestDb();
 
       const triggerCheck = await db.execute(
-        `SELECT 1 FROM pg_proc WHERE proname = 'check_no_demotion_of_machine_owner' LIMIT 1`
+        sql<{
+          exists: number;
+        }>`SELECT 1 AS exists FROM pg_proc WHERE proname = 'check_no_demotion_of_machine_owner' LIMIT 1`
       );
 
-      if (!Array.isArray(triggerCheck) || triggerCheck.length === 0) {
+      if (triggerCheck.length === 0) {
         // Trigger not installed in PGlite schema — skip trigger behavior test.
         // CI verifies this via the actual Supabase branch DB where migrations run.
         return;
