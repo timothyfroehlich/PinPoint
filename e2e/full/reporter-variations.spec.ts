@@ -71,14 +71,16 @@ test.describe("Reporter Variations E2E", () => {
   test("should display invited user reporter correctly (legacy logic)", async ({
     page,
   }) => {
-    // TAF Issue 2 is invitedReportedBy (Jane Doe)
+    // TAF Issue 2 is invitedReportedBy (Invited Guest)
     const issue = seededIssues.TAF[1];
     await page.goto(`/m/TAF/i/${issue.num}`);
     const sidebar = page.getByTestId("issue-sidebar");
 
-    await expect(sidebar).toContainText("Jane Doe");
+    await expect(sidebar).toContainText("Invited Guest");
     await expect(
-      page.getByTestId("timeline-author-name").filter({ hasText: "Jane Doe" })
+      page
+        .getByTestId("timeline-author-name")
+        .filter({ hasText: "Invited Guest" })
     ).toBeVisible();
   });
 
