@@ -89,7 +89,7 @@ export default async function ReportSuccessPage({
             <Button
               asChild
               variant="ghost"
-              className="text-on-surface hover:text-on-surface-variant"
+              className="hover:text-muted-foreground"
             >
               <Link href="/">Return to Dashboard</Link>
             </Button>
