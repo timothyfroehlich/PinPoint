@@ -6,24 +6,14 @@ import {
   type MachinePresenceStatus,
 } from "~/lib/machines/presence";
 import { cn } from "~/lib/utils";
+import { badgeSizeClasses, type BadgeSize } from "./badge-size";
 
 interface MachinePresenceBadgeProps {
   status: MachinePresenceStatus;
-  /**
-   * xs — info-grid / very dense contexts (px-2 py-0.5 text-[10px])
-   * sm — card listings and dense rows (px-2.5 py-0.5 text-xs)
-   * md — page headers and prominent placements (px-3 py-1 text-sm)
-   */
-  size?: "xs" | "sm" | "md";
+  size?: BadgeSize;
   className?: string;
   "data-testid"?: string;
 }
-
-const sizeClasses: Record<"xs" | "sm" | "md", string> = {
-  xs: "px-2 py-0.5 text-[10px] font-bold",
-  sm: "px-2.5 py-0.5 text-xs font-semibold",
-  md: "px-3 py-1 text-sm font-semibold",
-};
 
 /**
  * MachinePresenceBadge — physical location / presence status for a machine.
@@ -49,7 +39,7 @@ export function MachinePresenceBadge({
       className={cn(
         getMachinePresenceStyles(status),
         "border",
-        sizeClasses[size],
+        badgeSizeClasses[size],
         className
       )}
     >
