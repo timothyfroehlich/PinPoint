@@ -86,7 +86,7 @@ export function UserMenu({
         </DropdownMenuItem>
 
         {/* Admin Panel — visible to admins only */}
-        {role === "admin" && (
+        {role === "admin" && ( // permissions-audit-allow: cleanup pending in PP-wwf
           <>
             <DropdownMenuItem asChild>
               <a

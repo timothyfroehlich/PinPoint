@@ -27,6 +27,7 @@ export default async function AdminLayout({
   });
 
   if (profile?.role !== "admin") {
+    // permissions-audit-allow: cleanup pending in PP-wwf
     return <Forbidden role={profile?.role ?? null} />;
   }
 

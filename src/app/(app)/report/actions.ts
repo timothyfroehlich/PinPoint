@@ -214,9 +214,9 @@ export async function submitPublicIssueAction(
     });
 
     if (
-      profile?.role === "admin" ||
-      profile?.role === "technician" ||
-      profile?.role === "member"
+      profile?.role === "admin" || // permissions-audit-allow: cleanup pending in PP-wwf
+      profile?.role === "technician" || // permissions-audit-allow: cleanup pending in PP-wwf
+      profile?.role === "member" // permissions-audit-allow: cleanup pending in PP-wwf
     ) {
       canSetWorkflowFields = true;
     }

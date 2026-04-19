@@ -159,7 +159,7 @@ export function BottomTabBar({
               <span>About</span>
             </Link>
 
-            {role === "admin" && (
+            {role === "admin" && ( // permissions-audit-allow: cleanup pending in PP-wwf
               <Link
                 href="/admin/users"
                 onClick={() => setMoreOpen(false)}

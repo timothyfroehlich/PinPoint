@@ -21,7 +21,7 @@ interface ForbiddenProps {
  *
  * Usage in layouts:
  * ```tsx
- * if (profile?.role !== "admin") {
+ * if (profile?.role !== "admin") { // permissions-audit-allow: JSDoc usage example
  *   return <Forbidden role={profile?.role} />;
  * }
  * ```
