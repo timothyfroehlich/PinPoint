@@ -51,7 +51,7 @@ export function RecentIssuesPanelClient({
           className
         )}
       >
-        <p className="py-2 text-center text-xs text-on-surface-variant italic">
+        <p className="py-2 text-center text-xs text-muted-foreground italic">
           Select a machine to see recent issues.
         </p>
       </div>
@@ -66,7 +66,7 @@ export function RecentIssuesPanelClient({
       aria-expanded={isOpen}
     >
       <h3
-        className="text-sm font-semibold text-on-surface truncate text-left flex-1"
+        className="text-sm font-semibold text-foreground truncate text-left flex-1"
         title="Recent Issues"
       >
         {isLoading ? "Loading issues..." : "Recent Issues"}
@@ -83,7 +83,7 @@ export function RecentIssuesPanelClient({
         )}
         <ChevronDown
           className={cn(
-            "h-4 w-4 text-on-surface-variant transition-transform duration-200",
+            "h-4 w-4 text-muted-foreground transition-transform duration-200",
             !isOpen && "-rotate-90"
           )}
         />
@@ -124,7 +124,7 @@ export function RecentIssuesPanelClient({
                 ))}
               </div>
             ) : isError ? (
-              <div className="flex items-center gap-2 text-xs text-on-surface-variant italic">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground italic">
                 <AlertCircle className="h-4 w-4" />
                 Could not load recent issues
               </div>
@@ -133,10 +133,10 @@ export function RecentIssuesPanelClient({
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-variant/50 mb-1.5">
                   <CheckCircle2 className="h-4 w-4 text-green-600/70 dark:text-green-400/70" />
                 </div>
-                <p className="text-xs font-medium text-on-surface">
+                <p className="text-xs font-medium text-foreground">
                   No recent issues
                 </p>
-                <p className="text-[10px] text-on-surface-variant mt-0.5">
+                <p className="text-[10px] text-muted-foreground mt-0.5">
                   This machine is running smoothly.
                 </p>
               </div>
@@ -152,7 +152,7 @@ export function RecentIssuesPanelClient({
                     )}`}
                   >
                     <div className="flex h-[36px] items-center justify-between gap-2 rounded-md border border-transparent bg-surface hover:border-outline-variant px-2 transition-all active:scale-[0.98]">
-                      <p className="truncate text-xs font-medium text-on-surface group-hover:text-primary transition-colors">
+                      <p className="truncate text-xs font-medium text-foreground group-hover:text-primary transition-colors">
                         {issue.title}
                       </p>
                       <IssueBadge type="status" value={issue.status} />

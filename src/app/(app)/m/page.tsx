@@ -223,7 +223,7 @@ export default async function MachinesPage({
                 <Card className="h-full border-outline-variant hover:border-primary transition-all cursor-pointer hover:shadow-md bg-surface-container-low group">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-xl text-on-surface group-hover:text-primary transition-colors">
+                      <CardTitle className="text-xl text-foreground group-hover:text-primary transition-colors">
                         {machine.name}
                       </CardTitle>
                       <div className="flex flex-col items-end gap-1.5">
@@ -246,7 +246,7 @@ export default async function MachinesPage({
                       {/* Issue count */}
                       <div className="flex items-center gap-2 text-sm">
                         <span
-                          className="text-on-surface-variant"
+                          className="text-muted-foreground"
                           data-testid="machine-open-issues-label"
                         >
                           Open Issues:
@@ -258,7 +258,7 @@ export default async function MachinesPage({
                               ? "text-error"
                               : machine.status === "needs_service"
                                 ? "text-warning"
-                                : "text-on-surface-variant"
+                                : "text-muted-foreground"
                           )}
                           data-testid={`machine-open-issues-count-${machine.id}`}
                         >
@@ -269,10 +269,10 @@ export default async function MachinesPage({
                       <div className="h-px bg-outline-variant w-full" />
 
                       {/* Created date */}
-                      <div className="text-xs text-on-surface-variant flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground flex items-center justify-between">
                         <span>
                           initials:{" "}
-                          <span className="font-mono text-on-surface">
+                          <span className="font-mono text-foreground">
                             {machine.initials}
                           </span>
                         </span>

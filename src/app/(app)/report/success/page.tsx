@@ -44,16 +44,16 @@ export default async function ReportSuccessPage({
             className="mx-auto size-16 text-primary"
             strokeWidth={2.5}
           />
-          <CardTitle className="text-3xl font-bold text-on-surface">
+          <CardTitle className="text-3xl font-bold text-foreground">
             Issue Sent!
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-3">
-            <p className="text-lg text-on-surface">
+            <p className="text-lg text-foreground">
               Thank you for reporting this issue.
             </p>
-            <p className="text-sm text-on-surface-variant leading-relaxed">
+            <p className="text-sm text-muted-foreground leading-relaxed">
               Our maintenance team has been notified. We appreciate your help
               keeping these machines running smoothly for everyone.
             </p>
@@ -64,7 +64,7 @@ export default async function ReportSuccessPage({
               <h4 className="text-sm font-semibold text-primary mb-1">
                 Want to track your reports?
               </h4>
-              <p className="text-xs text-on-surface-variant mb-3">
+              <p className="text-xs text-muted-foreground mb-3">
                 We&apos;ve saved your details. Create a full account to see
                 status updates and manage all your reports in one place.
               </p>
@@ -82,7 +82,7 @@ export default async function ReportSuccessPage({
             <Button
               asChild
               variant="outline"
-              className="border-outline-variant text-on-surface"
+              className="border-outline-variant text-foreground"
             >
               <Link href="/report">Report Another Issue</Link>
             </Button>

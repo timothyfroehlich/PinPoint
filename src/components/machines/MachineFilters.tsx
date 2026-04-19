@@ -196,11 +196,11 @@ export function MachineFilters({
               isSearching && "opacity-70"
             )}
           >
-            <Search className="h-4 w-4 text-on-surface-variant shrink-0" />
+            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
             <div className="flex-1 min-w-0 relative flex items-center gap-1.5 overflow-hidden">
               <input
                 placeholder="Search machines by name or initials..."
-                className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-on-surface-variant h-full"
+                className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground h-full"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />

@@ -47,7 +47,7 @@ export function CopyButton({
             size={size}
             variant={variant}
             className={cn(
-              "relative z-10 size-8 text-on-surface-variant hover:bg-surface-variant hover:text-on-surface",
+              "relative z-10 size-8 text-muted-foreground hover:bg-surface-variant hover:text-foreground",
               className
             )}
             onClick={() => {

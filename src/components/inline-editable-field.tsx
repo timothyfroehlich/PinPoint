@@ -103,7 +103,7 @@ export function InlineEditableField({
 
   return (
     <div data-testid={testId} className="space-y-1.5">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
 
@@ -173,7 +173,7 @@ export function InlineEditableField({
           data-testid={testId ? `${testId}-display` : undefined}
         >
           {isEmpty ? (
-            <p className="py-1 text-sm italic text-on-surface-variant/60">
+            <p className="py-1 text-sm italic text-muted-foreground/60">
               {placeholder ?? `Add ${label.toLowerCase()}...`}
             </p>
           ) : (
@@ -181,7 +181,7 @@ export function InlineEditableField({
           )}
           {canEdit && (
             <Pencil
-              className="absolute right-2 top-1 size-3.5 text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-100"
+              className="absolute right-2 top-1 size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
               aria-hidden="true"
             />
           )}

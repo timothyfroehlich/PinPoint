@@ -22,7 +22,7 @@ export function EditButtonWithTooltip({
             variant="outline"
             size="sm"
             disabled
-            className="w-full border-outline text-on-surface-variant"
+            className="w-full border-outline text-muted-foreground"
             data-testid="edit-machine-button-disabled"
           >
             <Pencil className="mr-2 size-4" />

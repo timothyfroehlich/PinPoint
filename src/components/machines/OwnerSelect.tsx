@@ -94,7 +94,7 @@ export function OwnerSelect({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label htmlFor="ownerId" className="text-on-surface">
+        <Label htmlFor="ownerId" className="text-foreground">
           Machine Owner
         </Label>
         {!disabled && (
@@ -121,7 +121,7 @@ export function OwnerSelect({
       >
         <SelectTrigger
           id="ownerId"
-          className="border-outline bg-surface text-on-surface"
+          className="border-outline bg-surface text-foreground"
           aria-describedby="owner-help"
           data-testid="owner-select"
         >
@@ -133,12 +133,12 @@ export function OwnerSelect({
               <div className="flex items-center gap-2">
                 <span>{user.name}</span>
                 {user.machineCount > 0 && (
-                  <span className="text-[10px] text-on-surface-variant/70">
+                  <span className="text-[10px] text-muted-foreground/70">
                     ({user.machineCount})
                   </span>
                 )}
                 {user.status === "invited" && (
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
                     (Invited)
                   </span>
                 )}
@@ -147,7 +147,7 @@ export function OwnerSelect({
           ))}
         </SelectContent>
       </Select>
-      <p id="owner-help" className="text-xs text-on-surface-variant">
+      <p id="owner-help" className="text-xs text-muted-foreground">
         The owner receives notifications for new issues on this machine.
       </p>
 

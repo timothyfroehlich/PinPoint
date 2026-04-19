@@ -65,7 +65,7 @@ export function StatusSelect({
       name={name}
     >
       <SelectTrigger
-        className="w-full border-outline-variant bg-surface text-on-surface"
+        className="w-full border-outline-variant bg-surface text-foreground"
         aria-label={`Status: ${STATUS_CONFIG[value].label}`}
         data-testid="issue-status-select"
       >

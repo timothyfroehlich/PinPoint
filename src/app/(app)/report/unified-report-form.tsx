@@ -265,7 +265,7 @@ export function UnifiedReportForm({
 
   return (
     <div className="w-full">
-      <p className="text-sm text-on-surface-variant mb-6">
+      <p className="text-sm text-muted-foreground mb-6">
         Tell us what&apos;s going on and the maintenance crew will take it from
         here.
       </p>
@@ -288,7 +288,7 @@ export function UnifiedReportForm({
               autoComplete="off"
             />
             <div className="space-y-1.5">
-              <Label htmlFor="machineId" className="text-on-surface">
+              <Label htmlFor="machineId" className="text-foreground">
                 Machine *
               </Label>
               <select
@@ -313,7 +313,7 @@ export function UnifiedReportForm({
                     );
                   }
                 }}
-                className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
               >
                 <option value="" disabled>
                   Select a machine...
@@ -341,7 +341,7 @@ export function UnifiedReportForm({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label htmlFor="title" className="text-on-surface">
+                <Label htmlFor="title" className="text-foreground">
                   Issue Title *
                 </Label>
                 <span
@@ -362,12 +362,12 @@ export function UnifiedReportForm({
                 placeholder="e.g., Left flipper not responding"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="h-9 border-outline-variant bg-surface text-on-surface focus:border-primary"
+                className="h-9 border-outline-variant bg-surface text-foreground focus:border-primary"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-on-surface">Description</Label>
+              <Label className="text-foreground">Description</Label>
               <RichTextEditor
                 content={description}
                 onChange={setDescription}
@@ -386,7 +386,7 @@ export function UnifiedReportForm({
             {/* Severity + Frequency: always side-by-side */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="severity" className="text-on-surface">
+                <Label htmlFor="severity" className="text-foreground">
                   Severity *
                 </Label>
                 <input type="hidden" name="severity" value={severity} />
@@ -394,7 +394,7 @@ export function UnifiedReportForm({
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="frequency" className="text-on-surface">
+                <Label htmlFor="frequency" className="text-foreground">
                   Frequency *
                 </Label>
                 <input type="hidden" name="frequency" value={frequency} />
@@ -410,7 +410,7 @@ export function UnifiedReportForm({
             {canSetWorkflowFields && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="priority" className="text-on-surface">
+                  <Label htmlFor="priority" className="text-foreground">
                     Priority *
                   </Label>
                   <input type="hidden" name="priority" value={priority} />
@@ -420,7 +420,7 @@ export function UnifiedReportForm({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="status" className="text-on-surface">
+                  <Label htmlFor="status" className="text-foreground">
                     Status *
                   </Label>
                   <input type="hidden" name="status" value={status} />
@@ -432,7 +432,7 @@ export function UnifiedReportForm({
             {/* Assign To: full-width */}
             {canSetWorkflowFields && assignees.length > 0 && (
               <div className="space-y-1.5">
-                <Label htmlFor="assignedTo" className="text-on-surface">
+                <Label htmlFor="assignedTo" className="text-foreground">
                   Assign To
                 </Label>
                 <select
@@ -441,7 +441,7 @@ export function UnifiedReportForm({
                   data-testid="assigned-to-select"
                   value={assignedTo}
                   onChange={(e) => setAssignedTo(e.target.value)}
-                  className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                  className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                 >
                   <option value="">Unassigned</option>
                   {assignees.map((assignee) => (
@@ -491,7 +491,7 @@ export function UnifiedReportForm({
             {!userAuthenticated && (
               <div className="space-y-2 pt-2">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-semibold text-on-surface">
+                  <h3 className="text-sm font-semibold text-foreground">
                     Your Information (Optional)
                   </h3>
                 </div>
@@ -500,46 +500,46 @@ export function UnifiedReportForm({
                     <div className="space-y-1.5">
                       <Label
                         htmlFor="firstName"
-                        className="text-xs text-on-surface"
+                        className="text-xs text-foreground"
                       >
                         First Name
                       </Label>
                       <Input
                         id="firstName"
                         name="firstName"
-                        className="h-8 border-outline-variant bg-surface text-sm text-on-surface"
+                        className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
                     <div className="space-y-1.5">
                       <Label
                         htmlFor="lastName"
-                        className="text-xs text-on-surface"
+                        className="text-xs text-foreground"
                       >
                         Last Name
                       </Label>
                       <Input
                         id="lastName"
                         name="lastName"
-                        className="h-8 border-outline-variant bg-surface text-sm text-on-surface"
+                        className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="email" className="text-xs text-on-surface">
+                    <Label htmlFor="email" className="text-xs text-foreground">
                       Email Address
                     </Label>
                     <Input
                       id="email"
                       name="email"
                       type="email"
-                      className="h-8 border-outline-variant bg-surface text-sm text-on-surface"
+                      className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                     />
-                    <p className="text-[10px] text-on-surface-variant leading-none">
+                    <p className="text-[10px] text-muted-foreground leading-none">
                       Verified emails link to your profile.
                     </p>
                   </div>
                 </div>
-                <p className="text-sm text-on-surface-variant pb-1">
+                <p className="text-sm text-muted-foreground pb-1">
                   Already have an account?{" "}
                   <Link
                     href={getLoginUrl(
@@ -566,11 +566,11 @@ export function UnifiedReportForm({
                 <div className="space-y-0.5">
                   <Label
                     htmlFor="watchIssue"
-                    className="text-sm font-medium text-on-surface cursor-pointer"
+                    className="text-sm font-medium text-foreground cursor-pointer"
                   >
                     Watch this issue
                   </Label>
-                  <p className="text-xs text-on-surface-variant">
+                  <p className="text-xs text-muted-foreground">
                     Get updates when status or comments change.
                   </p>
                 </div>

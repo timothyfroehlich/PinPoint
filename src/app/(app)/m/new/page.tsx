@@ -61,7 +61,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
       {/* Form */}
       <Card className="max-w-2xl border-outline-variant">
         <CardHeader>
-          <CardTitle className="text-2xl text-on-surface">
+          <CardTitle className="text-2xl text-foreground">
             Machine Details
           </CardTitle>
         </CardHeader>

@@ -33,40 +33,40 @@ export function MachineInfoDisplay({
     <div className="space-y-4">
       {/* Machine Name */}
       <div className="space-y-1">
-        <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
           Name
         </p>
-        <p className="text-sm font-medium text-on-surface">{machine.name}</p>
+        <p className="text-sm font-medium text-foreground">{machine.name}</p>
       </div>
 
       {/* Initials */}
       <div className="space-y-1">
-        <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
           Initials
         </p>
-        <p className="text-sm font-medium text-on-surface">
+        <p className="text-sm font-medium text-foreground">
           {machine.initials}
         </p>
       </div>
 
       {/* Owner */}
       <div className="space-y-1" data-testid="owner-display">
-        <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
           Machine Owner
         </p>
         {machine.owner || machine.invitedOwner ? (
           <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-on-surface">
+            <p className="text-sm font-medium text-foreground">
               {machine.owner?.name ?? machine.invitedOwner?.name}
             </p>
             {machine.invitedOwner && !machine.owner && (
-              <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
                 (Invited)
               </span>
             )}
           </div>
         ) : (
-          <p className="text-sm text-on-surface-variant">No owner assigned</p>
+          <p className="text-sm text-muted-foreground">No owner assigned</p>
         )}
       </div>
 

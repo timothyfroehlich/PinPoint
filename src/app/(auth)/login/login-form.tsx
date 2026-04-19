@@ -8,6 +8,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { PasswordInput } from "~/components/ui/password-input";
 import { Label } from "~/components/ui/label";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { loginAction, type LoginResult } from "~/app/(auth)/actions";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
@@ -90,13 +91,7 @@ export function LoginForm({
 
         {/* Remember Me */}
         <div className="flex items-center space-x-2">
-          <input
-            id="rememberMe"
-            name="rememberMe"
-            type="checkbox"
-            className="size-4 rounded border-border text-primary focus:ring-2 focus:ring-ring bg-input"
-            defaultChecked
-          />
+          <Checkbox id="rememberMe" name="rememberMe" defaultChecked />
           <Label
             htmlFor="rememberMe"
             className="text-sm font-normal cursor-pointer"
@@ -114,7 +109,7 @@ export function LoginForm({
         {/* Submit button */}
         <Button
           type="submit"
-          className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+          className="w-full"
           size="lg"
           loading={isPending}
           disabled={isPending || (enforceCaptcha && !turnstileToken)}

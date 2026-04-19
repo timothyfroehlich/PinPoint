@@ -32,11 +32,11 @@ export function getMachinePresenceStyles(
     on_the_floor:
       "bg-success-container text-on-success-container border-success",
     off_the_floor:
-      "bg-surface-container-highest text-on-surface-variant border-outline-variant",
+      "bg-surface-container-highest text-muted-foreground border-outline-variant",
     on_loan: "bg-tertiary-container text-on-tertiary-container border-tertiary",
     pending_arrival:
       "bg-secondary-container text-on-secondary-container border-secondary",
-    removed: "bg-surface-container text-on-surface-variant border-outline",
+    removed: "bg-surface-container text-muted-foreground border-outline",
   };
 
   return styles[status];

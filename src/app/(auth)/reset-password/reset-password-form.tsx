@@ -44,7 +44,7 @@ export function ResetPasswordForm(): React.JSX.Element {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <p className="text-xs text-on-surface-variant">
+        <p className="text-xs text-muted-foreground">
           Must be at least 8 characters
         </p>
         <PasswordStrength password={password} />
@@ -71,12 +71,7 @@ export function ResetPasswordForm(): React.JSX.Element {
       </div>
 
       {/* Submit button */}
-      <Button
-        type="submit"
-        className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
-        size="lg"
-        loading={isPending}
-      >
+      <Button type="submit" className="w-full" size="lg" loading={isPending}>
         Update Password
       </Button>
     </form>

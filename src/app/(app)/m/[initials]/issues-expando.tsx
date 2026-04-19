@@ -33,7 +33,7 @@ export function IssuesExpando({
       data-testid="issues-expando"
     >
       <summary
-        className="flex cursor-pointer list-none items-center gap-2 px-6 py-4 text-on-surface hover:bg-surface-variant/30"
+        className="flex cursor-pointer list-none items-center gap-2 px-6 py-4 text-foreground hover:bg-surface-variant/30"
         data-testid="issues-expando-trigger"
       >
         <ChevronRight
@@ -46,7 +46,7 @@ export function IssuesExpando({
           Open Issues ({issues.length})
         </span>
         {totalIssuesCount > issues.length && (
-          <span className="text-sm text-on-surface-variant">
+          <span className="text-sm text-muted-foreground">
             of {totalIssuesCount} total
           </span>
         )}

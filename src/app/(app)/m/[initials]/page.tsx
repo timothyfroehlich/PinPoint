@@ -239,7 +239,7 @@ export default async function MachineDetailPage({
       {/* Content */}
       <div className="space-y-6">
         {!isOnTheFloor(machine.presenceStatus) && (
-          <div className="rounded-md border border-outline-variant bg-surface-container px-4 py-2 text-sm text-on-surface-variant">
+          <div className="rounded-md border border-outline-variant bg-surface-container px-4 py-2 text-sm text-muted-foreground">
             This machine is currently{" "}
             <strong>
               {getMachinePresenceLabel(machine.presenceStatus).toLowerCase()}
@@ -251,7 +251,7 @@ export default async function MachineDetailPage({
         {/* Full-width Details Card */}
         <Card className="border-outline-variant bg-surface">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
-            <CardTitle className="text-xl text-on-surface">
+            <CardTitle className="text-xl text-foreground">
               Machine Information
             </CardTitle>
             <QrCodeDialog
@@ -287,18 +287,18 @@ export default async function MachineDetailPage({
                   {/* Status & Issues Count Row */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                         Status
                       </p>
                       <MachineStatusBadge status={machineStatus} size="xs" />
                     </div>
 
                     <div data-testid="detail-open-issues">
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                         Open Issues
                       </p>
                       <p
-                        className="text-xl font-bold text-on-surface"
+                        className="text-xl font-bold text-foreground"
                         data-testid="detail-open-issues-count"
                       >
                         {openIssues.length}
@@ -309,10 +309,10 @@ export default async function MachineDetailPage({
                   {/* Date & Total Row */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                         Added Date
                       </p>
-                      <div className="flex items-center gap-1.5 text-on-surface-variant">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Calendar className="size-3" />
                         <p className="text-xs font-medium">
                           {formatDate(machine.createdAt)}
@@ -321,10 +321,10 @@ export default async function MachineDetailPage({
                     </div>
 
                     <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                         Total Issues
                       </p>
-                      <p className="text-xl font-bold text-on-surface">
+                      <p className="text-xl font-bold text-foreground">
                         {totalIssuesCount}
                       </p>
                     </div>

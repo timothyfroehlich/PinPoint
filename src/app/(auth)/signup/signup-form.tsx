@@ -60,10 +60,10 @@ export function SignupForm({
           </svg>
         </div>
         <div className="space-y-2">
-          <h3 className="text-xl font-semibold text-on-surface">
+          <h3 className="text-xl font-semibold text-foreground">
             Check your email
           </h3>
-          <p className="text-on-surface-variant text-sm text-balance">
+          <p className="text-muted-foreground text-sm text-balance">
             We sent a confirmation link to your email address. Please click the
             link to verify your account.
           </p>
@@ -145,7 +145,7 @@ export function SignupForm({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <p className="text-xs text-on-surface-variant">Minimum 8 characters</p>
+        <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
 
         {/* Password strength indicator */}
         <PasswordStrength password={password} />
@@ -179,7 +179,7 @@ export function SignupForm({
         />
         <Label
           htmlFor="termsAccepted"
-          className="text-sm text-on-surface-variant leading-relaxed cursor-pointer"
+          className="text-sm text-muted-foreground leading-relaxed cursor-pointer"
         >
           I agree to the{" "}
           <Link
@@ -201,7 +201,7 @@ export function SignupForm({
 
       <Button
         type="submit"
-        className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
+        className="w-full"
         size="lg"
         loading={isPending}
         disabled={isPending || (enforceCaptcha && !turnstileToken)}
