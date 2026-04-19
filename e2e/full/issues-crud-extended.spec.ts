@@ -74,9 +74,11 @@ test.describe("Issues System - Extended", () => {
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
       rememberIssueId(page);
 
-      // On detail page, watch button should show "Watch" (not watching)
+      // On detail page, watch button should show "Watch" (not watching).
+      // The page renders two accessible "Watch Issue" elements (header icon-only +
+      // sidebar text button); use .first() to tolerate this without strict-mode error.
       await expect(
-        page.getByRole("button", { name: /^Watch Issue$/i })
+        page.getByRole("button", { name: /^Watch Issue$/i }).first()
       ).toBeVisible();
     });
   });

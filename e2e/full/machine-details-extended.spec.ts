@@ -143,6 +143,9 @@ test.describe("Machine Details - Extended", () => {
   test("should hide owner requirements from unauthenticated users", async ({
     page,
   }, testInfo) => {
+    // Ensure we're on a known page with the user menu before logging out.
+    // A previous test may leave the browser on a non-dashboard route.
+    await page.goto("/dashboard");
     // Logout to become unauthenticated
     await logout(page, testInfo);
 
@@ -158,7 +161,9 @@ test.describe("Machine Details - Extended", () => {
   test("should display owner requirements callout on issue page", async ({
     page,
   }, testInfo) => {
-    // First, let's login as admin and set owner requirements on a machine
+    // First, let's login as admin and set owner requirements on a machine.
+    // Navigate to dashboard first to ensure user menu is available for logout.
+    await page.goto("/dashboard");
     await logout(page, testInfo);
     await loginAs(page, testInfo, {
       email: TEST_USERS.admin.email,

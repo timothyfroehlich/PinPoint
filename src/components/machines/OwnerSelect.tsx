@@ -15,7 +15,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Checkbox } from "~/components/ui/checkbox";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import type { UserStatus, UserRole } from "~/lib/types";
 import { InviteUserDialog } from "~/components/users/InviteUserDialog";
 import { Plus } from "lucide-react";
@@ -27,8 +27,7 @@ import { compareUnifiedUsers } from "~/lib/users/comparators";
  * ## Pattern
  * Standard `<Select>` with an inline "Invite New" button that opens an
  * `<InviteUserDialog>`. After a user is invited, the new user is
- * optimistically added to the list and auto-selected via a pending
- * selection ref that fires once the `users` prop updates.
+ * optimistically added to the list and auto-selected.
  *
  * ## Composition
  * - Users are sorted by `compareUnifiedUsers` (confirmed first, by machine
@@ -45,12 +44,14 @@ import { compareUnifiedUsers } from "~/lib/users/comparators";
  * ## Key Abstractions
  * - `OwnerSelectUser` includes `role`, `machineCount`, and `status` for
  *   metadata display and filtering
- * - `pendingSelectionRef` handles the async flow: invite dialog closes ->
- *   parent updates users -> effect detects the new user and selects them
+ * - After an invite, `setSelectedId` and `onUsersChange` are called together
+ *   so React batches them into one render — the new user is visible in the
+ *   content and the trigger shows their name immediately
  * - `compareUnifiedUsers` from `~/lib/users/comparators` drives sort order
  * - The help text below the select explains the notification implication of
  *   owner assignment
  */
+
 /** Minimal user shape for owner selection (CORE-SEC-006) */
 export interface OwnerSelectUser {
   id: string;
@@ -69,6 +70,59 @@ interface OwnerSelectProps {
   onValueChange?: (id: string) => void;
 }
 
+// Module-scope helper components — must NOT be defined inside OwnerSelect.
+// Defining components inside a render function creates a new component type on
+// every render, causing Radix UI to unmount/remount items and lose their refs,
+// which triggers "Cannot read properties of undefined (reading 'ref')" crashes.
+
+function RoleBadge({
+  user,
+}: {
+  user: OwnerSelectUser;
+}): React.JSX.Element | null {
+  const isGuest = user.role === "guest"; // permissions-audit-allow: UI badge display, not a permission gate
+  const isInvited = user.status === "invited";
+
+  if (isGuest && isInvited) {
+    return (
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        (Invited · Guest)
+      </span>
+    );
+  }
+  if (isInvited) {
+    return (
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        (Invited)
+      </span>
+    );
+  }
+  if (isGuest) {
+    return (
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        (Guest)
+      </span>
+    );
+  }
+  return null;
+}
+
+function UserItem({ user }: { user: OwnerSelectUser }): React.JSX.Element {
+  return (
+    <SelectItem value={user.id}>
+      <div className="flex items-center gap-2">
+        <span>{user.name}</span>
+        {user.machineCount > 0 && (
+          <span className="text-[10px] text-muted-foreground/70">
+            ({user.machineCount})
+          </span>
+        )}
+        <RoleBadge user={user} />
+      </div>
+    </SelectItem>
+  );
+}
+
 export function OwnerSelect({
   users,
   defaultValue,
@@ -80,22 +134,6 @@ export function OwnerSelect({
   const [selectedId, setSelectedId] = useState(defaultValue ?? "");
   const [showHidden, setShowHidden] = useState(false);
   const [query, setQuery] = useState("");
-
-  // Ref to track pending user ID to select after users list updates
-  const pendingSelectionRef = useRef<string | null>(null);
-
-  // Effect to apply pending selection after users list is updated
-  useEffect(() => {
-    if (pendingSelectionRef.current) {
-      const pendingId = pendingSelectionRef.current;
-      // Check if the pending ID now exists in the users list
-      if (users.some((u) => u.id === pendingId)) {
-        setSelectedId(pendingId);
-        onValueChange?.(pendingId);
-        pendingSelectionRef.current = null;
-      }
-    }
-  }, [users, onValueChange]);
 
   // Re-sort users after client-side mutations (e.g., inviting a new user)
   // to maintain consistent ordering: confirmed first, by machine count desc, then by last name
@@ -142,52 +180,6 @@ export function OwnerSelect({
       guestUsers: guestGroup,
     };
   }, [sortedUsers, query, showHidden, selectedId]);
-
-  const RoleBadge = ({
-    user,
-  }: {
-    user: OwnerSelectUser;
-  }): React.JSX.Element | null => {
-    const isGuest = user.role === "guest"; // permissions-audit-allow: UI badge display, not a permission gate
-    const isInvited = user.status === "invited";
-
-    if (isGuest && isInvited) {
-      return (
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          (Invited · Guest)
-        </span>
-      );
-    }
-    if (isInvited) {
-      return (
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          (Invited)
-        </span>
-      );
-    }
-    if (isGuest) {
-      return (
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          (Guest)
-        </span>
-      );
-    }
-    return null;
-  };
-
-  const UserItem = ({ user }: { user: OwnerSelectUser }): React.JSX.Element => (
-    <SelectItem key={user.id} value={user.id}>
-      <div className="flex items-center gap-2">
-        <span>{user.name}</span>
-        {user.machineCount > 0 && (
-          <span className="text-[10px] text-muted-foreground/70">
-            ({user.machineCount})
-          </span>
-        )}
-        <RoleBadge user={user} />
-      </div>
-    </SelectItem>
-  );
 
   return (
     <div className="space-y-2">
@@ -310,8 +302,12 @@ export function OwnerSelect({
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
         onSuccess={(newUserId, newUser) => {
-          // Store the pending selection - it will be applied after users list updates
-          pendingSelectionRef.current = newUserId;
+          // Select the new user and show hidden groups so the invited user
+          // appears in the content. Both state updates are batched with
+          // onUsersChange into a single render — trigger shows correct name.
+          setSelectedId(newUserId);
+          setShowHidden(true);
+          onValueChange?.(newUserId);
           // Add the new user to the list immediately (no server refresh needed)
           if (onUsersChange) {
             onUsersChange([...users, newUser]);
