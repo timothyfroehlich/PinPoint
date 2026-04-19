@@ -14,7 +14,7 @@ if ! command -v rg >/dev/null 2>&1; then
   echo "Install with: brew install ripgrep   (or: apt-get install ripgrep)" >&2
   exit 2
 fi
-raw=$(rg -n -B1 -A1 'role\s*(===|!==)\s*"(admin|technician|member|guest)"' src \
+raw=$(rg -n -B1 -A1 '\brole\s*(===|!==)\s*"(admin|technician|member|guest)"' src \
   --glob '!src/lib/permissions/**' \
   --glob '!**/*.test.*' \
   --glob '!src/test/**' \
