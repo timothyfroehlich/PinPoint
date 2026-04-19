@@ -166,7 +166,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       expect(watcherRow?.watchMode).toBe("subscribe");
     });
 
-    it("should leave guest role unchanged if an error occurs during machine update", async () => {
+    it("should leave guest role unchanged if validation fails before the transaction starts", async () => {
       const { createClient } = await import("~/lib/supabase/server");
       const { updateMachineAction } = await import("~/app/(app)/m/actions");
       const db = await getTestDb();
@@ -360,10 +360,10 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
         `SELECT 1 FROM pg_proc WHERE proname = 'check_machine_owner_not_guest' LIMIT 1`
       );
 
-      // On a real DB with migration applied: result.rows.length === 1
-      // On PGlite schema export (no migration SQL): result.rows.length === 0
+      // On a real DB with migration applied: result.length === 1
+      // On PGlite schema export (no migration SQL): result.length === 0
       // Either is valid — the trigger is verified by the Supabase branch setup in CI.
-      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
     });
 
     it("should block assigning a guest as machine owner when trigger is active", async () => {
@@ -374,7 +374,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
         `SELECT 1 FROM pg_proc WHERE proname = 'check_machine_owner_not_guest' LIMIT 1`
       );
 
-      if ((triggerCheck as any).rows?.length === 0) {
+      if (!Array.isArray(triggerCheck) || triggerCheck.length === 0) {
         // Trigger not installed in PGlite schema — skip trigger behavior test.
         // CI verifies this via the actual Supabase branch DB where migrations run.
         return;
@@ -401,7 +401,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
         `SELECT 1 FROM pg_proc WHERE proname = 'check_no_demotion_of_machine_owner' LIMIT 1`
       );
 
-      if ((triggerCheck as any).rows?.length === 0) {
+      if (!Array.isArray(triggerCheck) || triggerCheck.length === 0) {
         // Trigger not installed in PGlite schema — skip trigger behavior test.
         // CI verifies this via the actual Supabase branch DB where migrations run.
         return;
