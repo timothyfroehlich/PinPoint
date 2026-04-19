@@ -27,13 +27,6 @@ import {
   FormLabel,
   FormMessage,
 } from "~/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { inviteUser } from "~/app/(app)/admin/users/actions";
 import { inviteUserSchema } from "~/app/(app)/admin/users/schema";
@@ -60,7 +53,7 @@ export function InviteUserDialog({
       lastName: "",
       email: "",
       role: "member",
-      sendInvite: false,
+      sendInvite: true,
     },
   });
 
@@ -80,12 +73,14 @@ export function InviteUserDialog({
           toast.success("User invited successfully");
           form.reset();
           // Build minimal user object for the callback (CORE-SEC-006)
+          // Role is always "member" — the role field was removed from this dialog
           const newUser: OwnerSelectUser = {
             id: result.userId,
             name: `${values.firstName} ${values.lastName}`,
             lastName: values.lastName,
             status: "invited",
             machineCount: 0,
+            role: "member",
           };
           // Call onSuccess with both the ID and minimal OwnerSelectUser, then close dialog
           // Note: router.refresh() removed - parent manages users state directly
@@ -161,31 +156,6 @@ export function InviteUserDialog({
                   <FormControl>
                     <Input type="email" {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Role</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a role" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="guest">Guest</SelectItem>
-                      <SelectItem value="member">Member</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

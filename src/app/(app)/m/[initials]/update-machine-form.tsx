@@ -42,6 +42,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Pencil } from "lucide-react";
 
 import type { OwnerSelectUser } from "~/components/machines/OwnerSelect";
@@ -79,6 +80,7 @@ export function EditMachineDialog({
 }: EditMachineDialogProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
+  const [isPromoteOpen, setIsPromoteOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const transferConfirmedRef = useRef(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState(
@@ -95,6 +97,13 @@ export function EditMachineDialog({
   useEffect(() => {
     if (state?.ok) {
       setOpen(false);
+    }
+  }, [state]);
+
+  // Open promote dialog when server returns ASSIGNEE_NOT_MEMBER
+  useEffect(() => {
+    if (state && !state.ok && state.code === "ASSIGNEE_NOT_MEMBER") {
+      setIsPromoteOpen(true);
     }
   }, [state]);
 
@@ -136,6 +145,26 @@ export function EditMachineDialog({
     formRef.current?.requestSubmit();
   };
 
+  // Assignee from ASSIGNEE_NOT_MEMBER result
+  const assignee =
+    state && !state.ok && state.code === "ASSIGNEE_NOT_MEMBER"
+      ? state.meta?.assignee
+      : undefined;
+
+  const confirmPromote = (): void => {
+    if (!assignee || !formRef.current) return;
+    setIsPromoteOpen(false);
+
+    // Inject the hidden forcePromoteUserId field and re-submit
+    const hiddenInput = document.createElement("input");
+    hiddenInput.type = "hidden";
+    hiddenInput.name = "forcePromoteUserId";
+    hiddenInput.value = assignee.id;
+    formRef.current.appendChild(hiddenInput);
+    formRef.current.requestSubmit();
+    formRef.current.removeChild(hiddenInput);
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -166,8 +195,8 @@ export function EditMachineDialog({
           >
             <input type="hidden" name="id" value={machine.id} />
 
-            {/* Flash message */}
-            {state && !state.ok && (
+            {/* Flash message — suppress ASSIGNEE_NOT_MEMBER since it opens a dialog */}
+            {state && !state.ok && state.code !== "ASSIGNEE_NOT_MEMBER" && (
               <div
                 className={cn(
                   "rounded-md border p-4",
@@ -281,7 +310,7 @@ export function EditMachineDialog({
             <DialogFooter>
               <Button
                 type="submit"
-                className="bg-primary text-on-primary hover:bg-primary/90"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
                 loading={isPending}
               >
                 Update Machine
@@ -316,6 +345,55 @@ export function EditMachineDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Promote guest to member confirmation */}
+      {assignee && (
+        <Dialog
+          open={isPromoteOpen}
+          onOpenChange={(o) => {
+            if (!o) {
+              setIsPromoteOpen(false);
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Promote to member and assign?</DialogTitle>
+              <DialogDescription>
+                This updates the user&apos;s role and assigns them as owner.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <p>
+                <strong>{assignee.name}</strong>
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground ml-1">
+                  {assignee.type === "invited"
+                    ? "(INVITED · GUEST)"
+                    : "(GUEST)"}
+                </span>{" "}
+                is currently a guest. Assigning them as owner of{" "}
+                <strong>{machine.name}</strong> will promote them to member.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                As a member they&apos;ll be able to edit the machine&apos;s
+                details, owner notes, tournament notes, and owner requirements.
+              </p>
+              <Alert>
+                <AlertDescription>
+                  Promotion and assignment run in one transaction — both succeed
+                  or both roll back.
+                </AlertDescription>
+              </Alert>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsPromoteOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={confirmPromote}>Promote and assign</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }
