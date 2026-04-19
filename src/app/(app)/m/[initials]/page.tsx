@@ -1,27 +1,19 @@
 import type React from "react";
 import { notFound } from "next/navigation";
 import { getUnifiedUsers } from "~/lib/users/queries";
-import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines, issues, userProfiles } from "~/server/db/schema";
 import { eq, notInArray, sql } from "drizzle-orm";
-import {
-  deriveMachineStatus,
-  getMachineStatusLabel,
-  getMachineStatusStyles,
-} from "~/lib/machines/status";
-import {
-  getMachinePresenceLabel,
-  getMachinePresenceStyles,
-  isOnTheFloor,
-} from "~/lib/machines/presence";
+import { deriveMachineStatus } from "~/lib/machines/status";
+import { getMachinePresenceLabel, isOnTheFloor } from "~/lib/machines/presence";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Badge } from "~/components/ui/badge";
 import { Calendar, Plus } from "lucide-react";
+import { MachineStatusBadge } from "~/components/machines/MachineStatusBadge";
+import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { formatDate } from "~/lib/dates";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -213,14 +205,7 @@ export default async function MachineDetailPage({
   const watchMode = currentUserWatch?.watchMode ?? "notify";
 
   const presenceBadge = !isOnTheFloor(machine.presenceStatus) ? (
-    <Badge
-      className={cn(
-        getMachinePresenceStyles(machine.presenceStatus),
-        "border px-3 py-1 text-sm font-semibold"
-      )}
-    >
-      {getMachinePresenceLabel(machine.presenceStatus)}
-    </Badge>
+    <MachinePresenceBadge status={machine.presenceStatus} size="md" />
   ) : null;
 
   const watchButton = canWatch ? (
@@ -305,14 +290,7 @@ export default async function MachineDetailPage({
                       <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                         Status
                       </p>
-                      <Badge
-                        className={cn(
-                          getMachineStatusStyles(machineStatus),
-                          "border px-2 py-0.5 text-[10px] font-bold"
-                        )}
-                      >
-                        {getMachineStatusLabel(machineStatus)}
-                      </Badge>
+                      <MachineStatusBadge status={machineStatus} size="xs" />
                     </div>
 
                     <div data-testid="detail-open-issues">

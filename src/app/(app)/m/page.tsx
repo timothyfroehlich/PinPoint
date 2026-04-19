@@ -7,22 +7,17 @@ import { getUnifiedUsers } from "~/lib/users/queries";
 import { desc, eq } from "drizzle-orm";
 import {
   deriveMachineStatus,
-  getMachineStatusLabel,
-  getMachineStatusStyles,
   type IssueForStatus,
 } from "~/lib/machines/status";
-import {
-  getMachinePresenceLabel,
-  getMachinePresenceStyles,
-  isOnTheFloor,
-} from "~/lib/machines/presence";
+import { isOnTheFloor } from "~/lib/machines/presence";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Badge } from "~/components/ui/badge";
 import { Plus, SearchX } from "lucide-react";
 import { EmptyState } from "~/components/ui/empty-state";
 import { cn } from "~/lib/utils";
+import { MachineStatusBadge } from "~/components/machines/MachineStatusBadge";
+import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge";
 import {
   parseMachineFilters,
   hasActiveMachineFilters,
@@ -232,24 +227,16 @@ export default async function MachinesPage({
                         {machine.name}
                       </CardTitle>
                       <div className="flex flex-col items-end gap-1.5">
-                        <Badge
+                        <MachineStatusBadge
                           data-testid="machine-status-badge"
-                          className={cn(
-                            getMachineStatusStyles(machine.status),
-                            "border px-2.5 py-0.5 text-xs font-semibold rounded-full"
-                          )}
-                        >
-                          {getMachineStatusLabel(machine.status)}
-                        </Badge>
+                          status={machine.status}
+                          size="sm"
+                        />
                         {!isOnTheFloor(machine.presenceStatus) && (
-                          <Badge
-                            className={cn(
-                              getMachinePresenceStyles(machine.presenceStatus),
-                              "border px-2.5 py-0.5 text-xs font-semibold rounded-full"
-                            )}
-                          >
-                            {getMachinePresenceLabel(machine.presenceStatus)}
-                          </Badge>
+                          <MachinePresenceBadge
+                            status={machine.presenceStatus}
+                            size="sm"
+                          />
                         )}
                       </div>
                     </div>
