@@ -24,6 +24,7 @@ async function verifyAdmin(userId: string): Promise<void> {
   });
 
   if (currentUserProfile?.role !== "admin") {
+    // permissions-audit-allow: cleanup pending in PP-wwf
     throw new Error("Forbidden: Only admins can perform this action");
   }
 }

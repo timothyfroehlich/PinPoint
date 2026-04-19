@@ -106,6 +106,7 @@ export async function createMachineAction(
 
   // Access control: only admins or technicians can create machines
   if (profile.role !== "admin" && profile.role !== "technician") {
+    // permissions-audit-allow: cleanup pending in feat/machine-owner-member-invariant
     log.warn(
       { userId: user.id, action: "createMachineAction" },
       "Unauthorized user attempted to create a machine"
@@ -271,7 +272,7 @@ export async function updateMachineAction(
   try {
     // Admins and technicians can update any machine, non-privileged users can only update their own machines
     const isPrivileged =
-      profile.role === "admin" || profile.role === "technician";
+      profile.role === "admin" || profile.role === "technician"; // permissions-audit-allow: cleanup pending in feat/machine-owner-member-invariant
     const whereConditions = isPrivileged
       ? eq(machines.id, id)
       : and(eq(machines.id, id), eq(machines.ownerId, user.id));
@@ -579,7 +580,7 @@ async function updateMachineTextField(
     // Permission check
     const isOwner = user.id === machine.ownerId;
     const isPrivileged =
-      profile.role === "admin" || profile.role === "technician";
+      profile.role === "admin" || profile.role === "technician"; // permissions-audit-allow: cleanup pending in feat/machine-owner-member-invariant
 
     if (field === "ownerNotes") {
       // Owner notes: owner only (not even admins)

@@ -37,8 +37,8 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   });
 
   const canCreateMachine =
-    currentUserProfile?.role === "admin" ||
-    currentUserProfile?.role === "technician";
+    currentUserProfile?.role === "admin" || // permissions-audit-allow: cleanup pending in PP-wwf
+    currentUserProfile?.role === "technician"; // permissions-audit-allow: cleanup pending in PP-wwf
 
   if (!canCreateMachine) {
     return <Forbidden role={currentUserProfile?.role ?? null} backUrl="/m" />;

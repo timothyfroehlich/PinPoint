@@ -70,7 +70,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
 
   // Check if user is the sole admin
   const isSoleAdmin =
-    profile.role === "admin" &&
+    profile.role === "admin" && // permissions-audit-allow: sole-admin invariant (business rule)
     (
       await db
         .select({ count: count() })

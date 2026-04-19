@@ -57,7 +57,7 @@ export default async function IssuesPage({
       })
     : undefined;
 
-  const isAdmin = currentUserProfile?.role === "admin";
+  const isAdmin = currentUserProfile?.role === "admin"; // permissions-audit-allow: isAdmin flag for SQL/query filtering, not a request gate
 
   // Add currentUserId for watching filter (if authenticated)
   filters.currentUserId = user?.id;

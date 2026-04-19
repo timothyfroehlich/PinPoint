@@ -23,6 +23,7 @@ export async function anonymizeUserReferences(
     }
 
     if (profile.role === "admin") {
+      // permissions-audit-allow: sole-admin invariant
       const [adminCount] = await tx
         .select({ count: count() })
         .from(userProfiles)

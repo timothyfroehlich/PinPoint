@@ -862,6 +862,7 @@ export async function deleteCommentAction(
     });
 
     if (existingComment.authorId !== user.id && userProfile?.role !== "admin") {
+      // permissions-audit-allow: cleanup pending in PP-wwf
       return err(
         "UNAUTHORIZED",
         "You can only delete your own comments, or you must be an admin"
