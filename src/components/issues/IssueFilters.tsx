@@ -510,7 +510,7 @@ export function IssueFilters({
                     key={badge.id}
                     data-testid="filter-badge"
                     className={cn(
-                      "flex items-center gap-1 px-2 py-0.5 whitespace-nowrap rounded-sm text-[10px] font-medium leading-none h-6 bg-secondary/50 border-secondary-foreground/10 text-secondary-foreground group/badge max-w-[120px] pointer-events-auto",
+                      "flex items-center gap-1 px-2 py-0.5 whitespace-nowrap rounded-sm text-[10px] font-medium leading-none h-6 bg-secondary/50 border-secondary/30 text-foreground group/badge max-w-[120px] pointer-events-auto",
                       badge.iconColor
                     )}
                   >

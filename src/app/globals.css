@@ -6,7 +6,7 @@
   --color-background: #0f0f11; /* Even darker for more contrast */
   --color-foreground: #f8fafc;
 
-  /* Card & Surface - Slightly lighter charcoal with a hint of purple */
+  /* Card & Surface - Slightly lighter charcoal */
   --color-card: #18151b;
   --color-card-foreground: #f8fafc;
   --color-popover: #18151b;
@@ -16,9 +16,9 @@
   --color-primary: #4ade80;
   --color-primary-foreground: #022c22;
 
-  /* Secondary / Accents - Electric Purple */
-  --color-secondary: #d946ef; /* More intense magenta/purple */
-  --color-secondary-foreground: #ffffff;
+  /* Secondary / Accents - Teal (tight green-family pairing with the APC primary) */
+  --color-secondary: #2dd4bf; /* teal-400 */
+  --color-secondary-foreground: #042f2e; /* teal-950 */
   --color-muted: #27272a;
   --color-muted-foreground: #a1a1aa;
 
@@ -30,7 +30,7 @@
 
   /* Status Specific */
   --color-status-new: #4ade80;
-  --color-status-in-progress: #d946ef;
+  --color-status-in-progress: #38bdf8; /* sky-400 — non-palette, reserved for this status */
   --color-status-unplayable: #ef4444;
 
   /* Semantic Status Colors */
@@ -62,11 +62,11 @@
   --color-on-surface: #f8fafc;
   --color-on-surface-variant: #a1a1aa;
   --color-on-primary: #022c22;
-  --color-on-secondary: #ffffff;
+  --color-on-secondary: #042f2e; /* teal-950 — matches --color-secondary-foreground */
   --color-primary-container: #14532d;
   --color-on-primary-container: #dcfce7;
-  --color-secondary-container: #581c87;
-  --color-on-secondary-container: #f3e8ff;
+  --color-secondary-container: #115e59; /* teal-800 */
+  --color-on-secondary-container: #ccfbf1; /* teal-100 */
 
   /* Radius */
   --radius: 0.5rem;

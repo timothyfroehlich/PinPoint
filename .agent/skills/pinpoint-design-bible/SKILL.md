@@ -18,16 +18,25 @@ Use this skill when:
 
 ## 1. Visual Identity
 
-PinPoint uses a **dark neon aesthetic** -- deep charcoal backgrounds with neon green and electric purple accents.
+PinPoint uses a **dark neon aesthetic** -- deep charcoal backgrounds with neon green and teal accents.
 
-| Token              | Value     | Usage                                    |
-| :----------------- | :-------- | :--------------------------------------- |
-| Primary            | `#4ade80` | Actions, active states, CTAs, links      |
-| Secondary          | `#d946ef` | Accents, decorative highlights           |
-| Background         | `#0f0f11` | Page background                          |
-| Surface            | `#0f0f11` | Content areas, full-width sections       |
-| Card               | `#18151b` | Elevated containers (subtle purple tint) |
-| Surface-variant/30 | --        | Dimmed/closed items                      |
+| Token              | Value     | Usage                               |
+| :----------------- | :-------- | :---------------------------------- |
+| Primary            | `#4ade80` | Actions, active states, CTAs, links |
+| Secondary          | `#2dd4bf` | Accents, decorative highlights      |
+| Background         | `#0f0f11` | Page background                     |
+| Surface            | `#0f0f11` | Content areas, full-width sections  |
+| Card               | `#18151b` | Elevated containers                 |
+| Surface-variant/30 | --        | Dimmed/closed items                 |
+
+**Purple is not in the palette.** It was removed in favor of teal so the
+primary and secondary read as one green-family pairing rather than two
+competing brands. Do not reintroduce a purple/magenta/fuchsia secondary, or
+raw `purple-*` / `fuchsia-*` / `magenta-*` classes, in new code. The one
+exception is the legacy raw-Tailwind purple used for a handful of entries in
+`src/lib/issues/status.ts` and `PRIORITY_CONFIG` -- those are tracked for
+conversion to semantic tokens and should be migrated opportunistically, not
+extended.
 
 **Rules:**
 
