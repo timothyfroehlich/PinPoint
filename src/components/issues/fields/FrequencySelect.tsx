@@ -42,7 +42,7 @@ export function FrequencySelect({
       name={name}
     >
       <SelectTrigger
-        className="w-full border-outline-variant bg-surface text-on-surface"
+        className="w-full border-outline-variant bg-surface text-foreground"
         aria-label={
           value
             ? `Frequency: ${FREQUENCY_CONFIG[value].label}`

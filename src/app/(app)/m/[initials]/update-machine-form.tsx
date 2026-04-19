@@ -143,7 +143,7 @@ export function EditMachineDialog({
           <Button
             variant="outline"
             size="sm"
-            className="w-full border-outline text-on-surface hover:bg-surface-variant"
+            className="w-full border-outline text-foreground hover:bg-surface-variant"
             data-testid="edit-machine-button"
           >
             <Pencil className="mr-2 size-4" />
@@ -180,23 +180,23 @@ export function EditMachineDialog({
 
             {/* Machine Initials (Read Only) */}
             <div className="space-y-2">
-              <Label htmlFor="edit-initials" className="text-on-surface">
+              <Label htmlFor="edit-initials" className="text-foreground">
                 Initials
               </Label>
               <Input
                 id="edit-initials"
                 value={machine.initials}
                 disabled
-                className="border-outline bg-surface-variant text-on-surface-variant"
+                className="border-outline bg-surface-variant text-muted-foreground"
               />
-              <p className="text-xs text-on-surface-variant">
+              <p className="text-xs text-muted-foreground">
                 Machine initials cannot be changed
               </p>
             </div>
 
             {/* Machine Name */}
             <div className="space-y-2">
-              <Label htmlFor="edit-name" className="text-on-surface">
+              <Label htmlFor="edit-name" className="text-foreground">
                 Machine Name *
               </Label>
               <Input
@@ -206,16 +206,16 @@ export function EditMachineDialog({
                 required
                 defaultValue={machine.name}
                 placeholder="e.g., Medieval Madness"
-                className="border-outline bg-surface text-on-surface placeholder:text-on-surface-variant"
+                className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
               />
-              <p className="text-xs text-on-surface-variant">
+              <p className="text-xs text-muted-foreground">
                 Enter the full name of the pinball machine
               </p>
             </div>
 
             {/* Availability */}
             <div className="space-y-2">
-              <Label htmlFor="edit-presence" className="text-on-surface">
+              <Label htmlFor="edit-presence" className="text-foreground">
                 Availability
               </Label>
               <Select
@@ -224,7 +224,7 @@ export function EditMachineDialog({
               >
                 <SelectTrigger
                   id="edit-presence"
-                  className="border-outline bg-surface text-on-surface"
+                  className="border-outline bg-surface text-foreground"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -236,7 +236,7 @@ export function EditMachineDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-on-surface-variant">
+              <p className="text-xs text-muted-foreground">
                 Whether this machine is currently available on the floor
               </p>
             </div>
@@ -250,28 +250,28 @@ export function EditMachineDialog({
               />
             ) : (
               <div className="space-y-2" data-testid="owner-display">
-                <span className="text-sm font-semibold text-on-surface">
+                <span className="text-sm font-semibold text-foreground">
                   Machine Owner
                 </span>
                 <div className="rounded-md border border-outline bg-surface px-3 py-2">
                   {machine.owner || machine.invitedOwner ? (
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-on-surface">
+                      <span className="text-sm text-foreground">
                         {machine.owner?.name ?? machine.invitedOwner?.name}
                       </span>
                       {machine.invitedOwner && !machine.owner && (
-                        <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
                           (Invited)
                         </span>
                       )}
                     </div>
                   ) : (
-                    <span className="text-sm text-on-surface-variant">
+                    <span className="text-sm text-muted-foreground">
                       No owner assigned
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-on-surface-variant">
+                <p className="text-xs text-muted-foreground">
                   The owner receives notifications for new issues on this
                   machine.
                 </p>

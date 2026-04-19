@@ -82,14 +82,14 @@ export function PasswordStrength({
             style={{ width: `${widthPercentage}%` }}
           />
         </div>
-        <span className="text-xs font-medium text-on-surface-variant min-w-16">
+        <span className="text-xs font-medium text-muted-foreground min-w-16">
           {label}
         </span>
       </div>
 
       {/* Feedback */}
       {strength.feedback.length > 0 && (
-        <ul className="text-xs text-on-surface-variant space-y-1">
+        <ul className="text-xs text-muted-foreground space-y-1">
           {strength.feedback.map((message, i) => (
             <li key={i}>• {message}</li>
           ))}

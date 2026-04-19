@@ -48,10 +48,10 @@ export default async function ResetPasswordPage({
   return (
     <Card className="border-outline-variant bg-surface shadow-xl">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-on-surface">
+        <CardTitle className="text-2xl font-bold text-foreground">
           Set New Password
         </CardTitle>
-        <p className="text-sm text-on-surface-variant">
+        <p className="text-sm text-muted-foreground">
           Enter your new password below
         </p>
       </CardHeader>
@@ -60,7 +60,7 @@ export default async function ResetPasswordPage({
         <ResetPasswordForm />
 
         {/* Back to login link */}
-        <div className="text-center text-sm text-on-surface-variant">
+        <div className="text-center text-sm text-muted-foreground">
           Remember your password?{" "}
           <Link
             href="/login"

@@ -67,12 +67,12 @@ export function QrCodeDialog({
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                  <Printer className="size-4 text-on-surface-variant/50" />
+                  <Printer className="size-4 text-muted-foreground/50" />
                 </div>
                 <CopyButton
                   value={reportUrl}
                   variant="outline"
-                  className="w-full justify-start pl-10 pr-2 font-mono text-xs text-on-surface-variant hover:text-on-surface border-dashed"
+                  className="w-full justify-start pl-10 pr-2 font-mono text-xs text-muted-foreground hover:text-foreground border-dashed"
                 />
               </div>
               <Button
@@ -89,7 +89,7 @@ export function QrCodeDialog({
               </Button>
             </div>
 
-            <p className="text-[10px] text-center text-on-surface-variant/70 pt-2">
+            <p className="text-[10px] text-center text-muted-foreground/70 pt-2">
               Optimized for standard 2&quot;x2&quot; or larger label printers.
             </p>
           </div>

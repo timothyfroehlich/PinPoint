@@ -56,7 +56,7 @@ export function getMachineStatusStyles(status: MachineStatus): string {
       "bg-success-container text-on-success-container border-success",
     needs_service:
       "bg-warning-container text-on-warning-container border-warning",
-    unplayable: "bg-error-container text-on-error-container border-error",
+    unplayable: "bg-destructive/10 text-destructive border-error",
   };
   return styles[status];
 }

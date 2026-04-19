@@ -71,14 +71,14 @@ export function UserMenu({
       <DropdownMenuContent align="end" className="w-56 bg-surface-variant">
         {/* User Info Header */}
         <div className="flex flex-col px-2 py-1.5 outline-none">
-          <p className="text-sm font-semibold text-on-surface">{userName}</p>
+          <p className="text-sm font-semibold text-foreground">{userName}</p>
         </div>
         <DropdownMenuSeparator className="bg-outline-variant" />
 
         {/* Profile - future implementation */}
         <DropdownMenuItem
           disabled
-          className="cursor-not-allowed opacity-50 text-on-surface-variant"
+          className="cursor-not-allowed opacity-50 text-muted-foreground"
         >
           <User className="mr-2 size-4" />
           <span>Profile</span>

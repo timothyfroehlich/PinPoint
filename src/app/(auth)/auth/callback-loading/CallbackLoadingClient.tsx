@@ -49,9 +49,9 @@ export function CallbackLoadingClient({
   return (
     <main className="flex min-h-screen items-center justify-center bg-surface px-4">
       <div className="rounded-lg border border-outline-variant bg-surface shadow-md">
-        <div className="px-6 py-4 text-center text-on-surface">
+        <div className="px-6 py-4 text-center text-foreground">
           <p className="text-sm font-medium">Finalizing sign-in…</p>
-          <p className="text-xs text-on-surface-variant">
+          <p className="text-xs text-muted-foreground">
             One moment while we finish securing your session.
           </p>
         </div>

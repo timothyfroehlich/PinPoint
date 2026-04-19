@@ -51,7 +51,7 @@ export function CreateMachineForm({
       <form action={formAction} className="space-y-6">
         {/* Machine Name */}
         <div className="space-y-2">
-          <Label htmlFor="name" className="text-on-surface">
+          <Label htmlFor="name" className="text-foreground">
             Machine Name *
           </Label>
           <Input
@@ -60,17 +60,17 @@ export function CreateMachineForm({
             type="text"
             required
             placeholder="e.g., Medieval Madness"
-            className="border-outline bg-surface text-on-surface placeholder:text-on-surface-variant"
+            className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
             autoFocus
           />
-          <p className="text-xs text-on-surface-variant">
+          <p className="text-xs text-muted-foreground">
             Enter the full name of the pinball machine
           </p>
         </div>
 
         {/* Machine Initials */}
         <div className="space-y-2">
-          <Label htmlFor="initials" className="text-on-surface">
+          <Label htmlFor="initials" className="text-foreground">
             Initials *
           </Label>
           <Input
@@ -81,14 +81,14 @@ export function CreateMachineForm({
             minLength={2}
             maxLength={6}
             placeholder="e.g., MM"
-            className="border-outline bg-surface text-on-surface placeholder:text-on-surface-variant uppercase"
+            className="border-outline bg-surface text-foreground placeholder:text-muted-foreground uppercase"
             onChange={(e) => {
               e.target.value = e.target.value
                 .toUpperCase()
                 .replace(/[^A-Z0-9]/g, "");
             }}
           />
-          <p className="text-xs text-on-surface-variant">
+          <p className="text-xs text-muted-foreground">
             2-6 characters. Permanent unique identifier.
           </p>
         </div>
@@ -111,7 +111,7 @@ export function CreateMachineForm({
             <Button
               type="button"
               variant="outline"
-              className="w-full border-outline text-on-surface hover:bg-surface-variant"
+              className="w-full border-outline text-foreground hover:bg-surface-variant"
             >
               Cancel
             </Button>

@@ -77,7 +77,7 @@ describe("getMachineStatusStyles", () => {
     expect(needsServiceStyles).toContain("text-on-warning-container");
 
     const unplayableStyles = getMachineStatusStyles("unplayable");
-    expect(unplayableStyles).toContain("bg-error-container");
-    expect(unplayableStyles).toContain("text-on-error-container");
+    expect(unplayableStyles).toContain("bg-destructive/10");
+    expect(unplayableStyles).toContain("text-destructive");
   });
 });

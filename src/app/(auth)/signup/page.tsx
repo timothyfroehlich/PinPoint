@@ -69,10 +69,10 @@ export default async function SignupPage({
   return (
     <Card className="border-outline-variant bg-surface shadow-xl">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-on-surface">
+        <CardTitle className="text-2xl font-bold text-foreground">
           Create Account
         </CardTitle>
-        <p className="text-sm text-on-surface-variant">
+        <p className="text-sm text-muted-foreground">
           Join PinPoint to report and track issues
         </p>
       </CardHeader>
@@ -82,7 +82,7 @@ export default async function SignupPage({
         <SignupForm initialData={initialData} />
 
         {/* Login link */}
-        <div className="text-center text-sm text-on-surface-variant">
+        <div className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link href="/login" className="text-link font-medium">
             Sign in
