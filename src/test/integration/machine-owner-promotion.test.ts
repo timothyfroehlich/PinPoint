@@ -101,13 +101,15 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
     return user;
   };
 
+  let machineCounter = 0;
   const createMachine = async (ownerId?: string) => {
     const db = await getTestDb();
+    machineCounter += 1;
     const [machine] = await db
       .insert(machines)
       .values({
         name: "Medieval Madness",
-        initials: `MM${Math.random().toString(36).slice(2, 4).toUpperCase()}`,
+        initials: `M${String(machineCounter).padStart(3, "0")}`,
         ownerId,
       })
       .returning();
@@ -373,11 +375,8 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       );
 
       if ((triggerCheck as any).rows?.length === 0) {
-        // Trigger not installed in PGlite schema — skip trigger behavior test
-        // (CI verifies this via the actual Supabase branch DB)
-        console.log(
-          "Skipping trigger test — trigger not in PGlite schema.sql (expected)"
-        );
+        // Trigger not installed in PGlite schema — skip trigger behavior test.
+        // CI verifies this via the actual Supabase branch DB where migrations run.
         return;
       }
 
@@ -403,9 +402,8 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       );
 
       if ((triggerCheck as any).rows?.length === 0) {
-        console.log(
-          "Skipping demotion trigger test — trigger not in PGlite schema.sql (expected)"
-        );
+        // Trigger not installed in PGlite schema — skip trigger behavior test.
+        // CI verifies this via the actual Supabase branch DB where migrations run.
         return;
       }
 

@@ -244,18 +244,29 @@ export async function createMachineAction(
         return [newMachine];
       });
 
-      // Notify new owner after transaction commits
+      // Post-commit side effect — best-effort: do not fail the action on notification errors
       if (targetActive) {
-        await createNotification({
-          type: "machine_ownership_changed",
-          resourceId: machine.id,
-          resourceType: "machine",
-          actorId: user.id,
-          includeActor: false,
-          machineName: machine.name,
-          newStatus: "added",
-          additionalRecipientIds: [forcePromoteUserId],
-        });
+        try {
+          await createNotification({
+            type: "machine_ownership_changed",
+            resourceId: machine.id,
+            resourceType: "machine",
+            actorId: user.id,
+            includeActor: false,
+            machineName: machine.name,
+            newStatus: "added",
+            additionalRecipientIds: [forcePromoteUserId],
+          });
+        } catch (sideEffectError: unknown) {
+          log.error(
+            {
+              error: sideEffectError,
+              action: "createMachineAction",
+              machineId: machine.id,
+            },
+            "Post-commit notification failed — mutation succeeded"
+          );
+        }
       }
 
       revalidatePath("/m");
@@ -551,40 +562,52 @@ export async function updateMachineAction(
         return [updatedMachine];
       });
 
-      // Notify old owner (outside transaction)
-      if (oldOwnerId && oldOwnerId !== machineOwnerId) {
-        await db
-          .delete(machineWatchers)
-          .where(
-            and(
-              eq(machineWatchers.machineId, id),
-              eq(machineWatchers.userId, oldOwnerId)
-            )
-          );
-        await createNotification({
-          type: "machine_ownership_changed",
-          resourceId: machine.id,
-          resourceType: "machine",
-          actorId: user.id,
-          includeActor: false,
-          machineName: machine.name,
-          newStatus: "removed",
-          additionalRecipientIds: [oldOwnerId],
-        });
-      }
+      // Post-commit side effects — best-effort: do not fail the action on notification errors
+      try {
+        // Remove old owner watcher and notify them
+        if (oldOwnerId && oldOwnerId !== machineOwnerId) {
+          await db
+            .delete(machineWatchers)
+            .where(
+              and(
+                eq(machineWatchers.machineId, id),
+                eq(machineWatchers.userId, oldOwnerId)
+              )
+            );
+          await createNotification({
+            type: "machine_ownership_changed",
+            resourceId: machine.id,
+            resourceType: "machine",
+            actorId: user.id,
+            includeActor: false,
+            machineName: machine.name,
+            newStatus: "removed",
+            additionalRecipientIds: [oldOwnerId],
+          });
+        }
 
-      // Notify new owner (outside transaction)
-      if (machineOwnerId && machineOwnerId !== oldOwnerId) {
-        await createNotification({
-          type: "machine_ownership_changed",
-          resourceId: machine.id,
-          resourceType: "machine",
-          actorId: user.id,
-          includeActor: false,
-          machineName: machine.name,
-          newStatus: "added",
-          additionalRecipientIds: [machineOwnerId],
-        });
+        // Notify new owner
+        if (machineOwnerId && machineOwnerId !== oldOwnerId) {
+          await createNotification({
+            type: "machine_ownership_changed",
+            resourceId: machine.id,
+            resourceType: "machine",
+            actorId: user.id,
+            includeActor: false,
+            machineName: machine.name,
+            newStatus: "added",
+            additionalRecipientIds: [machineOwnerId],
+          });
+        }
+      } catch (sideEffectError: unknown) {
+        log.error(
+          {
+            error: sideEffectError,
+            action: "updateMachineAction",
+            machineId: machine.id,
+          },
+          "Post-commit side effects failed (watcher/notification) — mutation succeeded"
+        );
       }
 
       revalidatePath("/m");
