@@ -143,10 +143,11 @@ async function seedUsersAndData() {
 
   const invitedUserId = await sql`
     INSERT INTO invited_users (first_name, last_name, email, role)
-    VALUES ('Jane', 'Doe', 'jane.doe@example.com', 'guest')
+    VALUES ('Jane', 'Doe', 'jane.doe@example.com', 'member')
     ON CONFLICT (email) DO UPDATE SET
       first_name = 'Jane',
-      last_name = 'Doe'
+      last_name = 'Doe',
+      role = 'member'
     RETURNING id
   `.then((rows) => rows[0]?.id);
 
