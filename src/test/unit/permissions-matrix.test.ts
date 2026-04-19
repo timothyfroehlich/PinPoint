@@ -10,6 +10,7 @@ import {
   hasPermission,
   requiresOwnershipCheck,
 } from "~/lib/permissions/matrix";
+import { getGrantedPermissions } from "~/lib/permissions/helpers";
 
 /**
  * Unit tests for the permissions matrix.
@@ -411,5 +412,57 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("admin.users.invite", "technician")).toBe(true);
       expect(getPermission("admin.users.invite", "admin")).toBe(true);
     });
+
+    it("should allow technician and admin to promote guests to members", () => {
+      expect(
+        getPermission("admin.users.promote.guestToMember", "unauthenticated")
+      ).toBe(false);
+      expect(getPermission("admin.users.promote.guestToMember", "guest")).toBe(
+        false
+      );
+      expect(getPermission("admin.users.promote.guestToMember", "member")).toBe(
+        false
+      );
+      expect(
+        getPermission("admin.users.promote.guestToMember", "technician")
+      ).toBe(true);
+      expect(getPermission("admin.users.promote.guestToMember", "admin")).toBe(
+        true
+      );
+    });
+
+    it("should keep admin.users.roles admin-only (not accessible by technician)", () => {
+      expect(getPermission("admin.users.roles", "technician")).toBe(false);
+      expect(getPermission("admin.users.roles", "admin")).toBe(true);
+    });
+  });
+});
+
+describe("admin.users.promote.guestToMember permission", () => {
+  it("should be included in getGrantedPermissions for technician", () => {
+    const permissions = getGrantedPermissions("technician");
+    expect(permissions).toContain("admin.users.promote.guestToMember");
+  });
+
+  it("should be included in getGrantedPermissions for admin", () => {
+    const permissions = getGrantedPermissions("admin");
+    expect(permissions).toContain("admin.users.promote.guestToMember");
+  });
+
+  it("should NOT be included in getGrantedPermissions for member", () => {
+    const permissions = getGrantedPermissions("member");
+    expect(permissions).not.toContain("admin.users.promote.guestToMember");
+  });
+
+  it("should NOT be included in getGrantedPermissions for guest", () => {
+    const permissions = getGrantedPermissions("guest");
+    expect(permissions).not.toContain("admin.users.promote.guestToMember");
+  });
+
+  it("should exist in PERMISSIONS_BY_ID", () => {
+    const perm = PERMISSIONS_BY_ID["admin.users.promote.guestToMember"];
+    expect(perm).toBeDefined();
+    // toBeDefined does not narrow TypeScript types, so check label via property access
+    expect(perm).toMatchObject({ label: "Promote guests to members" });
   });
 });

@@ -412,6 +412,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "admin.users.promote.guestToMember",
+        label: "Promote guests to members",
+        description:
+          "Upgrade a guest account to member status (narrow scope — used when assigning machine ownership)",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
         id: "admin.users.roles",
         label: "Manage user roles",
         description: "Change user roles (guest, member, technician, admin)",

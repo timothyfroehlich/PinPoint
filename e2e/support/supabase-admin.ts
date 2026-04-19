@@ -92,9 +92,23 @@ export async function createTestUser(
 }
 
 /**
- * Create a test machine directly in the database
+ * Create a test machine directly in the database.
+ *
+ * Side effect: ensures the owner is at least a `member` before insert.
+ * Migration 0027 added a DB trigger (check_machine_owner_not_guest) that
+ * blocks INSERT/UPDATE on machines whose owner_id points to a guest. New
+ * users created via Supabase auth default to `guest` (handle_new_user
+ * trigger), so without this promotion the trigger would reject the insert.
  */
 export async function createTestMachine(ownerId: string, initials?: string) {
+  // Promote owner to member if needed (no-op if already member+)
+  const { error: promoteError } = await supabaseAdmin
+    .from("user_profiles")
+    .update({ role: "member" })
+    .eq("id", ownerId)
+    .eq("role", "guest");
+  if (promoteError) throw promoteError;
+
   const finalInitials = initials ?? `TM${Math.floor(Math.random() * 10000)}`;
   const { data, error } = await supabaseAdmin
     .from("machines")
