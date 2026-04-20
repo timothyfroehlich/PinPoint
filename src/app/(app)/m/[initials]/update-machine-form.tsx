@@ -160,16 +160,27 @@ export function EditMachineDialog({
 
   const confirmPromote = (): void => {
     if (!assignee || !formRef.current) return;
+    const form = formRef.current;
     setIsPromoteOpen(false);
 
-    // Inject the hidden forcePromoteUserId field and re-submit
+    // Inject the hidden forcePromoteUserId field and re-submit.
+    // Removing the input synchronously after requestSubmit() races the browser's
+    // FormData serialization (which can happen on a later task). Defer cleanup
+    // to the `formdata` event so the value is guaranteed to be captured.
     const hiddenInput = document.createElement("input");
     hiddenInput.type = "hidden";
     hiddenInput.name = "forcePromoteUserId";
     hiddenInput.value = assignee.id;
-    formRef.current.appendChild(hiddenInput);
-    formRef.current.requestSubmit();
-    formRef.current.removeChild(hiddenInput);
+
+    const cleanup = (): void => {
+      if (hiddenInput.parentNode === form) {
+        form.removeChild(hiddenInput);
+      }
+    };
+
+    form.addEventListener("formdata", cleanup, { once: true });
+    form.appendChild(hiddenInput);
+    form.requestSubmit();
   };
 
   return (
@@ -202,11 +213,15 @@ export function EditMachineDialog({
           >
             <input type="hidden" name="id" value={machine.id} />
 
-            {/* Flash message — suppress ASSIGNEE_NOT_MEMBER when the promote dialog
-                will handle it; show inline if user lacks promote permission */}
+            {/* Flash message — suppress ASSIGNEE_NOT_MEMBER only while the
+                promote dialog is open and handling it. After the dialog is
+                dismissed (Cancel/Escape) or when the user lacks promote
+                permission, show the inline error so they have guidance. */}
             {state &&
               !state.ok &&
-              (state.code !== "ASSIGNEE_NOT_MEMBER" || !canEditAnyMachine) && (
+              (state.code !== "ASSIGNEE_NOT_MEMBER" ||
+                !canEditAnyMachine ||
+                !isPromoteOpen) && (
                 <div
                   className={cn(
                     "rounded-md border p-4",

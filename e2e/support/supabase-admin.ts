@@ -174,6 +174,22 @@ export async function updateUserRole(
 }
 
 /**
+ * Get a user's role from the user_profiles table.
+ * Useful for asserting promotion side-effects in E2E tests.
+ */
+export async function getUserRole(
+  userId: string
+): Promise<"guest" | "member" | "admin"> {
+  const { data, error } = await supabaseAdmin
+    .from("user_profiles")
+    .select("role")
+    .eq("id", userId)
+    .single();
+  if (error) throw error;
+  return data.role as "guest" | "member" | "admin";
+}
+
+/**
  * Delete a test user by ID (admin only)
  */
 export async function deleteTestUser(userId: string) {

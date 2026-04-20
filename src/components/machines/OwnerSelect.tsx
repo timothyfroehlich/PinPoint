@@ -149,12 +149,36 @@ export function OwnerSelect({
   // happen before the users prop is updated, without triggering extra renders.
   const pendingSelectionRef = useRef<string | null>(null);
 
-  // Re-sort users after client-side mutations (e.g., inviting a new user)
-  // to maintain consistent ordering: confirmed first, by machine count desc, then by last name
-  const sortedUsers = useMemo(
-    () => [...users, ...localExtraUsers].sort(compareUnifiedUsers),
-    [users, localExtraUsers]
-  );
+  // Merge users (prop) and localExtraUsers (post-invite optimistic additions),
+  // de-duping by id so the parent re-rendering with the invited user in `users`
+  // doesn't produce duplicate React keys / duplicate dropdown entries.
+  // Sort: confirmed first, by machine count desc, then by last name.
+  const sortedUsers = useMemo(() => {
+    const mergedUsers = new Map<string, OwnerSelectUser>();
+    for (const user of users) {
+      mergedUsers.set(user.id, user);
+    }
+    for (const user of localExtraUsers) {
+      mergedUsers.set(user.id, user);
+    }
+    return [...mergedUsers.values()].sort(compareUnifiedUsers);
+  }, [users, localExtraUsers]);
+
+  // Once the parent's `users` prop catches up and includes an optimistically
+  // invited user, drop the duplicate from `localExtraUsers` so props remain the
+  // single source of truth. Avoids stale local copies if the server returns an
+  // updated user record (e.g. corrected casing or normalized name).
+  useEffect(() => {
+    if (localExtraUsers.length === 0) return;
+    const userIds = new Set(users.map((user) => user.id));
+    // Bail out if no local extras are now in props — avoids creating a new
+    // array reference and triggering an unnecessary re-render every time
+    // `users` updates.
+    if (!localExtraUsers.some((user) => userIds.has(user.id))) return;
+    setLocalExtraUsers((current) =>
+      current.filter((user) => !userIds.has(user.id))
+    );
+  }, [users, localExtraUsers]);
 
   // Apply the pending selection once the invited user appears in sortedUsers.
   // This effect fires after the render where localExtraUsers is updated (adding
@@ -173,17 +197,21 @@ export function OwnerSelect({
   }, [sortedUsers, onValueChange]);
 
   // Filter and section logic.
-  // When query is empty and showHidden is false: only member+ active users.
-  // When query has content: all users matching the search (filter bypassed).
-  // The currently selected user is always included regardless of filter so
-  // Radix Select can display the trigger value correctly.
+  // When query is empty and showHidden is false: only member+ active users
+  // (plus the currently selected user, so the trigger can render the label).
+  // When query has content: matches by name, but also force-include the
+  // selected user so a non-matching query never unmounts the selected
+  // SelectItem (which would blank the trigger via Radix's portal mechanism).
+  // showHidden=true bypasses the role/status filter entirely.
   const { memberUsers, invitedUsers, guestUsers } = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const isSearching = normalizedQuery.length > 0;
 
     const visibleUsers = isSearching
-      ? sortedUsers.filter((u) =>
-          u.name.toLowerCase().includes(normalizedQuery)
+      ? sortedUsers.filter(
+          (u) =>
+            u.id === selectedId ||
+            u.name.toLowerCase().includes(normalizedQuery)
         )
       : showHidden
         ? sortedUsers

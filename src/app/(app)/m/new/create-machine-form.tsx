@@ -60,31 +60,46 @@ export function CreateMachineForm({
 
   const confirmPromote = (): void => {
     if (!assignee || !formRef.current) return;
+    const form = formRef.current;
     setIsPromoteOpen(false);
 
-    // Inject the hidden forcePromoteUserId field and re-submit
+    // Inject the hidden forcePromoteUserId field and re-submit.
+    // Removing the input synchronously after requestSubmit() races the browser's
+    // FormData serialization (which can happen on a later task). Defer cleanup
+    // to the `formdata` event so the value is guaranteed to be captured.
     const hiddenInput = document.createElement("input");
     hiddenInput.type = "hidden";
     hiddenInput.name = "forcePromoteUserId";
     hiddenInput.value = assignee.id;
-    formRef.current.appendChild(hiddenInput);
-    formRef.current.requestSubmit();
-    formRef.current.removeChild(hiddenInput);
+
+    const cleanup = (): void => {
+      if (hiddenInput.parentNode === form) {
+        form.removeChild(hiddenInput);
+      }
+    };
+
+    form.addEventListener("formdata", cleanup, { once: true });
+    form.appendChild(hiddenInput);
+    form.requestSubmit();
   };
 
   return (
     <>
-      {/* Flash message — suppress ASSIGNEE_NOT_MEMBER since it opens a dialog */}
-      {state && !state.ok && state.code !== "ASSIGNEE_NOT_MEMBER" && (
-        <div
-          className={cn(
-            "mb-6 rounded-md border p-4",
-            "border-destructive/20 bg-destructive/10 text-destructive"
-          )}
-        >
-          <p className="text-sm font-medium">{state.message}</p>
-        </div>
-      )}
+      {/* Flash message — suppress ASSIGNEE_NOT_MEMBER only while the promote
+          dialog is open and handling it. After dismissal (Cancel/Escape) the
+          inline error is shown so the user has guidance on what happened. */}
+      {state &&
+        !state.ok &&
+        (state.code !== "ASSIGNEE_NOT_MEMBER" || !isPromoteOpen) && (
+          <div
+            className={cn(
+              "mb-6 rounded-md border p-4",
+              "border-destructive/20 bg-destructive/10 text-destructive"
+            )}
+          >
+            <p className="text-sm font-medium">{state.message}</p>
+          </div>
+        )}
 
       <form ref={formRef} action={formAction} className="space-y-6">
         {/* Machine Name */}
