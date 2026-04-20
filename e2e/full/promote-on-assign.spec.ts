@@ -101,13 +101,16 @@ test.describe("Promote-on-assign (Create + Update flows)", () => {
     await expect(promoteDialog).toContainText(guestFullName);
     await expect(promoteDialog).toContainText(/(Guest)/);
 
-    // Confirm promotion + assignment (one transaction)
-    await promoteDialog
-      .getByRole("button", { name: /Promote and assign/i })
-      .click();
+    // Confirm promotion + assignment (one transaction).
+    // Wait for the form re-submit to land via Promise.all to avoid races
+    // between the click handler running and Playwright moving on.
+    await Promise.all([
+      page.waitForURL(`**/m/${machineInitials}`, { timeout: 30_000 }),
+      promoteDialog
+        .getByRole("button", { name: /Promote and assign/i })
+        .click(),
+    ]);
 
-    // Machine should be created and we should land on its detail page
-    await expect(page).toHaveURL(`/m/${machineInitials}`);
     await expect(
       page.getByRole("heading", { name: machineName })
     ).toBeVisible();

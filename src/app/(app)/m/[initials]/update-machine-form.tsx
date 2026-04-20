@@ -81,6 +81,12 @@ export function EditMachineDialog({
   const [open, setOpen] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
+  // Hidden form value driven by state so React owns the DOM. When set, the
+  // useEffect below triggers requestSubmit AFTER the input is in the DOM —
+  // avoiding the timing race that imperative DOM injection had.
+  const [forcePromoteUserId, setForcePromoteUserId] = useState<string | null>(
+    null
+  );
   const formRef = useRef<HTMLFormElement>(null);
   const transferConfirmedRef = useRef(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState(
@@ -113,6 +119,15 @@ export function EditMachineDialog({
       setIsPromoteOpen(true);
     }
   }, [state, canEditAnyMachine]);
+
+  // When forcePromoteUserId is set, submit the form (the hidden input is now
+  // rendered in the DOM with the value). Then clear it for the next attempt.
+  useEffect(() => {
+    if (forcePromoteUserId && formRef.current) {
+      formRef.current.requestSubmit();
+      setForcePromoteUserId(null);
+    }
+  }, [forcePromoteUserId]);
 
   // Reset selectedOwnerId when dialog reopens to avoid stale selection
   useEffect(() => {
@@ -160,27 +175,10 @@ export function EditMachineDialog({
 
   const confirmPromote = (): void => {
     if (!assignee || !formRef.current) return;
-    const form = formRef.current;
     setIsPromoteOpen(false);
-
-    // Inject the hidden forcePromoteUserId field and re-submit.
-    // Removing the input synchronously after requestSubmit() races the browser's
-    // FormData serialization (which can happen on a later task). Defer cleanup
-    // to the `formdata` event so the value is guaranteed to be captured.
-    const hiddenInput = document.createElement("input");
-    hiddenInput.type = "hidden";
-    hiddenInput.name = "forcePromoteUserId";
-    hiddenInput.value = assignee.id;
-
-    const cleanup = (): void => {
-      if (hiddenInput.parentNode === form) {
-        form.removeChild(hiddenInput);
-      }
-    };
-
-    form.addEventListener("formdata", cleanup, { once: true });
-    form.appendChild(hiddenInput);
-    form.requestSubmit();
+    // Drive the hidden input via state — the useEffect above submits once the
+    // input is in the DOM, eliminating any race with FormData serialization.
+    setForcePromoteUserId(assignee.id);
   };
 
   return (
@@ -212,6 +210,17 @@ export function EditMachineDialog({
             className="space-y-6"
           >
             <input type="hidden" name="id" value={machine.id} />
+            {/* Persistent hidden input controlled by React for the promote
+                flow. When forcePromoteUserId is non-null, the useEffect
+                above triggers requestSubmit() so the value is always in the
+                DOM by the time the form submits. */}
+            {forcePromoteUserId !== null && (
+              <input
+                type="hidden"
+                name="forcePromoteUserId"
+                value={forcePromoteUserId}
+              />
+            )}
 
             {/* Flash message — suppress ASSIGNEE_NOT_MEMBER only while the
                 promote dialog is open and handling it. After the dialog is
