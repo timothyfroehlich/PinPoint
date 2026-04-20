@@ -141,15 +141,49 @@ async function seedUsersAndData() {
   // 2. Seed Invited Users (for testing invited reporter display)
   console.log("\n👤 Seeding invited users...");
 
-  const invitedGuestUserId = await sql`
-    INSERT INTO invited_users (first_name, last_name, email, role)
-    VALUES ('Invited', 'Guest', 'invited.guest@example.com', 'guest')
-    ON CONFLICT (email) DO UPDATE SET
-      first_name = 'Invited',
-      last_name = 'Guest',
-      role = EXCLUDED.role
-    RETURNING id
-  `.then((rows) => rows[0]?.id);
+  /**
+   * Upsert an invited user and return the resulting id.
+   *
+   * Wrapped in try/catch because the `check_no_demotion_of_invited_owner`
+   * trigger from migration 0028 blocks any UPDATE that demotes a user who
+   * currently owns machines. The trigger cannot distinguish "same role
+   * rewritten" from "genuine demotion", so the ON CONFLICT path can throw
+   * on contaminated preview DBs (e.g. an earlier seed run assigned the
+   * guest-email user as TAF's invited_owner_id, migration 0028 then
+   * auto-promoted them to member, and now `role = EXCLUDED.role` reads as
+   * a demotion). In that case we fall back to the existing row so the
+   * seed can continue — the trigger has already prevented the unsafe
+   * state change, which is the whole point.
+   */
+  async function upsertInvitedUser(firstName, lastName, email, role) {
+    try {
+      const rows = await sql`
+        INSERT INTO invited_users (first_name, last_name, email, role)
+        VALUES (${firstName}, ${lastName}, ${email}, ${role})
+        ON CONFLICT (email) DO UPDATE SET
+          first_name = EXCLUDED.first_name,
+          last_name = EXCLUDED.last_name,
+          role = EXCLUDED.role
+        RETURNING id
+      `;
+      return rows[0]?.id;
+    } catch (err) {
+      console.warn(
+        `⚠️  Upsert of ${email} blocked (likely trigger-protected):`,
+        err.message
+      );
+      const existing =
+        await sql`SELECT id FROM invited_users WHERE email = ${email}`;
+      return existing[0]?.id;
+    }
+  }
+
+  const invitedGuestUserId = await upsertInvitedUser(
+    "Invited",
+    "Guest",
+    "invited.guest@example.com",
+    "guest"
+  );
 
   if (invitedGuestUserId) {
     console.log(
@@ -159,15 +193,12 @@ async function seedUsersAndData() {
     console.warn("⚠️ Could not seed invited guest user");
   }
 
-  const invitedMemberUserId = await sql`
-    INSERT INTO invited_users (first_name, last_name, email, role)
-    VALUES ('Invited', 'Member', 'invited.member@example.com', 'member')
-    ON CONFLICT (email) DO UPDATE SET
-      first_name = 'Invited',
-      last_name = 'Member',
-      role = EXCLUDED.role
-    RETURNING id
-  `.then((rows) => rows[0]?.id);
+  const invitedMemberUserId = await upsertInvitedUser(
+    "Invited",
+    "Member",
+    "invited.member@example.com",
+    "member"
+  );
 
   if (invitedMemberUserId) {
     console.log(
