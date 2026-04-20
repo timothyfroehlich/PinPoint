@@ -10,10 +10,9 @@ import {
   machineWatchers,
 } from "~/server/db/schema";
 import type { IssueWatcher } from "~/lib/types/database";
-import { sendEmail } from "~/lib/email/client";
 import { log } from "~/lib/logger";
-import { isInternalAccount } from "~/lib/auth/internal-accounts";
-import { getEmailHtml, getEmailSubject } from "~/lib/notification-formatting";
+import { getChannels } from "./channels/registry";
+import type { ChannelContext, DeliveryResult } from "./channels/types";
 
 type NotificationPreferences = typeof notificationPreferences.$inferSelect;
 
@@ -190,85 +189,64 @@ export async function createNotification(
     .where(inArray(userProfiles.id, [...recipientIds]));
   const emailMap = new Map(users.map((u) => [u.id, u.email]));
 
-  // 4. Fan out per recipient — behavior preserved, inline for this task.
-  //    (Task 5 replaces this block with a channel registry call.)
+  // 4. Fan-out per recipient using the channel registry.
+  //    See src/lib/notifications/channels/registry.ts.
+  const channels = getChannels();
+
+  // Rows for batched in-app insert (preserves historical single-INSERT).
   const notificationsToInsert: {
     userId: string;
     type: NotificationType;
     resourceId: string;
     resourceType: ResourceType;
   }[] = [];
-  const emailsToSend: { to: string; subject: string; html: string }[] = [];
+
+  // Email dispatch is concurrent via Promise.allSettled so one slow/failed
+  // email doesn't block others (spec: "Promise.allSettled concurrent dispatch
+  // preserved").
+  const emailDeliveries: Promise<DeliveryResult>[] = [];
 
   for (const userId of recipientIds) {
     const prefs =
       (prefsMap.get(userId) as NotificationPreferences | undefined) ??
       buildDefaultPrefs(userId);
 
+    // Cross-channel pre-dispatch rule: skip own actions entirely.
+    // (Spec decision: suppressOwnActions stays at the top of the recipient
+    // loop — it is NOT per-channel.)
     if (actorId && userId === actorId && prefs.suppressOwnActions) {
       continue;
     }
 
-    let emailNotify = false;
-    let inAppNotify = false;
+    const ctx: ChannelContext = {
+      userId,
+      type,
+      resourceId,
+      resourceType,
+      email: emailMap.get(userId) ?? null,
+      issueTitle: resolvedIssueTitle,
+      machineName: resolvedMachineName,
+      formattedIssueId: resolvedFormattedIssueId,
+      commentContent,
+      newStatus,
+      issueDescription,
+      tx,
+    };
 
-    switch (type) {
-      case "issue_assigned":
-        emailNotify = prefs.emailNotifyOnAssigned;
-        inAppNotify = prefs.inAppNotifyOnAssigned;
-        break;
-      case "issue_status_changed":
-        emailNotify = prefs.emailNotifyOnStatusChange;
-        inAppNotify = prefs.inAppNotifyOnStatusChange;
-        break;
-      case "new_comment":
-        emailNotify = prefs.emailNotifyOnNewComment;
-        inAppNotify = prefs.inAppNotifyOnNewComment;
-        break;
-      case "new_issue": {
-        emailNotify =
-          prefs.emailNotifyOnNewIssue || prefs.emailWatchNewIssuesGlobal;
-        inAppNotify =
-          prefs.inAppNotifyOnNewIssue || prefs.inAppWatchNewIssuesGlobal;
-        break;
-      }
-      case "machine_ownership_changed":
-        emailNotify = true;
-        inAppNotify = true;
-        break;
-      case "mentioned":
-        emailNotify = prefs.emailNotifyOnMentioned;
-        inAppNotify = prefs.inAppNotifyOnMentioned;
-        break;
-    }
+    for (const channel of channels) {
+      if (!channel.shouldDeliver(prefs, type)) continue;
 
-    if (prefs.inAppEnabled && inAppNotify) {
-      notificationsToInsert.push({ userId, type, resourceId, resourceType });
-    }
-
-    if (prefs.emailEnabled && emailNotify) {
-      const email = emailMap.get(userId);
-      if (email && !isInternalAccount(email)) {
-        emailsToSend.push({
-          to: email,
-          subject: getEmailSubject(
-            type,
-            resolvedIssueTitle,
-            resolvedMachineName,
-            resolvedFormattedIssueId,
-            newStatus
-          ),
-          html: getEmailHtml({
-            type,
-            issueTitle: resolvedIssueTitle,
-            machineName: resolvedMachineName,
-            formattedIssueId: resolvedFormattedIssueId,
-            commentContent,
-            newStatus,
-            userId,
-            issueDescription,
-          }),
+      if (channel.key === "in_app") {
+        // Batched insert — collect, don't deliver individually.
+        notificationsToInsert.push({
+          userId,
+          type,
+          resourceId,
+          resourceType,
         });
+      } else {
+        // Email (and future Discord): fire-and-forget under allSettled.
+        emailDeliveries.push(channel.deliver(ctx));
       }
     }
   }
@@ -281,14 +259,16 @@ export async function createNotification(
     await tx.insert(notifications).values(notificationsToInsert);
   }
 
-  if (emailsToSend.length > 0) {
-    await Promise.all(
-      emailsToSend.map((email) =>
-        sendEmail(email).catch((err: unknown) => {
-          log.error({ err }, "Failed to send email notification");
-        })
-      )
-    );
+  if (emailDeliveries.length > 0) {
+    const results = await Promise.allSettled(emailDeliveries);
+    for (const r of results) {
+      if (r.status === "rejected") {
+        // Channel.deliver() is expected to catch its own errors and return
+        // {ok:false}. A rejection here means a bug — log at error level.
+        const err: unknown = r.reason;
+        log.error({ err }, "Notification channel delivery rejected");
+      }
+    }
   }
 }
 
