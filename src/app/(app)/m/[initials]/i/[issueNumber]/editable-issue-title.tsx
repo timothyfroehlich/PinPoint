@@ -83,7 +83,7 @@ export function EditableIssueTitle({
     return (
       <h1
         className={cn(
-          "font-extrabold tracking-tight",
+          "text-balance font-extrabold tracking-tight",
           className ?? "text-3xl @3xl:text-4xl"
         )}
         title={title.length > 60 ? title : undefined}
@@ -134,7 +134,7 @@ export function EditableIssueTitle({
     <div className="group/title flex items-center gap-2">
       <h1
         className={cn(
-          "font-extrabold tracking-tight",
+          "text-balance font-extrabold tracking-tight",
           className ?? "text-3xl @3xl:text-4xl"
         )}
         title={title.length > 60 ? title : undefined}

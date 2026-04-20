@@ -50,10 +50,10 @@ export default async function ReportSuccessPage({
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-3">
-            <p className="text-lg text-foreground">
+            <p className="text-pretty text-lg text-foreground">
               Thank you for reporting this issue.
             </p>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="text-pretty text-sm text-muted-foreground leading-relaxed">
               Our maintenance team has been notified. We appreciate your help
               keeping these machines running smoothly for everyone.
             </p>
@@ -61,10 +61,10 @@ export default async function ReportSuccessPage({
 
           {isNewPending && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-left">
-              <h4 className="text-sm font-semibold text-primary mb-1">
+              <h4 className="text-balance text-sm font-semibold text-primary mb-1">
                 Want to track your reports?
               </h4>
-              <p className="text-xs text-muted-foreground mb-3">
+              <p className="text-pretty text-xs text-muted-foreground mb-3">
                 We&apos;ve saved your details. Create a full account to see
                 status updates and manage all your reports in one place.
               </p>

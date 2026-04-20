@@ -12,8 +12,10 @@ export function UserManagementHeader(): React.JSX.Element {
   return (
     <div className="flex items-center justify-between">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">User Management</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-balance text-2xl font-bold tracking-tight">
+          User Management
+        </h2>
+        <p className="text-pretty text-muted-foreground">
           Manage activated and invited users.
         </p>
       </div>

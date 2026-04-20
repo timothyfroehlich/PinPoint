@@ -257,6 +257,14 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 | Issue IDs                  | `font-mono` (e.g., AFM-3)                                                |
 | Machine name in cards      | `text-xs font-medium underline decoration-primary/30 underline-offset-2` |
 
+**Text wrapping (text-balance / text-pretty):**
+
+- `text-balance` on headings that may wrap onto multiple lines (page titles, card titles, dialog titles, hero copy, section headings).
+- `text-pretty` on multi-line body copy that may wrap (card descriptions, alert/dialog descriptions, PageHeader subtitles, auth intro copy, feature descriptions).
+- Skip both for short definitely-single-line labels, table cells, badge/chip labels, and legends.
+
+The shared primitives (`CardTitle`/`CardDescription`, `AlertTitle`/`AlertDescription`, `DialogTitle`/`DialogDescription`, `AlertDialogTitle`/`AlertDialogDescription`, `EmptyState`, `PageHeader`) bake these in by default — call sites rarely need to add them manually.
+
 ## 10. Border & Divider Rules
 
 | Context            | Treatment                              |

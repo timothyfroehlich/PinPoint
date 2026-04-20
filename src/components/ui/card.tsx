@@ -41,7 +41,7 @@ function CardTitle({
   return (
     <h2
       data-slot="card-title"
-      className={cn("leading-none font-semibold", className)}
+      className={cn("text-balance leading-none font-semibold", className)}
       {...props}
     />
   );
@@ -54,7 +54,7 @@ function CardDescription({
   return (
     <div
       data-slot="card-description"
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-pretty text-muted-foreground text-sm", className)}
       {...props}
     />
   );

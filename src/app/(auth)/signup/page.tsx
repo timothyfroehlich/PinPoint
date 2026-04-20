@@ -72,7 +72,7 @@ export default async function SignupPage({
         <CardTitle className="text-2xl font-bold text-foreground">
           Create Account
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-pretty text-sm text-muted-foreground">
           Join PinPoint to report and track issues
         </p>
       </CardHeader>

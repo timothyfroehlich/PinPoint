@@ -35,10 +35,10 @@ export default function LandingPage(): React.JSX.Element {
             />
           </a>
         </div>
-        <h1 className="text-4xl md:text-5xl font-bold text-foreground">
+        <h1 className="text-balance text-4xl md:text-5xl font-bold text-foreground">
           Welcome to PinPoint
         </h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-pretty text-xl text-muted-foreground max-w-2xl mx-auto">
           The issue tracker for the{" "}
           <a
             href="https://austinpinballcollective.org"
@@ -78,10 +78,10 @@ export default function LandingPage(): React.JSX.Element {
             <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
               <Target className="size-6 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold text-foreground">
+            <h3 className="text-balance text-lg font-semibold text-foreground">
               Track Issues
             </h3>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-pretty text-muted-foreground text-sm">
               Report problems with any machine. Track severity, status, and
               priority so fixes happen faster.
             </p>
@@ -93,10 +93,10 @@ export default function LandingPage(): React.JSX.Element {
             <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
               <Wrench className="size-6 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold text-foreground">
+            <h3 className="text-balance text-lg font-semibold text-foreground">
               Stay Informed
             </h3>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-pretty text-muted-foreground text-sm">
               See which machines need attention, which were recently fixed, and
               what&apos;s being worked on.
             </p>
@@ -108,10 +108,10 @@ export default function LandingPage(): React.JSX.Element {
             <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
               <Users className="size-6 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold text-foreground">
+            <h3 className="text-balance text-lg font-semibold text-foreground">
               Community Driven
             </h3>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-pretty text-muted-foreground text-sm">
               Anyone can report issues. Sign up to comment, get notifications,
               and help keep machines in top shape.
             </p>
@@ -121,7 +121,7 @@ export default function LandingPage(): React.JSX.Element {
 
       {/* Secondary CTA - View Dashboard */}
       <section className="text-center pt-4">
-        <p className="text-muted-foreground mb-4">
+        <p className="text-pretty text-muted-foreground mb-4">
           Want to see the full picture?
         </p>
         <Button asChild variant="outline" data-testid="cta-dashboard">

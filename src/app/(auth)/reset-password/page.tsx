@@ -51,7 +51,7 @@ export default async function ResetPasswordPage({
         <CardTitle className="text-2xl font-bold text-foreground">
           Set New Password
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-pretty text-sm text-muted-foreground">
           Enter your new password below
         </p>
       </CardHeader>

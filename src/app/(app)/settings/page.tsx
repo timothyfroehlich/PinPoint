@@ -86,7 +86,9 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
 
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-semibold mb-4">Profile Settings</h2>
+          <h2 className="text-balance text-xl font-semibold mb-4">
+            Profile Settings
+          </h2>
           <ProfileForm
             firstName={profile.firstName}
             lastName={profile.lastName}
@@ -99,7 +101,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
         <Separator />
 
         <div>
-          <h2 className="text-xl font-semibold mb-4">
+          <h2 className="text-balance text-xl font-semibold mb-4">
             Notification Preferences
           </h2>
           {/* CORE-SEC-006: Map to minimal shape, strip userId */}
@@ -128,8 +130,8 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
         <Separator />
 
         <div>
-          <h2 className="text-xl font-semibold mb-4">Security</h2>
-          <p className="text-sm text-muted-foreground mb-4">
+          <h2 className="text-balance text-xl font-semibold mb-4">Security</h2>
+          <p className="text-pretty text-sm text-muted-foreground mb-4">
             Change your account password.
           </p>
           <ChangePasswordSection />
@@ -138,10 +140,10 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
         <Separator />
 
         <div>
-          <h2 className="text-xl font-semibold mb-2 text-destructive">
+          <h2 className="text-balance text-xl font-semibold mb-2 text-destructive">
             Danger Zone
           </h2>
-          <p className="text-sm text-muted-foreground mb-4">
+          <p className="text-pretty text-sm text-muted-foreground mb-4">
             Permanently delete your account and anonymize your contributions.
           </p>
           <DeleteAccountSection
