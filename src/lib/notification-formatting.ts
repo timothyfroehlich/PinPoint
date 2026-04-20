@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import sanitizeHtml from "sanitize-html";
 import { getSiteUrl } from "~/lib/url";
-import { type NotificationType } from "~/lib/notifications";
+import { type NotificationType } from "~/lib/notifications/dispatch";
 
 export function getEmailSubject(
   type: NotificationType,
