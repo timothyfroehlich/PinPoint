@@ -637,6 +637,53 @@ export const machineWatchersRelations = relations(
 );
 
 /**
+ * Discord Integration Config (singleton)
+ *
+ * Stores admin-managed configuration for the Discord bot integration.
+ * Exactly one row (id = 'singleton'), enforced by a CHECK constraint in SQL.
+ *
+ * The bot token is NOT stored in this table — `botTokenVaultId` points to a
+ * Supabase Vault secret. Use `getDiscordConfig()` server accessor to read
+ * the decrypted token via the `get_discord_config()` SECURITY DEFINER RPC.
+ *
+ * RLS: admin role only (see 0028_discord_admin_config.sql).
+ *
+ * Spec: docs/superpowers/specs/2026-04-19-discord-integration-design.md (§ PR 3)
+ */
+export const discordIntegrationConfig = pgTable(
+  "discord_integration_config",
+  {
+    id: text("id").primaryKey().default("singleton"),
+    enabled: boolean("enabled").notNull().default(false),
+    guildId: text("guild_id"),
+    inviteLink: text("invite_link"),
+    // UUID reference to vault.secrets.id — no FK (Drizzle cannot cross-schema)
+    botTokenVaultId: uuid("bot_token_vault_id"),
+    botHealthStatus: text("bot_health_status", {
+      enum: ["unknown", "healthy", "degraded"],
+    })
+      .notNull()
+      .default("unknown"),
+    lastBotCheckAt: timestamp("last_bot_check_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // UUID reference to auth.users.id — no FK (Drizzle cannot cross-schema)
+    updatedBy: uuid("updated_by"),
+  },
+  (_t) => ({
+    singletonCheck: check(
+      "discord_integration_config_singleton",
+      sql`id = 'singleton'`
+    ),
+    healthStatusCheck: check(
+      "discord_integration_config_health_check",
+      sql`bot_health_status IN ('unknown', 'healthy', 'degraded')`
+    ),
+  })
+);
+
+/**
  * Type exports
  */
 export type IssueImage = typeof issueImages.$inferSelect;
