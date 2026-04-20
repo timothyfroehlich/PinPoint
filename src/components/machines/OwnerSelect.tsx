@@ -1,29 +1,34 @@
 "use client";
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
-import { Label } from "~/components/ui/label";
-import { Button } from "~/components/ui/button";
-
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useMemo } from "react";
+import { ChevronsUpDown, Plus } from "lucide-react";
 import type { UserStatus } from "~/lib/types";
 import { InviteUserDialog } from "~/components/users/InviteUserDialog";
-import { Plus } from "lucide-react";
 import { compareUnifiedUsers } from "~/lib/users/comparators";
+import { Button } from "~/components/ui/button";
+import { Label } from "~/components/ui/label";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "~/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover";
 
 /**
  * OwnerSelect — Single-select dropdown for assigning a machine owner.
  *
  * ## Pattern
- * Standard `<Select>` with an inline "Invite New" button that opens an
- * `<InviteUserDialog>`. After a user is invited, the new user is
- * optimistically added to the list and auto-selected via a pending
- * selection ref that fires once the `users` prop updates.
+ * Popover + Command (cmdk) dropdown with built-in search. An "Invite New"
+ * button opens an `<InviteUserDialog>`; on invite-success the new user is
+ * immediately added to the list and selected.
  *
  * ## Composition
  * - Users are sorted by `compareUnifiedUsers` (confirmed first, by machine
@@ -35,12 +40,10 @@ import { compareUnifiedUsers } from "~/lib/users/comparators";
  *
  * ## Key Abstractions
  * - `OwnerSelectUser` includes `machineCount` and `status` for metadata display
- * - `pendingSelectionRef` handles the async flow: invite dialog closes ->
- *   parent updates users -> effect detects the new user and selects them
+ * - A hidden `<input type="hidden">` preserves native form submission compat
  * - `compareUnifiedUsers` from `~/lib/users/comparators` drives sort order
- * - The help text below the select explains the notification implication of
- *   owner assignment
  */
+
 /** Minimal user shape for owner selection (CORE-SEC-006) */
 export interface OwnerSelectUser {
   id: string;
@@ -65,36 +68,33 @@ export function OwnerSelect({
   onUsersChange,
   onValueChange,
 }: OwnerSelectProps): React.JSX.Element {
+  const [open, setOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(defaultValue ?? "");
 
-  // Ref to track pending user ID to select after users list updates
-  const pendingSelectionRef = useRef<string | null>(null);
-
-  // Effect to apply pending selection after users list is updated
-  useEffect(() => {
-    if (pendingSelectionRef.current) {
-      const pendingId = pendingSelectionRef.current;
-      // Check if the pending ID now exists in the users list
-      if (users.some((u) => u.id === pendingId)) {
-        setSelectedId(pendingId);
-        onValueChange?.(pendingId);
-        pendingSelectionRef.current = null;
-      }
-    }
-  }, [users, onValueChange]);
-
-  // Re-sort users after client-side mutations (e.g., inviting a new user)
-  // to maintain consistent ordering: confirmed first, by machine count desc, then by last name
   const sortedUsers = useMemo(
     () => [...users].sort(compareUnifiedUsers),
     [users]
   );
 
+  const selectedUser = useMemo(
+    () => users.find((u) => u.id === selectedId) ?? null,
+    [users, selectedId]
+  );
+
+  const handleSelect = (userId: string): void => {
+    setSelectedId(userId);
+    onValueChange?.(userId);
+    setOpen(false);
+  };
+
   return (
     <div className="space-y-2">
+      {/* Hidden input for native form submission — server actions read formData.get("ownerId") */}
+      <input type="hidden" name="ownerId" value={selectedId} />
+
       <div className="flex items-center justify-between">
-        <Label htmlFor="ownerId" className="text-foreground">
+        <Label htmlFor="owner-trigger" className="text-foreground">
           Machine Owner
         </Label>
         {!disabled && (
@@ -110,43 +110,77 @@ export function OwnerSelect({
           </Button>
         )}
       </div>
-      <Select
-        name="ownerId"
-        value={selectedId}
-        onValueChange={(value) => {
-          setSelectedId(value);
-          onValueChange?.(value);
-        }}
-        disabled={!!disabled}
-      >
-        <SelectTrigger
-          id="ownerId"
-          className="border-outline bg-surface text-foreground"
-          aria-describedby="owner-help"
-          data-testid="owner-select"
+
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            id="owner-trigger"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            aria-describedby="owner-help"
+            disabled={!!disabled}
+            data-testid="owner-select"
+            className="w-full justify-between border-outline bg-surface text-foreground font-normal"
+          >
+            <span
+              className={
+                selectedUser ? "text-foreground" : "text-muted-foreground"
+              }
+            >
+              {selectedUser ? selectedUser.name : "Select an owner"}
+            </span>
+            <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          className="w-(--radix-popover-trigger-width) p-0"
+          align="start"
         >
-          <SelectValue placeholder="Select an owner" />
-        </SelectTrigger>
-        <SelectContent>
-          {sortedUsers.map((user) => (
-            <SelectItem key={user.id} value={user.id}>
-              <div className="flex items-center gap-2">
-                <span>{user.name}</span>
-                {user.machineCount > 0 && (
-                  <span className="text-[10px] text-muted-foreground/70">
-                    ({user.machineCount})
-                  </span>
-                )}
-                {user.status === "invited" && (
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                    (Invited)
-                  </span>
-                )}
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          <Command>
+            <CommandInput placeholder="Search users..." />
+            <CommandList>
+              <CommandEmpty>No users found.</CommandEmpty>
+              <CommandGroup>
+                {sortedUsers.map((user) => (
+                  <CommandItem
+                    key={user.id}
+                    value={user.name}
+                    onSelect={() => handleSelect(user.id)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{user.name}</span>
+                      {user.machineCount > 0 && (
+                        <span className="text-[10px] text-muted-foreground/70">
+                          ({user.machineCount})
+                        </span>
+                      )}
+                      {user.status === "invited" && (
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                          (Invited)
+                        </span>
+                      )}
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+              <CommandSeparator />
+              <CommandGroup>
+                <CommandItem
+                  onSelect={() => {
+                    setOpen(false);
+                    setInviteDialogOpen(true);
+                  }}
+                >
+                  <Plus className="mr-1 size-4" />
+                  Invite new user
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
       <p id="owner-help" className="text-xs text-muted-foreground">
         The owner receives notifications for new issues on this machine.
       </p>
@@ -155,12 +189,12 @@ export function OwnerSelect({
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
         onSuccess={(newUserId, newUser) => {
-          // Store the pending selection - it will be applied after users list updates
-          pendingSelectionRef.current = newUserId;
-          // Add the new user to the list immediately (no server refresh needed)
+          // Immediately add the new user and select them
           if (onUsersChange) {
             onUsersChange([...users, newUser]);
           }
+          setSelectedId(newUserId);
+          onValueChange?.(newUserId);
         }}
       />
     </div>
