@@ -3,23 +3,28 @@
 import React from "react";
 import { cn } from "~/lib/utils";
 import { Loader2, User } from "lucide-react";
-import { Command, CommandInput, CommandList } from "~/components/ui/command";
+import {
+  Command,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "~/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
-import { Separator } from "~/components/ui/separator";
 
 /**
  * AssigneePicker — Dropdown for assigning a user to an issue.
  *
  * ## Pattern
  * Popover + Command (cmdk) with manual search filtering. We use `Command` +
- * `CommandInput` + `CommandList` for the wrapper and search input, then render
- * items as plain `[role="option"]` divs so we can fully control `aria-selected`
- * based on the current `assignedToId` (not cmdk's keyboard focus state).
- * Radix Popover handles click-outside and focus management.
+ * `CommandInput` + `CommandList` + `CommandItem` for full cmdk keyboard navigation.
+ * `shouldFilter={false}` lets us filter manually so "Me" and "Unassigned" stay
+ * visible regardless of query. Radix Popover handles click-outside and focus management.
  *
  * ## Composition
  * - Trigger button shows the selected user's avatar initial + name, or "Unassigned"
@@ -50,14 +55,6 @@ interface AssigneePickerProps {
   disabledReason?: string | null;
   currentUserId?: string | null;
 }
-
-/** Shared option row styles — matches CommandItem visual style */
-const optionClass = cn(
-  "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm cursor-default select-none",
-  "hover:bg-accent hover:text-accent-foreground",
-  "aria-selected:bg-accent aria-selected:text-accent-foreground",
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-);
 
 export function AssigneePicker({
   assignedToId,
@@ -180,8 +177,7 @@ export function AssigneePicker({
         {/*
          * shouldFilter={false}: we manage filtering manually so that "Me" and
          * "Unassigned" remain visible regardless of the search query.
-         * Items are rendered as <button type="button" role="option"> elements so we
-         * can control aria-selected based on assignedToId (not cmdk keyboard focus).
+         * CommandItems use onSelect for both click and keyboard (Enter) activation.
          */}
         <Command shouldFilter={false}>
           <CommandInput
@@ -192,50 +188,49 @@ export function AssigneePicker({
             onValueChange={setQuery}
           />
           <CommandList aria-label="Assignee options">
-            <div className="p-1 space-y-0.5">
-              {/* "Me" quick-select — shown only when the current user is in the list */}
+            {/* Quick-selects group: "Me" (if current user present) + "Unassigned" */}
+            <CommandGroup>
               {currentUser ? (
-                <button
-                  type="button"
-                  className={optionClass}
-                  onClick={() => handleSelect(currentUser.id)}
+                <CommandItem
+                  value={`me-${currentUser.id}`}
+                  onSelect={() => handleSelect(currentUser.id)}
                   data-testid="assignee-option-me"
-                  role="option"
+                  data-assigned={assignedToId === currentUser.id}
                   aria-selected={assignedToId === currentUser.id}
                 >
                   <User className="size-6 shrink-0 p-0.5 text-primary" />
                   <span className="font-medium text-primary">Me</span>
-                </button>
+                </CommandItem>
               ) : null}
-              <button
-                type="button"
-                className={optionClass}
-                onClick={() => handleSelect(null)}
+              <CommandItem
+                value="unassigned"
+                onSelect={() => handleSelect(null)}
                 data-testid="assignee-option-unassigned"
-                role="option"
+                data-assigned={assignedToId === null}
                 aria-selected={assignedToId === null}
               >
                 <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
                   ?
                 </div>
                 <span className="font-medium">Unassigned</span>
-              </button>
-              {/* Separator between quick-selects and alphabetical user list */}
-              {currentUser ? <Separator className="my-1" /> : null}
-              {/* Alphabetical user list — manually filtered by query */}
+              </CommandItem>
+            </CommandGroup>
+            {/* Separator between quick-selects and alphabetical user list */}
+            {currentUser ? <CommandSeparator /> : null}
+            {/* Alphabetical user list — manually filtered by query */}
+            <CommandGroup>
               {filteredUsers.length === 0 ? (
                 <p className="px-2 py-1.5 text-xs text-muted-foreground">
                   No matches found
                 </p>
               ) : (
                 filteredUsers.map((user) => (
-                  <button
-                    type="button"
+                  <CommandItem
                     key={user.id}
-                    className={optionClass}
-                    onClick={() => handleSelect(user.id)}
+                    value={user.id}
+                    onSelect={() => handleSelect(user.id)}
                     data-testid={`assignee-option-${user.id}`}
-                    role="option"
+                    data-assigned={user.id === assignedToId}
                     aria-selected={user.id === assignedToId}
                   >
                     <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
@@ -246,10 +241,10 @@ export function AssigneePicker({
                         {user.name}
                       </span>
                     </div>
-                  </button>
+                  </CommandItem>
                 ))
               )}
-            </div>
+            </CommandGroup>
           </CommandList>
         </Command>
       </PopoverContent>

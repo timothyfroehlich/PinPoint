@@ -54,15 +54,17 @@ describe("AssigneePicker Accessibility", () => {
 
     const unassignedOption = screen.getByTestId("assignee-option-unassigned");
     expect(unassignedOption).toHaveAttribute("role", "option");
-    expect(unassignedOption).toHaveAttribute("aria-selected", "false");
+    // data-assigned tracks the currently assigned user (distinct from cmdk's
+    // aria-selected which reflects keyboard highlight state)
+    expect(unassignedOption).toHaveAttribute("data-assigned", "false");
 
     const aliceOption = screen.getByTestId("assignee-option-1");
     expect(aliceOption).toHaveAttribute("role", "option");
-    expect(aliceOption).toHaveAttribute("aria-selected", "true");
+    expect(aliceOption).toHaveAttribute("data-assigned", "true");
 
     const bobOption = screen.getByTestId("assignee-option-2");
     expect(bobOption).toHaveAttribute("role", "option");
-    expect(bobOption).toHaveAttribute("aria-selected", "false");
+    expect(bobOption).toHaveAttribute("data-assigned", "false");
   });
 
   it("renders loading state with accessible attributes", () => {
@@ -197,7 +199,7 @@ describe("AssigneePicker — Me quick-select", () => {
     fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
 
     const meOption = screen.getByTestId("assignee-option-me");
-    expect(meOption).toHaveAttribute("aria-selected", "true");
+    expect(meOption).toHaveAttribute("data-assigned", "true");
   });
 
   it("does NOT show 'Me' when currentUserId does not match any user in the list", () => {

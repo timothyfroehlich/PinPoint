@@ -71,15 +71,24 @@ export function OwnerSelect({
   const [open, setOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(defaultValue ?? "");
+  // Local extra users added via invite when parent doesn't provide onUsersChange
+  const [extraUsers, setExtraUsers] = useState<OwnerSelectUser[]>([]);
+
+  // Merged user list: prop users + locally-tracked invited users (deduped)
+  const allUsers = useMemo(() => {
+    if (extraUsers.length === 0) return users;
+    const knownIds = new Set(users.map((u) => u.id));
+    return [...users, ...extraUsers.filter((u) => !knownIds.has(u.id))];
+  }, [users, extraUsers]);
 
   const sortedUsers = useMemo(
-    () => [...users].sort(compareUnifiedUsers),
-    [users]
+    () => [...allUsers].sort(compareUnifiedUsers),
+    [allUsers]
   );
 
   const selectedUser = useMemo(
-    () => users.find((u) => u.id === selectedId) ?? null,
-    [users, selectedId]
+    () => allUsers.find((u) => u.id === selectedId) ?? null,
+    [allUsers, selectedId]
   );
 
   const handleSelect = (userId: string): void => {
@@ -190,9 +199,12 @@ export function OwnerSelect({
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
         onSuccess={(newUserId, newUser) => {
-          // Immediately add the new user and select them
+          // Propagate to parent if callback provided; otherwise track locally so
+          // the new user appears in the list and can be re-selected.
           if (onUsersChange) {
             onUsersChange([...users, newUser]);
+          } else {
+            setExtraUsers((prev) => [...prev, newUser]);
           }
           setSelectedId(newUserId);
           onValueChange?.(newUserId);
