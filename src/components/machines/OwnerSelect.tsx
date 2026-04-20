@@ -138,7 +138,18 @@ export function OwnerSelect({
                 selectedUser ? "text-foreground" : "text-muted-foreground"
               }
             >
-              {selectedUser ? selectedUser.name : "Select an owner"}
+              {selectedUser ? (
+                <>
+                  {selectedUser.name}
+                  {selectedUser.status === "invited" && (
+                    <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                      (Invited)
+                    </span>
+                  )}
+                </>
+              ) : (
+                "Select an owner"
+              )}
             </span>
             <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
           </Button>
