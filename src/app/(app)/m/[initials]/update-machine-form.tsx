@@ -81,18 +81,16 @@ export function EditMachineDialog({
   const [open, setOpen] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
-  // Hidden form value driven by state so React owns the DOM. When set, the
-  // useEffect below triggers requestSubmit AFTER the input is in the DOM —
-  // avoiding the timing race that imperative DOM injection had.
-  const [forcePromoteUserId, setForcePromoteUserId] = useState<string | null>(
-    null
-  );
   const formRef = useRef<HTMLFormElement>(null);
   const transferConfirmedRef = useRef(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState(
     machine.ownerId ?? machine.invitedOwnerId ?? ""
   );
   const currentOwnerId = machine.ownerId ?? machine.invitedOwnerId ?? "";
+  // Stable per-instance form id so the promote-dialog submit button can use
+  // form="..." to associate with the form even when Radix portals it
+  // outside the DOM tree of the form.
+  const formId = `edit-machine-form-${machine.id}`;
 
   const [state, formAction, isPending] = useActionState<
     UpdateMachineResult | undefined,
@@ -119,15 +117,6 @@ export function EditMachineDialog({
       setIsPromoteOpen(true);
     }
   }, [state, canEditAnyMachine]);
-
-  // When forcePromoteUserId is set, submit the form (the hidden input is now
-  // rendered in the DOM with the value). Then clear it for the next attempt.
-  useEffect(() => {
-    if (forcePromoteUserId && formRef.current) {
-      formRef.current.requestSubmit();
-      setForcePromoteUserId(null);
-    }
-  }, [forcePromoteUserId]);
 
   // Reset selectedOwnerId when dialog reopens to avoid stale selection
   useEffect(() => {
@@ -173,14 +162,6 @@ export function EditMachineDialog({
       ? state.meta?.assignee
       : undefined;
 
-  const confirmPromote = (): void => {
-    if (!assignee || !formRef.current) return;
-    setIsPromoteOpen(false);
-    // Drive the hidden input via state — the useEffect above submits once the
-    // input is in the DOM, eliminating any race with FormData serialization.
-    setForcePromoteUserId(assignee.id);
-  };
-
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -205,22 +186,12 @@ export function EditMachineDialog({
 
           <form
             ref={formRef}
+            id={formId}
             action={formAction}
             onSubmit={handleSubmit}
             className="space-y-6"
           >
             <input type="hidden" name="id" value={machine.id} />
-            {/* Persistent hidden input controlled by React for the promote
-                flow. When forcePromoteUserId is non-null, the useEffect
-                above triggers requestSubmit() so the value is always in the
-                DOM by the time the form submits. */}
-            {forcePromoteUserId !== null && (
-              <input
-                type="hidden"
-                name="forcePromoteUserId"
-                value={forcePromoteUserId}
-              />
-            )}
 
             {/* Flash message — suppress ASSIGNEE_NOT_MEMBER only while the
                 promote dialog is open and handling it. After the dialog is
@@ -420,10 +391,28 @@ export function EditMachineDialog({
               </Alert>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsPromoteOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsPromoteOpen(false);
+                }}
+              >
                 Cancel
               </Button>
-              <Button onClick={confirmPromote}>Promote and assign</Button>
+              <Button
+                type="submit"
+                form={formId}
+                name="forcePromoteUserId"
+                value={assignee.id}
+                onClick={() => {
+                  // Close the dialog after the click. The native submit fires
+                  // first, capturing forcePromoteUserId before unmount.
+                  setIsPromoteOpen(false);
+                }}
+              >
+                Promote and assign
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "~/components/ui/button";
@@ -43,13 +43,6 @@ export function CreateMachineForm({
   // Lift users state to client so we can append new users without full refresh
   const [users, setUsers] = useState<OwnerSelectUser[]>(allUsers);
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
-  // Hidden form value driven by state so React owns the DOM. When set, the
-  // useEffect below triggers requestSubmit AFTER the input is in the DOM —
-  // avoiding the timing race that imperative DOM injection had.
-  const [forcePromoteUserId, setForcePromoteUserId] = useState<string | null>(
-    null
-  );
-  const formRef = useRef<HTMLFormElement>(null);
 
   // Open promote dialog when server returns ASSIGNEE_NOT_MEMBER
   useEffect(() => {
@@ -58,28 +51,11 @@ export function CreateMachineForm({
     }
   }, [state]);
 
-  // When forcePromoteUserId is set, submit the form (the hidden input is now
-  // rendered in the DOM with the value). Then clear it for the next attempt.
-  useEffect(() => {
-    if (forcePromoteUserId && formRef.current) {
-      formRef.current.requestSubmit();
-      setForcePromoteUserId(null);
-    }
-  }, [forcePromoteUserId]);
-
   // Assignee from ASSIGNEE_NOT_MEMBER result
   const assignee =
     state && !state.ok && state.code === "ASSIGNEE_NOT_MEMBER"
       ? state.meta?.assignee
       : undefined;
-
-  const confirmPromote = (): void => {
-    if (!assignee || !formRef.current) return;
-    setIsPromoteOpen(false);
-    // Drive the hidden input via state — the useEffect above submits once the
-    // input is in the DOM, eliminating any race with FormData serialization.
-    setForcePromoteUserId(assignee.id);
-  };
 
   return (
     <>
@@ -99,18 +75,7 @@ export function CreateMachineForm({
           </div>
         )}
 
-      <form ref={formRef} action={formAction} className="space-y-6">
-        {/* Persistent hidden input controlled by React. When forcePromoteUserId
-            is non-null, the useEffect above will trigger requestSubmit() so the
-            value is always in the DOM by the time the form submits. */}
-        {forcePromoteUserId !== null && (
-          <input
-            type="hidden"
-            name="forcePromoteUserId"
-            value={forcePromoteUserId}
-          />
-        )}
-
+      <form id="create-machine-form" action={formAction} className="space-y-6">
         {/* Machine Name */}
         <div className="space-y-2">
           <Label htmlFor="name" className="text-foreground">
@@ -181,7 +146,15 @@ export function CreateMachineForm({
         </div>
       </form>
 
-      {/* Promote guest to member confirmation */}
+      {/*
+       * Promote-on-assign dialog. The "Promote and assign" button uses the
+       * `form="create-machine-form"` attribute to associate with the form
+       * even though Radix Dialog portals it outside the form's DOM tree.
+       * `name`/`value` on the submit button injects forcePromoteUserId into
+       * the submitted FormData — natively, no requestSubmit() needed. This
+       * sidesteps the React server-action submit-interception race that
+       * affected programmatic requestSubmit() from a closing dialog.
+       */}
       {assignee && (
         <Dialog
           open={isPromoteOpen}
@@ -221,10 +194,28 @@ export function CreateMachineForm({
               </Alert>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsPromoteOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsPromoteOpen(false);
+                }}
+              >
                 Cancel
               </Button>
-              <Button onClick={confirmPromote}>Promote and assign</Button>
+              <Button
+                type="submit"
+                form="create-machine-form"
+                name="forcePromoteUserId"
+                value={assignee.id}
+                onClick={() => {
+                  // Close the dialog after the click. The native submit fires
+                  // first, capturing forcePromoteUserId before unmount.
+                  setIsPromoteOpen(false);
+                }}
+              >
+                Promote and assign
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
