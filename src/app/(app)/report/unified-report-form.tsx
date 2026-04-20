@@ -313,7 +313,7 @@ export function UnifiedReportForm({
                     );
                   }
                 }}
-                className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors duration-150"
+                className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-[color,background-color,border-color,box-shadow] duration-150"
               >
                 <option value="" disabled>
                   Select a machine...
@@ -441,7 +441,7 @@ export function UnifiedReportForm({
                   data-testid="assigned-to-select"
                   value={assignedTo}
                   onChange={(e) => setAssignedTo(e.target.value)}
-                  className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors duration-150"
+                  className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-[color,background-color,border-color,box-shadow] duration-150"
                 >
                   <option value="">Unassigned</option>
                   {assignees.map((assignee) => (
