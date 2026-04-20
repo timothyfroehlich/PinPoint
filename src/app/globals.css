@@ -6,7 +6,7 @@
   --color-background: #0f0f11; /* Even darker for more contrast */
   --color-foreground: #f8fafc;
 
-  /* Card & Surface - Slightly lighter charcoal with a hint of purple */
+  /* Card & Surface - Slightly lighter charcoal */
   --color-card: #18151b;
   --color-card-foreground: #f8fafc;
   --color-popover: #18151b;
@@ -16,22 +16,24 @@
   --color-primary: #4ade80;
   --color-primary-foreground: #022c22;
 
-  /* Secondary / Accents - Electric Purple */
-  --color-secondary: #d946ef; /* More intense magenta/purple */
-  --color-secondary-foreground: #ffffff;
+  /* Secondary / Accents - Teal (tight green-family pairing with the APC primary) */
+  --color-secondary: #2dd4bf; /* teal-400 */
+  --color-secondary-foreground: #042f2e; /* teal-950 */
   --color-muted: #27272a;
   --color-muted-foreground: #a1a1aa;
 
   /* Accents & Status */
   --color-accent: #27272a;
   --color-accent-foreground: #f8fafc;
-  --color-destructive: #ef4444;
+  --color-destructive: #dc2626; /* red-600 — white on red-500 failed AA (~3.8:1); red-600 passes (~5.3:1) */
   --color-destructive-foreground: #ffffff;
 
   /* Status Specific */
   --color-status-new: #4ade80;
-  --color-status-in-progress: #d946ef;
-  --color-status-unplayable: #ef4444;
+  --color-status-in-progress: #0ea5e9; /* sky-500 — non-palette, aligned with STATUS_CONFIG.in_progress border/bg family */
+  --color-status-unplayable: var(
+    --color-destructive
+  ); /* aliased to keep the three destructive-ish reds in sync */
 
   /* Semantic Status Colors */
   --color-success: #22c55e;
@@ -44,15 +46,17 @@
   --color-warning-container: #713f12;
   --color-on-warning-container: #fef9c3;
 
-  --color-error: #ef4444;
-  --color-error-foreground: #ffffff;
+  --color-error: var(--color-destructive); /* aliased so drift is impossible */
+  --color-error-foreground: var(--color-destructive-foreground);
   --color-error-container: #7f1d1d;
   --color-on-error-container: #fee2e2;
 
   /* Borders & Inputs */
   --color-border: #27272a;
   --color-input: #27272a;
-  --color-ring: #4ade80;
+  --color-ring: var(
+    --color-foreground
+  ); /* was primary green — same color as primary-button fill made focus invisible */
 
   /* Extended Surface Palette */
   --color-surface: #0f0f11;
@@ -62,11 +66,11 @@
   --color-on-surface: #f8fafc;
   --color-on-surface-variant: #a1a1aa;
   --color-on-primary: #022c22;
-  --color-on-secondary: #ffffff;
+  --color-on-secondary: #042f2e; /* teal-950 — matches --color-secondary-foreground */
   --color-primary-container: #14532d;
   --color-on-primary-container: #dcfce7;
-  --color-secondary-container: #581c87;
-  --color-on-secondary-container: #f3e8ff;
+  --color-secondary-container: #115e59; /* teal-800 */
+  --color-on-secondary-container: #ccfbf1; /* teal-100 */
 
   /* Radius */
   --radius: 0.5rem;

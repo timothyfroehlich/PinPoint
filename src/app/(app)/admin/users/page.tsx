@@ -48,12 +48,18 @@ function UserRow({
       </TableCell>
       <TableCell className="w-[150px]">
         {user.status === "active" ? (
-          <Badge className="bg-success-container text-on-success-container">
+          <Badge
+            variant="outline"
+            className="border-success/40 bg-success/15 text-success"
+          >
             Active
           </Badge>
         ) : (
           <div className="flex flex-col gap-1">
-            <Badge className="bg-warning-container text-on-warning-container">
+            <Badge
+              variant="outline"
+              className="border-warning/40 bg-warning/15 text-warning"
+            >
               Invited
             </Badge>
             {user.inviteSentAt && (
