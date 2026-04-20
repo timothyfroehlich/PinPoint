@@ -141,23 +141,79 @@ async function seedUsersAndData() {
   // 2. Seed Invited Users (for testing invited reporter display)
   console.log("\n👤 Seeding invited users...");
 
-  const invitedUserId = await sql`
-    INSERT INTO invited_users (first_name, last_name, email, role)
-    VALUES ('Jane', 'Doe', 'jane.doe@example.com', 'member')
-    ON CONFLICT (email) DO UPDATE SET
-      first_name = 'Jane',
-      last_name = 'Doe',
-      role = 'member'
-    RETURNING id
-  `.then((rows) => rows[0]?.id);
+  /**
+   * Upsert an invited user and return the resulting id.
+   *
+   * Wrapped in try/catch because the `check_no_demotion_of_invited_owner`
+   * trigger from migration 0028 blocks any UPDATE that demotes a user who
+   * currently owns machines. The trigger cannot distinguish "same role
+   * rewritten" from "genuine demotion", so the ON CONFLICT path can throw
+   * on contaminated preview DBs (e.g. an earlier seed run assigned the
+   * guest-email user as TAF's invited_owner_id, migration 0028 then
+   * auto-promoted them to member, and now `role = EXCLUDED.role` reads as
+   * a demotion). In that case we fall back to the existing row so the
+   * seed can continue — the trigger has already prevented the unsafe
+   * state change, which is the whole point.
+   */
+  async function upsertInvitedUser(firstName, lastName, email, role) {
+    try {
+      const rows = await sql`
+        INSERT INTO invited_users (first_name, last_name, email, role)
+        VALUES (${firstName}, ${lastName}, ${email}, ${role})
+        ON CONFLICT (email) DO UPDATE SET
+          first_name = EXCLUDED.first_name,
+          last_name = EXCLUDED.last_name,
+          role = EXCLUDED.role
+        RETURNING id
+      `;
+      return rows[0]?.id;
+    } catch (err) {
+      console.warn(
+        `⚠️  Upsert of ${email} blocked (likely trigger-protected):`,
+        err.message
+      );
+      const existing =
+        await sql`SELECT id FROM invited_users WHERE email = ${email}`;
+      return existing[0]?.id;
+    }
+  }
 
-  if (invitedUserId) {
+  const invitedGuestUserId = await upsertInvitedUser(
+    "Invited",
+    "Guest",
+    "invited.guest@example.com",
+    "guest"
+  );
+
+  if (invitedGuestUserId) {
     console.log(
-      `✅ Invited user seeded: jane.doe@example.com (ID: ${invitedUserId})`
+      `✅ Invited user seeded: invited.guest@example.com (ID: ${invitedGuestUserId})`
     );
   } else {
-    console.warn("⚠️ Could not seed invited user");
+    console.warn("⚠️ Could not seed invited guest user");
   }
+
+  const invitedMemberUserId = await upsertInvitedUser(
+    "Invited",
+    "Member",
+    "invited.member@example.com",
+    "member"
+  );
+
+  if (invitedMemberUserId) {
+    console.log(
+      `✅ Invited user seeded: invited.member@example.com (ID: ${invitedMemberUserId})`
+    );
+  } else {
+    console.warn("⚠️ Could not seed invited member user");
+  }
+
+  // Alias kept so existing references continue to link to the guest-role
+  // invited user for reporter-style fields (e.g. TAF Issue 2's
+  // invited_reporter_id). Machine ownership below uses invitedMemberUserId
+  // directly because the DB trigger from migration 0027
+  // (machine_owner_member_invariant) enforces member+ for invited_owner_id.
+  const invitedUserId = invitedGuestUserId;
 
   // 3. Seed Machines (Distributed ownership)
   if (userIds.admin) {
@@ -174,21 +230,22 @@ async function seedUsersAndData() {
     // They are now assigned to the member user because machine owners must be member+
     // (enforced by the DB trigger from migration 0027_machine_owner_member_invariant).
     const ownerMap = {
-      "HD": userIds.admin,
-      "SC": userIds.member,
-      "FB": userIds.member,
-      "BK": userIds.admin,
-      "EBD": userIds.member,
-      "TAF": null, // Will use invited owner
-      "AFM": userIds.member,
-      "MM": userIds.admin,
-      "SM": userIds.member,
-      "GDZ": userIds.admin,
+      HD: userIds.admin,
+      SC: userIds.member,
+      FB: userIds.member,
+      BK: userIds.admin,
+      EBD: userIds.member,
+      TAF: null, // Will use invited owner
+      AFM: userIds.member,
+      MM: userIds.admin,
+      SM: userIds.member,
+      GDZ: userIds.admin,
     };
 
     for (const machine of machines) {
       const ownerId = ownerMap[machine.initials];
-      const invitedOwnerId = machine.initials === "TAF" ? invitedUserId : null;
+      const invitedOwnerId =
+        machine.initials === "TAF" ? invitedMemberUserId : null;
 
       await sql`
         INSERT INTO machines (id, name, initials, owner_id, invited_owner_id, created_at, updated_at)
@@ -519,19 +576,25 @@ async function seedUsersAndData() {
         "10000000-0000-4000-8000-000000000002": [
           {
             author: userIds.admin,
-            content: "Confirmed. Will need to disassemble the score motor assembly.",
+            content:
+              "Confirmed. Will need to disassemble the score motor assembly.",
             isSystem: false,
             daysAgo: 3,
           },
           {
             author: userIds.admin,
             isSystem: true,
-            eventData: { type: "status_changed", from: "new", to: "in_progress" },
+            eventData: {
+              type: "status_changed",
+              from: "new",
+              to: "in_progress",
+            },
             daysAgo: 2.5,
           },
           {
             author: userIds.member,
-            content: "Found the issue - linkage arm needs adjustment. Working on it now.",
+            content:
+              "Found the issue - linkage arm needs adjustment. Working on it now.",
             isSystem: false,
             daysAgo: 1,
           },
@@ -540,13 +603,15 @@ async function seedUsersAndData() {
         "10000000-0000-4000-8000-000000000004": [
           {
             author: userIds.admin,
-            content: "This is a known issue with Fireball. The zipper flippers use a complex relay system.",
+            content:
+              "This is a known issue with Fireball. The zipper flippers use a complex relay system.",
             isSystem: false,
             daysAgo: 5,
           },
           {
             author: userIds.guest,
-            content: "Happens about 1 in 5 balls. Very frustrating during tournament play.",
+            content:
+              "Happens about 1 in 5 balls. Very frustrating during tournament play.",
             isSystem: false,
             daysAgo: 4,
           },
@@ -567,7 +632,8 @@ async function seedUsersAndData() {
         "10000000-0000-4000-8000-000000000008": [
           {
             author: userIds.member,
-            content: "Opened up the playfield. The 8-ball target solenoid is binding.",
+            content:
+              "Opened up the playfield. The 8-ball target solenoid is binding.",
             isSystem: false,
             daysAgo: 2,
           },
@@ -580,7 +646,11 @@ async function seedUsersAndData() {
           {
             author: userIds.admin,
             isSystem: true,
-            eventData: { type: "status_changed", from: "new", to: "in_progress" },
+            eventData: {
+              type: "status_changed",
+              from: "new",
+              to: "in_progress",
+            },
             daysAgo: 1,
           },
         ],
@@ -610,7 +680,11 @@ async function seedUsersAndData() {
           {
             author: userIds.admin,
             isSystem: true,
-            eventData: { type: "status_changed", from: "new", to: "in_progress" },
+            eventData: {
+              type: "status_changed",
+              from: "new",
+              to: "in_progress",
+            },
             daysAgo: 1.5,
           },
           {
@@ -621,7 +695,8 @@ async function seedUsersAndData() {
           },
           {
             author: userIds.member,
-            content: "Ordered replacement saucer coil from Marco. Should arrive next week.",
+            content:
+              "Ordered replacement saucer coil from Marco. Should arrive next week.",
             isSystem: false,
             daysAgo: 1,
           },
@@ -630,7 +705,8 @@ async function seedUsersAndData() {
         "10000000-0000-4000-8000-000000000015": [
           {
             author: userIds.admin,
-            content: "Added some white lithium grease to the motor gears. Much quieter now.",
+            content:
+              "Added some white lithium grease to the motor gears. Much quieter now.",
             isSystem: false,
             daysAgo: 2,
           },
@@ -645,7 +721,8 @@ async function seedUsersAndData() {
         "10000000-0000-4000-8000-000000000019": [
           {
             author: userIds.member,
-            content: "I can reproduce this when multiball starts and the building has to reset quickly.",
+            content:
+              "I can reproduce this when multiball starts and the building has to reset quickly.",
             isSystem: false,
             daysAgo: 4,
           },
@@ -657,7 +734,8 @@ async function seedUsersAndData() {
           },
           {
             author: userIds.guest,
-            content: "The hesitation is short, but it happens often enough to disrupt shots into the scoop.",
+            content:
+              "The hesitation is short, but it happens often enough to disrupt shots into the scoop.",
             isSystem: false,
             daysAgo: 3,
           },
@@ -675,7 +753,8 @@ async function seedUsersAndData() {
           },
           {
             author: userIds.member,
-            content: "I tightened the bracket and added a note for the next owner check.",
+            content:
+              "I tightened the bracket and added a note for the next owner check.",
             isSystem: false,
             daysAgo: 0.5,
           },
