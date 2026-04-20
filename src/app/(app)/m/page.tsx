@@ -220,7 +220,7 @@ export default async function MachinesPage({
                 data-testid="machine-card"
                 href={`/m/${machine.initials}`}
               >
-                <Card className="h-full border-outline-variant hover:border-primary transition-all cursor-pointer hover:shadow-md bg-surface-container-low group">
+                <Card className="h-full border-outline-variant hover:border-primary hover:glow-primary transition-all cursor-pointer bg-card group">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="text-xl text-foreground group-hover:text-primary transition-colors">
