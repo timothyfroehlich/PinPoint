@@ -114,6 +114,7 @@ export function OwnerSelect({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
+            type="button"
             id="owner-trigger"
             variant="outline"
             role="combobox"

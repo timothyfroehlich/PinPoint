@@ -180,8 +180,8 @@ export function AssigneePicker({
         {/*
          * shouldFilter={false}: we manage filtering manually so that "Me" and
          * "Unassigned" remain visible regardless of the search query.
-         * Items are rendered as plain [role="option"] divs so we can set
-         * aria-selected based on the current assignedToId, not cmdk focus state.
+         * Items are rendered as <button type="button" role="option"> elements so we
+         * can control aria-selected based on assignedToId (not cmdk keyboard focus).
          */}
         <Command shouldFilter={false}>
           <CommandInput
@@ -195,43 +195,31 @@ export function AssigneePicker({
             <div className="p-1 space-y-0.5">
               {/* "Me" quick-select — shown only when the current user is in the list */}
               {currentUser ? (
-                <div
+                <button
+                  type="button"
                   className={optionClass}
                   onClick={() => handleSelect(currentUser.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleSelect(currentUser.id);
-                    }
-                  }}
                   data-testid="assignee-option-me"
                   role="option"
                   aria-selected={assignedToId === currentUser.id}
-                  tabIndex={0}
                 >
                   <User className="size-6 shrink-0 p-0.5 text-primary" />
                   <span className="font-medium text-primary">Me</span>
-                </div>
+                </button>
               ) : null}
-              <div
+              <button
+                type="button"
                 className={optionClass}
                 onClick={() => handleSelect(null)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleSelect(null);
-                  }
-                }}
                 data-testid="assignee-option-unassigned"
                 role="option"
                 aria-selected={assignedToId === null}
-                tabIndex={0}
               >
                 <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
                   ?
                 </div>
                 <span className="font-medium">Unassigned</span>
-              </div>
+              </button>
               {/* Separator between quick-selects and alphabetical user list */}
               {currentUser ? <Separator className="my-1" /> : null}
               {/* Alphabetical user list — manually filtered by query */}
@@ -241,20 +229,14 @@ export function AssigneePicker({
                 </p>
               ) : (
                 filteredUsers.map((user) => (
-                  <div
+                  <button
+                    type="button"
                     key={user.id}
                     className={optionClass}
                     onClick={() => handleSelect(user.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleSelect(user.id);
-                      }
-                    }}
                     data-testid={`assignee-option-${user.id}`}
                     role="option"
                     aria-selected={user.id === assignedToId}
-                    tabIndex={0}
                   >
                     <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
                       {user.name.slice(0, 1).toUpperCase()}
@@ -264,7 +246,7 @@ export function AssigneePicker({
                         {user.name}
                       </span>
                     </div>
-                  </div>
+                  </button>
                 ))
               )}
             </div>
