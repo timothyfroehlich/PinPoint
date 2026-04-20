@@ -18,7 +18,9 @@ export function PageHeader({
     <div className={cn("border-b border-outline-variant pb-2", className)}>
       <div className="flex items-center justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+          <h1 className="text-balance text-3xl font-bold tracking-tight">
+            {title}
+          </h1>
           {titleAdornment}
         </div>
         {actions != null && (

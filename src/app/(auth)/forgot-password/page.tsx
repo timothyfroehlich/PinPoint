@@ -28,7 +28,7 @@ export default async function ForgotPasswordPage(): Promise<React.JSX.Element> {
         <CardTitle className="text-2xl font-bold text-foreground">
           Reset Password
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-pretty text-sm text-muted-foreground">
           Enter your email address and we'll send you a link to reset your
           password
         </p>

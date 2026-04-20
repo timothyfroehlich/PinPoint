@@ -34,7 +34,7 @@ export default async function LoginPage({
         <CardTitle className="text-2xl font-bold text-foreground">
           Sign In
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-pretty text-sm text-muted-foreground">
           Enter your credentials to access your account
         </p>
       </CardHeader>
