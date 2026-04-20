@@ -313,7 +313,7 @@ export function UnifiedReportForm({
                     );
                   }
                 }}
-                className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors duration-150"
               >
                 <option value="" disabled>
                   Select a machine...
@@ -346,7 +346,7 @@ export function UnifiedReportForm({
                 </Label>
                 <span
                   className={cn(
-                    "text-xs text-muted-foreground transition-opacity duration-200",
+                    "text-xs text-muted-foreground transition-opacity duration-150",
                     title.length < 40 && "opacity-0 select-none"
                   )}
                   aria-hidden={title.length < 40}
@@ -441,7 +441,7 @@ export function UnifiedReportForm({
                   data-testid="assigned-to-select"
                   value={assignedTo}
                   onChange={(e) => setAssignedTo(e.target.value)}
-                  className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                  className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors duration-150"
                 >
                   <option value="">Unassigned</option>
                   {assignees.map((assignee) => (

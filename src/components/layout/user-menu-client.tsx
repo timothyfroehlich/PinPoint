@@ -47,7 +47,7 @@ export function UserMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="User menu"
-        className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-primary hover:text-on-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-primary hover:text-on-primary transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         data-testid={testId}
       >
         <div className="flex items-center gap-1.5">

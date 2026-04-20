@@ -165,7 +165,7 @@
     @apply leading-7 not-first:mt-4;
   }
   a {
-    @apply transition-colors;
+    @apply transition-colors duration-150;
   }
 }
 

@@ -54,7 +54,7 @@ export function IssueEditableCell({
         <DropdownMenuTrigger asChild disabled={isUpdating}>
           <button
             className={cn(
-              "flex items-center gap-1.5 text-xs font-medium text-foreground leading-tight hover:bg-muted/80 px-3 py-3 rounded-md transition-colors w-full text-left",
+              "flex items-center gap-1.5 text-xs font-medium text-foreground leading-tight hover:bg-muted/80 px-3 py-3 rounded-md transition-colors duration-150 w-full text-left",
               isUpdating && "opacity-50 cursor-not-allowed"
             )}
           >

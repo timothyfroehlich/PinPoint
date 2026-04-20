@@ -39,7 +39,7 @@ export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
   return (
     <div
       className={cn(
-        "group flex items-start gap-4 border-b border-border p-4 transition-colors",
+        "group flex items-start gap-4 border-b border-border p-4 transition-colors duration-150",
         (CLOSED_STATUSES as readonly string[]).includes(issue.status)
           ? "bg-muted/30 opacity-60 hover:opacity-100"
           : "hover:bg-muted/40"
@@ -55,7 +55,7 @@ export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
         <div className="flex items-center gap-2">
           <Link
             href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
-            className="font-semibold text-foreground hover:text-primary transition-colors truncate"
+            className="font-semibold text-foreground hover:text-primary transition-colors duration-150 truncate"
           >
             {issue.title}
           </Link>

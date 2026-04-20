@@ -192,7 +192,7 @@ export function MachineFilters({
         <div className="relative flex-1 group">
           <div
             className={cn(
-              "flex items-center gap-2 px-3 h-11 bg-surface-container border border-outline-variant rounded-full transition-all shadow-sm focus-within:ring-2 focus-within:ring-primary focus-within:border-primary",
+              "flex items-center gap-2 px-3 h-11 bg-surface-container border border-outline-variant rounded-full transition-colors duration-150 shadow-sm focus-within:ring-2 focus-within:ring-primary focus-within:border-primary",
               isSearching && "opacity-70"
             )}
           >

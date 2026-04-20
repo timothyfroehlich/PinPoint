@@ -286,7 +286,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Total Open Issues */}
                 <Link href="/issues?status=new,confirmed,in_progress,need_parts,need_help,wait_owner">
-                  <Card className="border-outline-variant bg-card hover:border-primary/50 hover:glow-primary transition-all cursor-pointer h-full">
+                  <Card className="border-outline-variant bg-card hover:border-primary/50 hover:glow-primary transition-[color,background-color,border-color,box-shadow] duration-150 cursor-pointer h-full">
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -308,7 +308,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
                 {/* Machines Needing Service */}
                 <Link href="/m?status=unplayable,needs_service">
-                  <Card className="border-outline-variant bg-card hover:border-primary/50 hover:glow-primary transition-all cursor-pointer h-full">
+                  <Card className="border-outline-variant bg-card hover:border-primary/50 hover:glow-primary transition-[color,background-color,border-color,box-shadow] duration-150 cursor-pointer h-full">
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -333,7 +333,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                   <Link
                     href={`/issues?assignee=${user.id}&status=new,confirmed,in_progress,need_parts,need_help,wait_owner`}
                   >
-                    <Card className="border-outline-variant bg-card hover:border-primary/50 hover:glow-primary transition-all cursor-pointer h-full">
+                    <Card className="border-outline-variant bg-card hover:border-primary/50 hover:glow-primary transition-[color,background-color,border-color,box-shadow] duration-150 cursor-pointer h-full">
                       <CardHeader>
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -381,7 +381,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             >
               {newestMachines.map((machine) => (
                 <Link key={machine.id} href={`/m/${machine.initials}`}>
-                  <Card className="border-outline-variant bg-card hover:border-primary/50 hover:glow-primary transition-all cursor-pointer h-full">
+                  <Card className="border-outline-variant bg-card hover:border-primary/50 hover:glow-primary transition-[color,background-color,border-color,box-shadow] duration-150 cursor-pointer h-full">
                     <CardHeader>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
@@ -422,7 +422,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             >
               {recentlyFixedMachines.map((machine) => (
                 <Link key={machine.id} href={`/m/${machine.initials}`}>
-                  <Card className="border-success/30 bg-success/10 hover:border-success hover:glow-success transition-all cursor-pointer h-full">
+                  <Card className="border-success/30 bg-success/10 hover:border-success hover:glow-success transition-[color,background-color,border-color,box-shadow] duration-150 cursor-pointer h-full">
                     <CardHeader>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">

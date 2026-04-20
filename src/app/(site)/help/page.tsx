@@ -92,7 +92,7 @@ function HelpCardGrid({ cards }: { cards: HelpCard[] }): React.JSX.Element {
     <div className="grid gap-4 sm:grid-cols-2">
       {cards.map((card) => (
         <Link key={card.href} href={card.href} className="group">
-          <Card className="h-full transition-colors group-hover:border-primary/50">
+          <Card className="h-full transition-colors duration-150 group-hover:border-primary/50">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <card.icon className="size-5 text-muted-foreground" />

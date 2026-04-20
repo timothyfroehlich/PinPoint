@@ -274,15 +274,23 @@ The shared primitives (`CardTitle`/`CardDescription`, `AlertTitle`/`AlertDescrip
 | Form sections      | `Separator` component                  |
 | Page header bottom | `border-b border-outline-variant pb-6` |
 
-## 11. Transition Standards
+## 11. Transition Durations
 
-| Change type          | Use                                                        |
-| :------------------- | :--------------------------------------------------------- |
-| Hover color change   | `transition-colors` (default 150ms)                        |
-| Layout / size change | `transition-all duration-300 ease-in-out`                  |
-| Expand / collapse    | `transition-[grid-template-rows] duration-200 ease-in-out` |
+Two canonical durations standardize all animated feedback:
 
-**Rule:** Do not use `transition-all` for simple color-only changes -- it is unnecessary and hurts performance.
+| Intent                                | Duration | Class          | Typical use                                 |
+| ------------------------------------- | -------- | -------------- | ------------------------------------------- |
+| Hover feedback, color shifts          | 150ms    | `duration-150` | Button hover, text color, icon state        |
+| Layout changes, structural animations | 300ms    | `duration-300` | Panel slides, accordion expand, drawer open |
+
+**Property selection:** Prefer specific transitions over `transition-all` — use `transition-colors`, `transition-opacity`, or `transition-transform` only for the properties that animate. This improves performance and clarity.
+
+- `transition-colors duration-150` for button hovers, link colors, icon fills
+- `transition-opacity duration-150` for opacity-only reveals (badges, icons)
+- `transition-transform duration-150` for small rotations (chevrons, badges)
+- `transition-all duration-300` (or specific property + `duration-300`) for layout shifts, drawer animations, and height changes
+
+**Rule:** Never introduce a duration other than 150 or 300 unless the canonical two genuinely don't fit. If you find an edge case, add a new row to this table first, document the use case, then use it consistently across similar elements.
 
 ## 12. Component Inventory
 

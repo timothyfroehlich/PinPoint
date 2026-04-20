@@ -102,7 +102,7 @@ export function AppHeader({
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors lg:px-3",
+              "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors duration-150 lg:px-3",
               item.active
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-primary/10 hover:text-primary"

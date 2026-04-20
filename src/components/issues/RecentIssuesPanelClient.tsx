@@ -83,7 +83,7 @@ export function RecentIssuesPanelClient({
         )}
         <ChevronDown
           className={cn(
-            "h-4 w-4 text-muted-foreground transition-transform duration-200",
+            "h-4 w-4 text-muted-foreground transition-transform duration-150",
             !isOpen && "-rotate-90"
           )}
         />
@@ -102,7 +102,7 @@ export function RecentIssuesPanelClient({
 
       <div
         className={cn(
-          "grid transition-[grid-template-rows] duration-200 ease-in-out",
+          "grid transition-[grid-template-rows] duration-300 ease-in-out",
           isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
         )}
       >
@@ -151,8 +151,8 @@ export function RecentIssuesPanelClient({
                       issue.status
                     )}`}
                   >
-                    <div className="flex h-[36px] items-center justify-between gap-2 rounded-md border border-transparent bg-surface hover:border-outline-variant px-2 transition-all active:scale-[0.98]">
-                      <p className="truncate text-xs font-medium text-foreground group-hover:text-primary transition-colors">
+                    <div className="flex h-[36px] items-center justify-between gap-2 rounded-md border border-transparent bg-surface hover:border-outline-variant px-2 transition-colors duration-150 active:scale-[0.98]">
+                      <p className="truncate text-xs font-medium text-foreground group-hover:text-primary transition-colors duration-150">
                         {issue.title}
                       </p>
                       <IssueBadge type="status" value={issue.status} />
