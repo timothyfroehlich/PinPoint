@@ -436,6 +436,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           admin: true,
         },
       },
+      {
+        id: "admin.integrations.manage",
+        label: "Manage integrations",
+        description:
+          "View and configure third-party integrations (Discord bot, etc.)",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: false,
+          admin: true,
+        },
+      },
     ],
   },
 ];
