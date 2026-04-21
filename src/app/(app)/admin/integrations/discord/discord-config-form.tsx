@@ -64,7 +64,7 @@ export function DiscordConfigForm({
             name="guildId"
             type="text"
             inputMode="numeric"
-            pattern="\d*"
+            pattern="[0-9]*"
             defaultValue={guildId}
             placeholder="123456789012345678"
             maxLength={64}

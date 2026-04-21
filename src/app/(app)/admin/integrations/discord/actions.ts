@@ -3,7 +3,7 @@
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { discordIntegrationConfig, userProfiles } from "~/server/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { updateDiscordConfigSchema, rotateBotTokenSchema } from "./schema";
 import { log } from "~/lib/logger";
@@ -96,23 +96,43 @@ export async function rotateBotToken(formData: FormData): Promise<void> {
       await db.execute(
         sql`SELECT vault.update_secret(${existing.botTokenVaultId}::uuid, ${newToken}, 'discord_bot_token', 'Discord bot token (rotated)')`
       );
-    } else {
-      // First-time set: create a new vault secret and link it
-      const rows = (await db.execute(
-        sql`SELECT vault.create_secret(${newToken}, 'discord_bot_token', 'Discord bot token') AS id`
-      )) as unknown as { id: string }[];
-      const newVaultId = rows[0]?.id;
-      if (!newVaultId) {
-        throw new Error("Vault create_secret returned no id");
-      }
       await db
         .update(discordIntegrationConfig)
-        .set({
-          botTokenVaultId: newVaultId,
-          updatedAt: new Date(),
-          updatedBy: userId,
-        })
+        .set({ updatedAt: new Date(), updatedBy: userId })
         .where(eq(discordIntegrationConfig.id, "singleton"));
+    } else {
+      // First-time set: create a vault secret, then link it. Wrap in a
+      // transaction and gate the UPDATE on bot_token_vault_id still being
+      // NULL so a racing rotation won't double-create and orphan a secret.
+      await db.transaction(async (tx) => {
+        const rows = (await tx.execute(
+          sql`SELECT vault.create_secret(${newToken}, 'discord_bot_token', 'Discord bot token') AS id`
+        )) as unknown as { id: string }[];
+        const newVaultId = rows[0]?.id;
+        if (!newVaultId) {
+          throw new Error("Vault create_secret returned no id");
+        }
+        const updated = await tx
+          .update(discordIntegrationConfig)
+          .set({
+            botTokenVaultId: newVaultId,
+            updatedAt: new Date(),
+            updatedBy: userId,
+          })
+          .where(
+            and(
+              eq(discordIntegrationConfig.id, "singleton"),
+              isNull(discordIntegrationConfig.botTokenVaultId)
+            )
+          )
+          .returning({ id: discordIntegrationConfig.id });
+        if (updated.length === 0) {
+          // Another writer won the race; abort to roll back the vault create.
+          throw new Error(
+            "Bot token was set by another admin while this request was in flight. Please refresh and try again."
+          );
+        }
+      });
     }
 
     revalidatePath("/admin/integrations/discord");

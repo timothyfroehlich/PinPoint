@@ -204,6 +204,13 @@
       "when": 1776729369635,
       "tag": "0028_natural_vengeance",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1776812668657,
+      "tag": "0029_discord_config_role_check",
+      "breakpoints": true
     }
   ]
 }

@@ -14,7 +14,6 @@ export function BotTokenField({
   const [isEditing, setIsEditing] = React.useState(!hasToken);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [success, setSuccess] = React.useState(false);
 
   return (
     <div className="flex flex-col gap-2">
@@ -24,10 +23,10 @@ export function BotTokenField({
           action={async (formData) => {
             setPending(true);
             setError(null);
-            setSuccess(false);
             try {
               await rotateBotToken(formData);
-              setSuccess(true);
+              // The masked input view below is the success state — no
+              // transient message needed since the view change signals it.
               setIsEditing(false);
             } catch (e) {
               setError(e instanceof Error ? e.message : "Failed to save token");
@@ -66,7 +65,6 @@ export function BotTokenField({
             )}
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          {success && <p className="text-sm text-success">Token saved.</p>}
         </form>
       ) : (
         <div className="flex items-center gap-2">
