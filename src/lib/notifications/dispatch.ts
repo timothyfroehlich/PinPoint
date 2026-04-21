@@ -204,7 +204,7 @@ export async function createNotification(
   // Email dispatch is concurrent via Promise.allSettled so one slow/failed
   // email doesn't block others (spec: "Promise.allSettled concurrent dispatch
   // preserved").
-  const emailDeliveries: Promise<DeliveryResult>[] = [];
+  const deferredDeliveries: (() => Promise<DeliveryResult>)[] = [];
 
   for (const userId of recipientIds) {
     const prefs =
@@ -245,8 +245,11 @@ export async function createNotification(
           resourceType,
         });
       } else {
-        // Email (and future Discord): fire-and-forget under allSettled.
-        emailDeliveries.push(channel.deliver(ctx));
+        // Email (and future Discord): deferred until after the in-app insert
+        // succeeds. Pushing a thunk (not the promise itself) prevents deliver()
+        // from starting mid-loop, which would send side-effects before the DB
+        // write completes and on insert failure leave emails sent without rows.
+        deferredDeliveries.push(() => channel.deliver(ctx));
       }
     }
   }
@@ -259,8 +262,10 @@ export async function createNotification(
     await tx.insert(notifications).values(notificationsToInsert);
   }
 
-  if (emailDeliveries.length > 0) {
-    const results = await Promise.allSettled(emailDeliveries);
+  if (deferredDeliveries.length > 0) {
+    const results = await Promise.allSettled(
+      deferredDeliveries.map((fn) => fn())
+    );
     for (const r of results) {
       if (r.status === "rejected") {
         // Channel.deliver() is expected to catch its own errors and return
@@ -273,8 +278,8 @@ export async function createNotification(
 }
 
 /**
- * Fallback prefs when a user has no row in notification_preferences.
- * Extracted so channels can reuse the exact defaults in Task 4.
+ * Fallback prefs used within this module when a user has no row in
+ * notification_preferences.
  */
 function buildDefaultPrefs(userId: string): NotificationPreferences {
   return {
