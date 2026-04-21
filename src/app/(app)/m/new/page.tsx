@@ -52,6 +52,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
     lastName: u.lastName,
     machineCount: u.machineCount,
     status: u.status,
+    role: u.role,
   }));
 
   return (

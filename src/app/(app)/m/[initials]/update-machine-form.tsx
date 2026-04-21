@@ -15,6 +15,7 @@ import {
 import {
   updateMachineAction,
   type UpdateMachineResult,
+  type AssigneeNotMemberMeta,
 } from "~/app/(app)/m/actions";
 import { cn } from "~/lib/utils";
 import { OwnerSelect } from "~/components/machines/OwnerSelect";
@@ -42,6 +43,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Pencil } from "lucide-react";
 
 import type { OwnerSelectUser } from "~/components/machines/OwnerSelect";
@@ -86,27 +88,66 @@ export function EditMachineDialog({
   );
   const currentOwnerId = machine.ownerId ?? machine.invitedOwnerId ?? "";
 
+  // Promote dialog state — populated when server returns ASSIGNEE_NOT_MEMBER
+  const [promoteAssignee, setPromoteAssignee] = useState<
+    AssigneeNotMemberMeta["assignee"] | null
+  >(null);
+  const [isPromoteOpen, setIsPromoteOpen] = useState(false);
+
+  // State-driven hidden input for re-submission with forcePromoteUserId.
+  // Using state (not ref) so React flushes the value before requestSubmit.
+  const [forcePromoteUserId, setForcePromoteUserId] = useState("");
+
+  // Track whether we need to submit after forcePromoteUserId state flushes
+  const [pendingSubmit, setPendingSubmit] = useState(false);
+
   const [state, formAction, isPending] = useActionState<
     UpdateMachineResult | undefined,
     FormData
   >(updateMachineAction, undefined);
 
-  // Close dialog on successful update
+  // Close edit dialog on successful update
   useEffect(() => {
     if (state?.ok) {
       setOpen(false);
     }
   }, [state]);
 
-  // Reset selectedOwnerId when dialog reopens to avoid stale selection
+  // Open promote dialog when server returns ASSIGNEE_NOT_MEMBER
+  useEffect(() => {
+    if (
+      state &&
+      !state.ok &&
+      state.code === "ASSIGNEE_NOT_MEMBER" &&
+      state.meta?.assignee &&
+      !isPromoteOpen
+    ) {
+      setPromoteAssignee(state.meta.assignee);
+      setIsPromoteOpen(true);
+    }
+  }, [state, isPromoteOpen]);
+
+  // Reset state when edit dialog opens/closes
   useEffect(() => {
     if (open) {
       setSelectedOwnerId(currentOwnerId);
       transferConfirmedRef.current = false;
+      setForcePromoteUserId("");
+      setPromoteAssignee(null);
+      setIsPromoteOpen(false);
+      setPendingSubmit(false);
     }
   }, [open, currentOwnerId]);
 
-  // Find the selected owner's name for the confirmation dialog
+  // Submit after forcePromoteUserId has been set in state (ensures React flushed it)
+  useEffect(() => {
+    if (pendingSubmit && forcePromoteUserId) {
+      setPendingSubmit(false);
+      formRef.current?.requestSubmit();
+    }
+  }, [pendingSubmit, forcePromoteUserId]);
+
+  // Find the selected owner's name for the transfer confirmation dialog
   const selectedOwnerName =
     allUsers.find((u) => u.id === selectedOwnerId)?.name ?? "the selected user";
 
@@ -136,6 +177,21 @@ export function EditMachineDialog({
     formRef.current?.requestSubmit();
   };
 
+  const confirmPromote = (): void => {
+    if (!promoteAssignee) return;
+    setForcePromoteUserId(promoteAssignee.id);
+    setIsPromoteOpen(false);
+    // Signal that we want to submit after state flushes (useEffect handles the actual call)
+    setPendingSubmit(true);
+  };
+
+  const cancelPromote = (): void => {
+    setIsPromoteOpen(false);
+    setPromoteAssignee(null);
+    setForcePromoteUserId("");
+    setPendingSubmit(false);
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -162,12 +218,19 @@ export function EditMachineDialog({
             ref={formRef}
             action={formAction}
             onSubmit={handleSubmit}
+            id="edit-machine-form"
             className="space-y-6"
           >
             <input type="hidden" name="id" value={machine.id} />
+            {/* State-driven hidden input for re-submission with forcePromoteUserId */}
+            <input
+              type="hidden"
+              name="forcePromoteUserId"
+              value={forcePromoteUserId}
+            />
 
-            {/* Flash message */}
-            {state && !state.ok && (
+            {/* Flash message — suppress ASSIGNEE_NOT_MEMBER since dialog handles it */}
+            {state && !state.ok && state.code !== "ASSIGNEE_NOT_MEMBER" && (
               <div
                 className={cn(
                   "rounded-md border p-4",
@@ -288,6 +351,54 @@ export function EditMachineDialog({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/*
+       * Promote-and-assign confirmation dialog.
+       * Duplicated from create-machine-form.tsx — pending extraction at 3rd consumer.
+       *
+       * Radix portals DialogContent outside the form tree. The confirm button
+       * cannot implicitly target the outer form, so we use a state-driven
+       * hidden forcePromoteUserId input + requestAnimationFrame to flush state
+       * before programmatic requestSubmit fires on the outer form.
+       */}
+      <Dialog open={isPromoteOpen} onOpenChange={setIsPromoteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Promote to member and assign?</DialogTitle>
+            <DialogDescription>
+              This updates the user&apos;s role and assigns them as owner.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p>
+              <strong>{promoteAssignee?.name}</strong>
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground ml-1">
+                {promoteAssignee?.type === "invited"
+                  ? "(INVITED · GUEST)"
+                  : "(GUEST)"}
+              </span>{" "}
+              is currently a guest. Assigning them as owner of{" "}
+              <strong>{machine.name}</strong> will promote them to member.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              As a member they&apos;ll be able to edit the machine&apos;s
+              details, owner notes, tournament notes, and owner requirements.
+            </p>
+            <Alert>
+              <AlertDescription>
+                Promotion and assignment run in one transaction — both succeed
+                or both roll back.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelPromote}>
+              Cancel
+            </Button>
+            <Button onClick={confirmPromote}>Promote and assign</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
