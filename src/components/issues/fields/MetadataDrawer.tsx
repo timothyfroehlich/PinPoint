@@ -64,7 +64,7 @@ export function MetadataDrawer<T extends string>({
                   type="button"
                   data-testid={option.testId}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
+                    "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors duration-150",
                     "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     isSelected
                       ? "border-primary bg-primary/5"
@@ -100,7 +100,7 @@ export function MetadataDrawer<T extends string>({
                   </div>
                   <Check
                     className={cn(
-                      "size-4 shrink-0 text-primary transition-opacity",
+                      "size-4 shrink-0 text-primary transition-opacity duration-150",
                       isSelected ? "opacity-100" : "opacity-0"
                     )}
                     aria-hidden="true"

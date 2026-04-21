@@ -38,7 +38,7 @@ export function IssuesExpando({
       >
         <ChevronRight
           className={cn(
-            "size-5 transition-transform duration-200",
+            "size-5 transition-transform duration-150",
             isOpen && "rotate-90"
           )}
         />

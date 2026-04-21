@@ -144,7 +144,7 @@ export function EditableIssueTitle({
       <Button
         variant="ghost"
         size="icon-sm"
-        className="opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 transition-opacity shrink-0"
+        className="opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 shrink-0"
         onClick={() => setIsEditing(true)}
         aria-label="Edit title"
       >

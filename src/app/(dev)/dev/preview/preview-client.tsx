@@ -192,7 +192,7 @@ export function PreviewClient(): React.JSX.Element {
           />
           <button
             type="submit"
-            className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm font-medium hover:bg-primary/90 transition-colors"
+            className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm font-medium hover:bg-primary/90 transition-colors duration-150"
           >
             Go
           </button>
@@ -205,7 +205,7 @@ export function PreviewClient(): React.JSX.Element {
               key={preset.path}
               type="button"
               onClick={() => setState({ path: preset.path })}
-              className={`px-2 py-1 rounded text-xs transition-colors ${
+              className={`px-2 py-1 rounded text-xs transition-colors duration-150 ${
                 path === preset.path
                   ? "bg-primary/20 text-primary border border-primary/50"
                   : "bg-muted text-muted-foreground hover:text-foreground"
@@ -225,7 +225,7 @@ export function PreviewClient(): React.JSX.Element {
                 key={mode}
                 type="button"
                 onClick={() => setState({ viewMode: mode })}
-                className={`px-2 py-1 text-xs capitalize transition-colors ${
+                className={`px-2 py-1 text-xs capitalize transition-colors duration-150 ${
                   viewMode === mode
                     ? "bg-primary/20 text-primary"
                     : "bg-muted text-muted-foreground hover:text-foreground"
@@ -252,7 +252,7 @@ export function PreviewClient(): React.JSX.Element {
           <button
             type="button"
             onClick={() => setState({ hideChrome: !hideChrome })}
-            className={`px-2 py-1 rounded text-xs transition-colors ${
+            className={`px-2 py-1 rounded text-xs transition-colors duration-150 ${
               hideChrome
                 ? "bg-primary/20 text-primary border border-primary/50"
                 : "bg-muted text-muted-foreground hover:text-foreground"

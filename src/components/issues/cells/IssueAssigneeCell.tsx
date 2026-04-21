@@ -46,7 +46,7 @@ export function IssueAssigneeCell({
         <DropdownMenuTrigger asChild disabled={isUpdating}>
           <button
             className={cn(
-              "text-xs font-medium leading-tight hover:bg-muted/80 px-3 py-3 rounded-md transition-colors w-full text-left",
+              "text-xs font-medium leading-tight hover:bg-muted/80 px-3 py-3 rounded-md transition-colors duration-150 w-full text-left",
               isUpdating && "opacity-50 cursor-not-allowed"
             )}
           >

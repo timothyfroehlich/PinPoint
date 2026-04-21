@@ -181,7 +181,7 @@ export function InlineEditableField({
           )}
           {canEdit && (
             <Pencil
-              className="absolute right-2 top-1 size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+              className="absolute right-2 top-1 size-3.5 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100"
               aria-hidden="true"
             />
           )}

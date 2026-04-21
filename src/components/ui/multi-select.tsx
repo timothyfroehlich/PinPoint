@@ -210,7 +210,7 @@ export function MultiSelect({
                     key={group.label}
                     heading={
                       <div
-                        className="flex items-center gap-2 py-1 cursor-pointer select-none hover:bg-accent/50 -mx-2 px-2 rounded-sm transition-colors group/header"
+                        className="flex items-center gap-2 py-1 cursor-pointer select-none hover:bg-accent/50 -mx-2 px-2 rounded-sm transition-colors duration-150 group/header"
                         onClick={toggleGroup}
                         data-testid={
                           testId
@@ -230,7 +230,7 @@ export function MultiSelect({
                           onCheckedChange={toggleGroup}
                           onClick={(e) => e.stopPropagation()}
                         />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 group-hover/header:text-foreground transition-colors">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 group-hover/header:text-foreground transition-colors duration-150">
                           {group.label}
                         </span>
                       </div>

@@ -87,7 +87,7 @@ export function DateRangePicker({
               <div
                 role="button"
                 onClick={handleClear}
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 rounded-sm hover:bg-muted flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 rounded-sm hover:bg-muted flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150"
               >
                 <X className="h-3 w-3 text-muted-foreground" />
               </div>

@@ -180,7 +180,7 @@ export default async function IssueDetailPage({
           <Link
             href={`/m/${initials}`}
             data-testid="machine-link"
-            className="truncate text-sm font-semibold text-foreground transition-colors hover:text-primary"
+            className="truncate text-sm font-semibold text-foreground transition-colors duration-150 hover:text-primary"
           >
             {issue.machine.name}
           </Link>
@@ -194,7 +194,7 @@ export default async function IssueDetailPage({
           <Link
             href={`/m/${initials}`}
             data-testid="machine-link"
-            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
           >
             {issue.machine.name}
           </Link>
@@ -205,7 +205,7 @@ export default async function IssueDetailPage({
               {issue.machine.owner?.id ? (
                 <Link
                   href={`/issues?owner=${issue.machine.owner.id}`}
-                  className="font-medium text-foreground transition-colors hover:text-primary"
+                  className="font-medium text-foreground transition-colors duration-150 hover:text-primary"
                 >
                   {ownerName}
                 </Link>
