@@ -98,6 +98,16 @@ export function UserMenu({
                 <span>Admin Panel</span>
               </a>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a
+                href="/admin/integrations/discord"
+                className="flex items-center cursor-pointer"
+                data-testid="user-menu-admin-integrations"
+              >
+                <Shield className="mr-2 size-4" />
+                <span>Integrations</span>
+              </a>
+            </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-outline-variant" />
           </>
         )}
