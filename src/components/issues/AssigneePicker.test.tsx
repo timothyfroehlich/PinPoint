@@ -32,7 +32,7 @@ describe("AssigneePicker Accessibility", () => {
     expect(svg).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("renders listbox options with correct roles and aria-selected", () => {
+  it("renders listbox options with correct roles and data-assigned", () => {
     const onAssign = vi.fn();
     render(
       <AssigneePicker

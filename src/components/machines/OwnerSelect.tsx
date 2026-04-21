@@ -168,6 +168,7 @@ export function OwnerSelect({
                     key={user.id}
                     value={user.name}
                     onSelect={() => handleSelect(user.id)}
+                    aria-current={user.id === selectedId ? "true" : undefined}
                   >
                     <div className="flex items-center gap-2">
                       <span>{user.name}</span>
