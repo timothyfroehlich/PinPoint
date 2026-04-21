@@ -11,6 +11,7 @@ import {
 import { eq, and, ne, count } from "drizzle-orm";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { ProfileForm } from "./profile-form";
+import { ConnectedAccountsSection } from "./connected-accounts/connected-accounts-section";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
 import { ChangePasswordSection } from "./change-password-section";
 import { DeleteAccountSection } from "./delete-account-section";
@@ -96,6 +97,12 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             role={profile.role}
             isInternalAccount={isInternalAccount(profile.email)}
           />
+        </div>
+
+        <Separator />
+
+        <div>
+          <ConnectedAccountsSection />
         </div>
 
         <Separator />
