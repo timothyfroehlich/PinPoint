@@ -4,10 +4,6 @@ import { Separator } from "~/components/ui/separator";
 import { getAvailableProviders } from "~/lib/auth/providers";
 import { signInWithProviderAction } from "~/app/(auth)/oauth-actions";
 
-interface OAuthButtonListProps {
-  mode: "login" | "signup";
-}
-
 /**
  * Renders one progressive-enhancement <form action> per available provider.
  *
@@ -17,9 +13,7 @@ interface OAuthButtonListProps {
  *
  * When no providers are configured, renders `null` (no stray separator).
  */
-export function OAuthButtonList({
-  mode: _mode,
-}: OAuthButtonListProps): React.JSX.Element | null {
+export function OAuthButtonList(): React.JSX.Element | null {
   const available = getAvailableProviders();
 
   if (available.length === 0) {

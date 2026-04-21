@@ -2,23 +2,19 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 import type * as ProvidersModule from "./providers";
 
-// Import lazily in each test so env mutations take effect
 async function loadModule(): Promise<typeof ProvidersModule> {
   vi.resetModules();
   return import("./providers");
 }
 
 describe("provider registry", () => {
-  const ORIGINAL_ENV = { ...process.env };
-
   beforeEach(() => {
-    process.env = { ...ORIGINAL_ENV };
-    delete process.env.DISCORD_CLIENT_ID;
-    delete process.env.DISCORD_CLIENT_SECRET;
+    vi.stubEnv("DISCORD_CLIENT_ID", "");
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "");
   });
 
   afterEach(() => {
-    process.env = ORIGINAL_ENV;
+    vi.unstubAllEnvs();
   });
 
   it("exposes a discord provider with the expected shape", async () => {
@@ -32,13 +28,26 @@ describe("provider registry", () => {
     expect(typeof discord.isAvailable).toBe("function");
   });
 
-  it("discord.isAvailable() is false without DISCORD_CLIENT_ID", async () => {
+  it("isAvailable() is false when both env vars are missing", async () => {
     const mod = await loadModule();
     expect(mod.providers.discord.isAvailable()).toBe(false);
   });
 
-  it("discord.isAvailable() is true when DISCORD_CLIENT_ID is set", async () => {
-    process.env.DISCORD_CLIENT_ID = "abc";
+  it("isAvailable() is false when only DISCORD_CLIENT_ID is set", async () => {
+    vi.stubEnv("DISCORD_CLIENT_ID", "abc");
+    const mod = await loadModule();
+    expect(mod.providers.discord.isAvailable()).toBe(false);
+  });
+
+  it("isAvailable() is false when only DISCORD_CLIENT_SECRET is set", async () => {
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "def");
+    const mod = await loadModule();
+    expect(mod.providers.discord.isAvailable()).toBe(false);
+  });
+
+  it("isAvailable() is true when both env vars are set", async () => {
+    vi.stubEnv("DISCORD_CLIENT_ID", "abc");
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "def");
     const mod = await loadModule();
     expect(mod.providers.discord.isAvailable()).toBe(true);
   });
@@ -48,8 +57,9 @@ describe("provider registry", () => {
     expect(mod.getAvailableProviders()).toEqual([]);
   });
 
-  it("getAvailableProviders() includes discord when DISCORD_CLIENT_ID is set", async () => {
-    process.env.DISCORD_CLIENT_ID = "abc";
+  it("getAvailableProviders() includes discord when both env vars are set", async () => {
+    vi.stubEnv("DISCORD_CLIENT_ID", "abc");
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "def");
     const mod = await loadModule();
     const keys = mod.getAvailableProviders().map((p) => p.key);
     expect(keys).toEqual(["discord"]);

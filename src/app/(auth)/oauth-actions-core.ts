@@ -25,11 +25,15 @@ export type LinkProviderResult = Result<
 
 export type UnlinkProviderResult = Result<
   void,
-  "NOT_AUTHENTICATED" | "ONLY_IDENTITY" | "NOT_LINKED" | "SERVER"
+  | "PROVIDER_UNAVAILABLE"
+  | "NOT_AUTHENTICATED"
+  | "ONLY_IDENTITY"
+  | "NOT_LINKED"
+  | "SERVER"
 >;
 
 function isProviderKey(value: string): value is ProviderKey {
-  return value in providers;
+  return Object.prototype.hasOwnProperty.call(providers, value);
 }
 
 export async function runSignInWithProvider(
@@ -49,6 +53,10 @@ export async function runSignInWithProvider(
   }
 
   const supabase = await createClient();
+  // CORE-SSR-002: getUser() must immediately follow createClient(), even in
+  // pre-auth flows, to keep cookie refresh semantics consistent with middleware.
+  await supabase.auth.getUser();
+
   const siteUrl = getSiteUrl();
   const redirectTo = `${siteUrl}/auth/callback`;
 
@@ -93,7 +101,10 @@ export async function runLinkProvider(
   }
 
   const siteUrl = getSiteUrl();
-  const redirectTo = `${siteUrl}/settings`;
+  // Route through /auth/callback so exchangeCodeForSession runs. Skipping the
+  // callback would drop us on /settings with a stray `code` param and no code
+  // exchange, so the link would never actually persist.
+  const redirectTo = `${siteUrl}/auth/callback?next=/settings`;
 
   const { data, error } = await supabase.auth.linkIdentity({
     provider: provider.key,
@@ -123,7 +134,7 @@ export async function runUnlinkProvider(
   rawKey: string
 ): Promise<UnlinkProviderResult> {
   if (!isProviderKey(rawKey)) {
-    return err("NOT_LINKED", "Unknown provider");
+    return err("PROVIDER_UNAVAILABLE", "Unknown provider");
   }
 
   const supabase = await createClient();

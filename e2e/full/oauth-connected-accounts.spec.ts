@@ -59,5 +59,21 @@ test.describe("OAuth + Connected Accounts", () => {
       });
       await expect(connectBtn).toBeVisible();
     });
+
+    test("Connect Discord from /settings redirects through Discord", async ({
+      page,
+    }) => {
+      await page.goto("/settings");
+
+      const connectBtn = page.getByRole("button", {
+        name: /connect discord/i,
+      });
+      await expect(connectBtn).toBeVisible();
+
+      await Promise.all([
+        page.waitForURL(/discord\.com/, { timeout: 15_000 }),
+        connectBtn.click(),
+      ]);
+    });
   });
 });

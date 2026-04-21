@@ -1,7 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
-// Mock the server action so the form doesn't try to call a real server action
 vi.mock("~/app/(auth)/oauth-actions", () => ({
   signInWithProviderAction: vi.fn(),
 }));
@@ -9,25 +8,24 @@ vi.mock("~/app/(auth)/oauth-actions", () => ({
 import { OAuthButtonList } from "./oauth-button-list";
 
 describe("OAuthButtonList", () => {
-  const ORIGINAL_ENV = { ...process.env };
-
   beforeEach(() => {
-    process.env = { ...ORIGINAL_ENV };
-    delete process.env.DISCORD_CLIENT_ID;
+    vi.stubEnv("DISCORD_CLIENT_ID", "");
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "");
   });
 
   afterEach(() => {
-    process.env = ORIGINAL_ENV;
+    vi.unstubAllEnvs();
   });
 
   it("renders nothing when no providers are configured", () => {
-    const { container } = render(<OAuthButtonList mode="login" />);
+    const { container } = render(<OAuthButtonList />);
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("renders Continue with Discord when DISCORD_CLIENT_ID is set", () => {
-    process.env.DISCORD_CLIENT_ID = "abc";
-    render(<OAuthButtonList mode="login" />);
+  it("renders Continue with Discord when Discord env vars are set", () => {
+    vi.stubEnv("DISCORD_CLIENT_ID", "abc");
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "def");
+    render(<OAuthButtonList />);
     expect(
       screen.getByRole("button", { name: /continue with discord/i })
     ).toBeInTheDocument();

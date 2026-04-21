@@ -79,7 +79,7 @@ export default async function SignupPage({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <OAuthButtonList mode="signup" />
+        <OAuthButtonList />
 
         {/* Signup form - Client Component for password strength */}
         <SignupForm initialData={initialData} />

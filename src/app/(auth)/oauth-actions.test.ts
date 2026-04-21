@@ -39,6 +39,7 @@ function identity(provider: string): UserIdentity {
 describe("runSignInWithProvider (core)", () => {
   beforeEach(() => {
     process.env.DISCORD_CLIENT_ID = "abc";
+    process.env.DISCORD_CLIENT_SECRET = "def";
   });
 
   it("refuses when provider is not available", async () => {
@@ -51,12 +52,15 @@ describe("runSignInWithProvider (core)", () => {
 
   it("returns redirect URL from supabase.auth.signInWithOAuth", async () => {
     const { createClient } = await import("~/lib/supabase/server");
+    const getUser = vi
+      .fn()
+      .mockResolvedValue({ data: { user: null }, error: null });
     const signInWithOAuth = vi.fn().mockResolvedValue({
       data: { url: "https://discord.com/oauth2/authorize?..." },
       error: null,
     });
     (createClient as ReturnType<typeof vi.fn>).mockResolvedValue({
-      auth: { signInWithOAuth },
+      auth: { getUser, signInWithOAuth },
     });
 
     const { runSignInWithProvider } = await loadCore();
@@ -75,6 +79,7 @@ describe("runSignInWithProvider (core)", () => {
 describe("runUnlinkProvider (core)", () => {
   beforeEach(() => {
     process.env.DISCORD_CLIENT_ID = "abc";
+    process.env.DISCORD_CLIENT_SECRET = "def";
   });
 
   it("refuses when unlink would leave user with zero identities", async () => {
@@ -141,6 +146,7 @@ describe("runUnlinkProvider (core)", () => {
 describe("runLinkProvider (core)", () => {
   beforeEach(() => {
     process.env.DISCORD_CLIENT_ID = "abc";
+    process.env.DISCORD_CLIENT_SECRET = "def";
   });
 
   it("returns redirect URL from supabase.auth.linkIdentity", async () => {
@@ -173,16 +179,20 @@ describe("runLinkProvider (core)", () => {
 describe("signInWithProviderAction (wrapper)", () => {
   beforeEach(() => {
     process.env.DISCORD_CLIENT_ID = "abc";
+    process.env.DISCORD_CLIENT_SECRET = "def";
   });
 
   it("redirects to the provider URL on success", async () => {
     const { createClient } = await import("~/lib/supabase/server");
+    const getUser = vi
+      .fn()
+      .mockResolvedValue({ data: { user: null }, error: null });
     const signInWithOAuth = vi.fn().mockResolvedValue({
       data: { url: "https://discord.com/oauth2/authorize?..." },
       error: null,
     });
     (createClient as ReturnType<typeof vi.fn>).mockResolvedValue({
-      auth: { signInWithOAuth },
+      auth: { getUser, signInWithOAuth },
     });
 
     const { signInWithProviderAction } = await loadActions();
@@ -203,6 +213,7 @@ describe("signInWithProviderAction (wrapper)", () => {
 describe("unlinkProviderAction (wrapper)", () => {
   beforeEach(() => {
     process.env.DISCORD_CLIENT_ID = "abc";
+    process.env.DISCORD_CLIENT_SECRET = "def";
   });
 
   it("redirects to /settings?oauth_status=unlinked on success", async () => {

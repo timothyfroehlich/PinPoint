@@ -41,7 +41,7 @@ export default async function LoginPage({
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <OAuthButtonList mode="login" />
+        <OAuthButtonList />
 
         {/* Only enable test admin button in non-production environments */}
         <LoginForm

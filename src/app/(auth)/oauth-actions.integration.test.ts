@@ -33,6 +33,7 @@ function makeIdentity(provider: string): UserIdentity {
 describe("link -> unlink round-trip", () => {
   beforeEach(() => {
     process.env.DISCORD_CLIENT_ID = "abc";
+    process.env.DISCORD_CLIENT_SECRET = "def";
   });
 
   it("refuses second unlink once user is back to one identity", async () => {

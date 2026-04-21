@@ -8,9 +8,16 @@ import { DiscordIcon } from "~/components/icons/discord-icon";
  * Each provider is a plain object so adding a new provider (Google, GitHub,
  * etc.) requires only a new entry here + an inline SVG icon component.
  */
+/**
+ * Registered OAuth provider keys. Widen this union when adding a new
+ * provider (Google, GitHub, etc.); the entry in `providers` below and
+ * `Provider.key` both derive from it so nothing else needs editing.
+ */
+export type ProviderKey = "discord";
+
 export interface Provider {
   /** Stable key — matches Supabase's provider string (`discord`, `google`). */
-  readonly key: "discord";
+  readonly key: ProviderKey;
   readonly displayName: string;
   /** Space-separated OAuth scopes passed to `signInWithOAuth`. */
   readonly scopes: string;
@@ -32,11 +39,13 @@ export const providers = {
     displayName: "Discord",
     scopes: "identify email",
     iconComponent: DiscordIcon,
-    isAvailable: () => Boolean(process.env["DISCORD_CLIENT_ID"]),
+    isAvailable: () => {
+      const id = process.env["DISCORD_CLIENT_ID"]?.trim();
+      const secret = process.env["DISCORD_CLIENT_SECRET"]?.trim();
+      return Boolean(id) && Boolean(secret);
+    },
   } satisfies Provider,
 } as const;
-
-export type ProviderKey = keyof typeof providers;
 
 export function getAvailableProviders(): readonly Provider[] {
   return Object.values(providers).filter((p) => p.isAvailable());
