@@ -131,7 +131,7 @@ export function RecentIssuesPanelClient({
             ) : displayIssues.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-1 text-center animate-in fade-in zoom-in duration-300">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-variant/50 mb-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-green-600/70 dark:text-green-400/70" />
+                  <CheckCircle2 className="h-4 w-4 text-success/70" />
                 </div>
                 <p className="text-xs font-medium text-foreground">
                   No recent issues
