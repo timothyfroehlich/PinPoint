@@ -66,7 +66,7 @@ test.describe("Technician Role Permissions", () => {
 
     // Should be able to select an owner
     await page.getByRole("combobox").click();
-    await page.getByLabel("Admin User").click();
+    await page.getByRole("option", { name: "Admin User" }).click();
 
     await page.getByRole("button", { name: "Create Machine" }).click();
 
