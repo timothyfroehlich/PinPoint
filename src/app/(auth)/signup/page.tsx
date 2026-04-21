@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { createClient } from "~/lib/supabase/server";
+import { OAuthButtonList } from "../oauth-button-list";
 import { SignupForm } from "./signup-form";
 
 import { db } from "~/server/db";
@@ -78,6 +79,8 @@ export default async function SignupPage({
       </CardHeader>
 
       <CardContent className="space-y-4">
+        <OAuthButtonList mode="signup" />
+
         {/* Signup form - Client Component for password strength */}
         <SignupForm initialData={initialData} />
 

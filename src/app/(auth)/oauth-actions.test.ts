@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { UserIdentity } from "@supabase/supabase-js";
 
+import type * as OAuthCoreModule from "./oauth-actions-core";
 import type * as OAuthActionsModule from "./oauth-actions";
 
 vi.mock("~/lib/supabase/server", () => ({
@@ -11,6 +12,11 @@ vi.mock("next/navigation", () => ({
     throw new Error(`NEXT_REDIRECT:${url}`);
   }),
 }));
+
+async function loadCore(): Promise<typeof OAuthCoreModule> {
+  vi.resetModules();
+  return import("./oauth-actions-core");
+}
 
 async function loadActions(): Promise<typeof OAuthActionsModule> {
   vi.resetModules();
@@ -30,20 +36,20 @@ function identity(provider: string): UserIdentity {
   } as UserIdentity;
 }
 
-describe("signInWithProviderAction", () => {
+describe("runSignInWithProvider (core)", () => {
   beforeEach(() => {
     process.env.DISCORD_CLIENT_ID = "abc";
   });
 
   it("refuses when provider is not available", async () => {
     delete process.env.DISCORD_CLIENT_ID;
-    const { signInWithProviderAction } = await loadActions();
-    const result = await signInWithProviderAction("discord");
+    const { runSignInWithProvider } = await loadCore();
+    const result = await runSignInWithProvider("discord");
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("PROVIDER_UNAVAILABLE");
   });
 
-  it("calls supabase.auth.signInWithOAuth and redirects to provider URL", async () => {
+  it("returns redirect URL from supabase.auth.signInWithOAuth", async () => {
     const { createClient } = await import("~/lib/supabase/server");
     const signInWithOAuth = vi.fn().mockResolvedValue({
       data: { url: "https://discord.com/oauth2/authorize?..." },
@@ -53,10 +59,12 @@ describe("signInWithProviderAction", () => {
       auth: { signInWithOAuth },
     });
 
-    const { signInWithProviderAction } = await loadActions();
-    await expect(signInWithProviderAction("discord")).rejects.toThrow(
-      /NEXT_REDIRECT:https:\/\/discord\.com/
-    );
+    const { runSignInWithProvider } = await loadCore();
+    const result = await runSignInWithProvider("discord");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.redirectUrl).toMatch(/discord\.com/);
+    }
     expect(signInWithOAuth).toHaveBeenCalledWith({
       provider: "discord",
       options: expect.objectContaining({ scopes: "identify email" }),
@@ -64,7 +72,7 @@ describe("signInWithProviderAction", () => {
   });
 });
 
-describe("unlinkProviderAction", () => {
+describe("runUnlinkProvider (core)", () => {
   beforeEach(() => {
     process.env.DISCORD_CLIENT_ID = "abc";
   });
@@ -84,8 +92,8 @@ describe("unlinkProviderAction", () => {
       auth: { getUser, getUserIdentities, unlinkIdentity },
     });
 
-    const { unlinkProviderAction } = await loadActions();
-    const result = await unlinkProviderAction("discord");
+    const { runUnlinkProvider } = await loadCore();
+    const result = await runUnlinkProvider("discord");
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("ONLY_IDENTITY");
     expect(unlinkIdentity).not.toHaveBeenCalled();
@@ -107,8 +115,8 @@ describe("unlinkProviderAction", () => {
       auth: { getUser, getUserIdentities, unlinkIdentity },
     });
 
-    const { unlinkProviderAction } = await loadActions();
-    const result = await unlinkProviderAction("discord");
+    const { runUnlinkProvider } = await loadCore();
+    const result = await runUnlinkProvider("discord");
     expect(result.ok).toBe(true);
     expect(unlinkIdentity).toHaveBeenCalledWith(discordIdentity);
   });
@@ -123,19 +131,19 @@ describe("unlinkProviderAction", () => {
       auth: { getUser },
     });
 
-    const { unlinkProviderAction } = await loadActions();
-    const result = await unlinkProviderAction("discord");
+    const { runUnlinkProvider } = await loadCore();
+    const result = await runUnlinkProvider("discord");
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("NOT_AUTHENTICATED");
   });
 });
 
-describe("linkProviderAction", () => {
+describe("runLinkProvider (core)", () => {
   beforeEach(() => {
     process.env.DISCORD_CLIENT_ID = "abc";
   });
 
-  it("calls linkIdentity and redirects to provider URL", async () => {
+  it("returns redirect URL from supabase.auth.linkIdentity", async () => {
     const { createClient } = await import("~/lib/supabase/server");
     const getUser = vi.fn().mockResolvedValue({
       data: { user: { id: "u1" } },
@@ -149,13 +157,93 @@ describe("linkProviderAction", () => {
       auth: { getUser, linkIdentity },
     });
 
-    const { linkProviderAction } = await loadActions();
-    await expect(linkProviderAction("discord")).rejects.toThrow(
-      /NEXT_REDIRECT:https:\/\/discord\.com/
-    );
+    const { runLinkProvider } = await loadCore();
+    const result = await runLinkProvider("discord");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.redirectUrl).toMatch(/discord\.com/);
+    }
     expect(linkIdentity).toHaveBeenCalledWith({
       provider: "discord",
       options: expect.objectContaining({ scopes: "identify email" }),
     });
+  });
+});
+
+describe("signInWithProviderAction (wrapper)", () => {
+  beforeEach(() => {
+    process.env.DISCORD_CLIENT_ID = "abc";
+  });
+
+  it("redirects to the provider URL on success", async () => {
+    const { createClient } = await import("~/lib/supabase/server");
+    const signInWithOAuth = vi.fn().mockResolvedValue({
+      data: { url: "https://discord.com/oauth2/authorize?..." },
+      error: null,
+    });
+    (createClient as ReturnType<typeof vi.fn>).mockResolvedValue({
+      auth: { signInWithOAuth },
+    });
+
+    const { signInWithProviderAction } = await loadActions();
+    await expect(signInWithProviderAction("discord")).rejects.toThrow(
+      /NEXT_REDIRECT:https:\/\/discord\.com/
+    );
+  });
+
+  it("redirects to /login?oauth_error=PROVIDER_UNAVAILABLE on failure", async () => {
+    delete process.env.DISCORD_CLIENT_ID;
+    const { signInWithProviderAction } = await loadActions();
+    await expect(signInWithProviderAction("discord")).rejects.toThrow(
+      /NEXT_REDIRECT:\/login\?oauth_error=PROVIDER_UNAVAILABLE/
+    );
+  });
+});
+
+describe("unlinkProviderAction (wrapper)", () => {
+  beforeEach(() => {
+    process.env.DISCORD_CLIENT_ID = "abc";
+  });
+
+  it("redirects to /settings?oauth_status=unlinked on success", async () => {
+    const { createClient } = await import("~/lib/supabase/server");
+    const getUser = vi.fn().mockResolvedValue({
+      data: { user: { id: "u1" } },
+      error: null,
+    });
+    const discordIdentity = identity("discord");
+    const getUserIdentities = vi.fn().mockResolvedValue({
+      data: { identities: [identity("email"), discordIdentity] },
+      error: null,
+    });
+    const unlinkIdentity = vi.fn().mockResolvedValue({ error: null });
+    (createClient as ReturnType<typeof vi.fn>).mockResolvedValue({
+      auth: { getUser, getUserIdentities, unlinkIdentity },
+    });
+
+    const { unlinkProviderAction } = await loadActions();
+    await expect(unlinkProviderAction("discord")).rejects.toThrow(
+      /NEXT_REDIRECT:\/settings\?oauth_status=unlinked/
+    );
+  });
+
+  it("redirects to /settings?oauth_error=ONLY_IDENTITY when refused", async () => {
+    const { createClient } = await import("~/lib/supabase/server");
+    const getUser = vi.fn().mockResolvedValue({
+      data: { user: { id: "u1" } },
+      error: null,
+    });
+    const getUserIdentities = vi.fn().mockResolvedValue({
+      data: { identities: [identity("discord")] },
+      error: null,
+    });
+    (createClient as ReturnType<typeof vi.fn>).mockResolvedValue({
+      auth: { getUser, getUserIdentities },
+    });
+
+    const { unlinkProviderAction } = await loadActions();
+    await expect(unlinkProviderAction("discord")).rejects.toThrow(
+      /NEXT_REDIRECT:\/settings\?oauth_error=ONLY_IDENTITY/
+    );
   });
 });
