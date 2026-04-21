@@ -54,8 +54,9 @@ describe("AssigneePicker Accessibility", () => {
 
     const unassignedOption = screen.getByTestId("assignee-option-unassigned");
     expect(unassignedOption).toHaveAttribute("role", "option");
-    // data-assigned tracks the currently assigned user (distinct from cmdk's
-    // aria-selected which reflects keyboard highlight state)
+    // data-assigned is the stable signal this test uses for current assignee
+    // state; this assertion intentionally does not rely on aria-selected
+    // (which cmdk owns and uses for keyboard highlight).
     expect(unassignedOption).toHaveAttribute("data-assigned", "false");
 
     const aliceOption = screen.getByTestId("assignee-option-1");
@@ -184,7 +185,7 @@ describe("AssigneePicker — Me quick-select", () => {
     expect(screen.getByTestId("assignee-option-3")).toBeInTheDocument();
   });
 
-  it("marks 'Me' as aria-selected when the current user is assigned", () => {
+  it("marks 'Me' with data-assigned when the current user is assigned", () => {
     const onAssign = vi.fn();
     render(
       <AssigneePicker

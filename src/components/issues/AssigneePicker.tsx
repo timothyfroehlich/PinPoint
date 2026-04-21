@@ -196,7 +196,6 @@ export function AssigneePicker({
                   onSelect={() => handleSelect(currentUser.id)}
                   data-testid="assignee-option-me"
                   data-assigned={assignedToId === currentUser.id}
-                  aria-selected={assignedToId === currentUser.id}
                 >
                   <User className="size-6 shrink-0 p-0.5 text-primary" />
                   <span className="font-medium text-primary">Me</span>
@@ -207,7 +206,6 @@ export function AssigneePicker({
                 onSelect={() => handleSelect(null)}
                 data-testid="assignee-option-unassigned"
                 data-assigned={assignedToId === null}
-                aria-selected={assignedToId === null}
               >
                 <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
                   ?
@@ -231,7 +229,6 @@ export function AssigneePicker({
                     onSelect={() => handleSelect(user.id)}
                     data-testid={`assignee-option-${user.id}`}
                     data-assigned={user.id === assignedToId}
-                    aria-selected={user.id === assignedToId}
                   >
                     <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
                       {user.name.slice(0, 1).toUpperCase()}
