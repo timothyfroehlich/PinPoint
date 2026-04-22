@@ -59,7 +59,9 @@ test.describe("Machine Owner Picker UX (PP-6oi)", () => {
 
     // "Guest User" should now appear under "Guests" section
     await expect(list.getByText("Guest User")).toBeVisible();
-    await expect(list.getByText("(GUEST)")).toBeVisible();
+    // At least one "(GUEST)" badge is visible — .first() avoids strict-mode
+    // violations when preview DBs contain multiple guest users.
+    await expect(list.getByText("(GUEST)").first()).toBeVisible();
   });
 
   test("typed search bypasses the guest filter", async ({ page }) => {
