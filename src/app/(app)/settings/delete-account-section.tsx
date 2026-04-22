@@ -112,11 +112,11 @@ export function DeleteAccountSection({
                   </div>
 
                   {ownedMachineCount > 0 && (
-                    <div className="space-y-3 rounded-lg border border-amber-500/20 bg-amber-50/50 p-4 dark:bg-amber-950/20">
-                      <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                    <div className="space-y-3 rounded-lg border border-warning/30 bg-warning-container/30 p-4">
+                      <p className="text-sm font-medium text-on-warning-container">
                         Machine Reassignment Needed
                       </p>
-                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                      <p className="text-xs text-on-warning-container/80">
                         You own {ownedMachineCount}{" "}
                         {ownedMachineCount === 1 ? "machine" : "machines"}.
                         Choose a new owner:
