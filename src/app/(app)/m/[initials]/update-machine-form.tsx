@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useActionState, useState, useRef, useEffect } from "react";
+import {
+  useActionState,
+  useState,
+  useRef,
+  useEffect,
+  startTransition,
+} from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -94,17 +100,13 @@ export function EditMachineDialog({
   >(null);
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
 
-  // State-driven hidden input for re-submission with forcePromoteUserId.
-  // Using state (not ref) so React flushes the value before requestSubmit.
-  const [forcePromoteUserId, setForcePromoteUserId] = useState("");
-
-  // Track whether we need to submit after forcePromoteUserId state flushes
-  const [pendingSubmit, setPendingSubmit] = useState(false);
-
   const [state, formAction, isPending] = useActionState<
     UpdateMachineResult | undefined,
     FormData
   >(updateMachineAction, undefined);
+
+  // Track the last state we've already handled to avoid re-opening on cancel
+  const handledStateRef = useRef<typeof state>(undefined);
 
   // Close edit dialog on successful update
   useEffect(() => {
@@ -113,39 +115,30 @@ export function EditMachineDialog({
     }
   }, [state]);
 
-  // Open promote dialog when server returns ASSIGNEE_NOT_MEMBER
+  // Open promote dialog when server returns ASSIGNEE_NOT_MEMBER (once per state)
   useEffect(() => {
     if (
       state &&
+      state !== handledStateRef.current &&
       !state.ok &&
       state.code === "ASSIGNEE_NOT_MEMBER" &&
-      state.meta?.assignee &&
-      !isPromoteOpen
+      state.meta?.assignee
     ) {
+      handledStateRef.current = state;
       setPromoteAssignee(state.meta.assignee);
       setIsPromoteOpen(true);
     }
-  }, [state, isPromoteOpen]);
+  }, [state]);
 
   // Reset state when edit dialog opens/closes
   useEffect(() => {
     if (open) {
       setSelectedOwnerId(currentOwnerId);
       transferConfirmedRef.current = false;
-      setForcePromoteUserId("");
       setPromoteAssignee(null);
       setIsPromoteOpen(false);
-      setPendingSubmit(false);
     }
   }, [open, currentOwnerId]);
-
-  // Submit after forcePromoteUserId has been set in state (ensures React flushed it)
-  useEffect(() => {
-    if (pendingSubmit && forcePromoteUserId) {
-      setPendingSubmit(false);
-      formRef.current?.requestSubmit();
-    }
-  }, [pendingSubmit, forcePromoteUserId]);
 
   // Find the selected owner's name for the transfer confirmation dialog
   const selectedOwnerName =
@@ -178,18 +171,23 @@ export function EditMachineDialog({
   };
 
   const confirmPromote = (): void => {
-    if (!promoteAssignee) return;
-    setForcePromoteUserId(promoteAssignee.id);
+    if (!promoteAssignee || !formRef.current) return;
     setIsPromoteOpen(false);
-    // Signal that we want to submit after state flushes (useEffect handles the actual call)
-    setPendingSubmit(true);
+    // Build FormData from the live form DOM (captures all current field values)
+    // then inject forcePromoteUserId before dispatching directly to the action.
+    // This avoids the DOM requestSubmit() → useActionState wiring uncertainty.
+    const fd = new FormData(formRef.current);
+    fd.set("forcePromoteUserId", promoteAssignee.id);
+    // useActionState dispatch must be called inside a transition — calling it
+    // outside a transition silently skips the server action (React 19 requirement).
+    startTransition(() => {
+      formAction(fd);
+    });
   };
 
   const cancelPromote = (): void => {
     setIsPromoteOpen(false);
     setPromoteAssignee(null);
-    setForcePromoteUserId("");
-    setPendingSubmit(false);
   };
 
   return (
@@ -222,12 +220,6 @@ export function EditMachineDialog({
             className="space-y-6"
           >
             <input type="hidden" name="id" value={machine.id} />
-            {/* State-driven hidden input for re-submission with forcePromoteUserId */}
-            <input
-              type="hidden"
-              name="forcePromoteUserId"
-              value={forcePromoteUserId}
-            />
 
             {/* Flash message — suppress ASSIGNEE_NOT_MEMBER since dialog handles it */}
             {state && !state.ok && state.code !== "ASSIGNEE_NOT_MEMBER" && (
@@ -359,9 +351,8 @@ export function EditMachineDialog({
        * Duplicated from create-machine-form.tsx — pending extraction at 3rd consumer.
        *
        * Radix portals DialogContent outside the form tree. The confirm button
-       * cannot implicitly target the outer form, so we use a state-driven
-       * hidden forcePromoteUserId input + requestAnimationFrame to flush state
-       * before programmatic requestSubmit fires on the outer form.
+       * cannot implicitly target the outer form, so we read the live form DOM
+       * via formRef, inject forcePromoteUserId, and call formAction(fd) directly.
        */}
       <Dialog open={isPromoteOpen} onOpenChange={setIsPromoteOpen}>
         <DialogContent>
