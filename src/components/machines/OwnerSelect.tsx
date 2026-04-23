@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { ChevronsUpDown, Plus } from "lucide-react";
 import type { UserStatus } from "~/lib/types";
 import { InviteUserDialog } from "~/components/users/InviteUserDialog";
 import { compareUnifiedUsers } from "~/lib/users/comparators";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
+import { Checkbox } from "~/components/ui/checkbox";
 import {
   Command,
   CommandEmpty,
@@ -33,13 +34,15 @@ import {
  * ## Composition
  * - Users are sorted by `compareUnifiedUsers` (confirmed first, by machine
  *   count descending, then by last name)
- * - Each option shows: name, machine count badge (if > 0), and "(Invited)"
- *   tag for users with `status === "invited"`
+ * - Default state hides guests and invited users; a checkbox reveals them.
+ * - Typed search bypasses the hide-guests filter and shows all matches.
+ * - Each option shows: name, machine count badge (if > 0), and role tags
+ *   ("(GUEST)", "(INVITED)", or "(INVITED · GUEST)") for non-member users
  * - `onUsersChange` callback allows the parent to update its user list
  *   without a server round-trip after an invite
  *
  * ## Key Abstractions
- * - `OwnerSelectUser` includes `machineCount` and `status` for metadata display
+ * - `OwnerSelectUser` includes `role`, `machineCount` and `status` for metadata display
  * - A hidden `<input type="hidden">` preserves native form submission compat
  * - `compareUnifiedUsers` from `~/lib/users/comparators` drives sort order
  */
@@ -51,6 +54,7 @@ export interface OwnerSelectUser {
   lastName: string;
   machineCount: number;
   status: UserStatus;
+  role: "guest" | "member" | "technician" | "admin";
 }
 
 interface OwnerSelectProps {
@@ -71,8 +75,17 @@ export function OwnerSelect({
   const [open, setOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(defaultValue ?? "");
+  const [showHidden, setShowHidden] = useState(false);
+  const [query, setQuery] = useState("");
   // Local extra users added via invite when parent doesn't provide onUsersChange
   const [extraUsers, setExtraUsers] = useState<OwnerSelectUser[]>([]);
+
+  // Reset search when popover closes
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+    }
+  }, [open]);
 
   // Merged user list: prop users + locally-tracked invited users (deduped)
   const allUsers = useMemo(() => {
@@ -90,6 +103,58 @@ export function OwnerSelect({
     () => allUsers.find((u) => u.id === selectedId) ?? null,
     [allUsers, selectedId]
   );
+
+  /**
+   * Filter and partition users into three groups:
+   * 1. Member+ active users (no section header)
+   * 2. Invited users (header "Invited")
+   * 3. Guest users (header "Guests")
+   *
+   * When query is non-empty, all matches are shown regardless of showHidden.
+   * When query is empty and !showHidden, guests and invited users are hidden.
+   */
+  const { memberUsers, invitedUsers, guestUsers } = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    const hasQuery = normalized.length > 0;
+
+    const matchesQuery = (u: OwnerSelectUser): boolean =>
+      u.name.toLowerCase().includes(normalized);
+
+    const isGuest = (u: OwnerSelectUser): boolean => u.role === "guest"; // permissions-audit-allow: UI display filter, not a permission gate
+    const isInvited = (u: OwnerSelectUser): boolean =>
+      u.status === "invited" && !isGuest(u);
+    const isMemberPlus = (u: OwnerSelectUser): boolean =>
+      !isGuest(u) && !isInvited(u);
+
+    if (hasQuery) {
+      // Search bypasses the filter — show all matching users across categories
+      return {
+        memberUsers: sortedUsers.filter(
+          (u) => isMemberPlus(u) && matchesQuery(u)
+        ),
+        invitedUsers: sortedUsers.filter(
+          (u) => isInvited(u) && matchesQuery(u)
+        ),
+        guestUsers: sortedUsers.filter((u) => isGuest(u) && matchesQuery(u)),
+      };
+    }
+
+    if (showHidden) {
+      // Show all users, partitioned into groups
+      return {
+        memberUsers: sortedUsers.filter(isMemberPlus),
+        invitedUsers: sortedUsers.filter(isInvited),
+        guestUsers: sortedUsers.filter(isGuest),
+      };
+    }
+
+    // Default: only show member+ active users
+    return {
+      memberUsers: sortedUsers.filter(isMemberPlus),
+      invitedUsers: [],
+      guestUsers: [],
+    };
+  }, [sortedUsers, query, showHidden]);
 
   const handleSelect = (userId: string): void => {
     setSelectedId(userId);
@@ -141,11 +206,24 @@ export function OwnerSelect({
               {selectedUser ? (
                 <>
                   {selectedUser.name}
-                  {selectedUser.status === "invited" && (
-                    <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                      (Invited)
-                    </span>
-                  )}
+                  {selectedUser.role !== "guest" &&
+                    selectedUser.status === "invited" && ( // permissions-audit-allow: UI badge display, not a permission gate
+                      <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                        (Invited)
+                      </span>
+                    )}
+                  {selectedUser.role === "guest" &&
+                    selectedUser.status !== "invited" && ( // permissions-audit-allow: UI badge display, not a permission gate
+                      <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        (GUEST)
+                      </span>
+                    )}
+                  {selectedUser.role === "guest" &&
+                    selectedUser.status === "invited" && ( // permissions-audit-allow: UI badge display, not a permission gate
+                      <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        (INVITED · GUEST)
+                      </span>
+                    )}
                 </>
               ) : (
                 "Select an owner"
@@ -158,37 +236,128 @@ export function OwnerSelect({
           className="w-(--radix-popover-trigger-width) p-0"
           align="start"
         >
-          <Command>
-            <CommandInput placeholder="Search users..." />
+          {/*
+           * shouldFilter={false}: we manage filtering manually so guests/invited
+           * are only shown when toggle is on or query is active.
+           */}
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="Search users..."
+              value={query}
+              onValueChange={setQuery}
+            />
+            {/* Checkbox to reveal guests and invited users */}
+            <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+              <Checkbox
+                id="show-hidden-users"
+                checked={showHidden}
+                onCheckedChange={(checked) => {
+                  setShowHidden(checked === true);
+                }}
+              />
+              <label
+                htmlFor="show-hidden-users"
+                className="cursor-pointer text-xs text-muted-foreground select-none"
+              >
+                Show guests and invited users
+              </label>
+            </div>
             <CommandList>
               <CommandEmpty>No users found.</CommandEmpty>
-              <CommandGroup>
-                {sortedUsers.map((user) => (
-                  <CommandItem
-                    key={user.id}
-                    value={user.name}
-                    onSelect={() => handleSelect(user.id)}
-                    aria-current={user.id === selectedId ? "true" : undefined}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>{user.name}</span>
-                      {user.machineCount > 0 && (
-                        <span className="text-[10px] text-muted-foreground/70">
-                          ({user.machineCount})
-                        </span>
-                      )}
-                      {user.status === "invited" && (
-                        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
-                          (Invited)
-                        </span>
-                      )}
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+
+              {/* Section 1: Member+ active users (no header) */}
+              {memberUsers.length > 0 && (
+                <CommandGroup>
+                  {memberUsers.map((user) => (
+                    <CommandItem
+                      key={user.id}
+                      value={user.id}
+                      onSelect={() => handleSelect(user.id)}
+                      aria-current={user.id === selectedId ? "true" : undefined}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{user.name}</span>
+                        {user.machineCount > 0 && (
+                          <span className="text-[10px] text-muted-foreground/70">
+                            ({user.machineCount})
+                          </span>
+                        )}
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+
+              {/* Section 2: Invited (non-guest) users */}
+              {invitedUsers.length > 0 && (
+                <>
+                  {memberUsers.length > 0 && <CommandSeparator />}
+                  <CommandGroup heading="Invited">
+                    {invitedUsers.map((user) => (
+                      <CommandItem
+                        key={user.id}
+                        value={user.id}
+                        onSelect={() => handleSelect(user.id)}
+                        aria-current={
+                          user.id === selectedId ? "true" : undefined
+                        }
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{user.name}</span>
+                          {user.machineCount > 0 && (
+                            <span className="text-[10px] text-muted-foreground/70">
+                              ({user.machineCount})
+                            </span>
+                          )}
+                          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                            (INVITED)
+                          </span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
+
+              {/* Section 3: Guest users */}
+              {guestUsers.length > 0 && (
+                <>
+                  {(memberUsers.length > 0 || invitedUsers.length > 0) && (
+                    <CommandSeparator />
+                  )}
+                  <CommandGroup heading="Guests">
+                    {guestUsers.map((user) => (
+                      <CommandItem
+                        key={user.id}
+                        value={user.id}
+                        onSelect={() => handleSelect(user.id)}
+                        aria-current={
+                          user.id === selectedId ? "true" : undefined
+                        }
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{user.name}</span>
+                          {user.machineCount > 0 && (
+                            <span className="text-[10px] text-muted-foreground/70">
+                              ({user.machineCount})
+                            </span>
+                          )}
+                          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                            {user.status === "invited"
+                              ? "(INVITED · GUEST)"
+                              : "(GUEST)"}
+                          </span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
+
               <CommandSeparator />
               <CommandGroup>
                 <CommandItem
+                  value="invite-new"
                   onSelect={() => {
                     setOpen(false);
                     setInviteDialogOpen(true);
