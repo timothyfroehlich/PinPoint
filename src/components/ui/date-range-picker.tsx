@@ -64,7 +64,7 @@ export function DateRangePicker({
               data-testid={testId}
               className={cn(
                 "w-full justify-between text-left font-normal h-9 px-3",
-                date?.from ? "pr-8" : "",
+                date?.from && "pr-8",
                 !date?.from && "text-muted-foreground"
               )}
             >
@@ -90,7 +90,7 @@ export function DateRangePicker({
               type="button"
               onClick={handleClear}
               aria-label="Clear date range"
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 rounded-sm hover:bg-muted flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-opacity duration-150"
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 rounded-sm hover:bg-muted flex items-center justify-center opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-opacity duration-150"
             >
               <X className="h-3 w-3 text-muted-foreground" />
             </button>
