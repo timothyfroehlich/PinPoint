@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { Calendar as CalendarIcon, X } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { cn } from "~/lib/utils";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import { Calendar } from "~/components/ui/calendar";
 import {
   Popover,
@@ -57,57 +57,63 @@ export function DateRangePicker({
 
   return (
     <div className={cn("grid gap-2", className)}>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            id="date"
-            variant={"outline"}
-            data-testid={testId}
+      <div className="flex items-center gap-1">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              id="date"
+              variant={"outline"}
+              data-testid={testId}
+              className={cn(
+                "flex-1 justify-between text-left font-normal h-9 px-3",
+                !date?.from && "text-muted-foreground"
+              )}
+            >
+              <span className="truncate">
+                {date?.from ? (
+                  date.to ? (
+                    <>
+                      {format(date.from, "LLL dd, y")} -{" "}
+                      {format(date.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(date.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>{placeholder}</span>
+                )}
+              </span>
+              <CalendarIcon className="h-4 w-4 shrink-0 opacity-50 ml-2" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-auto max-h-[80dvh] overflow-y-auto p-0"
+            align="start"
+          >
+            <Calendar
+              initialFocus
+              mode="range"
+              {...(date?.from ? { defaultMonth: date.from } : {})}
+              selected={date}
+              onSelect={handleSelect}
+              numberOfMonths={2}
+            />
+          </PopoverContent>
+        </Popover>
+        {date?.from && (
+          <button
+            type="button"
+            onClick={handleClear}
+            aria-label="Clear date range"
             className={cn(
-              "w-full justify-between text-left font-normal h-9 px-3 group relative pr-8",
-              !date?.from && "text-muted-foreground"
+              buttonVariants({ variant: "ghost", size: "icon" }),
+              "h-9 w-9 shrink-0 opacity-100 hover:opacity-100 hover:bg-muted"
             )}
           >
-            <span className="truncate">
-              {date?.from ? (
-                date.to ? (
-                  <>
-                    {format(date.from, "LLL dd, y")} -{" "}
-                    {format(date.to, "LLL dd, y")}
-                  </>
-                ) : (
-                  format(date.from, "LLL dd, y")
-                )
-              ) : (
-                <span>{placeholder}</span>
-              )}
-            </span>
-            <CalendarIcon className="h-4 w-4 shrink-0 opacity-50 ml-2" />
-            {date?.from && (
-              <div
-                role="button"
-                onClick={handleClear}
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 rounded-sm hover:bg-muted flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-              >
-                <X className="h-3 w-3 text-muted-foreground" />
-              </div>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-auto max-h-[80dvh] overflow-y-auto p-0"
-          align="start"
-        >
-          <Calendar
-            initialFocus
-            mode="range"
-            {...(date?.from ? { defaultMonth: date.from } : {})}
-            selected={date}
-            onSelect={handleSelect}
-            numberOfMonths={2}
-          />
-        </PopoverContent>
-      </Popover>
+            <X className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
