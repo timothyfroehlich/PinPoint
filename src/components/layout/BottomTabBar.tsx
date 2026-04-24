@@ -24,6 +24,7 @@ import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { isNavItemActive } from "~/components/layout/nav-utils";
 import { NAV_ITEMS } from "~/components/layout/nav-config";
 import type { UserRole } from "~/lib/types";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 interface BottomTabBarProps {
   role?: UserRole | undefined;
@@ -37,9 +38,9 @@ const bottomTabs = [
 ] as const;
 
 const tabBaseClass =
-  "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors min-h-[56px]";
+  "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors duration-150 min-h-[56px]";
 const sheetItemClass =
-  "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary";
+  "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-primary/10 hover:text-primary";
 
 export function BottomTabBar({
   role,
@@ -159,7 +160,7 @@ export function BottomTabBar({
               <span>About</span>
             </Link>
 
-            {role === "admin" && ( // permissions-audit-allow: cleanup pending in PP-wwf
+            {checkPermission("admin.access", getAccessLevel(role)) && (
               <Link
                 href="/admin/users"
                 onClick={() => setMoreOpen(false)}

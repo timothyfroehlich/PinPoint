@@ -25,7 +25,7 @@ function PermissionValueCell({
 }): React.JSX.Element {
   if (value === true) {
     return (
-      <span className="flex justify-center text-green-600 dark:text-green-400">
+      <span className="flex justify-center text-success">
         <Check className="size-4" aria-label="Allowed" />
       </span>
     );
@@ -127,7 +127,7 @@ export function PermissionsLegend(): React.JSX.Element {
   return (
     <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
       <span className="inline-flex items-center gap-1.5">
-        <Check className="size-4 text-green-600 dark:text-green-400" />
+        <Check className="size-4 text-success" />
         Allowed
       </span>
       <span className="inline-flex items-center gap-1.5">

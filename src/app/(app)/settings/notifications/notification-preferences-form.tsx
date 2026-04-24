@@ -164,7 +164,7 @@ export function NotificationPreferencesForm({
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           Behavior
         </h3>
-        <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors hover:bg-surface-variant/30">
+        <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors duration-150 hover:bg-surface-variant/30">
           <div className="space-y-0.5 pr-4">
             <Label
               htmlFor="suppressOwnActions"
@@ -336,7 +336,7 @@ function MainSwitchItem({
   onCheckedChange,
 }: MainSwitchItemProps): React.JSX.Element {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors hover:bg-surface-variant/30">
+    <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors duration-150 hover:bg-surface-variant/30">
       <div className="space-y-0.5 pr-4">
         <Label htmlFor={id} className="text-sm font-medium cursor-pointer">
           {label}
@@ -379,7 +379,7 @@ function PreferenceRow({
   return (
     <div
       className={cn(
-        "gap-4 p-3 items-center hover:bg-surface-variant/30 transition-colors",
+        "gap-4 p-3 items-center hover:bg-surface-variant/30 transition-colors duration-150",
         hideEmail
           ? "grid grid-cols-[1fr_auto]"
           : "grid grid-cols-[1fr_auto_auto]"

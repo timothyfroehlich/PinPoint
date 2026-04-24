@@ -177,6 +177,7 @@ export default async function MachineDetailPage({
     lastName: u.lastName,
     machineCount: u.machineCount,
     status: u.status,
+    role: u.role,
   }));
 
   const totalIssuesCount = totalIssuesCountResult[0]?.count ?? 0;

@@ -31,7 +31,7 @@ export function RichTextDisplay({
 
   return (
     <div
-      className={cn("prose prose-sm dark:prose-invert max-w-none", className)}
+      className={cn("prose prose-sm prose-invert max-w-none", className)}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

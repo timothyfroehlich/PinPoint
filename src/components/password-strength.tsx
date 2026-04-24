@@ -59,16 +59,16 @@ export function PasswordStrength({
   }
 
   const colors = [
-    "bg-red-500", // 0: too weak
-    "bg-orange-500", // 1: weak
-    "bg-yellow-500", // 2: fair
-    "bg-lime-500", // 3: good
-    "bg-green-600", // 4: strong
+    "bg-destructive", // 0: too weak
+    "bg-destructive/70", // 1: weak
+    "bg-warning", // 2: fair
+    "bg-success/70", // 3: good
+    "bg-success", // 4: strong
   ];
 
   const labels = ["Too weak", "Weak", "Fair", "Good", "Strong"];
 
-  const color = colors[strength.score] ?? "bg-gray-300";
+  const color = colors[strength.score] ?? "bg-muted";
   const label = labels[strength.score] ?? "Unknown";
   const widthPercentage = ((strength.score + 1) / 5) * 100;
 

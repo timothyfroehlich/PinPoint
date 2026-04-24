@@ -8,7 +8,7 @@ import {
   notificationPreferences,
   machines,
 } from "~/server/db/schema";
-import { eq, and, ne, count } from "drizzle-orm";
+import { eq, and, ne, count, inArray } from "drizzle-orm";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { ProfileForm } from "./profile-form";
 import { ConnectedAccountsSection } from "./connected-accounts/connected-accounts-section";
@@ -64,7 +64,14 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     db
       .select({ id: userProfiles.id, name: userProfiles.name })
       .from(userProfiles)
-      .where(ne(userProfiles.id, user.id)),
+      .where(
+        and(
+          ne(userProfiles.id, user.id),
+          // Guests cannot own machines (matrix: machines.edit guest:false).
+          // Only member+ are valid reassignment targets. (PP-hci)
+          inArray(userProfiles.role, ["member", "technician", "admin"])
+        )
+      ),
   ]);
 
   const ownedMachineCount = ownedMachinesResult[0]?.count ?? 0;

@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useActionState, useState, useRef, useEffect } from "react";
+import {
+  useActionState,
+  useState,
+  useRef,
+  useEffect,
+  startTransition,
+} from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -15,6 +21,7 @@ import {
 import {
   updateMachineAction,
   type UpdateMachineResult,
+  type AssigneeNotMemberMeta,
 } from "~/app/(app)/m/actions";
 import { cn } from "~/lib/utils";
 import { OwnerSelect } from "~/components/machines/OwnerSelect";
@@ -42,6 +49,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Pencil } from "lucide-react";
 
 import type { OwnerSelectUser } from "~/components/machines/OwnerSelect";
@@ -86,27 +94,53 @@ export function EditMachineDialog({
   );
   const currentOwnerId = machine.ownerId ?? machine.invitedOwnerId ?? "";
 
+  // Promote dialog state — populated when server returns ASSIGNEE_NOT_MEMBER
+  const [promoteAssignee, setPromoteAssignee] = useState<
+    AssigneeNotMemberMeta["assignee"] | null
+  >(null);
+  const [isPromoteOpen, setIsPromoteOpen] = useState(false);
+
   const [state, formAction, isPending] = useActionState<
     UpdateMachineResult | undefined,
     FormData
   >(updateMachineAction, undefined);
 
-  // Close dialog on successful update
+  // Track the last state we've already handled to avoid re-opening on cancel
+  const handledStateRef = useRef<typeof state>(undefined);
+
+  // Close edit dialog on successful update
   useEffect(() => {
     if (state?.ok) {
       setOpen(false);
     }
   }, [state]);
 
-  // Reset selectedOwnerId when dialog reopens to avoid stale selection
+  // Open promote dialog when server returns ASSIGNEE_NOT_MEMBER (once per state)
+  useEffect(() => {
+    if (
+      state &&
+      state !== handledStateRef.current &&
+      !state.ok &&
+      state.code === "ASSIGNEE_NOT_MEMBER" &&
+      state.meta?.assignee
+    ) {
+      handledStateRef.current = state;
+      setPromoteAssignee(state.meta.assignee);
+      setIsPromoteOpen(true);
+    }
+  }, [state]);
+
+  // Reset state when edit dialog opens/closes
   useEffect(() => {
     if (open) {
       setSelectedOwnerId(currentOwnerId);
       transferConfirmedRef.current = false;
+      setPromoteAssignee(null);
+      setIsPromoteOpen(false);
     }
   }, [open, currentOwnerId]);
 
-  // Find the selected owner's name for the confirmation dialog
+  // Find the selected owner's name for the transfer confirmation dialog
   const selectedOwnerName =
     allUsers.find((u) => u.id === selectedOwnerId)?.name ?? "the selected user";
 
@@ -136,6 +170,26 @@ export function EditMachineDialog({
     formRef.current?.requestSubmit();
   };
 
+  const confirmPromote = (): void => {
+    if (!promoteAssignee || !formRef.current) return;
+    setIsPromoteOpen(false);
+    // Build FormData from the live form DOM (captures all current field values)
+    // then inject forcePromoteUserId before dispatching directly to the action.
+    // This avoids the DOM requestSubmit() → useActionState wiring uncertainty.
+    const fd = new FormData(formRef.current);
+    fd.set("forcePromoteUserId", promoteAssignee.id);
+    // useActionState dispatch must be called inside a transition — calling it
+    // outside a transition silently skips the server action (React 19 requirement).
+    startTransition(() => {
+      formAction(fd);
+    });
+  };
+
+  const cancelPromote = (): void => {
+    setIsPromoteOpen(false);
+    setPromoteAssignee(null);
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -162,12 +216,13 @@ export function EditMachineDialog({
             ref={formRef}
             action={formAction}
             onSubmit={handleSubmit}
+            id="edit-machine-form"
             className="space-y-6"
           >
             <input type="hidden" name="id" value={machine.id} />
 
-            {/* Flash message */}
-            {state && !state.ok && (
+            {/* Flash message — suppress ASSIGNEE_NOT_MEMBER since dialog handles it */}
+            {state && !state.ok && state.code !== "ASSIGNEE_NOT_MEMBER" && (
               <div
                 className={cn(
                   "rounded-md border p-4",
@@ -288,6 +343,53 @@ export function EditMachineDialog({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/*
+       * Promote-and-assign confirmation dialog.
+       * Duplicated from create-machine-form.tsx — pending extraction at 3rd consumer.
+       *
+       * Radix portals DialogContent outside the form tree. The confirm button
+       * cannot implicitly target the outer form, so we read the live form DOM
+       * via formRef, inject forcePromoteUserId, and call formAction(fd) directly.
+       */}
+      <Dialog open={isPromoteOpen} onOpenChange={setIsPromoteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Promote to member and assign?</DialogTitle>
+            <DialogDescription>
+              This updates the user&apos;s role and assigns them as owner.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p>
+              <strong>{promoteAssignee?.name}</strong>
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground ml-1">
+                {promoteAssignee?.type === "invited"
+                  ? "(INVITED · GUEST)"
+                  : "(GUEST)"}
+              </span>{" "}
+              is currently a guest. Assigning them as owner of{" "}
+              <strong>{machine.name}</strong> will promote them to member.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              As a member they&apos;ll be able to edit the machine&apos;s
+              details, owner notes, tournament notes, and owner requirements.
+            </p>
+            <Alert>
+              <AlertDescription>
+                Promotion and assignment run in one transaction — both succeed
+                or both roll back.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelPromote}>
+              Cancel
+            </Button>
+            <Button onClick={confirmPromote}>Promote and assign</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -23,8 +23,12 @@ async function verifyAdmin(userId: string): Promise<void> {
     columns: { role: true },
   });
 
-  if (currentUserProfile?.role !== "admin") {
-    // permissions-audit-allow: cleanup pending in PP-wwf
+  if (
+    !checkPermission(
+      "admin.users.roles",
+      getAccessLevel(currentUserProfile?.role)
+    )
+  ) {
     throw new Error("Forbidden: Only admins can perform this action");
   }
 }

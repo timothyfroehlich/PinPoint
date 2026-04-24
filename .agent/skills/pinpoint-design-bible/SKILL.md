@@ -206,7 +206,7 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 ## 7. Card & List Patterns
 
 - Cards are full-width tappable links on mobile, grid layout on desktop.
-- **Open items:** `bg-surface` + `hover:glow-primary` + `border-outline-variant hover:border-primary/50`.
+- **Open items:** `bg-card` + `hover:glow-primary` + `border-outline-variant hover:border-primary/50`. (Earlier drafts called for `bg-surface` here, but the cards are content surfaces, not full-width sections — see §2 Surface Hierarchy.)
 - **Closed items:** `bg-surface-variant/30`, no glow.
 - `IssueCard` has `normal` and `compact` variants -- use `compact` for secondary/nested lists.
 - `IssueBadgeGrid` has `variant="normal"` (grid layout) and `variant="strip"` (inline flex).
@@ -274,15 +274,24 @@ The shared primitives (`CardTitle`/`CardDescription`, `AlertTitle`/`AlertDescrip
 | Form sections      | `Separator` component                  |
 | Page header bottom | `border-b border-outline-variant pb-6` |
 
-## 11. Transition Standards
+## 11. Transition Durations
 
-| Change type          | Use                                                        |
-| :------------------- | :--------------------------------------------------------- |
-| Hover color change   | `transition-colors` (default 150ms)                        |
-| Layout / size change | `transition-all duration-300 ease-in-out`                  |
-| Expand / collapse    | `transition-[grid-template-rows] duration-200 ease-in-out` |
+Two canonical durations standardize all animated feedback:
 
-**Rule:** Do not use `transition-all` for simple color-only changes -- it is unnecessary and hurts performance.
+| Intent                                | Duration | Class          | Typical use                                 |
+| ------------------------------------- | -------- | -------------- | ------------------------------------------- |
+| Hover feedback, color shifts          | 150ms    | `duration-150` | Button hover, text color, icon state        |
+| Layout changes, structural animations | 300ms    | `duration-300` | Panel slides, accordion expand, drawer open |
+
+**Property selection:** Prefer specific transitions over `transition-all` — list the properties that actually animate. This improves performance and clarity.
+
+- `transition-colors duration-150` for button hovers, link colors, icon fills
+- `transition-opacity duration-150` for opacity-only reveals (badges, icons)
+- `transition-transform duration-150` for small rotations (chevrons, badges)
+- When a single element animates multiple properties (e.g. colors + a focus ring's box-shadow, or colors + a pressed-state transform), use the bracket syntax: `transition-[color,background-color,border-color,box-shadow] duration-150`
+- For layout shifts (drawers, accordions, height/width transitions), prefer the specific property list with `duration-300`: `transition-[height,width] duration-300`, `transition-[grid-template-rows] duration-300`, etc. Reserve `transition-all duration-300` for cases where the set of animating properties genuinely isn't enumerable.
+
+**Rule:** Never introduce a duration other than 150 or 300 unless the canonical two genuinely don't fit. If you find an edge case, add a new row to this table first, document the use case, then use it consistently across similar elements.
 
 ## 12. Component Inventory
 

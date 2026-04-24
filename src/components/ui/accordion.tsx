@@ -38,13 +38,13 @@ function AccordionTrigger({
     <summary
       data-slot="accordion-trigger"
       className={cn(
-        "flex cursor-pointer list-none items-center justify-between py-4 text-left text-sm font-medium transition-all hover:underline [&::-webkit-details-marker]:hidden",
+        "flex cursor-pointer list-none items-center justify-between py-4 text-left text-sm font-medium transition-colors duration-150 hover:underline [&::-webkit-details-marker]:hidden",
         className
       )}
       {...props}
     >
       {children}
-      <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
+      <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-open:rotate-180" />
     </summary>
   );
 }

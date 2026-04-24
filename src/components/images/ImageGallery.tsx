@@ -44,7 +44,7 @@ export function ImageGallery({
                   data-testid="gallery-image"
                   fill
                   unoptimized={isLocalhost}
-                  className="object-cover transition-transform group-hover:scale-105"
+                  className="object-cover transition-transform duration-150 group-hover:scale-105"
                   sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
                 />
                 {/* Note: Delete button will be added in PR 3 */}

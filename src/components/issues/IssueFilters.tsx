@@ -472,7 +472,7 @@ export function IssueFilters({
           <div
             ref={searchBarRef}
             className={cn(
-              "flex items-center gap-2 px-3 h-11 bg-background border rounded-md transition-all shadow-sm ring-offset-background flex-1 relative focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+              "flex items-center gap-2 px-3 h-11 bg-background border rounded-md transition-colors duration-150 shadow-sm ring-offset-background flex-1 relative focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
               isSearching && "opacity-70 grayscale-[0.3]"
             )}
           >
@@ -522,7 +522,7 @@ export function IssueFilters({
                     <span className="truncate">{badge.label}</span>
                     <button
                       type="button"
-                      className="opacity-0 group-hover/badge:opacity-100 p-0.5 hover:bg-secondary rounded-full transition-opacity ml-0.5"
+                      className="opacity-0 group-hover/badge:opacity-100 p-0.5 hover:bg-secondary rounded-full transition-opacity duration-150 ml-0.5"
                       onClick={() => badge.clear()}
                       aria-label={`Clear ${badge.label}`}
                     >
