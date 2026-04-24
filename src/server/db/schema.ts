@@ -646,8 +646,9 @@ export const machineWatchersRelations = relations(
  * Supabase Vault secret. Use `getDiscordConfig()` server accessor to read
  * the decrypted token via the `get_discord_config()` SECURITY DEFINER RPC.
  *
- * RLS: admin role only (see drizzle/0028_natural_vengeance.sql and
- * drizzle/0029_discord_config_role_check.sql).
+ * RLS: admin role only (see drizzle/0028_natural_vengeance.sql,
+ * drizzle/0029_discord_config_role_check.sql, and
+ * drizzle/0030_fix_discord_rls_user_metadata.sql).
  *
  * Spec: docs/superpowers/specs/2026-04-19-discord-integration-design.md (§ PR 3)
  */

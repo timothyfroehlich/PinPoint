@@ -18,7 +18,7 @@ interface UserMenuProps {
   userName: string;
   /** Override the trigger's data-testid. Useful when rendered in multiple layout regions. */
   testId?: string;
-  /** User role — when "admin", shows User Management link in dropdown. */
+  /** User role — when "admin", shows the User Management and Integrations links in the dropdown. */
   role?: UserRole | undefined;
 }
 
