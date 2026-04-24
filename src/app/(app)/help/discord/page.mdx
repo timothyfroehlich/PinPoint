@@ -1,0 +1,34 @@
+import { HelpPage } from "~/components/help/HelpPage";
+
+export const metadata = {
+  title: "Discord Integration | PinPoint",
+};
+
+<HelpPage breadcrumb="Discord Integration" title="Discord Integration" description="How PinPoint uses Discord for sign-in and (soon) direct-message notifications.">
+
+## What it does
+
+Discord currently powers the **Sign in with Discord** button on the login and signup pages. Once enabled by an admin, members can authenticate with their Discord account instead of an email and password.
+
+Per-user DM notifications are planned next — PinPoint will be able to deliver issue updates via direct message to members who have connected their Discord account.
+
+## How admins enable it
+
+1. Go to **User Management → Integrations → Discord** (link is in the user menu, admins only).
+2. Paste the bot token from the Discord developer portal and save it.
+3. Optionally set the **Guild ID** for the APC server and an **Invite link** — the invite link is surfaced to users when DMs fail because they aren't in the server.
+4. Flip the **Integration enabled** switch. The switch stays disabled until a token has been saved.
+
+Without a saved token the "Sign in with Discord" button stays hidden for everyone.
+
+## How users connect their account
+
+Once the integration is enabled, go to **Settings → Connected Accounts → Connect Discord** and follow the OAuth flow. Connecting is what lets PinPoint deliver DM notifications to your Discord inbox.
+
+## Troubleshooting
+
+- **"Sign in with Discord" button is missing on the login page.** An admin hasn't enabled the integration yet. Ask an admin to set the bot token and flip the Enabled switch.
+- **DMs aren't arriving.** The bot can only DM users who share a server with it. Make sure you're in the APC Discord server — admins can share the invite link configured under Integrations.
+- **Bot health shows anything other than "ok".** Re-check the bot token under Integrations and make sure the bot user hasn't been removed from the server.
+
+</HelpPage>

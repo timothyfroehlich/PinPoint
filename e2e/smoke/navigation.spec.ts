@@ -135,7 +135,7 @@ test.describe("Bottom Tab Bar (mobile only)", () => {
     await expect(page.getByTestId("more-sheet-about")).toBeVisible();
   });
 
-  test("More sheet shows Admin Panel only for admin users", async ({
+  test("More sheet shows User Management only for admin users", async ({
     page,
   }, testInfo) => {
     const isMobile = testInfo.project.name.includes("Mobile");
@@ -152,7 +152,7 @@ test.describe("Bottom Tab Bar (mobile only)", () => {
     const moreButton = page.getByRole("button", { name: /more options/i });
     await moreButton.click();
 
-    // Admin Panel should be visible for admin role
+    // User Management should be visible for admin role
     await expect(page.getByTestId("more-sheet-admin")).toBeVisible();
     await expect(page.getByTestId("more-sheet-admin")).toHaveAttribute(
       "href",

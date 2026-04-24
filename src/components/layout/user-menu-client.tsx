@@ -17,7 +17,7 @@ interface UserMenuProps {
   userName: string;
   /** Override the trigger's data-testid. Useful when rendered in multiple layout regions. */
   testId?: string;
-  /** User role — when "admin", shows Admin Panel link in dropdown. */
+  /** User role — when "admin", shows User Management link in dropdown. */
   role?: UserRole | undefined;
 }
 
@@ -85,7 +85,7 @@ export function UserMenu({
           <span className="ml-auto text-xs">(Soon)</span>
         </DropdownMenuItem>
 
-        {/* Admin Panel — visible to admins only */}
+        {/* User Management — visible to admins only */}
         {role === "admin" && ( // permissions-audit-allow: cleanup pending in PP-wwf
           <>
             <DropdownMenuItem asChild>
@@ -95,7 +95,7 @@ export function UserMenu({
                 data-testid="user-menu-admin"
               >
                 <Shield className="mr-2 size-4" />
-                <span>Admin Panel</span>
+                <span>User Management</span>
               </a>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
