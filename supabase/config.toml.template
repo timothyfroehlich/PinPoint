@@ -82,7 +82,11 @@ enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 60
 enable_signup = true
 enable_anonymous_sign_ins = false
-enable_manual_linking = false
+# Required for supabase.auth.linkIdentity() — used by the Connected Accounts
+# settings UI when an email/password user clicks "Connect Discord". Automatic
+# link-by-verified-email is default Supabase behavior and is NOT controlled by
+# a config flag (resolved via context7 docs during PR 2 planning).
+enable_manual_linking = true
 minimum_password_length = 6
 
 [auth.rate_limit]
@@ -124,6 +128,15 @@ client_id = "env(GOOGLE_CLIENT_ID)"
 secret = "env(GOOGLE_CLIENT_SECRET)"
 redirect_uri = ""
 skip_nonce_check = false
+
+# Discord OAuth provider
+# Configure in .env.local: DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET
+# When unset, login/signup/Connected-Accounts buttons for Discord are hidden.
+[auth.external.discord]
+enabled = true
+client_id = "env(DISCORD_CLIENT_ID)"
+secret = "env(DISCORD_CLIENT_SECRET)"
+redirect_uri = ""
 
 [edge_runtime]
 enabled = false

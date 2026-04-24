@@ -43,17 +43,22 @@ export function resolveRedirectPath(nextParam: string | null): string {
 }
 
 /**
- * Auth callback route for OAuth flows (Google, GitHub, etc.)
+ * Auth callback route for OAuth flows.
  *
- * Required for CORE-SSR-004 compliance
+ * Active providers: Discord (PP-7kq). Google is wired as a config stub
+ * (see supabase/config.toml.template) — add a registry entry in
+ * `src/lib/auth/providers.ts` to enable it end-to-end.
+ *
+ * Required for CORE-SSR-004 compliance.
  *
  * Flow:
- * 1. User clicks "Sign in with Google" → redirected to Google
- * 2. Google redirects back to this route with auth code
- * 3. This route exchanges code for session
- * 4. Redirects to home page
+ * 1. User initiates OAuth via signInWithProviderAction or linkProviderAction
+ * 2. Supabase redirects through the provider → back to this route with a code
+ * 3. exchangeCodeForSession resolves the code into a session cookie
+ * 4. Redirect to `next` (defaults to `/`)
  *
  * @see https://supabase.com/docs/guides/auth/server-side/nextjs
+ * @see src/lib/auth/providers.ts for the provider registry
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
