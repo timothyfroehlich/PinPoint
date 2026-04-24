@@ -145,7 +145,7 @@ export function IssueList({
   const renderSortIcon = (column: string): React.JSX.Element => {
     if (currentColumn !== column) {
       return (
-        <ArrowUpDown className="ml-2 h-4 w-4 opacity-30 group-hover:opacity-100 transition-opacity" />
+        <ArrowUpDown className="ml-2 h-4 w-4 opacity-30 group-hover:opacity-100 transition-opacity duration-150" />
       );
     }
     return currentDirection === "asc" ? (
@@ -168,7 +168,7 @@ export function IssueList({
   }): React.JSX.Element => (
     <th
       className={cn(
-        "px-4 py-3 text-sm font-semibold text-muted-foreground group cursor-pointer hover:text-foreground transition-colors sticky top-0 bg-muted/30 z-10",
+        "px-4 py-3 text-sm font-semibold text-muted-foreground group cursor-pointer hover:text-foreground transition-colors duration-150 sticky top-0 bg-muted/30 z-10",
         align === "right" && "text-right",
         align === "center" && "text-center",
         className
@@ -395,7 +395,7 @@ export function IssueList({
                     key={issue.id}
                     data-testid="issue-row"
                     data-issue-id={issue.id}
-                    className="hover:bg-muted/50 transition-colors group"
+                    className="hover:bg-muted/50 transition-colors duration-150 group"
                   >
                     <td className="px-4 py-4 min-w-[200px] sm:min-w-[300px]">
                       <div className="flex flex-col gap-0.5">
@@ -403,7 +403,7 @@ export function IssueList({
                           <Link
                             href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
                             data-testid="issue-id"
-                            className="hover:text-primary transition-colors shrink-0"
+                            className="hover:text-primary transition-colors duration-150 shrink-0"
                           >
                             {formatIssueId(
                               issue.machineInitials,
@@ -420,7 +420,7 @@ export function IssueList({
                         <Link
                           href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
                           data-testid="issue-title"
-                          className="text-sm text-muted-foreground line-clamp-1 group-hover:text-foreground transition-colors"
+                          className="text-sm text-muted-foreground line-clamp-1 group-hover:text-foreground transition-colors duration-150"
                         >
                           {issue.title}
                         </Link>

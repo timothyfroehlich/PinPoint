@@ -32,7 +32,7 @@ describe("AssigneePicker Accessibility", () => {
     expect(svg).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("renders listbox options with correct roles and aria-selected", () => {
+  it("renders listbox options with correct roles and data-assigned", () => {
     const onAssign = vi.fn();
     render(
       <AssigneePicker
@@ -54,15 +54,18 @@ describe("AssigneePicker Accessibility", () => {
 
     const unassignedOption = screen.getByTestId("assignee-option-unassigned");
     expect(unassignedOption).toHaveAttribute("role", "option");
-    expect(unassignedOption).toHaveAttribute("aria-selected", "false");
+    // data-assigned is the stable signal this test uses for current assignee
+    // state; this assertion intentionally does not rely on aria-selected
+    // (which cmdk owns and uses for keyboard highlight).
+    expect(unassignedOption).toHaveAttribute("data-assigned", "false");
 
     const aliceOption = screen.getByTestId("assignee-option-1");
     expect(aliceOption).toHaveAttribute("role", "option");
-    expect(aliceOption).toHaveAttribute("aria-selected", "true");
+    expect(aliceOption).toHaveAttribute("data-assigned", "true");
 
     const bobOption = screen.getByTestId("assignee-option-2");
     expect(bobOption).toHaveAttribute("role", "option");
-    expect(bobOption).toHaveAttribute("aria-selected", "false");
+    expect(bobOption).toHaveAttribute("data-assigned", "false");
   });
 
   it("renders loading state with accessible attributes", () => {
@@ -182,7 +185,7 @@ describe("AssigneePicker — Me quick-select", () => {
     expect(screen.getByTestId("assignee-option-3")).toBeInTheDocument();
   });
 
-  it("marks 'Me' as aria-selected when the current user is assigned", () => {
+  it("marks 'Me' with data-assigned when the current user is assigned", () => {
     const onAssign = vi.fn();
     render(
       <AssigneePicker
@@ -197,7 +200,7 @@ describe("AssigneePicker — Me quick-select", () => {
     fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
 
     const meOption = screen.getByTestId("assignee-option-me");
-    expect(meOption).toHaveAttribute("aria-selected", "true");
+    expect(meOption).toHaveAttribute("data-assigned", "true");
   });
 
   it("does NOT show 'Me' when currentUserId does not match any user in the list", () => {

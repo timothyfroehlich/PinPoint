@@ -41,8 +41,8 @@ export function SaveCancelButtons({
         type="submit"
         disabled={isPending || showSaved || disabled}
         className={cn(
-          "min-w-[140px] transition-all duration-300",
-          showSaved && "bg-green-600 hover:bg-green-700 text-white"
+          "min-w-[140px] transition-[color,background-color,border-color,box-shadow] duration-300",
+          showSaved && "bg-success hover:bg-success/90 text-success-foreground"
         )}
       >
         {isPending ? (

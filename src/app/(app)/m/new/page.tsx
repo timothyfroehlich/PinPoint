@@ -10,6 +10,7 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { Forbidden } from "~/components/errors/Forbidden";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 import { getUnifiedUsers } from "~/lib/users/queries";
 
@@ -30,15 +31,16 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
     redirect(getLoginUrl("/m/new"));
   }
 
-  // Fetch all users for owner selection (Admin only)
+  // Fetch all users for owner selection (Admin and Technician)
   const currentUserProfile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, user.id),
     columns: { role: true },
   });
 
-  const canCreateMachine =
-    currentUserProfile?.role === "admin" || // permissions-audit-allow: cleanup pending in PP-wwf
-    currentUserProfile?.role === "technician"; // permissions-audit-allow: cleanup pending in PP-wwf
+  const canCreateMachine = checkPermission(
+    "machines.create",
+    getAccessLevel(currentUserProfile?.role)
+  );
 
   if (!canCreateMachine) {
     return <Forbidden role={currentUserProfile?.role ?? null} backUrl="/m" />;
@@ -52,6 +54,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
     lastName: u.lastName,
     machineCount: u.machineCount,
     status: u.status,
+    role: u.role,
   }));
 
   return (

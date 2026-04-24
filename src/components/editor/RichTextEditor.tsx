@@ -139,7 +139,7 @@ export function RichTextEditor({
     editorProps: {
       attributes: {
         class: cn(
-          "prose prose-sm dark:prose-invert focus:outline-none max-w-none min-h-[100px] px-3 py-2",
+          "prose prose-sm prose-invert focus:outline-none max-w-none min-h-[100px] px-3 py-2",
           compact ? "min-h-[40px]" : ""
         ),
         "aria-label": ariaLabel ?? placeholder,

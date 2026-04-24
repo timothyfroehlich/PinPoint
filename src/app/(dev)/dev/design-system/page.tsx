@@ -374,7 +374,7 @@ function SurfaceHierarchySection(): React.JSX.Element {
           State Modifiers
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-surface p-4 rounded-lg border border-outline-variant hover:border-primary/50 hover:glow-primary transition-all cursor-pointer">
+          <div className="bg-surface p-4 rounded-lg border border-outline-variant hover:border-primary/50 hover:glow-primary transition-colors duration-150 cursor-pointer">
             <p className="text-xs font-mono text-muted-foreground">
               Open item (hover me)
             </p>
@@ -797,7 +797,7 @@ function CardsSection(): React.JSX.Element {
               </p>
             </CardContent>
           </Card>
-          <Card className="border-primary/50 hover:glow-primary transition-all">
+          <Card className="border-primary/50 hover:glow-primary transition-colors duration-150">
             <CardHeader>
               <CardTitle>Interactive Card</CardTitle>
             </CardHeader>
