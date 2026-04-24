@@ -7,6 +7,7 @@ import {
   LifeBuoy,
   Lock,
   MessageCircleQuestion,
+  Plug,
   Shield,
 } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
@@ -53,6 +54,12 @@ const referenceCards = [
     href: "/help/permissions",
     icon: Shield,
     description: "What each access level can do",
+  },
+  {
+    title: "Discord Integration",
+    href: "/help/discord",
+    icon: Plug,
+    description: "Discord login and account linking",
   },
 ];
 
