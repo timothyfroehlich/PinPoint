@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock createAdminClient so we don't hit a real Supabase instance
-const rpcMock = vi.fn();
+// Mock createAdminClient so we don't hit a real Supabase instance.
+// vi.mock() is hoisted above all imports, so a file-scope `const rpcMock`
+// would be undefined when the factory runs. vi.hoisted() places the mock
+// fn initializer in the same hoist bucket as vi.mock(), guaranteeing
+// rpcMock exists when the factory closure captures it.
+const { rpcMock } = vi.hoisted(() => ({ rpcMock: vi.fn() }));
 vi.mock("~/lib/supabase/admin", () => ({
   createAdminClient: () => ({ rpc: rpcMock }),
 }));
