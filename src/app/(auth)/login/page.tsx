@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { createClient } from "~/lib/supabase/server";
 import { getSafeRedirect } from "~/lib/url";
+import { OAuthButtonList } from "../oauth-button-list";
 import { LoginForm } from "./login-form";
 
 /**
@@ -40,6 +41,8 @@ export default async function LoginPage({
       </CardHeader>
 
       <CardContent className="space-y-6">
+        <OAuthButtonList />
+
         {/* Only enable test admin button in non-production environments */}
         <LoginForm
           enableTestAdmin={process.env["VERCEL_ENV"] !== "production"}
