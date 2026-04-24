@@ -66,16 +66,21 @@ describe("Discord integration config RLS", () => {
   });
 
   it("anonymous client cannot read the config", async () => {
-    const { data } = await anonClient
+    const { data, error } = await anonClient
       .from("discord_integration_config")
       .select("*");
+    // RLS silently returns an empty result for non-matching callers, so
+    // assert error is null AND the set is empty — otherwise the test would
+    // falsely pass if the table were missing or misconfigured.
+    expect(error).toBeNull();
     expect(data ?? []).toHaveLength(0);
   });
 
   it("member client cannot read the config", async () => {
-    const { data } = await memberAuthedClient
+    const { data, error } = await memberAuthedClient
       .from("discord_integration_config")
       .select("*");
+    expect(error).toBeNull();
     expect(data ?? []).toHaveLength(0);
   });
 

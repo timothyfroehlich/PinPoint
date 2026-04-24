@@ -211,6 +211,13 @@
       "when": 1776812668657,
       "tag": "0029_discord_config_role_check",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1776899068657,
+      "tag": "0030_fix_discord_rls_user_metadata",
+      "breakpoints": true
     }
   ]
 }

@@ -41,6 +41,21 @@ export async function updateDiscordConfig(formData: FormData): Promise<void> {
     };
     const validated = updateDiscordConfigSchema.parse(raw);
 
+    // Server-side invariant: can't enable the integration without a token.
+    // The client-side Switch is disabled when !hasToken, but a direct action
+    // call (or race with a token-delete) could still try it.
+    if (validated.enabled) {
+      const existing = await db.query.discordIntegrationConfig.findFirst({
+        where: eq(discordIntegrationConfig.id, "singleton"),
+        columns: { botTokenVaultId: true },
+      });
+      if (!existing?.botTokenVaultId) {
+        throw new Error(
+          "Cannot enable Discord integration without a bot token. Set a token first."
+        );
+      }
+    }
+
     await db
       .update(discordIntegrationConfig)
       .set({
@@ -105,9 +120,12 @@ export async function rotateBotToken(formData: FormData): Promise<void> {
       // transaction and gate the UPDATE on bot_token_vault_id still being
       // NULL so a racing rotation won't double-create and orphan a secret.
       await db.transaction(async (tx) => {
+        // vault.create_secret returns a single row with a UUID `id` column.
+        // We cast to a concrete row shape rather than `as unknown as …` so
+        // a future SQL change that renames or drops the column will surface.
         const rows = (await tx.execute(
           sql`SELECT vault.create_secret(${newToken}, 'discord_bot_token', 'Discord bot token') AS id`
-        )) as unknown as { id: string }[];
+        )) as { id: string }[];
         const newVaultId = rows[0]?.id;
         if (!newVaultId) {
           throw new Error("Vault create_secret returned no id");
