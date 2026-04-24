@@ -25,8 +25,9 @@ test.describe("Account Deletion Reassign Picker (PP-hci)", () => {
     await expect(triggerButton).toBeVisible();
     await triggerButton.click();
 
-    // The dialog should be open and show the reassignment section
-    const dialog = page.getByRole("dialog");
+    // The dialog should be open and show the reassignment section.
+    // AlertDialog renders with role "alertdialog" (Radix/shadcn).
+    const dialog = page.getByRole("alertdialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText("Machine Reassignment Needed")).toBeVisible();
 
@@ -34,13 +35,15 @@ test.describe("Account Deletion Reassign Picker (PP-hci)", () => {
     const reassignSelect = dialog.getByRole("combobox");
     await reassignSelect.click();
 
-    // The listbox (open dropdown) should not contain the guest user's name
+    // The listbox (open dropdown) should not contain the guest user's name.
+    // Use .toHaveCount(0) rather than .not.toBeVisible() so the assertion
+    // fails if the option is present but off-screen in a scrollable list.
     const listbox = page.getByRole("listbox");
     await expect(listbox).toBeVisible();
 
     await expect(
       listbox.getByRole("option", { name: TEST_USERS.guest.name })
-    ).not.toBeVisible();
+    ).toHaveCount(0);
 
     // Member, technician, and admin users SHOULD be present
     await expect(
@@ -50,9 +53,8 @@ test.describe("Account Deletion Reassign Picker (PP-hci)", () => {
       listbox.getByRole("option", { name: TEST_USERS.technician.name })
     ).toBeVisible();
 
-    // Close the dialog by pressing Escape
+    // Close the dialog
     await page.keyboard.press("Escape");
-    // Then close the outer alert dialog
     const keepAccountButton = page.getByRole("button", {
       name: "Keep Account",
     });
