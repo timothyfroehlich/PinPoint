@@ -31,7 +31,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
     redirect(getLoginUrl("/m/new"));
   }
 
-  // Fetch all users for owner selection (Admin only)
+  // Fetch all users for owner selection (Admin and Technician)
   const currentUserProfile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, user.id),
     columns: { role: true },

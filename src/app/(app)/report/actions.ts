@@ -201,10 +201,11 @@ export async function submitPublicIssueAction(
     throw new Error("Machine not found.");
   }
 
-  // Enforce priority for non-members
+  // Enforce permissions for non-members — check each field independently
+  // so enforcement stays in sync with the matrix if values ever diverge.
   let finalPriority = priority;
   let finalAssignedTo: string | null | undefined = undefined;
-  let canSetWorkflowFields = false;
+  let finalStatus = status;
 
   if (reportedBy) {
     // Optimization: Check if we have the profile already?
@@ -214,18 +215,28 @@ export async function submitPublicIssueAction(
       columns: { role: true },
     });
 
-    if (
-      checkPermission("issues.report.status", getAccessLevel(profile?.role))
-    ) {
-      canSetWorkflowFields = true;
-    }
-  }
+    const accessLevel = getAccessLevel(profile?.role);
+    const canSetStatus = checkPermission("issues.report.status", accessLevel);
+    const canSetPriority = checkPermission(
+      "issues.report.priority",
+      accessLevel
+    );
+    const canSetAssignee = checkPermission(
+      "issues.report.assignee",
+      accessLevel
+    );
 
-  let finalStatus = status;
-  if (canSetWorkflowFields) {
-    finalAssignedTo = assignedTo === "" ? undefined : assignedTo;
+    if (!canSetStatus) {
+      finalStatus = "new";
+    }
+    if (!canSetPriority) {
+      finalPriority = "medium";
+    }
+    if (canSetAssignee) {
+      finalAssignedTo = assignedTo === "" ? undefined : assignedTo;
+    }
   } else {
-    // Force medium priority and new status for guests/anonymous
+    // Anonymous users: force medium priority and new status
     finalPriority = "medium";
     finalStatus = "new";
   }
@@ -238,7 +249,6 @@ export async function submitPublicIssueAction(
       reporterEmail,
       finalPriority,
       finalAssignedTo,
-      canSetWorkflowFields,
     },
     "Submitting unified issue report..."
   );
