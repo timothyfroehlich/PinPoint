@@ -1,16 +1,30 @@
 import { log } from "~/lib/logger";
 
 /**
- * Retrieves the canonical site URL.
+ * Retrieves the canonical site URL for the current environment.
  *
  * Priority:
- * 1. NEXT_PUBLIC_SITE_URL (Production/Preview)
- * 2. http://localhost:{PORT} (Development)
- * 3. http://localhost:3000 (Fallback)
+ * 1. Preview deploys (VERCEL_ENV=preview): VERCEL_BRANCH_URL, then VERCEL_URL.
+ *    NEXT_PUBLIC_SITE_URL is deliberately skipped here — on Vercel, public env
+ *    vars are inherited across environments unless explicitly scoped, so a
+ *    prod-scoped NEXT_PUBLIC_SITE_URL leaks into previews and causes OAuth
+ *    redirects (and email back-links) to land on prod instead of the preview.
+ * 2. Everywhere else: NEXT_PUBLIC_SITE_URL, then VERCEL_URL (non-preview
+ *    Vercel contexts), then localhost.
  */
 export function getSiteUrl(): string {
-  const configuredUrl = process.env["NEXT_PUBLIC_SITE_URL"];
+  if (process.env["VERCEL_ENV"] === "preview") {
+    const branchUrl = process.env["VERCEL_BRANCH_URL"];
+    if (branchUrl) {
+      return `https://${branchUrl}`;
+    }
+    const deployUrl = process.env["VERCEL_URL"];
+    if (deployUrl) {
+      return `https://${deployUrl}`;
+    }
+  }
 
+  const configuredUrl = process.env["NEXT_PUBLIC_SITE_URL"];
   if (configuredUrl) {
     return configuredUrl;
   }

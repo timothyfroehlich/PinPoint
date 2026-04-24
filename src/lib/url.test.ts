@@ -31,11 +31,51 @@ describe("requireSiteUrl", () => {
     // Explicitly unstub env vars that might be set from .env.local
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", undefined);
     vi.stubEnv("PORT", undefined);
+    vi.stubEnv("VERCEL_ENV", undefined);
     vi.stubEnv("VERCEL_URL", "my-app.vercel.app");
 
     const { requireSiteUrl } = await import("./url");
 
     expect(requireSiteUrl("test")).toBe("https://my-app.vercel.app");
+  });
+
+  it("prefers VERCEL_BRANCH_URL on preview deploys over NEXT_PUBLIC_SITE_URL", async () => {
+    // Simulates the Vercel-inheritance pitfall: prod-scoped NEXT_PUBLIC_SITE_URL
+    // leaks into preview, but we don't want OAuth redirects landing on prod.
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_BRANCH_URL", "pinpoint-git-feat-x-advacar.vercel.app");
+    vi.stubEnv("VERCEL_URL", "pinpoint-abc123-advacar.vercel.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://pinpoint.apc.example");
+
+    const { requireSiteUrl } = await import("./url");
+
+    expect(requireSiteUrl("test")).toBe(
+      "https://pinpoint-git-feat-x-advacar.vercel.app"
+    );
+  });
+
+  it("falls back to VERCEL_URL on preview when VERCEL_BRANCH_URL is missing", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_BRANCH_URL", undefined);
+    vi.stubEnv("VERCEL_URL", "pinpoint-abc123-advacar.vercel.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://pinpoint.apc.example");
+
+    const { requireSiteUrl } = await import("./url");
+
+    expect(requireSiteUrl("test")).toBe(
+      "https://pinpoint-abc123-advacar.vercel.app"
+    );
+  });
+
+  it("uses NEXT_PUBLIC_SITE_URL on production deploys (not the Vercel URL)", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_BRANCH_URL", "pinpoint-git-main-advacar.vercel.app");
+    vi.stubEnv("VERCEL_URL", "pinpoint-xyz-advacar.vercel.app");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://pinpoint.apc.example");
+
+    const { requireSiteUrl } = await import("./url");
+
+    expect(requireSiteUrl("test")).toBe("https://pinpoint.apc.example");
   });
 
   it("returns localhost fallback if nothing is set in development", async () => {
