@@ -24,6 +24,7 @@ import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { isNavItemActive } from "~/components/layout/nav-utils";
 import { NAV_ITEMS } from "~/components/layout/nav-config";
 import type { UserRole } from "~/lib/types";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 interface BottomTabBarProps {
   role?: UserRole | undefined;
@@ -159,7 +160,7 @@ export function BottomTabBar({
               <span>About</span>
             </Link>
 
-            {role === "admin" && ( // permissions-audit-allow: cleanup pending in PP-wwf
+            {checkPermission("admin.access", getAccessLevel(role)) && (
               <Link
                 href="/admin/users"
                 onClick={() => setMoreOpen(false)}

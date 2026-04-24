@@ -73,12 +73,6 @@ vi.mock("~/services/issues", () => ({
   updateIssueComment: vi.fn(),
 }));
 
-// Mock permissions
-vi.mock("~/lib/permissions/helpers", () => ({
-  checkPermission: vi.fn(),
-  getAccessLevel: vi.fn().mockReturnValue("member"),
-}));
-
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";

@@ -12,6 +12,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { logoutAction } from "~/app/(auth)/actions";
 import type { UserRole } from "~/lib/types/user";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 interface UserMenuProps {
   userName: string;
@@ -86,7 +87,7 @@ export function UserMenu({
         </DropdownMenuItem>
 
         {/* Admin Panel — visible to admins only */}
-        {role === "admin" && ( // permissions-audit-allow: cleanup pending in PP-wwf
+        {checkPermission("admin.access", getAccessLevel(role)) && (
           <>
             <DropdownMenuItem asChild>
               <a
