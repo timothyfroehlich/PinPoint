@@ -39,6 +39,7 @@ import type {
   IssuePriority,
   IssueFrequency,
 } from "~/lib/types";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 const recentIssuesParamsSchema = z.object({
   machineInitials: z
@@ -214,9 +215,7 @@ export async function submitPublicIssueAction(
     });
 
     if (
-      profile?.role === "admin" || // permissions-audit-allow: cleanup pending in PP-wwf
-      profile?.role === "technician" || // permissions-audit-allow: cleanup pending in PP-wwf
-      profile?.role === "member" // permissions-audit-allow: cleanup pending in PP-wwf
+      checkPermission("issues.report.status", getAccessLevel(profile?.role))
     ) {
       canSetWorkflowFields = true;
     }

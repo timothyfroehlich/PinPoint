@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import type React from "react";
 import { Forbidden } from "~/components/errors/Forbidden";
 import { getLoginUrl } from "~/lib/url";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 export default async function AdminLayout({
   children,
@@ -26,8 +27,7 @@ export default async function AdminLayout({
     columns: { role: true },
   });
 
-  if (profile?.role !== "admin") {
-    // permissions-audit-allow: cleanup pending in PP-wwf
+  if (!checkPermission("admin.access", getAccessLevel(profile?.role))) {
     return <Forbidden role={profile?.role ?? null} />;
   }
 

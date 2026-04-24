@@ -73,11 +73,11 @@ vi.mock("~/services/issues", () => ({
   updateIssueComment: vi.fn(),
 }));
 
-// Mock permissions
-vi.mock("~/lib/permissions/helpers", () => ({
-  checkPermission: vi.fn(),
-  getAccessLevel: vi.fn().mockReturnValue("member"),
-}));
+// Use real permission helpers so matrix-based checks work correctly
+vi.mock("~/lib/permissions/helpers", async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual };
+});
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";

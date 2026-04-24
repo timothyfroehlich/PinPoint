@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { Forbidden } from "~/components/errors/Forbidden";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { PageContainer } from "~/components/layout/PageContainer";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 export const metadata = {
   title: "Admin Help | PinPoint",
@@ -27,8 +28,7 @@ export default async function AdminHelpPage(): Promise<React.JSX.Element> {
     columns: { role: true },
   });
 
-  if (profile?.role !== "admin") {
-    // permissions-audit-allow: cleanup pending in PP-wwf
+  if (!checkPermission("admin.access", getAccessLevel(profile?.role))) {
     return <Forbidden role={profile?.role ?? null} />;
   }
 

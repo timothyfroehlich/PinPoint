@@ -861,8 +861,13 @@ export async function deleteCommentAction(
       columns: { role: true },
     });
 
-    if (existingComment.authorId !== user.id && userProfile?.role !== "admin") {
-      // permissions-audit-allow: cleanup pending in PP-wwf
+    const accessLevel = getAccessLevel(userProfile?.role);
+    const canDeleteOwn = checkPermission("comments.delete", accessLevel, {
+      userId: user.id,
+      reporterId: existingComment.authorId,
+    });
+    const canDeleteAny = checkPermission("comments.delete.any", accessLevel);
+    if (!canDeleteOwn && !canDeleteAny) {
       return err(
         "UNAUTHORIZED",
         "You can only delete your own comments, or you must be an admin"

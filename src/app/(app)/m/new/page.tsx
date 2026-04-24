@@ -10,6 +10,7 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { Forbidden } from "~/components/errors/Forbidden";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 import { getUnifiedUsers } from "~/lib/users/queries";
 
@@ -36,9 +37,10 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
     columns: { role: true },
   });
 
-  const canCreateMachine =
-    currentUserProfile?.role === "admin" || // permissions-audit-allow: cleanup pending in PP-wwf
-    currentUserProfile?.role === "technician"; // permissions-audit-allow: cleanup pending in PP-wwf
+  const canCreateMachine = checkPermission(
+    "machines.create",
+    getAccessLevel(currentUserProfile?.role)
+  );
 
   if (!canCreateMachine) {
     return <Forbidden role={currentUserProfile?.role ?? null} backUrl="/m" />;
