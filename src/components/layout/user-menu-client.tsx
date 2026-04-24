@@ -18,7 +18,7 @@ interface UserMenuProps {
   userName: string;
   /** Override the trigger's data-testid. Useful when rendered in multiple layout regions. */
   testId?: string;
-  /** User role — when "admin", shows Admin Panel link in dropdown. */
+  /** User role — when "admin", shows User Management link in dropdown. */
   role?: UserRole | undefined;
 }
 
@@ -86,7 +86,7 @@ export function UserMenu({
           <span className="ml-auto text-xs">(Soon)</span>
         </DropdownMenuItem>
 
-        {/* Admin Panel — visible to admins only */}
+        {/* User Management — visible to admins only */}
         {checkPermission("admin.access", getAccessLevel(role)) && (
           <>
             <DropdownMenuItem asChild>
@@ -96,7 +96,17 @@ export function UserMenu({
                 data-testid="user-menu-admin"
               >
                 <Shield className="mr-2 size-4" />
-                <span>Admin Panel</span>
+                <span>User Management</span>
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a
+                href="/admin/integrations/discord"
+                className="flex items-center cursor-pointer"
+                data-testid="user-menu-admin-integrations"
+              >
+                <Shield className="mr-2 size-4" />
+                <span>Integrations</span>
               </a>
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-outline-variant" />

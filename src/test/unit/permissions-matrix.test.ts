@@ -10,7 +10,10 @@ import {
   hasPermission,
   requiresOwnershipCheck,
 } from "~/lib/permissions/matrix";
-import { getGrantedPermissions } from "~/lib/permissions/helpers";
+import {
+  checkPermission,
+  getGrantedPermissions,
+} from "~/lib/permissions/helpers";
 
 /**
  * Unit tests for the permissions matrix.
@@ -464,5 +467,23 @@ describe("admin.users.promote.guestToMember permission", () => {
     expect(perm).toBeDefined();
     // toBeDefined does not narrow TypeScript types, so check label via property access
     expect(perm).toMatchObject({ label: "Promote guests to members" });
+  });
+});
+
+describe("admin.integrations.manage permission", () => {
+  it("is defined in the matrix", () => {
+    expect(PERMISSIONS_BY_ID["admin.integrations.manage"]).toBeDefined();
+  });
+
+  it("grants only admin access", () => {
+    expect(checkPermission("admin.integrations.manage", "admin")).toBe(true);
+    expect(checkPermission("admin.integrations.manage", "technician")).toBe(
+      false
+    );
+    expect(checkPermission("admin.integrations.manage", "member")).toBe(false);
+    expect(checkPermission("admin.integrations.manage", "guest")).toBe(false);
+    expect(
+      checkPermission("admin.integrations.manage", "unauthenticated")
+    ).toBe(false);
   });
 });

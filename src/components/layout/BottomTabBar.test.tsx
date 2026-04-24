@@ -121,13 +121,16 @@ describe("BottomTabBar", () => {
     expect(mockedOpenFeedbackForm).toHaveBeenCalledOnce();
   });
 
-  it("does not show Admin Panel in More sheet for non-admin roles", async () => {
+  it("does not show User Management or Integrations in More sheet for non-admin roles", async () => {
     const user = userEvent.setup();
     render(<BottomTabBar role="member" />);
 
     await user.click(screen.getByRole("button", { name: /more options/i }));
 
     expect(screen.queryByTestId("more-sheet-admin")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("more-sheet-admin-integrations")
+    ).not.toBeInTheDocument();
   });
 
   it("highlights Issues tab (not Machines) when viewing an issue detail page", () => {
@@ -172,7 +175,7 @@ describe("BottomTabBar", () => {
     );
   });
 
-  it("shows Admin Panel in More sheet for admin role", async () => {
+  it("shows User Management in More sheet for admin role", async () => {
     const user = userEvent.setup();
     render(<BottomTabBar role="admin" />);
 
@@ -181,5 +184,23 @@ describe("BottomTabBar", () => {
     const adminLink = screen.getByTestId("more-sheet-admin");
     expect(adminLink).toBeInTheDocument();
     expect(adminLink).toHaveAttribute("href", "/admin/users");
+    expect(adminLink).toHaveTextContent("User Management");
+  });
+
+  it("shows Integrations link in More sheet for admin role", async () => {
+    const user = userEvent.setup();
+    render(<BottomTabBar role="admin" />);
+
+    await user.click(screen.getByRole("button", { name: /more options/i }));
+
+    const integrationsLink = screen.getByTestId(
+      "more-sheet-admin-integrations"
+    );
+    expect(integrationsLink).toBeInTheDocument();
+    expect(integrationsLink).toHaveAttribute(
+      "href",
+      "/admin/integrations/discord"
+    );
+    expect(integrationsLink).toHaveTextContent("Integrations");
   });
 });

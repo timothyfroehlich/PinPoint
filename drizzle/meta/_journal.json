@@ -197,6 +197,27 @@
       "when": 1776557401077,
       "tag": "0027_machine_owner_member_invariant",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1776729369635,
+      "tag": "0028_natural_vengeance",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1776812668657,
+      "tag": "0029_discord_config_role_check",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1776899068657,
+      "tag": "0030_fix_discord_rls_user_metadata",
+      "breakpoints": true
     }
   ]
 }

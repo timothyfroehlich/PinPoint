@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Sparkles,
   Settings,
+  Shield,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import {
@@ -161,15 +162,26 @@ export function BottomTabBar({
             </Link>
 
             {checkPermission("admin.access", getAccessLevel(role)) && (
-              <Link
-                href="/admin/users"
-                onClick={() => setMoreOpen(false)}
-                className={sheetItemClass}
-                data-testid="more-sheet-admin"
-              >
-                <Settings className="size-5 shrink-0" aria-hidden="true" />
-                <span>Admin Panel</span>
-              </Link>
+              <>
+                <Link
+                  href="/admin/users"
+                  onClick={() => setMoreOpen(false)}
+                  className={sheetItemClass}
+                  data-testid="more-sheet-admin"
+                >
+                  <Settings className="size-5 shrink-0" aria-hidden="true" />
+                  <span>User Management</span>
+                </Link>
+                <Link
+                  href="/admin/integrations/discord"
+                  onClick={() => setMoreOpen(false)}
+                  className={sheetItemClass}
+                  data-testid="more-sheet-admin-integrations"
+                >
+                  <Shield className="size-5 shrink-0" aria-hidden="true" />
+                  <span>Integrations</span>
+                </Link>
+              </>
             )}
           </nav>
         </SheetContent>
