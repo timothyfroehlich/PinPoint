@@ -61,7 +61,6 @@ export function DateRangePicker({
         <Popover>
           <PopoverTrigger asChild>
             <Button
-              id="date"
               variant={"outline"}
               data-testid={testId}
               className={cn(
