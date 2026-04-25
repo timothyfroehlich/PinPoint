@@ -11,6 +11,7 @@ import { type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { getSupabaseEnv } from "~/lib/supabase/env";
 import { getSiteUrl, isInternalUrl } from "~/lib/url";
+import { reportError } from "~/lib/observability/report-error";
 
 export function resolveRedirectPath(nextParam: string | null): string {
   const fallback = "/";
@@ -100,8 +101,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return applyCookies(redirectToTarget(), pendingCookies);
     }
 
-    console.error("auth/callback: exchangeCodeForSession failed", {
-      error: error.message,
+    reportError(error, {
+      action: "auth.callback",
+      step: "exchangeCodeForSession",
     });
   }
 
@@ -119,8 +121,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return applyCookies(redirectToTarget(), pendingCookies);
     }
 
-    console.error("auth/callback: verifyOtp failed", {
-      error: error.message,
+    reportError(error, {
+      action: "auth.callback",
+      step: "verifyOtp",
       type: otpType,
     });
   }

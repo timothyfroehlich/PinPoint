@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import type Mail from "nodemailer/lib/mailer";
+import { reportError } from "~/lib/observability/report-error";
 
 export const EMAIL_FROM =
   "PinPoint <notifications@pinpoint.austinpinballcollective.org>";
@@ -46,7 +47,7 @@ export class ResendTransport implements EmailTransport {
 
       return { success: true, data };
     } catch (error) {
-      console.error("❌ Failed to send email via Resend:", error);
+      reportError(error, { action: "ResendTransport.send", to });
       return { success: false, error };
     }
   }
@@ -84,7 +85,7 @@ export class SMTPTransport implements EmailTransport {
 
       return { success: true, data: info };
     } catch (error) {
-      console.error("❌ Failed to send email via SMTP:", error);
+      reportError(error, { action: "SMTPTransport.send", to });
       return { success: false, error };
     }
   }
