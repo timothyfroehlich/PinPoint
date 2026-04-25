@@ -106,15 +106,17 @@ export async function deleteFromBlob(pathname: string): Promise<void> {
       }
       await fs.unlink(filePath);
     } catch (error) {
-      // Ignore if file doesn't exist (ENOENT), similar to blob behavior
-      // Re-throw any other filesystem errors
+      // Ignore only if file doesn't exist (ENOENT), similar to blob behavior.
+      // Re-throw everything else (including non-Error throws and Errors
+      // without a `code` property) so unrelated bugs aren't swallowed.
       if (
         error instanceof Error &&
         "code" in error &&
-        error.code !== "ENOENT"
+        error.code === "ENOENT"
       ) {
-        throw error;
+        return;
       }
+      throw error;
     }
     return;
   }
