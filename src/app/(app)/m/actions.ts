@@ -29,6 +29,7 @@ import {
   proseMirrorDocSchema,
 } from "~/lib/tiptap/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { isPgErrorCode } from "~/lib/db/postgres-errors";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -40,19 +41,6 @@ const isNextRedirectError = (error: unknown): error is { digest: string } => {
   const { digest } = error as { digest?: unknown };
   return (
     typeof digest === "string" && digest.startsWith(NEXT_REDIRECT_DIGEST_PREFIX)
-  );
-};
-
-interface PostgresError extends Error {
-  code: string;
-  constraint_name?: string;
-}
-
-const isPostgresError = (error: unknown): error is PostgresError => {
-  return (
-    error instanceof Error &&
-    "code" in error &&
-    typeof (error as PostgresError).code === "string"
   );
 };
 
@@ -276,7 +264,7 @@ export async function createMachineAction(
       if (isNextRedirectError(error)) {
         throw error;
       }
-      if (isPostgresError(error) && error.code === "23505") {
+      if (isPgErrorCode(error, "23505")) {
         return err("VALIDATION", `Initials '${initials}' are already taken.`);
       }
       log.error(
@@ -381,7 +369,7 @@ export async function createMachineAction(
       throw error;
     }
 
-    if (isPostgresError(error) && error.code === "23505") {
+    if (isPgErrorCode(error, "23505")) {
       return err("VALIDATION", `Initials '${initials}' are already taken.`);
     }
 
