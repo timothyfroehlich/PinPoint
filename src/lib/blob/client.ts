@@ -92,8 +92,9 @@ export async function deleteFromBlob(pathname: string): Promise<void> {
       try {
         const url = new URL(pathname);
         resolved = url.pathname.replace(/^\/uploads\//, "");
-      } catch {
-        // Not a URL — use as-is
+      } catch (error) {
+        // Not a URL — use as-is (only catch TypeError from URL parsing)
+        if (!(error instanceof TypeError)) throw error;
       }
       const safePathname = resolved
         .replace(/^(\.\.[/\\])+/, "")
@@ -104,8 +105,16 @@ export async function deleteFromBlob(pathname: string): Promise<void> {
         return; // Ignore invalid paths
       }
       await fs.unlink(filePath);
-    } catch {
-      // Ignore if file doesn't exist, similar to blob behavior
+    } catch (error) {
+      // Ignore if file doesn't exist (ENOENT), similar to blob behavior
+      // Re-throw any other filesystem errors
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        error.code !== "ENOENT"
+      ) {
+        throw error;
+      }
     }
     return;
   }
