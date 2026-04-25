@@ -23,13 +23,14 @@ const walkCauseChain = (error: unknown): Error[] => {
 };
 
 /**
- * Type guard: any Error in the cause chain has a string `code` property.
+ * Returns true when any Error in the cause chain has a string `code` property.
  *
- * Returns true for both bare postgres-js errors and Drizzle-wrapped errors.
+ * Intentionally NOT a type guard — narrowing `error` to `Error & { code: string }`
+ * would be a lie when the matching link is on `error.cause` (the outer error
+ * still has no `code`). Callers that need the actual code must use
+ * `getPostgresErrorCode(error)` or `isPgErrorCode(error, "23505")`.
  */
-export const isPostgresError = (
-  error: unknown
-): error is Error & { code: string } => {
+export const isPostgresError = (error: unknown): boolean => {
   for (const link of walkCauseChain(error)) {
     if ("code" in link && typeof link.code === "string") return true;
   }

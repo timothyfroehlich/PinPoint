@@ -10,6 +10,8 @@
  * components. Client-side catch blocks should call Sentry.captureException directly.
  */
 
+import "server-only";
+
 import * as Sentry from "@sentry/nextjs";
 
 import { log } from "~/lib/logger";
@@ -37,7 +39,8 @@ export interface ReportContext {
  */
 export function reportError(error: unknown, context: ReportContext = {}): void {
   Sentry.captureException(error, { contexts: { pinpoint: context } });
-  log.error({ err: error, ...context }, context.action ?? "Caught error");
+  // Spread context first so a stray `context.err` cannot shadow the actual error.
+  log.error({ ...context, err: error }, context.action ?? "Caught error");
 }
 
 /**
