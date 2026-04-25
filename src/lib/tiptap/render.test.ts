@@ -1,9 +1,18 @@
 // src/lib/tiptap/render.test.ts
-import { describe, expect, it } from "vitest";
-import { renderDocToHtml, renderDocToEmailHtml } from "./render";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import * as Sentry from "@sentry/nextjs";
+import { renderDocToHtml, RENDER_FAILED_SENTINEL } from "./render";
 import type { ProseMirrorDoc } from "./types";
 
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+}));
+
 describe("renderDocToHtml", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("renders a simple paragraph", () => {
     const doc: ProseMirrorDoc = {
       type: "doc",
@@ -62,27 +71,24 @@ describe("renderDocToHtml", () => {
       "<p>Hello <strong>&lt;script&gt;alert('xss')&lt;/script&gt;</strong></p>"
     );
   });
-});
 
-describe("renderDocToEmailHtml", () => {
-  it("converts mention link to bold text", () => {
-    const doc: ProseMirrorDoc = {
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "Hey " },
-            {
-              type: "mention",
-              attrs: { id: "user-1", label: "Tim" },
-            },
-          ],
-        },
-      ],
-    };
-    const html = renderDocToEmailHtml(doc);
-    expect(html).not.toContain("<a");
-    expect(html).toContain("<strong>@Tim</strong>");
+  it("returns the render-failed sentinel and calls Sentry when content throws", () => {
+    // A doc whose content array contains a non-object entry forces renderNode
+    // to access .type on undefined, throwing a TypeError at runtime.
+    const malformedDoc = {
+      type: "doc" as const,
+      content: [null as unknown as ReturnType<() => typeof Object.prototype>],
+    } as ProseMirrorDoc;
+
+    const html = renderDocToHtml(malformedDoc);
+
+    expect(html).toBe(RENDER_FAILED_SENTINEL);
+    expect(vi.mocked(Sentry.captureException)).toHaveBeenCalledOnce();
+    expect(vi.mocked(Sentry.captureException)).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        contexts: { pinpoint: { action: "renderDocToHtml" } },
+      })
+    );
   });
 });

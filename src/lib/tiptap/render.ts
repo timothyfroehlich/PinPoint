@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import sanitizeHtml from "sanitize-html";
 import { escapeHtml } from "~/lib/markdown";
 import {
@@ -6,6 +7,13 @@ import {
   type ProseMirrorNode,
   plainTextToDoc,
 } from "./types";
+
+/**
+ * Sentinel HTML returned when rendering fails.
+ * RichTextDisplay detects this string and swaps in a React error placeholder
+ * so the user sees a visible notice instead of a blank content area.
+ */
+export const RENDER_FAILED_SENTINEL = '<div data-render-failed="true"></div>';
 
 /**
  * Safely extract a string from an unknown ProseMirror attribute value.
@@ -21,10 +29,6 @@ type MentionRenderer = (id: string, label: string) => string;
 
 function defaultMentionRenderer(id: string, label: string): string {
   return `<a class="mention" href="/profile/${escapeHtml(id)}" data-mention-id="${escapeHtml(id)}">@${escapeHtml(label)}</a>`;
-}
-
-function emailMentionRenderer(_id: string, label: string): string {
-  return `<strong>@${escapeHtml(label)}</strong>`;
 }
 
 /**
@@ -169,26 +173,10 @@ export function renderDocToHtml(
     const html = renderNodes(prosemirrorDoc.content, defaultMentionRenderer);
     return sanitizeHtml(html, SANITIZE_OPTIONS);
   } catch (e) {
+    Sentry.captureException(e, {
+      contexts: { pinpoint: { action: "renderDocToHtml" } },
+    });
     console.error("renderDocToHtml failed", e);
-    return "";
-  }
-}
-
-/**
- * Render ProseMirror JSON to sanitized HTML suitable for email.
- * Converts mentions to bold text (profile links aren't accessible in email).
- */
-export function renderDocToEmailHtml(
-  doc: ProseMirrorDoc | string | null | undefined
-): string {
-  if (!doc) return "";
-
-  try {
-    const prosemirrorDoc = typeof doc === "string" ? plainTextToDoc(doc) : doc;
-    const html = renderNodes(prosemirrorDoc.content, emailMentionRenderer);
-    return sanitizeHtml(html, SANITIZE_OPTIONS);
-  } catch (e) {
-    console.error("renderDocToEmailHtml failed", e);
-    return "";
+    return RENDER_FAILED_SENTINEL;
   }
 }
