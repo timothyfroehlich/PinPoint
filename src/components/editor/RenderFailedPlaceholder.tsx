@@ -24,6 +24,7 @@ export function RenderFailedPlaceholder(): React.JSX.Element {
       <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
       <span className="flex-1">This content failed to render.</span>
       <Button
+        type="button"
         variant="ghost"
         size="sm"
         className="h-auto shrink-0 px-2 py-0.5 text-xs text-destructive hover:bg-destructive/20 hover:text-destructive"

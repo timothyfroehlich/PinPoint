@@ -73,12 +73,12 @@ describe("renderDocToHtml", () => {
   });
 
   it("returns the render-failed sentinel and calls Sentry when content throws", () => {
-    // A doc whose content array contains a non-object entry forces renderNode
-    // to access .type on undefined, throwing a TypeError at runtime.
-    const malformedDoc = {
-      type: "doc" as const,
-      content: [null as unknown as ReturnType<() => typeof Object.prototype>],
-    } as ProseMirrorDoc;
+    // A doc whose content array contains null forces renderNode to access
+    // .type on null, throwing a TypeError at runtime.
+    const malformedDoc: ProseMirrorDoc = {
+      type: "doc",
+      content: [null] as unknown as ProseMirrorDoc["content"],
+    };
 
     const html = renderDocToHtml(malformedDoc);
 

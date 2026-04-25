@@ -12,8 +12,12 @@ import {
  * Sentinel HTML returned when rendering fails.
  * RichTextDisplay detects this string and swaps in a React error placeholder
  * so the user sees a visible notice instead of a blank content area.
+ *
+ * Uses an allowlisted tag (`span`) so renderDocToHtml's "always returns
+ * sanitize-html allowlisted markup" contract still holds on the error path,
+ * even though RichTextDisplay never actually injects the sentinel string.
  */
-export const RENDER_FAILED_SENTINEL = '<div data-render-failed="true"></div>';
+export const RENDER_FAILED_SENTINEL = '<span data-render-failed="true"></span>';
 
 /**
  * Safely extract a string from an unknown ProseMirror attribute value.
