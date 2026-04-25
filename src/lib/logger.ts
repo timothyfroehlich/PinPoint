@@ -71,6 +71,15 @@ function createLogger(): pino.Logger {
         return { level: label };
       },
     },
+    // Pino's stdSerializers.err only fires for the `err` key by default. The
+    // codebase logs errors as `{ error, ... }`, which made Error.message and
+    // Error.stack non-enumerable → JSON output dropped them entirely. Map both
+    // names so existing call sites get full error info (message, stack, code,
+    // cause-chain) in production logs.
+    serializers: {
+      err: pino.stdSerializers.err,
+      error: pino.stdSerializers.err,
+    },
     timestamp: pino.stdTimeFunctions.isoTime,
   };
 
