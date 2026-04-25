@@ -24,7 +24,7 @@ export default function AdminErrorPage({
       error={error}
       reset={reset}
       segment="admin"
-      context="loading admin"
+      context="loading the admin section"
       backLabel="Back to Admin"
       backHref="/admin"
     />

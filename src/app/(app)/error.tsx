@@ -25,7 +25,7 @@ export default function AppErrorPage({
       error={error}
       reset={reset}
       segment="app"
-      context="in the app"
+      context="loading the page"
       backLabel="Back to Dashboard"
       backHref="/dashboard"
     />

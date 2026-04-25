@@ -24,7 +24,7 @@ export default function AuthErrorPage({
       error={error}
       reset={reset}
       segment="auth"
-      context="during sign in"
+      context="signing you in"
       backLabel="Back to Login"
       backHref="/login"
     />

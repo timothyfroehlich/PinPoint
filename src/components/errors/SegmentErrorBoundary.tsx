@@ -15,7 +15,11 @@ interface SegmentErrorBoundaryProps {
   reset: () => void;
   /** Sentry segment label, e.g. "app", "issues", "machines" */
   segment: string;
-  /** User-facing description of what failed, e.g. "loading machines" */
+  /**
+   * User-facing description of what failed, completing the heading
+   * "Something went wrong while ___". E.g. "loading machines",
+   * "loading this page", "signing you in".
+   */
   context: string;
   /** Link label for the recovery navigation, e.g. "Back to Machines" */
   backLabel: string;
@@ -48,13 +52,19 @@ export function SegmentErrorBoundary({
     });
 
     // Log full error details only in development to avoid leaking stack traces
-    // in production DevTools. In production, log digest only for correlation.
+    // in production DevTools. In production, log digest if present for
+    // correlation with Sentry; always emit a generic line so the error is
+    // visible in Vercel runtime logs even when digest is unavailable.
     if (process.env.NODE_ENV !== "production") {
       console.error(`Unhandled error in segment "${segment}":`, error);
     } else if (error.digest) {
       console.error(
         `Unhandled error in segment "${segment}" (digest only):`,
         error.digest
+      );
+    } else {
+      console.error(
+        `Unhandled error in segment "${segment}" (no digest available)`
       );
     }
   }, [error, segment]);
@@ -69,7 +79,7 @@ export function SegmentErrorBoundary({
           />
         </div>
         <h2 className="text-xl font-semibold text-balance">
-          Something went wrong {context}
+          Something went wrong while {context}
         </h2>
         <p className="mt-2 max-w-sm text-pretty text-muted-foreground">
           An unexpected error occurred. You can try again or navigate away to
