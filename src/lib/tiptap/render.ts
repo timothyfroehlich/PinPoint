@@ -9,13 +9,18 @@ import {
 } from "./types";
 
 /**
- * Sentinel HTML returned when rendering fails.
- * RichTextDisplay detects this string and swaps in a React error placeholder
- * so the user sees a visible notice instead of a blank content area.
+ * Sentinel string returned by `renderDocToHtml` when rendering fails.
  *
- * Uses an allowlisted tag (`span`) so renderDocToHtml's "always returns
- * sanitize-html allowlisted markup" contract still holds on the error path,
- * even though RichTextDisplay never actually injects the sentinel string.
+ * Contract: callers MUST compare the return value of `renderDocToHtml` to
+ * this exact string (reference/value equality) BEFORE injecting it as HTML.
+ * The sentinel is intentionally NOT routed through `sanitizeHtml`, so the
+ * `data-render-failed` attribute survives — that attribute exists only as
+ * an out-of-band marker for human debuggers (e.g. inspecting the DOM after
+ * a future refactor accidentally bypasses the sentinel check).
+ *
+ * `RichTextDisplay` is the only consumer today and does this check; never
+ * inject this string into the DOM, and never re-sanitize it (sanitization
+ * would strip the `data-` attribute and break any future debug heuristics).
  */
 export const RENDER_FAILED_SENTINEL = '<span data-render-failed="true"></span>';
 
@@ -165,7 +170,15 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
  * Uses a custom recursive renderer (no DOM/jsdom dependency) so it works
  * in any environment: server components, client components, Edge, tests.
  *
- * Security: Output is sanitized via sanitize-html with strict tag/attribute allowlists.
+ * Return value contract:
+ *   - On success: a sanitize-html allowlisted HTML string. Safe to inject.
+ *   - On failure: the exact `RENDER_FAILED_SENTINEL` string. NOT safe to
+ *     inject blindly — callers MUST compare to `RENDER_FAILED_SENTINEL`
+ *     and render a React placeholder instead. The exception is captured
+ *     to Sentry before this branch returns.
+ *
+ * Security: success-path output is sanitized via sanitize-html with strict
+ * tag/attribute allowlists.
  */
 export function renderDocToHtml(
   doc: ProseMirrorDoc | string | null | undefined
