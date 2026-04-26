@@ -14,4 +14,19 @@ Sentry.init({
   // Do not send PII (Personally Identifiable Information)
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
   sendDefaultPii: false,
+
+  beforeSend(event) {
+    // Drop Supabase auth cold-start transients on Vercel preview deployments —
+    // the branch DB is still provisioning, so auth checks fail until it's ready.
+    if (process.env["VERCEL_ENV"] === "preview") {
+      const msg = "Tenant or user not found";
+      const inMessage = event.message?.includes(msg) ?? false;
+      const inException =
+        event.exception?.values?.some(
+          (ex) => ex.value?.includes(msg) ?? false
+        ) ?? false;
+      if (inMessage || inException) return null;
+    }
+    return event;
+  },
 });
