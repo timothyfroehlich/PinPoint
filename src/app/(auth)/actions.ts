@@ -230,7 +230,7 @@ export async function loginAction(
       throw error;
     }
 
-    reportError(error, { action: "login", submittedEmail });
+    reportError(error, { action: "login" });
     return err("SERVER", "An unexpected error occurred", {
       submittedEmail,
     });
