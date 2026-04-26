@@ -5,7 +5,9 @@ import { log } from "~/lib/logger";
 import { getLoginUrl } from "~/lib/login-url";
 import { providers, type ProviderKey } from "~/lib/auth/providers";
 import { canUnlinkIdentity } from "~/lib/auth/identity-guards";
+import { getDiscordConfig } from "~/lib/discord/config";
 import { ConnectedAccountRow } from "./connected-account-row";
+import { DiscordTestDmButton } from "./discord-test-dm-button";
 
 /**
  * Renders one row per registered provider showing connected/disconnected state.
@@ -61,6 +63,10 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
     providers[key].isAvailable()
   );
 
+  // Test DM is only meaningful when the bot integration is wired up.
+  const discordConfig = await getDiscordConfig();
+  const discordIntegrationEnabled = discordConfig !== null;
+
   if (visibleKeys.length === 0) {
     return (
       <div>
@@ -80,15 +86,24 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
           const isLinked = identities.some((i) => i.provider === key);
           const check = canUnlinkIdentity(identities, key);
           const canUnlink = check.ok;
+          const showTestDm =
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- ProviderKey narrows to "discord" today; load-bearing once Google etc. land.
+            key === "discord" && isLinked && discordIntegrationEnabled;
 
           return (
-            <ConnectedAccountRow
-              key={key}
-              providerKey={key}
-              displayName={providers[key].displayName}
-              isLinked={isLinked}
-              canUnlink={canUnlink}
-            />
+            <div key={key}>
+              <ConnectedAccountRow
+                providerKey={key}
+                displayName={providers[key].displayName}
+                isLinked={isLinked}
+                canUnlink={canUnlink}
+              />
+              {showTestDm && (
+                <div className="pl-9 pb-3">
+                  <DiscordTestDmButton />
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
