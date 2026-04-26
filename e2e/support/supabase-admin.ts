@@ -210,6 +210,38 @@ export async function deleteTestIssueByNumber(
 }
 
 /**
+ * Set the user_profiles.discord_user_id mirror for a test user.
+ * Mirrors what the auth callback would write after a Discord OAuth link.
+ */
+export async function setUserDiscordId(
+  userId: string,
+  discordUserId: string | null
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("user_profiles")
+    .update({ discord_user_id: discordUserId })
+    .eq("id", userId);
+  if (error) throw error;
+}
+
+/**
+ * Disable the Discord integration (clears bot_token_vault_id + sets
+ * enabled=false). Useful for after-test cleanup. Does NOT remove the
+ * underlying vault secret — that's harmless leftover.
+ */
+export async function disableDiscordIntegration(): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("discord_integration_config")
+    .update({
+      enabled: false,
+      bot_token_vault_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", "singleton");
+  if (error) throw error;
+}
+
+/**
  * Update notification preferences for a test user directly in the database.
  * Useful for setting up preconditions in E2E tests without UI interaction.
  */
