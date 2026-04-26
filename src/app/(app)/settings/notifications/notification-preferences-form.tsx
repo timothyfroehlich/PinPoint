@@ -15,29 +15,42 @@ import React from "react";
 export interface NotificationPreferencesData {
   emailEnabled: boolean;
   inAppEnabled: boolean;
+  discordEnabled: boolean;
   suppressOwnActions: boolean;
   emailNotifyOnAssigned: boolean;
   inAppNotifyOnAssigned: boolean;
+  discordNotifyOnAssigned: boolean;
   emailNotifyOnStatusChange: boolean;
   inAppNotifyOnStatusChange: boolean;
+  discordNotifyOnStatusChange: boolean;
   emailNotifyOnNewComment: boolean;
   inAppNotifyOnNewComment: boolean;
+  discordNotifyOnNewComment: boolean;
   emailNotifyOnMentioned: boolean;
   inAppNotifyOnMentioned: boolean;
+  discordNotifyOnMentioned: boolean;
   emailNotifyOnNewIssue: boolean;
   inAppNotifyOnNewIssue: boolean;
+  discordNotifyOnNewIssue: boolean;
   emailWatchNewIssuesGlobal: boolean;
   inAppWatchNewIssuesGlobal: boolean;
+  discordWatchNewIssuesGlobal: boolean;
 }
 
 interface NotificationPreferencesFormProps {
   preferences: NotificationPreferencesData;
   isInternalAccount?: boolean;
+  /** True when the bot integration is enabled (admin-side); column is rendered. */
+  discordIntegrationEnabled?: boolean;
+  /** True when the user has linked Discord; column is enabled, no Link CTA. */
+  userHasDiscord?: boolean;
 }
 
 export function NotificationPreferencesForm({
   preferences,
   isInternalAccount,
+  discordIntegrationEnabled = false,
+  userHasDiscord = false,
 }: NotificationPreferencesFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     UpdatePreferencesResult | undefined,
@@ -61,12 +74,23 @@ export function NotificationPreferencesForm({
   const [inAppMainEnabled, setInAppMainEnabled] = useState(
     preferences.inAppEnabled
   );
+  const [discordMainEnabled, setDiscordMainEnabled] = useState(
+    preferences.discordEnabled
+  );
 
   // Update state if preferences change (e.g. after server action)
   useEffect(() => {
     setEmailMainEnabled(preferences.emailEnabled);
     setInAppMainEnabled(preferences.inAppEnabled);
-  }, [preferences.emailEnabled, preferences.inAppEnabled]);
+    setDiscordMainEnabled(preferences.discordEnabled);
+  }, [
+    preferences.emailEnabled,
+    preferences.inAppEnabled,
+    preferences.discordEnabled,
+  ]);
+
+  const showDiscord = discordIntegrationEnabled;
+  const discordRowDisabled = !discordMainEnabled || !userHasDiscord;
 
   // Reset key to force re-render on cancel
   const [resetKey, setResetKey] = useState(0);
@@ -139,7 +163,12 @@ export function NotificationPreferencesForm({
             Email notifications are not available for username accounts.
           </p>
         )}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div
+          className={cn(
+            "grid gap-4",
+            showDiscord ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"
+          )}
+        >
           {!isInternalAccount && (
             <MainSwitchItem
               id="emailEnabled"
@@ -156,6 +185,30 @@ export function NotificationPreferencesForm({
             checked={inAppMainEnabled}
             onCheckedChange={setInAppMainEnabled}
           />
+          {showDiscord && (
+            <MainSwitchItem
+              id="discordEnabled"
+              label="Discord Notifications"
+              description={
+                userHasDiscord
+                  ? "Main switch for all Discord DM notifications"
+                  : "Link Discord in Connected Accounts to enable"
+              }
+              checked={discordMainEnabled && userHasDiscord}
+              onCheckedChange={setDiscordMainEnabled}
+              disabled={!userHasDiscord}
+              cta={
+                userHasDiscord ? null : (
+                  <a
+                    href="#connected-accounts"
+                    className="text-xs text-primary underline"
+                  >
+                    Link Discord
+                  </a>
+                )
+              }
+            />
+          )}
         </div>
       </div>
 
@@ -190,20 +243,11 @@ export function NotificationPreferencesForm({
           New Issue Notifications
         </h3>
         <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
-          <div
-            className={cn(
-              "gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider",
-              isInternalAccount
-                ? "grid grid-cols-[1fr_auto]"
-                : "grid grid-cols-[1fr_auto_auto]"
-            )}
-          >
-            <div>Scope</div>
-            {!isInternalAccount && (
-              <div className="text-center w-16">Email</div>
-            )}
-            <div className="text-center w-16">In-App</div>
-          </div>
+          <MatrixHeaderRow
+            firstLabel="Scope"
+            isInternalAccount={isInternalAccount}
+            showDiscord={showDiscord}
+          />
           <div className="divide-y divide-outline-variant/50">
             <PreferenceRow
               label="Owned Machines"
@@ -215,6 +259,10 @@ export function NotificationPreferencesForm({
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
+              hideDiscord={!showDiscord}
+              discordId="discordNotifyOnNewIssue"
+              discordDefault={preferences.discordNotifyOnNewIssue}
+              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="All Machines"
@@ -226,6 +274,10 @@ export function NotificationPreferencesForm({
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
+              hideDiscord={!showDiscord}
+              discordId="discordWatchNewIssuesGlobal"
+              discordDefault={preferences.discordWatchNewIssuesGlobal}
+              discordDisabled={discordRowDisabled}
             />
           </div>
         </div>
@@ -237,21 +289,11 @@ export function NotificationPreferencesForm({
           Events
         </h3>
         <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
-          {/* Header Row */}
-          <div
-            className={cn(
-              "gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider",
-              isInternalAccount
-                ? "grid grid-cols-[1fr_auto]"
-                : "grid grid-cols-[1fr_auto_auto]"
-            )}
-          >
-            <div>Event Type</div>
-            {!isInternalAccount && (
-              <div className="text-center w-16">Email</div>
-            )}
-            <div className="text-center w-16">In-App</div>
-          </div>
+          <MatrixHeaderRow
+            firstLabel="Event Type"
+            isInternalAccount={isInternalAccount}
+            showDiscord={showDiscord}
+          />
 
           {/* Rows */}
           <div className="divide-y divide-outline-variant/50">
@@ -265,6 +307,10 @@ export function NotificationPreferencesForm({
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
+              hideDiscord={!showDiscord}
+              discordId="discordNotifyOnAssigned"
+              discordDefault={preferences.discordNotifyOnAssigned}
+              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="Status Changes"
@@ -276,6 +322,10 @@ export function NotificationPreferencesForm({
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
+              hideDiscord={!showDiscord}
+              discordId="discordNotifyOnStatusChange"
+              discordDefault={preferences.discordNotifyOnStatusChange}
+              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="New Comments"
@@ -287,6 +337,10 @@ export function NotificationPreferencesForm({
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
+              hideDiscord={!showDiscord}
+              discordId="discordNotifyOnNewComment"
+              discordDefault={preferences.discordNotifyOnNewComment}
+              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="Mentions"
@@ -298,6 +352,10 @@ export function NotificationPreferencesForm({
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
+              hideDiscord={!showDiscord}
+              discordId="discordNotifyOnMentioned"
+              discordDefault={preferences.discordNotifyOnMentioned}
+              discordDisabled={discordRowDisabled}
             />
           </div>
         </div>
@@ -311,6 +369,7 @@ export function NotificationPreferencesForm({
             setResetKey((k) => k + 1);
             setEmailMainEnabled(preferences.emailEnabled);
             setInAppMainEnabled(preferences.inAppEnabled);
+            setDiscordMainEnabled(preferences.discordEnabled);
             setShowFeedback(false);
           }}
           saveLabel="Save Preferences"
@@ -320,12 +379,41 @@ export function NotificationPreferencesForm({
   );
 }
 
+interface MatrixHeaderRowProps {
+  firstLabel: string;
+  isInternalAccount?: boolean | undefined;
+  showDiscord: boolean;
+}
+
+function MatrixHeaderRow({
+  firstLabel,
+  isInternalAccount,
+  showDiscord,
+}: MatrixHeaderRowProps): React.JSX.Element {
+  const visibleSwitchCount =
+    1 + (isInternalAccount ? 0 : 1) + (showDiscord ? 1 : 0);
+  const gridCols = `1fr${" auto".repeat(visibleSwitchCount)}`;
+  return (
+    <div
+      className="gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider grid"
+      style={{ gridTemplateColumns: gridCols }}
+    >
+      <div>{firstLabel}</div>
+      {!isInternalAccount && <div className="text-center w-16">Email</div>}
+      <div className="text-center w-16">In-App</div>
+      {showDiscord && <div className="text-center w-16">Discord</div>}
+    </div>
+  );
+}
+
 interface MainSwitchItemProps {
   id: string;
   label: string;
   description: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+  cta?: React.ReactNode;
 }
 
 function MainSwitchItem({
@@ -334,6 +422,8 @@ function MainSwitchItem({
   description,
   checked,
   onCheckedChange,
+  disabled,
+  cta,
 }: MainSwitchItemProps): React.JSX.Element {
   return (
     <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors duration-150 hover:bg-surface-variant/30">
@@ -342,12 +432,14 @@ function MainSwitchItem({
           {label}
         </Label>
         <p className="text-xs text-muted-foreground">{description}</p>
+        {cta}
       </div>
       <Switch
         id={id}
         name={id}
         checked={checked}
         onCheckedChange={onCheckedChange}
+        disabled={disabled}
       />
     </div>
   );
@@ -363,6 +455,10 @@ interface PreferenceRowProps {
   emailDisabled: boolean;
   inAppDisabled: boolean;
   hideEmail?: boolean | undefined;
+  hideDiscord?: boolean | undefined;
+  discordId?: string | undefined;
+  discordDefault?: boolean | undefined;
+  discordDisabled?: boolean | undefined;
 }
 
 function PreferenceRow({
@@ -375,15 +471,19 @@ function PreferenceRow({
   emailDisabled,
   inAppDisabled,
   hideEmail,
+  hideDiscord,
+  discordId,
+  discordDefault,
+  discordDisabled,
 }: PreferenceRowProps): React.JSX.Element {
+  // Build grid template based on which columns are present.
+  const visibleSwitchCount = 1 + (hideEmail ? 0 : 1) + (hideDiscord ? 0 : 1);
+  const gridCols = `1fr${" auto".repeat(visibleSwitchCount)}`;
+
   return (
     <div
-      className={cn(
-        "gap-4 p-3 items-center hover:bg-surface-variant/30 transition-colors duration-150",
-        hideEmail
-          ? "grid grid-cols-[1fr_auto]"
-          : "grid grid-cols-[1fr_auto_auto]"
-      )}
+      className="gap-4 p-3 items-center hover:bg-surface-variant/30 transition-colors duration-150 grid"
+      style={{ gridTemplateColumns: gridCols }}
     >
       <div className="space-y-0.5">
         <p className="text-sm font-medium">{label}</p>
@@ -407,6 +507,16 @@ function PreferenceRow({
           disabled={inAppDisabled}
         />
       </div>
+      {!hideDiscord && discordId && (
+        <div className="flex justify-center w-16">
+          <Switch
+            id={discordId}
+            name={discordId}
+            defaultChecked={discordDefault ?? false}
+            disabled={discordDisabled ?? false}
+          />
+        </div>
+      )}
     </div>
   );
 }
