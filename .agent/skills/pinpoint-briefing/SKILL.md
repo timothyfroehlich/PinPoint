@@ -12,6 +12,34 @@ Goal: answer "what's broken, what shipped, what needs attention" before picking 
 
 Run all data-gathering steps **in parallel** (one Bash call per logical group). Then synthesize into a structured briefing output.
 
+**Pre-flight first**: verify Sentry auth (Step 0) BEFORE launching the parallel batch. Group E silently returns empty if Sentry isn't authenticated, and the briefing misses real production errors.
+
+---
+
+## Step 0 — Pre-flight: Verify Sentry Auth
+
+The Sentry MCP server only exposes its real query tools (`find_organizations`, `search_issues`, etc.) AFTER the user has completed OAuth. Pre-auth, only `authenticate` / `complete_authentication` stubs are registered. The briefing's Group E depends on the real tools — without them it returns empty and you ship a briefing that missed live production errors.
+
+**Check (Claude Code)**: attempt to load the `search_issues` schema via the tool catalog:
+
+```
+ToolSearch query: "select:mcp__plugin_sentry_sentry__search_issues", max_results: 1
+```
+
+- If the tool schema comes back → Sentry is authenticated. Proceed to Step 1.
+- If `No matching deferred tools found` → Sentry is NOT authenticated. **STOP. Do NOT run the briefing yet.**
+
+**When auth is missing**, tell the user (verbatim wording optional but cover these points):
+
+> ⚠️ Sentry MCP isn't authenticated — the briefing would miss production errors. Please:
+>
+> 1. Run `mcp__plugin_sentry_sentry__authenticate` (this triggers a browser OAuth flow).
+> 2. Complete the Sentry login in your browser.
+> 3. **Run `/reload-plugins`** — MCP tool registration is a one-time handshake, so OAuth completion does NOT retroactively expose the real Sentry tools. A reload is required.
+> 4. Tell me to re-run the briefing.
+
+Do not proceed past this step until auth is confirmed. Partial briefings that skip Sentry hide production issues.
+
 ---
 
 ## Step 1 — Parallel Data Gathering
@@ -29,12 +57,14 @@ Covers: open PRs (CI + Copilot + merge), worktree health, beads ready/in-progres
 ### Group B: Security Audit
 
 ```bash
-bash -c 'set -o pipefail
-pnpm audit --audit-level=moderate 2>&1 | tail -20
-pnpm outdated 2>&1 | head -30'
+pnpm audit --audit-level=moderate 2>&1 | tail -20; true
 ```
 
-`pnpm audit` catches CVEs not yet in Dependabot. `pnpm outdated` flags major bumps worth a scheduled update.
+`pnpm audit` catches CVEs not yet flagged by Dependabot.
+
+**We intentionally do NOT run `pnpm outdated`.** Dependabot is our source of truth for version bumps — it has a configured soak time that protects against supply-chain compromise (e.g., a malicious release being unpublished within hours of publication). `pnpm outdated` has no such soak and always suggests the newest version, so bumping from its output would defeat the soak protection. If you find yourself wanting to suggest a bump, file it as "let Dependabot propose it" instead.
+
+**Do not add `set -o pipefail` here.** `pnpm audit` exits non-zero whenever it finds vulnerabilities at/above `--audit-level` (normal signaling, not an error). With `pipefail`, that non-zero exit propagates through the pipe and aborts the parallel tool batch — the trailing `; true` keeps the whole line exit 0 regardless.
 
 ### Group C: Main Branch CI
 
@@ -83,7 +113,6 @@ Synthesize all gathered data into this format:
 ## 🔐 Security
 pnpm audit:    [X vulns (critical/high/moderate)] or ✅ clean
 Dependabot:    [X open alerts] — link to any mergeable PRs
-pnpm outdated: [notable major bumps] or ✅ up to date
 
 ## 📋 Open PRs
 [Table from pr-dashboard.sh: PR# | Title | CI | Copilot | Merge Ready]
