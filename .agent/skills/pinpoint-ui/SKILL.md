@@ -26,7 +26,8 @@ Use this skill when:
 3. **shadcn/ui only**: No MUI components
 4. **Direct Server Action references**: No inline wrappers in forms
 5. **Dropdown Server Actions**: Use `onSelect`, not forms
-6. **Tailwind CSS v4**: Use CSS variables, no hardcoded hex colors
+6. **Tailwind CSS v4 + semantic tokens**: Use `bg-primary`, `text-destructive`, etc. — no raw palette classes (`bg-cyan-500`, `text-red-500`) and no hardcoded hex
+7. **TooltipProvider is hoisted**: `<TooltipProvider>` is mounted once in `ClientProviders` — don't add nested providers. See `pinpoint-design-bible` §12.
 
 ### Adding Components
 
@@ -60,11 +61,13 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 
 ### Pickers & Selects
 
-| File                                         | What It Teaches                                                 |
-| :------------------------------------------- | :-------------------------------------------------------------- |
-| `src/components/issues/AssigneePicker.tsx`   | Listbox pattern, "Unassigned" special value, user search/filter |
-| `src/components/machines/MachineFilters.tsx` | Inline filter bar, sort dropdown, owner display with metadata   |
-| `src/components/machines/OwnerSelect.tsx`    | Owner select with machine count and invite status metadata      |
+Single-select user pickers all follow the **Picker Pattern** (Popover + cmdk Command) — see `pinpoint-design-bible` §12 for the canonical pattern + rules. Don't reimplement; copy from one of these.
+
+| File                                         | What It Teaches                                                                         |
+| :------------------------------------------- | :-------------------------------------------------------------------------------------- |
+| `src/components/issues/AssigneePicker.tsx`   | Picker pattern, "Unassigned" sentinel, "Me" quick-select, hidden input for form compat  |
+| `src/components/machines/OwnerSelect.tsx`    | Picker pattern, hide-guests toggle, invite-on-the-fly via `<InviteUserDialog>`          |
+| `src/components/machines/MachineFilters.tsx` | Inline filter bar (not a picker — filter composition + sort dropdown for the list page) |
 
 ### Styling & Tokens
 
@@ -75,27 +78,33 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 
 ### Layout
 
-| File                                     | What It Teaches                                                    |
-| :--------------------------------------- | :----------------------------------------------------------------- |
-| `src/components/layout/MainLayout.tsx`   | App shell (AppHeader + content + BottomTabBar), horizontal padding |
-| `src/components/layout/AppHeader.tsx`    | Unified responsive header (icon-only at md:, icon+text at lg:)     |
-| `src/components/layout/BottomTabBar.tsx` | Mobile tab bar (md:hidden), More sheet with secondary nav          |
-| `src/components/layout/nav-config.ts`    | Shared NAV_ITEMS array used by AppHeader and BottomTabBar          |
-| `src/components/layout/HelpMenu.tsx`     | Help dropdown (Feedback, What's New, Help, About) with badge       |
+Every authenticated page should compose `<MainLayout>` → `<PageContainer>` → `<PageHeader>` → content. See `pinpoint-design-bible` §5 for the size mapping (narrow/standard/wide/full).
 
-## Label Standards (Decided)
+| File                                        | What It Teaches                                                                                                   |
+| :------------------------------------------ | :---------------------------------------------------------------------------------------------------------------- |
+| `src/components/layout/MainLayout.tsx`      | App shell (AppHeader + content + BottomTabBar), horizontal padding                                                |
+| `src/components/layout/PageContainer.tsx`   | Width + vertical padding wrapper. `size="narrow" \| "standard" (default) \| "wide" \| "full"`                     |
+| `src/components/layout/PageHeader.tsx`      | Page title (h1, text-balance, 3xl bold) + optional `titleAdornment` + optional `actions`. Bottom border separator |
+| `src/components/layout/AppHeader.tsx`       | Unified responsive header (icon-only at md:, icon+text at lg:)                                                    |
+| `src/components/layout/BottomTabBar.tsx`    | Mobile tab bar (md:hidden), More sheet with secondary nav                                                         |
+| `src/components/layout/nav-config.ts`       | Shared NAV_ITEMS array used by AppHeader and BottomTabBar                                                         |
+| `src/components/layout/HelpMenu.tsx`        | Help dropdown (Feedback, What's New, Help, About) with badge                                                      |
+| `src/components/layout/ClientProviders.tsx` | Hoists `<TooltipProvider>` (`delayDuration={300}`) — don't add nested providers                                   |
 
-- Status group labels: "Open" (not "New"), "In Progress", "Closed" -- decided standard for Phase 2. Currently hardcoded as "New" in StatusSelect.tsx and IssueFilters.tsx; `STATUS_GROUP_LABELS` will be added in the label rename PR.
-- Quick-select labels: "Me" (assignee), "My machines" (not "Your machines") -- decided standard for Phase 2. Will be added in the "Me" quick-select (PinPoint-2y2) and "My machines" (PinPoint-x04) PRs.
-- Status "wait_owner": Use `STATUS_CONFIG.wait_owner.label` as canonical source (currently "Pending Owner"). Note: mockups use "Wait Owner" -- this may be reconciled later.
+## Label Standards
+
+- Status group labels: import from `STATUS_GROUP_LABELS` in `src/lib/issues/status.ts` ("Open", "In Progress", "Closed"). Never hardcode the strings.
+- Quick-select labels for "current user" filters are "Me" (assignee) and "My machines" (machines). Both shipped — see `AssigneePicker` and `MachineFilters`.
+- Status `wait_owner`: use `STATUS_CONFIG.wait_owner.label` as the canonical display string (currently "Pending Owner"). Mockups occasionally use "Wait Owner"; the config wins.
 
 ## Color System
 
-- **Always use Tailwind token names** (e.g., `bg-cyan-500`), never hex values
-- Status colors are defined in `STATUS_CONFIG` in `status.ts` -- never hardcode
-- Theme uses Material Design 3 via CSS custom properties in `globals.css`
-- Primary: `--color-primary` (APC Neon Green #4ade80)
-- Secondary: `--color-secondary` (Fuchsia #d946ef)
+- **Use semantic tokens** (`bg-primary`, `text-destructive`, `text-muted-foreground`, `border-success/40`). Raw Tailwind palette classes (`bg-cyan-500`, `text-red-500`, `border-fuchsia-500`) and hardcoded hex are **forbidden in component code** — see design-bible §1 for the full rule and the design-layer config exceptions.
+- Status / severity / priority / frequency colors come from `STATUS_CONFIG` / `SEVERITY_CONFIG` / `PRIORITY_CONFIG` / `FREQUENCY_CONFIG` in `src/lib/issues/status.ts` — never freestyle.
+- Theme tokens are defined in `src/app/globals.css` via Tailwind v4 `@theme` block. Dark-only — `dark:` utility classes are dead code, remove them when you touch the file.
+- Primary: `--color-primary` (APC Neon Green `#4ade80`)
+- Secondary: `--color-secondary` (Teal `#2dd4bf`) — **purple/fuchsia secondary was removed in PR #1204; do not reintroduce.**
+- For the full visual identity (surface hierarchy, glow rules, accessibility constraints) see `pinpoint-design-bible` §1–§2.
 
 ## Core UI Patterns
 
@@ -165,7 +174,7 @@ export function CreateIssueForm() {
   return (
     <form action={formAction}>
       <input name="title" required />
-      {state.message && <p className="text-red-500">{state.message}</p>}
+      {state.message && <p className="text-destructive">{state.message}</p>}
       <button type="submit">Create Issue</button>
     </form>
   );
@@ -392,7 +401,7 @@ export function IssueForm() {
 
 // Peer patterns for form validation
 <Input className="peer" />
-<p className="peer-invalid:visible invisible text-red-500">
+<p className="peer-invalid:visible invisible text-destructive">
   Invalid input
 </p>
 ```
@@ -418,34 +427,41 @@ export function IssueForm() {
 ### Page Layout
 
 ```typescript
-// Consistent page structure
+// Canonical page structure: PageContainer + PageHeader + body grid.
+// MainLayout wraps the route — don't re-add it here.
+import { PageContainer } from "~/components/layout/PageContainer";
+import { PageHeader } from "~/components/layout/PageHeader";
+
 export default async function MachinesPage() {
   const machines = await getMachines();
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Machines</h1>
-        <Button asChild>
-          <Link href="/machines/new">Add Machine</Link>
-        </Button>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <PageContainer size="wide">
+      <PageHeader
+        title="Machines"
+        actions={
+          <Button asChild>
+            <Link href="/m/new">Add Machine</Link>
+          </Button>
+        }
+      />
+      <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {machines.map((machine) => (
           <MachineCard key={machine.id} machine={machine} />
         ))}
       </div>
-    </div>
+    </PageContainer>
   );
 }
 ```
 
 ### Responsive Grid
 
+Per the **Two-Layer Responsive Framework** (AGENTS.md rule #16): viewport breakpoints (`md:`, `lg:`, `xl:`) for page-level grid columns; container queries for component internals. **`sm:` is padding/spacing only — never `sm:grid-cols-*`.**
+
 ```typescript
-// Responsive grid with Tailwind
-<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+// Page-level grid (Layer 1, viewport breakpoints)
+<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
   {items.map((item) => (
     <Card key={item.id}>{item.name}</Card>
   ))}
@@ -465,8 +481,12 @@ export default async function MachinesPage() {
   padding: 0;
 }
 
-/* GOOD: Use Tailwind's Preflight */
-@tailwind base;
+/* GOOD: Use Tailwind v4's Preflight (already in src/app/globals.css) */
+@import "tailwindcss";
+
+@theme {
+  /* token definitions */
+}
 ```
 
 **Hardcoded Spacing in Components**:
@@ -489,8 +509,8 @@ export function Card({ children, className }: CardProps) {
 // BAD: Inline styles
 <div style={{ marginTop: '10px', color: '#ff0000' }}>
 
-// GOOD: Tailwind utilities
-<div className="mt-2.5 text-red-500">
+// GOOD: Tailwind utilities with semantic tokens
+<div className="mt-2.5 text-destructive">
 ```
 
 ## Troubleshooting
