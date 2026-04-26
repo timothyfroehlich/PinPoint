@@ -184,10 +184,15 @@ export async function createNotification(
 
   // 3. Fetch emails (avoid N+1)
   const users = await tx
-    .select({ id: userProfiles.id, email: userProfiles.email })
+    .select({
+      id: userProfiles.id,
+      email: userProfiles.email,
+      discordUserId: userProfiles.discordUserId,
+    })
     .from(userProfiles)
     .where(inArray(userProfiles.id, [...recipientIds]));
   const emailMap = new Map(users.map((u) => [u.id, u.email]));
+  const discordUserIdMap = new Map(users.map((u) => [u.id, u.discordUserId]));
 
   // 4. Fan-out per recipient using the channel registry.
   //    See src/lib/notifications/channels/registry.ts.
@@ -224,6 +229,7 @@ export async function createNotification(
       resourceId,
       resourceType,
       email: emailMap.get(userId) ?? null,
+      discordUserId: discordUserIdMap.get(userId) ?? null,
       issueTitle: resolvedIssueTitle,
       machineName: resolvedMachineName,
       formattedIssueId: resolvedFormattedIssueId,
