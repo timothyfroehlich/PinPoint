@@ -6,6 +6,7 @@ import { db } from "~/server/db";
 import { notifications } from "~/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { type Result, ok, err } from "~/lib/result";
+import { serverActionError } from "~/lib/observability/report-error";
 
 export type MarkAsReadResult = Result<
   { success: boolean },
@@ -37,8 +38,15 @@ export async function markAsReadAction(
     revalidatePath("/", "layout"); // Revalidate everywhere to update notification count
     return ok({ success: true });
   } catch (error) {
-    console.error("markAsReadAction failed", error);
-    return err("SERVER", "Failed to mark notification as read");
+    return serverActionError(
+      error,
+      "SERVER",
+      "Failed to mark notification as read",
+      {
+        action: "markAsReadAction",
+        notificationId,
+      }
+    );
   }
 }
 
@@ -60,7 +68,8 @@ export async function markAllAsReadAction(): Promise<MarkAsReadResult> {
     revalidatePath("/", "layout");
     return ok({ success: true });
   } catch (error) {
-    console.error("markAllAsReadAction failed", error);
-    return err("SERVER", "Failed to mark all as read");
+    return serverActionError(error, "SERVER", "Failed to mark all as read", {
+      action: "markAllAsReadAction",
+    });
   }
 }

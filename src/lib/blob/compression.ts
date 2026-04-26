@@ -1,4 +1,5 @@
 import imageCompression from "browser-image-compression";
+import * as Sentry from "@sentry/nextjs";
 import { BLOB_CONFIG } from "./config";
 
 /**
@@ -29,7 +30,13 @@ export async function compressImage(
       lastModified: Date.now(),
     });
   } catch (err) {
-    console.error("Compression failed:", err);
+    // Best-effort: compression failure is tolerated — we fall back to the original file.
+    // Captured so we can track how often this degrades in production.
+    Sentry.captureException(err, {
+      contexts: {
+        pinpoint: { action: "compressImage", mode, bestEffort: true },
+      },
+    });
     return file; // Fallback to original
   }
 }
