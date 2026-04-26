@@ -1,4 +1,4 @@
-/* eslint-disable eslint-comments/no-restricted-disable, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call -- Auth callback requires direct Supabase client usage which returns any */
+/* eslint-disable eslint-comments/no-restricted-disable, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- Auth callback requires direct Supabase client usage which returns any */
 /**
  * Auth callback route requires direct use of createServerClient with custom cookie handling
  * to properly set cookies in the response. Standard SSR wrapper cannot be used here.
@@ -9,6 +9,9 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { eq } from "drizzle-orm";
+import { db } from "~/server/db";
+import { userProfiles } from "~/server/db/schema";
 import { getSupabaseEnv } from "~/lib/supabase/env";
 import { getSiteUrl, isInternalUrl } from "~/lib/url";
 
@@ -94,9 +97,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      const {
-        data: { user: _user },
-      } = await supabase.auth.getUser();
+      await syncDiscordIdentity(supabase);
       return applyCookies(redirectToTarget(), pendingCookies);
     }
 
@@ -113,9 +114,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
 
     if (!error) {
-      const {
-        data: { user: _user },
-      } = await supabase.auth.getUser();
+      await syncDiscordIdentity(supabase);
       return applyCookies(redirectToTarget(), pendingCookies);
     }
 
@@ -146,6 +145,27 @@ function isValidEmailOtpType(value: string | null): value is EmailOtpType {
     value === "email_change" ||
     value === "email"
   );
+}
+
+async function syncDiscordIdentity(
+  supabase: ReturnType<typeof createServerClient>
+): Promise<void> {
+  const { data: userResponse } = await supabase.auth.getUser();
+  const user = userResponse.user;
+  if (!user) return;
+
+  const identities = (user.identities ?? []) as {
+    provider: string;
+    identity_data?: { provider_id?: string; sub?: string };
+  }[];
+  const discord = identities.find((i) => i.provider === "discord");
+  const discordUserId =
+    discord?.identity_data?.provider_id ?? discord?.identity_data?.sub ?? null;
+
+  await db
+    .update(userProfiles)
+    .set({ discordUserId })
+    .where(eq(userProfiles.id, user.id));
 }
 
 function createSupabaseClient(request: NextRequest): {
