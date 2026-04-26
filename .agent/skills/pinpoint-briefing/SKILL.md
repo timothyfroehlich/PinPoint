@@ -12,11 +12,34 @@ Goal: answer "what's broken, what shipped, what needs attention" before picking 
 
 Run all data-gathering steps **in parallel** (one Bash call per logical group). Then synthesize into a structured briefing output.
 
-**Pre-flight first**: verify Sentry auth (Step 0) BEFORE launching the parallel batch. Group E silently returns empty if Sentry isn't authenticated, and the briefing misses real production errors.
+**Pre-flight first**: run both checks in Step 0 BEFORE launching the parallel batch. The briefing reads local files (lockfile, `package.json`) AND remote services (Sentry MCP) — if either is stale or unauthenticated, the briefing reports rotten data without warning.
 
 ---
 
-## Step 0 — Pre-flight: Verify Sentry Auth
+## Step 0 — Pre-flight checks
+
+Two independent gates. Each one failing is a stop-and-ask, not a soft warning.
+
+### 0a — Confirm we're on a fresh main
+
+The audit, the lockfile, and the package overrides are read from the **local** working tree. If local main is days behind, `pnpm audit` will flag CVEs that have already been patched upstream and the briefing ships a "regression" finding that's actually just stale state. (We've shipped this exact bug — a `uuid` override "regression" turned out to be a 2-day-old local checkout.)
+
+```bash
+git fetch origin main
+current=$(git symbolic-ref --short HEAD 2>/dev/null || echo "DETACHED")
+if [ "$current" = "main" ]; then
+  git pull --ff-only origin main
+fi
+```
+
+- If `current == main` → fast-forward and proceed.
+- Otherwise → **STOP. Do NOT run the briefing yet.** Tell the user:
+
+  > ⚠️ I'm on `<branch>`, not main. The briefing reads local files (`pnpm-lock.yaml`, `package.json`) and would silently report stale CVEs from before main moved on. Want me to switch to main first, or run anyway with that caveat in mind?
+
+  Wait for an explicit answer. If they say "run anyway", state in the briefing's Security section that the audit was run from a non-main checkout and any CVE finding should be re-verified.
+
+### 0b — Verify Sentry auth
 
 The Sentry MCP server only exposes its real query tools (`find_organizations`, `search_issues`, etc.) AFTER the user has completed OAuth. Pre-auth, only `authenticate` / `complete_authentication` stubs are registered. The briefing's Group E depends on the real tools — without them it returns empty and you ship a briefing that missed live production errors.
 
