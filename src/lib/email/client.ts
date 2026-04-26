@@ -1,3 +1,5 @@
+import "server-only";
+
 import {
   type EmailTransport,
   type EmailParams,
@@ -79,7 +81,7 @@ export async function sendEmail({
   if (result.success) {
     log.info({ to, subject }, "[Email] Email sent successfully");
   } else {
-    reportError(result.error, { action: "sendEmail", to, subject });
+    reportError(result.error, { action: "sendEmail" });
   }
   return result;
 }

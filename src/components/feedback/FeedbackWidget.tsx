@@ -1,7 +1,7 @@
 "use client";
 
 import * as Sentry from "@sentry/nextjs";
-import React, { useEffect } from "react";
+import React from "react";
 import { Button } from "~/components/ui/button";
 import { MessageSquare, Bug, Lightbulb } from "lucide-react";
 import {
@@ -151,11 +151,6 @@ function handleFeedback(type: "bug" | "feature"): void {
 }
 
 export function FeedbackWidget(): React.JSX.Element | null {
-  useEffect(() => {
-    // Dev-only mount check — intentionally not routed through Sentry since this
-    // is the Sentry feedback widget itself; recursive capture would be noisy.
-  }, []);
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

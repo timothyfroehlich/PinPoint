@@ -1,3 +1,5 @@
+import "server-only";
+
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import type Mail from "nodemailer/lib/mailer";
@@ -47,7 +49,7 @@ export class ResendTransport implements EmailTransport {
 
       return { success: true, data };
     } catch (error) {
-      reportError(error, { action: "ResendTransport.send", to });
+      reportError(error, { action: "ResendTransport.send" });
       return { success: false, error };
     }
   }
@@ -85,7 +87,7 @@ export class SMTPTransport implements EmailTransport {
 
       return { success: true, data: info };
     } catch (error) {
-      reportError(error, { action: "SMTPTransport.send", to });
+      reportError(error, { action: "SMTPTransport.send" });
       return { success: false, error };
     }
   }
