@@ -301,5 +301,14 @@ function buildDefaultPrefs(userId: string): NotificationPreferences {
     inAppWatchNewIssuesGlobal: false,
     emailNotifyOnMachineOwnershipChange: false,
     inAppNotifyOnMachineOwnershipChange: false,
+    discordEnabled: true,
+    discordNotifyOnAssigned: true,
+    discordNotifyOnStatusChange: false,
+    discordNotifyOnNewComment: false,
+    discordNotifyOnMentioned: true,
+    discordNotifyOnNewIssue: false,
+    discordNotifyOnMachineOwnershipChange: false,
+    discordWatchNewIssuesGlobal: false,
+    discordDmBlockedAt: null,
   };
 }
