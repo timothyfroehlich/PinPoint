@@ -196,7 +196,7 @@ export async function createNotification(
 
   // 4. Fan-out per recipient using the channel registry.
   //    See src/lib/notifications/channels/registry.ts.
-  const channels = getChannels();
+  const channels = await getChannels();
 
   // Rows for batched in-app insert (preserves historical single-INSERT).
   const notificationsToInsert: {

@@ -1,3 +1,5 @@
+import { getDiscordConfig } from "~/lib/discord/config";
+import { discordChannel } from "./discord-channel";
 import { emailChannel } from "./email-channel";
 import { inAppChannel } from "./in-app-channel";
 import type { NotificationChannel } from "./types";
@@ -5,13 +7,16 @@ import type { NotificationChannel } from "./types";
 /**
  * Returns the list of active notification channels.
  *
- * A function (not a const) so later PRs (see PP-2n5) can register
- * the Discord channel conditionally on `getDiscordConfig().enabled`.
- * See spec decision #18 (missing bot token → channel not registered).
+ * Order is fixed for test determinism:
+ *   in_app → email → discord
  *
- * Order matters for test determinism — in-app first, then email,
- * matches the historical ordering in the monolithic dispatcher.
+ * Discord is appended only when getDiscordConfig() returns a usable config
+ * (see spec decision #18: missing token / disabled toggle → channel not
+ * registered, no UI advertising the feature).
  */
-export function getChannels(): readonly NotificationChannel[] {
-  return [inAppChannel, emailChannel];
+export async function getChannels(): Promise<readonly NotificationChannel[]> {
+  const channels: NotificationChannel[] = [inAppChannel, emailChannel];
+  const discord = await getDiscordConfig();
+  if (discord) channels.push(discordChannel);
+  return channels;
 }
