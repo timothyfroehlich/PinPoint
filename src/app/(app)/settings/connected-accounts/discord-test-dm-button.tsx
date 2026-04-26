@@ -16,7 +16,7 @@ const REASON_COPY: Record<
   not_linked: "Link your Discord account first.",
   not_configured: "Discord integration isn't configured yet.",
   blocked:
-    "Discord won't deliver to you — check that you've joined the APC server and allow DMs from members.",
+    "Discord won't deliver to you — check that you've joined the configured Discord server and allow DMs from members.",
   rate_limited: "Rate-limited by Discord. Try again in a moment.",
   transient: "Couldn't reach Discord. Try again.",
 };

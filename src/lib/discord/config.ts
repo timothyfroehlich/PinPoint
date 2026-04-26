@@ -31,6 +31,12 @@ export interface DiscordConfig {
  * the service-role Supabase client and exposes secret material. The
  * "server-only" import above guards against accidental client imports.
  */
+/** Trimmed env value, or null if undefined / empty. */
+function envOrNull(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : null;
+}
+
 interface DiscordConfigRow {
   enabled: boolean;
   guild_id: string | null;
@@ -42,6 +48,24 @@ interface DiscordConfigRow {
 }
 
 export async function getDiscordConfig(): Promise<DiscordConfig | null> {
+  // Dev convenience: when DISCORD_BOT_TOKEN is set in env, skip the DB
+  // round-trip and return a synthetic config built from env vars. This
+  // lets new worktrees pick up Discord credentials automatically without
+  // an admin re-paste through /admin/integrations/discord. Production
+  // never sets this env var, so the DB path still owns config there.
+  const envToken = process.env["DISCORD_BOT_TOKEN"]?.trim();
+  if (envToken) {
+    return {
+      enabled: true,
+      guildId: envOrNull(process.env["DISCORD_GUILD_ID"]),
+      inviteLink: envOrNull(process.env["DISCORD_INVITE_LINK"]),
+      botToken: envToken,
+      botHealthStatus: "unknown",
+      lastBotCheckAt: null,
+      updatedAt: new Date(),
+    };
+  }
+
   const supabase = createAdminClient();
   // The `get_discord_config` RPC is defined in 0028_natural_vengeance.sql but
   // is not present in Supabase's generated types. Cast the response to the

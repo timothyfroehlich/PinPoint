@@ -58,7 +58,7 @@ export function DiscordConfigForm({
         )}
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="guildId">Guild ID (APC Discord server)</Label>
+          <Label htmlFor="guildId">Guild ID (Discord server)</Label>
           <Input
             id="guildId"
             name="guildId"

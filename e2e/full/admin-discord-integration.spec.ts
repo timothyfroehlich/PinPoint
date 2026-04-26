@@ -46,9 +46,7 @@ test.describe("Admin Discord Integration", () => {
 
     // Form fields should be present.
     await expect(page.getByLabel("Bot token")).toBeVisible();
-    await expect(
-      page.getByLabel("Guild ID (APC Discord server)")
-    ).toBeVisible();
+    await expect(page.getByLabel("Guild ID (Discord server)")).toBeVisible();
     await expect(page.getByLabel("Invite link")).toBeVisible();
 
     // The Enabled switch is disabled until a bot token is set — this is the
