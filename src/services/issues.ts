@@ -13,6 +13,7 @@ import {
   type TimelineEventData,
 } from "~/lib/timeline/events";
 import { createNotification } from "~/lib/notifications";
+import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
 import { formatIssueId } from "~/lib/issues/utils";
 import {
@@ -250,11 +251,11 @@ export async function createIssue({
         }
       }
     } catch (error) {
-      log.error(
-        { error, action: "createIssue.notifications" },
-        "Failed to process notifications"
-      );
-      // Don't fail the action if notifications fail
+      reportError(error, {
+        action: "createIssueNotifications",
+        bestEffort: true,
+        issueId: issue.id,
+      });
     }
 
     return issue;
@@ -343,10 +344,11 @@ export async function updateIssueStatus({
         tx
       );
     } catch (error) {
-      log.error(
-        { error, action: "updateIssueStatus.notifications" },
-        "Failed to send notification"
-      );
+      reportError(error, {
+        action: "updateIssueStatusNotifications",
+        bestEffort: true,
+        issueId,
+      });
     }
 
     return { issueId, oldStatus, newStatus: status };
@@ -453,10 +455,12 @@ export async function addIssueComment({
         );
       }
     } catch (error) {
-      log.error(
-        { error, action: "addIssueComment.notifications" },
-        "Failed to send notification"
-      );
+      reportError(error, {
+        action: "addIssueCommentNotifications",
+        bestEffort: true,
+        issueId,
+        commentId: comment.id,
+      });
     }
     return comment;
   });
@@ -602,10 +606,11 @@ export async function assignIssue({
         );
       }
     } catch (error) {
-      log.error(
-        { error, action: "assignIssue.notifications" },
-        "Failed to process notifications"
-      );
+      reportError(error, {
+        action: "assignIssueNotifications",
+        bestEffort: true,
+        issueId,
+      });
     }
   });
 }
