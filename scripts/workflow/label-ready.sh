@@ -143,8 +143,8 @@ if [ "$CLEANUP" = "true" ]; then
     if [ -z "$worktree_path" ]; then
         branch_dir=$(echo "$branch" | tr '/' '-')
         for candidate in \
-            "/home/froeht/Code/pinpoint-worktrees/${branch_dir}" \
-            "/home/froeht/Code/pinpoint-worktrees/${branch}"; do
+            "${HOME}/Code/pinpoint-worktrees/${branch_dir}" \
+            "${HOME}/Code/pinpoint-worktrees/${branch}"; do
             if [ -d "$candidate" ]; then
                 worktree_path="$candidate"
                 break
