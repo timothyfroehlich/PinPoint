@@ -6,6 +6,10 @@ import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
 import { createIssue } from "~/services/issues";
 import {
+  reportError,
+  serverActionError,
+} from "~/lib/observability/report-error";
+import {
   checkPublicIssueLimit,
   formatResetTime,
   getClientIp,
@@ -392,7 +396,9 @@ export async function submitPublicIssueAction(
     if (isRedirectError(error)) {
       throw error;
     }
-    log.error({ error }, "Failed to submit issue");
+    reportError(error, {
+      action: "submitPublicIssueAction",
+    });
     return {
       error: "Unable to submit the issue. Please try again.",
     };
@@ -449,10 +455,9 @@ export async function getRecentIssuesAction(
       }))
     );
   } catch (error) {
-    log.error(
-      { error, machineInitials },
-      "Error fetching recent issues via server action"
-    );
-    return err("SERVER", "Could not load recent issues");
+    return serverActionError(error, "SERVER", "Could not load recent issues", {
+      action: "getRecentIssuesAction",
+      machineInitials,
+    });
   }
 }
