@@ -12,6 +12,10 @@ import {
 } from "./schemas";
 import { log } from "~/lib/logger";
 import {
+  serverActionError,
+  reportError,
+} from "~/lib/observability/report-error";
+import {
   checkLoginIpLimit,
   checkLoginAccountLimit,
   checkSignupLimit,
@@ -226,15 +230,7 @@ export async function loginAction(
       throw error;
     }
 
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        stack: error instanceof Error ? error.stack : undefined,
-        action: "login",
-      },
-      "Login server error"
-    );
-
+    reportError(error, { action: "login" });
     return err("SERVER", "An unexpected error occurred", {
       submittedEmail,
     });
@@ -422,16 +418,9 @@ export async function signupAction(
       throw error;
     }
 
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        stack: error instanceof Error ? error.stack : undefined,
-        action: "signup",
-      },
-      "Signup server error"
-    );
-
-    return err("SERVER", "An unexpected error occurred");
+    return serverActionError(error, "SERVER", "An unexpected error occurred", {
+      action: "signup",
+    });
   }
 }
 
@@ -465,14 +454,7 @@ export async function logoutAction(): Promise<void> {
       "User logged out successfully"
     );
   } catch (cause) {
-    log.error(
-      {
-        error: cause instanceof Error ? cause.message : "Unknown",
-        stack: cause instanceof Error ? cause.stack : undefined,
-        action: "logout",
-      },
-      "Logout server error"
-    );
+    reportError(cause, { action: "logout" });
   }
 
   // Always redirect to dashboard after logout attempt
@@ -569,15 +551,9 @@ export async function forgotPasswordAction(
     // This prevents email enumeration attacks
     return ok(undefined);
   } catch (error) {
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        stack: error instanceof Error ? error.stack : undefined,
-        action: "forgot-password",
-      },
-      "Forgot password server error"
-    );
-    return err("SERVER", "An unexpected error occurred");
+    return serverActionError(error, "SERVER", "An unexpected error occurred", {
+      action: "forgot-password",
+    });
   }
 }
 
@@ -681,15 +657,8 @@ export async function resetPasswordAction(
       throw error;
     }
 
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        stack: error instanceof Error ? error.stack : undefined,
-        action: "reset-password",
-      },
-      "Reset password server error"
-    );
-
-    return err("SERVER", "An unexpected error occurred");
+    return serverActionError(error, "SERVER", "An unexpected error occurred", {
+      action: "reset-password",
+    });
   }
 }
