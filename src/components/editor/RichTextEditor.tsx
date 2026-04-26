@@ -64,7 +64,7 @@ export function RichTextEditor({
           suggestion: {
             items: ({ query }) => searchMentionableUsers(query),
             render: () => {
-              let component: ReactRenderer<MentionListRef>;
+              let component: ReactRenderer<MentionListRef> | undefined;
               let popup: TippyInstance[] | undefined;
 
               return {
@@ -92,7 +92,7 @@ export function RichTextEditor({
                 },
 
                 onUpdate(props) {
-                  component.updateProps(props);
+                  component?.updateProps(props);
 
                   if (!props.clientRect || !popup?.[0]) {
                     return;
@@ -111,12 +111,12 @@ export function RichTextEditor({
                     return true;
                   }
 
-                  return component.ref?.onKeyDown(props) ?? false;
+                  return component?.ref?.onKeyDown(props) ?? false;
                 },
 
                 onExit() {
                   popup?.[0]?.destroy();
-                  component.destroy();
+                  component?.destroy();
                 },
               };
             },

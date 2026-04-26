@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import sanitizeHtml from "sanitize-html";
 import { escapeHtml } from "~/lib/markdown";
 import {
@@ -6,6 +7,22 @@ import {
   type ProseMirrorNode,
   plainTextToDoc,
 } from "./types";
+
+/**
+ * Sentinel string returned by `renderDocToHtml` when rendering fails.
+ *
+ * Contract: callers MUST compare the return value of `renderDocToHtml` to
+ * this exact string (reference/value equality) BEFORE injecting it as HTML.
+ * The sentinel is intentionally NOT routed through `sanitizeHtml`, so the
+ * `data-render-failed` attribute survives — that attribute exists only as
+ * an out-of-band marker for human debuggers (e.g. inspecting the DOM after
+ * a future refactor accidentally bypasses the sentinel check).
+ *
+ * `RichTextDisplay` is the only consumer today and does this check; never
+ * inject this string into the DOM, and never re-sanitize it (sanitization
+ * would strip the `data-` attribute and break any future debug heuristics).
+ */
+export const RENDER_FAILED_SENTINEL = '<span data-render-failed="true"></span>';
 
 /**
  * Safely extract a string from an unknown ProseMirror attribute value.
@@ -21,10 +38,6 @@ type MentionRenderer = (id: string, label: string) => string;
 
 function defaultMentionRenderer(id: string, label: string): string {
   return `<a class="mention" href="/profile/${escapeHtml(id)}" data-mention-id="${escapeHtml(id)}">@${escapeHtml(label)}</a>`;
-}
-
-function emailMentionRenderer(_id: string, label: string): string {
-  return `<strong>@${escapeHtml(label)}</strong>`;
 }
 
 /**
@@ -157,7 +170,15 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
  * Uses a custom recursive renderer (no DOM/jsdom dependency) so it works
  * in any environment: server components, client components, Edge, tests.
  *
- * Security: Output is sanitized via sanitize-html with strict tag/attribute allowlists.
+ * Return value contract:
+ *   - On success: a sanitize-html allowlisted HTML string. Safe to inject.
+ *   - On failure: the exact `RENDER_FAILED_SENTINEL` string. NOT safe to
+ *     inject blindly — callers MUST compare to `RENDER_FAILED_SENTINEL`
+ *     and render a React placeholder instead. The exception is captured
+ *     to Sentry before this branch returns.
+ *
+ * Security: success-path output is sanitized via sanitize-html with strict
+ * tag/attribute allowlists.
  */
 export function renderDocToHtml(
   doc: ProseMirrorDoc | string | null | undefined
@@ -169,26 +190,10 @@ export function renderDocToHtml(
     const html = renderNodes(prosemirrorDoc.content, defaultMentionRenderer);
     return sanitizeHtml(html, SANITIZE_OPTIONS);
   } catch (e) {
+    Sentry.captureException(e, {
+      contexts: { pinpoint: { action: "renderDocToHtml" } },
+    });
     console.error("renderDocToHtml failed", e);
-    return "";
-  }
-}
-
-/**
- * Render ProseMirror JSON to sanitized HTML suitable for email.
- * Converts mentions to bold text (profile links aren't accessible in email).
- */
-export function renderDocToEmailHtml(
-  doc: ProseMirrorDoc | string | null | undefined
-): string {
-  if (!doc) return "";
-
-  try {
-    const prosemirrorDoc = typeof doc === "string" ? plainTextToDoc(doc) : doc;
-    const html = renderNodes(prosemirrorDoc.content, emailMentionRenderer);
-    return sanitizeHtml(html, SANITIZE_OPTIONS);
-  } catch (e) {
-    console.error("renderDocToEmailHtml failed", e);
-    return "";
+    return RENDER_FAILED_SENTINEL;
   }
 }
