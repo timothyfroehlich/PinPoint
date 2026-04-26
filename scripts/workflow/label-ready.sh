@@ -121,6 +121,11 @@ fi
 
 # Cleanup worktree
 if [ "$CLEANUP" = "true" ]; then
+    # The main worktree is always the first entry in 'git worktree list --porcelain'.
+    # We never want to clean it up — running worktree_cleanup.py on it would stop
+    # the user's Supabase and try to remove their primary checkout.
+    main_worktree=$(git worktree list --porcelain | awk '/^worktree / { print substr($0, 10); exit }')
+
     # Ask git for the worktree path bound to this branch — handles every layout
     # (pinpoint-worktrees/<branch>, pinpoint-worktrees/<branch-with-slashes-as-dashes>,
     # and Claude Code's .claude/worktrees/agent-<hash>).
@@ -154,6 +159,8 @@ if [ "$CLEANUP" = "true" ]; then
 
     if [ -z "$worktree_path" ] || [ ! -d "$worktree_path" ]; then
         echo "No worktree found for branch ${branch}."
+    elif [ "$worktree_path" = "$main_worktree" ]; then
+        echo "SKIP: Branch lives in the main worktree (${worktree_path}); cleanup would stop Supabase and try to remove the primary checkout."
     elif [ "$is_locked" = "true" ]; then
         echo "SKIP: Worktree at ${worktree_path} is locked (likely an active subagent). Remove manually after the agent finishes."
     elif [ "$DRY_RUN" = "true" ]; then
