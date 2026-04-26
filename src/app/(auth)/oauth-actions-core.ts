@@ -6,12 +6,15 @@
  * App code should NOT import from this module — use `oauth-actions.ts`.
  */
 
+import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { type Result, ok, err } from "~/lib/result";
 import { getSiteUrl } from "~/lib/url";
 import { log } from "~/lib/logger";
 import { getProvider, providers, type ProviderKey } from "~/lib/auth/providers";
 import { canUnlinkIdentity } from "~/lib/auth/identity-guards";
+import { db } from "~/server/db";
+import { userProfiles } from "~/server/db/schema";
 
 export type SignInWithProviderResult = Result<
   { redirectUrl: string },
@@ -194,6 +197,16 @@ export async function runUnlinkProvider(
     { userId: user.id, providerKey: rawKey, action: "oauth-unlink" },
     "Provider unlinked successfully"
   );
+
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- ProviderKey narrows to "discord" today; this guard is load-bearing once Google etc. land.
+  if (rawKey === "discord") {
+    // Mirror column on user_profiles must follow auth.identities — the
+    // dispatcher reads this field, not auth.identities directly.
+    await db
+      .update(userProfiles)
+      .set({ discordUserId: null })
+      .where(eq(userProfiles.id, user.id));
+  }
 
   return ok(undefined);
 }
