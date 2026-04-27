@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock createAdminClient so we don't hit a real Supabase instance.
 // vi.mock() is hoisted above all imports, so a file-scope `const rpcMock`
@@ -16,6 +16,15 @@ import { getDiscordConfig } from "~/lib/discord/config";
 describe("getDiscordConfig", () => {
   beforeEach(() => {
     rpcMock.mockReset();
+    // Clear env-var override so tests exercise the DB path. Real env may
+    // populate these (e.g. dev worktrees with DISCORD_BOT_TOKEN set).
+    vi.stubEnv("DISCORD_BOT_TOKEN", "");
+    vi.stubEnv("DISCORD_GUILD_ID", "");
+    vi.stubEnv("DISCORD_INVITE_LINK", "");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("returns null when RPC yields no rows", async () => {
