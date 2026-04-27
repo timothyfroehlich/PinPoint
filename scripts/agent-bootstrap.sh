@@ -14,10 +14,16 @@
 #   BEADS_BOOTSTRAP_SKIP_PNPM=1   Skip `pnpm install` (faster re-runs).
 #   BEADS_BOOTSTRAP_SKIP_DOLT=1   Skip beads sync (offline / read-only).
 #
-# Targets Linux (Anthropic web env). The apt block is gated so the script
-# is non-destructive on macOS, but the rest assumes a Linux-style sandbox.
+# Targets Linux (Anthropic web env). Fails fast on other platforms rather
+# than silently misbehaving with Linux-specific installers (sudo, GNU mktemp,
+# the dolt linux-amd64 release tarball, etc.).
 
 set -euo pipefail
+
+if [ "$(uname -s)" != "Linux" ]; then
+  printf '\033[31m[bootstrap]\033[0m This script targets Linux only (got: %s). Aborting.\n' "$(uname -s)" >&2
+  exit 1
+fi
 
 ACTIONLINT_VERSION="1.7.11"
 ZIZMOR_VERSION="1.23.1"
@@ -33,7 +39,9 @@ ensure_path() {
 }
 
 ensure_path "$HOME/.local/bin"
-ensure_path "$(go env GOPATH)/bin"
+if command -v go >/dev/null; then
+  ensure_path "$(go env GOPATH)/bin"
+fi
 
 # 1. apt packages (Linux only; macOS runs assume Homebrew already provided these)
 if command -v apt-get >/dev/null; then
@@ -58,24 +66,28 @@ if [ ! -e "$HOME/.local/bin/fd" ] && command -v fdfind >/dev/null; then
 fi
 
 # 2. Go-installed CLIs --------------------------------------------------------
-go_bin="$(go env GOPATH)/bin"
+if ! command -v go >/dev/null; then
+  warn "go not installed — skipping bd and ratchet installs"
+else
+  go_bin="$(go env GOPATH)/bin"
 
-if ! command -v bd >/dev/null; then
-  log "go install bd (beads)"
-  go install github.com/steveyegge/beads/cmd/bd@latest
-fi
-
-if ! command -v ratchet >/dev/null; then
-  log "go install ratchet"
-  go install github.com/sethvargo/ratchet@latest
-fi
-
-# Surface go-installed binaries on the default PATH for post-bootstrap shells.
-for bin in bd ratchet; do
-  if [ -x "$go_bin/$bin" ] && [ ! -e "$HOME/.local/bin/$bin" ]; then
-    ln -s "$go_bin/$bin" "$HOME/.local/bin/$bin"
+  if ! command -v bd >/dev/null; then
+    log "go install bd (beads)"
+    go install github.com/steveyegge/beads/cmd/bd@latest
   fi
-done
+
+  if ! command -v ratchet >/dev/null; then
+    log "go install ratchet"
+    go install github.com/sethvargo/ratchet@latest
+  fi
+
+  # Surface go-installed binaries on the default PATH for post-bootstrap shells.
+  for bin in bd ratchet; do
+    if [ -x "$go_bin/$bin" ] && [ ! -e "$HOME/.local/bin/$bin" ]; then
+      ln -s "$go_bin/$bin" "$HOME/.local/bin/$bin"
+    fi
+  done
+fi
 
 # 3. actionlint (pinned, mirrors CI) ------------------------------------------
 if ! command -v actionlint >/dev/null; then
@@ -88,8 +100,12 @@ fi
 
 # 4. zizmor (pinned, mirrors CI) ----------------------------------------------
 if ! command -v zizmor >/dev/null; then
-  log "uv tool install zizmor==$ZIZMOR_VERSION"
-  uv tool install --quiet "zizmor==$ZIZMOR_VERSION"
+  if ! command -v uv >/dev/null; then
+    warn "uv not installed — skipping zizmor install (pnpm run check:linters will fail)"
+  else
+    log "uv tool install zizmor==$ZIZMOR_VERSION"
+    uv tool install --quiet "zizmor==$ZIZMOR_VERSION"
+  fi
 fi
 
 # 5. dolt CLI -----------------------------------------------------------------
@@ -142,11 +158,12 @@ else
       dolt remote add origin "$BEADS_DOLT_REMOTE"
     fi
     log "fetch beads from DoltHub"
-    if dolt fetch origin 2>&1 | tee /tmp/bd-fetch.log | grep -q "PermissionDenied"; then
-      warn "DoltHub denied the fetch (Host not in allowlist or invalid creds). See /tmp/bd-fetch.log."
-    else
+    if dolt fetch origin >/tmp/bd-fetch.log 2>&1; then
       log "reset local DB to origin/main"
       dolt reset --hard origin/main >/dev/null
+    else
+      warn "dolt fetch failed (exit $?); local DB left untouched. Output:"
+      sed 's/^/  /' /tmp/bd-fetch.log >&2
     fi
     popd >/dev/null
   fi
