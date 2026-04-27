@@ -323,9 +323,9 @@ Every page will eventually need one of these three states: empty, loading, error
 
 ### Empty State
 
-> **Status — planned component, not yet implemented.** `<EmptyState>` **will live** at `~/components/ui/empty-state`; the file doesn't exist today. Extraction is tracked as **PP-yxw.5** (Wave 2a of the consistency pass). This section specifies the contract that PR will build to. Until the component lands, existing inline empty states stay where they are; new code should wait for the component rather than hand-rolling another inline variant.
+> **Canonical component.** Use `<EmptyState>` from `~/components/ui/empty-state` whenever a list, collection, or section has zero items to display. Prefer the shared component over hand-rolled inline empty-state layouts so copy, spacing, and visual hierarchy stay consistent across the app.
 
-Once the component is in place: use `<EmptyState>` whenever a list, collection, or section has zero items to display.
+Use `<EmptyState>` whenever a list, collection, or section has zero items to display.
 
 | Prop          | Purpose                                                              |
 | :------------ | :------------------------------------------------------------------- |

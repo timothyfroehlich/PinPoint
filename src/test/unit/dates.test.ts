@@ -64,11 +64,11 @@ describe("formatDate", () => {
 
 describe("formatDateTime", () => {
   it("throws for null", () => {
-    expect(() => formatDateTime(null as unknown as number)).toThrow(TypeError);
+    expect(() => formatDateTime(null as unknown as Date)).toThrow(TypeError);
   });
 
   it("throws for undefined", () => {
-    expect(() => formatDateTime(undefined as unknown as number)).toThrow(
+    expect(() => formatDateTime(undefined as unknown as Date)).toThrow(
       TypeError
     );
   });
