@@ -134,47 +134,58 @@ Use container queries when the decision depends on the component's available wid
 
 ## 5. Page Archetypes
 
-When building a new page, pick the closest archetype and follow its pattern.
+When building a new page, pick the closest archetype and follow its pattern. Every page should start with `<MainLayout>` → `<PageContainer>` → `<PageHeader>` → content; the archetype only changes the `size` prop and the body grid.
+
+### Picking a `PageContainer` size
+
+| Content type                               | `size` prop          | max-width   |
+| :----------------------------------------- | :------------------- | :---------- |
+| Settings forms, info pages, content pages  | `narrow`             | `max-w-3xl` |
+| Dashboard, detail pages, standard forms    | `standard` (default) | `max-w-6xl` |
+| List/table views (issues, machines)        | `wide`               | `max-w-7xl` |
+| Edge-to-edge dashboards (currently unused) | `full`               | none        |
+
+The archetype tables below give the canonical `size` and the body-level grid for each kind of page. Auth pages opt out of `MainLayout`/`PageContainer` entirely (they get a centered card on the bare background).
 
 ### Dashboard
 
-`max-w-6xl` -- Stats in `grid-cols-1 md:grid-cols-3`, lists in `md:grid-cols-2`.
+`size="standard"` (max-w-6xl) -- Stats in `grid-cols-1 md:grid-cols-3`, lists in `md:grid-cols-2`.
 
 ### List Page (issues, machines)
 
-`max-w-7xl` -- Filters + card grid `md:grid-cols-2 lg:grid-cols-3`.
+`size="wide"` (max-w-7xl) -- Filters + card grid `md:grid-cols-2 lg:grid-cols-3`.
 
 ### Detail Page with Sidebar (issue detail)
 
-`grid md:grid-cols-[minmax(0,1fr)_320px]` -- Sidebar `hidden md:block`, collapses to inline strips on mobile.
+`size="standard"` -- Body uses `grid md:grid-cols-[minmax(0,1fr)_320px]`. Sidebar `hidden md:block`, collapses to inline strips on mobile.
 
 ### Detail Page with Internal Grid (machine detail)
 
-`max-w-6xl` -- Single card body uses `lg:grid-cols-2` internally.
+`size="standard"` (max-w-6xl) -- Single card body uses `lg:grid-cols-2` internally.
 
 ### Form Page (report, create machine)
 
-`max-w-2xl` -- Form inside a card, back button + title in header.
+`size="narrow"` (max-w-3xl) -- Form inside a card, back button + title in header.
 
 ### Settings Page
 
-`max-w-3xl` -- Vertical sections separated by `Separator` components.
+`size="narrow"` (max-w-3xl) -- Vertical sections separated by `Separator` components.
 
 ### Admin Table
 
-`max-w-6xl` -- Full-width `Table` with fixed column widths.
+`size="standard"` (max-w-6xl) -- Full-width `Table` with fixed column widths.
 
 ### Auth Page
 
-`max-w-md` -- Centered card, no MainLayout wrapper.
+`max-w-md` -- Centered card on bare `bg-background`. **No `MainLayout` / `PageContainer` wrapper.**
 
 ### Content Page (about, privacy, changelog)
 
-`max-w-3xl` -- Prose content inside a card.
+`size="narrow"` (max-w-3xl) -- Prose content inside a card.
 
 ### Help Hub
 
-`max-w-3xl` -- Card grid `sm:grid-cols-2`.
+`size="narrow"` (max-w-3xl) -- Card grid `md:grid-cols-2`.
 
 ## 6. Spacing Rhythm
 
@@ -297,25 +308,85 @@ Two canonical durations standardize all animated feedback:
 
 Before building something new, check if one of these already exists:
 
+### Page shell & layout
+
+| Component         | Purpose                                                                                                                 |
+| :---------------- | :---------------------------------------------------------------------------------------------------------------------- |
+| `MainLayout`      | App shell — `AppHeader` + content + `BottomTabBar` + horizontal padding. Wraps every authenticated route.               |
+| `PageContainer`   | Width + vertical padding wrapper. `size="narrow" \| "standard" (default) \| "wide" \| "full"`. See §5 for size mapping. |
+| `PageHeader`      | Page title (h1, `text-balance`, 3xl bold) + optional `titleAdornment` + optional `actions`. Bottom border separator.    |
+| `AppHeader`       | Two-tier responsive header. Icon-only nav at `md:`, icon+text at `lg:`. APC logo at `lg:` only.                         |
+| `HelpMenu`        | Dropdown with Feedback, What's New, Help, About. Badge dot for unread changelog.                                        |
+| `BottomTabBar`    | Mobile tab bar (`md:hidden`). Dashboard, Issues, Machines, Report, More.                                                |
+| `ClientProviders` | Client-only provider hoist (TooltipProvider with `delayDuration={300}`, etc.). Don't add nested `<TooltipProvider>`s.   |
+
+### Issues
+
+| Component          | Purpose                                                                |
+| :----------------- | :--------------------------------------------------------------------- |
+| `IssueBadgeGrid`   | Status/severity/priority/frequency display                             |
+| `IssueBadge`       | Individual status badge with color                                     |
+| `IssueCard`        | Issue summary card (normal/compact)                                    |
+| `IssueRow`         | Table row variant of issue display                                     |
+| `IssueSidebar`     | Right-rail sidebar on issue detail (metadata, watchers, actions)       |
+| `IssueTimeline`    | Comment + activity timeline                                            |
+| `IssueFilters`     | List-page filter bar (status, machine, assignee, more-filters drawer)  |
+| `SidebarActions`   | Issue metadata editing (compact/full, rowLayout)                       |
+| `AssigneePicker`   | Single-select user picker for issue assignee. See **§Picker Pattern**. |
+| `OwnerBadge`       | Inline display of an issue's owner with avatar                         |
+| `BackToIssuesLink` | Breadcrumb back navigation                                             |
+| `WatchButton`      | Watch/unwatch toggle for an issue                                      |
+
+### Machines
+
+| Component                  | Purpose                                                                                      |
+| :------------------------- | :------------------------------------------------------------------------------------------- |
+| `MachineStatusBadge`       | Operational status pill. Colors derive from `STATUS_CONFIG` in `src/lib/issues/status.ts`.   |
+| `MachinePresenceBadge`     | At-location / off-location indicator                                                         |
+| `MachineFilters`           | Inline filter bar + sort dropdown for the machines list                                      |
+| `MachineEmptyState`        | Wrapper around `<EmptyState>` for the machine list contexts                                  |
+| `OwnerSelect`              | Single-select user picker for machine owner with invite-on-the-fly. See **§Picker Pattern**. |
+| `OwnerRequirementsCallout` | Explainer for why a machine needs an owner                                                   |
+| `WatchMachineButton`       | Watch/unwatch toggle for a machine                                                           |
+
+### Cross-cutting UI primitives
+
 | Component                             | Purpose                                                                                         |
 | :------------------------------------ | :---------------------------------------------------------------------------------------------- |
-| `AppHeader`                           | Two-tier responsive header. Icon-only nav at `md:`, icon+text at `lg:`. APC logo at `lg:` only. |
-| `HelpMenu`                            | Dropdown with Feedback, What's New, Help, About. Badge dot for unread changelog.                |
-| `BottomTabBar`                        | Mobile tab bar (`md:hidden`). Dashboard, Issues, Machines, Report, More.                        |
-| `IssueBadgeGrid`                      | Status/severity/priority/frequency display                                                      |
-| `IssueBadge`                          | Individual status badge with color                                                              |
-| `IssueCard`                           | Issue summary card (normal/compact)                                                             |
-| `IssueRow`                            | Table row variant of issue display                                                              |
-| `SidebarActions`                      | Issue metadata editing (compact/full, rowLayout)                                                |
-| `SaveCancelButtons`                   | Form action buttons                                                                             |
-| `Card` / `CardHeader` / `CardContent` | shadcn/ui card                                                                                  |
-| `Sheet`                               | Bottom drawer (mobile "More" menu)                                                              |
+| `EmptyState`                          | Icon + title + optional body + optional action. `variant="card"` (default) or `variant="bare"`. |
+| `SaveCancelButtons`                   | Form action buttons with built-in green "Saved!" success flash                                  |
 | `NotificationList`                    | Notification bell + dropdown                                                                    |
 | `UserMenu`                            | Avatar + dropdown menu (includes Admin link for admin role)                                     |
-| `BackToIssuesLink`                    | Breadcrumb back navigation                                                                      |
-| `EmptyState`                          | Icon + title + optional body + optional action. `variant="card"` (default) or `variant="bare"`. |
+| `DateRangePicker`                     | Calendar-popover date range input                                                               |
+| `MultiSelect`                         | Grouped/flat multi-select with selected-items-first sorting and indeterminate group headers     |
+| `Card` / `CardHeader` / `CardContent` | shadcn/ui card                                                                                  |
+| `Popover`                             | shadcn/ui popover. Building block for the **Picker Pattern**.                                   |
+| `Command`                             | shadcn/ui (cmdk) command palette. Building block for the **Picker Pattern**.                    |
+| `Sheet`                               | Bottom drawer (mobile "More" menu)                                                              |
+| `Drawer`                              | Vaul-based bottom sheet for mobile-first overlays                                               |
 | `Alert` (shadcn)                      | Inline message. `variant="destructive"` for errors. Never hand-roll `<div role="alert">`.       |
 | `Skeleton` (shadcn)                   | Loading placeholder. Shape it like the content that will arrive.                                |
+
+### Picker Pattern (Popover + cmdk Command)
+
+Single-select dropdowns over a moderate-to-large list of users (or other entities) follow one shared pattern: a `<Popover>` whose content is a `<Command>` from [`~/components/ui/command`](../../../src/components/ui/command.tsx) (cmdk-based). The trigger is a `<Button variant="outline">` showing the current selection or a placeholder; the popover holds a `<CommandInput>` for search, optional `<CommandGroup>` sections, and `<CommandItem>` rows.
+
+**Reference implementations:**
+
+- [`OwnerSelect`](../../../src/components/machines/OwnerSelect.tsx) — machine owner picker with invite-on-the-fly via `<InviteUserDialog>`, hide-guests toggle, and metadata pills (machine count, role tags).
+- [`AssigneePicker`](../../../src/components/issues/AssigneePicker.tsx) — issue assignee picker with an "Unassigned" sentinel value and "Me" quick-select.
+
+**Rules:**
+
+- Reach for the picker pattern, not a `<Select>`, when the list exceeds ~10 items, needs search, or needs per-row metadata (avatar, secondary text, badge).
+- If the picker participates in native form submission (especially `<form action={serverAction}>`), include a hidden `<input type="hidden" name="...">` so the selected value submits without JS (progressive enhancement). Action-driven pickers that commit selection directly via callback (for example, [`AssigneePicker`](../../../src/components/issues/AssigneePicker.tsx)) do not need a hidden input.
+- Reserve sentinel values (`"unassigned"`, `""`) for "no selection" — never make the picker required-by-omission.
+- Keyboard navigation, focus management, and filter highlighting come free from cmdk; do not reimplement them.
+- Sort users via [`compareUnifiedUsers`](../../../src/lib/users/comparators.ts) so order is consistent across pickers.
+
+### TooltipProvider hoist
+
+`<TooltipProvider>` is mounted once in [`ClientProviders`](../../../src/components/layout/ClientProviders.tsx) with `delayDuration={300}`. **Do not add nested providers** — `<Tooltip>` components anywhere in the tree just work. Sole documented exception: [`CopyButton`](../../../src/components/ui/copy-button.tsx) keeps a local `<TooltipProvider delayDuration={0}>` so the "Copied!" tooltip appears instantly.
 
 ## 13. Cross-Cutting UI States
 
@@ -323,9 +394,7 @@ Every page will eventually need one of these three states: empty, loading, error
 
 ### Empty State
 
-> **Status — planned component, not yet implemented.** `<EmptyState>` **will live** at `~/components/ui/empty-state`; the file doesn't exist today. Extraction is tracked as **PP-yxw.5** (Wave 2a of the consistency pass). This section specifies the contract that PR will build to. Until the component lands, existing inline empty states stay where they are; new code should wait for the component rather than hand-rolling another inline variant.
-
-Once the component is in place: use `<EmptyState>` whenever a list, collection, or section has zero items to display.
+`<EmptyState>` lives at [`~/components/ui/empty-state`](../../../src/components/ui/empty-state.tsx). Use it whenever a list, collection, or section has zero items to display. Never hand-roll another inline empty state.
 
 | Prop          | Purpose                                                              |
 | :------------ | :------------------------------------------------------------------- |
@@ -410,9 +479,7 @@ When something happens in response to user action, where should they see feedbac
 
 ## 15. Date Formatting Vocabulary
 
-> **Status — planned API, not yet implemented.** Three canonical helpers **will live** in `src/lib/dates.ts`; the module doesn't exist today. Extraction is tracked as **PP-yxw.7** (Wave 2c of the consistency pass). This section specifies the contract that PR will build to. Until the module lands, existing inline `formatDistanceToNow` and `toLocaleDateString` callers stay where they are; new code should wait for the helpers rather than adding more inline calls.
-
-Once the module is in place: use the helpers below. Never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
+Three canonical helpers live in [`src/lib/dates.ts`](../../../src/lib/dates.ts). Use them; never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
 
 | Helper                 | Output                         | When to use                                                  |
 | :--------------------- | :----------------------------- | :----------------------------------------------------------- |
@@ -420,7 +487,7 @@ Once the module is in place: use the helpers below. Never call `formatDistanceTo
 | `formatDate(date)`     | `"Apr 17, 2026"`               | Absolute dates in detail views, created-at fields            |
 | `formatDateTime(date)` | `"Apr 17, 2026, 9:30 PM"`      | Admin audit logs, precise timestamps, debug info             |
 
-All three will accept `Date | string | number` input. For `null` / `undefined` input, all three will return the canonical fallback `"—"` — callers should not have to null-guard before calling.
+All three accept `Date | string | number | null | undefined`. For `null` / `undefined` input they return `""` — wrap with surrounding text only when the date is guaranteed to be present, or null-guard at the call site for clean fallbacks like `<EmptyState>` or em-dash placeholders. (`formatRelative` uses `date-fns`; `formatDate` / `formatDateTime` use a hoisted `Intl.DateTimeFormat` instance for performance.)
 
 **Why a vocabulary instead of raw calls?**
 
