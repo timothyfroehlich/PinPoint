@@ -33,8 +33,9 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
         Connected Accounts
       </h2>
       <p className="text-pretty text-sm text-muted-foreground mb-4">
-        Link a third-party account to sign in faster. You can always remove one,
-        but you must keep at least one way to sign in.
+        Link a third-party account to sign in faster and receive notifications
+        on that platform. You can always remove one, but you must keep at least
+        one way to sign in.
       </p>
     </>
   );
@@ -91,19 +92,14 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
             key === "discord" && isLinked && discordIntegrationEnabled;
 
           return (
-            <div key={key}>
-              <ConnectedAccountRow
-                providerKey={key}
-                displayName={providers[key].displayName}
-                isLinked={isLinked}
-                canUnlink={canUnlink}
-              />
-              {showTestDm && (
-                <div className="pl-9 pb-3">
-                  <DiscordTestDmButton />
-                </div>
-              )}
-            </div>
+            <ConnectedAccountRow
+              key={key}
+              providerKey={key}
+              displayName={providers[key].displayName}
+              isLinked={isLinked}
+              canUnlink={canUnlink}
+              secondaryAction={showTestDm ? <DiscordTestDmButton /> : undefined}
+            />
           );
         })}
       </div>

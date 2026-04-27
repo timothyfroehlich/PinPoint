@@ -26,11 +26,22 @@ export function DiscordTestDmButton(): React.JSX.Element {
   const [result, setResult] = useState<TestDmResult | null>(null);
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex items-center justify-end gap-2">
+      {result && (
+        <p
+          className={
+            result.ok
+              ? "text-xs text-emerald-600 max-w-[20rem] text-right"
+              : "text-xs text-destructive max-w-[20rem] text-right"
+          }
+          role="status"
+        >
+          {result.ok ? "Test DM sent" : REASON_COPY[result.reason]}
+        </p>
+      )}
       <Button
         type="button"
         variant="outline"
-        size="sm"
         disabled={pending}
         onClick={() => {
           startTransition(async () => {
@@ -40,16 +51,6 @@ export function DiscordTestDmButton(): React.JSX.Element {
       >
         {pending ? "Sending…" : "Send test DM"}
       </Button>
-      {result && (
-        <p
-          className={
-            result.ok ? "text-xs text-emerald-600" : "text-xs text-destructive"
-          }
-          role="status"
-        >
-          {result.ok ? "Test DM sent" : REASON_COPY[result.reason]}
-        </p>
-      )}
     </div>
   );
 }
