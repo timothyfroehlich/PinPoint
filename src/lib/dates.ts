@@ -4,6 +4,10 @@ import { formatDistanceToNow } from "date-fns";
  * Coerce a Date | string | number to a Date.
  */
 function toDate(date: Date | string | number): Date {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- guard against 'any' or untyped JSON input
+  if (date == null) {
+    throw new TypeError("Expected date to be a Date, string, or number");
+  }
   if (date instanceof Date) return date;
   return new Date(date);
 }

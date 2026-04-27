@@ -63,6 +63,16 @@ describe("formatDate", () => {
 });
 
 describe("formatDateTime", () => {
+  it("throws for null", () => {
+    expect(() => formatDateTime(null as unknown as number)).toThrow(TypeError);
+  });
+
+  it("throws for undefined", () => {
+    expect(() => formatDateTime(undefined as unknown as number)).toThrow(
+      TypeError
+    );
+  });
+
   it("formats a Date object as a non-empty string including time", () => {
     const result = formatDateTime(FIXED_DATE);
     expect(typeof result).toBe("string");

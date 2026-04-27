@@ -410,9 +410,7 @@ When something happens in response to user action, where should they see feedbac
 
 ## 15. Date Formatting Vocabulary
 
-> **Status — planned API, not yet implemented.** Three canonical helpers **will live** in `src/lib/dates.ts`; the module doesn't exist today. Extraction is tracked as **PP-yxw.7** (Wave 2c of the consistency pass). This section specifies the contract that PR will build to. Until the module lands, existing inline `formatDistanceToNow` and `toLocaleDateString` callers stay where they are; new code should wait for the helpers rather than adding more inline calls.
-
-Once the module is in place: use the helpers below. Never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
+> **Status — implemented.** Three canonical helpers live in `src/lib/dates.ts`. Use the helpers below. Never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
 
 | Helper                 | Output                         | When to use                                                  |
 | :--------------------- | :----------------------------- | :----------------------------------------------------------- |
