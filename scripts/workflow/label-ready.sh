@@ -121,27 +121,59 @@ fi
 
 # Cleanup worktree
 if [ "$CLEANUP" = "true" ]; then
-    branch_dir=$(echo "$branch" | tr '/' '-')
-    worktree_path="/home/froeht/Code/pinpoint-worktrees/${branch_dir}"
-    # Fallback to old nested path
-    if [ ! -d "$worktree_path" ]; then
-        worktree_path="/home/froeht/Code/pinpoint-worktrees/${branch}"
-    fi
-    if [ -d "$worktree_path" ]; then
-        if [ "$DRY_RUN" = "true" ]; then
-            echo "DRY RUN: Would remove worktree at ${worktree_path}"
-        else
-            echo "Removing worktree: ${worktree_path}"
-            if [ -f "./scripts/worktree_cleanup.py" ]; then
-                python3 ./scripts/worktree_cleanup.py "$worktree_path" || echo "WARN: worktree cleanup failed."
-            fi
-            if [ -d "$worktree_path" ]; then
-                git worktree remove "$worktree_path" 2>/dev/null || \
-                    echo "WARN: Could not remove worktree (it may contain uncommitted changes). Clean up manually."
-            fi
+    # The main worktree is always the first entry in 'git worktree list --porcelain'.
+    # We never want to clean it up — running worktree_cleanup.py on it would stop
+    # the user's Supabase and try to remove their primary checkout.
+    main_worktree=$(git worktree list --porcelain | awk '/^worktree / { print substr($0, 10); exit }')
+
+    # Ask git for the worktree path bound to this branch — handles every layout
+    # (pinpoint-worktrees/<branch>, pinpoint-worktrees/<branch-with-slashes-as-dashes>,
+    # and Claude Code's .claude/worktrees/agent-<hash>).
+    worktree_path=$(git worktree list --porcelain | awk -v target="refs/heads/${branch}" '
+        /^worktree / { wt = substr($0, 10) }
+        /^branch /   { if ($2 == target) { print wt; exit } }
+    ')
+    is_locked=false
+    if [ -n "$worktree_path" ]; then
+        if git worktree list --porcelain | awk -v wt="$worktree_path" '
+            /^worktree / { current = ($0 == "worktree " wt) }
+            /^locked/    { if (current) { exit 0 } }
+            END          { exit 1 }
+        '; then
+            is_locked=true
         fi
+    fi
+
+    # Fallbacks for older naming conventions in case git's metadata is missing
+    if [ -z "$worktree_path" ]; then
+        branch_dir=$(echo "$branch" | tr '/' '-')
+        for candidate in \
+            "${HOME}/Code/pinpoint-worktrees/${branch_dir}" \
+            "${HOME}/Code/pinpoint-worktrees/${branch}"; do
+            if [ -d "$candidate" ]; then
+                worktree_path="$candidate"
+                break
+            fi
+        done
+    fi
+
+    if [ -z "$worktree_path" ] || [ ! -d "$worktree_path" ]; then
+        echo "No worktree found for branch ${branch}."
+    elif [ "$worktree_path" = "$main_worktree" ]; then
+        echo "SKIP: Branch lives in the main worktree (${worktree_path}); cleanup would stop Supabase and try to remove the primary checkout."
+    elif [ "$is_locked" = "true" ]; then
+        echo "SKIP: Worktree at ${worktree_path} is locked (likely an active subagent). Remove manually after the agent finishes."
+    elif [ "$DRY_RUN" = "true" ]; then
+        echo "DRY RUN: Would remove worktree at ${worktree_path}"
     else
-        echo "No worktree found at ${worktree_path}."
+        echo "Removing worktree: ${worktree_path}"
+        if [ -f "./scripts/worktree_cleanup.py" ]; then
+            python3 ./scripts/worktree_cleanup.py "$worktree_path" || echo "WARN: worktree cleanup failed."
+        fi
+        if [ -d "$worktree_path" ]; then
+            git worktree remove "$worktree_path" 2>/dev/null || \
+                echo "WARN: Could not remove worktree (it may contain uncommitted changes). Clean up manually."
+        fi
     fi
 fi
 

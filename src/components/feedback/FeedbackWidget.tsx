@@ -1,7 +1,7 @@
 "use client";
 
 import * as Sentry from "@sentry/nextjs";
-import React, { useEffect } from "react";
+import React from "react";
 import { Button } from "~/components/ui/button";
 import { MessageSquare, Bug, Lightbulb } from "lucide-react";
 import {
@@ -68,6 +68,9 @@ function openSentryFeedbackWidget(
             }
           }
         } catch (err) {
+          // Intentionally console.error — this IS the Sentry feedback widget.
+          // Calling Sentry.captureException here would recursively invoke the
+          // widget we're already trying to open, causing an infinite loop.
           console.error("[FeedbackWidget] Error calling createForm:", err);
         }
       })();
@@ -133,6 +136,9 @@ function handleFeedback(type: "bug" | "feature"): void {
             }
           }
         } catch (err) {
+          // Intentionally console.error — this IS the Sentry feedback widget.
+          // Calling Sentry.captureException here would recursively invoke the
+          // widget we're already trying to open, causing an infinite loop.
           console.error("[FeedbackWidget] Error calling createForm:", err);
         }
       })();
@@ -145,14 +151,6 @@ function handleFeedback(type: "bug" | "feature"): void {
 }
 
 export function FeedbackWidget(): React.JSX.Element | null {
-  useEffect(() => {
-    // Optional: Mount checks/logging if needed in dev
-    if (process.env.NODE_ENV === "development") {
-      const feedback = Sentry.getFeedback();
-      console.log("[FeedbackWidget] Mounted.", { feedback });
-    }
-  }, []);
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

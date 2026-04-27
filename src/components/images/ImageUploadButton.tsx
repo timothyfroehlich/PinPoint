@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -62,9 +63,11 @@ export function ImageUploadButton({
         toast.error(`Upload failed: ${result.message}`);
       }
     } catch (error) {
-      // Client-side component - use console.error as logger is server-side only
-
-      console.error("Upload error:", error);
+      Sentry.captureException(error, {
+        contexts: {
+          pinpoint: { action: "ImageUploadButton.handleFileChange", issueId },
+        },
+      });
       toast.error(getUploadErrorMessage(error));
     } finally {
       setIsUploading(false);

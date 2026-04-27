@@ -1,3 +1,5 @@
+import "server-only";
+
 import {
   type EmailTransport,
   type EmailParams,
@@ -6,6 +8,8 @@ import {
   SMTPTransport,
   EMAIL_FROM,
 } from "./transport";
+import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 
 // Re-export for backward compatibility
 export { EMAIL_FROM };
@@ -37,20 +41,21 @@ function createTransport(): EmailTransport | null {
       return raw ? parseInt(raw, 10) : 1025;
     })();
 
-    console.log(`[Email] Using SMTP transport on port ${port}`);
+    log.info({ port }, "[Email] Using SMTP transport");
     return new SMTPTransport({ port });
   }
 
   // Production/Dev: use Resend if API key is present
   const apiKey = process.env["RESEND_API_KEY"];
   if (apiKey) {
-    console.log("[Email] Using Resend transport with API key");
+    log.info({}, "[Email] Using Resend transport with API key");
     return new ResendTransport(apiKey);
   }
 
   // No transport configured
-  console.warn(
-    "[Email] ⚠️ No email transport configured - RESEND_API_KEY not found"
+  log.warn(
+    {},
+    "[Email] No email transport configured - RESEND_API_KEY not found"
   );
   return null;
 }
@@ -62,21 +67,21 @@ export async function sendEmail({
   subject,
   html,
 }: EmailParams): Promise<EmailResult> {
-  console.log(`[Email] Attempting to send email to ${to}: ${subject}`);
+  log.info({ to, subject }, "[Email] Attempting to send email");
 
   if (!transport) {
-    console.warn("⚠️ No email transport configured. Email not sent:", {
-      to,
-      subject,
-    });
+    log.warn(
+      { to, subject },
+      "[Email] No transport configured. Email not sent."
+    );
     return { success: false, error: "No transport configured" };
   }
 
   const result = await transport.send({ to, subject, html });
   if (result.success) {
-    console.log(`✅ Email sent successfully to ${to}: ${subject}`);
+    log.info({ to, subject }, "[Email] Email sent successfully");
   } else {
-    console.error(`❌ Email failed to send to ${to}:`, result.error);
+    reportError(result.error, { action: "sendEmail" });
   }
   return result;
 }

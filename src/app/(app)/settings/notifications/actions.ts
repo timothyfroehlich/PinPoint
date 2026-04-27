@@ -5,6 +5,7 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { notificationPreferences } from "~/server/db/schema";
 import { type Result, ok, err } from "~/lib/result";
+import { serverActionError } from "~/lib/observability/report-error";
 import { z } from "zod";
 
 const updatePreferencesSchema = z.object({
@@ -108,7 +109,8 @@ export async function updateNotificationPreferencesAction(
     revalidatePath("/settings");
     return ok({ success: true });
   } catch (error) {
-    console.error("updateNotificationPreferencesAction failed", error);
-    return err("SERVER", "Failed to update preferences");
+    return serverActionError(error, "SERVER", "Failed to update preferences", {
+      action: "updateNotificationPreferencesAction",
+    });
   }
 }

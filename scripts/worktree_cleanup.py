@@ -57,6 +57,26 @@ def main() -> None:
         print(f"Warning: {worktree_path} does not exist, skipping", file=sys.stderr)
         return
 
+    # Refuse to operate on the main worktree. Inside a main worktree, .git is a
+    # directory; inside an additional worktree, .git is a file with a "gitdir:"
+    # pointer. A caller pointing this script at the main worktree (e.g., a
+    # cleanup script that misidentified the path) would otherwise stop the
+    # user's primary Supabase and try to remove their main checkout.
+    git_marker = worktree_path / ".git"
+    if git_marker.is_dir():
+        print(
+            f"Refusing to clean up the main worktree at {worktree_path}. "
+            "worktree_cleanup.py is for additional (git worktree add) worktrees only.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    if not git_marker.is_file():
+        print(
+            f"Warning: {worktree_path} has no .git marker — not a worktree. Skipping.",
+            file=sys.stderr,
+        )
+        return
+
     # Get branch name for Docker volume cleanup
     try:
         result = subprocess.run(

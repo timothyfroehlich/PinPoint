@@ -23,6 +23,7 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
 import { createNotification } from "~/lib/notifications";
+import { reportError } from "~/lib/observability/report-error";
 import {
   type ProseMirrorDoc,
   docToPlainText,
@@ -247,14 +248,11 @@ export async function createMachineAction(
             additionalRecipientIds: [forcePromoteUserId],
           });
         } catch (sideEffectError: unknown) {
-          log.error(
-            {
-              error: sideEffectError,
-              action: "createMachineAction",
-              machineId: machine.id,
-            },
-            "Post-commit notification failed — mutation succeeded"
-          );
+          reportError(sideEffectError, {
+            action: "createMachineNotify",
+            bestEffort: true,
+            machineId: machine.id,
+          });
         }
       }
 
@@ -592,14 +590,11 @@ export async function updateMachineAction(
           });
         }
       } catch (sideEffectError: unknown) {
-        log.error(
-          {
-            error: sideEffectError,
-            action: "updateMachineAction",
-            machineId: machine.id,
-          },
-          "Post-commit side effects failed (watcher/notification) — mutation succeeded"
-        );
+        reportError(sideEffectError, {
+          action: "updateMachineNotifyForcePromote",
+          bestEffort: true,
+          machineId: machine.id,
+        });
       }
 
       revalidatePath("/m");

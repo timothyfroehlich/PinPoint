@@ -16,7 +16,9 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { type Result, ok, err } from "~/lib/result";
 import { deleteFromBlob } from "~/lib/blob/client";
+import { serverActionError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import { checkLoginAccountLimit } from "~/lib/rate-limit";
 import {
   anonymizeUserReferences,
@@ -86,8 +88,9 @@ export async function updateProfileAction(
 
     return ok({ success: true });
   } catch (error) {
-    console.error("Failed to update profile:", error);
-    return err("SERVER", "Failed to update profile");
+    return serverActionError(error, "SERVER", "Failed to update profile", {
+      action: "updateProfileAction",
+    });
   }
 }
 
@@ -159,8 +162,12 @@ export async function deleteAccountAction(
     if (avatarUrl) {
       try {
         await deleteFromBlob(avatarUrl);
-      } catch {
-        log.warn({ userId }, "Avatar blob cleanup failed");
+      } catch (error) {
+        reportError(error, {
+          action: "deleteAccountAvatarCleanup",
+          bestEffort: true,
+          userId,
+        });
       }
     }
 
@@ -173,10 +180,11 @@ export async function deleteAccountAction(
       await adminClient.auth.admin.deleteUser(userId);
 
     if (deleteError) {
-      log.error(
-        { userId, error: deleteError.message },
-        "Failed to delete auth user after anonymization — requires manual cleanup"
-      );
+      reportError(deleteError, {
+        action: "deleteAccountAuthUser",
+        bestEffort: true,
+        userId,
+      });
     }
 
     // Sign out the current session
