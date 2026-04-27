@@ -379,14 +379,14 @@ Single-select dropdowns over a moderate-to-large list of users (or other entitie
 **Rules:**
 
 - Reach for the picker pattern, not a `<Select>`, when the list exceeds ~10 items, needs search, or needs per-row metadata (avatar, secondary text, badge).
-- Always include a hidden `<input type="hidden" name="...">` so the picker works inside `<form action={serverAction}>` without JS (progressive enhancement).
+- If the picker participates in native form submission (especially `<form action={serverAction}>`), include a hidden `<input type="hidden" name="...">` so the selected value submits without JS (progressive enhancement). Action-driven pickers that commit selection directly via callback (for example, [`AssigneePicker`](../../../src/components/issues/AssigneePicker.tsx)) do not need a hidden input.
 - Reserve sentinel values (`"unassigned"`, `""`) for "no selection" — never make the picker required-by-omission.
 - Keyboard navigation, focus management, and filter highlighting come free from cmdk; do not reimplement them.
 - Sort users via [`compareUnifiedUsers`](../../../src/lib/users/comparators.ts) so order is consistent across pickers.
 
 ### TooltipProvider hoist
 
-`<TooltipProvider>` is mounted once in [`ClientProviders`](../../../src/components/layout/ClientProviders.tsx) with `delayDuration={300}`. **Do not add nested providers** — `<Tooltip>` components anywhere in the tree just work. Sole documented exception: [`CopyButton`](../../../src/components/ui/copy-button.tsx) keeps a local `<TooltipProvider delayDuration={0}>` so the "Copied!" toast appears instantly.
+`<TooltipProvider>` is mounted once in [`ClientProviders`](../../../src/components/layout/ClientProviders.tsx) with `delayDuration={300}`. **Do not add nested providers** — `<Tooltip>` components anywhere in the tree just work. Sole documented exception: [`CopyButton`](../../../src/components/ui/copy-button.tsx) keeps a local `<TooltipProvider delayDuration={0}>` so the "Copied!" tooltip appears instantly.
 
 ## 13. Cross-Cutting UI States
 

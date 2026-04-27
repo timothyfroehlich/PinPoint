@@ -63,11 +63,11 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 
 Single-select user pickers all follow the **Picker Pattern** (Popover + cmdk Command) — see `pinpoint-design-bible` §12 for the canonical pattern + rules. Don't reimplement; copy from one of these.
 
-| File                                         | What It Teaches                                                                         |
-| :------------------------------------------- | :-------------------------------------------------------------------------------------- |
-| `src/components/issues/AssigneePicker.tsx`   | Picker pattern, "Unassigned" sentinel, "Me" quick-select, hidden input for form compat  |
-| `src/components/machines/OwnerSelect.tsx`    | Picker pattern, hide-guests toggle, invite-on-the-fly via `<InviteUserDialog>`          |
-| `src/components/machines/MachineFilters.tsx` | Inline filter bar (not a picker — filter composition + sort dropdown for the list page) |
+| File                                         | What It Teaches                                                                                     |
+| :------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
+| `src/components/issues/AssigneePicker.tsx`   | Picker pattern, "Unassigned" sentinel, "Me" quick-select, callback-driven assignment via `onAssign` |
+| `src/components/machines/OwnerSelect.tsx`    | Picker pattern, hide-guests toggle, invite-on-the-fly via `<InviteUserDialog>`                      |
+| `src/components/machines/MachineFilters.tsx` | Inline filter bar (not a picker — filter composition + sort dropdown for the list page)             |
 
 ### Styling & Tokens
 
