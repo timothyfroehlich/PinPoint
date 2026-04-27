@@ -58,12 +58,13 @@ export function reportError(error: unknown, context: ReportContext = {}): void {
  *     });
  *   }
  */
-export function serverActionError<C extends string>(
+export function serverActionError<C extends string, M = undefined>(
   error: unknown,
   code: C,
   message: string,
-  context: ReportContext = {}
-): Result<never, C> {
+  context: ReportContext = {},
+  meta?: M
+): Result<never, C, M> {
   reportError(error, context);
-  return err(code, message);
+  return err(code, message, meta);
 }
