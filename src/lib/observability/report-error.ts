@@ -57,6 +57,12 @@ export function reportError(error: unknown, context: ReportContext = {}): void {
  *       action: "createMachineAction",
  *     });
  *   }
+ *
+ * @param error The caught error to report.
+ * @param code The Result error code.
+ * @param message The user-facing error message.
+ * @param context Log/Sentry context (not returned to caller).
+ * @param meta Result metadata (returned to caller in Result.meta).
  */
 export function serverActionError<C extends string, M = undefined>(
   error: unknown,
