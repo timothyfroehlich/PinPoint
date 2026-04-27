@@ -5,7 +5,10 @@
  * Rules:
  * 1. Manual CI polling loops → use ./scripts/workflow/pr-watch.py
  * 2. Ad-hoc curl health checks → use `pnpm run dev:status`
- * 3. Merge commands → present command to user, don't run directly
+ *
+ * Note: `gh pr merge` is gated by the "ask" tier in settings.json, not by this
+ * hook. That keeps the confirmation interactive (and overridable) instead of a
+ * hard deny that can't be authorized in-conversation.
  */
 
 const rules = [
@@ -32,20 +35,6 @@ const rules = [
     },
     reason:
       "Ad-hoc curl health check detected. Use `pnpm run dev:status` instead — it checks Next.js, Supabase, and Postgres in one command and respects worktree port config.",
-  },
-  {
-    name: "merge-command",
-    test: (cmd) => {
-      // Strip quoted strings and heredocs to avoid false positives in commit messages
-      const stripped = cmd
-        .replace(/\$\(cat <<'EOF'[\s\S]*?EOF\s*\)/g, "")
-        .replace(/"[^"]*"/g, '""')
-        .replace(/'[^']*'/g, "''");
-      // Block `gh pr merge` (merging a PR). Allow `git merge origin/main` (syncing from main).
-      return /\bgh\s+pr\s+merge\b/.test(stripped);
-    },
-    reason:
-      "Merge commands are banned for agents. Present the exact command to the user and let them run it directly. We use squash merges only (gh pr merge --squash).",
   },
 ];
 
