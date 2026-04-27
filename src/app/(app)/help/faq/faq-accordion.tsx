@@ -89,9 +89,17 @@ const FAQ_ITEMS = [
     question: "How do I get notifications?",
     answer: (
       <>
-        Go to Settings to configure your notification preferences. You can also
-        &ldquo;watch&rdquo; specific machines or issues to get notified when
-        their status changes.
+        PinPoint can notify you in-app, by email, or as a Discord DM. Configure
+        each channel and event in{" "}
+        <Link href="/settings/notifications" className="text-primary underline">
+          Settings → Notifications
+        </Link>
+        , or read the{" "}
+        <Link href="/help/notifications" className="text-primary underline">
+          notifications guide
+        </Link>{" "}
+        for the full breakdown. You can also &ldquo;watch&rdquo; specific
+        machines or issues to get notified when their status changes.
       </>
     ),
   },

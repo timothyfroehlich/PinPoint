@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowRightLeft,
+  Bell,
   Compass,
   LifeBuoy,
   Lock,
@@ -56,10 +57,16 @@ const referenceCards = [
     description: "What each access level can do",
   },
   {
+    title: "Notifications",
+    href: "/help/notifications",
+    icon: Bell,
+    description: "How you're notified — in-app, email, and Discord DMs",
+  },
+  {
     title: "Discord Integration",
     href: "/help/discord",
     icon: Plug,
-    description: "Discord login and account linking",
+    description: "Sign in with Discord and receive issue updates as DMs",
   },
 ];
 
