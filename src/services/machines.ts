@@ -3,7 +3,7 @@ import { db } from "~/server/db";
 import { machineWatchers } from "~/server/db/schema";
 import { type Result, ok, err } from "~/lib/result";
 import { z } from "zod";
-import { log } from "~/lib/logger";
+import { serverActionError } from "~/lib/observability/report-error";
 
 const watchModeSchema = z.enum(["notify", "subscribe"]);
 
@@ -49,8 +49,11 @@ export async function toggleMachineWatcher({
       return ok({ isWatching: true, watchMode });
     }
   } catch (error) {
-    log.error({ error, machineId, userId }, "Failed to toggle machine watcher");
-    return err("SERVER", "Failed to toggle watch status");
+    return serverActionError(error, "SERVER", "Failed to toggle watch status", {
+      action: "toggleMachineWatcher",
+      machineId,
+      userId,
+    });
   }
 }
 
@@ -98,10 +101,11 @@ export async function updateMachineWatchMode({
 
     return ok({ watchMode });
   } catch (error) {
-    log.error(
-      { error, machineId, userId, watchMode },
-      "Failed to update machine watch mode"
-    );
-    return err("SERVER", "Failed to update watch mode");
+    return serverActionError(error, "SERVER", "Failed to update watch mode", {
+      action: "updateMachineWatchMode",
+      machineId,
+      userId,
+      watchMode,
+    });
   }
 }

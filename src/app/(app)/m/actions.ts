@@ -23,7 +23,10 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
 import { createNotification } from "~/lib/notifications";
-import { reportError } from "~/lib/observability/report-error";
+import {
+  reportError,
+  serverActionError,
+} from "~/lib/observability/report-error";
 import {
   type ProseMirrorDoc,
   docToPlainText,
@@ -265,11 +268,12 @@ export async function createMachineAction(
       if (isPgErrorCode(error, "23505")) {
         return err("VALIDATION", `Initials '${initials}' are already taken.`);
       }
-      log.error(
-        { error, action: "createMachineAction" },
-        "createMachineAction (forcePromote) failed"
+      return serverActionError(
+        error,
+        "SERVER",
+        "Failed to create machine. Please try again.",
+        { action: "createMachineAction (forcePromote)" }
       );
-      return err("SERVER", "Failed to create machine. Please try again.");
     }
   }
 
@@ -371,11 +375,12 @@ export async function createMachineAction(
       return err("VALIDATION", `Initials '${initials}' are already taken.`);
     }
 
-    log.error(
-      { error, action: "createMachineAction" },
-      "createMachineAction failed"
+    return serverActionError(
+      error,
+      "SERVER",
+      "Failed to create machine. Please try again.",
+      { action: "createMachineAction" }
     );
-    return err("SERVER", "Failed to create machine. Please try again.");
   }
 }
 
@@ -744,11 +749,12 @@ export async function updateMachineAction(
     if (isNextRedirectError(error)) {
       throw error;
     }
-    log.error(
-      { error, action: "updateMachineAction" },
-      "updateMachineAction failed"
+    return serverActionError(
+      error,
+      "SERVER",
+      "Failed to update machine. Please try again.",
+      { action: "updateMachineAction" }
     );
-    return err("SERVER", "Failed to update machine. Please try again.");
   }
 }
 
@@ -791,11 +797,12 @@ export async function deleteMachineAction(
 
     return ok({ machineId });
   } catch (error) {
-    log.error(
-      { error, action: "deleteMachineAction" },
-      "deleteMachineAction failed"
+    return serverActionError(
+      error,
+      "SERVER",
+      "Failed to delete machine. Please try again.",
+      { action: "deleteMachineAction" }
     );
-    return err("SERVER", "Failed to delete machine. Please try again.");
   }
 }
 
@@ -954,10 +961,11 @@ async function updateMachineTextField(
     if (isNextRedirectError(error)) {
       throw error;
     }
-    log.error(
-      { error, action: "updateMachineTextField", field },
-      `updateMachineTextField (${field}) failed`
+    return serverActionError(
+      error,
+      "SERVER",
+      "Failed to update field. Please try again.",
+      { action: "updateMachineTextField", field }
     );
-    return err("SERVER", "Failed to update field. Please try again.");
   }
 }

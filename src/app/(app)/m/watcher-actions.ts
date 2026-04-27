@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
-import { log } from "~/lib/logger";
+import { serverActionError } from "~/lib/observability/report-error";
 import { type Result, ok, err } from "~/lib/result";
 import {
   toggleMachineWatcher,
@@ -45,11 +45,12 @@ export async function toggleMachineWatcherAction(
 
     return ok(result.value);
   } catch (error) {
-    log.error(
-      { error, action: "toggleMachineWatcher" },
-      "toggleMachineWatcherAction failed"
+    return serverActionError(
+      error,
+      "SERVER",
+      "Failed to toggle machine watcher",
+      { action: "toggleMachineWatcherAction", machineId }
     );
-    return err("SERVER", "Failed to toggle machine watcher");
   }
 }
 
@@ -87,11 +88,12 @@ export async function updateMachineWatchModeAction(
 
     return ok(result.value);
   } catch (error) {
-    log.error(
-      { error, action: "updateMachineWatchMode" },
-      "updateMachineWatchModeAction failed"
+    return serverActionError(
+      error,
+      "SERVER",
+      "Failed to update machine watch mode",
+      { action: "updateMachineWatchModeAction", machineId, watchMode }
     );
-    return err("SERVER", "Failed to update machine watch mode");
   }
 }
 
