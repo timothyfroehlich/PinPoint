@@ -1,8 +1,7 @@
-# Project Instructions for AI Agents
+# Gemini CLI Agent Context
 
-@AGENTS.md
-
-> **CRITICAL**: You MUST read `AGENTS.md` at the start of every session. It contains the "10 Commandments" and core project mandates that take precedence over all other instructions.
+This file provides project-specific context and instructions for the Gemini CLI agent.
+It serves as a supplement to the core mandates and instructions provided in the system prompt.
 
 ## Gemini CLI-Specific
 

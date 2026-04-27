@@ -396,7 +396,7 @@ When something happens in response to user action, where should they see feedbac
 | Form submit error                                 | `<Alert variant="destructive">` at top + `<FormMessage>` under fields                               |
 | Field validation error (Zod)                      | Inline `<FormMessage>`                                                                              |
 | Inline list edit (status change, priority change) | `toast` for both success and error                                                                  |
-| Optimistic action (toggle, bookmark)              | Immediate UI update; `toast.error()` on failure                                                     |
+| optimistic action (toggle, bookmark)              | Immediate UI update; `toast.error()` on failure                                                     |
 | Long-running background work (uploads)            | Toast with progress indicator                                                                       |
 | Short in-place work (counter increment)           | Immediate UI update, no notification                                                                |
 
@@ -410,7 +410,7 @@ When something happens in response to user action, where should they see feedbac
 
 ## 15. Date Formatting Vocabulary
 
-> **Status — implemented.** Three canonical helpers live in `src/lib/dates.ts`. Use the helpers below. Never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
+> **Status — implemented.** Three canonical helpers live in [`src/lib/dates.ts`](../../../src/lib/dates.ts). Use them; never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
 
 | Helper                 | Output                         | When to use                                                  |
 | :--------------------- | :----------------------------- | :----------------------------------------------------------- |
