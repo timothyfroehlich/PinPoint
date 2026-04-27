@@ -273,9 +273,11 @@ For multiple independent tasks, use worktree-isolated subagents.
 
 See `pinpoint-orchestrator` skill for the full workflow.
 
-### Claude-in-Web Candidates
+### Claude in Web Candidates
 
 Some work is well-suited for Claude in Web — the cloud session that runs in a browser-based environment without local Supabase, dev server, or interactive debugging. Tag those issues with the `web-ready` label so they're easy to discover and dispatch.
+
+> Commands below use `bd` (the [beads](https://github.com/timothyfroehlich/beads) issue tracker that PinPoint uses for task management — the full command reference is loaded at session start via the `bd prime` hook). `<id>` refers to a beads issue ID like `PP-3or`.
 
 **Triage gates — all must pass before tagging `web-ready`:**
 
@@ -290,9 +292,9 @@ Some work is well-suited for Claude in Web — the cloud session that runs in a 
 - Tag during grooming: `bd label add web-ready <id>` and append a one-line note explaining the fit (e.g., "Web-ready: unit tests, single-file scope").
 - If a fixable gate fails (missing acceptance criteria, undecided UI, etc.), leave a note describing the gap instead of tagging — surface for refinement.
 - Discover candidates: `bd query "label=web-ready AND status=open"` (combine with `--priority-max` to prioritize).
-- After Claude-in-Web ships a PR, treat it like any other agent PR: Copilot review, CI, ready-for-review label, then user merges.
+- After Claude in Web ships a PR, treat it like any other agent PR: Copilot review, CI, ready-for-review label, then user merges.
 
-**On Supabase branching:** every PR auto-provisions a branch DB with migrations + seed via the `Supabase Branch Setup` workflow. Claude-in-Web never touches local Supabase — CI exercises the integration path.
+**On Supabase branching:** every PR auto-provisions a branch DB with migrations + seed via the `Supabase Branch Setup` workflow. Claude in Web never touches local Supabase — CI exercises the integration path.
 
 ## 5. Documentation Philosophy
 
