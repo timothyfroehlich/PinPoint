@@ -169,6 +169,13 @@ export function NotificationPreferencesForm({
             showDiscord ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"
           )}
         >
+          <MainSwitchItem
+            id="inAppEnabled"
+            label="In-App Notifications"
+            description="Main switch for all in-app notifications"
+            checked={inAppMainEnabled}
+            onCheckedChange={setInAppMainEnabled}
+          />
           {!isInternalAccount && (
             <MainSwitchItem
               id="emailEnabled"
@@ -178,13 +185,6 @@ export function NotificationPreferencesForm({
               onCheckedChange={setEmailMainEnabled}
             />
           )}
-          <MainSwitchItem
-            id="inAppEnabled"
-            label="In-App Notifications"
-            description="Main switch for all in-app notifications"
-            checked={inAppMainEnabled}
-            onCheckedChange={setInAppMainEnabled}
-          />
           {showDiscord && (
             <MainSwitchItem
               id="discordEnabled"
@@ -399,8 +399,8 @@ function MatrixHeaderRow({
       style={{ gridTemplateColumns: gridCols }}
     >
       <div>{firstLabel}</div>
-      {!isInternalAccount && <div className="text-center w-16">Email</div>}
       <div className="text-center w-16">In-App</div>
+      {!isInternalAccount && <div className="text-center w-16">Email</div>}
       {showDiscord && <div className="text-center w-16">Discord</div>}
     </div>
   );
@@ -489,6 +489,14 @@ function PreferenceRow({
         <p className="text-sm font-medium">{label}</p>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
+      <div className="flex justify-center w-16">
+        <Switch
+          id={inAppId}
+          name={inAppId}
+          defaultChecked={inAppDefault}
+          disabled={inAppDisabled}
+        />
+      </div>
       {!hideEmail && (
         <div className="flex justify-center w-16">
           <Switch
@@ -499,14 +507,6 @@ function PreferenceRow({
           />
         </div>
       )}
-      <div className="flex justify-center w-16">
-        <Switch
-          id={inAppId}
-          name={inAppId}
-          defaultChecked={inAppDefault}
-          disabled={inAppDisabled}
-        />
-      </div>
       {!hideDiscord && discordId && (
         <div className="flex justify-center w-16">
           <Switch

@@ -509,7 +509,7 @@ export const notificationPreferences = pgTable(
       .default(true),
     discordNotifyOnNewIssue: boolean("discord_notify_on_new_issue")
       .notNull()
-      .default(false),
+      .default(true),
     discordNotifyOnMachineOwnershipChange: boolean(
       "discord_notify_on_machine_ownership_change"
     )

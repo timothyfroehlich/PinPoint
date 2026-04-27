@@ -312,7 +312,7 @@ function buildDefaultPrefs(userId: string): NotificationPreferences {
     discordNotifyOnStatusChange: false,
     discordNotifyOnNewComment: false,
     discordNotifyOnMentioned: true,
-    discordNotifyOnNewIssue: false,
+    discordNotifyOnNewIssue: true,
     discordNotifyOnMachineOwnershipChange: false,
     discordWatchNewIssuesGlobal: false,
     discordDmBlockedAt: null,
