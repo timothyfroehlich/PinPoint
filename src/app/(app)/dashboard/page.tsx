@@ -153,7 +153,7 @@ const getDashboardData = cache(async (userId?: string) => {
       id: machines.id,
       name: machines.name,
       initials: machines.initials,
-      fixedAt: sql<Date>`max(${issues.updatedAt})`.as("fixed_at"),
+      fixedAt: sql<Date | null>`max(${issues.updatedAt})`.as("fixed_at"),
     })
     .from(machines)
     .innerJoin(issues, eq(issues.machineInitials, machines.initials))
@@ -430,7 +430,8 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                             {machine.name}
                           </CardTitle>
                           <p className="text-xs text-success/80">
-                            Fixed {formatDate(machine.fixedAt)}
+                            {machine.fixedAt &&
+                              `Fixed ${formatDate(machine.fixedAt)}`}
                           </p>
                         </div>
                         <CheckCircle2 className="size-5 text-success" />

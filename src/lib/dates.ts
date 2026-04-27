@@ -2,10 +2,13 @@ import { formatDistanceToNow } from "date-fns";
 
 /**
  * Coerce a Date | string | number to a Date.
- * Returns null for null/undefined so callers can return "" gracefully.
+ * Throws TypeError if date is null/undefined at runtime.
  */
-function toDate(date: Date | string | number | null | undefined): Date | null {
-  if (date == null) return null;
+function toDate(date: Date | string | number): Date {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- guard against 'any' or untyped JSON input
+  if (date == null) {
+    throw new TypeError("Expected date to be a Date, string, or number");
+  }
   if (date instanceof Date) return date;
   return new Date(date);
 }
@@ -24,36 +27,24 @@ const MEDIUM_DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
 /**
  * Relative time label: "3 minutes ago", "2 days ago", etc.
  * Uses date-fns formatDistanceToNow with addSuffix: true.
- * Returns "" for null/undefined input.
  */
-export function formatRelative(
-  date: Date | string | number | null | undefined
-): string {
+export function formatRelative(date: Date | string | number): string {
   const d = toDate(date);
-  if (!d) return "";
   return formatDistanceToNow(d, { addSuffix: true });
 }
 
 /**
  * Medium date only: "Apr 18, 2026" (locale-aware via Intl).
- * Returns "" for null/undefined input.
  */
-export function formatDate(
-  date: Date | string | number | null | undefined
-): string {
+export function formatDate(date: Date | string | number): string {
   const d = toDate(date);
-  if (!d) return "";
   return MEDIUM_DATE_FORMATTER.format(d);
 }
 
 /**
  * Medium date + short time: "Apr 18, 2026, 3:45 PM" (locale-aware via Intl).
- * Returns "" for null/undefined input.
  */
-export function formatDateTime(
-  date: Date | string | number | null | undefined
-): string {
+export function formatDateTime(date: Date | string | number): string {
   const d = toDate(date);
-  if (!d) return "";
   return MEDIUM_DATE_TIME_FORMATTER.format(d);
 }
