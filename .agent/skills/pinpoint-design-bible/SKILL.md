@@ -420,7 +420,7 @@ Once the module is in place: use the helpers below. Never call `formatDistanceTo
 | `formatDate(date)`     | `"Apr 17, 2026"`               | Absolute dates in detail views, created-at fields            |
 | `formatDateTime(date)` | `"Apr 17, 2026, 9:30 PM"`      | Admin audit logs, precise timestamps, debug info             |
 
-All three will accept `Date | string | number` input. For `null` / `undefined` input, all three will return the canonical fallback `"—"` — callers should not have to null-guard before calling.
+All three accept `Date | string | number`. For `null` / `undefined` dates, null-guard at the call site and choose a context-appropriate placeholder (e.g., hiding the element, rendering `"—"`, or using a semantic placeholder like `"never"`).
 
 **Why a vocabulary instead of raw calls?**
 
