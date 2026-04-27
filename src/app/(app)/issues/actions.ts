@@ -14,6 +14,7 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { log } from "~/lib/logger";
+import { serverActionError } from "~/lib/observability/report-error";
 import {
   updateIssueStatusSchema,
   updateIssueSeveritySchema,
@@ -201,14 +202,9 @@ export async function updateIssueStatusAction(
     if (isNextRedirectError(error)) {
       throw error;
     }
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        action: "updateIssueStatus",
-      },
-      "Update issue status error"
-    );
-    return err("SERVER", "Failed to update status");
+    return serverActionError(error, "SERVER", "Failed to update status", {
+      action: "updateIssueStatus",
+    });
   }
 }
 
@@ -307,14 +303,9 @@ export async function updateIssueSeverityAction(
     if (isNextRedirectError(error)) {
       throw error;
     }
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        action: "updateIssueSeverity",
-      },
-      "Update issue severity error"
-    );
-    return err("SERVER", "Failed to update severity");
+    return serverActionError(error, "SERVER", "Failed to update severity", {
+      action: "updateIssueSeverity",
+    });
   }
 }
 
@@ -398,14 +389,9 @@ export async function updateIssueFrequencyAction(
     );
     return ok({ issueId });
   } catch (error: unknown) {
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        action: "updateIssueFrequency",
-      },
-      "Update issue frequency error"
-    );
-    return err("SERVER", "Failed to update frequency");
+    return serverActionError(error, "SERVER", "Failed to update frequency", {
+      action: "updateIssueFrequency",
+    });
   }
 }
 
@@ -503,14 +489,9 @@ export async function updateIssuePriorityAction(
     if (isNextRedirectError(error)) {
       throw error;
     }
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        action: "updateIssuePriority",
-      },
-      "Update issue priority error"
-    );
-    return err("SERVER", "Failed to update priority");
+    return serverActionError(error, "SERVER", "Failed to update priority", {
+      action: "updateIssuePriority",
+    });
   }
 }
 
@@ -608,14 +589,9 @@ export async function assignIssueAction(
     if (isNextRedirectError(error)) {
       throw error;
     }
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        action: "assignIssue",
-      },
-      "Assign issue error"
-    );
-    return err("SERVER", "Failed to assign issue");
+    return serverActionError(error, "SERVER", "Failed to assign issue", {
+      action: "assignIssue",
+    });
   }
 }
 
@@ -696,14 +672,9 @@ export async function addCommentAction(
       imagesMetadata,
     });
   } catch (error) {
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        action: "addComment",
-      },
-      "Failed to add issue comment"
-    );
-    return err("SERVER", "Failed to add comment");
+    return serverActionError(error, "SERVER", "Failed to add comment", {
+      action: "addComment",
+    });
   }
 
   // We need issue context for revalidation
@@ -802,14 +773,9 @@ export async function editCommentAction(
 
     return ok({ commentId });
   } catch (error) {
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        action: "editComment",
-      },
-      "Failed to edit issue comment"
-    );
-    return err("SERVER", "Failed to edit comment");
+    return serverActionError(error, "SERVER", "Failed to edit comment", {
+      action: "editComment",
+    });
   }
 }
 
@@ -920,14 +886,9 @@ export async function deleteCommentAction(
 
     return ok({ commentId });
   } catch (error) {
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        action: "deleteComment",
-      },
-      "Failed to delete issue comment"
-    );
-    return err("SERVER", "Failed to delete comment");
+    return serverActionError(error, "SERVER", "Failed to delete comment", {
+      action: "deleteComment",
+    });
   }
 }
 
@@ -1016,13 +977,8 @@ export async function updateIssueTitleAction(
     if (isNextRedirectError(error)) {
       throw error;
     }
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        action: "updateIssueTitle",
-      },
-      "Update issue title error"
-    );
-    return err("SERVER", "Failed to update title");
+    return serverActionError(error, "SERVER", "Failed to update title", {
+      action: "updateIssueTitle",
+    });
   }
 }
