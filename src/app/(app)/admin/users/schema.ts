@@ -21,6 +21,6 @@ export const inviteUserSchema = z.object({
     .max(254, "Email is too long")
     .trim()
     .toLowerCase(),
-  role: z.enum(["guest", "member", "technician"]), // Explicitly exclude "admin"
+  role: z.literal("member"),
   sendInvite: z.boolean().optional(),
 });
