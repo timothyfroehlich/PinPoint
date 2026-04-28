@@ -24,7 +24,7 @@ Use this skill when:
 2. **Explicit return types**: Required for public functions
 3. **Path aliases**: Always use `~/` (e.g., `~/lib/utils`)
 4. **Optional property assignment**: Use conditional spread for `exactOptionalPropertyTypes` safety
-5. **Type guards**: Use predicates for narrowing (e.g., `user is UserProfile`)
+5. **Type guards**: Use predicates for narrowing (e.g., `profile is UserProfile`)
 
 ### Common Fixes
 
@@ -55,17 +55,6 @@ Read these files for comprehensive TypeScript patterns and rules:
 ### Null Safety & Optional Chaining
 
 ```typescript
-// ✅ Safe authentication check (Supabase SSR)
-const supabase = await createClient();
-const {
-  data: { user },
-} = await supabase.auth.getUser();
-
-if (!user?.id) {
-  throw new Error("Unauthorized");
-}
-const userId = user.id; // Safe - narrowed to non-null
-
 // ✅ Safe array access
 const firstItem = items[0]?.name ?? "No items";
 const lastItem = items.at(-1)?.name ?? "No items";
@@ -125,61 +114,13 @@ function processResult(result: Result) {
 }
 ```
 
-## Common Error Fixes
-
-### "Object is possibly null" Errors
-
-```typescript
-// ❌ Problem
-const user = await getUserById(id);
-console.log(user.email); // Error: Object is possibly null
-
-// ✅ Solution 1: Null check
-const user = await getUserById(id);
-if (!user) throw new Error("User not found");
-console.log(user.email); // Safe
-
-// ✅ Solution 2: Optional chaining with fallback
-const user = await getUserById(id);
-console.log(user?.email ?? "No email"); // Safe with fallback
-```
-
-### "Argument of type X is not assignable to parameter" Errors
-
-```typescript
-// ❌ Problem: Mixing string and number
-const id: string | number = getId();
-const result = await fetchUser(id); // Error: expects string
-
-// ✅ Solution: Type narrowing
-const id: string | number = getId();
-const userId = typeof id === "string" ? id : String(id);
-const result = await fetchUser(userId);
-```
-
-### Union Type Errors
-
-```typescript
-// ✅ Discriminated unions
-type Result =
-  | { type: "success"; data: string }
-  | { type: "error"; message: string };
-
-function processResult(result: Result) {
-  if (result.type === "success") {
-    console.log(result.data); // Safe
-  } else {
-    console.log(result.message); // Safe
-  }
-}
-```
-
 ## Drizzle Query Safety
 
 ### Safe Query Patterns
 
 ```typescript
-import { eq, and, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
+import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
 import { type Issue } from "~/lib/types/database";
 
@@ -190,22 +131,6 @@ export async function getIssuesByMachine(machineId: string): Promise<Issue[]> {
     orderBy: desc(issues.createdAt),
   });
 }
-
-// ✅ Explicit column selection
-const users = await db.query.userProfiles.findMany({
-  columns: {
-    id: true,
-    email: true,
-    name: true,
-  },
-});
-
-// ✅ Type-safe joins
-const issuesWithMachines = await db.query.issues.findMany({
-  with: {
-    machine: true, // Drizzle infers correct relational types
-  },
-});
 ```
 
 ### Database Type Inference
@@ -235,7 +160,7 @@ export function toProfileSummary(dbUser: DbUser): UserProfileSummary {
     id: dbUser.id,
     email: dbUser.email,
     fullName: `${dbUser.firstName} ${dbUser.lastName}`,
-    role: dbUser.role as UserRole,
+    role: dbUser.role, // Inferred correctly from schema enum
   };
 }
 ```
@@ -246,19 +171,17 @@ export function toProfileSummary(dbUser: DbUser): UserProfileSummary {
 
 ```typescript
 // ✅ Safe auth context in Server Component
+import { createClient } from "~/lib/supabase/server";
+import { redirect } from "next/navigation";
+
 export default async function ProtectedPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  // Handle both success and error cases
-  if (error || !user) {
+  if (!user) {
     redirect("/login");
   }
 
-  // user is guaranteed to be non-null here
   return <DashboardContent user={user} />;
 }
 ```
@@ -268,6 +191,11 @@ export default async function ProtectedPage() {
 ```typescript
 // ✅ Safe Server Action with auth
 "use server";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
+import { db } from "~/server/db";
+import { userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
 
 export async function updateProfile(formData: FormData): Promise<void> {
@@ -298,6 +226,9 @@ export async function updateProfile(formData: FormData): Promise<void> {
 ```typescript
 // ✅ Explicit return types prevent inference errors
 import { type Issue } from "~/lib/types/database";
+import { db } from "~/server/db";
+import { issues } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function getIssuesByMachine(machineId: string): Promise<Issue[]> {
   return await db.query.issues.findMany({
@@ -306,18 +237,7 @@ export async function getIssuesByMachine(machineId: string): Promise<Issue[]> {
 }
 
 // ✅ Strict parameter validation (Zod schemas)
-import { createIssueSchema } from "~/app/(app)/report/schemas";
-```
-
-## Import Path Consistency
-
-```typescript
-// ✅ Always use TypeScript alias
-import { createClient } from "~/lib/supabase/server";
-import { userProfiles } from "~/server/db/schema";
-
-// ❌ Never use relative paths for deep imports
-import { createClient } from "../../../lib/supabase/server";
+import { publicIssueSchema } from "~/app/(app)/report/schemas";
 ```
 
 ## Anti-Patterns to Avoid
@@ -334,7 +254,7 @@ const user = getUser()!.email; // Dangerous (Rule #7)
 const result = dangerousOperation();
 
 // ❌ Never: Unsafe type assertions
-const user = data as UserProfile; // Without validation
+const user = data as UserProfile; // Without validation (Rule #7)
 
 // ✅ Instead: Proper validation / Type guards
 if (isUserProfile(data)) {
@@ -347,7 +267,11 @@ if (isUserProfile(data)) {
 ### Async Component Patterns
 
 ```typescript
-// ✅ Safe async Server Component
+// ✅ Safe async Server Component (Next.js 15)
+import { db } from "~/server/db";
+import { issues } from "~/server/db/schema";
+import { eq, desc } from "drizzle-orm";
+
 export default async function MachineIssuesPage({
   params
 }: {
@@ -374,14 +298,23 @@ export default async function MachineIssuesPage({
 
 ```typescript
 // ✅ Safe FormData handling with Zod schemas from route directory
+// ⚠️ Note: Use per-field extraction or helpers for boolean coercion (like watchIssue)
 "use server";
-import { createIssueSchema } from "~/app/(app)/report/schemas";
+import { revalidatePath } from "next/cache";
+import { db } from "~/server/db";
+import { issues } from "~/server/db/schema";
+import { publicIssueSchema } from "~/app/(app)/report/schemas";
 
 export async function createIssueAction(formData: FormData) {
-  const rawData = Object.fromEntries(formData.entries());
+  // Simple extraction for strings; use parsePublicIssueForm() for booleans/coercion
+  const rawData = {
+    machineId: String(formData.get("machineId")),
+    title: String(formData.get("title")),
+    // ...
+  };
 
   // Type-safe validation
-  const validation = createIssueSchema.safeParse(rawData);
+  const validation = publicIssueSchema.safeParse(rawData);
   if (!validation.success) {
     return { error: validation.error.flatten() };
   }
@@ -409,4 +342,4 @@ Before committing TypeScript code:
 
 - TypeScript patterns: `docs/TYPESCRIPT_STRICTEST_PATTERNS.md`
 - Non-negotiables: `docs/NON_NEGOTIABLES.md` (CORE-TS-\* rules)
-- Drizzle types: Use Context7 MCP for latest patterns
+- Drizzle types: Use `src/lib/types/database.ts` as canonical source
