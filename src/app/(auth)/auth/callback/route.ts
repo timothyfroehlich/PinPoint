@@ -153,22 +153,37 @@ function isValidEmailOtpType(value: string | null): value is EmailOtpType {
 async function syncDiscordIdentity(
   supabase: ReturnType<typeof createServerClient>
 ): Promise<void> {
-  const { data: userResponse } = await supabase.auth.getUser();
-  const user = userResponse.user;
-  if (!user) return;
+  // Errors here are non-fatal for the OAuth callback (the user is signed in
+  // either way) but they cause UI/runtime drift: the Connected Accounts
+  // panel reads auth.identities while testDiscordDmAction reads
+  // user_profiles.discord_user_id. A silent failure here means the badge
+  // says "Connected" but DMs report "Link your Discord account first."
+  // Wrap in try/catch + reportError so the divergence shows up in Sentry
+  // instead of disappearing.
+  try {
+    const { data: userResponse } = await supabase.auth.getUser();
+    const user = userResponse.user;
+    if (!user) return;
 
-  const identities = (user.identities ?? []) as {
-    provider: string;
-    identity_data?: { provider_id?: string; sub?: string };
-  }[];
-  const discord = identities.find((i) => i.provider === "discord");
-  const discordUserId =
-    discord?.identity_data?.provider_id ?? discord?.identity_data?.sub ?? null;
+    const identities = (user.identities ?? []) as {
+      provider: string;
+      identity_data?: { provider_id?: string; sub?: string };
+    }[];
+    const discord = identities.find((i) => i.provider === "discord");
+    const discordUserId =
+      discord?.identity_data?.provider_id ??
+      discord?.identity_data?.sub ??
+      null;
 
-  await db
-    .update(userProfiles)
-    .set({ discordUserId })
-    .where(eq(userProfiles.id, user.id));
+    await db
+      .update(userProfiles)
+      .set({ discordUserId })
+      .where(eq(userProfiles.id, user.id));
+  } catch (error) {
+    reportError(error, {
+      action: "auth.callback.syncDiscordIdentity",
+    });
+  }
 }
 
 function createSupabaseClient(request: NextRequest): {

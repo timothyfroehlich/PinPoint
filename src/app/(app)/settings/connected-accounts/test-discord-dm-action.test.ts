@@ -109,4 +109,23 @@ describe("testDiscordDmAction", () => {
       reason: "blocked",
     });
   });
+
+  it.each([["rate_limited"], ["transient"]] as const)(
+    "propagates %s from sendDm",
+    async (reason) => {
+      mockUser("u1");
+      findFirst.mockResolvedValue({ id: "u1", discordUserId: "d1" });
+      vi.mocked(getDiscordConfig).mockResolvedValue({
+        enabled: true,
+        botToken: "t",
+        guildId: null,
+        inviteLink: null,
+        botHealthStatus: "healthy",
+        lastBotCheckAt: null,
+        updatedAt: new Date(),
+      });
+      vi.mocked(sendDm).mockResolvedValue({ ok: false, reason });
+      expect(await testDiscordDmAction()).toEqual({ ok: false, reason });
+    }
+  );
 });

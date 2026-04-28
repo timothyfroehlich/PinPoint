@@ -156,4 +156,34 @@ test.describe("Discord DM preferences (integration enabled)", () => {
       await setUserDiscordId(memberId, null);
     }
   });
+
+  test("Linked user can click 'Send test DM' and gets feedback", async ({
+    page,
+  }, testInfo) => {
+    // NON_NEGOTIABLE #11: every clickable UI element must be exercised in
+    // E2E. The button triggers a real call to Discord with the test fake
+    // token, so the result will be a failure — but the form must render
+    // a result paragraph rather than hang or crash.
+    await setUserDiscordId(memberId, "test-discord-id-test-dm");
+
+    try {
+      await loginAs(page, testInfo, {
+        email: memberEmail,
+        password: "TestPassword123",
+      });
+      await page.goto("/settings");
+
+      const button = page.getByRole("button", { name: "Send test DM" });
+      await expect(button).toBeVisible();
+      await button.click();
+
+      // Either success or one of the REASON_COPY failure messages should
+      // surface. The fake bot token makes failure (transient) the most
+      // likely outcome — but we don't depend on the specific reason.
+      const resultMessage = page.getByRole("status");
+      await expect(resultMessage).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await setUserDiscordId(memberId, null);
+    }
+  });
 });
