@@ -69,8 +69,14 @@ export type ValidateServerIdResult =
   | { ok: true; guildName?: string }
   | {
       ok: false;
-      reason: "not_configured" | "not_member" | "invalid_token" | "transient";
+      reason:
+        | "not_configured"
+        | "not_member"
+        | "invalid_token"
+        | "invalid_input"
+        | "transient";
       status?: number;
+      message?: string;
     };
 
 async function probeServerMembership(
@@ -158,7 +164,12 @@ export async function validateServerId(
   };
   const parsed = validateServerIdSchema.safeParse(raw);
   if (!parsed.success) {
-    return { ok: false, reason: "transient" };
+    const firstIssue = parsed.error.issues[0];
+    return {
+      ok: false,
+      reason: "invalid_input",
+      message: firstIssue?.message ?? "Server ID is invalid.",
+    };
   }
 
   const token = await resolveTokenForValidation(parsed.data.newToken);
@@ -326,7 +337,12 @@ export async function saveDiscordConfig(
           }
           orphanGuard.vaultId = newVaultId;
 
-          await tx
+          // The WHERE clause guards against an admin race writing the
+          // singleton's bot_token_vault_id between our SELECT and this
+          // UPDATE. If 0 rows are affected, the freshly-created vault
+          // secret has no DB reference — throw so the catch block fires
+          // and deletes the orphan.
+          const updated = await tx
             .update(discordIntegrationConfig)
             .set({
               botTokenVaultId: newVaultId,
@@ -338,7 +354,13 @@ export async function saveDiscordConfig(
                 eq(discordIntegrationConfig.id, "singleton"),
                 isNull(discordIntegrationConfig.botTokenVaultId)
               )
+            )
+            .returning({ id: discordIntegrationConfig.id });
+          if (updated.length === 0) {
+            throw new Error(
+              "Race: singleton row already has a bot_token_vault_id"
             );
+          }
         }
       }
 

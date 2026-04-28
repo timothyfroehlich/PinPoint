@@ -45,7 +45,15 @@ export function DiscordTestDmButton(): React.JSX.Element {
         disabled={pending}
         onClick={() => {
           startTransition(async () => {
-            setResult(await testDiscordDmAction());
+            try {
+              setResult(await testDiscordDmAction());
+            } catch {
+              // Server actions normally surface errors via the result
+              // object, but a network-level failure or runtime crash
+              // would reject. Fall back to transient so the user gets
+              // a status message instead of a stuck spinner.
+              setResult({ ok: false, reason: "transient" });
+            }
           });
         }}
       >

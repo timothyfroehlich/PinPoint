@@ -352,6 +352,12 @@ function toValidationState(
     case "not_configured":
       message = "Set a bot token first.";
       break;
+    case "invalid_input":
+      message =
+        "message" in result && result.message
+          ? result.message
+          : "Input is invalid.";
+      break;
     case "transient":
       message = `Discord didn't respond${"status" in result && result.status ? ` (HTTP ${result.status})` : ""}. Try again.`;
       break;

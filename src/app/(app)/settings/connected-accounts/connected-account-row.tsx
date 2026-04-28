@@ -1,11 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useTransition } from "react";
+import { useFormStatus } from "react-dom";
 import { Button } from "~/components/ui/button";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -39,6 +38,24 @@ interface ConnectedAccountRowProps {
 const UNLINK_DISABLED_MSG =
   "Add a password or another provider before disconnecting this one";
 
+function UnlinkSubmitButton({
+  displayName,
+}: {
+  displayName: string;
+}): React.JSX.Element {
+  const { pending } = useFormStatus();
+  return (
+    <Button
+      type="submit"
+      variant="destructive"
+      disabled={pending}
+      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+    >
+      {pending ? "Disconnecting..." : `Disconnect ${displayName}`}
+    </Button>
+  );
+}
+
 export function ConnectedAccountRow({
   providerKey,
   displayName,
@@ -48,14 +65,8 @@ export function ConnectedAccountRow({
 }: ConnectedAccountRowProps): React.JSX.Element {
   const Icon = providers[providerKey].iconComponent;
   const linkAction = linkProviderAction.bind(null, providerKey);
+  const unlinkAction = unlinkProviderAction.bind(null, providerKey);
   const helpId = `unlink-${providerKey}-help`;
-  const [isPending, startTransition] = useTransition();
-
-  function handleUnlink(): void {
-    startTransition(async () => {
-      await unlinkProviderAction(providerKey);
-    });
-  }
 
   return (
     <div className="flex items-center justify-between gap-4 py-3">
@@ -81,7 +92,7 @@ export function ConnectedAccountRow({
                       <Button
                         type="button"
                         variant="destructive"
-                        disabled={!canUnlink || isPending}
+                        disabled={!canUnlink}
                         aria-describedby={!canUnlink ? helpId : undefined}
                       >
                         Disconnect {displayName}
@@ -108,16 +119,12 @@ export function ConnectedAccountRow({
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={isPending}>
-                  Cancel
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleUnlink}
-                  disabled={isPending}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  {isPending ? "Disconnecting..." : `Disconnect ${displayName}`}
-                </AlertDialogAction>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                {/* Form-action submit preserves progressive enhancement
+                    (NON_NEGOTIABLE #5) — unlink works without JS. */}
+                <form action={unlinkAction}>
+                  <UnlinkSubmitButton displayName={displayName} />
+                </form>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
