@@ -30,7 +30,7 @@ import type { ActionState } from "./unified-report-form";
 import { imagesMetadataArraySchema } from "../issues/schemas";
 import { deleteFromBlob } from "~/lib/blob/client";
 import { z } from "zod";
-import { ok, err, type Result } from "~/lib/result";
+import { ok, type Result } from "~/lib/result";
 import {
   type ProseMirrorDoc,
   plainTextToDoc,
@@ -424,11 +424,12 @@ export async function getRecentIssuesAction(
 ): Promise<Result<RecentIssueData[], "SERVER">> {
   const parsed = recentIssuesParamsSchema.safeParse({ machineInitials, limit });
   if (!parsed.success) {
-    log.warn(
-      { machineInitials, limit, issues: parsed.error.issues },
-      "getRecentIssuesAction: invalid input"
-    );
-    return err("SERVER", "Invalid input");
+    return serverActionError(parsed.error, "SERVER", "Invalid input", {
+      action: "getRecentIssuesActionValidation",
+      machineInitials,
+      limit,
+      issues: parsed.error.issues,
+    });
   }
 
   try {
