@@ -20,11 +20,11 @@ Use this skill when:
 
 ### Critical TypeScript Rules
 
-1. **Strictest config**: No `any`, no `!`, no unsafe `as`
+1. **Strictest config**: No `any`, no `!`, no unsafe `as` (NON_NEGOTIABLE #7)
 2. **Explicit return types**: Required for public functions
-3. **Path aliases**: Use `~/` instead of relative imports
-4. **Optional property assignment**: Use conditional spread, not direct assignment with undefined
-5. **Type guards**: Write proper predicates for narrowing
+3. **Path aliases**: Always use `~/` (e.g., `~/lib/utils`)
+4. **Optional property assignment**: Use conditional spread for `exactOptionalPropertyTypes` safety
+5. **Type guards**: Use predicates for narrowing (e.g., `user is UserProfile`)
 
 ### Common Fixes
 
@@ -38,25 +38,24 @@ const data = {
   ...(description && { description }),
 };
 
-// ❌ Wrong: Direct assignment
-const data = { name: value }; // Error if value is undefined
+// ❌ Wrong: Direct assignment (fails if value is undefined)
+const data = { name: value };
 ```
 
 ## Detailed Documentation
 
-Read this file for comprehensive TypeScript patterns:
+Read these files for comprehensive TypeScript patterns and rules:
 
-```bash
-# All TypeScript strictest patterns
-cat docs/TYPESCRIPT_STRICTEST_PATTERNS.md
-```
+- `docs/TYPESCRIPT_STRICTEST_PATTERNS.md` — Detailed generic and union patterns
+- `docs/NON_NEGOTIABLES.md` — Core project constraints (CORE-TS-\* rules)
+- `src/lib/types/database.ts` — Canonical database entity types
 
 ## Core Safety Patterns
 
 ### Null Safety & Optional Chaining
 
 ```typescript
-// ✅ Safe authentication check
+// ✅ Safe authentication check (Supabase SSR)
 const supabase = await createClient();
 const {
   data: { user },
@@ -65,56 +64,50 @@ const {
 if (!user?.id) {
   throw new Error("Unauthorized");
 }
-const userId = user.id; // Now safe - TypeScript knows user is not null
+const userId = user.id; // Safe - narrowed to non-null
 
 // ✅ Safe array access
 const firstItem = items[0]?.name ?? "No items";
 const lastItem = items.at(-1)?.name ?? "No items";
 
-// ✅ Safe object property access
+// ✅ Safe object property access (Drizzle relational)
 const machineName = issue.machine?.name ?? "Unknown";
 ```
 
-### Optional Property Assignment (exactOptionalPropertyTypes)
+### Date Formatting (Narrowing Required)
+
+Helpers in `~/lib/dates.ts` (**formatDate**, **formatDateTime**, **formatRelative**) currently throw `TypeError` on `null` or `undefined`. You MUST narrow before calling.
 
 ```typescript
-// ✅ Correct: Conditional assignment
-const data: { name?: string } = {};
-if (value) data.name = value;
+// ✅ Correct: Narrowing with fallback
+<span>{machine.fixedAt ? formatDate(machine.fixedAt) : "—"}</span>
 
-// ✅ Correct: Object spread with conditional
-const data = {
-  id: uuid(),
-  ...(name && { name }),
-  ...(description && { description }),
-};
+// ✅ Correct: Early return/guard
+if (!issue.createdAt) return null;
+return <div>{formatDate(issue.createdAt)}</div>
 
-// ❌ Wrong: Direct assignment of potentially undefined
-const data: { name?: string } = { name: value }; // Error if value is undefined
+// ❌ Wrong: Passing potentially null value
+<div>{formatDate(issue.closedAt)}</div> // Throws if closedAt is null
 ```
 
 ### Type Guards
 
 ```typescript
 // ✅ Type guard for arrays
-function hasItems<T>(arr: T[] | undefined): arr is T[] {
-  return arr !== undefined && arr.length > 0;
+function hasItems<T>(arr: T[] | null | undefined): arr is T[] {
+  return !!arr && arr.length > 0;
 }
 
-// Usage
-if (hasItems(issues)) {
-  issues.forEach((issue) => console.log(issue.title)); // Safe
-}
+// ✅ Type guard for UserProfile (Auth context)
+import { type UserProfile } from "~/lib/types/database";
 
-// ✅ Type guard for Supabase user
-function isValidUser(user: unknown): user is { id: string; email: string } {
+function isUserProfile(profile: unknown): profile is UserProfile {
   return (
-    typeof user === "object" &&
-    user !== null &&
-    "id" in user &&
-    "email" in user &&
-    typeof (user as any).id === "string" &&
-    typeof (user as any).email === "string"
+    typeof profile === "object" &&
+    profile !== null &&
+    "id" in profile &&
+    "email" in profile &&
+    "role" in profile
   );
 }
 
@@ -125,9 +118,9 @@ type Result =
 
 function processResult(result: Result) {
   if (result.type === "success") {
-    console.log(result.data); // Safe - TypeScript knows it's success
+    console.log(result.data); // Safe - narrowing works
   } else {
-    console.log(result.message); // Safe - TypeScript knows it's error
+    console.log(result.message); // Safe - narrowing works
   }
 }
 ```
@@ -187,14 +180,11 @@ function processResult(result: Result) {
 
 ```typescript
 import { eq, and, desc } from "drizzle-orm";
-import { issues, machines } from "~/server/db/schema";
+import { issues, userProfiles } from "~/server/db/schema";
+import { type Issue } from "~/lib/types/database";
 
-// ✅ Safe Drizzle queries with proper typing
-export async function getIssuesForMachine(machineId: string): Promise<Issue[]> {
-  if (!machineId) {
-    throw new Error("Machine ID required");
-  }
-
+// ✅ Safe Drizzle queries with explicit typing
+export async function getIssuesByMachine(machineId: string): Promise<Issue[]> {
   return await db.query.issues.findMany({
     where: eq(issues.machineId, machineId),
     orderBy: desc(issues.createdAt),
@@ -202,45 +192,50 @@ export async function getIssuesForMachine(machineId: string): Promise<Issue[]> {
 }
 
 // ✅ Explicit column selection
-const users = await db.query.users.findMany({
+const users = await db.query.userProfiles.findMany({
   columns: {
     id: true,
     email: true,
     name: true,
-    // Explicitly exclude sensitive fields
   },
 });
 
 // ✅ Type-safe joins
 const issuesWithMachines = await db.query.issues.findMany({
   with: {
-    machine: true, // Drizzle infers correct types
+    machine: true, // Drizzle infers correct relational types
   },
 });
 ```
 
-### Database Type Conversion
+### Database Type Inference
 
 ```typescript
-// Database types (snake_case)
-import { users } from "~/server/db/schema";
-type DbUser = typeof users.$inferSelect;
+// Database types (Inferred from schema)
+import { userProfiles } from "~/server/db/schema";
+import { type InferSelectModel } from "drizzle-orm";
 
-// Application types (camelCase)
-export type User = {
+type DbUser = InferSelectModel<typeof userProfiles>;
+// Resulting type uses camelCase from schema.ts:
+// { id: string, email: string, firstName: string, lastName: string, ... }
+
+// Application types (Cleaned up or extended)
+import { type UserRole } from "~/lib/types/user";
+
+export type UserProfileSummary = {
   id: string;
   email: string;
-  fullName: string | null;
-  createdAt: Date;
+  fullName: string;
+  role: UserRole;
 };
 
 // Converter at boundary
-export function dbUserToUser(dbUser: DbUser): User {
+export function toProfileSummary(dbUser: DbUser): UserProfileSummary {
   return {
     id: dbUser.id,
     email: dbUser.email,
-    fullName: dbUser.full_name,
-    createdAt: new Date(dbUser.created_at),
+    fullName: `${dbUser.firstName} ${dbUser.lastName}`,
+    role: dbUser.role as UserRole,
   };
 }
 ```
@@ -273,6 +268,8 @@ export default async function ProtectedPage() {
 ```typescript
 // ✅ Safe Server Action with auth
 "use server";
+import { createClient } from "~/lib/supabase/server";
+
 export async function updateProfile(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const {
@@ -288,7 +285,10 @@ export async function updateProfile(formData: FormData): Promise<void> {
     throw new Error("Name must be a string");
   }
 
-  await db.update(users).set({ name }).where(eq(users.id, user.id));
+  await db
+    .update(userProfiles)
+    .set({ name })
+    .where(eq(userProfiles.id, user.id));
   revalidatePath("/profile");
 }
 ```
@@ -297,36 +297,27 @@ export async function updateProfile(formData: FormData): Promise<void> {
 
 ```typescript
 // ✅ Explicit return types prevent inference errors
-export async function getIssuesForMachine(machineId: string): Promise<Issue[]> {
-  if (!machineId) {
-    throw new Error("Machine ID required");
-  }
+import { type Issue } from "~/lib/types/database";
 
+export async function getIssuesByMachine(machineId: string): Promise<Issue[]> {
   return await db.query.issues.findMany({
     where: eq(issues.machineId, machineId),
   });
 }
 
-// ✅ Strict parameter validation
-export function createIssue(data: {
-  title: string;
-  description?: string;
-  machineId: string;
-  severity: "minor" | "playable" | "unplayable";
-}): Promise<Issue> {
-  return db.insert(issues).values(data).returning();
-}
+// ✅ Strict parameter validation (Zod schemas)
+import { createIssueSchema } from "~/app/(app)/report/schemas";
 ```
 
 ## Import Path Consistency
 
 ```typescript
 // ✅ Always use TypeScript alias
-import { validateUser } from "~/lib/validation/user";
 import { createClient } from "~/lib/supabase/server";
+import { userProfiles } from "~/server/db/schema";
 
 // ❌ Never use relative paths for deep imports
-import { validateUser } from "../../../lib/validation/user";
+import { createClient } from "../../../lib/supabase/server";
 ```
 
 ## Anti-Patterns to Avoid
@@ -336,21 +327,18 @@ import { validateUser } from "../../../lib/validation/user";
 const data: any = await fetchData();
 
 // ❌ Never: Non-null assertion without justification
-const user = getUser()!.email; // Dangerous
+const user = getUser()!.email; // Dangerous (Rule #7)
 
 // ❌ Never: Ignoring TypeScript errors
 // @ts-ignore
 const result = dangerousOperation();
 
 // ❌ Never: Unsafe type assertions
-const user = data as User; // Without validation
+const user = data as UserProfile; // Without validation
 
-// ✅ Instead: Proper validation
-function isUser(data: unknown): data is User {
-  return typeof data === "object" && data !== null && "id" in data;
-}
-if (isUser(data)) {
-  const user = data; // Safe
+// ✅ Instead: Proper validation / Type guards
+if (isUserProfile(data)) {
+  const user = data; // Safe narrowed type
 }
 ```
 
@@ -363,20 +351,18 @@ if (isUser(data)) {
 export default async function MachineIssuesPage({
   params
 }: {
-  params: { machineId: string }
+  params: Promise<{ machineId: string }>
 }): Promise<JSX.Element> {
-  if (!params.machineId) {
-    throw new Error("Machine ID required");
-  }
+  const { machineId } = await params;
 
-  const issues = await db.query.issues.findMany({
-    where: eq(issues.machineId, params.machineId),
+  const issuesResult = await db.query.issues.findMany({
+    where: eq(issues.machineId, machineId),
     orderBy: desc(issues.createdAt),
   });
 
   return (
     <div>
-      {issues.map((issue) => (
+      {issuesResult.map((issue) => (
         <IssueCard key={issue.id} issue={issue} />
       ))}
     </div>
@@ -384,32 +370,23 @@ export default async function MachineIssuesPage({
 }
 ```
 
-### Form Data Validation
+### Form Data Validation (Zod)
 
 ```typescript
-// ✅ Safe FormData handling with Zod
+// ✅ Safe FormData handling with Zod schemas from route directory
 "use server";
-import { z } from "zod";
-
-const createIssueSchema = z.object({
-  title: z.string().min(1, "Title required"),
-  description: z.string().optional(),
-  machineId: z.string().uuid("Invalid machine ID"),
-  severity: z.enum(["minor", "playable", "unplayable"]),
-});
+import { createIssueSchema } from "~/app/(app)/report/schemas";
 
 export async function createIssueAction(formData: FormData) {
-  const rawData = {
-    title: formData.get("title"),
-    description: formData.get("description"),
-    machineId: formData.get("machineId"),
-    severity: formData.get("severity"),
-  };
+  const rawData = Object.fromEntries(formData.entries());
 
   // Type-safe validation
-  const validData = createIssueSchema.parse(rawData);
+  const validation = createIssueSchema.safeParse(rawData);
+  if (!validation.success) {
+    return { error: validation.error.flatten() };
+  }
 
-  const [issue] = await db.insert(issues).values(validData).returning();
+  const [issue] = await db.insert(issues).values(validation.data).returning();
   revalidatePath("/issues");
   return issue;
 }
