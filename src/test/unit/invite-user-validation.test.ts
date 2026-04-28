@@ -66,6 +66,10 @@ describe("InviteUser Validation", () => {
       sendInvite: false,
     });
     expect(result.success).toBe(false);
+    if (!result.success) {
+      const roleIssue = result.error.issues.find((i) => i.path[0] === "role");
+      expect(roleIssue).toBeDefined();
+    }
   });
 
   it("should fail validation for 'technician' role", () => {
@@ -77,5 +81,9 @@ describe("InviteUser Validation", () => {
       sendInvite: false,
     });
     expect(result.success).toBe(false);
+    if (!result.success) {
+      const roleIssue = result.error.issues.find((i) => i.path[0] === "role");
+      expect(roleIssue).toBeDefined();
+    }
   });
 });
