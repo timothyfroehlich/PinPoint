@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions.js";
 import {
   createTestUser,
+  deleteTestUser,
   disableDiscordIntegration,
   updateUserRole,
 } from "../support/supabase-admin.js";
@@ -23,6 +24,10 @@ test.describe("Admin Discord Integration", () => {
     await disableDiscordIntegration().catch(() => {
       // Tolerable if singleton row already matches.
     });
+  });
+
+  test.afterAll(async () => {
+    await deleteTestUser(adminId);
   });
 
   test("admin can navigate to the Discord integration page via the user menu", async ({
