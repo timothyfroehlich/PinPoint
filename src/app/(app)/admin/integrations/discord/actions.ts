@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { saveDiscordConfigSchema, validateServerIdSchema } from "./schema";
 import { log } from "~/lib/logger";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import { getDiscordConfig } from "~/lib/discord/config";
+import { getDiscordTokenForAdmin } from "~/lib/discord/config";
 
 async function verifyIntegrationsAdmin(): Promise<{ userId: string }> {
   const supabase = await createClient();
@@ -104,15 +104,18 @@ async function probeServerMembership(
 
 /**
  * Resolve the bot token to validate against — typed value if present, else
- * the saved Vault token via getDiscordConfig(). Returns null if neither
- * source has a token.
+ * the saved Vault token via getDiscordTokenForAdmin(). Returns null if
+ * neither source has a token.
+ *
+ * Uses the admin-only accessor so a saved-but-disabled integration's token
+ * is still surfaced for validation. (Validating before enabling is the whole
+ * point of the chicken-and-egg flow: env-seeded → admin validates → enables.)
  */
 async function resolveTokenForValidation(
   typed: string | undefined
 ): Promise<string | null> {
   if (typed && typed.length > 0) return typed;
-  const config = await getDiscordConfig();
-  return config?.botToken ?? null;
+  return getDiscordTokenForAdmin();
 }
 
 // ─── Public actions ────────────────────────────────────────────────────
@@ -215,80 +218,91 @@ export async function saveDiscordConfig(
   }
 
   const validated = parsed.data;
+  const hasTypedNewToken =
+    validated.newToken !== undefined && validated.newToken.length > 0;
 
-  // Resolve which token to validate against. If a new value was typed, that
-  // takes precedence; otherwise re-validate the existing Vault token.
-  const tokenForCheck = await resolveTokenForValidation(validated.newToken);
-  if (!tokenForCheck) {
-    return {
-      ok: false,
-      errors: [
-        {
-          field: "newToken",
-          message:
-            "Bot token is required. Paste a token to set up the integration.",
-        },
-      ],
-    };
-  }
-
-  // Cannot enable without a token in either form or DB. (The client UI
-  // already gates the switch; this is the server-side mirror.)
-  if (validated.enabled && !tokenForCheck) {
-    return {
-      ok: false,
-      errors: [
-        {
-          field: "newToken",
-          message: "Cannot enable the integration without a bot token.",
-        },
-      ],
-    };
-  }
-
-  // 1) Token check
-  const tokenResult = await probeBotToken(tokenForCheck);
-  if (!tokenResult.ok) {
-    return {
-      ok: false,
-      errors: [
-        {
-          field: "newToken",
-          message:
-            tokenResult.reason === "invalid_token"
-              ? "Discord rejected this token. Generate a new one in the Developer Portal."
-              : "Discord didn't respond. Try again in a moment.",
-        },
-      ],
-    };
-  }
-
-  // 2) Server membership check (hard-required)
-  const serverResult = await probeServerMembership(
-    tokenForCheck,
-    validated.guildId
-  );
-  if (!serverResult.ok) {
-    let message: string;
-    switch (serverResult.reason) {
-      case "not_member":
-        message =
-          "Bot isn't a member of this server. Invite the bot first, then save again.";
-        break;
-      case "invalid_token":
-        message = "Discord rejected the token while checking the server.";
-        break;
-      default:
-        message = "Discord didn't respond while checking the server.";
+  // Resolve the saved-or-typed token. Only required if we're enabling (the
+  // server can save a disabled config without any token at all) or if the
+  // admin typed a new token to rotate.
+  let tokenForProbes: string | null = null;
+  if (validated.enabled || hasTypedNewToken) {
+    tokenForProbes = await resolveTokenForValidation(validated.newToken);
+    if (validated.enabled && !tokenForProbes) {
+      return {
+        ok: false,
+        errors: [
+          {
+            field: "newToken",
+            message:
+              "Bot token is required to enable the integration. Paste one or seed via DISCORD_BOT_TOKEN.",
+          },
+        ],
+      };
     }
-    return {
-      ok: false,
-      errors: [{ field: "guildId", message }],
-    };
   }
 
-  // 3) Persist. Token rotation goes to Vault; everything else updates the
-  //    singleton row in one transaction.
+  // Discord-side probes only run when enabling. Saving as disabled never
+  // calls Discord — admins can fix a broken config without needing the bot
+  // online or in the right server.
+  let probedBotUsername: string | undefined;
+  if (validated.enabled && tokenForProbes) {
+    // Token rotation: probe the new typed value before committing to Vault.
+    // When not rotating, the saved token's validity gets verified implicitly
+    // by probeServerMembership (any 401 surfaces as `invalid_token`).
+    if (hasTypedNewToken) {
+      const tokenResult = await probeBotToken(tokenForProbes);
+      if (!tokenResult.ok) {
+        return {
+          ok: false,
+          errors: [
+            {
+              field: "newToken",
+              message:
+                tokenResult.reason === "invalid_token"
+                  ? "Discord rejected this token. Generate a new one in the Developer Portal."
+                  : "Discord didn't respond. Try again in a moment.",
+            },
+          ],
+        };
+      }
+      probedBotUsername = tokenResult.botUsername;
+    }
+
+    const serverResult = await probeServerMembership(
+      tokenForProbes,
+      validated.guildId
+    );
+    if (!serverResult.ok) {
+      let message: string;
+      switch (serverResult.reason) {
+        case "not_member":
+          message =
+            "Bot isn't a member of this server. Invite the bot first, then save again.";
+          break;
+        case "invalid_token":
+          message = "Discord rejected the token while checking the server.";
+          break;
+        default:
+          message = "Discord didn't respond while checking the server.";
+      }
+      return {
+        ok: false,
+        errors: [{ field: "guildId", message }],
+      };
+    }
+  }
+
+  // Persist. Token rotation goes to Vault; everything else updates the
+  // singleton row.
+  //
+  // Atomicity note: vault.create_secret + the Drizzle row update are not
+  // guaranteed to roll back together (Vault lives in a separate schema
+  // with its own SECURITY DEFINER scope). On a partial failure we
+  // explicitly delete the freshly-created vault secret in the catch block
+  // to avoid orphans. (The closure mutates `orphanGuard.vaultId` so
+  // TypeScript flow analysis preserves the `string | null` type after
+  // the awaited transaction.)
+  const orphanGuard: { vaultId: string | null } = { vaultId: null };
   try {
     await db.transaction(async (tx) => {
       const existing = await tx.query.discordIntegrationConfig.findFirst({
@@ -296,20 +310,22 @@ export async function saveDiscordConfig(
         columns: { botTokenVaultId: true },
       });
 
-      // Rotate Vault if a new token was provided.
-      if (validated.newToken && validated.newToken.length > 0) {
+      if (hasTypedNewToken) {
+        const newToken = validated.newToken ?? "";
         if (existing?.botTokenVaultId) {
           await tx.execute(
-            sql`SELECT vault.update_secret(${existing.botTokenVaultId}::uuid, ${validated.newToken}, 'discord_bot_token', 'Discord bot token (rotated via UI)')`
+            sql`SELECT vault.update_secret(${existing.botTokenVaultId}::uuid, ${newToken}, 'discord_bot_token', 'Discord bot token (rotated via UI)')`
           );
         } else {
           const rows = (await tx.execute(
-            sql`SELECT vault.create_secret(${validated.newToken}, 'discord_bot_token', 'Discord bot token (saved via UI)') AS id`
+            sql`SELECT vault.create_secret(${newToken}, 'discord_bot_token', 'Discord bot token (saved via UI)') AS id`
           )) as { id: string }[];
           const newVaultId = rows[0]?.id;
           if (!newVaultId) {
             throw new Error("Vault create_secret returned no id");
           }
+          orphanGuard.vaultId = newVaultId;
+
           await tx
             .update(discordIntegrationConfig)
             .set({
@@ -346,6 +362,24 @@ export async function saveDiscordConfig(
       },
       "Failed to save Discord config"
     );
+
+    if (orphanGuard.vaultId) {
+      try {
+        await db.execute(
+          sql`SELECT vault.delete_secret(${orphanGuard.vaultId}::uuid)`
+        );
+      } catch (cleanupErr) {
+        log.error(
+          {
+            action: "saveDiscordConfig.vaultCleanup",
+            vaultId: orphanGuard.vaultId,
+            error: cleanupErr instanceof Error ? cleanupErr.message : "Unknown",
+          },
+          "Failed to clean up orphaned vault secret"
+        );
+      }
+    }
+
     return {
       ok: false,
       errors: [
@@ -358,5 +392,7 @@ export async function saveDiscordConfig(
   }
 
   revalidatePath("/admin/integrations/discord");
-  return { ok: true, botUsername: tokenResult.botUsername };
+  return probedBotUsername
+    ? { ok: true, botUsername: probedBotUsername }
+    : { ok: true };
 }

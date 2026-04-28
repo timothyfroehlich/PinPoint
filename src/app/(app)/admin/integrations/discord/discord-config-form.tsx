@@ -82,6 +82,46 @@ export function DiscordConfigForm({
   const canValidateToken = tokenAvailable;
   const canValidateServer = tokenAvailable && guildIdInput.length > 0;
 
+  // Switch gating: turning the integration ON requires fresh validation.
+  //
+  // - Both Validate buttons must report "valid" in this session, OR
+  // - The saved state was already enabled — admins can return to the
+  //   already-validated state without re-running probes.
+  //
+  // Turning OFF is always allowed.
+  const validationsPassed =
+    tokenStatus.kind === "valid" && serverStatus.kind === "valid";
+  const canTurnOn = validationsPassed || enabled;
+  const switchDisabled = !tokenAvailable || (!enabledInput && !canTurnOn);
+  const switchTitle = !tokenAvailable
+    ? "Set a bot token first."
+    : !enabledInput && !canTurnOn
+      ? "Validate the bot token and Server ID before enabling."
+      : undefined;
+
+  // Unsaved-changes guard. Browser-level beforeunload fires on tab close,
+  // refresh, and external navigation. (App Router does not expose router
+  // events, so internal client-side nav via <Link> will not trigger this —
+  // accepted limitation.)
+  const isDirty =
+    tokenInput.length > 0 ||
+    guildIdInput !== guildId ||
+    inviteLinkInput !== inviteLink ||
+    enabledInput !== enabled;
+
+  React.useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent): void => {
+      e.preventDefault();
+      // Legacy browsers ignored without setting returnValue.
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => {
+      window.removeEventListener("beforeunload", handler);
+    };
+  }, [isDirty]);
+
   // Build a per-field error map from the latest save result.
   const fieldErrors = React.useMemo(() => {
     if (!saveState || saveState.ok) return {} as Record<string, string>;
@@ -266,9 +306,13 @@ export function DiscordConfigForm({
           id="enabled"
           checked={enabledInput}
           onCheckedChange={setEnabledInput}
-          disabled={!tokenAvailable}
+          disabled={switchDisabled}
         />
-        <Label htmlFor="enabled" className="text-sm font-medium">
+        <Label
+          htmlFor="enabled"
+          className="text-sm font-medium"
+          title={switchTitle}
+        >
           {enabledInput ? "Enabled" : "Disabled"}
         </Label>
       </section>

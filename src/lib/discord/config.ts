@@ -45,7 +45,7 @@ interface DiscordConfigRow {
   updated_at: string;
 }
 
-export async function getDiscordConfig(): Promise<DiscordConfig | null> {
+async function fetchDiscordConfigRow(): Promise<DiscordConfigRow | null> {
   const supabase = createAdminClient();
   // The `get_discord_config` RPC is defined in 0028_natural_vengeance.sql but
   // is not present in Supabase's generated types. Cast the response to the
@@ -59,8 +59,11 @@ export async function getDiscordConfig(): Promise<DiscordConfig | null> {
     throw new Error(`Failed to load Discord config: ${response.error.message}`);
   }
 
-  const rows = response.data ?? [];
-  const row = rows[0];
+  return response.data?.[0] ?? null;
+}
+
+export async function getDiscordConfig(): Promise<DiscordConfig | null> {
+  const row = await fetchDiscordConfigRow();
   if (!row || !row.enabled || !row.bot_token) {
     return null;
   }
@@ -76,4 +79,21 @@ export async function getDiscordConfig(): Promise<DiscordConfig | null> {
       : null,
     updatedAt: new Date(row.updated_at),
   };
+}
+
+/**
+ * Admin-only accessor: returns the saved bot token regardless of the
+ * `enabled` flag. Used by the admin Validate buttons so an admin can probe
+ * the saved token before flipping the integration on (the chicken-and-egg:
+ * env-seeded token + integration starts disabled → admin must validate to
+ * enable, but old getDiscordConfig() refused to surface the token until
+ * enabled was already true).
+ *
+ * SECURITY: Same as getDiscordConfig — server-only; uses the service-role
+ * client to decrypt the Vault secret. Callers must have already checked
+ * the admin permission via verifyIntegrationsAdmin().
+ */
+export async function getDiscordTokenForAdmin(): Promise<string | null> {
+  const row = await fetchDiscordConfigRow();
+  return row?.bot_token ?? null;
 }
