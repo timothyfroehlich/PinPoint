@@ -51,11 +51,20 @@ async function installRedirectInterceptor(page: Page): Promise<void> {
     // Patch Location.prototype.assign — works in WebKit even though
     // window.location.assign as an own property is non-configurable.
     const proto = Object.getPrototypeOf(window.location) as Location;
+    const original = proto.assign;
     Object.defineProperty(proto, "assign", {
-      value: (url: string | URL): void => {
+      value: function patchedAssign(this: Location, url: string | URL): void {
         const href = typeof url === "string" ? url : url.toString();
         w.__E2E_REDIRECT_TARGET = href;
-        // Don't actually navigate — the test driver will navigate via page.goto().
+        // Still invoke the original. In Chromium this triggers natural
+        // navigation (Branch A wins). In WebKit it stalls, so Branch B's
+        // poll picks up __E2E_REDIRECT_TARGET and navigates via page.goto().
+        // A try/catch shields the form's useEffect from any sync throw.
+        try {
+          original.call(this, href);
+        } catch {
+          // ignore — Branch B will pick up the captured target
+        }
       },
       writable: true,
       configurable: true,
@@ -109,10 +118,26 @@ export async function submitFormAndWaitForRedirect(
   const awayFrom = options?.awayFrom ?? new URL(currentUrl).pathname;
   const timeout = options?.timeout ?? 60000; // 60s for WebKit
 
+  // Predicate for "we have left awayFrom". Use exact-pathname comparison so
+  // nested paths like /report/success (the anonymous form's destination) ARE
+  // treated as having navigated away from /report. A startsWith() check would
+  // incorrectly keep waiting in that case.
+  const isAway = (urlObj: URL): boolean => urlObj.pathname !== awayFrom;
+
   // Install the location.assign interceptor BEFORE clicking. The form is
   // already rendered (we're on the same page as the form), so this is safe
   // to apply via page.evaluate().
   await installRedirectInterceptor(page);
+
+  // Coordination flag: only one branch should perform navigation. The first
+  // branch to claim it wins; later branches see claimed === true and skip
+  // their page.goto() call, preventing duplicate / racing navigations.
+  let claimed = false;
+  const claimNavigation = (): boolean => {
+    if (claimed) return false;
+    claimed = true;
+    return true;
+  };
 
   // Branch B: poll for the captured redirect target every 100ms. When the
   // form's useEffect calls window.location.assign(redirectTo), our patch sets
@@ -124,11 +149,19 @@ export async function submitFormAndWaitForRedirect(
   const interceptorNavPromise: Promise<void> = (async () => {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- claimed is mutated from sibling async branches; TS narrows it to false in this scope
+      if (claimed) {
+        // Another branch already navigated. Stop polling.
+        await new Promise<void>(() => undefined);
+        return;
+      }
       const target = await page
         .evaluate(() => window.__E2E_REDIRECT_TARGET ?? null)
         .catch(() => null);
       if (target) {
-        await page.goto(target, { waitUntil: "domcontentloaded" });
+        if (claimNavigation()) {
+          await page.goto(target, { waitUntil: "domcontentloaded" });
+        }
         return;
       }
       await new Promise<void>((r) => {
@@ -156,11 +189,11 @@ export async function submitFormAndWaitForRedirect(
         const match =
           /"redirectTo":"(\/m\/[^/"\\]+\/i\/\d+)"/.exec(body) ??
           /\\"redirectTo\\":\\"(\/m\/[^/"\\]+\/i\/\d+)\\"/.exec(body);
-        if (match?.[1]) {
+        if (match?.[1] && claimNavigation()) {
           await page.goto(match[1], { waitUntil: "domcontentloaded" });
           resolve();
         }
-        // No match: stay quiet, let other branches handle it.
+        // No match (or already claimed): stay quiet, let other branches handle it.
       })
       .catch(() => {
         // waitForResponse timed out: stay quiet.
@@ -170,12 +203,31 @@ export async function submitFormAndWaitForRedirect(
   await submitButton.click();
 
   // Branch A: natural navigation. Use "commit" so we resolve as soon as the
-  // URL commits, without waiting for page load.
-  await Promise.race([
-    page.waitForURL((url) => !url.pathname.startsWith(awayFrom), {
+  // URL commits, without waiting for page load. We claim the navigation slot
+  // when it fires so Branches B/C don't double-navigate.
+  //
+  // The catch handles the case where Branch B/C navigates via page.goto()
+  // while Branch A's waitForURL is in flight — the navigation context detaches
+  // and waitForURL throws "ERR_ABORTED; maybe frame was detached?". By that
+  // point another branch has already navigated, so we treat it as a no-op.
+  const naturalNavPromise = page
+    .waitForURL((url) => isAway(url), {
       timeout,
       waitUntil: "commit",
-    }),
+    })
+    .then(() => {
+      claimNavigation();
+    })
+    .catch((error: unknown) => {
+      if (claimed) {
+        // Another branch won the race and detached the frame — that's fine.
+        return;
+      }
+      throw error;
+    });
+
+  await Promise.race([
+    naturalNavPromise,
     interceptorNavPromise,
     responseNavPromise,
   ]);
@@ -218,7 +270,14 @@ export async function fillReportForm(
   // hydrated silently no-ops the submission — no POST is sent. Waiting for
   // networkidle lets React 19's `<form action={serverAction}>` finish hooking
   // up the action handler before tests interact with it.
-  await page.waitForLoadState("networkidle", { timeout: 15000 });
+  //
+  // Best-effort: in Chromium with HMR connections, networkidle can never
+  // settle. We wrap in try/catch so other browsers proceed after the timeout
+  // instead of failing the test. WebKit, where this matters, reaches
+  // networkidle within a few seconds.
+  await page
+    .waitForLoadState("networkidle", { timeout: 5000 })
+    .catch(() => undefined);
 
   await page.getByLabel("Issue Title *").fill(title);
 

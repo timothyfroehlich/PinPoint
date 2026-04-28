@@ -97,7 +97,11 @@ test.describe("Issues System", () => {
       // Wait for hydration so the search input's React onChange handler is
       // bound — without it, fill() triggers a default browser input event but
       // React's debounced URL update never runs (Mobile Safari/WebKit).
-      await page.waitForLoadState("networkidle");
+      // Best-effort with timeout to handle Chromium HMR keeping the network
+      // busy indefinitely in dev.
+      await page
+        .waitForLoadState("networkidle", { timeout: 5000 })
+        .catch(() => undefined);
 
       const machineSearchInput = page.getByPlaceholder(
         "Search machines by name or initials..."

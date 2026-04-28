@@ -22,8 +22,11 @@ test.describe("Issue List Features", () => {
     // Wait for hydration before interacting with the search form. In Mobile
     // Safari/WebKit, pressing Enter before React has bound the onSubmit handler
     // triggers a default browser form submit (the input has no `name` attr,
-    // so ?q is never set in the URL).
-    await page.waitForLoadState("networkidle");
+    // so ?q is never set in the URL). Best-effort with timeout to handle
+    // Chromium HMR keeping the network busy indefinitely in dev.
+    await page
+      .waitForLoadState("networkidle", { timeout: 5000 })
+      .catch(() => undefined);
 
     // 2. Test Searching
     // Search for Issue 1
