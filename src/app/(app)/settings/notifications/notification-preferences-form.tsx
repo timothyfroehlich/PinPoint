@@ -153,6 +153,51 @@ export function NotificationPreferencesForm({
         </>
       )}
 
+      {/* Preserve Discord preference values when the Discord column is hidden
+          (integration disabled OR user not linked). Without these, missing
+          form fields would be coerced to false on save and silently wipe the
+          user's saved Discord prefs. Mirror of the internal-account email
+          preservation block above. */}
+      {!showDiscord && (
+        <>
+          <input
+            type="hidden"
+            name="discordEnabled"
+            value={preferences.discordEnabled ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="discordNotifyOnAssigned"
+            value={preferences.discordNotifyOnAssigned ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="discordNotifyOnStatusChange"
+            value={preferences.discordNotifyOnStatusChange ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="discordNotifyOnNewComment"
+            value={preferences.discordNotifyOnNewComment ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="discordNotifyOnMentioned"
+            value={preferences.discordNotifyOnMentioned ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="discordNotifyOnNewIssue"
+            value={preferences.discordNotifyOnNewIssue ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="discordWatchNewIssuesGlobal"
+            value={preferences.discordWatchNewIssuesGlobal ? "on" : ""}
+          />
+        </>
+      )}
+
       {/* Main Switches */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">

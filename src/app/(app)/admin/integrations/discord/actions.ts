@@ -121,7 +121,18 @@ async function resolveTokenForValidation(
   typed: string | undefined
 ): Promise<string | null> {
   if (typed && typed.length > 0) return typed;
-  return getDiscordTokenForAdmin();
+  try {
+    return await getDiscordTokenForAdmin();
+  } catch (error) {
+    log.error(
+      {
+        action: "resolveTokenForValidation",
+        error: error instanceof Error ? error.message : "Unknown",
+      },
+      "Failed to read saved Discord token from Vault"
+    );
+    return null;
+  }
 }
 
 // ─── Public actions ────────────────────────────────────────────────────
