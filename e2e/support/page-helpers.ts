@@ -13,16 +13,24 @@
 import type { Page, Locator } from "@playwright/test";
 import { selectOption } from "./actions";
 
-const escapeRegex = (value: string): string =>
-  value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 /**
  * Submit a form and wait for Server Action redirect to complete
  *
- * Safari-specific issues:
- * - Server Action redirects may not trigger immediately
- * - Safari may stay on the current page longer than other browsers
- * - Need explicit wait for URL change, not just network idle
+ * For authenticated users, the /report Server Action returns
+ * `{ success: true, redirectTo: "/m/TAF/i/42" }` in the RSC wire format.
+ * The client form then calls `window.location.assign(redirectTo)`.
+ *
+ * Strategy: Race between two branches:
+ *
+ * Branch A: waitForURL — browser navigates on its own (Chromium/Firefox/fast WebKit)
+ * Branch B: waitForResponse() captures the POST response body and extracts redirectTo
+ *   from the RSC wire format, then calls page.goto() directly. This bypasses
+ *   window.location.assign() for Mobile Safari where WebKit stalls navigation.
+ *
+ * IMPORTANT: waitForResponse() must be set up BEFORE submitButton.click() so that
+ * Playwright is already buffering the response when it arrives. Using page.on('response')
+ * with async response.text() fails in WebKit because the response body stream may be
+ * closed before the async callback can read it.
  *
  * @param page - Playwright Page object
  * @param submitButton - The submit button locator
@@ -36,71 +44,66 @@ export async function submitFormAndWaitForRedirect(
     awayFrom?: string;
     /** Maximum time to wait for redirect (default: 60000ms for Safari) */
     timeout?: number;
-    /** Expected issue title for /report fallback when Safari drops redirect */
+    // expectedIssueTitle is kept for call-site compatibility but no longer used.
+    /** @deprecated No longer used; kept for API compatibility */
     expectedIssueTitle?: string;
   }
 ): Promise<void> {
   const currentUrl = page.url();
   const awayFrom = options?.awayFrom ?? new URL(currentUrl).pathname;
-  const timeout = options?.timeout ?? 60000; // Increased from 30s to 60s for WebKit
-  const expectedIssueTitle = options?.expectedIssueTitle;
-  const actionResponsePromise = page
-    .waitForResponse(
-      (response) => {
-        if (response.request().method() !== "POST") {
-          return false;
+  const timeout = options?.timeout ?? 60000; // 60s for WebKit
+
+  // Branch B: set up waitForResponse BEFORE clicking so Playwright buffers the body.
+  // page.on('response') with async .text() fails in WebKit because the response stream
+  // may be closed before the callback fires. waitForResponse() buffers the full body.
+  //
+  // Filter to the POST that goes to the form's own URL (awayFrom path), not third-party
+  // POSTs (e.g. Cloudflare Turnstile). This ensures we capture the Server Action response.
+  //
+  // This promise only resolves when it successfully navigates (found redirectTo + goto done).
+  // If no redirectTo is found (e.g. anonymous form with server-side redirect), this promise
+  // never resolves, so Branch A (waitForURL) wins the race instead.
+  const responseNavPromise: Promise<void> = new Promise<void>((resolve) => {
+    void page
+      .waitForResponse(
+        (r) =>
+          r.request().method() === "POST" &&
+          new URL(r.url()).pathname.startsWith(awayFrom),
+        { timeout }
+      )
+      .then(async (response) => {
+        const body = await response.text();
+        const match =
+          /"redirectTo":"(\/m\/[^/"\\]+\/i\/\d+)"/.exec(body) ??
+          /\\"redirectTo\\":\\"(\/m\/[^/"\\]+\/i\/\d+)\\"/.exec(body);
+        if (match?.[1]) {
+          // Found redirectTo in RSC wire format — navigate directly via Playwright.
+          // This bypasses window.location.assign() which stalls in Mobile Safari.
+          await page.goto(match[1], { waitUntil: "domcontentloaded" });
+          resolve();
         }
-        return new URL(response.url()).pathname.startsWith(awayFrom);
-      },
-      { timeout }
-    )
-    .catch(() => null);
+        // If no redirectTo found (e.g. anonymous form redirect), Branch A handles it.
+        // Do NOT resolve here — let Branch A win the race.
+      })
+      .catch(() => {
+        // If waitForResponse times out or fails, Branch A is already racing.
+        // Do NOT resolve — let Branch A handle navigation detection.
+      });
+  });
 
   await submitButton.click();
 
-  try {
-    // Wait for URL to change away from current page.
-    // This is more reliable than waitForLoadState for Safari Server Actions.
-    await page.waitForURL((url) => !url.pathname.startsWith(awayFrom), {
+  // Branch A: wait for the browser to navigate away from awayFrom naturally.
+  // Branch B runs concurrently via the response promise established above.
+  // Use "commit" so waitForURL resolves as soon as the URL commits,
+  // without waiting for page resources (prevents stalling in Mobile Safari).
+  await Promise.race([
+    page.waitForURL((url) => !url.pathname.startsWith(awayFrom), {
       timeout,
-    });
-    return;
-  } catch (error) {
-    // If Safari dropped the redirect but the Server Action response contains
-    // the destination issue URL, navigate there directly.
-    const actionResponse = await actionResponsePromise;
-    if (actionResponse) {
-      const responseBody = await actionResponse.text();
-      const redirectToMatch =
-        responseBody.match(/"redirectTo":"(\/m\/[^/"\\]+\/i\/\d+)"/) ??
-        responseBody.match(/\\"redirectTo\\":\\"(\/m\/[^/"\\]+\/i\/\d+)\\"/);
-      if (redirectToMatch?.[1]) {
-        await page.goto(redirectToMatch[1]);
-        return;
-      }
-    }
-
-    // Safari/WebKit can drop the client redirect even when issue creation succeeds.
-    // If we have an expected title and we're still on /report, use the freshly-added
-    // "Recent Issues" item as a deterministic fallback path to the created issue.
-    if (awayFrom === "/report" && expectedIssueTitle) {
-      const issueLink = page
-        .getByRole("link", {
-          name: new RegExp(
-            `^View issue: ${escapeRegex(expectedIssueTitle)}\\s-\\s`
-          ),
-        })
-        .first();
-      await issueLink.waitFor({ state: "visible", timeout: 15000 });
-      const href = await issueLink.getAttribute("href");
-      if (href) {
-        await page.goto(href);
-        return;
-      }
-    }
-
-    throw error;
-  }
+      waitUntil: "commit",
+    }),
+    responseNavPromise,
+  ]);
 }
 
 /**
