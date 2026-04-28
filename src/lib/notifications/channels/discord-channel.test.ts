@@ -3,18 +3,26 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("~/lib/discord/client", () => ({
   sendDm: vi.fn(),
 }));
-vi.mock("~/lib/discord/config", () => ({
-  getDiscordConfig: vi.fn(),
-}));
 vi.mock("~/lib/url", () => ({ getSiteUrl: () => "https://app.example.com" }));
 vi.mock("~/lib/logger", () => ({
   log: { warn: vi.fn(), error: vi.fn(), debug: vi.fn(), info: vi.fn() },
 }));
 
-import { discordChannel } from "./discord-channel";
+import { createDiscordChannel } from "./discord-channel";
+import type { DiscordConfig } from "~/lib/discord/config";
 import type { NotificationPreferencesRow, ChannelContext } from "./types";
 import { sendDm } from "~/lib/discord/client";
-import { getDiscordConfig } from "~/lib/discord/config";
+
+const MOCK_CONFIG: DiscordConfig = {
+  enabled: true,
+  botToken: "tok",
+  guildId: "g",
+  inviteLink: null,
+  botHealthStatus: "healthy",
+  lastBotCheckAt: null,
+  updatedAt: new Date(),
+};
+const channel = createDiscordChannel(MOCK_CONFIG);
 
 function prefs(
   overrides: Partial<NotificationPreferencesRow> = {}
@@ -72,30 +80,18 @@ function ctx(overrides: Partial<ChannelContext> = {}): ChannelContext {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(getDiscordConfig).mockResolvedValue({
-    enabled: true,
-    botToken: "tok",
-    guildId: "g",
-    inviteLink: null,
-    botHealthStatus: "healthy",
-    lastBotCheckAt: null,
-    updatedAt: new Date(),
-  });
 });
 
 describe("discordChannel.shouldDeliver", () => {
   it("returns false when main switch off", () => {
     expect(
-      discordChannel.shouldDeliver(
-        prefs({ discordEnabled: false }),
-        "issue_assigned"
-      )
+      channel.shouldDeliver(prefs({ discordEnabled: false }), "issue_assigned")
     ).toBe(false);
   });
 
   it("respects per-event toggle", () => {
     expect(
-      discordChannel.shouldDeliver(
+      channel.shouldDeliver(
         prefs({ discordNotifyOnAssigned: false }),
         "issue_assigned"
       )
@@ -104,7 +100,7 @@ describe("discordChannel.shouldDeliver", () => {
 
   it("forces machine_ownership_changed even if per-event off (parity with email)", () => {
     expect(
-      discordChannel.shouldDeliver(
+      channel.shouldDeliver(
         prefs({ discordNotifyOnMachineOwnershipChange: false }),
         "machine_ownership_changed"
       )
@@ -113,7 +109,7 @@ describe("discordChannel.shouldDeliver", () => {
 
   it("returns false when discordDmBlockedAt is set", () => {
     expect(
-      discordChannel.shouldDeliver(
+      channel.shouldDeliver(
         prefs({ discordDmBlockedAt: new Date() }),
         "issue_assigned"
       )
@@ -122,7 +118,7 @@ describe("discordChannel.shouldDeliver", () => {
 
   it("falls back to global watch flag for new_issue", () => {
     expect(
-      discordChannel.shouldDeliver(
+      channel.shouldDeliver(
         prefs({
           discordNotifyOnNewIssue: false,
           discordWatchNewIssuesGlobal: true,
@@ -135,21 +131,14 @@ describe("discordChannel.shouldDeliver", () => {
 
 describe("discordChannel.deliver", () => {
   it("returns skipped when user has no discord_user_id", async () => {
-    const result = await discordChannel.deliver(ctx({ discordUserId: null }));
-    expect(result).toEqual({ ok: false, reason: "skipped" });
-    expect(sendDm).not.toHaveBeenCalled();
-  });
-
-  it("returns skipped when integration not configured", async () => {
-    vi.mocked(getDiscordConfig).mockResolvedValueOnce(null);
-    const result = await discordChannel.deliver(ctx());
+    const result = await channel.deliver(ctx({ discordUserId: null }));
     expect(result).toEqual({ ok: false, reason: "skipped" });
     expect(sendDm).not.toHaveBeenCalled();
   });
 
   it("calls sendDm with formatted body and returns ok on success", async () => {
     vi.mocked(sendDm).mockResolvedValueOnce({ ok: true });
-    const result = await discordChannel.deliver(ctx());
+    const result = await channel.deliver(ctx());
     expect(result).toEqual({ ok: true });
     expect(sendDm).toHaveBeenCalledWith({
       botToken: "tok",
@@ -163,7 +152,7 @@ describe("discordChannel.deliver", () => {
       ok: false,
       reason: "blocked",
     });
-    const result = await discordChannel.deliver(ctx());
+    const result = await channel.deliver(ctx());
     expect(result).toEqual({ ok: false, reason: "permanent" });
   });
 
@@ -172,7 +161,7 @@ describe("discordChannel.deliver", () => {
       ok: false,
       reason: "transient",
     });
-    const result = await discordChannel.deliver(ctx());
+    const result = await channel.deliver(ctx());
     expect(result).toEqual({ ok: false, reason: "transient" });
   });
 
@@ -181,7 +170,7 @@ describe("discordChannel.deliver", () => {
       ok: false,
       reason: "not_configured",
     });
-    const result = await discordChannel.deliver(ctx());
+    const result = await channel.deliver(ctx());
     expect(result).toEqual({ ok: false, reason: "skipped" });
   });
 });

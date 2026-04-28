@@ -124,7 +124,8 @@ export async function createNotification(
       where: (prefs, { or, eq }) =>
         or(
           eq(prefs.emailWatchNewIssuesGlobal, true),
-          eq(prefs.inAppWatchNewIssuesGlobal, true)
+          eq(prefs.inAppWatchNewIssuesGlobal, true),
+          eq(prefs.discordWatchNewIssuesGlobal, true)
         ),
     });
 
