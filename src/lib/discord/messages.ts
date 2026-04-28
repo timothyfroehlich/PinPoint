@@ -1,5 +1,7 @@
 import type { NotificationType } from "~/lib/notifications/dispatch";
 
+const DISCORD_MAX_MESSAGE_LENGTH = 2000;
+
 export interface DiscordMessageInput {
   type: NotificationType;
   siteUrl: string;
@@ -16,7 +18,16 @@ export function formatDiscordMessage(input: DiscordMessageInput): string {
   const link = buildResourceLink(input);
   const body = buildBody(input);
   const footer = `Manage notifications: ${input.siteUrl}/settings/notifications`;
-  return `${body}\n${link}\n\n${footer}`;
+  const suffix = `\n${link}\n\n${footer}`;
+
+  // Truncate body if the assembled message would exceed Discord's 2000-char
+  // hard limit. The link and footer are auxiliary metadata users rely on, so
+  // we preserve them and trim the body instead.
+  const bodyBudget = DISCORD_MAX_MESSAGE_LENGTH - suffix.length;
+  const safeBody =
+    body.length <= bodyBudget ? body : body.slice(0, bodyBudget - 1) + "…";
+
+  return `${safeBody}${suffix}`;
 }
 
 function buildResourceLink(input: DiscordMessageInput): string {
@@ -27,15 +38,16 @@ function buildResourceLink(input: DiscordMessageInput): string {
 }
 
 function buildBody(input: DiscordMessageInput): string {
-  const id = input.formattedIssueId ?? "";
-  const title = input.issueTitle ?? "";
-  const machine = input.machineName ?? "a machine";
+  const id = sanitize(input.formattedIssueId ?? "");
+  const title = sanitize(input.issueTitle ?? "");
+  const machine = sanitize(input.machineName ?? "a machine");
+  const status = sanitize(input.newStatus ?? "updated");
 
   switch (input.type) {
     case "issue_assigned":
       return `You were assigned ${id} — ${title}`;
     case "issue_status_changed":
-      return `${id} — ${title} is now ${input.newStatus ?? "updated"}`;
+      return `${id} — ${title} is now ${status}`;
     case "new_comment":
       return `New comment on ${id} — ${title}`;
     case "new_issue":
@@ -45,4 +57,26 @@ function buildBody(input: DiscordMessageInput): string {
     case "machine_ownership_changed":
       return `Ownership changed for ${machine}`;
   }
+}
+
+/**
+ * Make user-supplied content safe to interpolate into a Discord message.
+ *
+ * Discord renders message content as Markdown and parses mentions
+ * (`@everyone`, `@here`, `<@USER_ID>`, `<#CHANNEL_ID>`, `<@&ROLE_ID>`).
+ * Without escaping, an issue title containing `@everyone` would ping every
+ * member of any guild the bot is a member of, and titles like `**foo**`
+ * would render formatted.
+ *
+ * Strategy:
+ *   - Insert a zero-width space after `@` to break mention parsing while
+ *     keeping the message readable.
+ *   - Backslash-escape Markdown control characters so they render literally.
+ */
+const ZERO_WIDTH_SPACE = "\u200B";
+
+function sanitize(value: string): string {
+  return value
+    .replace(/@/g, `@${ZERO_WIDTH_SPACE}`)
+    .replace(/[\\*_~`|>]/g, (m) => `\\${m}`);
 }

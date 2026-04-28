@@ -55,4 +55,93 @@ describe("formatDiscordMessage", () => {
     expect(out).toContain("TWD-03");
     expect(out).toContain("Resolved");
   });
+
+  it("breaks @everyone / @here so they don't ping", () => {
+    const out = formatDiscordMessage({
+      type: "issue_assigned",
+      siteUrl: "https://app.example.com",
+      issueTitle: "@everyone please look at this @here",
+      formattedIssueId: "X-1",
+      resourceType: "issue",
+      resourceId: "i1",
+      machineName: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
+    });
+
+    expect(out).not.toMatch(/(^|\s)@everyone(\s|$)/);
+    expect(out).not.toMatch(/(^|\s)@here(\s|$)/);
+    // Each `@` is followed by a U+200B zero-width space.
+    expect(out).toMatch(/@\u200Beveryone/);
+    expect(out).toMatch(/@\u200Bhere/);
+  });
+
+  it("escapes Markdown control characters in user-supplied content", () => {
+    const out = formatDiscordMessage({
+      type: "issue_assigned",
+      siteUrl: "https://app.example.com",
+      issueTitle: "**bold** _italic_ `code` ~strike~ |spoiler| > quote \\back",
+      formattedIssueId: "X-1",
+      resourceType: "issue",
+      resourceId: "i1",
+      machineName: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
+    });
+
+    // None of the raw Markdown markers should appear unescaped in the body.
+    for (const marker of [
+      "**",
+      "_italic_",
+      "`code`",
+      "~strike~",
+      "|spoiler|",
+    ]) {
+      expect(out).not.toContain(marker);
+    }
+    // Backslash-escaped versions should be present.
+    expect(out).toContain("\\*\\*bold\\*\\*");
+    expect(out).toContain("\\_italic\\_");
+  });
+
+  it("does not escape characters in the link or footer", () => {
+    const out = formatDiscordMessage({
+      type: "new_issue",
+      siteUrl: "https://app.example.com",
+      issueTitle: "ok",
+      formattedIssueId: "X-1",
+      resourceType: "issue",
+      resourceId: "i1",
+      machineName: "Whitewater",
+      newStatus: undefined,
+      commentContent: undefined,
+    });
+
+    expect(out).toContain("https://app.example.com/issues/i1");
+    expect(out).toContain(
+      "Manage notifications: https://app.example.com/settings/notifications"
+    );
+  });
+
+  it("truncates the body to keep total length ≤ 2000 chars", () => {
+    const out = formatDiscordMessage({
+      type: "new_comment",
+      siteUrl: "https://app.example.com",
+      issueTitle: "x".repeat(5000),
+      formattedIssueId: "X-1",
+      resourceType: "issue",
+      resourceId: "i1",
+      machineName: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
+    });
+
+    expect(out.length).toBeLessThanOrEqual(2000);
+    // Link and footer both preserved.
+    expect(out).toContain("https://app.example.com/issues/i1");
+    expect(out).toContain("/settings/notifications");
+    // Body was truncated — should end the body section with an ellipsis
+    // before the link starts.
+    expect(out).toMatch(/…\nhttps:\/\/app\.example\.com\/issues\/i1/);
+  });
 });

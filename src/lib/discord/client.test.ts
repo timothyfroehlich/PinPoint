@@ -85,10 +85,45 @@ describe("sendDm", () => {
     expect(attempt).toBe(2);
   });
 
-  it("returns reason='blocked' on 403", async () => {
+  it("returns reason='blocked' on 403 with Discord code 50007 (cannot DM user)", async () => {
     installFetchMock((call) =>
       call.url.endsWith("/users/@me/channels")
-        ? new Response("{}", { status: 403 })
+        ? new Response(
+            JSON.stringify({ code: 50007, message: "Cannot send messages" }),
+            { status: 403 }
+          )
+        : new Response("{}", { status: 200 })
+    );
+    const result = await sendDm({
+      botToken: "t",
+      discordUserId: "u",
+      content: "hi",
+    });
+    expect(result).toEqual({ ok: false, reason: "blocked" });
+  });
+
+  it("returns reason='transient' on 403 with a non-50007 code (bot misconfig)", async () => {
+    // 50001 = Missing Access — admin can fix, not the user's fault.
+    installFetchMock((call) =>
+      call.url.endsWith("/users/@me/channels")
+        ? new Response(
+            JSON.stringify({ code: 50001, message: "Missing Access" }),
+            { status: 403 }
+          )
+        : new Response("{}", { status: 200 })
+    );
+    const result = await sendDm({
+      botToken: "t",
+      discordUserId: "u",
+      content: "hi",
+    });
+    expect(result).toEqual({ ok: false, reason: "transient" });
+  });
+
+  it("returns reason='blocked' on 404 (DM channel does not exist)", async () => {
+    installFetchMock((call) =>
+      call.url.endsWith("/users/@me/channels")
+        ? new Response("{}", { status: 404 })
         : new Response("{}", { status: 200 })
     );
     const result = await sendDm({

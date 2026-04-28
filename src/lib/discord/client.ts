@@ -37,7 +37,7 @@ async function openDmChannel(
     headers: authHeaders(botToken),
     body: JSON.stringify({ recipient_id: recipientId }),
   });
-  if (!res.ok) return { ok: false, result: classify(res) };
+  if (!res.ok) return { ok: false, result: await classify(res) };
 
   const json = (await res.json()) as { id?: string };
   if (!json.id)
@@ -68,9 +68,22 @@ async function postMessage(
   return { ok: true };
 }
 
-function classify(res: Response): SendDmResult {
-  if (res.status === 403 || res.status === 404) {
-    return { ok: false, reason: "blocked" };
+/**
+ * Discord error code 50007: "Cannot send messages to this user". Returned
+ * when the recipient has DMs disabled, blocked the bot, or doesn't share a
+ * server with the bot. Other 403s (e.g., 50001 "Missing Access") indicate
+ * bot misconfiguration that an admin can fix — those are transient from
+ * our perspective.
+ */
+const DISCORD_ERROR_CANNOT_DM_USER = 50007;
+
+async function classify(res: Response): Promise<SendDmResult> {
+  if (res.status === 404) return { ok: false, reason: "blocked" };
+  if (res.status === 403) {
+    const code = await readDiscordErrorCode(res);
+    return code === DISCORD_ERROR_CANNOT_DM_USER
+      ? { ok: false, reason: "blocked" }
+      : { ok: false, reason: "transient" };
   }
   if (res.status === 429) return { ok: false, reason: "rate_limited" };
   log.warn(
@@ -78,6 +91,15 @@ function classify(res: Response): SendDmResult {
     "Discord API non-2xx"
   );
   return { ok: false, reason: "transient" };
+}
+
+async function readDiscordErrorCode(res: Response): Promise<number | null> {
+  try {
+    const body = (await res.json()) as { code?: number };
+    return typeof body.code === "number" ? body.code : null;
+  } catch {
+    return null;
+  }
 }
 
 async function safeFetch(url: string, init: RequestInit): Promise<Response> {
