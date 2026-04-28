@@ -278,12 +278,11 @@ export async function changePasswordAction(
   // Rate-limit password change attempts per account (reuses login account limiter)
   const accountLimit = await checkLoginAccountLimit(user.email ?? user.id);
   if (!accountLimit.success) {
-    return serverActionError(
-      new Error("Change password rate limit exceeded"),
-      "SERVER",
-      "Too many attempts. Please try again later.",
-      { userId: user.id, action: "changePasswordRateLimit" }
+    log.warn(
+      { userId: user.id, action: "changePasswordRateLimit" },
+      "Change password rate limit exceeded"
     );
+    return err("SERVER", "Too many attempts. Please try again later.");
   }
 
   try {
