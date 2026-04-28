@@ -19,6 +19,11 @@ test.describe("Issue List Features", () => {
     const title2 = seededIssues.TAF[1].title;
 
     await page.goto("/issues");
+    // Wait for hydration before interacting with the search form. In Mobile
+    // Safari/WebKit, pressing Enter before React has bound the onSubmit handler
+    // triggers a default browser form submit (the input has no `name` attr,
+    // so ?q is never set in the URL).
+    await page.waitForLoadState("networkidle");
 
     // 2. Test Searching
     // Search for Issue 1

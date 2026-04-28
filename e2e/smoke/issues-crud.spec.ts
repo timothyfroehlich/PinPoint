@@ -30,6 +30,7 @@ const rememberIssueId = (page: Page): void => {
 
 test.describe("Issues System", () => {
   test.use({ storageState: STORAGE_STATE.member });
+  // eslint-disable-next-line no-empty-pattern -- Playwright requires destructuring pattern for first arg
   test.beforeEach(({}, testInfo) => {
     // Mobile Safari can take longer to settle Server Action redirects.
     test.setTimeout(
@@ -93,6 +94,10 @@ test.describe("Issues System", () => {
       await expect(
         page.getByRole("heading", { name: "Machines" })
       ).toBeVisible();
+      // Wait for hydration so the search input's React onChange handler is
+      // bound — without it, fill() triggers a default browser input event but
+      // React's debounced URL update never runs (Mobile Safari/WebKit).
+      await page.waitForLoadState("networkidle");
 
       const machineSearchInput = page.getByPlaceholder(
         "Search machines by name or initials..."

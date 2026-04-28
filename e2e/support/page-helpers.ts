@@ -13,24 +13,80 @@
 import type { Page, Locator } from "@playwright/test";
 import { selectOption } from "./actions";
 
+declare global {
+  interface Window {
+    __E2E_REDIRECT_TARGET?: string;
+  }
+}
+
+/**
+ * Install a monkey-patch on Location.prototype.assign that captures the
+ * redirect target into window.__E2E_REDIRECT_TARGET instead of triggering
+ * navigation. The unified report form's useEffect calls
+ * `window.location.assign(state.redirectTo)` after a successful Server Action,
+ * but Mobile Safari/WebKit stalls navigation triggered by location.assign
+ * during/after a Server Action POST. By intercepting it, we sidestep the
+ * navigation stall entirely and use Playwright's page.goto() instead.
+ *
+ * Why patch the prototype instead of the instance: in WebKit,
+ * `window.location.assign` is non-configurable (`Object.defineProperty`
+ * throws "Attempting to change configurable attribute of unconfigurable
+ * property"). The Location.prototype, however, IS patchable, and
+ * `instance.assign(url)` resolves through prototype lookup if the instance
+ * property is not its own. We override `Location.prototype.assign` directly.
+ *
+ * Idempotent: safe to call multiple times in the same context. Always clears
+ * any previously captured target so each form submission starts fresh.
+ */
+async function installRedirectInterceptor(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    interface PatchedWindow extends Window {
+      __E2E_REDIRECT_PATCHED?: boolean;
+    }
+    const w = window as PatchedWindow;
+    // Always reset the captured target so each click starts with a clean slate.
+    w.__E2E_REDIRECT_TARGET = undefined;
+    if (w.__E2E_REDIRECT_PATCHED) return;
+    w.__E2E_REDIRECT_PATCHED = true;
+    // Patch Location.prototype.assign — works in WebKit even though
+    // window.location.assign as an own property is non-configurable.
+    const proto = Object.getPrototypeOf(window.location) as Location;
+    Object.defineProperty(proto, "assign", {
+      value: (url: string | URL): void => {
+        const href = typeof url === "string" ? url : url.toString();
+        w.__E2E_REDIRECT_TARGET = href;
+        // Don't actually navigate — the test driver will navigate via page.goto().
+      },
+      writable: true,
+      configurable: true,
+    });
+  });
+}
+
 /**
  * Submit a form and wait for Server Action redirect to complete
  *
  * For authenticated users, the /report Server Action returns
  * `{ success: true, redirectTo: "/m/TAF/i/42" }` in the RSC wire format.
- * The client form then calls `window.location.assign(redirectTo)`.
+ * The client form's useEffect then calls `window.location.assign(redirectTo)`.
  *
- * Strategy: Race between two branches:
+ * Strategy: Three concurrent branches racing in Promise.race:
  *
- * Branch A: waitForURL — browser navigates on its own (Chromium/Firefox/fast WebKit)
- * Branch B: waitForResponse() captures the POST response body and extracts redirectTo
- *   from the RSC wire format, then calls page.goto() directly. This bypasses
- *   window.location.assign() for Mobile Safari where WebKit stalls navigation.
+ * Branch A (waitForURL): browser navigates on its own (Chromium / Firefox /
+ *   fast WebKit). Fast path for non-WebKit browsers and anonymous forms (which
+ *   use server-side `redirect()` rather than client-side location.assign).
  *
- * IMPORTANT: waitForResponse() must be set up BEFORE submitButton.click() so that
- * Playwright is already buffering the response when it arrives. Using page.on('response')
- * with async response.text() fails in WebKit because the response body stream may be
- * closed before the async callback can read it.
+ * Branch B (interceptor poll): we monkey-patch window.location.assign before
+ *   clicking. When the form's useEffect calls it, we capture the URL into
+ *   window.__E2E_REDIRECT_TARGET instead of triggering navigation. We then
+ *   poll for that global and call page.goto() directly. This bypasses Mobile
+ *   Safari's location.assign stall entirely.
+ *
+ * Branch C (waitForResponse): fallback that captures the POST response body
+ *   and looks for redirectTo in the RSC wire format. waitForResponse() buffers
+ *   the full body before resolving, which is essential in WebKit (the
+ *   page.on('response') event with async .text() loses the body to a closed
+ *   stream).
  *
  * @param page - Playwright Page object
  * @param submitButton - The submit button locator
@@ -53,16 +109,40 @@ export async function submitFormAndWaitForRedirect(
   const awayFrom = options?.awayFrom ?? new URL(currentUrl).pathname;
   const timeout = options?.timeout ?? 60000; // 60s for WebKit
 
-  // Branch B: set up waitForResponse BEFORE clicking so Playwright buffers the body.
-  // page.on('response') with async .text() fails in WebKit because the response stream
-  // may be closed before the callback fires. waitForResponse() buffers the full body.
-  //
-  // Filter to the POST that goes to the form's own URL (awayFrom path), not third-party
-  // POSTs (e.g. Cloudflare Turnstile). This ensures we capture the Server Action response.
-  //
-  // This promise only resolves when it successfully navigates (found redirectTo + goto done).
-  // If no redirectTo is found (e.g. anonymous form with server-side redirect), this promise
-  // never resolves, so Branch A (waitForURL) wins the race instead.
+  // Install the location.assign interceptor BEFORE clicking. The form is
+  // already rendered (we're on the same page as the form), so this is safe
+  // to apply via page.evaluate().
+  await installRedirectInterceptor(page);
+
+  // Branch B: poll for the captured redirect target every 100ms. When the
+  // form's useEffect calls window.location.assign(redirectTo), our patch sets
+  // window.__E2E_REDIRECT_TARGET. We then call page.goto() to perform the
+  // actual navigation, bypassing Mobile Safari's location.assign stall.
+  // We use a setTimeout-based delay rather than page.waitForTimeout because
+  // ESLint forbids waitForTimeout (Playwright auto-wait is preferred for app
+  // assertions, but here we genuinely need a fixed poll interval).
+  const interceptorNavPromise: Promise<void> = (async () => {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      const target = await page
+        .evaluate(() => window.__E2E_REDIRECT_TARGET ?? null)
+        .catch(() => null);
+      if (target) {
+        await page.goto(target, { waitUntil: "domcontentloaded" });
+        return;
+      }
+      await new Promise<void>((r) => {
+        setTimeout(r, 100);
+      });
+    }
+    // Timeout: never resolve. Let other branches win the race.
+    await new Promise<void>(() => undefined);
+  })();
+
+  // Branch C: response body fallback. Filter to the POST that goes to the
+  // form's own URL (awayFrom path), not third-party POSTs. waitForResponse()
+  // buffers the full body before resolving, which is essential in WebKit
+  // (page.on('response') with async .text() loses the body to a closed stream).
   const responseNavPromise: Promise<void> = new Promise<void>((resolve) => {
     void page
       .waitForResponse(
@@ -77,31 +157,26 @@ export async function submitFormAndWaitForRedirect(
           /"redirectTo":"(\/m\/[^/"\\]+\/i\/\d+)"/.exec(body) ??
           /\\"redirectTo\\":\\"(\/m\/[^/"\\]+\/i\/\d+)\\"/.exec(body);
         if (match?.[1]) {
-          // Found redirectTo in RSC wire format — navigate directly via Playwright.
-          // This bypasses window.location.assign() which stalls in Mobile Safari.
           await page.goto(match[1], { waitUntil: "domcontentloaded" });
           resolve();
         }
-        // If no redirectTo found (e.g. anonymous form redirect), Branch A handles it.
-        // Do NOT resolve here — let Branch A win the race.
+        // No match: stay quiet, let other branches handle it.
       })
       .catch(() => {
-        // If waitForResponse times out or fails, Branch A is already racing.
-        // Do NOT resolve — let Branch A handle navigation detection.
+        // waitForResponse timed out: stay quiet.
       });
   });
 
   await submitButton.click();
 
-  // Branch A: wait for the browser to navigate away from awayFrom naturally.
-  // Branch B runs concurrently via the response promise established above.
-  // Use "commit" so waitForURL resolves as soon as the URL commits,
-  // without waiting for page resources (prevents stalling in Mobile Safari).
+  // Branch A: natural navigation. Use "commit" so we resolve as soon as the
+  // URL commits, without waiting for page load.
   await Promise.race([
     page.waitForURL((url) => !url.pathname.startsWith(awayFrom), {
       timeout,
       waitUntil: "commit",
     }),
+    interceptorNavPromise,
     responseNavPromise,
   ]);
 }
@@ -137,6 +212,13 @@ export async function fillReportForm(
     includePriority = true,
     watchIssue = true,
   } = options;
+
+  // Wait for the page to settle (hydration + dynamic chunk loads). In Mobile
+  // Safari/WebKit, clicking the submit button before the form is fully
+  // hydrated silently no-ops the submission — no POST is sent. Waiting for
+  // networkidle lets React 19's `<form action={serverAction}>` finish hooking
+  // up the action handler before tests interact with it.
+  await page.waitForLoadState("networkidle", { timeout: 15000 });
 
   await page.getByLabel("Issue Title *").fill(title);
 
