@@ -1,20 +1,34 @@
 import { z } from "zod";
 
 /**
- * Update config fields — everything except the bot token itself.
+ * Save the full Discord integration config in one action.
  *
- * `guildId` and `inviteLink` may be empty strings (cleared). We coerce
- * empty strings to null on the server side before writing.
+ * `newToken` is optional: empty (or absent) means "no change to saved token";
+ * a non-empty value means "rotate to this on save." `guildId` is required
+ * because the dispatcher needs it to verify server membership before sending
+ * a DM. `inviteLink` is optional and may be empty (we coerce empty to null
+ * on write).
  */
-export const updateDiscordConfigSchema = z.object({
+export const saveDiscordConfigSchema = z.object({
   enabled: z.boolean(),
+  newToken: z
+    .string()
+    .trim()
+    .optional()
+    .refine(
+      (v) => v === undefined || v === "" || (v.length >= 50 && v.length <= 128),
+      "Token looks the wrong length"
+    )
+    .refine(
+      (v) => v === undefined || v === "" || /^[A-Za-z0-9._-]+$/.test(v),
+      "Token contains invalid characters"
+    ),
   guildId: z
     .string()
     .trim()
+    .min(1, "Server ID is required")
     .max(64)
-    .regex(/^\d*$/, "Guild ID must be numeric")
-    .optional()
-    .default(""),
+    .regex(/^\d+$/, "Server ID must be numeric"),
   inviteLink: z
     .string()
     .trim()
@@ -30,23 +44,21 @@ export const updateDiscordConfigSchema = z.object({
     .default(""),
 });
 
-export type UpdateDiscordConfigInput = z.infer<
-  typeof updateDiscordConfigSchema
->;
+export type SaveDiscordConfigInput = z.infer<typeof saveDiscordConfigSchema>;
 
 /**
- * Rotate the bot token. Separate action because it touches Vault.
+ * Validate-only Server ID input — used by the inline Validate button on the
+ * server-id field. The bot token comes from the form (typed value, optional)
+ * or falls back to the saved Vault token at runtime.
  */
-export const rotateBotTokenSchema = z.object({
-  // Discord bot tokens are 59-72 chars, alnum + dots/underscores/hyphens.
-  // We accept a broad range because Discord has quietly changed the format
-  // before. Empty string is rejected — use a different flow to clear.
-  newToken: z
+export const validateServerIdSchema = z.object({
+  serverId: z
     .string()
     .trim()
-    .min(50, "Token looks too short")
-    .max(128, "Token looks too long")
-    .regex(/^[A-Za-z0-9._-]+$/, "Token contains invalid characters"),
+    .min(1, "Server ID is required")
+    .max(64)
+    .regex(/^\d+$/, "Server ID must be numeric"),
+  newToken: z.string().trim().optional(),
 });
 
-export type RotateBotTokenInput = z.infer<typeof rotateBotTokenSchema>;
+export type ValidateServerIdInput = z.infer<typeof validateServerIdSchema>;

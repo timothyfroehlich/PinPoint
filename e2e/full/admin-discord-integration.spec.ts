@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions.js";
 import {
   createTestUser,
-  deleteTestUser,
+  disableDiscordIntegration,
   updateUserRole,
 } from "../support/supabase-admin.js";
 
@@ -16,10 +16,13 @@ test.describe("Admin Discord Integration", () => {
     const adminUser = await createTestUser(adminEmail);
     adminId = adminUser.id;
     await updateUserRole(adminId, "admin");
-  });
 
-  test.afterAll(async () => {
-    await deleteTestUser(adminId);
+    // Ensure a clean baseline: no bot token, integration disabled. Seed
+    // (db:_seed-discord) may have populated the row from env vars; this
+    // makes the "switch disabled when no token" assertion below deterministic.
+    await disableDiscordIntegration().catch(() => {
+      // Tolerable if singleton row already matches.
+    });
   });
 
   test("admin can navigate to the Discord integration page via the user menu", async ({
@@ -46,19 +49,27 @@ test.describe("Admin Discord Integration", () => {
 
     // Form fields should be present.
     await expect(page.getByLabel("Bot token")).toBeVisible();
-    await expect(page.getByLabel("Guild ID (Discord server)")).toBeVisible();
+    await expect(page.getByLabel("Server ID")).toBeVisible();
     await expect(page.getByLabel("Invite link")).toBeVisible();
 
-    // The Enabled switch is disabled until a bot token is set — this is the
-    // invariant we enforce in the config form.
-    const enabledSwitch = page.getByRole("switch", {
-      name: /integration enabled/i,
-    });
+    // Inline Validate buttons exist for both token and server fields.
+    // (Two buttons named "Validate" — one per field.)
+    await expect(page.getByRole("button", { name: "Validate" })).toHaveCount(2);
+
+    // The activation switch is disabled until a bot token is in the form
+    // (typed or saved in DB). On a fresh page load with no DB token and an
+    // empty input, the switch must be disabled. Its label flips between
+    // "Enabled" and "Disabled" based on state — start of "Disabled".
+    const enabledSwitch = page.getByRole("switch");
     await expect(enabledSwitch).toBeVisible();
     await expect(enabledSwitch).toBeDisabled();
+    await expect(page.getByText("Disabled")).toBeVisible();
+
+    // Save / Reset footer present.
     await expect(
-      page.getByText("Set a bot token above before enabling.")
+      page.getByRole("button", { name: "Save changes" })
     ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reset" })).toBeVisible();
   });
 
   test("User Management link in the user menu lands on /admin/users", async ({
