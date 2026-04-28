@@ -1,7 +1,7 @@
+import "server-only";
 import { Buffer } from "node:buffer";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import sanitizeHtml from "sanitize-html";
-import { sendEmail } from "~/lib/email/client";
 import { log } from "~/lib/logger";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getSiteUrl } from "~/lib/url";
@@ -12,6 +12,37 @@ import type {
   DeliveryResult,
 } from "./types";
 import type { NotificationType } from "~/lib/notifications/dispatch";
+
+/**
+ * Strict sanitization policy for email notifications.
+ * Prevents remote images, tracking pixels, and complex HTML.
+ */
+const EMAIL_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: [
+    "h2",
+    "h3",
+    "p",
+    "ul",
+    "ol",
+    "li",
+    "strong",
+    "em",
+    "b",
+    "i",
+    "a",
+    "span",
+    "br",
+    "blockquote",
+    "hr",
+    "code",
+    "pre",
+    "s",
+  ],
+  allowedAttributes: {
+    a: ["href"],
+    span: ["style"],
+  },
+};
 
 /**
  * Generate an HMAC-signed unsubscribe token for a user.
@@ -118,37 +149,41 @@ export function getEmailHtml({
       body = "You have been assigned to this issue.";
       break;
     case "issue_status_changed":
-      body = `Status changed to: <strong>${newStatus ? sanitizeHtml(newStatus) : ""}</strong>`;
+      body = `Status changed to: <strong>${newStatus ? sanitizeHtml(newStatus, EMAIL_SANITIZE_OPTIONS) : ""}</strong>`;
       break;
     case "new_comment": {
       const sanitizedComment = commentContent
-        ? sanitizeHtml(commentContent)
+        ? sanitizeHtml(commentContent, EMAIL_SANITIZE_OPTIONS)
         : "";
       body = `New comment:<br/><blockquote>${sanitizedComment}</blockquote>`;
       break;
     }
     case "mentioned": {
       const sanitizedComment = commentContent
-        ? sanitizeHtml(commentContent)
+        ? sanitizeHtml(commentContent, EMAIL_SANITIZE_OPTIONS)
         : "";
       body = `You were mentioned in an issue${sanitizedComment ? `:<br/><blockquote>${sanitizedComment}</blockquote>` : "."}`;
       break;
     }
     case "machine_ownership_changed":
       body = newStatus?.includes("removed")
-        ? `You have been <strong>removed</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName) : "a machine"}</strong>. You will no longer receive notifications for new issues on this machine.`
-        : `You have been <strong>added</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName) : "a machine"}</strong>. You will receive notifications for new issues reported on this machine.`;
+        ? `You have been <strong>removed</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS) : "a machine"}</strong>. You will no longer receive notifications for new issues on this machine.`
+        : `You have been <strong>added</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS) : "a machine"}</strong>. You will receive notifications for new issues reported on this machine.`;
       break;
   }
 
   const siteUrl = getSiteUrl();
-  const sanitizedMachineName = machineName ? sanitizeHtml(machineName) : "";
+  const sanitizedMachineName = machineName
+    ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS)
+    : "";
   const machinePrefix = sanitizedMachineName
     ? `[${sanitizedMachineName}] `
     : "";
-  const sanitizedIssueTitle = issueTitle ? sanitizeHtml(issueTitle) : "";
+  const sanitizedIssueTitle = issueTitle
+    ? sanitizeHtml(issueTitle, EMAIL_SANITIZE_OPTIONS)
+    : "";
   const sanitizedIssueId = formattedIssueId
-    ? sanitizeHtml(formattedIssueId)
+    ? sanitizeHtml(formattedIssueId, EMAIL_SANITIZE_OPTIONS)
     : "";
 
   let issueUrl = `${siteUrl}/issues`;
@@ -173,7 +208,7 @@ export function getEmailHtml({
 
   const sanitizedDescription =
     (type === "new_issue" || type === "issue_assigned") && issueDescription
-      ? sanitizeHtml(issueDescription)
+      ? sanitizeHtml(issueDescription, EMAIL_SANITIZE_OPTIONS)
       : "";
   const showDescription = !!sanitizedDescription;
 
@@ -215,6 +250,7 @@ export const emailChannel: NotificationChannel = {
     }
 
     try {
+      const { sendEmail } = await import("~/lib/email/client");
       await sendEmail({
         to: ctx.email,
         subject: getEmailSubject(
