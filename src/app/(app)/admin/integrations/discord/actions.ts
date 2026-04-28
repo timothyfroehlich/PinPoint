@@ -66,7 +66,7 @@ async function probeBotToken(token: string): Promise<ValidateBotTokenResult> {
 }
 
 export type ValidateServerIdResult =
-  | { ok: true }
+  | { ok: true; guildName?: string }
   | {
       ok: false;
       reason: "not_configured" | "not_member" | "invalid_token" | "transient";
@@ -78,11 +78,13 @@ async function probeServerMembership(
   serverId: string
 ): Promise<ValidateServerIdResult> {
   try {
-    const res = await fetch(
-      `https://discord.com/api/v10/guilds/${serverId}/members/@me`,
-      { headers: { Authorization: `Bot ${token}` } }
-    );
-    if (res.ok) return { ok: true };
+    const res = await fetch(`https://discord.com/api/v10/guilds/${serverId}`, {
+      headers: { Authorization: `Bot ${token}` },
+    });
+    if (res.ok) {
+      const body = (await res.json()) as { name?: string };
+      return body.name ? { ok: true, guildName: body.name } : { ok: true };
+    }
     if (res.status === 401) return { ok: false, reason: "invalid_token" };
     if (res.status === 404 || res.status === 403) {
       return { ok: false, reason: "not_member" };
@@ -182,9 +184,9 @@ export type SaveDiscordConfigResult =
  *
  * - `newToken`: empty/absent ⇒ no change. Non-empty ⇒ rotate to this value
  *   (validated against `/users/@me` first; rejected on 401).
- * - `guildId`: required and validated against `/guilds/{id}/members/@me`.
- *   Hard-required to pass — saves are rejected if the bot isn't in the
- *   server.
+ * - `guildId`: required and validated against `/guilds/{id}` (Bot-token
+ *   endpoint). Hard-required to pass — saves are rejected if the bot
+ *   isn't in the server.
  * - `inviteLink`: optional, no Discord-side validation.
  * - `enabled`: written through; the form-level disable rule (no token →
  *   switch greyed out) is enforced on the client and re-checked here.

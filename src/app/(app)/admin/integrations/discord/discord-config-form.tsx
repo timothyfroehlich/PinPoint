@@ -294,7 +294,8 @@ function toValidationState(
         message: `Token valid. Bot logs in as @${result.botUsername}.`,
       };
     }
-    return { kind: "valid", message: "Bot is a member of this server." };
+    const where = result.guildName ? `“${result.guildName}”` : "this server";
+    return { kind: "valid", message: `Bot has access to ${where}.` };
   }
   let message: string;
   switch (result.reason) {
