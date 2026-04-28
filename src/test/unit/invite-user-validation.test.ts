@@ -56,4 +56,26 @@ describe("InviteUser Validation", () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it("should fail validation for 'guest' role", () => {
+    const result = inviteUserSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "test@example.com",
+      role: "guest",
+      sendInvite: false,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should fail validation for 'technician' role", () => {
+    const result = inviteUserSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "test@example.com",
+      role: "technician",
+      sendInvite: false,
+    });
+    expect(result.success).toBe(false);
+  });
 });
