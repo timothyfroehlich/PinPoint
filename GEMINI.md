@@ -5,6 +5,12 @@ It serves as a supplement to the core mandates and instructions provided in the 
 
 ## Gemini CLI-Specific
 
+### Merge Policy (Gemini)
+
+- **Do NOT merge PRs.** Even if the user authorized merging another PR earlier in the conversation, that authorization does NOT carry to this PR. Always present the exact `gh pr merge --squash <PR>` command and let the user run it.
+- We use **squash merges only**: `gh pr merge --squash <PR>`
+- This rule is stricter than the policy for other agents on this project. Do not infer otherwise.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 
 ## Beads Issue Tracker

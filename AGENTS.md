@@ -116,13 +116,6 @@ conflicts across worktrees and force-push requirements on open PRs.
 - Only use when user explicitly requests it
 - Never add `gh pr merge` or broad wildcard tool patterns without explicit user approval.
 
-### Merge Policy
-
-- **Default: do not merge.** Agents do not merge PRs on their own initiative — propose readiness and wait for the user to authorize.
-- The user can authorize merges in conversation. The "ask" tier in `~/.claude/settings.json` gates `gh pr merge` so the user gets a confirmation prompt for each merge.
-- We use **squash merges only**: `gh pr merge --squash <PR>`
-- This applies to all agents — lead, teammates, and subagents. Subagents in `bypassPermissions` mode skip the prompt; their dispatch contract must explicitly authorize merging if it's expected.
-
 ### CI Workflow
 
 - When investigating CI failures, check for merge conflicts FIRST:
