@@ -3,6 +3,7 @@
 # Claude Code control files (ephemeral, worktree-local)
 .claude-hook-bypass
 .claude-task-contract
+.claude/scheduled_tasks.lock
 
 # dependencies
 /node_modules
