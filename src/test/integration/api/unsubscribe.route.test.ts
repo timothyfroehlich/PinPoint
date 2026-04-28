@@ -132,7 +132,6 @@ describe("/api/unsubscribe", () => {
       emailNotifyOnNewComment: false,
       emailNotifyOnNewIssue: false,
       emailWatchNewIssuesGlobal: false,
-      emailNotifyOnMachineOwnershipChange: false,
     });
     expect(updateWhereMock).toHaveBeenCalledTimes(1);
   });

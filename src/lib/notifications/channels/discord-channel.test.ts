@@ -44,15 +44,12 @@ function prefs(
     inAppNotifyOnNewIssue: false,
     emailWatchNewIssuesGlobal: false,
     inAppWatchNewIssuesGlobal: false,
-    emailNotifyOnMachineOwnershipChange: false,
-    inAppNotifyOnMachineOwnershipChange: false,
     discordEnabled: true,
     discordNotifyOnAssigned: true,
     discordNotifyOnStatusChange: false,
     discordNotifyOnNewComment: false,
     discordNotifyOnMentioned: true,
     discordNotifyOnNewIssue: false,
-    discordNotifyOnMachineOwnershipChange: false,
     discordWatchNewIssuesGlobal: false,
     discordDmBlockedAt: null,
     ...overrides,
@@ -98,10 +95,14 @@ describe("discordChannel.shouldDeliver", () => {
     ).toBe(false);
   });
 
-  it("forces machine_ownership_changed even if per-event off (parity with email)", () => {
+  it("always delivers machine_ownership_changed (critical event, no per-event opt-out)", () => {
+    // The per-event opt-out column was dropped in migration 0033; channels
+    // hardcode this event as always-on (only the main discordEnabled switch
+    // can opt out). The default-prefs fixture already has every other
+    // toggle off — this test asserts the hardcode wins.
     expect(
       channel.shouldDeliver(
-        prefs({ discordNotifyOnMachineOwnershipChange: false }),
+        prefs({ discordEnabled: true }),
         "machine_ownership_changed"
       )
     ).toBe(true);

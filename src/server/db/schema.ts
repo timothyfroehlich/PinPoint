@@ -479,17 +479,12 @@ export const notificationPreferences = pgTable(
       .notNull()
       .default(false),
 
-    // Machine Ownership Changes
-    emailNotifyOnMachineOwnershipChange: boolean(
-      "email_notify_on_machine_ownership_change"
-    )
-      .notNull()
-      .default(false),
-    inAppNotifyOnMachineOwnershipChange: boolean(
-      "in_app_notify_on_machine_ownership_change"
-    )
-      .notNull()
-      .default(false),
+    // Machine ownership change is treated as a critical event across all
+    // channels: notifications fire regardless of per-event preference (only
+    // the channel's main switch can opt out). The per-event opt-out columns
+    // were dropped in 0031 (formerly email/in-app) and a follow-up migration
+    // (this branch) for Discord — they were never honored by any channel
+    // implementation, so storing the bit served no purpose.
 
     // Discord — main switch
     discordEnabled: boolean("discord_enabled").notNull().default(true),
@@ -510,11 +505,6 @@ export const notificationPreferences = pgTable(
     discordNotifyOnNewIssue: boolean("discord_notify_on_new_issue")
       .notNull()
       .default(true),
-    discordNotifyOnMachineOwnershipChange: boolean(
-      "discord_notify_on_machine_ownership_change"
-    )
-      .notNull()
-      .default(false),
     discordWatchNewIssuesGlobal: boolean("discord_watch_new_issues_global")
       .notNull()
       .default(false),

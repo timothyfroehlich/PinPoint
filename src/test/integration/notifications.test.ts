@@ -595,8 +595,6 @@ describe("createNotification (Integration)", () => {
       userId: recipient.id,
       emailEnabled: true,
       inAppEnabled: true,
-      emailNotifyOnMachineOwnershipChange: false,
-      inAppNotifyOnMachineOwnershipChange: false,
     });
 
     await createNotification(

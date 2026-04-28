@@ -23,8 +23,6 @@ function prefs(
     inAppNotifyOnNewIssue: false,
     emailWatchNewIssuesGlobal: false,
     inAppWatchNewIssuesGlobal: false,
-    emailNotifyOnMachineOwnershipChange: false,
-    inAppNotifyOnMachineOwnershipChange: false,
     ...overrides,
   };
 }

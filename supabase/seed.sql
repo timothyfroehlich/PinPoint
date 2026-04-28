@@ -57,9 +57,7 @@ BEGIN
     email_notify_on_new_issue,
     in_app_notify_on_new_issue,
     email_watch_new_issues_global,
-    in_app_watch_new_issues_global,
-    email_notify_on_machine_ownership_change,
-    in_app_notify_on_machine_ownership_change
+    in_app_watch_new_issues_global
   )
   VALUES (
     NEW.id,
@@ -69,8 +67,7 @@ BEGIN
     false, false, -- Status change
     false, false, -- New comment
     true, false,  -- New issue on owned machines (email only)
-    false, false, -- Global watch
-    false, false  -- Machine ownership change
+    false, false  -- Global watch
   );
 
   -- Transfer guest issues to newly created account
