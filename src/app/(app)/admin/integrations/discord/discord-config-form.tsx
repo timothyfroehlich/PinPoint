@@ -155,7 +155,7 @@ export function DiscordConfigForm({
               // server-membership validation.
               setServerStatus({ kind: "idle" });
             }}
-            className="max-w-md flex-1 min-w-[240px]"
+            className="flex-1 max-w-[360px]"
           />
           <Button
             type="button"
@@ -207,7 +207,7 @@ export function DiscordConfigForm({
               }}
               required
               aria-required="true"
-              className="max-w-md flex-1 min-w-[240px]"
+              className="flex-1 max-w-[360px]"
             />
             <Button
               type="button"
@@ -250,7 +250,7 @@ export function DiscordConfigForm({
             onChange={(e) => {
               setInviteLinkInput(e.target.value);
             }}
-            className="max-w-md"
+            className="max-w-[360px]"
           />
           {fieldErrors["inviteLink"] && (
             <FieldError message={fieldErrors["inviteLink"]} />
