@@ -208,14 +208,14 @@ export async function updateProfile(formData: FormData): Promise<void> {
     redirect("/login");
   }
 
-  const name = formData.get("name");
-  if (typeof name !== "string") {
-    throw new Error("Name must be a string");
+  const firstName = formData.get("firstName");
+  if (typeof firstName !== "string") {
+    throw new Error("First name must be a string");
   }
 
   await db
     .update(userProfiles)
-    .set({ name })
+    .set({ firstName })
     .where(eq(userProfiles.id, user.id));
   revalidatePath("/profile");
 }
