@@ -39,10 +39,14 @@ async function fastReset() {
 
     // Reseed
     console.log("🌱 Reseding data...");
-    // We execute the seed command
-    // pnpm run db:_seed
-    execSync("pnpm run db:_seed", { stdio: "inherit" });
-    execSync("pnpm run db:_seed-users", { stdio: "inherit" });
+    const seedCommands = [
+      "pnpm run db:_seed",
+      "pnpm run db:_seed-users",
+      "pnpm run db:_seed-discord",
+    ];
+    for (const cmd of seedCommands) {
+      execSync(cmd, { stdio: "inherit" });
+    }
     console.log("✅ Database reseeded.");
   } catch (error) {
     console.error("❌ Fast reset failed:", error);

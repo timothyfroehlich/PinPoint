@@ -9,21 +9,7 @@ import {
   enableDiscordIntegrationForTest,
 } from "../support/supabase-admin.js";
 
-// When DISCORD_BOT_TOKEN is set in the dev server's env, getDiscordConfig()
-// short-circuits to env values and the integration is always considered
-// enabled — independent of the DB row. The "hide when disabled" tests in
-// this top-level describe rely on the DB-controlled path, so they only
-// produce meaningful coverage when the env override is absent (CI). Skip
-// them locally so contributors with credentials filled into .env.local
-// don't see spurious red.
-const envOverrideActive = !!process.env.DISCORD_BOT_TOKEN?.trim();
-
 test.describe("Discord DM preferences", () => {
-  test.skip(
-    envOverrideActive,
-    "DISCORD_BOT_TOKEN env override forces integration on; DB-disabled path unreachable"
-  );
-
   let memberEmail: string;
   let memberId: string;
 
