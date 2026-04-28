@@ -131,12 +131,17 @@ export async function submitFormAndWaitForRedirect(
 
   // Coordination flag: only one branch should perform navigation. The first
   // branch to claim it wins; later branches see claimed === true and skip
-  // their page.goto() call, preventing duplicate / racing navigations.
+  // their page.goto() call, preventing duplicate / racing navigations. If a
+  // branch's page.goto() throws (e.g., navigation already in progress), it
+  // releases the claim so other branches can still succeed.
   let claimed = false;
   const claimNavigation = (): boolean => {
     if (claimed) return false;
     claimed = true;
     return true;
+  };
+  const releaseClaim = (): void => {
+    claimed = false;
   };
 
   // Branch B: poll for the captured redirect target every 100ms. When the
@@ -160,8 +165,19 @@ export async function submitFormAndWaitForRedirect(
         .catch(() => null);
       if (target) {
         if (claimNavigation()) {
-          await page.goto(target, { waitUntil: "domcontentloaded" });
+          try {
+            await page.goto(target, { waitUntil: "domcontentloaded" });
+            return;
+          } catch {
+            // page.goto can race with sibling branches and throw (frame
+            // detached, navigation already in progress). Release the claim
+            // so Branch A's natural-nav or Branch C can still succeed.
+            releaseClaim();
+          }
         }
+        // Either claim failed (another branch won) or page.goto threw.
+        // Either way, stop polling and let other branches resolve the race.
+        await new Promise<void>(() => undefined);
         return;
       }
       await new Promise<void>((r) => {
@@ -172,16 +188,17 @@ export async function submitFormAndWaitForRedirect(
     await new Promise<void>(() => undefined);
   })();
 
-  // Branch C: response body fallback. Filter to the POST that goes to the
-  // form's own URL (awayFrom path), not third-party POSTs. waitForResponse()
-  // buffers the full body before resolving, which is essential in WebKit
-  // (page.on('response') with async .text() loses the body to a closed stream).
+  // Branch C: response body fallback. Match the form's exact pathname so we
+  // capture only the Server Action POST, not unrelated POSTs that share a
+  // prefix (e.g., /m vs /m/whatever). waitForResponse() buffers the full body
+  // before resolving, which is essential in WebKit (page.on('response') with
+  // async .text() loses the body to a closed stream).
   const responseNavPromise: Promise<void> = new Promise<void>((resolve) => {
     void page
       .waitForResponse(
         (r) =>
           r.request().method() === "POST" &&
-          new URL(r.url()).pathname.startsWith(awayFrom),
+          new URL(r.url()).pathname === awayFrom,
         { timeout }
       )
       .then(async (response) => {
@@ -190,10 +207,15 @@ export async function submitFormAndWaitForRedirect(
           /"redirectTo":"(\/m\/[^/"\\]+\/i\/\d+)"/.exec(body) ??
           /\\"redirectTo\\":\\"(\/m\/[^/"\\]+\/i\/\d+)\\"/.exec(body);
         if (match?.[1] && claimNavigation()) {
-          await page.goto(match[1], { waitUntil: "domcontentloaded" });
-          resolve();
+          try {
+            await page.goto(match[1], { waitUntil: "domcontentloaded" });
+            resolve();
+          } catch {
+            // Same race-with-sibling-branch handling as Branch B.
+            releaseClaim();
+          }
         }
-        // No match (or already claimed): stay quiet, let other branches handle it.
+        // No match (or already claimed, or page.goto threw): stay quiet.
       })
       .catch(() => {
         // waitForResponse timed out: stay quiet.
