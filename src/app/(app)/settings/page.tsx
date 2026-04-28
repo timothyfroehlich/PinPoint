@@ -10,7 +10,7 @@ import {
 } from "~/server/db/schema";
 import { eq, and, ne, count, inArray } from "drizzle-orm";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
-import { getDiscordConfig } from "~/lib/discord/config";
+import { isDiscordIntegrationEnabled } from "~/lib/discord/config";
 import { ProfileForm } from "./profile-form";
 import { ConnectedAccountsSection } from "./connected-accounts/connected-accounts-section";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
@@ -77,9 +77,9 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
 
   const ownedMachineCount = ownedMachinesResult[0]?.count ?? 0;
 
-  // Discord integration state for the preferences form (PP-2n5).
-  const discordConfig = await getDiscordConfig();
-  const discordIntegrationEnabled = discordConfig !== null;
+  // Discord integration state for the preferences form (PP-2n5). Only need
+  // the boolean here — skip the Vault decrypt that getDiscordConfig() does.
+  const discordIntegrationEnabled = await isDiscordIntegrationEnabled();
   const userHasDiscord = profile.discordUserId !== null;
 
   // Check if user is the sole admin

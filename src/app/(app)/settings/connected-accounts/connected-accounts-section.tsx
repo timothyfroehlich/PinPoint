@@ -5,7 +5,7 @@ import { log } from "~/lib/logger";
 import { getLoginUrl } from "~/lib/login-url";
 import { providers, type ProviderKey } from "~/lib/auth/providers";
 import { canUnlinkIdentity } from "~/lib/auth/identity-guards";
-import { getDiscordConfig } from "~/lib/discord/config";
+import { isDiscordIntegrationEnabled } from "~/lib/discord/config";
 import { ConnectedAccountRow } from "./connected-account-row";
 import { DiscordTestDmButton } from "./discord-test-dm-button";
 
@@ -64,9 +64,9 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
     providers[key].isAvailable()
   );
 
-  // Test DM is only meaningful when the bot integration is wired up.
-  const discordConfig = await getDiscordConfig();
-  const discordIntegrationEnabled = discordConfig !== null;
+  // Test DM is only meaningful when the bot integration is wired up. Only
+  // need the boolean — skip the Vault decrypt that getDiscordConfig() does.
+  const discordIntegrationEnabled = await isDiscordIntegrationEnabled();
 
   if (visibleKeys.length === 0) {
     return (

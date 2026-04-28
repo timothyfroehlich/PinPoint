@@ -25,9 +25,17 @@ export function formatDiscordMessage(input: DiscordMessageInput): string {
   // we preserve them and trim the body instead.
   const bodyBudget = DISCORD_MAX_MESSAGE_LENGTH - suffix.length;
   const safeBody =
-    body.length <= bodyBudget ? body : body.slice(0, bodyBudget - 1) + "…";
+    bodyBudget <= 0 || body.length > bodyBudget
+      ? body.slice(0, Math.max(0, bodyBudget - 1)) + "…"
+      : body;
 
-  return `${safeBody}${suffix}`;
+  const assembled = `${safeBody}${suffix}`;
+  // Belt-and-suspenders: if the suffix alone exceeds the limit (pathological
+  // siteUrl), hard-cap the final output. Discord rejects oversized messages
+  // with 400, which classifies as transient and would silently retry forever.
+  return assembled.length > DISCORD_MAX_MESSAGE_LENGTH
+    ? assembled.slice(0, DISCORD_MAX_MESSAGE_LENGTH - 1) + "…"
+    : assembled;
 }
 
 function buildResourceLink(input: DiscordMessageInput): string {

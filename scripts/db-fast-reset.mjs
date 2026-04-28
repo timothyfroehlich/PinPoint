@@ -38,7 +38,7 @@ async function fastReset() {
     console.log("✅ Tables truncated.");
 
     // Reseed
-    console.log("🌱 Reseding data...");
+    console.log("🌱 Reseeding data...");
     const seedCommands = [
       "pnpm run db:_seed",
       "pnpm run db:_seed-users",

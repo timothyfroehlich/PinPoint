@@ -97,3 +97,23 @@ export async function getDiscordTokenForAdmin(): Promise<string | null> {
   const row = await fetchDiscordConfigRow();
   return row?.bot_token ?? null;
 }
+
+/**
+ * Lightweight boolean accessor: is the Discord integration enabled and
+ * provisioned (token saved)?
+ *
+ * Avoids decrypting the Vault secret when callers only need to decide
+ * whether to render Discord-related UI. Use this on hot paths like the
+ * `/settings` server component.
+ *
+ * Returns false on any error (missing env vars, transient RPC failure, etc.)
+ * so a misconfigured Discord integration can't break unrelated pages.
+ */
+export async function isDiscordIntegrationEnabled(): Promise<boolean> {
+  try {
+    const row = await fetchDiscordConfigRow();
+    return Boolean(row?.enabled && row.bot_token);
+  } catch {
+    return false;
+  }
+}

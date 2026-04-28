@@ -65,16 +65,23 @@ export function DiscordConfigForm({
     FormData
   >(async (_prev, formData) => saveDiscordConfig(formData), undefined);
 
-  // After a successful save, clear the token input (the token is now in
-  // Vault; the field reverts to "no pending change" semantics) and reset
-  // both validation statuses (the page now reflects fresh DB state).
+  // After a successful save, reconcile local state with the freshly-saved
+  // server values. revalidatePath() in the action causes the parent server
+  // component to re-fetch and re-render with new props — but useState only
+  // initializes from props on the first render, so without this effect the
+  // local inputs would stay at the user's typed values (potentially differing
+  // from server-trimmed values) and isDirty would stay true even though the
+  // config is in sync. Resetting all controlled inputs here closes the gap.
   React.useEffect(() => {
     if (saveState?.ok) {
       setTokenInput("");
+      setGuildIdInput(guildId);
+      setInviteLinkInput(inviteLink);
+      setEnabledInput(enabled);
       setTokenStatus({ kind: "idle" });
       setServerStatus({ kind: "idle" });
     }
-  }, [saveState]);
+  }, [saveState, guildId, inviteLink, enabled]);
 
   // Activation rule: switch is interactive iff a token exists somewhere —
   // either committed in DB or freshly typed (Save will commit them together).
