@@ -1,5 +1,6 @@
 """Unit tests for worktree_setup.py env merging and port allocation."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -15,10 +16,12 @@ from worktree_setup import (
     PortConfig,
     allocate_slot,
     branch_to_project_id,
+    generate_launch_json,
     load_manifest,
     merge_env_local,
     parse_env_file,
     prune_manifest,
+    resolve_brainstorm_server_path,
     save_manifest,
 )
 
@@ -224,6 +227,7 @@ class TestPortConfig:
         assert config.inbucket_port == 54424
         assert config.smtp_port == 54425
         assert config.pop3_port == 54426
+        assert config.brainstorm_port == 49001
         assert config.site_url == "http://localhost:3010"
 
     def test_slot_40(self) -> None:
@@ -239,6 +243,182 @@ class TestPortConfig:
         assert config.api_port == 63921
         # All ports stay within the 54xxx-63xxx range expected by integration tests
         assert config.inbucket_port == 63924
+
+
+class TestBrainstormPort:
+    """Test brainstorm port allocation per slot."""
+
+    @pytest.mark.parametrize("slot", [1, 19, 96])
+    def test_brainstorm_port_formula(self, slot: int) -> None:
+        config = PortConfig(slot=slot, project_id="test", name="test")
+        assert config.brainstorm_port == 49000 + slot
+
+    def test_port_config_has_brainstorm_attribute(self) -> None:
+        config = PortConfig(slot=5, project_id="test", name="test")
+        # PortConfig exposes a brainstorm_port accessor.
+        assert hasattr(config, "brainstorm_port")
+        assert isinstance(config.brainstorm_port, int)
+
+
+class TestResolveBrainstormServerPath:
+    """Test resolve_brainstorm_server_path() version selection logic."""
+
+    def _make_version_dir(self, plugin_root: Path, version: str) -> None:
+        """Create the directory tree for a given plugin version."""
+        script = (
+            plugin_root
+            / version
+            / "skills"
+            / "brainstorming"
+            / "scripts"
+            / "start-server.sh"
+        )
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text("#!/bin/bash\n")
+
+    def test_selects_highest_numeric_version(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        plugin_root = tmp_path / "superpowers"
+        for version in ["1.0.0", "2.0.0", "1.10.0"]:
+            self._make_version_dir(plugin_root, version)
+
+        monkeypatch.setattr("worktree_setup.Path.home", lambda: tmp_path / "home")
+        # Patch the glob call by monkeypatching the plugin_root construction.
+        # Instead, import the function and patch via a fake home directory.
+        # We rebuild the expected plugin_root path structure.
+        home = tmp_path / "home"
+        real_plugin_root = (
+            home
+            / ".claude"
+            / "plugins"
+            / "cache"
+            / "claude-plugins-official"
+            / "superpowers"
+        )
+        for version in ["1.0.0", "2.0.0", "1.10.0"]:
+            script = (
+                real_plugin_root
+                / version
+                / "skills"
+                / "brainstorming"
+                / "scripts"
+                / "start-server.sh"
+            )
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text("#!/bin/bash\n")
+
+        result = resolve_brainstorm_server_path()
+
+        assert result is not None
+        # 2.0.0 > 1.10.0 > 1.0.0 numerically
+        assert "/2.0.0/" in result
+
+    def test_numeric_beats_non_numeric_segment(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        real_plugin_root = (
+            home
+            / ".claude"
+            / "plugins"
+            / "cache"
+            / "claude-plugins-official"
+            / "superpowers"
+        )
+        # "1.0.0" has all-numeric segments; "1.0.0-beta" has a non-numeric part
+        for version in ["1.0.0", "1.0.0-beta"]:
+            script = (
+                real_plugin_root
+                / version
+                / "skills"
+                / "brainstorming"
+                / "scripts"
+                / "start-server.sh"
+            )
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text("#!/bin/bash\n")
+
+        monkeypatch.setattr("worktree_setup.Path.home", lambda: home)
+
+        result = resolve_brainstorm_server_path()
+
+        assert result is not None
+        # Non-numeric segment sorts as -1, so "1.0.0-beta" < "1.0.0"
+        assert "/1.0.0/" in result
+        assert "beta" not in result
+
+    def test_returns_none_when_no_install(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        monkeypatch.setattr("worktree_setup.Path.home", lambda: home)
+
+        result = resolve_brainstorm_server_path()
+
+        assert result is None
+
+
+class TestGenerateLaunchJson:
+    """Test .claude/launch.json generation with optional brainstorm entry."""
+
+    @pytest.fixture
+    def port_config(self) -> PortConfig:
+        return PortConfig(slot=7, project_id="pinpoint-test", name="test-worktree")
+
+    def _read_launch(self, worktree_path: Path) -> dict[str, object]:
+        return json.loads((worktree_path / ".claude" / "launch.json").read_text())
+
+    def test_includes_brainstorm_when_resolver_returns_path(
+        self,
+        tmp_path: Path,
+        port_config: PortConfig,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        resolved = "/fake/plugins/superpowers/9.9.9/skills/brainstorming/scripts/start-server.sh"
+        monkeypatch.setattr(
+            "worktree_setup.resolve_brainstorm_server_path", lambda: resolved
+        )
+
+        generate_launch_json(tmp_path, port_config)
+        data = self._read_launch(tmp_path)
+
+        configs = data["configurations"]
+        assert isinstance(configs, list)
+        names = [c["name"] for c in configs]
+        assert names == ["next-dev", "brainstorm"]
+
+        brainstorm = next(c for c in configs if c["name"] == "brainstorm")
+        # slot 7 → 49007
+        assert brainstorm["port"] == 49007
+        assert brainstorm["port"] == port_config.brainstorm_port
+        assert brainstorm["runtimeExecutable"] == "bash"
+
+        runtime_args = brainstorm["runtimeArgs"]
+        assert runtime_args[0] == "-c"
+        assert resolved in runtime_args[1]
+        assert "BRAINSTORM_PORT=49007" in runtime_args[1]
+        assert '--project-dir "$PWD"' in runtime_args[1]
+        assert "--foreground" in runtime_args[1]
+
+    def test_omits_brainstorm_when_resolver_returns_none(
+        self,
+        tmp_path: Path,
+        port_config: PortConfig,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            "worktree_setup.resolve_brainstorm_server_path", lambda: None
+        )
+
+        generate_launch_json(tmp_path, port_config)
+        data = self._read_launch(tmp_path)
+
+        configs = data["configurations"]
+        assert isinstance(configs, list)
+        names = [c["name"] for c in configs]
+        assert names == ["next-dev"]
+        assert all(c["name"] != "brainstorm" for c in configs)
 
 
 class TestManifest:
