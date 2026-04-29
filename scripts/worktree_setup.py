@@ -11,6 +11,7 @@ import fcntl
 import json
 import os
 import re
+import shlex
 import stat
 import subprocess
 import sys
@@ -29,7 +30,7 @@ BASE_PORT_POOLER = 54329
 BASE_PORT_INBUCKET = 54324
 BASE_PORT_SMTP = 54325
 BASE_PORT_POP3 = 54326
-# Brainstorm server port: slot 1 → 49001, slot 96 → 49096. Within IANA dynamic range.
+# Brainstorm server port: slot 1 → 49001, slot 96 → 49096. Uses high, non-privileged ports.
 BASE_PORT_BRAINSTORM = 49000
 
 MANIFEST_PATH = Path.home() / ".config" / "pinpoint" / "worktree-slots.json"
@@ -381,7 +382,8 @@ def resolve_brainstorm_server_path() -> str | None:
     """Find the highest-version superpowers brainstorming start-server.sh.
 
     Returns the absolute path of the start-server.sh script under the highest
-    semver version of the installed superpowers plugin, or None if no install
+    installed version directory of the superpowers plugin using dotted numeric
+    comparison, with non-numeric segments sorting lower, or None if no install
     is found (e.g., the plugin isn't installed yet — this is fine).
     """
     plugin_root = (
@@ -438,7 +440,7 @@ def generate_launch_json(worktree_path: Path, port_config: PortConfig) -> None:
                     "-c",
                     (
                         f"BRAINSTORM_PORT={port_config.brainstorm_port} "
-                        f'{brainstorm_path} --project-dir "$PWD" --foreground'
+                        f'{shlex.quote(brainstorm_path)} --project-dir "$PWD" --foreground'
                     ),
                 ],
                 "port": port_config.brainstorm_port,

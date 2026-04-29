@@ -21,6 +21,7 @@ from worktree_setup import (
     merge_env_local,
     parse_env_file,
     prune_manifest,
+    resolve_brainstorm_server_path,
     save_manifest,
 )
 
@@ -257,6 +258,105 @@ class TestBrainstormPort:
         # PortConfig exposes a brainstorm_port accessor.
         assert hasattr(config, "brainstorm_port")
         assert isinstance(config.brainstorm_port, int)
+
+
+class TestResolveBrainstormServerPath:
+    """Test resolve_brainstorm_server_path() version selection logic."""
+
+    def _make_version_dir(self, plugin_root: Path, version: str) -> None:
+        """Create the directory tree for a given plugin version."""
+        script = (
+            plugin_root
+            / version
+            / "skills"
+            / "brainstorming"
+            / "scripts"
+            / "start-server.sh"
+        )
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text("#!/bin/bash\n")
+
+    def test_selects_highest_numeric_version(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        plugin_root = tmp_path / "superpowers"
+        for version in ["1.0.0", "2.0.0", "1.10.0"]:
+            self._make_version_dir(plugin_root, version)
+
+        monkeypatch.setattr("worktree_setup.Path.home", lambda: tmp_path / "home")
+        # Patch the glob call by monkeypatching the plugin_root construction.
+        # Instead, import the function and patch via a fake home directory.
+        # We rebuild the expected plugin_root path structure.
+        home = tmp_path / "home"
+        real_plugin_root = (
+            home
+            / ".claude"
+            / "plugins"
+            / "cache"
+            / "claude-plugins-official"
+            / "superpowers"
+        )
+        for version in ["1.0.0", "2.0.0", "1.10.0"]:
+            script = (
+                real_plugin_root
+                / version
+                / "skills"
+                / "brainstorming"
+                / "scripts"
+                / "start-server.sh"
+            )
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text("#!/bin/bash\n")
+
+        result = resolve_brainstorm_server_path()
+
+        assert result is not None
+        # 2.0.0 > 1.10.0 > 1.0.0 numerically
+        assert "/2.0.0/" in result
+
+    def test_numeric_beats_non_numeric_segment(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        real_plugin_root = (
+            home
+            / ".claude"
+            / "plugins"
+            / "cache"
+            / "claude-plugins-official"
+            / "superpowers"
+        )
+        # "1.0.0" has all-numeric segments; "1.0.0-beta" has a non-numeric part
+        for version in ["1.0.0", "1.0.0-beta"]:
+            script = (
+                real_plugin_root
+                / version
+                / "skills"
+                / "brainstorming"
+                / "scripts"
+                / "start-server.sh"
+            )
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text("#!/bin/bash\n")
+
+        monkeypatch.setattr("worktree_setup.Path.home", lambda: home)
+
+        result = resolve_brainstorm_server_path()
+
+        assert result is not None
+        # Non-numeric segment sorts as -1, so "1.0.0-beta" < "1.0.0"
+        assert "/1.0.0/" in result
+        assert "beta" not in result
+
+    def test_returns_none_when_no_install(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        home = tmp_path / "home"
+        monkeypatch.setattr("worktree_setup.Path.home", lambda: home)
+
+        result = resolve_brainstorm_server_path()
+
+        assert result is None
 
 
 class TestGenerateLaunchJson:
