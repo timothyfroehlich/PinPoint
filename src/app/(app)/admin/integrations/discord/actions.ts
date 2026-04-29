@@ -295,18 +295,28 @@ export async function saveDiscordConfig(
       validated.guildId
     );
     if (!serverResult.ok) {
-      let message: string;
-      switch (serverResult.reason) {
-        case "not_member":
-          message =
-            "Bot isn't a member of this server. Invite the bot first, then save again.";
-          break;
-        case "invalid_token":
-          message = "Discord rejected the token while checking the server.";
-          break;
-        default:
-          message = "Discord didn't respond while checking the server.";
+      // Field attribution matters because the form renders a per-field error.
+      // - not_member / transient: about this guild → guildId.
+      // - invalid_token: the token Discord rejected. Attach to newToken so
+      //   the admin can fix it where the input lives. (Also handles the
+      //   not-rotating path: the saved token is broken and they need to
+      //   paste a fresh one.)
+      if (serverResult.reason === "invalid_token") {
+        return {
+          ok: false,
+          errors: [
+            {
+              field: "newToken",
+              message:
+                "Discord rejected the saved bot token while checking the server. Paste a fresh token from the Developer Portal.",
+            },
+          ],
+        };
       }
+      const message =
+        serverResult.reason === "not_member"
+          ? "Bot isn't a member of this server. Invite the bot first, then save again."
+          : "Discord didn't respond while checking the server.";
       return {
         ok: false,
         errors: [{ field: "guildId", message }],

@@ -31,7 +31,7 @@ export function DiscordTestDmButton(): React.JSX.Element {
         <p
           className={
             result.ok
-              ? "text-xs text-emerald-600 max-w-[20rem] text-right"
+              ? "text-xs text-success max-w-[20rem] text-right"
               : "text-xs text-destructive max-w-[20rem] text-right"
           }
           role="status"

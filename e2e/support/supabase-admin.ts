@@ -226,6 +226,80 @@ export async function setUserDiscordId(
 }
 
 /**
+ * Forge a Discord identity row in `auth.identities` for a test user.
+ *
+ * Some UI surfaces (Connected Accounts, the Send test DM button) gate visibility
+ * on `supabase.auth.getUserIdentities()` rather than the mirror column, so a
+ * test user with only `user_profiles.discord_user_id` set will appear unlinked
+ * to those surfaces. This helper inserts the auth row directly because the
+ * Supabase admin SDK has no first-class way to add identities — they normally
+ * arrive via the OAuth callback, which we can't run in E2E.
+ *
+ * Pair with `unlinkDiscordIdentityForTest()` in afterEach/finally to keep
+ * subsequent tests clean. Also calls `setUserDiscordId()` so the runtime
+ * mirror matches what the OAuth callback would write.
+ */
+export async function linkDiscordIdentityForTest(
+  userId: string,
+  discordUserId: string
+): Promise<void> {
+  const postgresUrl =
+    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  if (!postgresUrl) {
+    throw new Error(
+      "POSTGRES_URL_NON_POOLING / POSTGRES_URL not set. Check .env.local."
+    );
+  }
+
+  const sql = postgres(postgresUrl, { connect_timeout: 3, max: 1 });
+  try {
+    await sql`
+      INSERT INTO auth.identities (
+        provider_id, user_id, identity_data, provider,
+        created_at, updated_at, last_sign_in_at
+      ) VALUES (
+        ${discordUserId},
+        ${userId}::uuid,
+        ${sql.json({ sub: discordUserId, provider_id: discordUserId })},
+        'discord',
+        now(), now(), now()
+      )
+      ON CONFLICT (provider, provider_id) DO NOTHING
+    `;
+  } finally {
+    await sql.end();
+  }
+  await setUserDiscordId(userId, discordUserId);
+}
+
+/**
+ * Inverse of `linkDiscordIdentityForTest`. Removes the forged auth.identities
+ * row and clears the mirror column. Idempotent.
+ */
+export async function unlinkDiscordIdentityForTest(
+  userId: string
+): Promise<void> {
+  const postgresUrl =
+    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  if (!postgresUrl) {
+    throw new Error(
+      "POSTGRES_URL_NON_POOLING / POSTGRES_URL not set. Check .env.local."
+    );
+  }
+
+  const sql = postgres(postgresUrl, { connect_timeout: 3, max: 1 });
+  try {
+    await sql`
+      DELETE FROM auth.identities
+      WHERE user_id = ${userId}::uuid AND provider = 'discord'
+    `;
+  } finally {
+    await sql.end();
+  }
+  await setUserDiscordId(userId, null);
+}
+
+/**
  * Disable the Discord integration (clears bot_token_vault_id + sets
  * enabled=false). Useful for after-test cleanup. Does NOT remove the
  * underlying vault secret — that's harmless leftover.

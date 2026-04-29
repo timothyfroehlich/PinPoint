@@ -7,6 +7,8 @@ import {
   updateUserRole,
   disableDiscordIntegration,
   enableDiscordIntegrationForTest,
+  linkDiscordIdentityForTest,
+  unlinkDiscordIdentityForTest,
 } from "../support/supabase-admin.js";
 
 test.describe("Discord DM preferences", () => {
@@ -164,7 +166,11 @@ test.describe("Discord DM preferences (integration enabled)", () => {
     // E2E. The button triggers a real call to Discord with the test fake
     // token, so the result will be a failure — but the form must render
     // a result paragraph rather than hang or crash.
-    await setUserDiscordId(memberId, "test-discord-id-test-dm");
+    //
+    // The Connected Accounts section gates `showTestDm` on `isLinked` from
+    // `getUserIdentities()`, not the mirror column, so we have to forge a
+    // Discord identity in `auth.identities` to make the button render.
+    await linkDiscordIdentityForTest(memberId, "test-discord-id-test-dm");
 
     try {
       await loginAs(page, testInfo, {
@@ -183,7 +189,7 @@ test.describe("Discord DM preferences (integration enabled)", () => {
       const resultMessage = page.getByRole("status");
       await expect(resultMessage).toBeVisible({ timeout: 15_000 });
     } finally {
-      await setUserDiscordId(memberId, null);
+      await unlinkDiscordIdentityForTest(memberId);
     }
   });
 });

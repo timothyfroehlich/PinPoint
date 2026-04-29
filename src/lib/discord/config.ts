@@ -102,17 +102,25 @@ export async function getDiscordTokenForAdmin(): Promise<string | null> {
  * Lightweight boolean accessor: is the Discord integration enabled and
  * provisioned (token saved)?
  *
- * Avoids decrypting the Vault secret when callers only need to decide
- * whether to render Discord-related UI. Use this on hot paths like the
- * `/settings` server component.
+ * Reads `enabled` and `bot_token_vault_id` directly from the singleton
+ * row instead of going through `get_discord_config()` — that RPC always
+ * decrypts the Vault secret, which is unnecessary when the caller only
+ * needs to decide whether to render Discord-related UI. Use this on hot
+ * paths like the `/settings` server component.
  *
  * Returns false on any error (missing env vars, transient RPC failure, etc.)
  * so a misconfigured Discord integration can't break unrelated pages.
  */
 export async function isDiscordIntegrationEnabled(): Promise<boolean> {
   try {
-    const row = await fetchDiscordConfigRow();
-    return Boolean(row?.enabled && row.bot_token);
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from("discord_integration_config")
+      .select("enabled, bot_token_vault_id")
+      .eq("id", "singleton")
+      .maybeSingle();
+    if (error || !data) return false;
+    return Boolean(data.enabled && data.bot_token_vault_id);
   } catch {
     return false;
   }

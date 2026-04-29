@@ -54,7 +54,11 @@ async function postMessage(
     safeFetch(`${DISCORD_API}/channels/${channelId}/messages`, {
       method: "POST",
       headers: authHeaders(botToken),
-      body: JSON.stringify({ content }),
+      // allowed_mentions: { parse: [] } is defense-in-depth: even if our
+      // sanitize() escape ever regresses, Discord refuses to resolve any
+      // user/role/everyone mention. Costs nothing and prevents accidental
+      // @everyone fan-outs from user-supplied issue titles/comments.
+      body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
     });
 
   let res = await send();

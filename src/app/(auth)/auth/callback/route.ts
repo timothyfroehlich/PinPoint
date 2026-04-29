@@ -165,15 +165,32 @@ async function syncDiscordIdentity(
     const user = userResponse.user;
     if (!user) return;
 
-    const identities = (user.identities ?? []) as {
+    // getUserIdentities() makes a fresh query; user.identities from getUser()
+    // can lag behind a just-completed link. We only mirror when a Discord
+    // identity is actually present — a non-Discord sign-in (email/password,
+    // password recovery, magic link) must NOT silently clear an existing
+    // discord_user_id. Unlinking is handled in oauth-actions-core.ts.
+    const { data: identitiesData, error: identitiesError } =
+      await supabase.auth.getUserIdentities();
+    if (identitiesError) {
+      reportError(identitiesError, {
+        action: "auth.callback.syncDiscordIdentity",
+        step: "getUserIdentities",
+        userId: user.id,
+      });
+      return;
+    }
+
+    const identities = identitiesData.identities as {
       provider: string;
       identity_data?: { provider_id?: string; sub?: string };
     }[];
     const discord = identities.find((i) => i.provider === "discord");
+    if (!discord) return;
+
     const discordUserId =
-      discord?.identity_data?.provider_id ??
-      discord?.identity_data?.sub ??
-      null;
+      discord.identity_data?.provider_id ?? discord.identity_data?.sub ?? null;
+    if (!discordUserId) return;
 
     await db
       .update(userProfiles)

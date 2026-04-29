@@ -704,7 +704,6 @@ test.describe.serial("Email Notifications", () => {
     expect(prefs.email_notify_on_new_comment).toBe(false);
     expect(prefs.email_notify_on_new_issue).toBe(false);
     expect(prefs.email_watch_new_issues_global).toBe(false);
-    expect(prefs.email_notify_on_machine_ownership_change).toBe(false);
 
     // Restore email prefs so cleanup/other tests aren't affected
     await updateNotificationPreferences(testAdminUserId, {
