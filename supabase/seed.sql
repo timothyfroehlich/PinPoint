@@ -66,7 +66,7 @@ BEGIN
     true, true, -- Assigned
     false, false, -- Status change
     false, false, -- New comment
-    true, false,  -- New issue on owned machines (email only)
+    true, false,  -- New issue on owned machines (email on, in-app off)
     false, false  -- Global watch
   );
 

@@ -80,7 +80,7 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
   }
 
   return (
-    <div>
+    <div id="connected-accounts">
       {header}
       <div className="divide-y">
         {visibleKeys.map((key) => {

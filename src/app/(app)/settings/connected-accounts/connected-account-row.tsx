@@ -83,51 +83,68 @@ export function ConnectedAccountRow({
       <div className="flex items-center gap-2">
         {secondaryAction}
         {isLinked ? (
-          <AlertDialog>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        disabled={!canUnlink}
-                        aria-describedby={!canUnlink ? helpId : undefined}
-                      >
-                        Disconnect {displayName}
-                      </Button>
-                    </AlertDialogTrigger>
-                  </span>
-                </TooltipTrigger>
+          <>
+            <AlertDialog>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          disabled={!canUnlink}
+                          aria-describedby={!canUnlink ? helpId : undefined}
+                        >
+                          Disconnect {displayName}
+                        </Button>
+                      </AlertDialogTrigger>
+                    </span>
+                  </TooltipTrigger>
+                  {!canUnlink && (
+                    <TooltipContent>{UNLINK_DISABLED_MSG}</TooltipContent>
+                  )}
+                </Tooltip>
                 {!canUnlink && (
-                  <TooltipContent>{UNLINK_DISABLED_MSG}</TooltipContent>
+                  <span className="sr-only" id={helpId}>
+                    {UNLINK_DISABLED_MSG}
+                  </span>
                 )}
-              </Tooltip>
-              {!canUnlink && (
-                <span className="sr-only" id={helpId}>
-                  {UNLINK_DISABLED_MSG}
-                </span>
-              )}
-            </TooltipProvider>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Disconnect {displayName}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  You can re-link {displayName} at any time, but you&apos;ll
-                  need to sign in again to do so.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                {/* Form-action submit preserves progressive enhancement
-                    (NON_NEGOTIABLE #5) — unlink works without JS. */}
+              </TooltipProvider>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Disconnect {displayName}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    You can re-link {displayName} at any time, but you&apos;ll
+                    need to sign in again to do so.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  {/* Form-action submit preserves progressive enhancement
+                      (NON_NEGOTIABLE #5) — unlink works without JS via the
+                      noscript fallback below; this in-dialog form is the
+                      with-JS path. */}
+                  <form action={unlinkAction}>
+                    <UnlinkSubmitButton displayName={displayName} />
+                  </form>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            {/* No-JS fallback: AlertDialog needs Radix's client JS to open,
+                so without JS the in-dialog form above is unreachable. The
+                browser hides <noscript> content when scripts run, so this
+                form only surfaces when JS is disabled. */}
+            {canUnlink && (
+              <noscript>
                 <form action={unlinkAction}>
-                  <UnlinkSubmitButton displayName={displayName} />
+                  <Button type="submit" variant="destructive">
+                    Disconnect {displayName}
+                  </Button>
                 </form>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+              </noscript>
+            )}
+          </>
         ) : (
           <form action={linkAction}>
             <Button type="submit">Connect {displayName}</Button>

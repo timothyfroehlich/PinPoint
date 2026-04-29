@@ -80,16 +80,38 @@ try {
   }
 
   // Update the singleton. guild_id and invite_link are only filled if they
-  // were null — admin-saved values are never overwritten.
-  await sql`
-    UPDATE discord_integration_config
-    SET
-      bot_token_vault_id = ${vaultId}::uuid,
-      guild_id = COALESCE(guild_id, ${envGuildId ?? null}),
-      invite_link = COALESCE(invite_link, ${envInviteLink ?? null}),
-      updated_at = now()
-    WHERE id = 'singleton'
-  `;
+  // were null — admin-saved values are never overwritten. RETURNING confirms
+  // the row was actually linked, and on any failure we delete the freshly-
+  // created vault secret so we don't orphan it (mirrors the rollback in
+  // saveDiscordConfig).
+  try {
+    const updated = await sql`
+      UPDATE discord_integration_config
+      SET
+        bot_token_vault_id = ${vaultId}::uuid,
+        guild_id = COALESCE(guild_id, ${envGuildId ?? null}),
+        invite_link = COALESCE(invite_link, ${envInviteLink ?? null}),
+        updated_at = now()
+      WHERE id = 'singleton' AND bot_token_vault_id IS NULL
+      RETURNING id
+    `;
+    if (updated.length === 0) {
+      throw new Error(
+        "discord_integration_config singleton was claimed by another writer between SELECT and UPDATE"
+      );
+    }
+  } catch (updateError) {
+    try {
+      await sql`SELECT vault.delete_secret(${vaultId}::uuid)`;
+    } catch (cleanupError) {
+      console.error(
+        "⚠️  Failed to clean up orphaned vault secret",
+        vaultId,
+        cleanupError.message ?? cleanupError
+      );
+    }
+    throw updateError;
+  }
 
   console.log("✅ Discord seeded:");
   console.log("   - bot_token_vault_id set");
