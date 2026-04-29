@@ -32,8 +32,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const result = await cleanupOrphanedBlobs();
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    log.error({ err: message }, "Blob cleanup cron failed");
+    log.error({ err }, "Blob cleanup cron failed");
     return NextResponse.json({ error: "Cleanup failed" }, { status: 500 });
   }
 }
