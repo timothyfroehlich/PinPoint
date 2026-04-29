@@ -42,7 +42,10 @@ BEGIN
   );
 
   -- Create default notification preferences
-  -- New user defaults: only assigned + new issue on owned machines (email) are ON
+  -- New user defaults: only assigned + new issue on owned machines (email) are ON.
+  -- Discord columns (discord_enabled, discord_notify_on_*, discord_watch_*) are
+  -- intentionally omitted from this column list — they pick up DB-level DEFAULTs
+  -- from migration 0031. The production trigger in 0033 follows the same pattern.
   INSERT INTO public.notification_preferences (
     user_id,
     email_enabled,

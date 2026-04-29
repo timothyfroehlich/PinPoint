@@ -89,11 +89,13 @@ export function DiscordConfigForm({
   const canValidateToken = tokenAvailable;
   const canValidateServer = tokenAvailable && guildIdInput.length > 0;
 
-  // Switch gating: turning the integration ON requires fresh validation.
-  //
-  // - Both Validate buttons must report "valid" in this session, OR
-  // - The saved state was already enabled — admins can return to the
-  //   already-validated state without re-running probes.
+  // Switch gating: turning the integration ON requires fresh validation,
+  // OR the saved state was already enabled (so the admin can flip back to
+  // a known-good state without re-running probes). Note this is a UI gate
+  // only — the server action re-runs `probeServerMembership` on every
+  // enabled save and rejects bad config regardless of what the client
+  // permitted, so an admin who flips OFF, edits a field to something
+  // invalid, and flips back ON will be rejected on submit.
   //
   // Turning OFF is always allowed.
   const validationsPassed =

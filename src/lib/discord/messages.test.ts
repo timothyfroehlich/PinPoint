@@ -76,6 +76,32 @@ describe("formatDiscordMessage", () => {
     expect(out).toMatch(/@\u200Bhere/);
   });
 
+  it("breaks angle-bracket mention forms (<@USER_ID>, <#CHANNEL_ID>, <@&ROLE_ID>)", () => {
+    // allowed_mentions: { parse: [] } in client.ts blocks the actual ping,
+    // but Discord still RENDERS the mention as "@username" / "#channel" in
+    // the recipient's DM, which would let a malicious title impersonate
+    // a system mention. Sanitize must break the syntax visually too.
+    const out = formatDiscordMessage({
+      type: "issue_assigned",
+      siteUrl: "https://app.example.com",
+      issueTitle: "Hi <@123456> see <#7890> via <@&5555> role",
+      formattedIssueId: "X-1",
+      resourceType: "issue",
+      resourceId: "i1",
+      machineName: undefined,
+      newStatus: undefined,
+      commentContent: undefined,
+    });
+
+    // None of the raw mention forms render — every `<` gets a ZWSP after it.
+    expect(out).not.toMatch(/<@\d/);
+    expect(out).not.toMatch(/<#\d/);
+    expect(out).not.toMatch(/<@&\d/);
+    expect(out).toMatch(/<\u200B@\u200B123456/);
+    expect(out).toMatch(/<\u200B#7890/);
+    expect(out).toMatch(/<\u200B@\u200B&5555/);
+  });
+
   it("escapes Markdown control characters in user-supplied content", () => {
     const out = formatDiscordMessage({
       type: "issue_assigned",

@@ -415,6 +415,10 @@ export async function saveDiscordConfig(
 
     if (orphanGuard.vaultId) {
       try {
+        // vault.delete_secret is the inverse of vault.create_secret/
+        // update_secret used above (pg_vault extension). Best-effort —
+        // a failure here just leaves a stray encrypted secret in
+        // vault.secrets; the singleton row already isn't pointing at it.
         await db.execute(
           sql`SELECT vault.delete_secret(${orphanGuard.vaultId}::uuid)`
         );
