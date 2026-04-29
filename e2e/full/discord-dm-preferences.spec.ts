@@ -7,16 +7,7 @@ import {
   updateUserRole,
   disableDiscordIntegration,
   enableDiscordIntegrationForTest,
-  linkDiscordIdentityForTest,
-  unlinkDiscordIdentityForTest,
 } from "../support/supabase-admin.js";
-
-// Both describes in this file mutate the singleton discord_integration_config
-// row (one disables, the other enables). With workers=2 in CI, the first
-// describe's afterAll (disable) can race with the second describe's tests
-// (which need it enabled), hiding the Discord column / Send test DM button
-// mid-flight. Force serial execution so the suites don't trample each other.
-test.describe.configure({ mode: "serial" });
 
 test.describe("Discord DM preferences", () => {
   let memberEmail: string;
@@ -174,10 +165,10 @@ test.describe("Discord DM preferences (integration enabled)", () => {
     // token, so the result will be a failure — but the form must render
     // a result paragraph rather than hang or crash.
     //
-    // The Connected Accounts section gates `showTestDm` on `isLinked` from
-    // `getUserIdentities()`, not the mirror column, so we have to forge a
-    // Discord identity in `auth.identities` to make the button render.
-    await linkDiscordIdentityForTest(memberId, "test-discord-id-test-dm");
+    // The section gates `showTestDm` on `canReceiveDiscordDms` (the mirror
+    // column), which is exactly what the dispatcher reads at delivery time.
+    // setUserDiscordId is sufficient to flip the gate.
+    await setUserDiscordId(memberId, "test-discord-id-test-dm");
 
     try {
       await loginAs(page, testInfo, {
@@ -196,7 +187,7 @@ test.describe("Discord DM preferences (integration enabled)", () => {
       const resultMessage = page.getByRole("status");
       await expect(resultMessage).toBeVisible({ timeout: 15_000 });
     } finally {
-      await unlinkDiscordIdentityForTest(memberId);
+      await setUserDiscordId(memberId, null);
     }
   });
 });
