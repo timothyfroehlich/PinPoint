@@ -158,7 +158,7 @@ export async function ensureUserProfile(user: User): Promise<void> {
     log.error(
       {
         userId: user.id,
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
       },
       "Failed to auto-heal user profile"
     );

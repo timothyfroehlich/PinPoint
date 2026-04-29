@@ -198,7 +198,7 @@ export async function POST(request: Request): Promise<Response> {
     });
   } catch (err) {
     log.error(
-      { error: err instanceof Error ? err.message : String(err) },
+      { err: err instanceof Error ? err.message : String(err) },
       "Test data cleanup failed"
     );
     return NextResponse.json(

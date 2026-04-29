@@ -70,7 +70,7 @@ export async function runSignInWithProvider(
 
   if (error || !data.url) {
     log.error(
-      { providerKey: rawKey, error: error?.message, action: "oauth-sign-in" },
+      { providerKey: rawKey, err: error?.message, action: "oauth-sign-in" },
       "signInWithOAuth failed"
     );
     return err("SERVER", "Unable to start OAuth sign-in");
@@ -119,7 +119,7 @@ export async function runLinkProvider(
       {
         userId: user.id,
         providerKey: rawKey,
-        error: error?.message,
+        err: error?.message,
         action: "oauth-link",
       },
       "linkIdentity failed"
@@ -153,7 +153,7 @@ export async function runUnlinkProvider(
     log.error(
       {
         userId: user.id,
-        error: identitiesError.message,
+        err: identitiesError.message,
         action: "oauth-unlink",
       },
       "getUserIdentities failed"
@@ -182,7 +182,7 @@ export async function runUnlinkProvider(
       {
         userId: user.id,
         providerKey: rawKey,
-        error: unlinkError.message,
+        err: unlinkError.message,
         action: "oauth-unlink",
       },
       "unlinkIdentity failed"

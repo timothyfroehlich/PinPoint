@@ -70,7 +70,7 @@ export async function uploadToBlob(
     });
   } catch (err) {
     const errorDetails = {
-      error: err instanceof Error ? err.message : String(err),
+      err: err instanceof Error ? err.message : String(err),
       pathname,
     };
     log.error(errorDetails, "Blob upload failed");
@@ -125,7 +125,7 @@ export async function deleteFromBlob(pathname: string): Promise<void> {
     await del(pathname);
   } catch (err) {
     const errorDetails = {
-      error: err instanceof Error ? err.message : String(err),
+      err: err instanceof Error ? err.message : String(err),
       pathname,
     };
     log.error(errorDetails, "Blob deletion failed");
