@@ -34,7 +34,7 @@ You can also "watch" individual issues or machines — the events above use the 
 1. Make sure an admin has enabled the Discord integration. If not, the Discord column won't appear.
 2. Go to **Settings → Connected Accounts → Connect Discord** and authorize PinPoint.
 3. Click **Send test DM** to confirm the bot can reach you. If it can't, make sure you've joined the configured Discord server and that you allow DMs from server members in your Discord privacy settings.
-4. Open **Settings → Notifications** and tick the events you want as DMs. Defaults match your email selections.
+4. Open **Settings → Notifications** and tick the events you want as DMs. Discord starts with the same per-event defaults as email (assigned, mentions, new issues are on; status changes and comments are off). Adjust per-event from there.
 
 ### Email
 
@@ -47,7 +47,7 @@ The **Don't notify me about my own actions** toggle suppresses notifications whe
 ## Troubleshooting
 
 - **Discord column is missing from the preferences page.** The integration isn't admin-enabled yet. Once an admin enables it, the column appears for everyone. Check the [Discord help page](/help/discord) for the full setup.
-- **Discord column shows but the switches are disabled.** The integration is enabled, but you haven't linked your Discord account yet. Use the **Link Discord** button in the column header to connect.
+- **Discord column shows but the switches are disabled.** The integration is enabled, but you haven't linked your Discord account yet. The **Discord Notifications** master switch in the Channels section at the top includes a **Link Discord** link — click it to jump to Connected Accounts and authorize.
 - **I'm getting too many notifications.** Turn off the channels you don't read regularly, or disable the events that don't matter to you. The matrix is per-channel-per-event so you can keep, say, mentions on email but mute everything else.
 - **No notifications at all.** Check the master switch at the top of each channel. If a channel's master switch is off, every event in that column is suppressed regardless of the per-event toggles.
 

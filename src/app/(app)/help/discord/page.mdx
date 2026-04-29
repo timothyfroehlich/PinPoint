@@ -19,17 +19,19 @@ Both features depend on the same admin-side configuration. They can be set up in
 
 1. Go to **Settings → Connected Accounts → Connect Discord** and authorize PinPoint.
 2. Use **Send test DM** under the Discord row to verify the bot can reach your inbox.
-3. Open **Settings → Notifications** and pick which events you want as DMs (Discord defaults match your email selections).
+3. Open **Settings → Notifications** and pick which events you want as DMs. Discord starts with the same per-event defaults as email — assigned issues, mentions, and new issues are on; status changes and comments are off. Adjust per-event from there.
 
 You can disconnect Discord at any time from the same Connected Accounts row — you'll be asked to confirm. Disconnecting stops DMs immediately; re-link to resume.
 
 ## How admins enable it
 
+The admin page is a single form with three fields and inline validation.
+
 1. Go to **Integrations → Discord** (the Integrations link is in the user dropdown, admins only).
-2. Paste the bot token from the Discord developer portal and save it.
-3. Optionally set the **Guild ID** for the Discord server and an **Invite link** — the invite link is surfaced to users when DMs fail because they aren't in the server.
-4. Flip the **Integration enabled** switch. The switch stays disabled until a token has been saved.
-5. Use **Verify bot token** under Test connection to confirm the bot can authenticate against Discord.
+2. Paste the bot token from the Discord developer portal into **Bot token** and click **Validate** next to it. A green check appears when Discord accepts the token.
+3. Enter the **Server ID** for your Discord server and click **Validate** next to it — this confirms the bot is a member of that server. Optionally fill **Invite link**; it's surfaced to users when DMs fail because they aren't in the server.
+4. Flip the **Integration enabled** switch. The switch stays disabled until both the token and server ID validate cleanly.
+5. Click **Save changes**. Tokens are written to Supabase Vault — you'll never see the saved value again, only re-paste a fresh one to rotate.
 
 Without a saved token the "Sign in with Discord" button stays hidden for everyone, and Discord is omitted from each user's notification preferences.
 

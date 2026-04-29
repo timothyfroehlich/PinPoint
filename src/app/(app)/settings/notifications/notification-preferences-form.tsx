@@ -154,10 +154,10 @@ export function NotificationPreferencesForm({
       )}
 
       {/* Preserve Discord preference values when the Discord column is hidden
-          (integration disabled OR user not linked). Without these, missing
-          form fields would be coerced to false on save and silently wipe the
-          user's saved Discord prefs. Mirror of the internal-account email
-          preservation block above. */}
+          (integration disabled — `showDiscord` mirrors `discordIntegrationEnabled`,
+          not link state). Without these, missing form fields would be coerced
+          to false on save and silently wipe the user's saved Discord prefs.
+          Mirror of the internal-account email preservation block above. */}
       {!showDiscord && (
         <>
           <input
