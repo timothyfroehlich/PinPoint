@@ -3,6 +3,7 @@ import { setTimeout } from "node:timers";
 import { log } from "~/lib/logger";
 
 const DISCORD_API = "https://discord.com/api/v10";
+const MAX_RETRY_AFTER_SECONDS = 5;
 
 export type SendDmResult =
   | { ok: true }
@@ -64,6 +65,16 @@ async function postMessage(
   let res = await send();
   if (res.status === 429) {
     const retryAfterSec = parseRetryAfter(res);
+    if (retryAfterSec > MAX_RETRY_AFTER_SECONDS) {
+      log.warn(
+        {
+          retryAfterSec,
+          action: "sendDm.rateLimit",
+        },
+        "Discord retry-after exceeds inline retry budget"
+      );
+      return { ok: false, reason: "rate_limited" };
+    }
     await sleep(retryAfterSec * 1000);
     res = await send();
     if (res.status === 429) return { ok: false, reason: "rate_limited" };

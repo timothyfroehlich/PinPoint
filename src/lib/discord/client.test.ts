@@ -85,6 +85,29 @@ describe("sendDm", () => {
     expect(attempt).toBe(2);
   });
 
+  it("does not sleep on retry-after values above the inline retry budget", async () => {
+    let messageAttempts = 0;
+    installFetchMock((call) => {
+      if (call.url.endsWith("/users/@me/channels")) {
+        return new Response(JSON.stringify({ id: "dm-1" }), { status: 200 });
+      }
+      messageAttempts += 1;
+      return new Response(JSON.stringify({ retry_after: 60 }), {
+        status: 429,
+        headers: { "retry-after": "60" },
+      });
+    });
+
+    await expect(
+      sendDm({
+        botToken: "t",
+        discordUserId: "u",
+        content: "hi",
+      })
+    ).resolves.toEqual({ ok: false, reason: "rate_limited" });
+    expect(messageAttempts).toBe(1);
+  });
+
   it("returns reason='blocked' on 403 with Discord code 50007 (cannot DM user)", async () => {
     installFetchMock((call) =>
       call.url.endsWith("/users/@me/channels")

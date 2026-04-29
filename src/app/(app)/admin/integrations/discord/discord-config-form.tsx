@@ -11,7 +11,7 @@ import { Badge } from "~/components/ui/badge";
 import { CheckCircle2, AlertCircle, Loader2, Check } from "lucide-react";
 import { cn } from "~/lib/utils";
 import {
-  saveDiscordConfig,
+  saveDiscordConfigAction,
   validateBotToken,
   validateServerId,
   type SaveDiscordConfigResult,
@@ -63,7 +63,7 @@ export function DiscordConfigForm({
   const [saveState, saveFormAction, isPending] = useActionState<
     SaveDiscordConfigResult | undefined,
     FormData
-  >(async (_prev, formData) => saveDiscordConfig(formData), undefined);
+  >(saveDiscordConfigAction, undefined);
 
   // After a successful save, reconcile local state with the freshly-saved
   // server values. revalidatePath() in the action causes the parent server

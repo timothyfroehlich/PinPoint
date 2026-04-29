@@ -203,6 +203,13 @@ export type SaveDiscordConfigResult =
       }[];
     };
 
+export async function saveDiscordConfigAction(
+  _previousState: SaveDiscordConfigResult | undefined,
+  formData: FormData
+): Promise<SaveDiscordConfigResult> {
+  return saveDiscordConfig(formData);
+}
+
 /**
  * Atomic save for the Discord admin form. Validates token and server
  * membership server-side before any DB write. Both must pass.
