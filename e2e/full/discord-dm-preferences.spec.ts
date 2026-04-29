@@ -11,6 +11,13 @@ import {
   unlinkDiscordIdentityForTest,
 } from "../support/supabase-admin.js";
 
+// Both describes in this file mutate the singleton discord_integration_config
+// row (one disables, the other enables). With workers=2 in CI, the first
+// describe's afterAll (disable) can race with the second describe's tests
+// (which need it enabled), hiding the Discord column / Send test DM button
+// mid-flight. Force serial execution so the suites don't trample each other.
+test.describe.configure({ mode: "serial" });
+
 test.describe("Discord DM preferences", () => {
   let memberEmail: string;
   let memberId: string;

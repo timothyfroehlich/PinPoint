@@ -1,5 +1,4 @@
 import "server-only";
-import { setTimeout } from "node:timers";
 import { log } from "~/lib/logger";
 
 const DISCORD_API = "https://discord.com/api/v10";
@@ -144,6 +143,6 @@ function parseRetryAfter(res: Response): number {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
-    setTimeout(resolve, ms);
+    globalThis.setTimeout(resolve, ms);
   });
 }
