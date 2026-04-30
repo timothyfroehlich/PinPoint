@@ -85,9 +85,12 @@ export function DiscordConfigForm({
 
   // Activation rule: switch is interactive iff a token exists somewhere —
   // either committed in DB or freshly typed (Save will commit them together).
-  const tokenAvailable = hasToken || tokenInput.length > 0;
+  // Trim before checking so whitespace-only input doesn't enable Validate /
+  // the activation switch — the server schema also `.trim()`s and would
+  // otherwise reject the save, leading to confusing UX.
+  const tokenAvailable = hasToken || tokenInput.trim().length > 0;
   const canValidateToken = tokenAvailable;
-  const canValidateServer = tokenAvailable && guildIdInput.length > 0;
+  const canValidateServer = tokenAvailable && guildIdInput.trim().length > 0;
 
   // Switch gating: turning the integration ON requires fresh validation,
   // OR the saved state was already enabled (so the admin can flip back to
@@ -182,7 +185,11 @@ export function DiscordConfigForm({
         <FieldLabel
           htmlFor="newToken"
           label="Bot token"
-          required
+          // Server schema treats newToken as optional ("" = no change when a
+          // token is already saved). Only flag the input as required when
+          // there's no saved token to fall back on, otherwise screen-reader
+          // required-field cues misrepresent the actual validation rule.
+          required={!hasToken}
           hint="From Discord Developer Portal → your app → Bot → Reset Token."
           savedBadge={hasToken && tokenInput === ""}
         />

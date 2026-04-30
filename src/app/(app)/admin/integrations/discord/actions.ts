@@ -58,7 +58,7 @@ async function probeBotToken(token: string): Promise<ValidateBotTokenResult> {
     log.error(
       {
         action: "probeBotToken",
-        err: error instanceof Error ? error.message : "Unknown",
+        err: error,
       },
       "Discord token validation failed"
     );
@@ -101,7 +101,7 @@ async function probeServerMembership(
     log.error(
       {
         action: "probeServerMembership",
-        err: error instanceof Error ? error.message : "Unknown",
+        err: error,
       },
       "Discord server validation failed"
     );
@@ -128,7 +128,7 @@ async function resolveTokenForValidation(
     log.error(
       {
         action: "resolveTokenForValidation",
-        err: error instanceof Error ? error.message : "Unknown",
+        err: error,
       },
       "Failed to read saved Discord token from Vault"
     );
@@ -409,7 +409,7 @@ export async function saveDiscordConfig(
       {
         action: "saveDiscordConfig",
         userId,
-        err: error instanceof Error ? error.message : "Unknown",
+        err: error,
       },
       "Failed to save Discord config"
     );
@@ -436,7 +436,7 @@ export async function saveDiscordConfig(
           {
             action: "saveDiscordConfig.vaultCleanup",
             vaultId: orphanGuard.vaultId,
-            err: cleanupErr instanceof Error ? cleanupErr.message : "Unknown",
+            err: cleanupErr,
           },
           "Failed to clean up orphaned vault secret"
         );
