@@ -17,7 +17,7 @@ const updateSetMock = vi.hoisted(() =>
 );
 const updateMock = vi.hoisted(() => vi.fn(() => ({ set: updateSetMock })));
 
-vi.mock("~/lib/notification-formatting", () => ({
+vi.mock("~/lib/notifications/channels/email-channel", () => ({
   verifyUnsubscribeToken: verifyTokenMock,
 }));
 

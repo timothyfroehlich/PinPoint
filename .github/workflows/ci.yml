@@ -963,6 +963,28 @@ jobs:
           }
           echo "$output"
 
+  # ==============================================================================
+  # CI Gate (Aggregator)
+  #
+  # Two tiers of required jobs:
+  #
+  #   1. ALWAYS-RUNS (must succeed): linters, gitleaks
+  #      These run on every PR including docs-only changes. Their `success` is
+  #      strictly required - failure or cancellation fails the gate.
+  #
+  #   2. PATH-FILTERED (optional outcomes): build, lint, format, typecheck,
+  #      test-*, pnpm-audit
+  #      These only run when source changes. On docs-only PRs they cascade-skip
+  #      because they depend on `setup` which is gated by `changes.outputs.code`.
+  #      `skipped` and `cancelled` pass; only `failure` fails the gate.
+  #
+  # Why allow `cancelled`?
+  #   - Cascade-skips from a gated `needs:` chain can surface as `cancelled`
+  #     instead of `skipped` depending on how the runner schedules them.
+  #   - Concurrency cancel-in-progress (when a new push supersedes an old run)
+  #     marks queued jobs `cancelled`. The replacement run becomes the
+  #     authoritative status, so it is safe to treat the cancelled run as pass.
+  # ==============================================================================
   ci-gate:
     name: CI Gate
     if: always()
@@ -989,18 +1011,47 @@ jobs:
           egress-policy: audit
 
       - name: Check required job results
+        env:
+          # Tier 1: always-runs jobs - must be `success`.
+          LINTERS_RESULT: ${{ needs.linters.result }}
+          GITLEAKS_RESULT: ${{ needs.gitleaks.result }}
+          # Tier 2: path-filtered jobs - `failure` fails the gate;
+          # `success`, `skipped`, and `cancelled` all pass.
+          BUILD_RESULT: ${{ needs.build.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          FORMAT_RESULT: ${{ needs.format.result }}
+          TYPECHECK_RESULT: ${{ needs.typecheck.result }}
+          TEST_UNIT_RESULT: ${{ needs.test-unit.result }}
+          TEST_INTEGRATION_RESULT: ${{ needs.test-integration.result }}
+          TEST_MIGRATIONS_RESULT: ${{ needs.test-migrations.result }}
+          TEST_INTEGRATION_SUPABASE_RESULT: ${{ needs.test-integration-supabase.result }}
+          TEST_E2E_SMOKE_RESULT: ${{ needs.test-e2e-smoke.result }}
+          TEST_E2E_SMOKE_MOBILE_CHROME_RESULT: ${{ needs.test-e2e-smoke-mobile-chrome.result }}
+          TEST_E2E_FULL_CHROMIUM_RESULT: ${{ needs.test-e2e-full-chromium.result }}
+          PNPM_AUDIT_RESULT: ${{ needs.pnpm-audit.result }}
         run: |
-          results=("${{ needs.linters.result }}" "${{ needs.gitleaks.result }}" \
-                   "${{ needs.build.result }}" "${{ needs.lint.result }}" \
-                   "${{ needs.format.result }}" "${{ needs.typecheck.result }}" \
-                   "${{ needs.test-unit.result }}" "${{ needs.test-integration.result }}" \
-                   "${{ needs.test-migrations.result }}" "${{ needs.test-integration-supabase.result }}" \
-                   "${{ needs.test-e2e-smoke.result }}" "${{ needs.test-e2e-smoke-mobile-chrome.result }}" \
-                   "${{ needs.test-e2e-full-chromium.result }}" "${{ needs.pnpm-audit.result }}")
-          for r in "${results[@]}"; do
-            if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then
-              echo "::error::One or more required jobs failed or were cancelled"
+          # Tier 1: always-runs jobs - must be `success`.
+          required=("$LINTERS_RESULT" "$GITLEAKS_RESULT")
+          for r in "${required[@]}"; do
+            if [[ "$r" != "success" ]]; then
+              echo "::error::Always-runs job did not succeed (result=$r)"
               exit 1
             fi
           done
-          echo "All required jobs passed or were skipped"
+
+          # Tier 2: path-filtered jobs - `failure` fails; `success`, `skipped`,
+          # and `cancelled` all pass. Cascade-skips on docs-only PRs and
+          # concurrency cancellations are intentional and should not block merge.
+          optional=("$BUILD_RESULT" "$LINT_RESULT" \
+                    "$FORMAT_RESULT" "$TYPECHECK_RESULT" \
+                    "$TEST_UNIT_RESULT" "$TEST_INTEGRATION_RESULT" \
+                    "$TEST_MIGRATIONS_RESULT" "$TEST_INTEGRATION_SUPABASE_RESULT" \
+                    "$TEST_E2E_SMOKE_RESULT" "$TEST_E2E_SMOKE_MOBILE_CHROME_RESULT" \
+                    "$TEST_E2E_FULL_CHROMIUM_RESULT" "$PNPM_AUDIT_RESULT")
+          for r in "${optional[@]}"; do
+            if [[ "$r" == "failure" ]]; then
+              echo "::error::Path-filtered job failed (result=$r)"
+              exit 1
+            fi
+          done
+          echo "All required jobs passed; path-filtered jobs passed, were skipped, or were cancelled"

@@ -94,7 +94,7 @@ export async function updateUserRole(
     log.error(
       {
         action: "updateUserRole",
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
       },
       "Failed to update user role"
     );
@@ -196,7 +196,7 @@ export async function inviteUser(
           {
             action: "inviteUser",
             email: validated.email,
-            error: emailResult.error,
+            err: emailResult.error,
           },
           "Failed to send invitation email"
         );
@@ -233,7 +233,7 @@ export async function inviteUser(
     log.error(
       {
         action: "inviteUser",
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
         stack: error instanceof Error ? error.stack : undefined,
       },
       "Invite user failed"
@@ -297,7 +297,7 @@ export async function removeInvitedUser(
       {
         action: "removeInvitedUser",
         userId,
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
         stack: error instanceof Error ? error.stack : undefined,
       },
       "Remove invited user failed"
@@ -350,7 +350,7 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean }> {
           action: "resendInvite",
           userId,
           email: invited.email,
-          error: emailResult.error,
+          err: emailResult.error,
         },
         "Failed to resend invitation email"
       );
@@ -379,7 +379,7 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean }> {
       {
         action: "resendInvite",
         userId,
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
         stack: error instanceof Error ? error.stack : undefined,
       },
       "Resend invite failed"

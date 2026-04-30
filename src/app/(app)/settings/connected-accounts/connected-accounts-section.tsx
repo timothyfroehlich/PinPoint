@@ -45,7 +45,7 @@ export async function ConnectedAccountsSection(): Promise<React.JSX.Element> {
 
   if (identitiesError) {
     log.error(
-      { userId: user.id, error: identitiesError.message },
+      { userId: user.id, err: identitiesError.message },
       "Failed to load connected account identities"
     );
     return (

@@ -314,7 +314,7 @@ export async function submitPublicIssueAction(
           } catch (dbError) {
             log.error(
               {
-                error: dbError instanceof Error ? dbError.message : dbError,
+                err: dbError instanceof Error ? dbError.message : dbError,
                 issueId: issue.id,
                 orphanedBlobs: imagesMetadata.map((img) => img.blobPathname),
               },
@@ -332,8 +332,7 @@ export async function submitPublicIssueAction(
       } catch (parseError) {
         log.error(
           {
-            error:
-              parseError instanceof Error ? parseError.message : parseError,
+            err: parseError instanceof Error ? parseError.message : parseError,
             issueId: issue.id,
           },
           "Failed to parse images metadata"

@@ -198,8 +198,14 @@ export async function deleteAccountAction(
         "You are the only admin. Promote another user to admin before deleting your account."
       );
     }
-    log.error({ error }, "Account deletion failed");
-    return err("SERVER", "Failed to delete account. Please try again.");
+    return serverActionError(
+      error,
+      "SERVER",
+      "Failed to delete account. Please try again.",
+      {
+        action: "deleteAccountAction",
+      }
+    );
   }
 
   redirect("/");
@@ -273,7 +279,7 @@ export async function changePasswordAction(
   const accountLimit = await checkLoginAccountLimit(user.email ?? user.id);
   if (!accountLimit.success) {
     log.warn(
-      { userId: user.id, action: "change-password" },
+      { userId: user.id, action: "changePasswordRateLimit" },
       "Change password rate limit exceeded"
     );
     return err("SERVER", "Too many attempts. Please try again later.");
@@ -281,11 +287,12 @@ export async function changePasswordAction(
 
   try {
     if (!user.email) {
-      log.error(
-        { userId: user.id, action: "change-password" },
-        "User has no email — cannot verify password"
+      return serverActionError(
+        new Error("User has no email — cannot verify password"),
+        "SERVER",
+        "Unable to verify your identity.",
+        { userId: user.id, action: "changePasswordMissingEmail" }
       );
-      return err("SERVER", "Unable to verify your identity.");
     }
 
     // Supabase has no "verify password" API, so we use signInWithPassword.
@@ -310,15 +317,12 @@ export async function changePasswordAction(
     });
 
     if (updateError) {
-      log.error(
-        {
-          userId: user.id,
-          action: "change-password",
-          error: updateError.message,
-        },
-        "Password update failed"
+      return serverActionError(
+        updateError,
+        "SERVER",
+        "Failed to update password. Please try again.",
+        { userId: user.id, action: "changePasswordUpdateError" }
       );
-      return err("SERVER", "Failed to update password. Please try again.");
     }
 
     log.info(
@@ -328,14 +332,9 @@ export async function changePasswordAction(
 
     return ok({ success: true });
   } catch (error) {
-    log.error(
-      {
-        userId: user.id,
-        error: error instanceof Error ? error.message : "Unknown",
-        action: "change-password",
-      },
-      "Change password server error"
-    );
-    return err("SERVER", "An unexpected error occurred.");
+    return serverActionError(error, "SERVER", "An unexpected error occurred.", {
+      action: "changePasswordAction",
+      userId: user.id,
+    });
   }
 }

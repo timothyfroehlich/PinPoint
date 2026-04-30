@@ -373,7 +373,7 @@ export async function signupAction(
         {
           userId: data.user.id,
           action: "signup",
-          error: termsError instanceof Error ? termsError.message : "Unknown",
+          err: termsError instanceof Error ? termsError.message : "Unknown",
         },
         "Failed to record terms acceptance timestamp"
       );
@@ -442,7 +442,7 @@ export async function logoutAction(): Promise<void> {
 
     if (error) {
       log.error(
-        { userId: user?.id, error: error.message, action: "logout" },
+        { userId: user?.id, err: error.message, action: "logout" },
         "Logout failed"
       );
 

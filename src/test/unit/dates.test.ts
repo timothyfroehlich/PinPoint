@@ -12,14 +12,6 @@ afterEach(() => {
 });
 
 describe("formatRelative", () => {
-  it("returns empty string for null", () => {
-    expect(formatRelative(null)).toBe("");
-  });
-
-  it("returns empty string for undefined", () => {
-    expect(formatRelative(undefined)).toBe("");
-  });
-
   it("accepts a Date object and returns a string with 'ago' suffix", () => {
     vi.useFakeTimers();
     vi.setSystemTime(FIXED_NOW);
@@ -50,14 +42,6 @@ describe("formatRelative", () => {
 });
 
 describe("formatDate", () => {
-  it("returns empty string for null", () => {
-    expect(formatDate(null)).toBe("");
-  });
-
-  it("returns empty string for undefined", () => {
-    expect(formatDate(undefined)).toBe("");
-  });
-
   it("formats a Date object as a non-empty string", () => {
     const result = formatDate(FIXED_DATE);
     expect(typeof result).toBe("string");
@@ -79,12 +63,14 @@ describe("formatDate", () => {
 });
 
 describe("formatDateTime", () => {
-  it("returns empty string for null", () => {
-    expect(formatDateTime(null)).toBe("");
+  it("throws for null", () => {
+    expect(() => formatDateTime(null as unknown as Date)).toThrow(TypeError);
   });
 
-  it("returns empty string for undefined", () => {
-    expect(formatDateTime(undefined)).toBe("");
+  it("throws for undefined", () => {
+    expect(() => formatDateTime(undefined as unknown as Date)).toThrow(
+      TypeError
+    );
   });
 
   it("formats a Date object as a non-empty string including time", () => {

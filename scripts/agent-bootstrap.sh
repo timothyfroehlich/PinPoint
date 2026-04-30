@@ -33,6 +33,16 @@ BEADS_PREFIX="PP"
 log()  { printf '\033[36m[bootstrap]\033[0m %s\n' "$*"; }
 warn() { printf '\033[33m[bootstrap]\033[0m %s\n' "$*" >&2; }
 
+# Anchor CWD to the repo root regardless of where the setup command was
+# invoked from. Setup commands in some web envs run from $HOME with the
+# script passed by absolute path, which breaks every relative path below
+# (.beads/, package.json, etc.). BASH_SOURCE is reliable across relative,
+# absolute, and symlink invocations.
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/.." && pwd)"
+cd "$repo_root"
+log "working from $repo_root"
+
 ensure_path() {
   local d=$1
   case ":$PATH:" in *":$d:"*) ;; *) export PATH="$d:$PATH" ;; esac

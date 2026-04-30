@@ -241,7 +241,7 @@ export async function uploadIssueImage(formData: FormData): Promise<
     } catch (caughtErr) {
       log.error(
         {
-          error:
+          err:
             caughtErr instanceof Error ? caughtErr.message : String(caughtErr),
           blobPathname: uploadedBlobPathname,
         },
@@ -256,8 +256,7 @@ export async function uploadIssueImage(formData: FormData): Promise<
   } catch (caughtErr) {
     log.error(
       {
-        error:
-          caughtErr instanceof Error ? caughtErr.message : String(caughtErr),
+        err: caughtErr instanceof Error ? caughtErr.message : String(caughtErr),
       },
       "Upload action failed"
     );

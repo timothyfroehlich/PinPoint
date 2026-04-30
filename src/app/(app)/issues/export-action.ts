@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
-import { log } from "~/lib/logger";
+import { serverActionError } from "~/lib/observability/report-error";
 import { type Result, ok, err } from "~/lib/result";
 import {
   buildWhereConditions,
@@ -165,7 +165,11 @@ export async function exportIssuesAction(input: {
 
     return ok({ csv, fileName });
   } catch (error) {
-    log.error({ error }, "Failed to export issues");
-    return err("SERVER", "An error occurred while exporting issues.");
+    return serverActionError(
+      error,
+      "SERVER",
+      "An error occurred while exporting issues.",
+      { action: "exportIssues" }
+    );
   }
 }

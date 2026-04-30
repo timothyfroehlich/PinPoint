@@ -108,7 +108,7 @@ export async function verifyTurnstileToken(
     log.error(
       {
         action: "turnstile",
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
       },
       "Turnstile verification request failed"
     );

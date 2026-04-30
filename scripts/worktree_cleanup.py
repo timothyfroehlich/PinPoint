@@ -114,7 +114,15 @@ def main() -> None:
             subprocess.run(["docker", "volume", "rm"] + volumes, capture_output=True)
             print(f"Removed {len(volumes)} Docker volume(s)", file=sys.stderr)
 
-    # Remove git worktree first — only deallocate slot if removal succeeds
+    # Unlock first. Claude Code agent runtimes lock worktrees while in use,
+    # and the lock persists after the agent finishes; `git worktree remove
+    # --force` does NOT bypass these locks. Unlock errors (e.g., "not locked")
+    # are harmless and intentionally ignored.
+    subprocess.run(
+        ["git", "worktree", "unlock", str(worktree_path)],
+        capture_output=True,
+    )
+
     result = subprocess.run(
         ["git", "worktree", "remove", "--force", str(worktree_path)],
         capture_output=True,
@@ -122,12 +130,13 @@ def main() -> None:
     )
     if result.returncode != 0:
         print(
-            f"Warning: git worktree remove failed: {result.stderr.strip()}",
+            f"Failed to remove worktree {worktree_path}: {result.stderr.strip()}",
             file=sys.stderr,
         )
-    else:
-        subprocess.run(["git", "worktree", "prune"], capture_output=True)
-        deallocate_slot(str(worktree_path))
+        sys.exit(1)
+
+    subprocess.run(["git", "worktree", "prune"], capture_output=True)
+    deallocate_slot(str(worktree_path))
 
     print(f"Cleaned up worktree: {worktree_path}", file=sys.stderr)
 

@@ -311,7 +311,7 @@ describe("Dashboard Queries (PGlite)", () => {
           id: machines.id,
           name: machines.name,
           initials: machines.initials,
-          fixedAt: sql<Date>`max(${issues.updatedAt})`.as("fixed_at"),
+          fixedAt: sql<Date | null>`max(${issues.updatedAt})`.as("fixed_at"),
         })
         .from(machines)
         .innerJoin(issues, eq(issues.machineInitials, machines.initials))
@@ -371,7 +371,7 @@ describe("Dashboard Queries (PGlite)", () => {
           id: machines.id,
           name: machines.name,
           initials: machines.initials,
-          fixedAt: sql<Date>`max(${issues.updatedAt})`.as("fixed_at"),
+          fixedAt: sql<Date | null>`max(${issues.updatedAt})`.as("fixed_at"),
         })
         .from(machines)
         .innerJoin(issues, eq(issues.machineInitials, machines.initials))

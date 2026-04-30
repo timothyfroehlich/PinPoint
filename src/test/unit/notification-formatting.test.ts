@@ -4,7 +4,7 @@ import {
   getEmailSubject,
   generateUnsubscribeToken,
   verifyUnsubscribeToken,
-} from "~/lib/notification-formatting";
+} from "~/lib/notifications/channels/email-channel";
 
 vi.mock("~/lib/url", () => ({
   getSiteUrl: () => "http://test.com",

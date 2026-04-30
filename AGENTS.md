@@ -127,18 +127,16 @@ conflicts across worktrees and force-push requirements on open PRs.
 - Only use when user explicitly requests it
 - Never add `gh pr merge` or broad wildcard tool patterns without explicit user approval.
 
-### Merge Ban
-
-- **Agents MUST NOT run merge commands** (`gh pr merge`, `git merge` into main, etc.)
-- When a PR is ready to merge, present the exact command to the user and let them run it directly
-- This applies to all agents — lead, teammates, and subagents
-- We use **squash merges only**: `gh pr merge --squash <PR>`
-- A PreToolUse hook blocks merge commands and reminds you of this rule
-
 ### CI Workflow
 
 - When investigating CI failures, check for merge conflicts FIRST:
-  `gh pr view <PR> --json mergeable`. A dirty mergeable state blocks all CI.
+  `gh pr view <PR> --json mergeable,mergeStateStatus`. A `DIRTY`/`CONFLICTING`
+  state means GitHub silently skips `pull_request:synchronize` workflow runs
+  (it can't create the merge commit needed for testing). **If you push fixes
+  while in this state, CI will not run them.** Resolve the conflicts first
+  via `git fetch origin && git merge origin/main` (per our merge-don't-rebase
+  policy), then push. `pnpm run check` includes a `check:behind-main` step
+  that warns about this proactively.
 - Never push directly to protected branches (main). Always use a feature branch.
 - After code changes, run `pnpm run preflight` before considering work complete.
   For trivial changes (comments, docs), `pnpm run check` is sufficient.
@@ -284,6 +282,29 @@ For multiple independent tasks, use worktree-isolated subagents.
 - DON'T forget to check Copilot comments before merging
 
 See `pinpoint-orchestrator` skill for the full workflow.
+
+### Claude in Web Candidates
+
+Some work is well-suited for Claude in Web — the cloud session that runs in a browser-based environment without local Supabase, dev server, or interactive debugging. Tag those issues with the `web-ready` label so they're easy to discover and dispatch.
+
+> Commands below use `bd` (the [beads](https://github.com/timothyfroehlich/beads) issue tracker that PinPoint uses for task management — the full command reference is loaded at session start via the `bd prime` hook). `<id>` refers to a beads issue ID like `PP-3or`.
+
+**Triage gates — all must pass before tagging `web-ready`:**
+
+1. **Decision-closed.** No open architecture questions, no "discuss with user", no TBDs in design notes.
+2. **Scope-pinned.** Specific files or unambiguous instructions (e.g., "rename X to Y wherever it appears"). Acceptance criteria writable as test cases.
+3. **UI gate.** No UI, or only mechanical UI (rename, prop rewire, copy change, icon swap, delete dead element). Excludes work where "does this look right?" matters.
+4. **Test gate.** Pure unit (`pnpm run check`) **or** integration/E2E that runs in CI against the auto-provisioned Supabase branch DB. The verification plan must say "CI passing is sufficient" — no local stack iteration required.
+5. **Self-contained.** No cross-PR coordination, no dependency on an open PR.
+
+**Workflow:**
+
+- Tag during grooming: `bd label add web-ready <id>` and append a one-line note explaining the fit (e.g., "Web-ready: unit tests, single-file scope").
+- If a fixable gate fails (missing acceptance criteria, undecided UI, etc.), leave a note describing the gap instead of tagging — surface for refinement.
+- Discover candidates: `bd query "label=web-ready AND status=open"` (combine with `--priority-max` to prioritize).
+- After Claude in Web ships a PR, treat it like any other agent PR: Copilot review, CI, ready-for-review label, then user merges.
+
+**On Supabase branching:** every PR auto-provisions a branch DB with migrations + seed via the `Supabase Branch Setup` workflow. Claude in Web never touches local Supabase — CI exercises the integration path.
 
 ## 5. Documentation Philosophy
 

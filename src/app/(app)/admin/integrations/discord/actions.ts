@@ -7,6 +7,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { saveDiscordConfigSchema, validateServerIdSchema } from "./schema";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getDiscordTokenForAdmin } from "~/lib/discord/config";
 
@@ -57,7 +58,7 @@ async function probeBotToken(token: string): Promise<ValidateBotTokenResult> {
     log.error(
       {
         action: "probeBotToken",
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
       },
       "Discord token validation failed"
     );
@@ -100,7 +101,7 @@ async function probeServerMembership(
     log.error(
       {
         action: "probeServerMembership",
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
       },
       "Discord server validation failed"
     );
@@ -127,7 +128,7 @@ async function resolveTokenForValidation(
     log.error(
       {
         action: "resolveTokenForValidation",
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
       },
       "Failed to read saved Discord token from Vault"
     );
@@ -408,10 +409,18 @@ export async function saveDiscordConfig(
       {
         action: "saveDiscordConfig",
         userId,
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
       },
       "Failed to save Discord config"
     );
+    // Surface to Sentry — admin save failures are user-facing incidents
+    // (the action returns errors and the user sees a generic "try again",
+    // so without Sentry we'd have no signal that anything broke).
+    reportError(error, {
+      action: "saveDiscordConfig",
+      bestEffort: false,
+      userId,
+    });
 
     if (orphanGuard.vaultId) {
       try {
@@ -427,10 +436,18 @@ export async function saveDiscordConfig(
           {
             action: "saveDiscordConfig.vaultCleanup",
             vaultId: orphanGuard.vaultId,
-            error: cleanupErr instanceof Error ? cleanupErr.message : "Unknown",
+            err: cleanupErr instanceof Error ? cleanupErr.message : "Unknown",
           },
           "Failed to clean up orphaned vault secret"
         );
+        // Orphaned vault secret is a separate-and-worse incident than the
+        // original save failure — flag it explicitly so it doesn't get
+        // lost in the noise.
+        reportError(cleanupErr, {
+          action: "saveDiscordConfig.vaultCleanup",
+          bestEffort: true,
+          vaultId: orphanGuard.vaultId,
+        });
       }
     }
 

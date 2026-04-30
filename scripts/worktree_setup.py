@@ -11,6 +11,7 @@ import fcntl
 import json
 import os
 import re
+import shlex
 import stat
 import subprocess
 import sys
@@ -29,6 +30,8 @@ BASE_PORT_POOLER = 54329
 BASE_PORT_INBUCKET = 54324
 BASE_PORT_SMTP = 54325
 BASE_PORT_POP3 = 54326
+# Brainstorm server port: slot 1 → 49001, slot 96 → 49096. Uses high, non-privileged ports.
+BASE_PORT_BRAINSTORM = 49000
 
 MANIFEST_PATH = Path.home() / ".config" / "pinpoint" / "worktree-slots.json"
 
@@ -124,6 +127,10 @@ class PortConfig:
     @property
     def pop3_port(self) -> int:
         return BASE_PORT_POP3 + self._offset
+
+    @property
+    def brainstorm_port(self) -> int:
+        return BASE_PORT_BRAINSTORM + self.slot
 
     @property
     def site_url(self) -> str:
@@ -395,22 +402,79 @@ def write_protected_file(path: Path, content: str) -> None:
     path.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
 
 
+def resolve_brainstorm_server_path() -> str | None:
+    """Find the highest-version superpowers brainstorming start-server.sh.
+
+    Returns the absolute path of the start-server.sh script under the highest
+    installed version directory of the superpowers plugin using dotted numeric
+    comparison, with non-numeric segments sorting lower, or None if no install
+    is found (e.g., the plugin isn't installed yet — this is fine).
+    """
+    plugin_root = (
+        Path.home()
+        / ".claude"
+        / "plugins"
+        / "cache"
+        / "claude-plugins-official"
+        / "superpowers"
+    )
+    matches = list(plugin_root.glob("*/skills/brainstorming/scripts/start-server.sh"))
+    if not matches:
+        return None
+
+    def _version_key(path: Path) -> tuple[int, ...]:
+        # Path layout: .../superpowers/<version>/skills/brainstorming/scripts/start-server.sh
+        # The version segment is 4 levels above start-server.sh.
+        version_segment = path.parents[3].name
+        parts: list[int] = []
+        for piece in version_segment.split("."):
+            try:
+                parts.append(int(piece))
+            except ValueError:
+                # Non-numeric segments sort lowest so stable releases beat them.
+                parts.append(-1)
+        return tuple(parts)
+
+    best = max(matches, key=_version_key)
+    return str(best.resolve())
+
+
 def generate_launch_json(worktree_path: Path, port_config: PortConfig) -> None:
-    """Generate .claude/launch.json with the worktree's Next.js port."""
+    """Generate .claude/launch.json with the worktree's Next.js + brainstorm ports."""
     claude_dir = worktree_path / ".claude"
     claude_dir.mkdir(exist_ok=True)
     launch_path = claude_dir / "launch.json"
+
+    configurations: list[dict[str, object]] = [
+        {
+            "name": "next-dev",
+            "runtimeExecutable": "pnpm",
+            "runtimeArgs": ["run", "dev"],
+            "port": port_config.nextjs_port,
+        }
+    ]
+
+    brainstorm_path = resolve_brainstorm_server_path()
+    if brainstorm_path is not None:
+        configurations.append(
+            {
+                "name": "brainstorm",
+                "runtimeExecutable": "bash",
+                "runtimeArgs": [
+                    "-c",
+                    (
+                        f"BRAINSTORM_PORT={port_config.brainstorm_port} "
+                        f'{shlex.quote(brainstorm_path)} --project-dir "$PWD" --foreground'
+                    ),
+                ],
+                "port": port_config.brainstorm_port,
+            }
+        )
+
     content = json.dumps(
         {
             "version": "0.0.1",
-            "configurations": [
-                {
-                    "name": "next-dev",
-                    "runtimeExecutable": "pnpm",
-                    "runtimeArgs": ["run", "dev"],
-                    "port": port_config.nextjs_port,
-                }
-            ],
+            "configurations": configurations,
         },
         indent=2,
     )

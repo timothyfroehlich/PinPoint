@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
-import { log } from "~/lib/logger";
+import { serverActionError } from "~/lib/observability/report-error";
 import { type Result, ok, err } from "~/lib/result";
 import { toggleIssueWatcher } from "~/services/issues";
 import { db } from "~/server/db";
@@ -40,7 +40,8 @@ export async function toggleWatcherAction(
 
     return ok(result);
   } catch (error) {
-    log.error({ error, action: "toggleWatcher" }, "toggleWatcherAction failed");
-    return err("SERVER", "Failed to toggle watcher");
+    return serverActionError(error, "SERVER", "Failed to toggle watcher", {
+      action: "toggleWatcher",
+    });
   }
 }

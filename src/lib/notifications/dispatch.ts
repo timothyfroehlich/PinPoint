@@ -11,6 +11,7 @@ import {
 } from "~/server/db/schema";
 import type { IssueWatcher } from "~/lib/types/database";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import { getChannels } from "./channels/registry";
 import type { ChannelContext, DeliveryResult } from "./channels/types";
 
@@ -276,9 +277,11 @@ export async function createNotification(
     for (const r of results) {
       if (r.status === "rejected") {
         // Channel.deliver() is expected to catch its own errors and return
-        // {ok:false}. A rejection here means a bug — log at error level.
-        const err: unknown = r.reason;
-        log.error({ err }, "Notification channel delivery rejected");
+        // {ok:false}. A rejection here means a bug — log at error level and report to Sentry.
+        reportError(r.reason, {
+          bestEffort: false,
+          action: "notifications.dispatch.fanout",
+        });
       }
     }
   }
