@@ -83,7 +83,7 @@ export async function updateDiscordConfig(formData: FormData): Promise<void> {
       {
         action: "updateDiscordConfig",
         userId,
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
       },
       "Failed to update Discord config"
     );
@@ -171,7 +171,7 @@ export async function rotateBotToken(formData: FormData): Promise<void> {
         userId,
         // Only log that the token was present; never the value
         hasToken: rawToken.length > 0,
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
       },
       "Failed to rotate Discord bot token"
     );
@@ -211,7 +211,7 @@ export async function sendTestDm(): Promise<SendTestDmResult> {
     log.error(
       {
         action: "sendTestDm",
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
       },
       "Discord test DM verification failed"
     );

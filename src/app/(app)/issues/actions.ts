@@ -656,10 +656,7 @@ export async function addCommentAction(
         JSON.parse(imagesMetadataStr)
       );
     } catch (e) {
-      log.error(
-        { error: e, issueId },
-        "Failed to parse comment images metadata"
-      );
+      log.error({ err: e, issueId }, "Failed to parse comment images metadata");
       // Non-blocking, but log it
     }
   }

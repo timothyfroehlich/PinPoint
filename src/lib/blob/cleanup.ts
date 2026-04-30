@@ -136,7 +136,7 @@ export async function cleanupOrphanedBlobs(): Promise<CleanupResult> {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       log.error(
-        { error: errorMessage, batchStart: i, batchSize: batch.length },
+        { err: errorMessage, batchStart: i, batchSize: batch.length },
         "Failed to delete blob batch"
       );
       result.errors.push(...batch);

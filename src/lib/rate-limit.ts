@@ -278,7 +278,7 @@ export async function checkLoginIpLimit(ip: string): Promise<RateLimitResult> {
     };
   } catch (error) {
     log.error(
-      { error: error instanceof Error ? error.message : "Unknown", ip },
+      { err: error instanceof Error ? error.message : "Unknown", ip },
       "Login IP rate limit check failed"
     );
     if (isProductionEnv()) {
@@ -338,7 +338,7 @@ export async function checkPublicIssueLimit(
     };
   } catch (error) {
     log.error(
-      { error: error instanceof Error ? error.message : "Unknown", ip },
+      { err: error instanceof Error ? error.message : "Unknown", ip },
       "Public issue rate limit check failed"
     );
     if (isProductionEnv()) {
@@ -398,7 +398,7 @@ export async function checkImageUploadLimit(
     };
   } catch (error) {
     log.error(
-      { error: error instanceof Error ? error.message : "Unknown", ip },
+      { err: error instanceof Error ? error.message : "Unknown", ip },
       "Image upload rate limit check failed"
     );
     if (isProductionEnv()) {
@@ -444,7 +444,7 @@ export async function checkLoginAccountLimit(
   } catch (error) {
     log.error(
       {
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
         email: email.substring(0, 3) + "***",
       },
       "Login account rate limit check failed"
@@ -504,7 +504,7 @@ export async function checkSignupLimit(ip: string): Promise<RateLimitResult> {
     };
   } catch (error) {
     log.error(
-      { error: error instanceof Error ? error.message : "Unknown", ip },
+      { err: error instanceof Error ? error.message : "Unknown", ip },
       "Signup rate limit check failed"
     );
     if (isProductionEnv()) {
@@ -550,7 +550,7 @@ export async function checkForgotPasswordLimit(
   } catch (error) {
     log.error(
       {
-        error: error instanceof Error ? error.message : "Unknown",
+        err: error instanceof Error ? error.message : "Unknown",
         email: email.substring(0, 3) + "***",
       },
       "Forgot password rate limit check failed"
