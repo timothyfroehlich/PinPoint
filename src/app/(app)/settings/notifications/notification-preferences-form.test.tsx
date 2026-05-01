@@ -2,35 +2,43 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
-import { NotificationPreferencesForm } from "./notification-preferences-form";
+import {
+  NotificationPreferencesForm,
+  type NotificationPreferencesData,
+} from "./notification-preferences-form";
 import * as actions from "./actions";
 
-// Spy on the server action
 const updatePreferencesSpy = vi.spyOn(
   actions,
   "updateNotificationPreferencesAction"
 );
 
-describe("NotificationPreferencesForm", () => {
-  const defaultPreferences = {
-    userId: "test-user-id",
-    emailEnabled: true,
-    inAppEnabled: true,
-    suppressOwnActions: false,
-    emailNotifyOnNewIssue: false,
-    inAppNotifyOnNewIssue: false,
-    emailWatchNewIssuesGlobal: false,
-    inAppWatchNewIssuesGlobal: false,
-    emailNotifyOnAssigned: true,
-    inAppNotifyOnAssigned: true,
-    emailNotifyOnStatusChange: true,
-    inAppNotifyOnStatusChange: true,
-    emailNotifyOnNewComment: true,
-    inAppNotifyOnNewComment: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+const defaultPreferences: NotificationPreferencesData = {
+  emailEnabled: true,
+  inAppEnabled: true,
+  discordEnabled: true,
+  suppressOwnActions: false,
+  emailNotifyOnNewIssue: false,
+  inAppNotifyOnNewIssue: false,
+  discordNotifyOnNewIssue: false,
+  emailWatchNewIssuesGlobal: false,
+  inAppWatchNewIssuesGlobal: false,
+  discordWatchNewIssuesGlobal: false,
+  emailNotifyOnAssigned: true,
+  inAppNotifyOnAssigned: true,
+  discordNotifyOnAssigned: true,
+  emailNotifyOnStatusChange: true,
+  inAppNotifyOnStatusChange: true,
+  discordNotifyOnStatusChange: false,
+  emailNotifyOnNewComment: true,
+  inAppNotifyOnNewComment: true,
+  discordNotifyOnNewComment: false,
+  emailNotifyOnMentioned: true,
+  inAppNotifyOnMentioned: true,
+  discordNotifyOnMentioned: true,
+};
 
+describe("NotificationPreferencesForm", () => {
   it("should render form with initial preferences", () => {
     render(<NotificationPreferencesForm preferences={defaultPreferences} />);
     expect(screen.getByLabelText("Email Notifications")).toBeChecked();
@@ -52,18 +60,45 @@ describe("NotificationPreferencesForm", () => {
     const user = userEvent.setup();
     render(<NotificationPreferencesForm preferences={defaultPreferences} />);
 
-    // Change a toggle
     const emailSwitch = screen.getByLabelText("Email Notifications");
     await user.click(emailSwitch);
     expect(emailSwitch).not.toBeChecked();
 
-    // Click cancel
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
-    // Re-query because the form was re-mounted
     const resetEmailSwitch = screen.getByLabelText("Email Notifications");
-
-    // Verify reset
     expect(resetEmailSwitch).toBeChecked();
+  });
+
+  it("hides Discord column when integration is not enabled", () => {
+    render(<NotificationPreferencesForm preferences={defaultPreferences} />);
+    expect(
+      screen.queryByLabelText("Discord Notifications")
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders Discord column when integration is enabled and user is linked", () => {
+    render(
+      <NotificationPreferencesForm
+        preferences={defaultPreferences}
+        discordIntegrationEnabled
+        userHasDiscord
+      />
+    );
+    expect(screen.getByLabelText("Discord Notifications")).toBeChecked();
+  });
+
+  it("disables Discord switches and shows Link CTA when user has not linked Discord", () => {
+    render(
+      <NotificationPreferencesForm
+        preferences={defaultPreferences}
+        discordIntegrationEnabled
+      />
+    );
+    expect(screen.getByLabelText("Discord Notifications")).toBeDisabled();
+    expect(screen.getByRole("link", { name: /link discord/i })).toHaveAttribute(
+      "href",
+      "#connected-accounts"
+    );
   });
 });

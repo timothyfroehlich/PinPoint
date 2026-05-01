@@ -54,6 +54,13 @@ runs:
         env_lines+=$'\n'"INBUCKET_SMTP_PORT=${smtp_port}"
         env_lines+=$'\n'"EMAIL_TRANSPORT=smtp"
 
+        # Discord OAuth — dummy values so providers.discord.isAvailable()
+        # returns true and the Connected Accounts row + login button render
+        # in CI. The OAuth flow itself isn't exercised; tests bypass it via
+        # direct DB writes (setUserDiscordId).
+        env_lines+=$'\n'"DISCORD_CLIENT_ID=ci_dummy_discord_client_id"
+        env_lines+=$'\n'"DISCORD_CLIENT_SECRET=ci_dummy_discord_client_secret"
+
         # Write to $GITHUB_ENV (available to subsequent workflow steps)
         echo "$env_lines" >> "$GITHUB_ENV"
 

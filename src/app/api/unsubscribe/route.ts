@@ -43,7 +43,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       emailNotifyOnNewComment: false,
       emailNotifyOnNewIssue: false,
       emailWatchNewIssuesGlobal: false,
-      emailNotifyOnMachineOwnershipChange: false,
     })
     .where(eq(notificationPreferences.userId, uid))
     .returning({ userId: notificationPreferences.userId });

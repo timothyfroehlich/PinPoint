@@ -4,31 +4,42 @@ export const metadata = {
   title: "Discord Integration | PinPoint",
 };
 
-<HelpPage breadcrumb="Discord Integration" title="Discord Integration" description="How PinPoint uses Discord for sign-in and (soon) direct-message notifications.">
+<HelpPage breadcrumb="Discord Integration" title="Discord Integration" description="How PinPoint uses Discord for sign-in and direct-message notifications.">
 
 ## What it does
 
-Discord currently powers the **Sign in with Discord** button on the login and signup pages. Once enabled by an admin, members can authenticate with their Discord account instead of an email and password.
+Discord powers two features in PinPoint:
 
-Per-user DM notifications are planned next — PinPoint will be able to deliver issue updates via direct message to members who have connected their Discord account.
+- **Sign in with Discord** — once enabled by an admin, members can authenticate with their Discord account instead of (or in addition to) an email and password.
+- **Direct-message notifications** — members who connect their Discord account can receive issue updates as DMs from the PinPoint bot, alongside (or instead of) email and in-app notifications.
 
-## How admins enable it
-
-1. Go to **Integrations → Discord** (the Integrations link is in the user dropdown, admins only).
-2. Paste the bot token from the Discord developer portal and save it.
-3. Optionally set the **Guild ID** for the APC server and an **Invite link** — the invite link is surfaced to users when DMs fail because they aren't in the server.
-4. Flip the **Integration enabled** switch. The switch stays disabled until a token has been saved.
-
-Without a saved token the "Sign in with Discord" button stays hidden for everyone.
+Both features depend on the same admin-side configuration. They can be set up independently per user from **Settings**.
 
 ## How users connect their account
 
-Once the integration is enabled, go to **Settings → Connected Accounts → Connect Discord** and follow the OAuth flow. Connecting is what lets PinPoint deliver DM notifications to your Discord inbox.
+1. Go to **Settings → Connected Accounts → Connect Discord** and authorize PinPoint.
+2. Use **Send test DM** under the Discord row to verify the bot can reach your inbox.
+3. Open **Settings → Notifications** and pick which events you want as DMs. Discord starts with the same per-event defaults as email — assigned issues, mentions, and new issues are on; status changes and comments are off. Adjust per-event from there.
+
+You can disconnect Discord at any time from the same Connected Accounts row — you'll be asked to confirm. Disconnecting stops DMs immediately; re-link to resume.
+
+## How admins enable it
+
+The admin page is a single form with three fields and inline validation.
+
+1. Go to **Integrations → Discord** (the Integrations link is in the user dropdown, admins only).
+2. Paste the bot token from the Discord developer portal into **Bot token** and click **Validate** next to it. A green check appears when Discord accepts the token.
+3. Enter the **Server ID** for your Discord server and click **Validate** next to it — this confirms the bot is a member of that server. Optionally fill **Invite link**; it's surfaced to users when DMs fail because they aren't in the server.
+4. Flip the **Integration enabled** switch. The switch stays disabled until both the token and server ID validate cleanly.
+5. Click **Save changes**. Tokens are written to Supabase Vault — you'll never see the saved value again, only re-paste a fresh one to rotate.
+
+Without a saved token the "Sign in with Discord" button stays hidden for everyone, and Discord is omitted from each user's notification preferences.
 
 ## Troubleshooting
 
 - **"Sign in with Discord" button is missing on the login page.** An admin hasn't enabled the integration yet. Ask an admin to set the bot token and flip the Enabled switch.
-- **DMs aren't arriving.** The bot can only DM users who share a server with it. Make sure you're in the APC Discord server — admins can share the invite link configured under Integrations.
+- **DMs aren't arriving.** The bot can only DM users who share a server with it. Make sure you're in the configured Discord server — admins can share the invite link from the Integrations page. If you've blocked DMs from server members in your Discord privacy settings, allow them.
+- **"Send test DM" returns "blocked".** Same root cause as above — usually privacy settings or not sharing a server with the bot.
 - **Bot health shows anything other than "healthy".** Possible values are `unknown`, `healthy`, and `degraded`. Re-check the bot token under Integrations and make sure the bot user hasn't been removed from the server.
 
 </HelpPage>

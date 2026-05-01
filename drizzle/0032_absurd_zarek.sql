@@ -1,0 +1,1 @@
+ALTER TABLE "notification_preferences" ALTER COLUMN "discord_notify_on_new_issue" SET DEFAULT true;

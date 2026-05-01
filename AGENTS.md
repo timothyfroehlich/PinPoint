@@ -90,6 +90,17 @@ slot N → Next.js 3000+(N*10), API 54321+(N*100), DB 54322+(N*100)
 - To modify: Edit `supabase/config.toml.template`, then switch branches to regenerate
 - _Supabase Failures_: Run `supabase stop` (current worktree only — never `--all`) then restart
 
+### Starting the Local Stack (Self-Service)
+
+If you need to run integration tests, E2E tests, `pnpm run preflight`, or `pnpm db:migrate` and either Docker (OrbStack) or this worktree's Supabase instance is not running, **start them yourself** — don't pause to ask the user.
+
+- **OrbStack stopped?** Run `open -a OrbStack` and wait a few seconds for the daemon, then `docker info` to confirm it's up.
+- **Supabase stopped?** From the current worktree: `supabase start`. The worktree's allocated ports (in `supabase/config.toml`) are isolated from other worktrees — starting yours does not interfere with anyone else's.
+
+What you must NOT do is unchanged: never `supabase stop --all`, never `pkill`/`killall`, never stop services you didn't start. Self-service applies only to **starting** services for the current worktree, not stopping shared resources.
+
+When you stand up the stack just so you can run a test or a dev server, you can leave it running — the user can `supabase stop` (worktree-local) when they're done. Tell them in your handoff what's running and how to stop it.
+
 ### Branch Management
 
 **Creating branches** - Ensure proper remote tracking:
@@ -119,7 +130,13 @@ conflicts across worktrees and force-push requirements on open PRs.
 ### CI Workflow
 
 - When investigating CI failures, check for merge conflicts FIRST:
-  `gh pr view <PR> --json mergeable`. A dirty mergeable state blocks all CI.
+  `gh pr view <PR> --json mergeable,mergeStateStatus`. A `DIRTY`/`CONFLICTING`
+  state means GitHub silently skips `pull_request:synchronize` workflow runs
+  (it can't create the merge commit needed for testing). **If you push fixes
+  while in this state, CI will not run them.** Resolve the conflicts first
+  via `git fetch origin && git merge origin/main` (per our merge-don't-rebase
+  policy), then push. `pnpm run check` includes a `check:behind-main` step
+  that warns about this proactively.
 - Never push directly to protected branches (main). Always use a feature branch.
 - After code changes, run `pnpm run preflight` before considering work complete.
   For trivial changes (comments, docs), `pnpm run check` is sufficient.

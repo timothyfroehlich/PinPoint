@@ -1,4 +1,4 @@
-/* eslint-disable eslint-comments/no-restricted-disable, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call -- Auth callback requires direct Supabase client usage which returns any */
+/* eslint-disable eslint-comments/no-restricted-disable, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- Auth callback requires direct Supabase client usage which returns any */
 /**
  * Auth callback route requires direct use of createServerClient with custom cookie handling
  * to properly set cookies in the response. Standard SSR wrapper cannot be used here.
@@ -9,6 +9,9 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { eq } from "drizzle-orm";
+import { db } from "~/server/db";
+import { userProfiles } from "~/server/db/schema";
 import { getSupabaseEnv } from "~/lib/supabase/env";
 import { getSiteUrl, isInternalUrl } from "~/lib/url";
 import { reportError } from "~/lib/observability/report-error";
@@ -95,9 +98,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      const {
-        data: { user: _user },
-      } = await supabase.auth.getUser();
+      await syncDiscordIdentity(supabase);
       return applyCookies(redirectToTarget(), pendingCookies);
     }
 
@@ -115,9 +116,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
 
     if (!error) {
-      const {
-        data: { user: _user },
-      } = await supabase.auth.getUser();
+      await syncDiscordIdentity(supabase);
       return applyCookies(redirectToTarget(), pendingCookies);
     }
 
@@ -149,6 +148,59 @@ function isValidEmailOtpType(value: string | null): value is EmailOtpType {
     value === "email_change" ||
     value === "email"
   );
+}
+
+async function syncDiscordIdentity(
+  supabase: ReturnType<typeof createServerClient>
+): Promise<void> {
+  // Errors here are non-fatal for the OAuth callback (the user is signed in
+  // either way) but they cause UI/runtime drift: the Connected Accounts
+  // panel reads auth.identities while testDiscordDmAction reads
+  // user_profiles.discord_user_id. A silent failure here means the badge
+  // says "Connected" but DMs report "Link your Discord account first."
+  // Wrap in try/catch + reportError so the divergence shows up in Sentry
+  // instead of disappearing.
+  try {
+    const { data: userResponse } = await supabase.auth.getUser();
+    const user = userResponse.user;
+    if (!user) return;
+
+    // getUserIdentities() makes a fresh query; user.identities from getUser()
+    // can lag behind a just-completed link. We only mirror when a Discord
+    // identity is actually present — a non-Discord sign-in (email/password,
+    // password recovery, magic link) must NOT silently clear an existing
+    // discord_user_id. Unlinking is handled in oauth-actions-core.ts.
+    const { data: identitiesData, error: identitiesError } =
+      await supabase.auth.getUserIdentities();
+    if (identitiesError) {
+      reportError(identitiesError, {
+        action: "auth.callback.syncDiscordIdentity",
+        step: "getUserIdentities",
+        userId: user.id,
+      });
+      return;
+    }
+
+    const identities = identitiesData.identities as {
+      provider: string;
+      identity_data?: { provider_id?: string; sub?: string };
+    }[];
+    const discord = identities.find((i) => i.provider === "discord");
+    if (!discord) return;
+
+    const discordUserId =
+      discord.identity_data?.provider_id ?? discord.identity_data?.sub ?? null;
+    if (!discordUserId) return;
+
+    await db
+      .update(userProfiles)
+      .set({ discordUserId })
+      .where(eq(userProfiles.id, user.id));
+  } catch (error) {
+    reportError(error, {
+      action: "auth.callback.syncDiscordIdentity",
+    });
+  }
 }
 
 function createSupabaseClient(request: NextRequest): {

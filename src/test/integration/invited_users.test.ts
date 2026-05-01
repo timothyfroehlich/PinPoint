@@ -595,7 +595,5 @@ describe("Invited Users Integration", () => {
     expect(prefs?.inAppNotifyOnNewComment).toBe(false);
     expect(prefs?.emailNotifyOnNewIssue).toBe(true);
     expect(prefs?.inAppNotifyOnNewIssue).toBe(false);
-    expect(prefs?.emailNotifyOnMachineOwnershipChange).toBe(false);
-    expect(prefs?.inAppNotifyOnMachineOwnershipChange).toBe(false);
   });
 });

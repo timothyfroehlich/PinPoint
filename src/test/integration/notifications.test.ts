@@ -26,6 +26,7 @@ vi.mock("~/lib/email/client", () => ({
 vi.mock("~/lib/logger", () => ({
   log: {
     error: vi.fn(),
+    warn: vi.fn(),
     info: vi.fn(),
     debug: vi.fn(),
   },
@@ -595,8 +596,6 @@ describe("createNotification (Integration)", () => {
       userId: recipient.id,
       emailEnabled: true,
       inAppEnabled: true,
-      emailNotifyOnMachineOwnershipChange: false,
-      inAppNotifyOnMachineOwnershipChange: false,
     });
 
     await createNotification(

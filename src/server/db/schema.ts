@@ -55,6 +55,7 @@ export const userProfiles = pgTable(
       .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
       .notNull(),
     avatarUrl: text("avatar_url"),
+    discordUserId: text("discord_user_id").unique(),
     role: text("role", { enum: ["guest", "member", "technician", "admin"] })
       .notNull()
       .default("guest"), // Default for new signups (no invitation)
@@ -478,17 +479,40 @@ export const notificationPreferences = pgTable(
       .notNull()
       .default(false),
 
-    // Machine Ownership Changes
-    emailNotifyOnMachineOwnershipChange: boolean(
-      "email_notify_on_machine_ownership_change"
-    )
+    // Machine ownership change is treated as a critical event across all
+    // channels: notifications fire regardless of per-event preference (only
+    // the channel's main switch can opt out). The three per-event opt-out
+    // columns (email/in-app/discord) were all dropped in migration 0033 —
+    // they were never honored by any channel implementation, so storing
+    // the bit served no purpose.
+
+    // Discord — main switch
+    discordEnabled: boolean("discord_enabled").notNull().default(true),
+
+    // Discord — per-event toggles (mirror email/in-app shape)
+    discordNotifyOnAssigned: boolean("discord_notify_on_assigned")
+      .notNull()
+      .default(true),
+    discordNotifyOnStatusChange: boolean("discord_notify_on_status_change")
       .notNull()
       .default(false),
-    inAppNotifyOnMachineOwnershipChange: boolean(
-      "in_app_notify_on_machine_ownership_change"
-    )
+    discordNotifyOnNewComment: boolean("discord_notify_on_new_comment")
       .notNull()
       .default(false),
+    discordNotifyOnMentioned: boolean("discord_notify_on_mentioned")
+      .notNull()
+      .default(true),
+    discordNotifyOnNewIssue: boolean("discord_notify_on_new_issue")
+      .notNull()
+      .default(true),
+    discordWatchNewIssuesGlobal: boolean("discord_watch_new_issues_global")
+      .notNull()
+      .default(false),
+
+    // PR 5 sets this when Discord rejects DMs to this user (used by failure detection).
+    discordDmBlockedAt: timestamp("discord_dm_blocked_at", {
+      withTimezone: true,
+    }),
   },
   (t) => ({
     globalWatchEmailIdx: index("idx_notif_prefs_global_watch_email").on(

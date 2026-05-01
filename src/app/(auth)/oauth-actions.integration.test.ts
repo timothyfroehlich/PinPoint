@@ -11,6 +11,12 @@ vi.mock("next/navigation", () => ({
     throw new Error(`NEXT_REDIRECT:${url}`);
   }),
 }));
+vi.mock("~/server/db", () => {
+  const where = vi.fn().mockResolvedValue(undefined);
+  const set = vi.fn(() => ({ where }));
+  const update = vi.fn(() => ({ set }));
+  return { db: { update } };
+});
 
 async function loadCore(): Promise<typeof OAuthCoreModule> {
   vi.resetModules();

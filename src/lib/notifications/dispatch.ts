@@ -125,7 +125,8 @@ export async function createNotification(
       where: (prefs, { or, eq }) =>
         or(
           eq(prefs.emailWatchNewIssuesGlobal, true),
-          eq(prefs.inAppWatchNewIssuesGlobal, true)
+          eq(prefs.inAppWatchNewIssuesGlobal, true),
+          eq(prefs.discordWatchNewIssuesGlobal, true)
         ),
     });
 
@@ -185,14 +186,19 @@ export async function createNotification(
 
   // 3. Fetch emails (avoid N+1)
   const users = await tx
-    .select({ id: userProfiles.id, email: userProfiles.email })
+    .select({
+      id: userProfiles.id,
+      email: userProfiles.email,
+      discordUserId: userProfiles.discordUserId,
+    })
     .from(userProfiles)
     .where(inArray(userProfiles.id, [...recipientIds]));
   const emailMap = new Map(users.map((u) => [u.id, u.email]));
+  const discordUserIdMap = new Map(users.map((u) => [u.id, u.discordUserId]));
 
   // 4. Fan-out per recipient using the channel registry.
   //    See src/lib/notifications/channels/registry.ts.
-  const channels = getChannels();
+  const channels = await getChannels();
 
   // Rows for batched in-app insert (preserves historical single-INSERT).
   const notificationsToInsert: {
@@ -225,6 +231,7 @@ export async function createNotification(
       resourceId,
       resourceType,
       email: emailMap.get(userId) ?? null,
+      discordUserId: discordUserIdMap.get(userId) ?? null,
       issueTitle: resolvedIssueTitle,
       machineName: resolvedMachineName,
       formattedIssueId: resolvedFormattedIssueId,
@@ -302,7 +309,13 @@ function buildDefaultPrefs(userId: string): NotificationPreferences {
     inAppNotifyOnNewIssue: false,
     emailWatchNewIssuesGlobal: false,
     inAppWatchNewIssuesGlobal: false,
-    emailNotifyOnMachineOwnershipChange: false,
-    inAppNotifyOnMachineOwnershipChange: false,
+    discordEnabled: true,
+    discordNotifyOnAssigned: true,
+    discordNotifyOnStatusChange: false,
+    discordNotifyOnNewComment: false,
+    discordNotifyOnMentioned: true,
+    discordNotifyOnNewIssue: true,
+    discordWatchNewIssuesGlobal: false,
+    discordDmBlockedAt: null,
   };
 }

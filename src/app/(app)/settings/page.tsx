@@ -10,6 +10,7 @@ import {
 } from "~/server/db/schema";
 import { eq, and, ne, count, inArray } from "drizzle-orm";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
+import { isDiscordIntegrationEnabled } from "~/lib/discord/config";
 import { ProfileForm } from "./profile-form";
 import { ConnectedAccountsSection } from "./connected-accounts/connected-accounts-section";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
@@ -76,6 +77,11 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
 
   const ownedMachineCount = ownedMachinesResult[0]?.count ?? 0;
 
+  // Discord integration state for the preferences form (PP-2n5). Only need
+  // the boolean here — skip the Vault decrypt that getDiscordConfig() does.
+  const discordIntegrationEnabled = await isDiscordIntegrationEnabled();
+  const userHasDiscord = profile.discordUserId !== null;
+
   // Check if user is the sole admin
   const isSoleAdmin =
     profile.role === "admin" && // permissions-audit-allow: sole-admin invariant (business rule)
@@ -123,21 +129,32 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             preferences={{
               emailEnabled: preferences.emailEnabled,
               inAppEnabled: preferences.inAppEnabled,
+              discordEnabled: preferences.discordEnabled,
               suppressOwnActions: preferences.suppressOwnActions,
               emailNotifyOnAssigned: preferences.emailNotifyOnAssigned,
               inAppNotifyOnAssigned: preferences.inAppNotifyOnAssigned,
+              discordNotifyOnAssigned: preferences.discordNotifyOnAssigned,
               emailNotifyOnStatusChange: preferences.emailNotifyOnStatusChange,
               inAppNotifyOnStatusChange: preferences.inAppNotifyOnStatusChange,
+              discordNotifyOnStatusChange:
+                preferences.discordNotifyOnStatusChange,
               emailNotifyOnNewComment: preferences.emailNotifyOnNewComment,
               inAppNotifyOnNewComment: preferences.inAppNotifyOnNewComment,
+              discordNotifyOnNewComment: preferences.discordNotifyOnNewComment,
               emailNotifyOnMentioned: preferences.emailNotifyOnMentioned,
               inAppNotifyOnMentioned: preferences.inAppNotifyOnMentioned,
+              discordNotifyOnMentioned: preferences.discordNotifyOnMentioned,
               emailNotifyOnNewIssue: preferences.emailNotifyOnNewIssue,
               inAppNotifyOnNewIssue: preferences.inAppNotifyOnNewIssue,
+              discordNotifyOnNewIssue: preferences.discordNotifyOnNewIssue,
               emailWatchNewIssuesGlobal: preferences.emailWatchNewIssuesGlobal,
               inAppWatchNewIssuesGlobal: preferences.inAppWatchNewIssuesGlobal,
+              discordWatchNewIssuesGlobal:
+                preferences.discordWatchNewIssuesGlobal,
             }}
             isInternalAccount={isInternalAccount(profile.email)}
+            discordIntegrationEnabled={discordIntegrationEnabled}
+            userHasDiscord={userHasDiscord}
           />
         </div>
 

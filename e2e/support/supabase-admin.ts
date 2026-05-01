@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import postgres from "postgres";
 
 /**
  * Supabase Admin Client for E2E Tests
@@ -207,6 +208,86 @@ export async function deleteTestIssueByNumber(
     .eq("issue_number", issueNumber);
 
   if (error) throw error;
+}
+
+/**
+ * Set the user_profiles.discord_user_id mirror for a test user.
+ * Mirrors what the auth callback would write after a Discord OAuth link.
+ */
+export async function setUserDiscordId(
+  userId: string,
+  discordUserId: string | null
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("user_profiles")
+    .update({ discord_user_id: discordUserId })
+    .eq("id", userId);
+  if (error) throw error;
+}
+
+/**
+ * Disable the Discord integration (clears bot_token_vault_id + sets
+ * enabled=false). Useful for after-test cleanup. Does NOT remove the
+ * underlying vault secret — that's harmless leftover.
+ */
+export async function disableDiscordIntegration(): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("discord_integration_config")
+    .update({
+      enabled: false,
+      bot_token_vault_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", "singleton");
+  if (error) throw error;
+}
+
+/**
+ * Enable the Discord integration with a fake bot token for E2E tests.
+ *
+ * Creates a vault secret, links it via `bot_token_vault_id`, and sets
+ * `enabled=true` on the singleton config row. After this, `getDiscordConfig()`
+ * returns a non-null config and the Discord column is rendered on the
+ * notification preferences page.
+ *
+ * Vault writes go through a direct postgres connection because vault.* lives
+ * in a separate schema that the supabase-js REST client can't reach. Pair
+ * with `disableDiscordIntegration()` in afterAll so the singleton row is
+ * restored for tests that depend on the disabled state.
+ */
+export async function enableDiscordIntegrationForTest(): Promise<void> {
+  const postgresUrl =
+    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  if (!postgresUrl) {
+    throw new Error(
+      "POSTGRES_URL_NON_POOLING / POSTGRES_URL not set. Check .env.local."
+    );
+  }
+
+  const sql = postgres(postgresUrl, { connect_timeout: 3, max: 1 });
+  try {
+    const rows = (await sql`
+      SELECT vault.create_secret(
+        ${"e2e-fake-discord-bot-token"},
+        ${`e2e_discord_bot_token_${Date.now()}`},
+        'Discord bot token (E2E test)'
+      ) AS id
+    `) as unknown as { id: string }[];
+    const vaultId = rows[0]?.id;
+    if (!vaultId) {
+      throw new Error("vault.create_secret returned no id");
+    }
+
+    await sql`
+      UPDATE discord_integration_config
+      SET enabled = true,
+          bot_token_vault_id = ${vaultId}::uuid,
+          updated_at = now()
+      WHERE id = 'singleton'
+    `;
+  } finally {
+    await sql.end();
+  }
 }
 
 /**

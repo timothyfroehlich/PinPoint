@@ -338,9 +338,38 @@ def format_env_file(
     return "\n".join(lines)
 
 
+def _read_user_keys(env_file: Path) -> dict[str, str]:
+    """Read non-managed (user-supplied) keys from a .env.local file.
+    Returns {} when the file doesn't exist."""
+    if not env_file.exists():
+        return {}
+    existing = parse_env_file(env_file)
+    return {k: v for k, v in existing.items() if k not in MANAGED_ENV_KEYS}
+
+
 def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
-    """Generate .env.local content, preserving user-provided custom keys."""
-    env_file = worktree_path / ".env.local"
+    """Generate .env.local content, preserving user-provided custom keys.
+
+    On first creation a new worktree has no .env.local of its own, so we
+    fall back to the main worktree's user keys (e.g., third-party API
+    keys, OAuth secrets, Discord bot tokens). Per-worktree overrides
+    always win — main's keys only fill gaps. This makes shared secrets
+    propagate automatically without manual copying.
+    """
+    target_keys = _read_user_keys(worktree_path / ".env.local")
+
+    main_keys: dict[str, str] = {}
+    try:
+        main_path = get_main_worktree()
+        if main_path != worktree_path:
+            main_keys = _read_user_keys(main_path / ".env.local")
+    except Exception:
+        # If git worktree introspection fails for any reason, just skip
+        # the inheritance step rather than blocking the whole setup.
+        pass
+
+    # Target wins; main fills gaps.
+    user_values = {**main_keys, **target_keys}
 
     managed_values = {
         "NEXT_PUBLIC_SUPABASE_URL": f"http://localhost:{port_config.api_port}",
@@ -361,11 +390,6 @@ def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
         "NEXT_PUBLIC_TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
         "TURNSTILE_SECRET_KEY": "1x0000000000000000000000000000000AA",
     }
-
-    user_values: dict[str, str] = {}
-    if env_file.exists():
-        existing = parse_env_file(env_file)
-        user_values = {k: v for k, v in existing.items() if k not in MANAGED_ENV_KEYS}
 
     return format_env_file(managed_values, user_values, port_config)
 

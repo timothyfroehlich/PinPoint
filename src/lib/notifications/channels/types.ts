@@ -21,6 +21,7 @@ export interface ChannelContext {
   resourceType: "issue" | "machine";
   // Recipient profile data
   email: string | null;
+  discordUserId: string | null;
   // Resolved at the top of createNotification before the fan-out
   issueTitle?: string | undefined;
   machineName?: string | undefined;

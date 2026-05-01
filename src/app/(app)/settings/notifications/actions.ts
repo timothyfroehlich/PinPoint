@@ -11,22 +11,29 @@ import { z } from "zod";
 const updatePreferencesSchema = z.object({
   emailEnabled: z.boolean(),
   inAppEnabled: z.boolean(),
+  discordEnabled: z.boolean(),
   suppressOwnActions: z.boolean(),
 
   // Granular Preferences
   emailNotifyOnAssigned: z.boolean(),
   inAppNotifyOnAssigned: z.boolean(),
+  discordNotifyOnAssigned: z.boolean(),
   emailNotifyOnStatusChange: z.boolean(),
   inAppNotifyOnStatusChange: z.boolean(),
+  discordNotifyOnStatusChange: z.boolean(),
   emailNotifyOnNewComment: z.boolean(),
   inAppNotifyOnNewComment: z.boolean(),
+  discordNotifyOnNewComment: z.boolean(),
   emailNotifyOnMentioned: z.boolean(),
   inAppNotifyOnMentioned: z.boolean(),
+  discordNotifyOnMentioned: z.boolean(),
   emailNotifyOnNewIssue: z.boolean(),
   inAppNotifyOnNewIssue: z.boolean(),
+  discordNotifyOnNewIssue: z.boolean(),
 
   emailWatchNewIssuesGlobal: z.boolean(),
   inAppWatchNewIssuesGlobal: z.boolean(),
+  discordWatchNewIssuesGlobal: z.boolean(),
 });
 
 export type UpdatePreferencesResult = Result<
@@ -50,26 +57,36 @@ export async function updateNotificationPreferencesAction(
   const rawData = {
     emailEnabled: formData.get("emailEnabled") === "on",
     inAppEnabled: formData.get("inAppEnabled") === "on",
+    discordEnabled: formData.get("discordEnabled") === "on",
     suppressOwnActions: formData.get("suppressOwnActions") === "on",
 
     // Granular Preferences
     emailNotifyOnAssigned: formData.get("emailNotifyOnAssigned") === "on",
     inAppNotifyOnAssigned: formData.get("inAppNotifyOnAssigned") === "on",
+    discordNotifyOnAssigned: formData.get("discordNotifyOnAssigned") === "on",
     emailNotifyOnStatusChange:
       formData.get("emailNotifyOnStatusChange") === "on",
     inAppNotifyOnStatusChange:
       formData.get("inAppNotifyOnStatusChange") === "on",
+    discordNotifyOnStatusChange:
+      formData.get("discordNotifyOnStatusChange") === "on",
     emailNotifyOnNewComment: formData.get("emailNotifyOnNewComment") === "on",
     inAppNotifyOnNewComment: formData.get("inAppNotifyOnNewComment") === "on",
+    discordNotifyOnNewComment:
+      formData.get("discordNotifyOnNewComment") === "on",
     emailNotifyOnMentioned: formData.get("emailNotifyOnMentioned") === "on",
     inAppNotifyOnMentioned: formData.get("inAppNotifyOnMentioned") === "on",
+    discordNotifyOnMentioned: formData.get("discordNotifyOnMentioned") === "on",
     emailNotifyOnNewIssue: formData.get("emailNotifyOnNewIssue") === "on",
     inAppNotifyOnNewIssue: formData.get("inAppNotifyOnNewIssue") === "on",
+    discordNotifyOnNewIssue: formData.get("discordNotifyOnNewIssue") === "on",
 
     emailWatchNewIssuesGlobal:
       formData.get("emailWatchNewIssuesGlobal") === "on",
     inAppWatchNewIssuesGlobal:
       formData.get("inAppWatchNewIssuesGlobal") === "on",
+    discordWatchNewIssuesGlobal:
+      formData.get("discordWatchNewIssuesGlobal") === "on",
   };
 
   const validation = updatePreferencesSchema.safeParse(rawData);

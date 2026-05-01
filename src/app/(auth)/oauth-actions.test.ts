@@ -12,6 +12,14 @@ vi.mock("next/navigation", () => ({
     throw new Error(`NEXT_REDIRECT:${url}`);
   }),
 }));
+vi.mock("~/server/db", () => {
+  // Drizzle's `db.update(table).set(...).where(...)` chains thenably.
+  // We don't care about the SQL, only that the call resolves.
+  const where = vi.fn().mockResolvedValue(undefined);
+  const set = vi.fn(() => ({ where }));
+  const update = vi.fn(() => ({ set }));
+  return { db: { update } };
+});
 
 async function loadCore(): Promise<typeof OAuthCoreModule> {
   vi.resetModules();
@@ -232,10 +240,17 @@ describe("unlinkProviderAction (wrapper)", () => {
       auth: { getUser, getUserIdentities, unlinkIdentity },
     });
 
+    const { db } = await import("~/server/db");
+    const updateMock = db.update as ReturnType<typeof vi.fn>;
+    const callsBefore = updateMock.mock.calls.length;
+
     const { unlinkProviderAction } = await loadActions();
     await expect(unlinkProviderAction("discord")).rejects.toThrow(
       /NEXT_REDIRECT:\/settings\?oauth_status=unlinked/
     );
+
+    // Discord-specific: discord_user_id mirror must be cleared on unlink.
+    expect(updateMock.mock.calls.length).toBe(callsBefore + 1);
   });
 
   it("redirects to /settings?oauth_error=ONLY_IDENTITY when refused", async () => {

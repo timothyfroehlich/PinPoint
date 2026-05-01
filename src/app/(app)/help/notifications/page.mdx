@@ -1,0 +1,54 @@
+import { HelpPage } from "~/components/help/HelpPage";
+
+export const metadata = {
+  title: "Notifications | PinPoint",
+};
+
+<HelpPage breadcrumb="Notifications" title="Notifications" description="How PinPoint tells you when things change — and how to control it.">
+
+## Channels
+
+PinPoint can deliver notifications through three channels. You can mix and match them per event from **Settings → Notifications**.
+
+- **In-app** — the bell icon in the header. Shows unread count and links straight to the issue.
+- **Email** — sent to your account's email address. Username-only accounts skip this channel.
+- **Discord DM** — direct message from the PinPoint bot. Available once the integration is enabled by an admin and you've linked your Discord account.
+
+## What can notify you
+
+Each event can be enabled or disabled independently per channel:
+
+- **Issue Assignment** — when an issue is assigned to you.
+- **Status Changes** — when an issue you're watching changes status (open → in progress → resolved).
+- **New Comments** — when someone comments on an issue you're watching.
+- **Mentions** — when someone @-mentions you in a comment.
+- **Owned Machines** — when a new issue is filed against a machine you own.
+- **All Machines** — every new issue filed in the system. Off by default; enable only if you actively triage.
+
+You can also "watch" individual issues or machines — the events above use the same notification rules for things you watch.
+
+## Setting it up
+
+### Discord DMs
+
+1. Make sure an admin has enabled the Discord integration. If not, the Discord column won't appear.
+2. Go to **Settings → Connected Accounts → Connect Discord** and authorize PinPoint.
+3. Click **Send test DM** to confirm the bot can reach you. If it can't, make sure you've joined the configured Discord server and that you allow DMs from server members in your Discord privacy settings.
+4. Open **Settings → Notifications** and tick the events you want as DMs. Discord starts with the same per-event defaults as email (assigned, mentions, new issues are on; status changes and comments are off). Adjust per-event from there.
+
+### Email
+
+Email notifications are on by default. Adjust per-event from **Settings → Notifications**. If you want to mute everything but keep the option to opt back in later, use the master **Email Notifications** switch at the top.
+
+### Quiet your own actions
+
+The **Don't notify me about my own actions** toggle suppresses notifications when you're the one who triggered the event. Most people leave this on.
+
+## Troubleshooting
+
+- **Discord column is missing from the preferences page.** The integration isn't admin-enabled yet. Once an admin enables it, the column appears for everyone. Check the [Discord help page](/help/discord) for the full setup.
+- **Discord column shows but the switches are disabled.** The integration is enabled, but you haven't linked your Discord account yet. The **Discord Notifications** master switch in the Channels section at the top includes a **Link Discord** link — click it to jump to Connected Accounts and authorize.
+- **I'm getting too many notifications.** Turn off the channels you don't read regularly, or disable the events that don't matter to you. The matrix is per-channel-per-event so you can keep, say, mentions on email but mute everything else.
+- **No notifications at all.** Check the master switch at the top of each channel. If a channel's master switch is off, every event in that column is suppressed regardless of the per-event toggles.
+
+</HelpPage>

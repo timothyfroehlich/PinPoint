@@ -1,11 +1,14 @@
 /**
  * E2E smoke: Admin Discord integration page.
  *
- * Covers the core admin surface shipped by PR 3 (PP-mud):
- * - Page renders with Status / Configuration / Test connection sections
- * - Test-DM button disabled when integration is off and no token is set
+ * Covers the redesigned single-form admin surface (PR 4 / PP-2n5):
+ * - Page renders with the heading and key form fields
+ * - Activation switch is disabled when no token is set in DB
  * - Navigation from the user menu lands on the Discord page
- * - Unauthenticated visitors don't see the Discord page heading
+ * - Unauthenticated visitors don't see the page heading
+ *
+ * The full admin-form behaviour (validate buttons, save round-trip,
+ * unsaved-changes guard) is covered by `e2e/full/admin-discord-integration.spec.ts`.
  */
 
 import { test, expect } from "@playwright/test";
@@ -14,26 +17,20 @@ import { STORAGE_STATE } from "../support/auth-state";
 test.describe("Admin Discord integration page", () => {
   test.use({ storageState: STORAGE_STATE.admin });
 
-  test("loads and renders the three sections", async ({ page }) => {
+  test("loads and renders the redesigned single form", async ({ page }) => {
     await page.goto("/admin/integrations/discord");
     await expect(
       page.getByRole("heading", { name: "Discord Integration" })
     ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Status" })).toBeVisible();
+    // Key form fields from the Pattern B redesign.
+    await expect(page.getByLabel("Bot token")).toBeVisible();
+    await expect(page.getByLabel("Server ID")).toBeVisible();
+    await expect(page.getByLabel("Invite link")).toBeVisible();
+    // Save / Reset footer.
     await expect(
-      page.getByRole("heading", { name: "Configuration" })
+      page.getByRole("button", { name: "Save changes" })
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Test connection" })
-    ).toBeVisible();
-  });
-
-  test("test-DM button is disabled when integration is off", async ({
-    page,
-  }) => {
-    await page.goto("/admin/integrations/discord");
-    const btn = page.getByTestId("discord-test-dm-button");
-    await expect(btn).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Reset" })).toBeVisible();
   });
 
   test("navigates here from the user menu", async ({ page }) => {
