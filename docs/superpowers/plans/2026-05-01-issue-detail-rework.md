@@ -874,6 +874,8 @@ EOF
 
 This is the largest task. Replace the page's body with the new structure: `PageContainer` → eyebrow → widened `PageHeader` (with `EditableIssueTitle` as the title node) → subtitle → `IssueMetadata` → `IssueTimeline` (and the page renders `StickyCommentComposer` at the end, conditionally).
 
+**Note on the `PageContainer` className override:** the `pb-[calc(56px+64px+env(safe-area-inset-bottom))] md:pb-10` class is required so mobile content clears BOTH the 56px `BottomTabBar` AND the ~52px `StickyCommentComposer` plus the iOS safe-area inset. On desktop (`md:`) the override falls back to `pb-10` since neither overlay is present. Per the design doc §5.3.1.
+
 - [ ] **Step 1: Read the current page to understand the imports and data flow**
 
 Run: `cat src/app/(app)/m/\[initials\]/i/\[issueNumber\]/page.tsx | head -50`
@@ -887,7 +889,10 @@ Open `src/app/(app)/m/[initials]/i/[issueNumber]/page.tsx`. Replace everything f
 ```tsx
 return (
   <>
-    <PageContainer size="standard">
+    <PageContainer
+      size="standard"
+      className="pb-[calc(56px+64px+env(safe-area-inset-bottom))] md:pb-10"
+    >
       <div className="space-y-2">
         <BackToIssuesLink href={issuesPath} />
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -1114,15 +1119,27 @@ render(<IssueMetadata issue={...} ... />);
 
 The props are nearly identical; the integration tests already cover the permission gating logic via the underlying `Update*Form` components.
 
-- [ ] **Step 5: Update `e2e/full/issues-crud.spec.ts`**
+- [ ] **Step 5: Update E2E specs that reference removed testids**
 
 Run: `rg -n "mobile-nav-row|issue-badge-strip|issue-sidebar" e2e/`
 
-For each test ID match, update:
+The actual files (NOT what the design doc table guessed):
 
-- `mobile-nav-row` is gone (the mobile-only breadcrumb row was removed) — remove tests that depend on this distinction; rely on the unified breadcrumb that exists at every viewport
-- `issue-badge-strip` is gone (the mobile bespoke strip was removed) — replace with `issue-metadata-grid`
-- `issue-sidebar` is gone — replace with `issue-metadata-grid`
+**`e2e/smoke/issues-crud.spec.ts` (lines ~226–244):** has a mobile/desktop conditional block asserting:
+
+- `getByTestId("mobile-nav-row").toBeVisible()` on mobile — testid removed; the unified eyebrow renders at every viewport
+- `getByRole("link", { name: /Back to Issues/i }).toHaveCount(0)` on mobile — must change. `BackToIssuesLink` is now ALWAYS visible (no `hidden md:block` wrapper), so the count is 1 on mobile too. Update to assert `toBeVisible()`.
+- `getByTestId("issue-sidebar").toBeHidden()` on mobile / `.toBeVisible()` on desktop with text "Reporter" / "Created" — testid removed. Replace with `getByTestId("issue-metadata-grid")` which is now visible at every viewport. Reporter/Created text is no longer in the metadata block; it's in the page subtitle row.
+- `getByTestId("issue-badge-strip").toBeVisible()` on mobile — testid removed. Drop this assertion entirely; the unified `issue-metadata-grid` covers both viewports.
+
+**`e2e/full/reporter-variations.spec.ts` (7 test cases):** every test does `page.getByTestId("issue-sidebar").toContainText(...)` for reporter names ("Member User", "John Guest", "League Player", "Anonymous", "Invited Guest", etc.). The sidebar is gone; reporter name now lives in the page subtitle row. Two options:
+
+- (a) Add `data-testid="issue-detail-subtitle"` to the subtitle div in `page.tsx` and use that selector. Choose this option — it's cleaner.
+- (b) Use `page.getByText("Reported by")` plus a chained text assertion. Brittle if the copy changes.
+
+If choosing option (a), modify `src/app/(app)/m/[initials]/i/[issueNumber]/page.tsx` to add `data-testid="issue-detail-subtitle"` to the existing subtitle `<div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">` (the one between PageHeader and IssueMetadata). This is a tiny addition to the page.tsx commit's scope but keeps the test selector contract clean.
+
+**Other files:** the rg search may turn up additional references. Update each per the same rules.
 
 - [ ] **Step 6: Run the full check suite**
 
