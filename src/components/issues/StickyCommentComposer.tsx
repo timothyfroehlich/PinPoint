@@ -29,12 +29,12 @@ export function StickyCommentComposer({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="md:hidden fixed bottom-[calc(56px+env(safe-area-inset-bottom))] left-0 right-0 z-30 border-t border-outline-variant bg-card/95 backdrop-blur-sm px-3 py-2">
+    <div className="md:hidden fixed bottom-[calc(56px+env(safe-area-inset-bottom))] left-0 right-0 z-30 border-t border-outline-variant bg-card/90 backdrop-blur-sm px-3 py-2">
       <Sheet open={open} onOpenChange={setOpen}>
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex w-full items-center gap-2 rounded-full border border-outline-variant bg-background px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:border-primary/40"
+          className="flex w-full items-center gap-2 rounded-full border border-outline-variant bg-background px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:border-primary/40 min-h-[44px]"
           aria-label="Add a comment"
         >
           <MessageSquarePlus className="size-4" aria-hidden="true" />

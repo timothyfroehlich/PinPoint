@@ -1,20 +1,12 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import React from "react";
 import { StickyCommentComposer } from "./StickyCommentComposer";
 
-// Mock AddCommentForm dependencies so jsdom can render without server actions
-vi.mock("~/app/(app)/issues/actions", () => ({
-  addCommentAction: vi.fn(),
+// Stub AddCommentForm to avoid jsdom + ProseMirror fragility
+// (matches pattern in src/test/unit/components/issues/issue-detail-permissions.test.tsx)
+vi.mock("~/components/issues/AddCommentForm", () => ({
+  AddCommentForm: () => <div data-testid="mock-add-comment-form" />,
 }));
-
-vi.mock("react", async (importOriginal) => {
-  const actual = await importOriginal<typeof React>();
-  return {
-    ...actual,
-    useActionState: vi.fn().mockReturnValue([undefined, vi.fn(), false]),
-  };
-});
 
 describe("StickyCommentComposer", () => {
   it("renders the trigger as a fixed-position bar", () => {
