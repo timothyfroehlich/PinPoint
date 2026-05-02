@@ -5,7 +5,7 @@ import type { IssueWithAllRelations } from "~/lib/types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { UpdateIssueStatusForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-status-form";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
-import { IssueSidebar } from "~/components/issues/IssueSidebar";
+import { IssueMetadata } from "~/components/issues/IssueMetadata";
 import { TooltipProvider } from "~/components/ui/tooltip";
 
 // Wrap renders in TooltipProvider since the global provider lives in the root
@@ -130,11 +130,11 @@ describe("Issue detail permission-aware UI", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("hides the watch button in the sidebar for unauthenticated users", () => {
+  it("renders the metadata grid for unauthenticated users", () => {
     const issue = createIssue();
 
     renderWithProviders(
-      <IssueSidebar
+      <IssueMetadata
         issue={issue}
         allUsers={[]}
         currentUserId={null}
@@ -143,6 +143,8 @@ describe("Issue detail permission-aware UI", () => {
       />
     );
 
+    expect(screen.getByTestId("issue-metadata-grid")).toBeInTheDocument();
+    // WatchButton is rendered by the page, not IssueMetadata
     expect(screen.queryByTestId("mock-watch-button")).not.toBeInTheDocument();
   });
 });
