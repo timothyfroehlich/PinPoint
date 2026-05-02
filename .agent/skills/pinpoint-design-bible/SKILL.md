@@ -252,16 +252,16 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 
 ## 9. Typography Scale
 
-| Element                    | Classes                                                                  |
-| :------------------------- | :----------------------------------------------------------------------- |
-| Page title (desktop)       | `text-3xl font-bold`                                                     |
-| Page title (mobile detail) | `text-xl font-extrabold`                                                 |
-| Section heading            | `text-xl font-semibold`                                                  |
-| Card title (normal)        | `text-base`                                                              |
-| Card title (compact)       | `text-sm`                                                                |
-| Metadata / labels          | `text-xs text-muted-foreground`                                          |
-| Issue IDs                  | `font-mono` (e.g., AFM-3)                                                |
-| Machine name in cards      | `text-xs font-medium underline decoration-primary/30 underline-offset-2` |
+| Element                  | Classes                                                                  |
+| :----------------------- | :----------------------------------------------------------------------- |
+| Page title (desktop)     | `text-3xl font-bold`                                                     |
+| Page title (detail page) | `text-3xl font-bold`                                                     |
+| Section heading          | `text-xl font-semibold`                                                  |
+| Card title (normal)      | `text-base`                                                              |
+| Card title (compact)     | `text-sm`                                                                |
+| Metadata / labels        | `text-xs text-muted-foreground`                                          |
+| Issue IDs                | `font-mono` (e.g., AFM-3)                                                |
+| Machine name in cards    | `text-xs font-medium underline decoration-primary/30 underline-offset-2` |
 
 **Text wrapping (text-balance / text-pretty):**
 

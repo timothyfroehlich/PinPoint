@@ -174,7 +174,7 @@ export default async function IssueDetailPage({
     <>
       <PageContainer
         size="standard"
-        className="pb-[calc(56px+52px+env(safe-area-inset-bottom))] md:pb-10"
+        className="pb-[calc(56px+64px+env(safe-area-inset-bottom))] md:pb-10"
       >
         <div className="space-y-2">
           <BackToIssuesLink href={issuesPath} />
@@ -222,7 +222,10 @@ export default async function IssueDetailPage({
           }
         />
 
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <div
+          data-testid="issue-detail-subtitle"
+          className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+        >
           <span>
             Reported by{" "}
             <span className="font-medium text-foreground">{reporter.name}</span>
