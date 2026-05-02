@@ -255,6 +255,9 @@ export default async function IssueDetailPage({
         />
 
         <section className="@container">
+          <h2 className="hidden md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-5">
+            Activity
+          </h2>
           <IssueTimeline
             issue={issueWithRelations}
             currentUserId={user?.id ?? null}
