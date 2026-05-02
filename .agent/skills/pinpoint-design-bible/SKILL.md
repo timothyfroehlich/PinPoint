@@ -151,9 +151,8 @@ When building a new page, pick the closest archetype and follow its pattern.
 
 ### Detail Page with Inline Metadata (issue detail)
 
-`max-w-6xl` single-column main flow. Page-level metadata renders inline in the main column above content rather than in a desktop sidebar. Use `IssueMetadata` (or equivalent) which uses container queries (`@container` + `@xl:`) to reflow from 1-column rows to 2-column grid based on the metadata block's available width — not the viewport width. Mobile uses a sticky bottom comment composer that opens a `Sheet`.
-
-This archetype eliminates the desktop/mobile divergence inherent in "Detail Page with Sidebar." Use it for new detail pages, and migrate existing sidebar-based detail pages opportunistically.
+`max-w-6xl` single-column main flow. Metadata uses `IssueMetadata` (container query reflows 1-col → 2-col at `@xl:`). Mobile sticky comment composer opens a `Sheet`.
+**Note:** Replaces "Detail Page with Sidebar" for issue detail; eliminates desktop/mobile divergence. Use for new detail pages; migrate existing sidebar pages opportunistically.
 
 ### Detail Page with Internal Grid (machine detail)
 
