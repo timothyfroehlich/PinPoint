@@ -239,6 +239,13 @@
       "when": 1777382549160,
       "tag": "0033_polite_sheva_callister",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1777693414861,
+      "tag": "0034_enable_rls_public_tables",
+      "breakpoints": true
     }
   ]
 }
