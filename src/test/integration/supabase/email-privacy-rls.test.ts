@@ -123,16 +123,23 @@ describe("Email Privacy RLS Integration", () => {
     expect(otherRecord?.email).toBeNull();
   });
 
-  it("Anonymous user cannot see any email addresses", async () => {
+  it("Anonymous user cannot see any rows from public_profiles_view", async () => {
     const { data, error } = await anonClient
       .from("public_profiles_view")
       .select("id, email");
 
     expect(error).toBeNull();
 
-    // All emails should be null for anonymous users
-    const allEmailsAreNull = data?.every((r) => r.email === null);
-    expect(allEmailsAreNull).toBe(true);
+    // Since migration 0034 set the view to security_invoker=true, the view
+    // runs with the caller's privileges. anon has no SELECT grant on the
+    // underlying user_profiles table (migration 0018 grants to authenticated
+    // only), so anon receives an empty result set rather than rows-with-
+    // masked-emails. Asserting empty array catches both regressions:
+    // (a) anon being granted access to the view, and (b) the view reverting
+    // to security_definer where anon would see all rows. The previous
+    // `data.every(r => r.email === null)` assertion was vacuously true on
+    // an empty array and didn't distinguish those two failure modes.
+    expect(data).toEqual([]);
   });
 
   it("invited_users are only viewable by administrators", async () => {
