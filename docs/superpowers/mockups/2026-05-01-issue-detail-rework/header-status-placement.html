@@ -1,0 +1,336 @@
+<h2>Status pill placement</h2>
+<p class="subtitle">Two placements at desktop fidelity. Linear's pattern (left) vs my original mockup (right). Pick whichever reads more naturally for PinPoint's daily use.</p>
+
+<style>
+  .placement-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+  @media (max-width: 1000px) {
+    .placement-grid { grid-template-columns: 1fr; }
+  }
+
+  .placement-option {
+    cursor: pointer;
+    border: 2px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 1rem;
+    background: #161616;
+    transition: border-color 150ms;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .placement-option:hover { border-color: #6cc6ff; }
+  .placement-option.selected {
+    border-color: #6cc6ff;
+    box-shadow: 0 0 0 3px rgba(108, 198, 255, 0.18);
+  }
+  .placement-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .placement-letter {
+    font-weight: 700;
+    color: #6cc6ff;
+    font-size: 1.05rem;
+  }
+  .placement-title {
+    font-weight: 600;
+    color: #f0f0f0;
+  }
+  .placement-tagline {
+    font-size: 0.8rem;
+    color: #a0a0a0;
+    line-height: 1.45;
+  }
+
+  /* Device frames */
+  .device {
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    background: #0d0d0d;
+    overflow: hidden;
+    margin-top: 0.5rem;
+  }
+  .device-label {
+    background: #1a1a1a;
+    color: #888;
+    padding: 4px 10px;
+    font-size: 0.7rem;
+    font-family: ui-monospace, monospace;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .device-body {
+    padding: 12px;
+    color: #e0e0e0;
+  }
+
+  .pp-back {
+    color: #6b89c8;
+    font-size: 0.65rem;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  /* ── Variant A: Linear top-left ── */
+  .header-linear {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #2a2a2a;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .status-linear {
+    background: #1a3a4a;
+    color: #6cc6ff;
+    border: 1px solid #2a5a7a;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 500;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .num-linear {
+    color: #888;
+    font-size: 0.65rem;
+    font-family: ui-monospace, monospace;
+  }
+  .title-linear {
+    flex: 1;
+    min-width: 200px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    line-height: 1.3;
+    color: #f0f0f0;
+    margin: 0;
+  }
+
+  /* ── Variant B: My mockup top-right hero ── */
+  .header-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #2a2a2a;
+    margin-bottom: 12px;
+  }
+  .header-hero-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .num-hero {
+    color: #888;
+    font-size: 0.65rem;
+    font-family: ui-monospace, monospace;
+  }
+  .title-hero {
+    font-weight: 600;
+    font-size: 0.95rem;
+    line-height: 1.3;
+    color: #f0f0f0;
+    margin: 2px 0 0 0;
+  }
+  .status-hero {
+    background: #1a3a4a;
+    color: #6cc6ff;
+    border: 1px solid #2a5a7a;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  /* Pill row (shared) */
+  .pp-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 12px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #1a1a1a;
+    color: #c0c0c0;
+    border: 1px solid #2a2a2a;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+  }
+  .pill .ico { color: #777; }
+  .pill .val { color: #e0e0e0; font-weight: 500; }
+  .pill.priority { color: #ffaa66; border-color: #6a4a2a; }
+  .pill.priority .val { color: #ffaa66; }
+  .pill.static { background: transparent; }
+
+  .pp-block {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: #888;
+    font-size: 0.7rem;
+    margin-bottom: 6px;
+  }
+
+  /* Mobile preview */
+  .mobile-preview {
+    align-self: center;
+    width: 220px;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    background: #0d0d0d;
+    overflow: hidden;
+    margin-top: 0.5rem;
+  }
+  .mobile-preview .device-label { font-size: 0.6rem; padding: 3px 8px; }
+  .mobile-preview .device-body { padding: 8px; font-size: 0.65rem; }
+  .mobile-preview .title-linear,
+  .mobile-preview .title-hero { font-size: 0.75rem; }
+  .mobile-preview .pp-block { font-size: 0.6rem; padding: 6px 8px; }
+
+  .pros-cons-mini {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    margin-top: 0.5rem;
+  }
+  .pros-cons-mini .pros { color: #6cc66c; }
+  .pros-cons-mini .cons { color: #c66c6c; }
+  .pros-cons-mini ul { margin: 4px 0 0 0; padding-left: 1rem; }
+  .pros-cons-mini li { margin-bottom: 2px; }
+</style>
+
+<div class="placement-grid" data-multiselect>
+
+  <!-- Variant A: Linear top-left -->
+  <div class="placement-option option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="placement-head">
+      <span class="placement-letter">A</span>
+      <span class="placement-title">Linear-style: top-left, regular size</span>
+    </div>
+    <p class="placement-tagline">Status pill sits at the start of the title row. Same visual weight as a regular pill — small, glanceable, not weighted as a hero element. Reads as "[State] Title".</p>
+
+    <div class="device">
+      <div class="device-label">Desktop · 1024px</div>
+      <div class="device-body">
+        <a class="pp-back">← Back to Issues</a>
+        <div class="header-linear">
+          <span class="status-linear">● In Progress</span>
+          <span class="num-linear">#PIN-101</span>
+          <h3 class="title-linear">Flippers stuck on Iron Maiden</h3>
+        </div>
+        <div class="pp-pills">
+          <span class="pill priority"><span class="ico">▲</span><span class="val">High</span></span>
+          <span class="pill"><span class="ico">👤</span><span class="val">Tim F.</span></span>
+          <span class="pill"><span class="ico">🎮</span><span class="val">Iron Maiden</span></span>
+          <span class="pill static"><span class="ico">📍</span><span class="val">Pinballz</span></span>
+          <span class="pill static"><span class="ico">👁</span><span class="val">2 watching</span></span>
+          <span class="pill static"><span class="ico">📅</span><span class="val">Apr 25</span></span>
+        </div>
+        <div class="pp-block">Description preview…</div>
+        <div class="pp-block">Activity timeline…</div>
+      </div>
+    </div>
+
+    <div class="mobile-preview">
+      <div class="device-label">Mobile · 390px</div>
+      <div class="device-body">
+        <a class="pp-back">← Back</a>
+        <div class="header-linear">
+          <span class="status-linear">● In Progress</span>
+          <h3 class="title-linear">Flippers stuck on Iron Maiden</h3>
+        </div>
+        <div class="pp-pills">
+          <span class="pill priority"><span class="val">High</span></span>
+          <span class="pill"><span class="val">Tim F.</span></span>
+          <span class="pill"><span class="val">Iron Maiden</span></span>
+          <span class="pill static"><span class="val">2</span></span>
+        </div>
+        <div class="pp-block">Description…</div>
+      </div>
+    </div>
+
+    <div class="pros-cons-mini">
+      <div class="pros"><strong>Pros</strong><ul><li>Status reads as part of the issue's identity</li><li>Title doesn't compete for layout space</li><li>Clean wrap on narrow screens — pill drops above title naturally</li></ul></div>
+      <div class="cons"><strong>Cons</strong><ul><li>Smaller status indicator — less "stop and notice" weight</li><li>Long status names ("Reopened (Repair)") might wrap awkwardly</li></ul></div>
+    </div>
+  </div>
+
+  <!-- Variant B: My hero top-right -->
+  <div class="placement-option option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="placement-head">
+      <span class="placement-letter">B</span>
+      <span class="placement-title">Top-right hero (my original)</span>
+    </div>
+    <p class="placement-tagline">Status sits at top-right of the header, slightly larger, weighted as a hero element. Title takes the left side. Reads as "what it is" + "system state".</p>
+
+    <div class="device">
+      <div class="device-label">Desktop · 1024px</div>
+      <div class="device-body">
+        <a class="pp-back">← Back to Issues</a>
+        <div class="header-hero">
+          <div class="header-hero-text">
+            <span class="num-hero">#PIN-101</span>
+            <h3 class="title-hero">Flippers stuck on Iron Maiden</h3>
+          </div>
+          <span class="status-hero">● In Progress</span>
+        </div>
+        <div class="pp-pills">
+          <span class="pill priority"><span class="ico">▲</span><span class="val">High</span></span>
+          <span class="pill"><span class="ico">👤</span><span class="val">Tim F.</span></span>
+          <span class="pill"><span class="ico">🎮</span><span class="val">Iron Maiden</span></span>
+          <span class="pill static"><span class="ico">📍</span><span class="val">Pinballz</span></span>
+          <span class="pill static"><span class="ico">👁</span><span class="val">2 watching</span></span>
+          <span class="pill static"><span class="ico">📅</span><span class="val">Apr 25</span></span>
+        </div>
+        <div class="pp-block">Description preview…</div>
+        <div class="pp-block">Activity timeline…</div>
+      </div>
+    </div>
+
+    <div class="mobile-preview">
+      <div class="device-label">Mobile · 390px</div>
+      <div class="device-body">
+        <a class="pp-back">← Back</a>
+        <div class="header-hero">
+          <div class="header-hero-text">
+            <span class="num-hero">#PIN-101</span>
+            <h3 class="title-hero">Flippers stuck on Iron Maiden</h3>
+          </div>
+          <span class="status-hero">● In Progress</span>
+        </div>
+        <div class="pp-pills">
+          <span class="pill priority"><span class="val">High</span></span>
+          <span class="pill"><span class="val">Tim F.</span></span>
+          <span class="pill"><span class="val">Iron Maiden</span></span>
+          <span class="pill static"><span class="val">2</span></span>
+        </div>
+        <div class="pp-block">Description…</div>
+      </div>
+    </div>
+
+    <div class="pros-cons-mini">
+      <div class="pros"><strong>Pros</strong><ul><li>Status gets dedicated, visible real estate</li><li>"Stop and notice" weight — good for technicians scanning urgency</li><li>Long status names breathe (own row on mobile if needed)</li></ul></div>
+      <div class="cons"><strong>Cons</strong><ul><li>On mobile, status competes with back link for top-right attention</li><li>Two visual weights for "metadata" (hero + pills) is harder to learn</li></ul></div>
+    </div>
+  </div>
+
+</div>
+
+<p style="margin-top: 1.5rem; font-size: 0.85rem; color: #a0a0a0; line-height: 1.5;">
+  <strong style="color:#e0e0e0;">My read</strong>: Variant A (Linear) is the more disciplined choice — one pill vocabulary across all metadata, no special "hero" exception, easier to teach. The status pill earns its prominence through position (start of the row) rather than size, which is cleaner for the design system. Variant B's hero treatment is louder but creates a "this one field is special" pattern we'd have to remember in every other detail page (machine, location).
+</p>
