@@ -17,20 +17,21 @@ describe("PageHeader", () => {
     render(
       <PageHeader
         title={
-          <h1
-            data-testid="custom-h1"
-            className="text-balance text-3xl font-bold tracking-tight"
-          >
+          <h1 className="text-balance text-3xl font-bold tracking-tight">
             Custom Title
           </h1>
         }
       />
     );
-    expect(screen.getByTestId("custom-h1")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Custom Title"
     );
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("always renders border-b class", () => {
+    const { container } = render(<PageHeader title="Test" />);
+    expect(container.firstChild).toHaveClass("border-b");
   });
 
   it("renders titleAdornment alongside a string title", () => {
@@ -46,13 +47,29 @@ describe("PageHeader", () => {
     expect(screen.getByTestId("adornment")).toBeInTheDocument();
   });
 
-  it("renders actions in a flex container when provided", () => {
+  it("renders actions when provided", () => {
     render(
-      <PageHeader
-        title="My Page"
-        actions={<button data-testid="action">Action</button>}
-      />
+      <PageHeader title="My Page" actions={<button>Do Something</button>} />
     );
-    expect(screen.getByTestId("action")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Do Something" })
+    ).toBeInTheDocument();
+  });
+
+  it("does not render actions container when actions is undefined", () => {
+    render(<PageHeader title="My Page" />);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("does not render actions container when actions is null", () => {
+    render(<PageHeader title="My Page" actions={null} />);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("merges additional className", () => {
+    const { container } = render(
+      <PageHeader title="Test" className="extra-class" />
+    );
+    expect(container.firstChild).toHaveClass("extra-class");
   });
 });
