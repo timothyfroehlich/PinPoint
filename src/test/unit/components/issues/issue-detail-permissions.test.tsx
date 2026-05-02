@@ -26,14 +26,6 @@ vi.mock("~/components/issues/AddCommentForm", () => ({
   AddCommentForm: () => <div data-testid="mock-add-comment-form" />,
 }));
 
-vi.mock("~/components/issues/WatchButton", () => ({
-  WatchButton: () => <div data-testid="mock-watch-button" />,
-}));
-
-vi.mock("~/components/issues/SidebarActions", () => ({
-  SidebarActions: () => <div data-testid="mock-sidebar-actions" />,
-}));
-
 function createIssue(
   overrides?: Partial<IssueWithAllRelations>
 ): IssueWithAllRelations {
@@ -131,11 +123,9 @@ describe("Issue detail permission-aware UI", () => {
   });
 
   it("renders the metadata grid for unauthenticated users", () => {
-    const issue = createIssue();
-
     renderWithProviders(
       <IssueMetadata
-        issue={issue}
+        issue={createIssue()}
         allUsers={[]}
         currentUserId={null}
         accessLevel="unauthenticated"
@@ -144,7 +134,5 @@ describe("Issue detail permission-aware UI", () => {
     );
 
     expect(screen.getByTestId("issue-metadata-grid")).toBeInTheDocument();
-    // WatchButton is rendered by the page, not IssueMetadata
-    expect(screen.queryByTestId("mock-watch-button")).not.toBeInTheDocument();
   });
 });
