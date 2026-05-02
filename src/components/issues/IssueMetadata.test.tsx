@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"; // render used inside renderWithProviders
+import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import type { ReactElement } from "react";
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -136,5 +136,52 @@ describe("IssueMetadata", () => {
     expect(screen.getByTestId("issue-metadata-row-frequency")).toHaveClass(
       "@xl:border-l"
     );
+  });
+
+  it("does not apply @xl:border-l to Status or Severity (left-column) rows", () => {
+    renderWithProviders(
+      <IssueMetadata
+        issue={fixtureIssue}
+        allUsers={fixtureUsers}
+        currentUserId="user-1"
+        accessLevel="member"
+        ownershipContext={fixtureOwnership}
+      />
+    );
+    expect(screen.getByTestId("issue-metadata-row-status")).not.toHaveClass(
+      "@xl:border-l"
+    );
+    expect(screen.getByTestId("issue-metadata-row-severity")).not.toHaveClass(
+      "@xl:border-l"
+    );
+  });
+
+  it("forwards accessLevel to form children — unauthenticated renders differently than member", () => {
+    const { container: memberContainer } = renderWithProviders(
+      <IssueMetadata
+        issue={fixtureIssue}
+        allUsers={fixtureUsers}
+        currentUserId="user-1"
+        accessLevel="member"
+        ownershipContext={fixtureOwnership}
+      />
+    );
+    const memberHTML = memberContainer.innerHTML;
+
+    const { container: anonContainer } = renderWithProviders(
+      <IssueMetadata
+        issue={fixtureIssue}
+        allUsers={fixtureUsers}
+        currentUserId={null}
+        accessLevel="unauthenticated"
+        ownershipContext={fixtureOwnership}
+      />
+    );
+    const anonHTML = anonContainer.innerHTML;
+
+    // If accessLevel reaches the forms, the rendered output should differ.
+    // The forms use accessLevel to gate their interactive UI, so member mode and
+    // unauthenticated mode produce structurally different DOM.
+    expect(memberHTML).not.toBe(anonHTML);
   });
 });

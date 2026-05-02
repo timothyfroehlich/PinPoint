@@ -78,7 +78,7 @@ export function IssueMetadata({
         <Row label="Assignee" testId="issue-metadata-row-assignee" spanBothAtXl>
           <AssignIssueForm
             issueId={issue.id}
-            assignedToId={issue.assignedTo ?? null}
+            assignedToId={issue.assignedTo}
             users={allUsers}
             currentUserId={currentUserId}
             accessLevel={accessLevel}
