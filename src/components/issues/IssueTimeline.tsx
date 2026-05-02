@@ -471,7 +471,7 @@ export function IssueTimeline({
                 userContext={userContext}
               />
               {index === 0 && ownerRequirements && machineName && (
-                <div className="hidden @xl:ml-20 @xl:block">
+                <div className="@xl:ml-20">
                   <OwnerRequirementsCallout
                     ownerRequirements={ownerRequirements}
                     machineName={machineName}
