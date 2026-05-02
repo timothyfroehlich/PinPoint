@@ -144,9 +144,16 @@ When building a new page, pick the closest archetype and follow its pattern.
 
 `max-w-7xl` -- Filters + card grid `md:grid-cols-2 lg:grid-cols-3`.
 
-### Detail Page with Sidebar (issue detail)
+### Detail Page with Sidebar (machine detail)
 
 `grid md:grid-cols-[minmax(0,1fr)_320px]` -- Sidebar `hidden md:block`, collapses to inline strips on mobile.
+**Note:** Issue detail migrated off this archetype (see "Detail Page with Inline Metadata" below). Machine and Location detail still use this pattern.
+
+### Detail Page with Inline Metadata (issue detail)
+
+`max-w-6xl` single-column main flow. Page-level metadata renders inline in the main column above content rather than in a desktop sidebar. Use `IssueMetadata` (or equivalent) which uses container queries (`@container` + `@xl:`) to reflow from 1-column rows to 2-column grid based on the metadata block's available width — not the viewport width. Mobile uses a sticky bottom comment composer that opens a `Sheet`.
+
+This archetype eliminates the desktop/mobile divergence inherent in "Detail Page with Sidebar." Use it for new detail pages, and migrate existing sidebar-based detail pages opportunistically.
 
 ### Detail Page with Internal Grid (machine detail)
 
