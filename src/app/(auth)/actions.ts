@@ -33,6 +33,7 @@ import {
   extractCaptchaToken,
   getUserMessageForAuthError,
 } from "~/lib/auth/errors";
+import { verifyTurnstileToken } from "~/lib/security/turnstile";
 
 /**
  * Result Types
@@ -64,7 +65,7 @@ export type ForgotPasswordResult = Result<
 
 export type ResetPasswordResult = Result<
   void,
-  "VALIDATION" | "WEAK_PASSWORD" | "SAME_PASSWORD" | "SERVER"
+  "VALIDATION" | "WEAK_PASSWORD" | "SAME_PASSWORD" | "CAPTCHA" | "SERVER"
 >;
 
 /**
@@ -589,6 +590,25 @@ export async function resetPasswordAction(
   const { password } = parsed.data;
 
   try {
+    // Verify Turnstile CAPTCHA. Unlike signUp/signInWithPassword/resetPasswordForEmail,
+    // Supabase's auth.updateUser() does not accept a captchaToken option, so we must
+    // verify the token ourselves before calling it.
+    const captchaToken = extractCaptchaToken(formData);
+    const captchaValid = await verifyTurnstileToken(
+      captchaToken ?? "",
+      await getClientIp()
+    );
+    if (!captchaValid) {
+      log.warn(
+        { action: "reset-password" },
+        "Turnstile CAPTCHA verification failed"
+      );
+      return err(
+        "CAPTCHA",
+        "Verification failed. Please refresh the page and try again."
+      );
+    }
+
     const supabase = await createClient();
 
     // Verify user is authenticated (should be authenticated via reset link)
