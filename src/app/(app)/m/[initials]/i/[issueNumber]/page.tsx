@@ -236,8 +236,8 @@ export default async function IssueDetailPage({
               <OwnerBadge size="sm" />
             )}
             <span className="text-muted-foreground/50">·</span>
-            <span title={`Updated ${issue.updatedAt.toLocaleString()}`}>
-              {formatRelative(issue.updatedAt)}
+            <span title={`Last updated ${issue.updatedAt.toLocaleString()}`}>
+              Updated {formatRelative(issue.updatedAt)}
             </span>
             <span className="text-muted-foreground/50">·</span>
             <span>{issue.watchers.length} watching</span>

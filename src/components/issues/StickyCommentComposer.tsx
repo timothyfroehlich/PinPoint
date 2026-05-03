@@ -43,7 +43,7 @@ export function StickyCommentComposer({
           <SheetHeader className="pb-2">
             <SheetTitle>Add a comment</SheetTitle>
           </SheetHeader>
-          <div className="mt-2">
+          <div className="px-4 pb-4">
             <AddCommentForm issueId={issueId} />
           </div>
         </SheetContent>
