@@ -39,6 +39,16 @@ import { getLoginUrl } from "~/lib/login-url";
 import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 
 interface Machine {
   id: string;
@@ -80,6 +90,9 @@ export function UnifiedReportForm({
 }: UnifiedReportFormProps): React.JSX.Element {
   const searchParams = useSearchParams();
   const hasRestored = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [isClearOpen, setIsClearOpen] = useState(false);
+  const [editorResetKey, setEditorResetKey] = useState(0);
   const [selectedMachineId, setSelectedMachineId] = useState(
     defaultMachineId ?? ""
   );
@@ -117,15 +130,39 @@ export function UnifiedReportForm({
     [machinesList, selectedMachineId]
   );
 
-  // Clear localStorage on successful submission, then redirect client-side
+  // Reset form state before navigating away on success (defense in depth).
+  // Even though we navigate, clearing first ensures: (1) if navigation fails
+  // the user sees an empty form, not stale values; (2) localStorage persistence
+  // effect (which short-circuits on state.success) sees clean values; (3) any
+  // back-button return to a still-mounted component shows a clean form.
   useEffect(() => {
-    if (state.success) {
-      window.localStorage.removeItem("report_form_state");
-      if (state.redirectTo) {
-        window.location.assign(state.redirectTo);
-      }
+    if (!state.success) return;
+
+    window.localStorage.removeItem("report_form_state");
+
+    // Native form reset — clears uncontrolled inputs (firstName/lastName/email/website)
+    formRef.current?.reset();
+
+    // Controlled state — preserve machine when URL param drove the page,
+    // since the user came here specifically to report on that machine.
+    setSelectedMachineId(defaultMachineId ?? "");
+    setTitle("");
+    setDescription(null);
+    setSeverity("minor");
+    setPriority("medium");
+    setFrequency("constant");
+    setStatus("new");
+    setAssignedTo("");
+    setWatchIssue(true);
+    setUploadedImages([]);
+    setTurnstileToken("");
+    // RichTextEditor is uncontrolled internally — bumping the key remounts it.
+    setEditorResetKey((k) => k + 1);
+
+    if (state.redirectTo) {
+      window.location.assign(state.redirectTo);
     }
-  }, [state.success, state.redirectTo]);
+  }, [state.success, state.redirectTo, defaultMachineId]);
 
   // Persistence: Restore from localStorage on mount
   useEffect(() => {
@@ -278,7 +315,11 @@ export function UnifiedReportForm({
             </Alert>
           )}
 
-          <form action={formAction} className="space-y-3 md:space-y-4">
+          <form
+            action={formAction}
+            ref={formRef}
+            className="space-y-3 md:space-y-4"
+          >
             {/* Honeypot field for bot detection */}
             <input
               type="text"
@@ -369,6 +410,7 @@ export function UnifiedReportForm({
             <div className="space-y-1.5">
               <Label className="text-foreground">Description</Label>
               <RichTextEditor
+                key={editorResetKey}
                 content={description}
                 onChange={setDescription}
                 mentionsEnabled={userAuthenticated}
@@ -592,14 +634,64 @@ export function UnifiedReportForm({
               onExpire={() => setTurnstileToken("")}
             />
 
-            <Button
-              type="submit"
-              className="w-full bg-primary text-on-primary hover:bg-primary/90 mt-1 h-10 text-sm font-semibold"
-              loading={isPending}
-            >
-              Submit Issue Report
-            </Button>
+            <div className="flex flex-col-reverse gap-2 mt-1 sm:flex-row sm:items-center">
+              <Button
+                type="button"
+                variant="outline"
+                className="sm:w-auto h-10 text-sm font-semibold"
+                disabled={isPending}
+                onClick={() => setIsClearOpen(true)}
+              >
+                Clear
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-primary text-on-primary hover:bg-primary/90 h-10 text-sm font-semibold"
+                loading={isPending}
+              >
+                Submit Issue Report
+              </Button>
+            </div>
           </form>
+
+          <AlertDialog open={isClearOpen} onOpenChange={setIsClearOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear all fields?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This removes everything you&apos;ve entered. You can&apos;t
+                  undo this.
+                  {defaultMachineId &&
+                    " The machine selection will be kept since it came from the URL."}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  onClick={() => {
+                    window.localStorage.removeItem("report_form_state");
+                    formRef.current?.reset();
+                    setSelectedMachineId(defaultMachineId ?? "");
+                    setTitle("");
+                    setDescription(null);
+                    setSeverity("minor");
+                    setPriority("medium");
+                    setFrequency("constant");
+                    setStatus("new");
+                    setAssignedTo("");
+                    setWatchIssue(true);
+                    setUploadedImages([]);
+                    setTurnstileToken("");
+                    setEditorResetKey((k) => k + 1);
+                    setIsClearOpen(false);
+                  }}
+                >
+                  Clear fields
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         {/* Right Sidebar: Recent Issues (Desktop) */}
