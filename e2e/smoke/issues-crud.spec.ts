@@ -222,11 +222,12 @@ test.describe("Issues System", () => {
         isMobile ? 0 : 1
       );
 
-      // New unified design: same elements visible at every viewport
+      // New unified design: metadata grid visible everywhere; Back to Issues
+      // link is mobile-only (desktop relies on AppHeader nav).
       await expect(page.getByTestId("issue-metadata-grid")).toBeVisible();
       await expect(
         page.getByRole("link", { name: /Back to Issues/i })
-      ).toBeVisible();
+      ).toHaveCount(isMobile ? 1 : 0);
 
       // Verify no horizontal overflow on issue detail page
       await assertNoHorizontalOverflow(page);
