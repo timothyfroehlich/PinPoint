@@ -195,11 +195,16 @@ export function UnifiedReportForm({
       }
 
       if (parsed.machineId && !defaultMachineId) {
-        setSelectedMachineId(parsed.machineId);
-
-        // Sync URL with the restored machine when no machine param is present.
+        // PP-lql: Only restore the machineId if it still exists in the current
+        // machinesList. A stale UUID (deleted machine, different tenant,
+        // abandoned draft) would otherwise sit in selectedMachineId while the
+        // native <select> silently displays — and submits — the first option's
+        // value instead.
         const machine = machinesList.find((m) => m.id === parsed.machineId);
         if (machine) {
+          setSelectedMachineId(parsed.machineId);
+
+          // Sync URL with the restored machine when no machine param is present.
           const params = new URLSearchParams(searchParams.toString());
           params.set("machine", machine.initials);
           window.history.replaceState(null, "", `?${params.toString()}`);
@@ -253,6 +258,20 @@ export function UnifiedReportForm({
       setSelectedMachineId(defaultMachineId);
     }
   }, [defaultMachineId]);
+
+  // PP-lql defense in depth: if selectedMachineId references a machine that
+  // is not in the current list (deleted, tenant switched, etc.), reset to "".
+  // The native <select value="<stale-uuid>"> silently shows — and submits —
+  // the first option's value otherwise, leading to issues being filed against
+  // the wrong machine without any user-visible error.
+  useEffect(() => {
+    if (
+      selectedMachineId &&
+      !machinesList.some((m) => m.id === selectedMachineId)
+    ) {
+      setSelectedMachineId("");
+    }
+  }, [selectedMachineId, machinesList]);
 
   // Fetch recent issues when selected machine changes
   useEffect(() => {

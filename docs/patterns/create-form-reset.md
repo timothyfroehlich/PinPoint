@@ -170,3 +170,60 @@ back to the form route, and assert empty values. See `e2e/full/form-resets.spec.
 - **shadcn `Select`**: prefer controlling it with a `value` prop. If a child
   component holds its own `useState` for the selected value (like
   `OwnerSelect`), bump a `key` on the component to remount it on reset.
+
+## Silent-fallback footgun: native `<select>` + stale option ID (PP-lql)
+
+A controlled native `<select value="X">` whose `value` does not match any
+`<option>` does **not** error or render visibly broken — browsers display the
+first non-disabled `<option>` and `FormData.get(name)` returns its value. This
+is HTML-spec behavior, not a React bug.
+
+This combines disastrously with localStorage-backed drafts: if the saved ID
+references a record that has since been deleted (or that belongs to a
+different tenant after a session change), restoration silently puts the form
+into a state where the dropdown shows — and submits — the alphabetically-first
+record. The Zod `uuid()` schema and any "does this id exist?" server checks
+both pass, because the submitted UUID _is_ a valid record. The user never sees
+an error, and an entity is created against the wrong target.
+
+**Mitigation pattern (apply when restoring an option-ID from localStorage or
+any other side-channel):**
+
+```ts
+useEffect(() => {
+  if (typeof window === "undefined" || hasRestored.current) return;
+  hasRestored.current = true;
+
+  const draft = readDraftFromLocalStorage();
+  if (!draft?.machineId) return;
+
+  // Validate against the live list before restoring.
+  if (machinesList.some((m) => m.id === draft.machineId)) {
+    setSelectedMachineId(draft.machineId);
+  }
+  // (rest of the draft fields can still restore independently)
+}, [machinesList]);
+
+// Defense in depth — catches any other path that puts a stale id into state.
+useEffect(() => {
+  if (
+    selectedMachineId &&
+    !machinesList.some((m) => m.id === selectedMachineId)
+  ) {
+    setSelectedMachineId("");
+  }
+}, [selectedMachineId, machinesList]);
+```
+
+**Better long-term**: replace native `<select>` with the project's shadcn
+`Select` for any field whose options come from a list that can change between
+sessions. shadcn's command-palette pattern surfaces the "no match" state
+clearly instead of silently picking the first option.
+
+Regression coverage:
+
+- `src/app/(app)/report/select-fallback.test.tsx` — JSDOM unit test pinning
+  the silent-fallback behavior in HTML.
+- `e2e/full/report-stale-machine.spec.ts` — seeds a stale localStorage draft,
+  asserts the form renders an empty placeholder and refuses to submit until
+  the user picks a machine.
