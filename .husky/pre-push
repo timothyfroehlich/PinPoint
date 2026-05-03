@@ -2,4 +2,7 @@ set -e
 
 if command -v bd >/dev/null 2>&1; then
   bd hooks run pre-push "$@" || true
+  # Flush local Dolt commits to DoltHub alongside the git push.
+  # Non-blocking: a transient bd push failure should not abort code push.
+  bd dolt push --quiet 2>&1 || echo "Warning: bd dolt push failed (non-fatal)" >&2
 fi
