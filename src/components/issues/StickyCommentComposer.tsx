@@ -6,6 +6,7 @@ import { MessageSquarePlus } from "lucide-react";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "~/components/ui/sheet";
@@ -42,6 +43,10 @@ export function StickyCommentComposer({
         <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto">
           <SheetHeader className="pb-2">
             <SheetTitle>Add a comment</SheetTitle>
+            <SheetDescription className="sr-only">
+              Comment on this issue. Mentions and image attachments are
+              supported.
+            </SheetDescription>
           </SheetHeader>
           <div className="px-4 pb-4">
             <AddCommentForm issueId={issueId} />

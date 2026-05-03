@@ -22,8 +22,13 @@ import { getLastIssuesPath } from "~/lib/cookies/preferences";
 import { EditableIssueTitle } from "./editable-issue-title";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
-import { formatRelative } from "~/lib/dates";
+import { formatRelative, formatDateTime } from "~/lib/dates";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import {
   type OwnershipContext,
   checkPermission,
@@ -236,9 +241,14 @@ export default async function IssueDetailPage({
               <OwnerBadge size="sm" />
             )}
             <span className="text-muted-foreground/50">·</span>
-            <span title={`Last updated ${issue.updatedAt.toLocaleString()}`}>
-              Updated {formatRelative(issue.updatedAt)}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span suppressHydrationWarning>
+                  Updated {formatRelative(issue.updatedAt)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{formatDateTime(issue.updatedAt)}</TooltipContent>
+            </Tooltip>
             <span className="text-muted-foreground/50">·</span>
             <span>{issue.watchers.length} watching</span>
             {accessLevel !== "unauthenticated" && (
