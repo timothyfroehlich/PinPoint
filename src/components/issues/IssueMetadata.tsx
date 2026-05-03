@@ -33,7 +33,7 @@ export function IssueMetadata({
     <div className="@container">
       <div
         data-testid="issue-metadata-grid"
-        className="grid grid-cols-1 @xl:grid-cols-2 rounded-lg border border-outline-variant bg-card overflow-hidden"
+        className="grid grid-cols-1 @xl:grid-cols-2 rounded-lg border border-outline-variant bg-card"
       >
         <Row label="Status" testId="issue-metadata-row-status">
           <UpdateIssueStatusForm
