@@ -35,6 +35,16 @@ export function IssueMetadata({
         data-testid="issue-metadata-grid"
         className="grid grid-cols-1 @xl:grid-cols-2 rounded-lg border border-outline-variant bg-card"
       >
+        <Row label="Assignee" testId="issue-metadata-row-assignee" spanBothAtXl>
+          <AssignIssueForm
+            issueId={issue.id}
+            assignedToId={issue.assignedTo}
+            users={allUsers}
+            currentUserId={currentUserId}
+            accessLevel={accessLevel}
+            ownershipContext={ownershipContext}
+          />
+        </Row>
         <Row label="Status" testId="issue-metadata-row-status">
           <UpdateIssueStatusForm
             issueId={issue.id}
@@ -71,16 +81,6 @@ export function IssueMetadata({
           <UpdateIssueFrequencyForm
             issueId={issue.id}
             currentFrequency={issue.frequency}
-            accessLevel={accessLevel}
-            ownershipContext={ownershipContext}
-          />
-        </Row>
-        <Row label="Assignee" testId="issue-metadata-row-assignee" spanBothAtXl>
-          <AssignIssueForm
-            issueId={issue.id}
-            assignedToId={issue.assignedTo}
-            users={allUsers}
-            currentUserId={currentUserId}
             accessLevel={accessLevel}
             ownershipContext={ownershipContext}
           />

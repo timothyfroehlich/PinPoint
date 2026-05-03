@@ -8,7 +8,6 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from "~/components/ui/sheet";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
 
@@ -29,7 +28,7 @@ export function StickyCommentComposer({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="md:hidden fixed bottom-[calc(56px+env(safe-area-inset-bottom))] left-0 right-0 z-30 border-t border-outline-variant bg-card/90 backdrop-blur-sm px-3 py-2">
+    <div className="md:hidden fixed bottom-[calc(56px+env(safe-area-inset-bottom))] left-0 right-0 z-30 border-t border-outline-variant bg-card/90 backdrop-blur-sm px-4 py-2">
       <Sheet open={open} onOpenChange={setOpen}>
         <button
           type="button"
@@ -41,14 +40,10 @@ export function StickyCommentComposer({
           <span>Add a comment…</span>
         </button>
         <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto">
-          <SheetHeader>
+          <SheetHeader className="pb-2">
             <SheetTitle>Add a comment</SheetTitle>
-            <SheetDescription>
-              Comment on this issue. Mentions and image attachments are
-              supported.
-            </SheetDescription>
           </SheetHeader>
-          <div className="mt-4">
+          <div className="mt-2">
             <AddCommentForm issueId={issueId} />
           </div>
         </SheetContent>

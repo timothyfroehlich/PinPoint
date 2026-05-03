@@ -44,7 +44,6 @@ import {
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
 import { type AccessLevel } from "~/lib/permissions/matrix";
-import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -391,10 +390,6 @@ interface IssueTimelineProps {
   currentUserId: string | null;
   currentUserRole: AccessLevel;
   currentUserInitials: string;
-  /** Owner requirements to display after the initial report (authenticated users only) */
-  ownerRequirements?: ProseMirrorDoc | undefined;
-  /** Machine name for the requirements callout title */
-  machineName?: string | undefined;
 }
 
 export function IssueTimeline({
@@ -402,8 +397,6 @@ export function IssueTimeline({
   currentUserId,
   currentUserRole,
   currentUserInitials,
-  ownerRequirements,
-  machineName,
 }: IssueTimelineProps): React.JSX.Element {
   const userContext: UserContext = {
     currentUserId,
@@ -463,22 +456,13 @@ export function IssueTimeline({
 
         {/* Events List */}
         <div className="relative flex flex-col space-y-4 @xl:space-y-6">
-          {allEvents.map((event, index) => (
-            <React.Fragment key={event.id}>
-              <TimelineItem
-                event={event}
-                issue={issue}
-                userContext={userContext}
-              />
-              {index === 0 && ownerRequirements && machineName && (
-                <div className="@xl:ml-20">
-                  <OwnerRequirementsCallout
-                    ownerRequirements={ownerRequirements}
-                    machineName={machineName}
-                  />
-                </div>
-              )}
-            </React.Fragment>
+          {allEvents.map((event) => (
+            <TimelineItem
+              key={event.id}
+              event={event}
+              issue={issue}
+              userContext={userContext}
+            />
           ))}
 
           {/* Delightful Empty State when no comments yet */}

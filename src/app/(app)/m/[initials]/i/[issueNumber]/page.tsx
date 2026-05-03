@@ -22,7 +22,8 @@ import { getLastIssuesPath } from "~/lib/cookies/preferences";
 import { EditableIssueTitle } from "./editable-issue-title";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
-import { formatDate } from "~/lib/dates";
+import { formatRelative } from "~/lib/dates";
+import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import {
   type OwnershipContext,
   checkPermission,
@@ -173,11 +174,11 @@ export default async function IssueDetailPage({
   return (
     <>
       <PageContainer
-        size="standard"
+        size="narrow"
         className="pb-[calc(56px+64px+env(safe-area-inset-bottom))] md:pb-10"
       >
         <div className="space-y-2">
-          <BackToIssuesLink href={issuesPath} />
+          <BackToIssuesLink href={issuesPath} className="md:hidden" />
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span className="inline-flex rounded-full border border-outline-variant bg-muted/40 px-2.5 py-0.5 font-mono text-xs font-bold">
               {formatIssueId(initials, issue.issueNumber)}
@@ -209,42 +210,54 @@ export default async function IssueDetailPage({
               </>
             ) : null}
           </div>
+
+          <PageHeader
+            title={
+              <EditableIssueTitle
+                issueId={issue.id}
+                title={issue.title}
+                canEdit={userCanEditTitle}
+                className="text-balance text-3xl font-bold tracking-tight"
+              />
+            }
+          />
+
+          <div
+            data-testid="issue-detail-subtitle"
+            className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+          >
+            <span>
+              by{" "}
+              <span className="font-medium text-foreground">
+                {reporter.name}
+              </span>
+            </span>
+            {isUserMachineOwner(issueWithRelations, reporter.id) && (
+              <OwnerBadge size="sm" />
+            )}
+            <span className="text-muted-foreground/50">·</span>
+            <span title={`Updated ${issue.updatedAt.toLocaleString()}`}>
+              {formatRelative(issue.updatedAt)}
+            </span>
+            <span className="text-muted-foreground/50">·</span>
+            <span>{issue.watchers.length} watching</span>
+            {accessLevel !== "unauthenticated" && (
+              <WatchButton
+                issueId={issue.id}
+                initialIsWatching={isWatching}
+                iconOnly
+                className="ml-1 h-7 w-7 rounded-full"
+              />
+            )}
+          </div>
         </div>
 
-        <PageHeader
-          title={
-            <EditableIssueTitle
-              issueId={issue.id}
-              title={issue.title}
-              canEdit={userCanEditTitle}
-              className="text-balance text-3xl font-bold tracking-tight"
-            />
-          }
-        />
-
-        <div
-          data-testid="issue-detail-subtitle"
-          className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
-        >
-          <span>
-            Reported by{" "}
-            <span className="font-medium text-foreground">{reporter.name}</span>
-          </span>
-          {isUserMachineOwner(issueWithRelations, reporter.id) && (
-            <OwnerBadge size="sm" />
-          )}
-          <span className="text-muted-foreground/50">·</span>
-          <span>{formatDate(issue.createdAt)}</span>
-          <span className="text-muted-foreground/50">·</span>
-          <span>{issue.watchers.length} watching</span>
-          {accessLevel !== "unauthenticated" && (
-            <WatchButton
-              issueId={issue.id}
-              initialIsWatching={isWatching}
-              className="ml-1 h-7 rounded-full px-3 py-0 text-xs"
-            />
-          )}
-        </div>
+        {ownerRequirements && (
+          <OwnerRequirementsCallout
+            ownerRequirements={ownerRequirements}
+            machineName={issue.machine.name}
+          />
+        )}
 
         <IssueMetadata
           issue={issueWithRelations}
@@ -265,8 +278,6 @@ export default async function IssueDetailPage({
             currentUserInitials={
               currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "??"
             }
-            ownerRequirements={ownerRequirements}
-            machineName={issue.machine.name}
           />
         </section>
       </PageContainer>
