@@ -44,7 +44,15 @@ vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
+// Mock Turnstile — default to passing so existing tests are unaffected.
+// Individual tests can override with mockResolvedValueOnce(false) to test
+// the CAPTCHA-failure branch.
+vi.mock("~/lib/security/turnstile", () => ({
+  verifyTurnstileToken: vi.fn().mockResolvedValue(true),
+}));
+
 import { createClient } from "~/lib/supabase/server";
+import { verifyTurnstileToken } from "~/lib/security/turnstile";
 
 describe("Auth Actions Security - Error Handling", () => {
   beforeEach(() => {
@@ -341,6 +349,69 @@ describe("Auth Actions Security - Error Handling", () => {
       expect(result.message).toBe("Failed to update password");
       expect(result.message).not.toContain("Constraint violation");
     }
+  });
+
+  it("resetPasswordAction should return CAPTCHA error when verification fails", async () => {
+    vi.mocked(verifyTurnstileToken).mockResolvedValueOnce(false);
+
+    const updateUserMock = vi.fn();
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
+        updateUser: updateUserMock,
+        signOut: vi.fn(),
+      },
+    } as any);
+
+    const formData = new FormData();
+    formData.set("password", "NewPassword123!");
+    formData.set("confirmPassword", "NewPassword123!");
+    formData.set("captchaToken", "invalid-token");
+
+    const result = await resetPasswordAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("CAPTCHA");
+      expect(result.message).toContain("Verification failed");
+    }
+    expect(updateUserMock).not.toHaveBeenCalled();
+  });
+
+  it("resetPasswordAction should call updateUser when CAPTCHA verification passes", async () => {
+    vi.mocked(verifyTurnstileToken).mockResolvedValueOnce(true);
+
+    const updateUserMock = vi.fn().mockResolvedValue({ error: null });
+    const signOutMock = vi.fn().mockResolvedValue({ error: null });
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
+        updateUser: updateUserMock,
+        signOut: signOutMock,
+      },
+    } as any);
+
+    const formData = new FormData();
+    formData.set("password", "NewPassword123!");
+    formData.set("confirmPassword", "NewPassword123!");
+    formData.set("captchaToken", "valid-token");
+
+    // resetPasswordAction calls redirect("/login") on success, which throws
+    // a NEXT_REDIRECT error in tests. We don't assert on the return value;
+    // we just confirm the password update was attempted.
+    try {
+      await resetPasswordAction(undefined, formData);
+    } catch {
+      // redirect() throws — expected.
+    }
+
+    expect(updateUserMock).toHaveBeenCalledWith({
+      password: "NewPassword123!",
+    });
   });
 
   it("loginAction should return CAPTCHA error for captcha_failed", async () => {
