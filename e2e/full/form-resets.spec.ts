@@ -98,6 +98,10 @@ test.describe("CREATE form resets", () => {
     await page.goto("/report");
     await page.getByTestId("machine-select").selectOption({ index: 1 });
 
+    // Picking a machine via the dropdown writes ?machine=… into the URL.
+    // Verify before clicking Clear so the strip-on-clear assertion is meaningful.
+    await expect(page).toHaveURL(/\/report\?.*machine=/);
+
     await page
       .getByLabel("Issue Title *")
       .fill(`${RESET_PREFIX} clear-button title`);
@@ -118,6 +122,9 @@ test.describe("CREATE form resets", () => {
 
     await expect(page.getByLabel("Issue Title *")).toHaveValue("");
     await expect(page.getByTestId("machine-select")).toHaveValue("");
+    // ?machine= must be stripped on Clear when the machine was user-picked
+    // (no URL-derived default). Otherwise a reload silently re-selects.
+    await expect(page).not.toHaveURL(/\?.*machine=/);
   });
 
   test("CreateMachineForm clears fields after successful submit", async ({
