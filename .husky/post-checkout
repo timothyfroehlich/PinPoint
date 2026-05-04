@@ -8,16 +8,15 @@ BRANCH_CHECKOUT=$3
 if command -v bd >/dev/null 2>&1; then
   export BD_GIT_HOOK=1
   _bd_timeout=${BEADS_HOOK_TIMEOUT:-300}
+  _bd_exit=0
   if command -v timeout >/dev/null 2>&1; then
-    timeout "$_bd_timeout" bd hooks run post-checkout "$@"
-    _bd_exit=$?
+    timeout "$_bd_timeout" bd hooks run post-checkout "$@" || _bd_exit=$?
     if [ $_bd_exit -eq 124 ]; then
       echo >&2 "beads: hook 'post-checkout' timed out after ${_bd_timeout}s — continuing without beads"
       _bd_exit=0
     fi
   else
-    bd hooks run post-checkout "$@"
-    _bd_exit=$?
+    bd hooks run post-checkout "$@" || _bd_exit=$?
   fi
   if [ $_bd_exit -eq 3 ]; then
     echo >&2 "beads: database not initialized — skipping hook 'post-checkout'"
