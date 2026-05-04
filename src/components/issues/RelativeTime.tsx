@@ -2,13 +2,14 @@
 
 import type React from "react";
 import { useEffect, useState } from "react";
-import { formatRelative } from "~/lib/dates";
+import { formatDateTime, formatRelative } from "~/lib/dates";
 
 interface RelativeTimeProps {
   value: Date | string;
-  /** Initial label rendered on the server and during hydration. Avoids a
-   *  hydration mismatch from `Date.now()` diverging between server and client. */
-  fallback: string;
+  /** Server/hydration label. Defaults to the absolute time, which is the
+   *  natural fallback for "X ago" strings and avoids `Date.now()`-induced
+   *  hydration mismatches. */
+  fallback?: string;
 }
 
 export function RelativeTime({
@@ -17,30 +18,19 @@ export function RelativeTime({
 }: RelativeTimeProps): React.JSX.Element {
   const [label, setLabel] = useState<string | null>(null);
 
-  // Stable primitive dependency: a fresh `Date` reference with the same instant
-  // shouldn't tear down and recreate the 60s interval on every parent re-render.
+  // Re-runs only when the instant changes, not the Date reference.
   const depKey = value instanceof Date ? value.getTime() : value;
 
   useEffect(() => {
     const date = typeof value === "string" ? new Date(value) : value;
-    // Bail out on invalid input. Leaving `label` null causes the fallback to
-    // render, and we avoid re-throwing inside a setInterval forever.
-    if (Number.isNaN(date.getTime())) {
-      return;
-    }
+    if (Number.isNaN(date.getTime())) return;
 
     const update = (): void => {
       try {
         setLabel(formatRelative(date));
       } catch (err) {
-        // Defense-in-depth: formatRelative -> formatDistanceToNow can still
-        // throw (e.g. RangeError on edge inputs). Swallow and stay on
-        // fallback. Logger module is server-only, so console.warn is the
-        // appropriate surface here.
-        console.warn(
-          "[RelativeTime] formatRelative threw; using fallback",
-          err
-        );
+        // formatDistanceToNow can throw RangeError on edge inputs; stay on fallback.
+        console.warn("[RelativeTime] formatRelative threw", err);
       }
     };
     update();
@@ -48,10 +38,13 @@ export function RelativeTime({
     return () => {
       window.clearInterval(interval);
     };
-    // depKey is the stabilized primitive form of `value` — passing the raw
-    // `value` would re-run this effect on every fresh Date reference, which is
-    // exactly the 60s-interval thrash this component is trying to avoid.
   }, [depKey]);
 
-  return <>{label ?? fallback}</>;
+  const resolvedFallback = (() => {
+    if (fallback !== undefined) return fallback;
+    const date = typeof value === "string" ? new Date(value) : value;
+    return Number.isNaN(date.getTime()) ? "" : formatDateTime(date);
+  })();
+
+  return <>{label ?? resolvedFallback}</>;
 }

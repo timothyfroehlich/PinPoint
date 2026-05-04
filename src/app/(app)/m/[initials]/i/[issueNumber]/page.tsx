@@ -35,6 +35,7 @@ import {
   checkPermission,
   getAccessLevel,
 } from "~/lib/permissions/helpers";
+import { reportError } from "~/lib/observability/report-error";
 
 /**
  * Issue Detail Page
@@ -59,12 +60,12 @@ export default async function IssueDetailPage({
     error: authError,
   } = await supabase.auth.getUser();
   if (authError) {
-    // Don't crash the page on backend auth glitches — degrade to "unauthenticated"
-    // — but surface the error so a silent guest-downgrade doesn't go undetected.
-    console.warn(
-      "[issue-detail] supabase.auth.getUser() failed; rendering as unauthenticated",
-      authError
-    );
+    // Backend glitch: keep rendering (as unauthenticated) rather than crash,
+    // but capture the error so the silent guest-downgrade is observable.
+    reportError(authError, {
+      action: "issue-detail-page.auth.getUser",
+      bestEffort: true,
+    });
   }
 
   const issueNum = parseInt(issueNumber, 10);
@@ -73,11 +74,8 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
-  // CORE-PERF-003: parallelize what we can. The assignee picker is only usable
-  // for triage-capable roles (member+), so we resolve the viewer's role first
-  // and only fetch the full member roster when they can actually use it.
-  // Loading it for guests would serialize the roster into the RSC payload
-  // with no UX benefit.
+  // CORE-PERF-003: parallelize what's safe before role is known; the roster
+  // fetch is gated below on triage permission.
   const [issue, currentUserProfile] = await Promise.all([
     // Query issue with all relations
     db.query.issues.findFirst({
@@ -159,15 +157,21 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
+  const issueWithRelations = issue as unknown as IssueWithAllRelations;
   const accessLevel = getAccessLevel(currentUserProfile?.role);
-  // Triage-capable roles (member, technician, admin) get the assignee roster.
-  // Guests and unauthenticated viewers see a read-only assignee, so serializing
-  // the full roster to them would be a privacy + payload regression with no
-  // benefit. The check matches the matrix's `issues.update.triage` floor.
-  const canTriage =
-    accessLevel === "member" ||
-    accessLevel === "technician" ||
-    accessLevel === "admin";
+  const ownershipContext: OwnershipContext = {
+    userId: user?.id,
+    reporterId: issueWithRelations.reportedBy,
+    machineOwnerId: getMachineOwnerId(issueWithRelations),
+  };
+
+  // Don't serialize the member roster to viewers who can't open the picker —
+  // privacy + payload regression with no benefit.
+  const canTriage = checkPermission(
+    "issues.update.triage",
+    accessLevel,
+    ownershipContext
+  );
   const allUsers = canTriage
     ? await db
         .select({ id: userProfiles.id, name: userProfiles.name })
@@ -176,18 +180,11 @@ export default async function IssueDetailPage({
         .orderBy(asc(userProfiles.name))
     : [];
 
-  // Cast issue to IssueWithAllRelations for type safety
-  const issueWithRelations = issue as unknown as IssueWithAllRelations;
   const ownerName = getMachineOwnerName(issueWithRelations);
   const reporter = resolveIssueReporter(issueWithRelations);
   const ownerRequirements = user
     ? (issue.machine.ownerRequirements ?? undefined)
     : undefined;
-  const ownershipContext: OwnershipContext = {
-    userId: user?.id,
-    reporterId: issueWithRelations.reportedBy,
-    machineOwnerId: getMachineOwnerId(issueWithRelations),
-  };
 
   // Compute title edit permission
   const userCanEditTitle = checkPermission(
@@ -263,15 +260,8 @@ export default async function IssueDetailPage({
             <span className="text-muted-foreground/50">·</span>
             <Tooltip>
               <TooltipTrigger asChild>
-                {/* tabIndex=0 makes the span keyboard-focusable so the tooltip
-                    is reachable without a mouse. The element itself is not
-                    interactive (no click action), so we don't add role=button. */}
                 <span tabIndex={0}>
-                  Updated{" "}
-                  <RelativeTime
-                    value={issue.updatedAt}
-                    fallback={formatDateTime(issue.updatedAt)}
-                  />
+                  Updated <RelativeTime value={issue.updatedAt} />
                 </span>
               </TooltipTrigger>
               <TooltipContent>{formatDateTime(issue.updatedAt)}</TooltipContent>
@@ -305,9 +295,6 @@ export default async function IssueDetailPage({
         />
 
         <section className="@container">
-          {/* Two-layer responsive (rule #16): heading visibility is a section-
-              internal concern, so use the container query (`@md:`) rather than
-              the viewport breakpoint (`md:`). */}
           <h2 className="hidden @md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-5">
             Activity
           </h2>

@@ -255,11 +255,11 @@ function TimelineItem({
               )}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="text-[11px] text-muted-foreground/60">
-                    <RelativeTime
-                      value={event.createdAt}
-                      fallback={formatDateTime(event.createdAt)}
-                    />
+                  <span
+                    tabIndex={0}
+                    className="text-[11px] text-muted-foreground/60"
+                  >
+                    <RelativeTime value={event.createdAt} />
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -296,11 +296,11 @@ function TimelineItem({
                   <span className="text-muted-foreground/40">&bull;</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="text-xs text-muted-foreground/60">
-                        <RelativeTime
-                          value={event.createdAt}
-                          fallback={formatDateTime(event.createdAt)}
-                        />
+                      <span
+                        tabIndex={0}
+                        className="text-xs text-muted-foreground/60"
+                      >
+                        <RelativeTime value={event.createdAt} />
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -310,12 +310,11 @@ function TimelineItem({
                   {isEdited && !isIssue && (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="text-xs text-muted-foreground/40">
-                          &bull; edited{" "}
-                          <RelativeTime
-                            value={event.updatedAt}
-                            fallback={formatDateTime(event.updatedAt)}
-                          />
+                        <span
+                          tabIndex={0}
+                          className="text-xs text-muted-foreground/40"
+                        >
+                          &bull; edited <RelativeTime value={event.updatedAt} />
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
