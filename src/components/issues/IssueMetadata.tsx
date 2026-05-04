@@ -14,6 +14,20 @@ interface IssueMetadataUser {
   name: string;
 }
 
+/**
+ * Fields consumed by the inner forms below. If you add a new sub-form that
+ * reads another field off `issue`, widen this Pick — otherwise the test
+ * fixture (which uses `satisfies Parameters<typeof IssueMetadata>[0]["issue"]`)
+ * will accept an underspecified shape and the failure surfaces inside the
+ * sub-form rather than at this seam.
+ *
+ * Currently consumed by:
+ * - AssignIssueForm: `id`, `assignedTo`
+ * - UpdateIssueStatusForm: `id`, `status`
+ * - UpdateIssuePriorityForm: `id`, `priority`
+ * - UpdateIssueSeverityForm: `id`, `severity`
+ * - UpdateIssueFrequencyForm: `id`, `frequency`
+ */
 type IssueMetadataIssue = Pick<
   IssueWithAllRelations,
   "id" | "assignedTo" | "status" | "priority" | "severity" | "frequency"

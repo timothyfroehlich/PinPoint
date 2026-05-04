@@ -56,7 +56,16 @@ export default async function IssueDetailPage({
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+  if (authError) {
+    // Don't crash the page on backend auth glitches — degrade to "unauthenticated"
+    // — but surface the error so a silent guest-downgrade doesn't go undetected.
+    console.warn(
+      "[issue-detail] supabase.auth.getUser() failed; rendering as unauthenticated",
+      authError
+    );
+  }
 
   const issueNum = parseInt(issueNumber, 10);
 
@@ -64,11 +73,12 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
-  // CORE-PERF-003: Execute independent queries in parallel to avoid waterfall.
-  // The user list is only loaded for authenticated viewers — unauthenticated
-  // visitors can't open the assignee picker, so serializing the full member
-  // roster into their RSC payload would leak names with no UX benefit.
-  const [issue, allUsers, currentUserProfile] = await Promise.all([
+  // CORE-PERF-003: parallelize what we can. The assignee picker is only usable
+  // for triage-capable roles (member+), so we resolve the viewer's role first
+  // and only fetch the full member roster when they can actually use it.
+  // Loading it for guests would serialize the roster into the RSC payload
+  // with no UX benefit.
+  const [issue, currentUserProfile] = await Promise.all([
     // Query issue with all relations
     db.query.issues.findFirst({
       where: and(
@@ -134,19 +144,9 @@ export default async function IssueDetailPage({
         },
       },
     }),
-    // Fetch all members/admins for assignment dropdown (only for auth users
-    // who can actually use the picker)
-    user?.id
-      ? db
-          .select({
-            id: userProfiles.id,
-            name: userProfiles.name,
-          })
-          .from(userProfiles)
-          .where(notInArray(userProfiles.role, ["guest"]))
-          .orderBy(asc(userProfiles.name))
-      : Promise.resolve([]),
-    // Fetch current user's profile for timeline permissions
+    // Fetch current user's profile for permission-aware rendering and to
+    // gate the (potentially expensive + privacy-sensitive) assignee roster
+    // fetch below.
     user?.id
       ? db.query.userProfiles.findFirst({
           where: eq(userProfiles.id, user.id),
@@ -159,6 +159,23 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
+  const accessLevel = getAccessLevel(currentUserProfile?.role);
+  // Triage-capable roles (member, technician, admin) get the assignee roster.
+  // Guests and unauthenticated viewers see a read-only assignee, so serializing
+  // the full roster to them would be a privacy + payload regression with no
+  // benefit. The check matches the matrix's `issues.update.triage` floor.
+  const canTriage =
+    accessLevel === "member" ||
+    accessLevel === "technician" ||
+    accessLevel === "admin";
+  const allUsers = canTriage
+    ? await db
+        .select({ id: userProfiles.id, name: userProfiles.name })
+        .from(userProfiles)
+        .where(notInArray(userProfiles.role, ["guest"]))
+        .orderBy(asc(userProfiles.name))
+    : [];
+
   // Cast issue to IssueWithAllRelations for type safety
   const issueWithRelations = issue as unknown as IssueWithAllRelations;
   const ownerName = getMachineOwnerName(issueWithRelations);
@@ -166,7 +183,6 @@ export default async function IssueDetailPage({
   const ownerRequirements = user
     ? (issue.machine.ownerRequirements ?? undefined)
     : undefined;
-  const accessLevel = getAccessLevel(currentUserProfile?.role);
   const ownershipContext: OwnershipContext = {
     userId: user?.id,
     reporterId: issueWithRelations.reportedBy,
@@ -247,7 +263,10 @@ export default async function IssueDetailPage({
             <span className="text-muted-foreground/50">·</span>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span>
+                {/* tabIndex=0 makes the span keyboard-focusable so the tooltip
+                    is reachable without a mouse. The element itself is not
+                    interactive (no click action), so we don't add role=button. */}
+                <span tabIndex={0}>
                   Updated{" "}
                   <RelativeTime
                     value={issue.updatedAt}
@@ -286,7 +305,10 @@ export default async function IssueDetailPage({
         />
 
         <section className="@container">
-          <h2 className="hidden md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-5">
+          {/* Two-layer responsive (rule #16): heading visibility is a section-
+              internal concern, so use the container query (`@md:`) rather than
+              the viewport breakpoint (`md:`). */}
+          <h2 className="hidden @md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-5">
             Activity
           </h2>
           <IssueTimeline

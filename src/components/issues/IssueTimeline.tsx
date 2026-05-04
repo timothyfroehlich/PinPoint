@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useTransition } from "react";
-import { formatRelative, formatDateTime } from "~/lib/dates";
+import { formatDateTime } from "~/lib/dates";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
 import { OwnerBadge } from "~/components/issues/OwnerBadge";
+import { RelativeTime } from "~/components/issues/RelativeTime";
 import { isUserMachineOwner } from "~/lib/issues/owner";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
@@ -255,7 +256,10 @@ function TimelineItem({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="text-[11px] text-muted-foreground/60">
-                    {formatRelative(event.createdAt)}
+                    <RelativeTime
+                      value={event.createdAt}
+                      fallback={formatDateTime(event.createdAt)}
+                    />
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -293,7 +297,10 @@ function TimelineItem({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="text-xs text-muted-foreground/60">
-                        {formatRelative(event.createdAt)}
+                        <RelativeTime
+                          value={event.createdAt}
+                          fallback={formatDateTime(event.createdAt)}
+                        />
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -304,7 +311,11 @@ function TimelineItem({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="text-xs text-muted-foreground/40">
-                          &bull; edited {formatRelative(event.updatedAt)}
+                          &bull; edited{" "}
+                          <RelativeTime
+                            value={event.updatedAt}
+                            fallback={formatDateTime(event.updatedAt)}
+                          />
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>

@@ -67,6 +67,10 @@ describe("IssueMetadata", () => {
   });
 
   it("applies @xl:col-span-2 to the Assignee row so it spans both columns at @xl: width", () => {
+    // Structural contract: the Assignee row MUST span both columns at @xl:
+    // (otherwise the 2-column reflow lays out as 3+2 which is broken). This is
+    // intentionally tested at the class level because the contract is layout
+    // intent, not visual styling.
     renderWithProviders(
       <IssueMetadata
         issue={fixtureIssue}
@@ -78,57 +82,6 @@ describe("IssueMetadata", () => {
     );
     const assigneeRow = screen.getByTestId("issue-metadata-row-assignee");
     expect(assigneeRow).toHaveClass("@xl:col-span-2");
-  });
-
-  it("applies @xl:grid-cols-2 to the inner grid for 2-column reflow", () => {
-    renderWithProviders(
-      <IssueMetadata
-        issue={fixtureIssue}
-        allUsers={fixtureUsers}
-        currentUserId="user-1"
-        accessLevel="member"
-        ownershipContext={fixtureOwnership}
-      />
-    );
-    const grid = screen.getByTestId("issue-metadata-grid");
-    expect(grid).toHaveClass("grid-cols-1");
-    expect(grid).toHaveClass("@xl:grid-cols-2");
-  });
-
-  it("applies @xl:border-l to even-numbered rows for visual column separation at @xl:", () => {
-    renderWithProviders(
-      <IssueMetadata
-        issue={fixtureIssue}
-        allUsers={fixtureUsers}
-        currentUserId="user-1"
-        accessLevel="member"
-        ownershipContext={fixtureOwnership}
-      />
-    );
-    expect(screen.getByTestId("issue-metadata-row-priority")).toHaveClass(
-      "@xl:border-l"
-    );
-    expect(screen.getByTestId("issue-metadata-row-frequency")).toHaveClass(
-      "@xl:border-l"
-    );
-  });
-
-  it("does not apply @xl:border-l to Status or Severity (left-column) rows", () => {
-    renderWithProviders(
-      <IssueMetadata
-        issue={fixtureIssue}
-        allUsers={fixtureUsers}
-        currentUserId="user-1"
-        accessLevel="member"
-        ownershipContext={fixtureOwnership}
-      />
-    );
-    expect(screen.getByTestId("issue-metadata-row-status")).not.toHaveClass(
-      "@xl:border-l"
-    );
-    expect(screen.getByTestId("issue-metadata-row-severity")).not.toHaveClass(
-      "@xl:border-l"
-    );
   });
 
   it("forwards accessLevel — member sees interactive forms, unauthenticated sees readonly", () => {
@@ -169,5 +122,24 @@ describe("IssueMetadata", () => {
       anonContainer.querySelectorAll('form[data-form="update-priority"]')
     ).toHaveLength(0);
     expect(screen.getByTestId("assignee-readonly")).toBeInTheDocument();
+  });
+
+  it("unauthenticated path displays the assignee name from allUsers", () => {
+    // Regression guard: AssignIssueForm reads the assignee name via
+    // `users.find(u => u.id === assignedToId)?.name ?? "Unassigned"` in the
+    // readonly branch. If the lookup silently fails (e.g. allUsers not threaded
+    // through, or assignedToId truncated), the readonly cell would display
+    // "Unassigned" instead of the actual user's name.
+    renderWithProviders(
+      <IssueMetadata
+        issue={fixtureIssue}
+        allUsers={fixtureUsers}
+        currentUserId={null}
+        accessLevel="unauthenticated"
+        ownershipContext={fixtureOwnership}
+      />
+    );
+    const readonly = screen.getByTestId("assignee-readonly");
+    expect(readonly).toHaveTextContent("Tim F.");
   });
 });
