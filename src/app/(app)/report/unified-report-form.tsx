@@ -692,6 +692,23 @@ export function UnifiedReportForm({
                     window.localStorage.removeItem("report_form_state");
                     formRef.current?.reset();
                     setSelectedMachineId(defaultMachineId ?? "");
+                    // If the machine was user-picked (URL didn't seed it), the
+                    // dropdown's onChange wrote ?machine=… into the URL via
+                    // history.replaceState. Strip it so a reload doesn't re-select.
+                    if (!defaultMachineId) {
+                      const params = new URLSearchParams(
+                        searchParams.toString()
+                      );
+                      if (params.has("machine")) {
+                        params.delete("machine");
+                        const query = params.toString();
+                        window.history.replaceState(
+                          null,
+                          "",
+                          query ? `?${query}` : window.location.pathname
+                        );
+                      }
+                    }
                     setTitle("");
                     setDescription(null);
                     setSeverity("minor");

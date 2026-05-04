@@ -21,9 +21,19 @@ import { fillReportForm } from "../support/page-helpers";
 const RESET_PREFIX = "E2E Reset";
 
 test.describe("CREATE form resets", () => {
+  // Tests that create real DB entities push their identifiers here so
+  // afterEach can hand them to cleanupTestEntities. Prevents pollution that
+  // would otherwise accumulate across runs and eventually collide on initials.
+  let machineInitialsToCleanup: string[] = [];
+
+  test.beforeEach(() => {
+    machineInitialsToCleanup = [];
+  });
+
   test.afterEach(async ({ request }) => {
     await cleanupTestEntities(request, {
       issueTitlePrefix: RESET_PREFIX,
+      machineInitials: machineInitialsToCleanup,
     });
   });
 
@@ -120,6 +130,7 @@ test.describe("CREATE form resets", () => {
 
     const initials = `R${String(Date.now()).slice(-3)}`;
     const name = `${RESET_PREFIX} Machine ${initials}`;
+    machineInitialsToCleanup.push(initials);
 
     await page.goto("/m/new");
 
