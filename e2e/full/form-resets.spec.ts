@@ -17,6 +17,7 @@ import { ensureLoggedIn, loginAs, logout } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { seededIssues, seededMachines, TEST_USERS } from "../support/constants";
 import { fillReportForm } from "../support/page-helpers";
+import { getTestMachineInitials } from "../support/test-isolation";
 
 const RESET_PREFIX = "E2E Reset";
 
@@ -135,7 +136,9 @@ test.describe("CREATE form resets", () => {
       password: TEST_USERS.admin.password,
     });
 
-    const initials = `R${String(Date.now()).slice(-3)}`;
+    // Worker-safe initials prevent 23505 unique-constraint collisions across
+    // parallel workers and quick reruns (3-digit timestamp suffix is too small).
+    const initials = getTestMachineInitials();
     const name = `${RESET_PREFIX} Machine ${initials}`;
     machineInitialsToCleanup.push(initials);
 

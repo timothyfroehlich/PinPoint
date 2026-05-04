@@ -155,6 +155,21 @@ export function UnifiedReportForm({
     // Controlled state — preserve machine when URL param drove the page,
     // since the user came here specifically to report on that machine.
     setSelectedMachineId(defaultMachineId ?? "");
+    // If the machine was user-picked (URL didn't seed it), strip the
+    // ?machine= the dropdown's onChange wrote into the URL. Mirrors the
+    // Clear-button path so a back-nav or failed redirect leaves a clean URL.
+    if (!defaultMachineId && typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("machine")) {
+        params.delete("machine");
+        const query = params.toString();
+        window.history.replaceState(
+          null,
+          "",
+          query ? `?${query}` : window.location.pathname
+        );
+      }
+    }
     setTitle("");
     setDescription(null);
     setSeverity("minor");
@@ -713,9 +728,11 @@ export function UnifiedReportForm({
                     // If the machine was user-picked (URL didn't seed it), the
                     // dropdown's onChange wrote ?machine=… into the URL via
                     // history.replaceState. Strip it so a reload doesn't re-select.
+                    // Read window.location.search (not the searchParams hook),
+                    // since replaceState mutations don't update useSearchParams.
                     if (!defaultMachineId) {
                       const params = new URLSearchParams(
-                        searchParams.toString()
+                        window.location.search
                       );
                       if (params.has("machine")) {
                         params.delete("machine");
