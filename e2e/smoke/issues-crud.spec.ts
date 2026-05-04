@@ -217,7 +217,17 @@ test.describe("Issues System", () => {
       ).toBeVisible();
 
       await expect(page.getByTestId("issue-timeline")).toBeVisible();
-      await expect(page.getByTestId("issue-comment-form")).toBeVisible();
+      // Authenticated mobile uses StickyCommentComposer (sticky bar with
+      // "Add a comment" button); desktop shows the inline composer at the end
+      // of the timeline. Either is the canonical comment composer for its
+      // viewport — assert on whichever applies.
+      if (isMobile) {
+        await expect(
+          page.getByRole("button", { name: "Add a comment" })
+        ).toBeVisible();
+      } else {
+        await expect(page.getByTestId("issue-comment-form")).toBeVisible();
+      }
       await expect(page.getByRole("heading", { name: "Activity" })).toHaveCount(
         isMobile ? 0 : 1
       );

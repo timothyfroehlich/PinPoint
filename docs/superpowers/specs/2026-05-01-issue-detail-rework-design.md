@@ -514,6 +514,22 @@ This rework is complete when:
 
 ---
 
+## 13b. Post-implementation deltas (PR #1270)
+
+Three decisions in this spec diverged from the shipped implementation. Treat the
+shipped code as the source of truth — these notes exist so future readers don't
+re-implement against the original spec values.
+
+| Spec value                                                                                     | Shipped value                                 | Why it changed                                                                                                                                                                                                                     |
+| :--------------------------------------------------------------------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IssueMetadata` 1-col → 2-col reflow at `@container (min-width: 40rem)` (≈640px), raw CSS      | `@xl:grid-cols-2` Tailwind variant (≈576px)   | Tailwind v4's `@xl:` shorthand is idiomatic in this codebase. The 64px-narrower threshold reflows on more devices (large phones in landscape, small tablets) at minimal cost.                                                      |
+| `OwnerRequirementsCallout` rendered inside `IssueTimeline` after the initial report event (D6) | Rendered at page level, above `IssueMetadata` | Design review during implementation: the ownership requirements describe the _machine_, not a timeline event. Hoisting it above the metadata grid makes it visible immediately on page load (no scroll), which matches its intent. |
+| `<PageContainer size="standard">` (max-w-6xl)                                                  | `<PageContainer size="narrow">` (max-w-3xl)   | Design review during implementation: at 1024px+ the metadata grid + timeline read better at 768px max-width. The wider container left a lot of empty space on the right. Issue detail is reading-content-shaped, not table-shaped. |
+
+The first two acceptance criteria below should be read with these deltas in
+mind: ≥40rem becomes ≥36rem, and "after initial report in timeline" becomes
+"above IssueMetadata at page level."
+
 ## 14. Brainstorming Provenance
 
 This design emerged from a brainstorming session whose mockups are preserved at [`docs/superpowers/mockups/2026-05-01-issue-detail-rework/`](../mockups/2026-05-01-issue-detail-rework/). See that directory's `README.md` for the full decision arc; the short version:

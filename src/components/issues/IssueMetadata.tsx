@@ -1,5 +1,4 @@
 import type React from "react";
-import { type IssueWithAllRelations } from "~/lib/types";
 import { AssignIssueForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/assign-issue-form";
 import { UpdateIssueStatusForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-status-form";
 import { UpdateIssueSeverityForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-severity-form";
@@ -7,6 +6,7 @@ import { UpdateIssuePriorityForm } from "~/app/(app)/m/[initials]/i/[issueNumber
 import { UpdateIssueFrequencyForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-frequency-form";
 import { type OwnershipContext } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
+import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 interface IssueMetadataUser {
@@ -14,8 +14,13 @@ interface IssueMetadataUser {
   name: string;
 }
 
+type IssueMetadataIssue = Pick<
+  IssueWithAllRelations,
+  "id" | "assignedTo" | "status" | "priority" | "severity" | "frequency"
+>;
+
 interface IssueMetadataProps {
-  issue: IssueWithAllRelations;
+  issue: IssueMetadataIssue;
   allUsers: IssueMetadataUser[];
   currentUserId: string | null;
   accessLevel: AccessLevel;
@@ -65,7 +70,11 @@ export function IssueMetadata({
             ownershipContext={ownershipContext}
           />
         </Row>
-        <Row label="Severity" testId="issue-metadata-row-severity">
+        <Row
+          label="Severity"
+          testId="issue-metadata-row-severity"
+          lastInColumnAtXl
+        >
           <UpdateIssueSeverityForm
             issueId={issue.id}
             currentSeverity={issue.severity}
@@ -96,6 +105,10 @@ interface RowProps {
   children: React.ReactNode;
   leftBorderAtXl?: boolean;
   spanBothAtXl?: boolean;
+  /** True for the bottom-left cell at @xl: 2-column layout. Without this, the
+   *  cell still draws a `border-b` (since `last:` only matches the very last
+   *  DOM child) and the bottom edge of the grid is asymmetric. */
+  lastInColumnAtXl?: boolean;
 }
 
 function Row({
@@ -104,6 +117,7 @@ function Row({
   children,
   leftBorderAtXl,
   spanBothAtXl,
+  lastInColumnAtXl,
 }: RowProps): React.JSX.Element {
   return (
     <div
@@ -112,7 +126,8 @@ function Row({
         "grid grid-cols-[90px_1fr] items-center gap-3 px-4 py-2.5 min-h-[44px]",
         "border-b border-outline-variant/40 last:border-b-0",
         leftBorderAtXl && "@xl:border-l @xl:border-outline-variant/40",
-        spanBothAtXl && "@xl:col-span-2"
+        spanBothAtXl && "@xl:col-span-2",
+        lastInColumnAtXl && "@xl:border-b-0"
       )}
     >
       <span className="text-xs uppercase tracking-wide text-muted-foreground font-bold">

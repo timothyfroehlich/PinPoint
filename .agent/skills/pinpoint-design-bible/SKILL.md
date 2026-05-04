@@ -151,7 +151,7 @@ When building a new page, pick the closest archetype and follow its pattern.
 
 ### Detail Page with Inline Metadata (issue detail)
 
-`max-w-6xl` single-column main flow. Metadata uses `IssueMetadata` (container query reflows 1-col → 2-col at `@xl:`). Mobile sticky comment composer opens a `Sheet`.
+`max-w-3xl` (PageContainer `size="narrow"`) single-column main flow. Metadata uses `IssueMetadata` (container query reflows 1-col → 2-col at `@xl:`). Mobile sticky comment composer opens a `Sheet`. Reading-content-shaped pages prefer `narrow` over `standard` — issue detail is text + form rows, not a dashboard.
 **Note:** Replaces "Detail Page with Sidebar" for issue detail; eliminates desktop/mobile divergence. Use for new detail pages; migrate existing sidebar pages opportunistically.
 
 ### Detail Page with Internal Grid (machine detail)

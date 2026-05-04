@@ -482,9 +482,15 @@ export function IssueTimeline({
         </div>
       </div>
 
-      {/* Add Comment Form */}
+      {/* Add Comment Form — hidden below md: when authenticated because
+          StickyCommentComposer is the canonical mobile composer. The
+          unauthenticated "Log in to comment" placeholder stays visible at all
+          viewports since there is no sticky composer for guests. */}
       <div
-        className="relative flex gap-4 pt-2"
+        className={cn(
+          "relative flex gap-4 pt-2",
+          currentUserRole !== "unauthenticated" && "hidden md:flex"
+        )}
         data-testid="issue-comment-form"
       >
         <div className="hidden w-16 flex-none flex-col items-center @xl:flex">

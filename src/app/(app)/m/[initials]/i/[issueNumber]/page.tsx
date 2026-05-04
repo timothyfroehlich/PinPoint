@@ -22,7 +22,8 @@ import { getLastIssuesPath } from "~/lib/cookies/preferences";
 import { EditableIssueTitle } from "./editable-issue-title";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
-import { formatRelative, formatDateTime } from "~/lib/dates";
+import { formatDateTime } from "~/lib/dates";
+import { RelativeTime } from "~/components/issues/RelativeTime";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import {
   Tooltip,
@@ -63,7 +64,10 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
-  // CORE-PERF-003: Execute independent queries in parallel to avoid waterfall
+  // CORE-PERF-003: Execute independent queries in parallel to avoid waterfall.
+  // The user list is only loaded for authenticated viewers — unauthenticated
+  // visitors can't open the assignee picker, so serializing the full member
+  // roster into their RSC payload would leak names with no UX benefit.
   const [issue, allUsers, currentUserProfile] = await Promise.all([
     // Query issue with all relations
     db.query.issues.findFirst({
@@ -130,15 +134,18 @@ export default async function IssueDetailPage({
         },
       },
     }),
-    // Fetch all members/admins for assignment dropdown (Restrict to actual users)
-    db
-      .select({
-        id: userProfiles.id,
-        name: userProfiles.name,
-      })
-      .from(userProfiles)
-      .where(notInArray(userProfiles.role, ["guest"]))
-      .orderBy(asc(userProfiles.name)),
+    // Fetch all members/admins for assignment dropdown (only for auth users
+    // who can actually use the picker)
+    user?.id
+      ? db
+          .select({
+            id: userProfiles.id,
+            name: userProfiles.name,
+          })
+          .from(userProfiles)
+          .where(notInArray(userProfiles.role, ["guest"]))
+          .orderBy(asc(userProfiles.name))
+      : Promise.resolve([]),
     // Fetch current user's profile for timeline permissions
     user?.id
       ? db.query.userProfiles.findFirst({
@@ -178,10 +185,7 @@ export default async function IssueDetailPage({
 
   return (
     <>
-      <PageContainer
-        size="narrow"
-        className="pb-[calc(56px+64px+env(safe-area-inset-bottom))] md:pb-10"
-      >
+      <PageContainer size="narrow" className="pb-16 md:pb-10">
         <div className="space-y-2">
           <BackToIssuesLink href={issuesPath} className="md:hidden" />
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -243,8 +247,12 @@ export default async function IssueDetailPage({
             <span className="text-muted-foreground/50">·</span>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span suppressHydrationWarning>
-                  Updated {formatRelative(issue.updatedAt)}
+                <span>
+                  Updated{" "}
+                  <RelativeTime
+                    value={issue.updatedAt}
+                    fallback={formatDateTime(issue.updatedAt)}
+                  />
                 </span>
               </TooltipTrigger>
               <TooltipContent>{formatDateTime(issue.updatedAt)}</TooltipContent>
