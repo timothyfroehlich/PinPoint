@@ -1,0 +1,521 @@
+<style>
+  /* Layout helpers */
+  .pair {
+    display: grid;
+    grid-template-columns: 1.45fr 1fr;
+    gap: 18px;
+    margin-top: 10px;
+    margin-bottom: 14px;
+  }
+  .viewport-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #71717a;
+    margin-bottom: 6px;
+  }
+  .takeaway {
+    font-size: 11px;
+    color: #a1a1aa;
+    font-style: italic;
+    margin-top: 6px;
+    line-height: 1.55;
+  }
+  .product-section { margin-bottom: 28px; }
+  .product-name {
+    font-weight: 700;
+    font-size: 16px;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+  }
+  .product-summary {
+    font-size: 12px;
+    color: #71717a;
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+  .divider { border-top: 1px solid #1e293b; margin: 14px 0; }
+
+  /* Generic page frame (per-product themed) */
+  .page-mock {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #27272a;
+  }
+  .mobile-frame { max-width: 300px; }
+
+  /* Section labels inside frames */
+  .frame-h { font-size: 9px; font-weight: 600; text-transform: uppercase;
+             letter-spacing: 0.08em; color: #71717a; margin: 0 0 4px 0; }
+
+  /* ---- GitHub theme ---- */
+  .gh { background: #0d1117; color: #c9d1d9; }
+  .gh-bar { background: #010409; border-bottom: 1px solid #21262d;
+            padding: 8px 12px; display: flex; gap: 14px; align-items: center;
+            font-size: 11px; color: #8b949e; }
+  .gh-logo { color: #fff; font-weight: 700; font-size: 13px; }
+  .gh-body { padding: 14px; }
+  .gh-bc { font-size: 11px; color: #58a6ff; }
+  .gh-bc .crumb { color: #58a6ff; }
+  .gh-bc .sep { color: #4d525b; padding: 0 4px; }
+  .gh-title-row { display: flex; align-items: flex-start; gap: 8px; margin-top: 4px; }
+  .gh-title { font-size: 18px; font-weight: 600; color: #c9d1d9; line-height: 1.25; }
+  .gh-id { color: #6e7681; font-weight: 400; }
+  .gh-statusbar { display: flex; align-items: center; gap: 8px; margin: 6px 0 10px; }
+  .gh-status-pill { background: #1f6feb; color: #fff; font-size: 10px;
+                    padding: 3px 8px; border-radius: 999px; font-weight: 600; }
+  .gh-meta { color: #8b949e; font-size: 10px; }
+  .gh-grid { display: grid; grid-template-columns: 1fr 200px; gap: 14px; }
+  .gh-body-card { background: #0d1117; border: 1px solid #21262d; border-radius: 6px;
+                  padding: 10px; font-size: 11px; color: #c9d1d9; line-height: 1.4; }
+  .gh-comment { background: #0d1117; border: 1px solid #21262d; border-radius: 6px;
+                padding: 10px; font-size: 11px; color: #c9d1d9; margin-top: 8px; }
+  .gh-sidebar { font-size: 11px; }
+  .gh-sb-section { padding: 8px 0; border-bottom: 1px solid #21262d; }
+  .gh-sb-label { font-weight: 600; color: #c9d1d9; }
+  .gh-sb-value { color: #8b949e; margin-top: 2px; }
+  .gh-mobile-acc { background: #0d1117; border: 1px solid #21262d; border-radius: 6px;
+                   padding: 8px 10px; font-size: 11px; display: flex; justify-content: space-between;
+                   align-items: center; color: #c9d1d9; margin-top: 4px; }
+  .gh-acc-arrow { color: #6e7681; }
+
+  /* ---- Linear theme ---- */
+  .ln { background: #0c0c0e; color: #d4d4d8; }
+  .ln-topbar { background: #0c0c0e; border-bottom: 1px solid #1f1f23;
+               padding: 8px 12px; display: flex; align-items: center; gap: 10px;
+               font-size: 11px; color: #71717a; }
+  .ln-id { color: #71717a; font-size: 10px; }
+  .ln-toolbar-pills { display: flex; gap: 5px; }
+  .ln-pill { background: #1a1a1d; border: 1px solid #27272a; color: #d4d4d8;
+             padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 500; }
+  .ln-pill-status { background: #1e3a8a33; color: #93c5fd; border-color: #1e40af66; }
+  .ln-pill-priority { background: #f59e0b22; color: #fbbf24; border-color: #ea580c66; }
+  .ln-pill-assignee { display: flex; align-items: center; gap: 4px; }
+  .ln-avatar { width: 14px; height: 14px; border-radius: 50%; background: #6366f1;
+               color: #fff; font-size: 8px; font-weight: 700; display: flex;
+               align-items: center; justify-content: center; }
+  .ln-body { padding: 18px 22px; }
+  .ln-title { font-size: 22px; font-weight: 700; color: #fafafa; line-height: 1.15;
+              margin-top: 10px; letter-spacing: -0.01em; }
+  .ln-grid { display: grid; grid-template-columns: 1fr 220px; gap: 24px; margin-top: 14px; }
+  .ln-desc { font-size: 11px; color: #a1a1aa; line-height: 1.55; }
+  .ln-comment { font-size: 11px; color: #a1a1aa; margin-top: 14px;
+                padding-left: 24px; position: relative; line-height: 1.55; }
+  .ln-comment::before { content: ""; width: 18px; height: 18px;
+                         background: #3b82f6; border-radius: 50%; position: absolute;
+                         left: 0; top: 0; }
+  .ln-props { font-size: 10px; color: #71717a; }
+  .ln-props-row { display: flex; justify-content: space-between; padding: 5px 0;
+                  border-bottom: 1px solid #1f1f2333; }
+  .ln-props-row span:last-child { color: #d4d4d8; }
+  .ln-mobile-stripe { display: flex; gap: 4px; overflow-x: auto;
+                      padding: 6px 0; margin: 8px 0 4px 0; }
+
+  /* ---- Asana theme ---- */
+  .as { background: #f6f8fa; color: #1f2937; }
+  .as-list { background: #fff; border-right: 1px solid #e5e7eb;
+             padding: 12px 10px; font-size: 11px; color: #6b7280; }
+  .as-list-row { padding: 8px 6px; border-bottom: 1px solid #f3f4f6;
+                 display: flex; align-items: center; gap: 8px; }
+  .as-task-circle { width: 12px; height: 12px; border-radius: 50%;
+                    border: 1.5px solid #d1d5db; }
+  .as-pane { background: #fff; padding: 16px; }
+  .as-title { font-size: 18px; font-weight: 600; color: #111827; line-height: 1.2; }
+  .as-field-row { display: grid; grid-template-columns: 90px 1fr; gap: 10px;
+                  align-items: center; padding: 7px 0;
+                  border-bottom: 1px solid #f3f4f6; font-size: 11px; }
+  .as-field-label { color: #6b7280; font-weight: 500; }
+  .as-field-value { color: #111827; }
+  .as-pill { background: #ecfeff; color: #155e75; font-size: 10px;
+             padding: 2px 8px; border-radius: 4px; font-weight: 500; display: inline-block; }
+  .as-section-h { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                  letter-spacing: 0.08em; color: #6b7280; margin: 12px 0 6px 0; }
+  .as-desc { font-size: 11px; color: #374151; line-height: 1.5; }
+  .as-grid-desktop { display: grid; grid-template-columns: 130px 1fr; }
+
+  /* ---- PinPoint theme (today) ---- */
+  .pp { background: #0f0f11; color: #e4e4e7; }
+  .pp-bar { background: rgba(24,21,27,0.85); border-bottom: 1px solid #4ade8033;
+            padding: 8px 12px; display: flex; align-items: center; gap: 14px;
+            font-size: 11px; color: #a1a1aa; }
+  .pp-logo { color: #4ade80; font-weight: 700; font-size: 13px; }
+  .pp-nav { display: flex; gap: 12px; font-size: 11px; }
+  .pp-nav .active { color: #4ade80; font-weight: 600; }
+  .pp-body { padding: 14px 18px; }
+  .pp-back { color: #4ade80; font-size: 11px; margin-bottom: 8px; }
+  .pp-bc-desktop { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .pp-id-mono-gray { font-family: monospace; font-weight: 700; color: #71717a; }
+  .pp-machine { color: #a1a1aa; }
+  .pp-game-owner { color: #71717a; font-size: 10px; }
+  .pp-title { font-size: 22px; font-weight: 800; color: #fafafa;
+              letter-spacing: -0.02em; margin-top: 6px; }
+  .pp-grid { display: grid; grid-template-columns: 1fr 240px; gap: 24px; margin-top: 14px; }
+  .pp-activity-h { font-size: 9px; font-weight: 600; text-transform: uppercase;
+                   letter-spacing: 0.08em; color: #71717a; margin-bottom: 6px; }
+  .pp-tl-item { padding: 8px 0 8px 14px; border-left: 2px solid #27272a;
+                font-size: 11px; color: #a1a1aa; line-height: 1.4; }
+  .pp-tl-item strong { color: #e4e4e7; }
+  .pp-card { background: #18151b; border: 1px solid #27272a; border-radius: 8px;
+             padding: 12px; }
+  .pp-card-title { font-size: 13px; font-weight: 600; color: #fafafa; margin-bottom: 8px; }
+  .pp-row { display: grid; grid-template-columns: 70px 1fr; align-items: center;
+            font-size: 11px; padding: 4px 0; }
+  .pp-row-label { color: #71717a; }
+  .pp-row-value { color: #d4d4d8; font-weight: 500; }
+  .pp-mob-bar { background: rgba(24,21,27,0.85); border-bottom: 1px solid #4ade8033;
+                padding: 8px 12px; display: flex; align-items: center;
+                justify-content: space-between; }
+  .pp-mob-id-pill { display: inline-flex; font-family: monospace; font-weight: 700;
+                    color: #71717a; background: #27272a; border: 1px solid #3f3f46;
+                    padding: 3px 9px; border-radius: 999px; font-size: 9px; }
+  .pp-mob-meta-strip { display: flex; align-items: center; justify-content: space-between;
+                       border-top: 1px solid #27272a; border-bottom: 1px solid #27272a;
+                       padding: 6px 0; margin-top: 8px; font-size: 10px; }
+  .pp-mob-row-card { background: #18151b; border: 1px solid #27272a;
+                     border-radius: 6px; padding: 8px; margin-top: 6px;
+                     display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .pp-mob-row-cell { font-size: 9px; }
+  .pp-mob-row-cell .label { color: #71717a; font-weight: 600;
+                            text-transform: uppercase; font-size: 8px;
+                            letter-spacing: 0.05em; }
+  .pp-mob-row-cell .value { color: #e4e4e7; }
+  .pp-tabbar { background: rgba(24,21,27,0.85); border-top: 1px solid #4ade8033;
+               padding: 6px 8px; display: flex; justify-content: space-around;
+               font-size: 8px; color: #71717a; }
+  .pp-tab-icon { width: 14px; height: 14px; border-radius: 3px;
+                 background: #3f3f46; margin: 0 auto 2px; }
+
+  /* Mock chrome shared */
+  .body-line { background: #2c2f36; height: 4px; border-radius: 2px;
+               margin: 4px 0; opacity: 0.45; }
+  .body-line.short { width: 70%; }
+  .body-line.shorter { width: 40%; }
+</style>
+
+<h2>Issue Detail — Competitive Landscape</h2>
+<p class="subtitle">How GitHub, Linear, Asana, and today's PinPoint solve the desktop / mobile relationship. Use this to anchor the next decision.</p>
+
+<!-- ============================================================ -->
+<!-- GITHUB -->
+<!-- ============================================================ -->
+<div class="product-section">
+  <div class="product-name">1. GitHub Issues — "Reflow with sidebar accordion below"</div>
+  <div class="product-summary">Two-column desktop with a thin metadata rail. On mobile (web), the entire rail collapses below the comments as a stack of expandable accordion sections — same fields, structurally repositioned.</div>
+
+  <div class="pair">
+    <div>
+      <div class="viewport-label">Desktop</div>
+      <div class="page-mock gh">
+        <div class="gh-bar">
+          <span class="gh-logo">⌚ GitHub</span>
+          <span style="color:#8b949e">acme / pinball-tracker</span>
+          <span style="color:#c9d1d9; margin-left:auto">Issues</span>
+          <span>Pull requests</span>
+        </div>
+        <div class="gh-body">
+          <div class="gh-bc"><span class="crumb">acme</span><span class="sep">/</span><span class="crumb">pinball-tracker</span></div>
+          <div class="gh-title-row">
+            <div class="gh-title">Left flipper sticking intermittently <span class="gh-id">#42</span></div>
+          </div>
+          <div class="gh-statusbar">
+            <span class="gh-status-pill">● Open</span>
+            <span class="gh-meta">opened 2 days ago by tim · 4 comments</span>
+          </div>
+          <div class="gh-grid">
+            <div>
+              <div class="gh-body-card">
+                <div class="body-line"></div>
+                <div class="body-line short"></div>
+                <div class="body-line"></div>
+              </div>
+              <div class="gh-comment">
+                <div class="body-line shorter"></div>
+                <div class="body-line"></div>
+              </div>
+              <div class="gh-comment">
+                <div class="body-line short"></div>
+              </div>
+            </div>
+            <div class="gh-sidebar">
+              <div class="gh-sb-section"><div class="gh-sb-label">Assignees</div><div class="gh-sb-value">mike</div></div>
+              <div class="gh-sb-section"><div class="gh-sb-label">Labels</div><div class="gh-sb-value">bug · flippers</div></div>
+              <div class="gh-sb-section"><div class="gh-sb-label">Type</div><div class="gh-sb-value">Bug</div></div>
+              <div class="gh-sb-section"><div class="gh-sb-label">Projects</div><div class="gh-sb-value">Q2 fixes</div></div>
+              <div class="gh-sb-section"><div class="gh-sb-label">Milestone</div><div class="gh-sb-value">v1.2</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="viewport-label">Mobile (web)</div>
+      <div class="page-mock gh mobile-frame">
+        <div class="gh-bar"><span class="gh-logo">⌚</span><span style="margin-left:auto">≡</span></div>
+        <div class="gh-body">
+          <div class="gh-bc"><span class="crumb">acme/pinball-tracker</span></div>
+          <div class="gh-title" style="font-size:14px">Left flipper sticking intermittently <span class="gh-id">#42</span></div>
+          <div class="gh-statusbar">
+            <span class="gh-status-pill" style="font-size:9px;padding:2px 6px">● Open</span>
+            <span class="gh-meta" style="font-size:9px">opened 2d ago · 4 💬</span>
+          </div>
+          <div class="gh-body-card">
+            <div class="body-line"></div>
+            <div class="body-line short"></div>
+            <div class="body-line"></div>
+          </div>
+          <div class="gh-comment"><div class="body-line"></div><div class="body-line short"></div></div>
+          <div class="gh-comment"><div class="body-line shorter"></div></div>
+          <div class="gh-mobile-acc"><span>Assignees · 1</span><span class="gh-acc-arrow">▾</span></div>
+          <div class="gh-mobile-acc"><span>Labels · 2</span><span class="gh-acc-arrow">▾</span></div>
+          <div class="gh-mobile-acc"><span>Type</span><span class="gh-acc-arrow">▾</span></div>
+          <div class="gh-mobile-acc"><span>Projects · 1</span><span class="gh-acc-arrow">▾</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="takeaway"><strong>Notable:</strong> Mobile and desktop ship the <em>same</em> sidebar fields — mobile just reformats them into expandable rows. No bespoke "metadata strip" with different chrome.</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- LINEAR -->
+<!-- ============================================================ -->
+<div class="product-section">
+  <div class="product-name">2. Linear — "Pills under the title at every viewport"</div>
+  <div class="product-summary">Status / priority / assignee live as pills directly under the title at <em>both</em> desktop and mobile. Desktop adds a properties panel for secondary fields. Mobile drops the panel entirely; the pills are enough.</div>
+
+  <div class="pair">
+    <div>
+      <div class="viewport-label">Desktop</div>
+      <div class="page-mock ln">
+        <div class="ln-topbar">
+          <span style="color:#d4d4d8;font-weight:600">⌬ Engineering</span>
+          <span class="ln-id">›  ENG-42</span>
+          <span style="margin-left:auto" class="ln-id">[</span>
+        </div>
+        <div class="ln-body">
+          <div class="ln-toolbar-pills">
+            <span class="ln-pill ln-pill-status">● In Progress</span>
+            <span class="ln-pill ln-pill-priority">▲ High</span>
+            <span class="ln-pill ln-pill-assignee"><span class="ln-avatar">M</span>Mike</span>
+            <span class="ln-pill">+ Label</span>
+          </div>
+          <div class="ln-title">Left flipper sticking intermittently</div>
+          <div class="ln-grid">
+            <div>
+              <div class="ln-desc">
+                <div class="body-line"></div>
+                <div class="body-line short"></div>
+                <div class="body-line"></div>
+              </div>
+              <div class="ln-comment"><div class="body-line shorter"></div><div class="body-line"></div></div>
+              <div class="ln-comment"><div class="body-line short"></div></div>
+            </div>
+            <div class="ln-props">
+              <div class="ln-props-row"><span>Status</span><span>In Progress</span></div>
+              <div class="ln-props-row"><span>Priority</span><span>High</span></div>
+              <div class="ln-props-row"><span>Assignee</span><span>Mike</span></div>
+              <div class="ln-props-row"><span>Cycle</span><span>Sprint 14</span></div>
+              <div class="ln-props-row"><span>Estimate</span><span>3 pts</span></div>
+              <div class="ln-props-row"><span>Created</span><span>2 days ago</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="viewport-label">Mobile</div>
+      <div class="page-mock ln mobile-frame">
+        <div class="ln-topbar"><span style="color:#d4d4d8">‹</span><span class="ln-id">ENG-42</span><span style="margin-left:auto" class="ln-id">⋯</span></div>
+        <div class="ln-body" style="padding:14px">
+          <div class="ln-mobile-stripe">
+            <span class="ln-pill ln-pill-status">● In Progress</span>
+            <span class="ln-pill ln-pill-priority">▲ High</span>
+            <span class="ln-pill ln-pill-assignee"><span class="ln-avatar">M</span>Mike</span>
+            <span class="ln-pill">+ Label</span>
+          </div>
+          <div class="ln-title" style="font-size:17px;margin-top:8px">Left flipper sticking intermittently</div>
+          <div class="ln-desc" style="margin-top:10px">
+            <div class="body-line"></div>
+            <div class="body-line short"></div>
+            <div class="body-line"></div>
+          </div>
+          <div class="ln-comment"><div class="body-line short"></div></div>
+          <div class="ln-comment"><div class="body-line shorter"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="takeaway"><strong>Notable:</strong> Pills under the title are the <em>same UI element</em> on both viewports — they just become the only metadata view on mobile. The properties panel is desktop-only enrichment, not the primary metadata surface.</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- ASANA -->
+<!-- ============================================================ -->
+<div class="product-section">
+  <div class="product-name">3. Asana — "Single column at every viewport"</div>
+  <div class="product-summary">Asana doesn't have a separate detail page — the task pane is single-column even on desktop. Title, then a table of fields, then description and comments. Mobile uses literally the same layout, full-width.</div>
+
+  <div class="pair">
+    <div>
+      <div class="viewport-label">Desktop</div>
+      <div class="page-mock as">
+        <div class="gh-bar" style="background:#fff;color:#374151;border-bottom:1px solid #e5e7eb;border-color:#e5e7eb">
+          <span style="color:#a855f7;font-weight:700">a Asana</span>
+          <span style="color:#6b7280">My tasks</span>
+          <span style="margin-left:auto;color:#374151">Today</span>
+        </div>
+        <div style="display:grid;grid-template-columns:140px 1fr">
+          <div class="as-list">
+            <div class="as-list-row"><span class="as-task-circle"></span>Inspect plunger</div>
+            <div class="as-list-row" style="background:#dbeafe"><span class="as-task-circle" style="border-color:#1d4ed8"></span><span style="color:#111827;font-weight:500">Left flipper sticking</span></div>
+            <div class="as-list-row"><span class="as-task-circle"></span>Replace bumper</div>
+          </div>
+          <div class="as-pane">
+            <div class="as-title">Left flipper sticking intermittently</div>
+            <div style="margin-top:10px">
+              <div class="as-field-row"><span class="as-field-label">Assignee</span><span class="as-field-value">Mike</span></div>
+              <div class="as-field-row"><span class="as-field-label">Due date</span><span class="as-field-value">Tomorrow</span></div>
+              <div class="as-field-row"><span class="as-field-label">Projects</span><span class="as-field-value"><span class="as-pill">Q2 fixes</span></span></div>
+              <div class="as-field-row"><span class="as-field-label">Status</span><span class="as-field-value"><span class="as-pill">In progress</span></span></div>
+              <div class="as-field-row"><span class="as-field-label">Priority</span><span class="as-field-value"><span class="as-pill">High</span></span></div>
+            </div>
+            <div class="as-section-h">Description</div>
+            <div class="as-desc">
+              <div class="body-line" style="background:#d1d5db"></div>
+              <div class="body-line short" style="background:#d1d5db"></div>
+              <div class="body-line" style="background:#d1d5db"></div>
+            </div>
+            <div class="as-section-h">Comments</div>
+            <div class="as-desc">
+              <div class="body-line short" style="background:#d1d5db"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="viewport-label">Mobile</div>
+      <div class="page-mock as mobile-frame">
+        <div class="gh-bar" style="background:#fff;color:#374151;border-bottom:1px solid #e5e7eb;border-color:#e5e7eb">
+          <span style="color:#374151">‹</span>
+          <span style="color:#374151;font-weight:600">Task</span>
+          <span style="margin-left:auto;color:#374151">⋯</span>
+        </div>
+        <div class="as-pane">
+          <div class="as-title" style="font-size:15px">Left flipper sticking intermittently</div>
+          <div style="margin-top:8px">
+            <div class="as-field-row"><span class="as-field-label">Assignee</span><span class="as-field-value">Mike</span></div>
+            <div class="as-field-row"><span class="as-field-label">Due date</span><span class="as-field-value">Tomorrow</span></div>
+            <div class="as-field-row"><span class="as-field-label">Projects</span><span class="as-field-value"><span class="as-pill">Q2 fixes</span></span></div>
+            <div class="as-field-row"><span class="as-field-label">Status</span><span class="as-field-value"><span class="as-pill">In progress</span></span></div>
+            <div class="as-field-row"><span class="as-field-label">Priority</span><span class="as-field-value"><span class="as-pill">High</span></span></div>
+          </div>
+          <div class="as-section-h">Description</div>
+          <div class="as-desc">
+            <div class="body-line" style="background:#d1d5db"></div>
+            <div class="body-line short" style="background:#d1d5db"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="takeaway"><strong>Notable:</strong> Mobile is structurally identical to desktop — the only thing the desktop adds is the task list rail to the left. The detail pane is single-column at every viewport, so consistency is automatic. Trade-off: no metadata sidebar on desktop at all.</div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ============================================================ -->
+<!-- PINPOINT (TODAY) -->
+<!-- ============================================================ -->
+<div class="product-section">
+  <div class="product-name">4. PinPoint — Today (the page we're reworking)</div>
+  <div class="product-summary">Desktop: BackToIssuesLink + custom breadcrumb (mono ID + machine + "Game Owner: Tim") + editable title + two-column layout with "Details" Card sidebar. Mobile: completely different — pill-style ID + machine, then a bordered metadata strip (assignee + watch), then a two-column "rowLayout" mini-card of status/priority/severity/frequency. Two products in one page.</div>
+
+  <div class="pair">
+    <div>
+      <div class="viewport-label">Desktop — current</div>
+      <div class="page-mock pp">
+        <div class="pp-bar">
+          <span class="pp-logo">PinPoint</span>
+          <span class="pp-nav"><span>Dashboard</span><span class="active">Issues</span><span>Machines</span></span>
+          <span style="margin-left:auto;color:#a1a1aa">+ Report</span>
+        </div>
+        <div class="pp-body">
+          <div class="pp-back">← Back to Issues</div>
+          <div class="pp-bc-desktop">
+            <span class="pp-id-mono-gray">AFM-4</span>
+            <span class="pp-machine">Attack From Mars</span>
+            <span style="color:#3f3f46">·</span>
+            <span class="pp-game-owner">Game Owner: <span style="color:#e4e4e7">Tim</span></span>
+          </div>
+          <div class="pp-title">Left flipper sticking intermittently</div>
+          <div class="pp-grid">
+            <div>
+              <div class="pp-activity-h">Activity</div>
+              <div class="pp-tl-item"><strong>Tim</strong> reported this issue · 2 days ago</div>
+              <div class="pp-tl-item"><strong>Mike</strong> changed status to In Progress · 1 day ago</div>
+              <div class="pp-tl-item"><strong>Tim</strong> commented · 12 hours ago</div>
+            </div>
+            <div class="pp-card">
+              <div class="pp-card-title">Details</div>
+              <div class="pp-row"><span class="pp-row-label">Assignee</span><span class="pp-row-value">Mike</span></div>
+              <div class="pp-row"><span class="pp-row-label">Status</span><span class="pp-row-value">In Progress</span></div>
+              <div class="pp-row"><span class="pp-row-label">Priority</span><span class="pp-row-value">High</span></div>
+              <div class="pp-row"><span class="pp-row-label">Severity</span><span class="pp-row-value">Major</span></div>
+              <div class="pp-row"><span class="pp-row-label">Frequency</span><span class="pp-row-value">Often</span></div>
+              <div style="border-top:1px solid #27272a;margin-top:8px;padding-top:8px;font-size:11px;color:#a1a1aa">👁 3 watching</div>
+              <div class="pp-row" style="margin-top:6px"><span class="pp-row-label">Reporter</span><span class="pp-row-value">Tim</span></div>
+              <div class="pp-row"><span class="pp-row-label">Created</span><span class="pp-row-value">Apr 24</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="viewport-label">Mobile — current</div>
+      <div class="page-mock pp mobile-frame">
+        <div class="pp-mob-bar">
+          <span class="pp-logo">PinPoint</span>
+          <span style="color:#a1a1aa">⋯</span>
+        </div>
+        <div class="pp-body" style="padding:12px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="pp-mob-id-pill">AFM-4</span>
+            <span style="color:#fafafa;font-weight:600;font-size:11px">Attack From Mars</span>
+          </div>
+          <div class="pp-title" style="font-size:15px;margin-top:6px">Left flipper sticking intermittently</div>
+          <div class="pp-mob-meta-strip">
+            <div style="display:flex;align-items:center;gap:6px;color:#d4d4d8">
+              <div class="ln-avatar">M</div><span>Mike</span>
+            </div>
+            <div style="color:#a1a1aa">👁 3</div>
+          </div>
+          <div class="pp-mob-row-card">
+            <div class="pp-mob-row-cell"><div class="label">Status</div><div class="value">In Progress</div></div>
+            <div class="pp-mob-row-cell"><div class="label">Priority</div><div class="value">High</div></div>
+            <div class="pp-mob-row-cell"><div class="label">Severity</div><div class="value">Major</div></div>
+            <div class="pp-mob-row-cell"><div class="label">Frequency</div><div class="value">Often</div></div>
+          </div>
+          <div style="margin-top:10px">
+            <div class="pp-tl-item"><strong>Tim</strong> reported this · 2d ago</div>
+            <div class="pp-tl-item"><strong>Mike</strong> changed status · 1d ago</div>
+          </div>
+        </div>
+        <div class="pp-tabbar">
+          <div><div class="pp-tab-icon"></div>Home</div>
+          <div style="color:#4ade80"><div class="pp-tab-icon" style="background:#4ade80"></div>Issues</div>
+          <div><div class="pp-tab-icon"></div>Machines</div>
+          <div><div class="pp-tab-icon"></div>Report</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="takeaway"><strong>Notable:</strong> The mobile and desktop versions barely look like the same product. Different breadcrumb chrome (gray-mono vs pill), different metadata containers (`Card` vs bordered strip + mini-card), different meaning of "Details" (sidebar Card vs four loose cells). The Reporter / Created fields exist on desktop but vanish entirely on mobile.</div>
+</div>
+
+<p class="subtitle" style="margin-top:18px">After looking through these, let me know in the terminal which direction feels closest to what you want — or describe a hybrid in your own words. We'll iterate from there.</p>

@@ -222,26 +222,12 @@ test.describe("Issues System", () => {
         isMobile ? 0 : 1
       );
 
-      if (isMobile) {
-        await expect(page.getByTestId("mobile-nav-row")).toBeVisible();
-        await expect(
-          page.getByRole("link", { name: /Back to Issues/i })
-        ).toHaveCount(0);
-        await expect(page.getByTestId("issue-sidebar")).toBeHidden();
-        await expect(page.getByTestId("issue-badge-strip")).toBeVisible();
-      } else {
-        const sidebar = page.getByTestId("issue-sidebar");
-        await expect(sidebar).toBeVisible();
-        await expect(
-          sidebar.getByText("Reporter", { exact: true })
-        ).toBeVisible();
-        await expect(
-          sidebar.getByText("Created", { exact: true })
-        ).toBeVisible();
-        await expect(
-          page.getByRole("link", { name: /Back to Issues/i })
-        ).toBeVisible();
-      }
+      // New unified design: metadata grid visible everywhere; Back to Issues
+      // link is mobile-only (desktop relies on AppHeader nav).
+      await expect(page.getByTestId("issue-metadata-grid")).toBeVisible();
+      await expect(
+        page.getByRole("link", { name: /Back to Issues/i })
+      ).toHaveCount(isMobile ? 1 : 0);
 
       // Verify no horizontal overflow on issue detail page
       await assertNoHorizontalOverflow(page);
