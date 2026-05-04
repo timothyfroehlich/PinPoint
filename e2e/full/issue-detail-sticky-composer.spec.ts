@@ -60,11 +60,16 @@ test.describe("StickyCommentComposer — mobile signed-in", () => {
 
     // Open the sticky composer's sheet.
     await page.getByRole("button", { name: "Add a comment" }).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // Wait for TipTap's dynamic import to mount the editor inside the dialog;
+    // without this the count assertion below can race with the lazy bundle.
+    await expect(dialog.getByLabel("Comment", { exact: true })).toBeVisible();
 
     // Even though both the inline AddCommentForm (display:none via hidden md:flex)
     // and the sheet's AddCommentForm are mounted, only the sheet's textarea
-    // should be visible. This guards against the regression where IssueTimeline
+    // should be visible. Guards against the regression where IssueTimeline
     // fails to hide the inline composer on mobile when authenticated.
     await expect(
       page.getByLabel("Comment", { exact: true }).filter({ visible: true })
