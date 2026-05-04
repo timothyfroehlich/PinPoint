@@ -16,6 +16,7 @@ import {
 } from "~/lib/rate-limit";
 import { parsePublicIssueForm } from "./validation";
 import { verifyTurnstileToken } from "~/lib/security/turnstile";
+import { extractCaptchaToken } from "~/lib/auth/errors";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { db } from "~/server/db";
 import {
@@ -95,19 +96,28 @@ export async function submitPublicIssueAction(
     };
   }
 
-  // 3. Verify Turnstile CAPTCHA
-  const turnstileToken = formData.get("cf-turnstile-response");
-  const tokenStr = typeof turnstileToken === "string" ? turnstileToken : "";
-  const captchaValid = await verifyTurnstileToken(tokenStr, ip);
+  // 3. Resolve current user (used to skip CAPTCHA for authenticated reporters
+  // and reused later for permission resolution).
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!captchaValid) {
-    log.warn(
-      { action: "publicIssueReport", ip },
-      "Turnstile CAPTCHA verification failed"
-    );
-    return {
-      error: "CAPTCHA verification failed. Please try again.",
-    };
+  // 4. Verify Turnstile CAPTCHA — only required for anonymous reporters.
+  // Logged-in users skip the Cloudflare round trip entirely.
+  if (!user) {
+    const captchaToken = extractCaptchaToken(formData);
+    const captchaValid = await verifyTurnstileToken(captchaToken ?? "", ip);
+
+    if (!captchaValid) {
+      log.warn(
+        { action: "publicIssueReport", ip },
+        "Turnstile CAPTCHA verification failed"
+      );
+      return {
+        error: "CAPTCHA verification failed. Please try again.",
+      };
+    }
   }
 
   const parsedValue = parsePublicIssueForm(formData);
@@ -156,12 +166,7 @@ export async function submitPublicIssueAction(
     }
   }
 
-  // 3. Resolve reporter
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  // 5. Resolve reporter (user was loaded above; reuse it here)
   let reportedBy: string | null = user?.id ?? null;
   log.info(
     { reportedBy, email: user?.email, action: "publicIssueReport" },
@@ -170,7 +175,7 @@ export async function submitPublicIssueAction(
   let reporterName: string | null = null;
   let reporterEmail: string | null = null;
 
-  // 4. Resolve reporter via name/email if not already logged in
+  // 6. Resolve reporter via name/email if not already logged in
   if (!reportedBy) {
     if (email) {
       // Check active user profiles directly to prevent spoofing
@@ -272,7 +277,7 @@ export async function submitPublicIssueAction(
       autoWatchReporter: watchIssue,
     });
 
-    // 5. Link uploaded images
+    // 7. Link uploaded images
     const imagesMetadataStr = formData.get("imagesMetadata");
     if (imagesMetadataStr && typeof imagesMetadataStr === "string") {
       try {

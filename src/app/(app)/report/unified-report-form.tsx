@@ -107,6 +107,12 @@ export function UnifiedReportForm({
 
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
   const [turnstileToken, setTurnstileToken] = useState("");
+  // CAPTCHA is only required for anonymous reporters. Logged-in users skip it
+  // both client-side (no widget rendered) and server-side (action checks
+  // auth.getUser() before calling verifyTurnstileToken).
+  const hasTurnstile = Boolean(process.env["NEXT_PUBLIC_TURNSTILE_SITE_KEY"]);
+  const enforceCaptcha =
+    hasTurnstile && process.env.NODE_ENV !== "test" && !userAuthenticated;
 
   // Recent issues panel state
   const [issues, setIssues] = useState<RecentIssueData[]>(initialIssues ?? []);
@@ -643,15 +649,19 @@ export function UnifiedReportForm({
               </div>
             )}
 
-            <input
-              type="hidden"
-              name="cf-turnstile-response"
-              value={turnstileToken}
-            />
-            <TurnstileWidget
-              onVerify={handleTurnstileVerify}
-              onExpire={() => setTurnstileToken("")}
-            />
+            {!userAuthenticated && (
+              <>
+                <input
+                  type="hidden"
+                  name="captchaToken"
+                  value={turnstileToken}
+                />
+                <TurnstileWidget
+                  onVerify={handleTurnstileVerify}
+                  onExpire={() => setTurnstileToken("")}
+                />
+              </>
+            )}
 
             <div className="flex flex-col-reverse gap-2 mt-1 sm:flex-row sm:items-center">
               <Button
@@ -667,6 +677,7 @@ export function UnifiedReportForm({
                 type="submit"
                 className="flex-1 bg-primary text-on-primary hover:bg-primary/90 h-10 text-sm font-semibold"
                 loading={isPending}
+                disabled={isPending || (enforceCaptcha && !turnstileToken)}
               >
                 Submit Issue Report
               </Button>
