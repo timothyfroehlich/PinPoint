@@ -222,12 +222,12 @@ test.describe("CREATE form resets", () => {
     ).toBeVisible();
 
     // Fill some values that should NOT survive a close+reopen cycle.
-    // Scope every locator to the dialog — the surrounding /m/new page has
-    // its own elements that match /Email/i (strict-mode collision otherwise).
+    // Use role+name for Email — the dialog also has a "Send Invitation Email"
+    // switch whose name matches /Email/i, so a label-only matcher collides.
     await dialog.getByLabel(/First Name/i).fill("Reset");
     await dialog.getByLabel(/Last Name/i).fill("Probe");
     await dialog
-      .getByLabel(/Email/i)
+      .getByRole("textbox", { name: "Email" })
       .fill(`reset-probe-${Date.now()}@example.com`);
 
     // Cancel dismisses without submit; the dialog's existing onOpenChange
@@ -246,6 +246,8 @@ test.describe("CREATE form resets", () => {
 
     await expect(reopened.getByLabel(/First Name/i)).toHaveValue("");
     await expect(reopened.getByLabel(/Last Name/i)).toHaveValue("");
-    await expect(reopened.getByLabel(/Email/i)).toHaveValue("");
+    await expect(reopened.getByRole("textbox", { name: "Email" })).toHaveValue(
+      ""
+    );
   });
 });
