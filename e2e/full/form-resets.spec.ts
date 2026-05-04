@@ -216,32 +216,36 @@ test.describe("CREATE form resets", () => {
 
     // Open invite dialog from the OwnerSelect "Invite New" affordance.
     await page.getByRole("button", { name: /Invite New/i }).click();
+    const dialog = page.getByRole("dialog");
     await expect(
-      page.getByRole("heading", { name: /Invite New User/i })
+      dialog.getByRole("heading", { name: /Invite New User/i })
     ).toBeVisible();
 
     // Fill some values that should NOT survive a close+reopen cycle.
-    await page.getByLabel(/First Name/i).fill("Reset");
-    await page.getByLabel(/Last Name/i).fill("Probe");
-    await page
+    // Scope every locator to the dialog — the surrounding /m/new page has
+    // its own elements that match /Email/i (strict-mode collision otherwise).
+    await dialog.getByLabel(/First Name/i).fill("Reset");
+    await dialog.getByLabel(/Last Name/i).fill("Probe");
+    await dialog
       .getByLabel(/Email/i)
       .fill(`reset-probe-${Date.now()}@example.com`);
 
     // Cancel dismisses without submit; the dialog's existing onOpenChange
     // useEffect calls form.reset() on close.
-    await page.getByRole("button", { name: /Cancel/i }).click();
+    await dialog.getByRole("button", { name: /Cancel/i }).click();
     await expect(
       page.getByRole("heading", { name: /Invite New User/i })
     ).not.toBeVisible();
 
     // Reopen and verify all fields are empty.
     await page.getByRole("button", { name: /Invite New/i }).click();
+    const reopened = page.getByRole("dialog");
     await expect(
-      page.getByRole("heading", { name: /Invite New User/i })
+      reopened.getByRole("heading", { name: /Invite New User/i })
     ).toBeVisible();
 
-    await expect(page.getByLabel(/First Name/i)).toHaveValue("");
-    await expect(page.getByLabel(/Last Name/i)).toHaveValue("");
-    await expect(page.getByLabel(/Email/i)).toHaveValue("");
+    await expect(reopened.getByLabel(/First Name/i)).toHaveValue("");
+    await expect(reopened.getByLabel(/Last Name/i)).toHaveValue("");
+    await expect(reopened.getByLabel(/Email/i)).toHaveValue("");
   });
 });
