@@ -112,6 +112,12 @@ export default async function IssueDetailPage({
             name: true,
           },
         },
+        assignedToUser: {
+          columns: {
+            id: true,
+            name: true,
+          },
+        },
         invitedReporter: {
           columns: {
             id: true,
@@ -166,7 +172,9 @@ export default async function IssueDetailPage({
   };
 
   // Don't serialize the member roster to viewers who can't open the picker —
-  // privacy + payload regression with no benefit.
+  // privacy + payload regression with no benefit. Non-triage viewers still get
+  // the currently-assigned user so AssignIssueForm's readonly path can display
+  // their name instead of "Unassigned".
   const canTriage = checkPermission(
     "issues.update.triage",
     accessLevel,
@@ -178,7 +186,9 @@ export default async function IssueDetailPage({
         .from(userProfiles)
         .where(notInArray(userProfiles.role, ["guest"]))
         .orderBy(asc(userProfiles.name))
-    : [];
+    : issue.assignedToUser
+      ? [issue.assignedToUser]
+      : [];
 
   const ownerName = getMachineOwnerName(issueWithRelations);
   const reporter = resolveIssueReporter(issueWithRelations);
