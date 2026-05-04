@@ -211,6 +211,24 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "issues.reassign",
+        label: "Reassign issue to another machine",
+        // Issues filed against the wrong game (common at APC where games sit
+        // close together) need to be movable. Limited to people likely to know
+        // the right machine: technicians, admins, and the *current* machine's
+        // owner. The "owner" value resolves via OwnershipContext.machineOwnerId
+        // in helpers.ts.
+        description:
+          "Move an issue from one machine to another. The issue's URL changes after reassignment.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: "owner",
+          technician: true,
+          admin: true,
+        },
+      },
+      {
         id: "issues.watch",
         label: "Watch issues",
         description: "Subscribe to notifications for an issue",

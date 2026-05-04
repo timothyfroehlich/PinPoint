@@ -3,11 +3,12 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, userProfiles } from "~/server/db/schema";
+import { issues, machines, userProfiles } from "~/server/db/schema";
 import { eq, asc, and, notInArray } from "drizzle-orm";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueMetadata } from "~/components/issues/IssueMetadata";
 import { StickyCommentComposer } from "~/components/issues/StickyCommentComposer";
+import { IssueActionsMenu } from "./issue-actions-menu";
 import { OwnerBadge } from "~/components/issues/OwnerBadge";
 import { WatchButton } from "~/components/issues/WatchButton";
 import {
@@ -64,7 +65,7 @@ export default async function IssueDetailPage({
   }
 
   // CORE-PERF-003: Execute independent queries in parallel to avoid waterfall
-  const [issue, allUsers, currentUserProfile] = await Promise.all([
+  const [issue, allUsers, currentUserProfile, allMachines] = await Promise.all([
     // Query issue with all relations
     db.query.issues.findFirst({
       where: and(
@@ -146,6 +147,12 @@ export default async function IssueDetailPage({
           columns: { name: true, role: true },
         })
       : Promise.resolve(null),
+    // Fetch all machines for the reassign-machine picker. Cheap given the org's
+    // machine count and rendered only when the viewer has permission.
+    db.query.machines.findMany({
+      columns: { initials: true, name: true },
+      orderBy: asc(machines.name),
+    }),
   ]);
 
   if (!issue) {
@@ -169,6 +176,11 @@ export default async function IssueDetailPage({
   // Compute title edit permission
   const userCanEditTitle = checkPermission(
     "issues.update.reporting",
+    accessLevel,
+    ownershipContext
+  );
+  const userCanReassign = checkPermission(
+    "issues.reassign",
     accessLevel,
     ownershipContext
   );
@@ -224,6 +236,16 @@ export default async function IssueDetailPage({
                 canEdit={userCanEditTitle}
                 className="text-balance text-3xl font-bold tracking-tight"
               />
+            }
+            actions={
+              userCanReassign ? (
+                <IssueActionsMenu
+                  issueId={issue.id}
+                  currentInitials={initials}
+                  machines={allMachines}
+                  canReassign={userCanReassign}
+                />
+              ) : undefined
             }
           />
 

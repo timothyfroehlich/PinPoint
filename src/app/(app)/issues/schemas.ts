@@ -142,3 +142,18 @@ export const updateIssueTitleSchema = z.object({
     .min(1, "Title cannot be empty")
     .max(100, "Title must be 100 characters or less"),
 });
+
+/**
+ * Schema for reassigning an issue to a different machine.
+ *
+ * The destination is identified by `machineInitials` (the FK column on the
+ * issues table). The service-layer existence check rejects unknown initials.
+ */
+export const reassignIssueMachineSchema = z.object({
+  issueId: uuidish,
+  newMachineInitials: z
+    .string()
+    .trim()
+    .min(1, "Pick a machine to move this issue to")
+    .max(20, "Invalid machine"),
+});

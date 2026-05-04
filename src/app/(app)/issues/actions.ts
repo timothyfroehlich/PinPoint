@@ -25,6 +25,7 @@ import {
   editCommentSchema,
   deleteCommentSchema,
   updateIssueTitleSchema,
+  reassignIssueMachineSchema,
   imagesMetadataArraySchema,
 } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
@@ -37,6 +38,7 @@ import {
   updateIssueFrequency,
   updateIssueComment,
   updateIssueTitle,
+  reassignIssueMachine,
 } from "~/services/issues";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { userProfiles, issueComments, issueImages } from "~/server/db/schema";
@@ -104,6 +106,11 @@ export type DeleteCommentResult = Result<
 
 export type UpdateIssueTitleResult = Result<
   { issueId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+export type ReassignIssueMachineResult = Result<
+  { issueId: string; newUrl: string },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
 
@@ -976,6 +983,108 @@ export async function updateIssueTitleAction(
     }
     return serverActionError(error, "SERVER", "Failed to update title", {
       action: "updateIssueTitle",
+    });
+  }
+}
+
+/**
+ * Reassign Issue Machine Action
+ *
+ * Moves an issue from one machine to another. Reserves a fresh issue number
+ * on the destination machine; the old number on the source becomes a permanent
+ * gap. Returns the new canonical URL so the client can navigate after success
+ * (the old URL would 404 since this page redirects when the issue isn't found
+ * on the requested machine).
+ */
+export async function reassignIssueMachineAction(
+  _prevState: ReassignIssueMachineResult | undefined,
+  formData: FormData
+): Promise<ReassignIssueMachineResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return err("UNAUTHORIZED", "Unauthorized");
+  }
+
+  const validation = reassignIssueMachineSchema.safeParse({
+    issueId: toOptionalString(formData.get("issueId")),
+    newMachineInitials: toOptionalString(formData.get("newMachineInitials")),
+  });
+
+  if (!validation.success) {
+    const firstError = validation.error.issues[0];
+    return err("VALIDATION", firstError?.message ?? "Invalid input");
+  }
+
+  const { issueId, newMachineInitials } = validation.data;
+
+  try {
+    const currentIssue = await db.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: {
+        machineInitials: true,
+        issueNumber: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
+      with: {
+        machine: { columns: { ownerId: true } },
+      },
+    });
+
+    if (!currentIssue) {
+      return err("NOT_FOUND", "Issue not found");
+    }
+
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    const accessLevel = getAccessLevel(userProfile?.role);
+    const ownershipCtx = {
+      userId: user.id,
+      reporterId: currentIssue.reportedBy,
+      machineOwnerId: currentIssue.machine.ownerId,
+    };
+
+    if (!checkPermission("issues.reassign", accessLevel, ownershipCtx)) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to reassign this issue"
+      );
+    }
+
+    const result = await reassignIssueMachine({
+      issueId,
+      newMachineInitials,
+      userId: user.id,
+    });
+
+    // Revalidate both old and new paths so issue lists on each machine reflect
+    // the move.
+    revalidatePath(
+      `/m/${result.fromInitials}/i/${result.fromIssueNumber.toString()}`
+    );
+    revalidatePath(`/m/${result.fromInitials}`);
+    revalidatePath(
+      `/m/${result.toInitials}/i/${result.toIssueNumber.toString()}`
+    );
+    revalidatePath(`/m/${result.toInitials}`);
+
+    return ok({
+      issueId,
+      newUrl: `/m/${result.toInitials}/i/${result.toIssueNumber.toString()}`,
+    });
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+    return serverActionError(error, "SERVER", "Failed to reassign issue", {
+      action: "reassignIssueMachine",
     });
   }
 }

@@ -300,6 +300,41 @@ describe("Specific permission rules from design", () => {
     });
   });
 
+  describe("Issue reassignment", () => {
+    it("denies reassign to unauthenticated and guest", () => {
+      expect(getPermission("issues.reassign", "unauthenticated")).toBe(false);
+      expect(getPermission("issues.reassign", "guest")).toBe(false);
+    });
+
+    it("requires machine ownership for members", () => {
+      expect(getPermission("issues.reassign", "member")).toBe("owner");
+      expect(requiresOwnershipCheck("issues.reassign", "member")).toBe(true);
+    });
+
+    it("grants unconditional reassign to technicians and admins", () => {
+      expect(getPermission("issues.reassign", "technician")).toBe(true);
+      expect(getPermission("issues.reassign", "admin")).toBe(true);
+    });
+
+    it("resolves owner condition via OwnershipContext.machineOwnerId", () => {
+      // Member who owns the machine: allowed
+      expect(
+        checkPermission("issues.reassign", "member", {
+          userId: "u1",
+          machineOwnerId: "u1",
+        })
+      ).toBe(true);
+
+      // Member who does not own the machine: denied
+      expect(
+        checkPermission("issues.reassign", "member", {
+          userId: "u1",
+          machineOwnerId: "u2",
+        })
+      ).toBe(false);
+    });
+  });
+
   describe("Comments", () => {
     it("should allow viewing comments by anyone", () => {
       expect(getPermission("comments.view", "unauthenticated")).toBe(true);

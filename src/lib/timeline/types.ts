@@ -24,7 +24,16 @@ export type TimelineEventData =
   | { type: "priority_changed"; from: string; to: string }
   | { type: "frequency_changed"; from: string; to: string }
   | { type: "comment_deleted"; deletedBy: "author" | "admin" }
-  | { type: "title_changed"; from: string; to: string };
+  | { type: "title_changed"; from: string; to: string }
+  | {
+      type: "machine_reassigned";
+      fromInitials: string;
+      fromIssueNumber: number;
+      fromMachineName: string;
+      toInitials: string;
+      toIssueNumber: number;
+      toMachineName: string;
+    };
 
 /**
  * Convert a structured timeline event to a human-readable string.
@@ -50,6 +59,8 @@ export function formatTimelineEvent(event: TimelineEventData): string {
         : "Comment removed by admin";
     case "title_changed":
       return `Title changed from "${event.from}" to "${event.to}"`;
+    case "machine_reassigned":
+      return `Moved from ${event.fromInitials}-${event.fromIssueNumber.toString()} (${event.fromMachineName}) to ${event.toInitials}-${event.toIssueNumber.toString()} (${event.toMachineName})`;
     default:
       return assertUnreachableEvent(event);
   }

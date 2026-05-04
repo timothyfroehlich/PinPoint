@@ -95,6 +95,22 @@ export interface UpdateIssueTitleParams {
   userId: string;
 }
 
+export interface ReassignIssueMachineParams {
+  issueId: string;
+  newMachineInitials: string;
+  userId: string;
+}
+
+export interface ReassignIssueMachineResult {
+  issueId: string;
+  fromInitials: string;
+  fromIssueNumber: number;
+  fromMachineName: string;
+  toInitials: string;
+  toIssueNumber: number;
+  toMachineName: string;
+}
+
 export interface UpdateIssueCommentParams {
   commentId: string;
   content: ProseMirrorDoc;
@@ -838,6 +854,117 @@ export async function updateIssueTitle({
     );
 
     return { issueId, oldTitle, newTitle: title };
+  });
+}
+
+/**
+ * Reassign an issue to a different machine.
+ *
+ * Atomically updates `machineInitials` and reserves a fresh `issueNumber` on the
+ * destination machine using the same counter pattern as `createIssue`. The old
+ * issue number on the source machine is left as a permanent gap (the source's
+ * `nextIssueNumber` does NOT decrement) — this is the only safe behavior given
+ * the unique constraint on `(machineInitials, issueNumber)` and any external
+ * references (URLs, notification deeplinks, comment cross-references) to the
+ * old number.
+ *
+ * Throws if the destination machine does not exist or matches the current
+ * machine (no-op).
+ */
+export async function reassignIssueMachine({
+  issueId,
+  newMachineInitials,
+  userId,
+}: ReassignIssueMachineParams): Promise<ReassignIssueMachineResult> {
+  return await db.transaction(async (tx) => {
+    const currentIssue = await tx.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: {
+        machineInitials: true,
+        issueNumber: true,
+        title: true,
+        assignedTo: true,
+        reportedBy: true,
+      },
+      with: {
+        machine: { columns: { name: true } },
+      },
+    });
+
+    if (!currentIssue) {
+      throw new Error("Issue not found");
+    }
+
+    if (currentIssue.machineInitials === newMachineInitials) {
+      throw new Error("Issue is already on that machine");
+    }
+
+    // Atomically reserve a number on the destination using the same UPDATE …
+    // RETURNING pattern as createIssue (services/issues.ts above). The
+    // RETURNING clause both reserves the slot and verifies the machine exists.
+    const [destinationMachine] = await tx
+      .update(machines)
+      .set({ nextIssueNumber: sql`${machines.nextIssueNumber} + 1` })
+      .where(eq(machines.initials, newMachineInitials))
+      .returning({
+        nextIssueNumber: machines.nextIssueNumber,
+        name: machines.name,
+      });
+
+    if (!destinationMachine) {
+      throw new Error(`Machine not found: ${newMachineInitials}`);
+    }
+
+    const newIssueNumber = destinationMachine.nextIssueNumber - 1;
+    const fromInitials = currentIssue.machineInitials;
+    const fromIssueNumber = currentIssue.issueNumber;
+    const fromMachineName = currentIssue.machine.name;
+
+    await tx
+      .update(issues)
+      .set({
+        machineInitials: newMachineInitials,
+        issueNumber: newIssueNumber,
+        updatedAt: new Date(),
+      })
+      .where(eq(issues.id, issueId));
+
+    await createTimelineEvent(
+      issueId,
+      {
+        type: "machine_reassigned",
+        fromInitials,
+        fromIssueNumber,
+        fromMachineName,
+        toInitials: newMachineInitials,
+        toIssueNumber: newIssueNumber,
+        toMachineName: destinationMachine.name,
+      },
+      tx,
+      userId
+    );
+
+    log.info(
+      {
+        issueId,
+        fromInitials,
+        fromIssueNumber,
+        toInitials: newMachineInitials,
+        toIssueNumber: newIssueNumber,
+        action: "reassignIssueMachine",
+      },
+      "Issue reassigned to a different machine"
+    );
+
+    return {
+      issueId,
+      fromInitials,
+      fromIssueNumber,
+      fromMachineName,
+      toInitials: newMachineInitials,
+      toIssueNumber: newIssueNumber,
+      toMachineName: destinationMachine.name,
+    };
   });
 }
 

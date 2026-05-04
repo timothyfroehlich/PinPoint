@@ -86,6 +86,21 @@ describe("formatTimelineEvent", () => {
     );
   });
 
+  it("formats machine_reassigned event", () => {
+    const event: TimelineEventData = {
+      type: "machine_reassigned",
+      fromInitials: "MM",
+      fromIssueNumber: 7,
+      fromMachineName: "Medieval Madness",
+      toInitials: "KP",
+      toIssueNumber: 12,
+      toMachineName: "Kiss Pro",
+    };
+    expect(formatTimelineEvent(event)).toBe(
+      "Moved from MM-7 (Medieval Madness) to KP-12 (Kiss Pro)"
+    );
+  });
+
   it("handles unknown status enum values gracefully", () => {
     const event: TimelineEventData = {
       type: "status_changed",

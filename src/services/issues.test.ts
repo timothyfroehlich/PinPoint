@@ -8,6 +8,7 @@ import {
   updateIssueSeverity,
   updateIssuePriority,
   updateIssueFrequency,
+  reassignIssueMachine,
 } from "./issues";
 import { db } from "~/server/db";
 import { createNotification } from "~/lib/notifications";
@@ -446,6 +447,117 @@ describe("Issue Service", () => {
       expect(mockDb.update).not.toHaveBeenCalled();
       expect(createTimelineEvent).not.toHaveBeenCalled();
       expect(createNotification).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("reassignIssueMachine", () => {
+    it("reserves a fresh number on the destination, updates the issue, and creates a timeline event", async () => {
+      mockDb.query.issues.findFirst.mockResolvedValue({
+        machineInitials: "MM",
+        issueNumber: 7,
+        title: "Stuck flipper",
+        assignedTo: null,
+        reportedBy: "reporter-1",
+        machine: { name: "Medieval Madness" },
+      } as any);
+
+      // The service does: UPDATE machines SET nextIssueNumber = … RETURNING …
+      // The returned nextIssueNumber is post-increment, so issueNumber = it - 1.
+      mockDb.update.mockReturnValueOnce(
+        mockUpdateReturning({ nextIssueNumber: 13, name: "Kiss Pro" })
+      );
+
+      const result = await reassignIssueMachine({
+        issueId: "issue-1",
+        newMachineInitials: "KP",
+        userId: "tech-1",
+      });
+
+      expect(result).toEqual({
+        issueId: "issue-1",
+        fromInitials: "MM",
+        fromIssueNumber: 7,
+        fromMachineName: "Medieval Madness",
+        toInitials: "KP",
+        toIssueNumber: 12,
+        toMachineName: "Kiss Pro",
+      });
+
+      expect(createTimelineEvent).toHaveBeenCalledWith(
+        "issue-1",
+        {
+          type: "machine_reassigned",
+          fromInitials: "MM",
+          fromIssueNumber: 7,
+          fromMachineName: "Medieval Madness",
+          toInitials: "KP",
+          toIssueNumber: 12,
+          toMachineName: "Kiss Pro",
+        },
+        expect.anything(),
+        "tech-1"
+      );
+    });
+
+    it("throws when destination machine matches the current one", async () => {
+      mockDb.query.issues.findFirst.mockResolvedValue({
+        machineInitials: "MM",
+        issueNumber: 7,
+        title: "Stuck flipper",
+        assignedTo: null,
+        reportedBy: "reporter-1",
+        machine: { name: "Medieval Madness" },
+      } as any);
+
+      await expect(
+        reassignIssueMachine({
+          issueId: "issue-1",
+          newMachineInitials: "MM",
+          userId: "tech-1",
+        })
+      ).rejects.toThrow("already on that machine");
+
+      expect(mockDb.update).not.toHaveBeenCalled();
+      expect(createTimelineEvent).not.toHaveBeenCalled();
+    });
+
+    it("throws when destination machine does not exist", async () => {
+      mockDb.query.issues.findFirst.mockResolvedValue({
+        machineInitials: "MM",
+        issueNumber: 7,
+        title: "Stuck flipper",
+        assignedTo: null,
+        reportedBy: "reporter-1",
+        machine: { name: "Medieval Madness" },
+      } as any);
+
+      // The UPDATE … RETURNING returns nothing when no row matches.
+      mockDb.update.mockReturnValueOnce(mockUpdateReturning(undefined));
+
+      await expect(
+        reassignIssueMachine({
+          issueId: "issue-1",
+          newMachineInitials: "DOES-NOT-EXIST",
+          userId: "tech-1",
+        })
+      ).rejects.toThrow("Machine not found");
+
+      expect(createTimelineEvent).not.toHaveBeenCalled();
+    });
+
+    it("throws when issue does not exist", async () => {
+      mockDb.query.issues.findFirst.mockResolvedValue(undefined as any);
+
+      await expect(
+        reassignIssueMachine({
+          issueId: "nope",
+          newMachineInitials: "KP",
+          userId: "tech-1",
+        })
+      ).rejects.toThrow("Issue not found");
+
+      expect(mockDb.update).not.toHaveBeenCalled();
+      expect(createTimelineEvent).not.toHaveBeenCalled();
     });
   });
 });
