@@ -93,6 +93,9 @@ export function UnifiedReportForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [isClearOpen, setIsClearOpen] = useState(false);
   const [editorResetKey, setEditorResetKey] = useState(0);
+  // Bumped to remount the Turnstile widget on reset — its internal "solved"
+  // state is otherwise out of sync with the cleared hidden token.
+  const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0);
   const [selectedMachineId, setSelectedMachineId] = useState(
     defaultMachineId ?? ""
   );
@@ -162,8 +165,11 @@ export function UnifiedReportForm({
     setWatchIssue(true);
     setUploadedImages([]);
     setTurnstileToken("");
-    // RichTextEditor is uncontrolled internally — bumping the key remounts it.
+    // RichTextEditor and TurnstileWidget are uncontrolled internally —
+    // bumping their keys remounts them so visible state matches the cleared
+    // controlled state.
     setEditorResetKey((k) => k + 1);
+    setTurnstileWidgetKey((k) => k + 1);
 
     if (state.redirectTo) {
       window.location.assign(state.redirectTo);
@@ -657,6 +663,7 @@ export function UnifiedReportForm({
                   value={turnstileToken}
                 />
                 <TurnstileWidget
+                  key={turnstileWidgetKey}
                   onVerify={handleTurnstileVerify}
                   onExpire={() => setTurnstileToken("")}
                 />
@@ -731,6 +738,7 @@ export function UnifiedReportForm({
                     setUploadedImages([]);
                     setTurnstileToken("");
                     setEditorResetKey((k) => k + 1);
+                    setTurnstileWidgetKey((k) => k + 1);
                     setIsClearOpen(false);
                   }}
                 >
