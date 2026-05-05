@@ -1,10 +1,9 @@
 """Unit tests for worktree_setup.py env merging and port allocation."""
 
 import json
-import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -556,9 +555,7 @@ class TestConfigureBranchTracking:
     # get_current_upstream
     # ---------------------------------------------------------------------------
 
-    def test_get_current_upstream_returns_ref_on_success(
-        self, tmp_path: Path
-    ) -> None:
+    def test_get_current_upstream_returns_ref_on_success(self, tmp_path: Path) -> None:
         with patch("worktree_setup.subprocess.run") as mock_run:
             mock_run.return_value = self._make_completed(
                 returncode=0, stdout="origin/main\n"
@@ -566,9 +563,7 @@ class TestConfigureBranchTracking:
             result = get_current_upstream("my-branch", tmp_path)
         assert result == "origin/main"
 
-    def test_get_current_upstream_returns_none_on_failure(
-        self, tmp_path: Path
-    ) -> None:
+    def test_get_current_upstream_returns_none_on_failure(self, tmp_path: Path) -> None:
         with patch("worktree_setup.subprocess.run") as mock_run:
             mock_run.return_value = self._make_completed(returncode=128, stdout="")
             result = get_current_upstream("my-branch", tmp_path)
@@ -627,9 +622,7 @@ class TestConfigureBranchTracking:
         # Only one git call: the @{u} lookup, then remote_check, then early return
         # (remote exists but upstream is already correct → no set-upstream call)
         set_upstream_calls = [
-            c
-            for c in mock_run.call_args_list
-            if "--set-upstream-to" in str(c)
+            c for c in mock_run.call_args_list if "--set-upstream-to" in str(c)
         ]
         assert len(set_upstream_calls) == 0
 
