@@ -211,6 +211,24 @@ export async function deleteTestIssueByNumber(
 }
 
 /**
+ * Set (or clear) the discord_user_id column in user_profiles.
+ *
+ * Used by discord-dm-preferences tests to gate the Discord DM notification
+ * toggle without needing a full OAuth identity in auth.identities.
+ * Pass null to clear.
+ */
+export async function setUserDiscordId(
+  userId: string,
+  discordUserId: string | null
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("user_profiles")
+    .update({ discord_user_id: discordUserId })
+    .eq("id", userId);
+  if (error) throw error;
+}
+
+/**
  * Manually link a Discord identity to a user in the auth.identities table.
  *
  * Required for E2E mocks because the UI checks auth.identities to determine
