@@ -282,8 +282,6 @@ jobs:
         with:
           files: |
             .github/workflows/ci.yml
-            .github/workflows/pr-screenshots.yml
-            .github/workflows/cleanup-screenshots.yml
             .github/workflows/supabase-branch-setup.yaml
 
   build:
