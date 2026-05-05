@@ -15,11 +15,20 @@
 import { test, expect } from "@playwright/test";
 import { ensureLoggedIn, loginAs, logout } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
-import { seededIssues, seededMachines, TEST_USERS } from "../support/constants";
-import { fillReportForm } from "../support/page-helpers";
-import { getTestMachineInitials } from "../support/test-isolation";
+import { seededMachines, TEST_USERS } from "../support/constants";
+import {
+  fillReportForm,
+  submitFormAndWaitForRedirect,
+} from "../support/page-helpers";
+import {
+  getTestMachineInitials,
+  getTestPrefix,
+} from "../support/test-isolation";
 
-const RESET_PREFIX = "E2E Reset";
+// Worker-unique prefix so one worker's afterEach cannot delete another worker's
+// freshly-created issues. getTestPrefix() returns e.g. "w0_kg5x" — stable for
+// the lifetime of this worker process.
+const RESET_PREFIX = `E2E Reset ${getTestPrefix()}`;
 
 test.describe("CREATE form resets", () => {
   // Tests that create real DB entities push their identifiers here so
@@ -200,9 +209,24 @@ test.describe("CREATE form resets", () => {
       password: TEST_USERS.admin.password,
     });
 
-    // Use a seeded issue so we don't have to create one.
-    const seeded = seededIssues.HD[0];
-    await page.goto(`/m/HD/i/${seeded.num}`);
+    // Create a throwaway issue so the comment is not left on a shared seeded
+    // issue. afterEach cleans up all issues whose title starts with RESET_PREFIX
+    // (which cascades their comments), so no timeline noise accumulates.
+    await page.goto("/report");
+    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await fillReportForm(page, {
+      title: `${RESET_PREFIX} Comment Form Reset Issue`,
+      description: "Throwaway issue for AddCommentForm reset test.",
+    });
+    await submitFormAndWaitForRedirect(
+      page,
+      page.getByRole("button", { name: "Submit Issue Report" }),
+      { awayFrom: "/report" }
+    );
+    // After redirect, we are on the new issue's detail page — stay here.
+    await expect(page).toHaveURL(/\/m\/[A-Z0-9]+\/i\/[0-9]+/, {
+      timeout: 30000,
+    });
 
     const editor = page.locator(".ProseMirror").first();
     await editor.waitFor({ timeout: 15000 });
