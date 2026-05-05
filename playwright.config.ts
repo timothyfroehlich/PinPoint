@@ -54,7 +54,7 @@ export default defineConfig({
     extraHTTPHeaders: { "x-skip-autologin": "true" },
     trace: "on-first-retry",
     screenshot: "only-on-failure",
-    actionTimeout: 10 * 1000,
+    actionTimeout: process.env["CI"] ? 30_000 : 5_000,
     navigationTimeout: 20 * 1000,
   },
 
