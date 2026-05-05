@@ -562,9 +562,15 @@ def configure_branch_tracking(branch: str, worktree_path: Path) -> None:
     )
 
     if not has_remote:
+        # Clear the stale origin/main upstream so `git pull` doesn't pull from main.
+        if current in ("origin/main", "origin/master"):
+            subprocess.run(
+                ["git", "-C", str(worktree_path), "branch", "--unset-upstream", branch],
+                capture_output=True,
+            )
         print(
             f"worktree_setup: '{branch}' has no remote yet — "
-            f"run `git push -u origin {branch}` on first push",
+            f"run `git push -u origin {shlex.quote(branch)}` on first push",
             file=sys.stderr,
         )
         return
