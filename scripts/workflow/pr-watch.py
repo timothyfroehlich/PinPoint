@@ -181,15 +181,24 @@ def write_failure_artifact(run_id: int) -> str:
 
 
 def main() -> int:
-    if len(sys.argv) != 2 or not sys.argv[1].isdigit():
-        print(f"Usage: {sys.argv[0]} <PR_NUMBER>", file=sys.stderr)
+    force = "--force" in sys.argv
+    args = [a for a in sys.argv if a != "--force"]
+
+    if len(args) != 2 or not args[1].isdigit():
+        print(f"Usage: {sys.argv[0]} [--force] <PR_NUMBER>", file=sys.stderr)
         return 1
 
-    pr = int(sys.argv[1])
+    pr = int(args[1])
 
     try:
         pr_data = json.loads(
-            gh("pr", "view", str(pr), "--json", "headRefName,headRefOid")
+            gh(
+                "pr",
+                "view",
+                str(pr),
+                "--json",
+                "headRefName,headRefOid,mergeStateStatus",
+            )
         )
     except (RuntimeError, json.JSONDecodeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -197,6 +206,138 @@ def main() -> int:
 
     branch = pr_data["headRefName"]
     head_sha = pr_data["headRefOid"]
+    merge_status = pr_data["mergeStateStatus"]
+
+    # --- Readiness Audit ---
+    if not force:
+        blocked = False
+
+        # 1. Check if behind main
+        try:
+            behind_by_str = gh(
+                "api",
+                f"repos/timothyfroehlich/PinPoint/compare/main...{head_sha}",
+                "--jq",
+                ".behind_by",
+            )
+            behind_by = int(behind_by_str) if behind_by_str else 0
+            if behind_by > 0:
+                emit(
+                    f"❌ Blocked: PR is {behind_by} commit(s) behind 'main'. Merge 'main' before watching."
+                )
+                blocked = True
+        except Exception as e:
+            # Fail closed if branch currency cannot be determined.
+            if merge_status == "BEHIND":
+                emit("❌ Blocked: PR is behind 'main'. Merge 'main' before watching.")
+                blocked = True
+            elif merge_status == "CONFLICTING":
+                emit("❌ Blocked: PR has merge conflicts.")
+                blocked = True
+            else:
+                emit(
+                    f"❌ Blocked: Could not determine whether PR is up to date with 'main': {e}"
+                )
+                blocked = True
+
+        # 2. Check for unresolved Copilot comments via GraphQL.
+        # Paginate via pageInfo.hasNextPage so PRs with >100 review threads are
+        # audited completely (a single page would silently miss feedback past
+        # the first 100 threads).
+        try:
+            all_threads: list[dict] = []
+            cursor: str | None = None
+            while True:
+                # First page omits cursor variable; subsequent pages use after: $cursor
+                if cursor is None:
+                    query = (
+                        """
+            query {
+              repository(owner: "timothyfroehlich", name: "PinPoint") {
+                pullRequest(number: %d) {
+                  reviewThreads(first: 100) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      isResolved
+                      comments(first: 1) {
+                        nodes { author { login } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """
+                        % pr
+                    )
+                    args = ["api", "graphql", "-f", "query=" + query]
+                else:
+                    query = (
+                        """
+            query($cursor: String!) {
+              repository(owner: "timothyfroehlich", name: "PinPoint") {
+                pullRequest(number: %d) {
+                  reviewThreads(first: 100, after: $cursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      isResolved
+                      comments(first: 1) {
+                        nodes { author { login } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """
+                        % pr
+                    )
+                    args = [
+                        "api",
+                        "graphql",
+                        "-f",
+                        "query=" + query,
+                        "-f",
+                        f"cursor={cursor}",
+                    ]
+                page_data = json.loads(gh(*args))
+                review_threads = page_data["data"]["repository"]["pullRequest"][
+                    "reviewThreads"
+                ]
+                all_threads.extend(review_threads["nodes"])
+                page_info = review_threads["pageInfo"]
+                if not page_info["hasNextPage"]:
+                    break
+                cursor = page_info["endCursor"]
+
+            unresolved = [
+                t
+                for t in all_threads
+                if not t["isResolved"]
+                and t["comments"]["nodes"]
+                and t["comments"]["nodes"][0]["author"]["login"]
+                in (
+                    "copilot-pull-request-reviewer",
+                    "copilot-pull-request-reviewer[bot]",
+                )
+            ]
+
+            if unresolved:
+                emit(
+                    f"❌ Blocked: {len(unresolved)} unresolved Copilot comments found."
+                )
+                emit(f"   Run: ./scripts/workflow/copilot-comments.sh {pr}")
+                blocked = True
+        except Exception as e:
+            emit(
+                f"❌ Blocked: Could not determine unresolved Copilot comment status: {e}"
+            )
+            blocked = True
+
+        if blocked:
+            emit("Use --force to watch anyway.")
+            return 1
+    # -----------------------
 
     active: list[dict] = []
     for attempt in range(STARTUP_RETRIES):
