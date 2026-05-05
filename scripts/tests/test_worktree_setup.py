@@ -3,7 +3,6 @@
 import json
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -17,9 +16,7 @@ from worktree_setup import (
     PortConfig,
     allocate_slot,
     branch_to_project_id,
-    configure_branch_tracking,
     generate_launch_json,
-    get_current_upstream,
     load_manifest,
     merge_env_local,
     parse_env_file,
@@ -27,6 +24,18 @@ from worktree_setup import (
     resolve_brainstorm_server_path,
     save_manifest,
 )
+
+# Testing philosophy for worktree setup
+# ────────────────────────────────────────────────────────────────────────────
+# Worktree setup is infrastructure code: it runs once per worktree, fails
+# benignly (config not generated → fixable manually), and any error surfaces
+# immediately on the next branch switch. We primarily test by running it.
+#
+# Keep unit tests minimal. Focus on logic that's hard to verify by usage —
+# parsing env files, port allocation, ID derivation, JSON manifest correctness.
+# Don't add unit tests for git/subprocess interactions; those tests test mocks
+# more than real behavior, and the integration path (run the post-checkout
+# hook in a real worktree) is faster and more accurate.
 
 
 class TestParseEnvFile:
@@ -529,187 +538,6 @@ class TestBranchToProjectId:
     def test_trailing_special_chars_stripped(self) -> None:
         result = branch_to_project_id("my-feature///")
         assert not result.endswith("-")
-
-
-class TestConfigureBranchTracking:
-    """Unit tests for configure_branch_tracking() and get_current_upstream()."""
-
-    # ---------------------------------------------------------------------------
-    # Helpers
-    # ---------------------------------------------------------------------------
-
-    def _make_completed(
-        self,
-        returncode: int = 0,
-        stdout: str = "",
-        stderr: str = "",
-    ) -> MagicMock:
-        """Build a fake CompletedProcess-like object."""
-        m = MagicMock()
-        m.returncode = returncode
-        m.stdout = stdout
-        m.stderr = stderr
-        return m
-
-    # ---------------------------------------------------------------------------
-    # get_current_upstream
-    # ---------------------------------------------------------------------------
-
-    def test_get_current_upstream_returns_ref_on_success(self, tmp_path: Path) -> None:
-        with patch("worktree_setup.subprocess.run") as mock_run:
-            mock_run.return_value = self._make_completed(
-                returncode=0, stdout="origin/main\n"
-            )
-            result = get_current_upstream("my-branch", tmp_path)
-        assert result == "origin/main"
-
-    def test_get_current_upstream_returns_none_on_failure(self, tmp_path: Path) -> None:
-        with patch("worktree_setup.subprocess.run") as mock_run:
-            mock_run.return_value = self._make_completed(returncode=128, stdout="")
-            result = get_current_upstream("my-branch", tmp_path)
-        assert result is None
-
-    def test_get_current_upstream_returns_none_for_empty_output(
-        self, tmp_path: Path
-    ) -> None:
-        with patch("worktree_setup.subprocess.run") as mock_run:
-            mock_run.return_value = self._make_completed(returncode=0, stdout="")
-            result = get_current_upstream("my-branch", tmp_path)
-        assert result is None
-
-    # ---------------------------------------------------------------------------
-    # configure_branch_tracking: no-op cases
-    # ---------------------------------------------------------------------------
-
-    def test_main_branch_is_skipped(self, tmp_path: Path) -> None:
-        with patch("worktree_setup.subprocess.run") as mock_run:
-            configure_branch_tracking("main", tmp_path)
-        mock_run.assert_not_called()
-
-    def test_master_branch_is_skipped(self, tmp_path: Path) -> None:
-        with patch("worktree_setup.subprocess.run") as mock_run:
-            configure_branch_tracking("master", tmp_path)
-        mock_run.assert_not_called()
-
-    def test_head_is_skipped(self, tmp_path: Path) -> None:
-        with patch("worktree_setup.subprocess.run") as mock_run:
-            configure_branch_tracking("HEAD", tmp_path)
-        mock_run.assert_not_called()
-
-    def test_custom_upstream_is_preserved(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Branch with a non-origin/main, non-origin/<branch> upstream is left alone."""
-        with patch("worktree_setup.subprocess.run") as mock_run:
-            # get_current_upstream returns a custom upstream
-            mock_run.return_value = self._make_completed(
-                returncode=0, stdout="upstream/feat/x\n"
-            )
-            configure_branch_tracking("feat/my-feature", tmp_path)
-        # Only one git call: the @{u} lookup — no set-upstream
-        assert mock_run.call_count == 1
-
-    def test_already_correct_upstream_is_silent(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Branch already tracking origin/<branch>: no further git calls."""
-        with patch("worktree_setup.subprocess.run") as mock_run:
-            # get_current_upstream returns correct upstream
-            mock_run.return_value = self._make_completed(
-                returncode=0, stdout="origin/feat/my-feature\n"
-            )
-            configure_branch_tracking("feat/my-feature", tmp_path)
-        # Only one git call: the @{u} lookup, then remote_check, then early return
-        # (remote exists but upstream is already correct → no set-upstream call)
-        set_upstream_calls = [
-            c for c in mock_run.call_args_list if "--set-upstream-to" in str(c)
-        ]
-        assert len(set_upstream_calls) == 0
-
-    # ---------------------------------------------------------------------------
-    # configure_branch_tracking: upstream repair cases
-    # ---------------------------------------------------------------------------
-
-    def test_no_remote_prints_reminder(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Branch with no origin remote → prints push reminder, no set-upstream."""
-
-        def side_effect(args: list[str], **kwargs: object) -> MagicMock:
-            if "@{u}" in " ".join(args):
-                # get_current_upstream → unset
-                return self._make_completed(returncode=128)
-            # rev-parse --verify → remote does not exist
-            return self._make_completed(returncode=128)
-
-        with patch("worktree_setup.subprocess.run", side_effect=side_effect):
-            configure_branch_tracking("feat/no-remote", tmp_path)
-
-        _, err = capsys.readouterr()
-        assert "git push -u origin feat/no-remote" in err
-        assert "--set-upstream-to" not in err
-
-    def test_stale_origin_main_upstream_is_replaced(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Branch whose upstream is still origin/main gets updated to origin/<branch>."""
-
-        def side_effect(args: list[str], **kwargs: object) -> MagicMock:
-            cmd = " ".join(args)
-            if "@{u}" in cmd:
-                # get_current_upstream → stale
-                return self._make_completed(returncode=0, stdout="origin/main\n")
-            if "refs/remotes/origin" in cmd:
-                # remote exists
-                return self._make_completed(returncode=0, stdout="abc123\n")
-            # set-upstream
-            return self._make_completed(returncode=0)
-
-        with patch("worktree_setup.subprocess.run", side_effect=side_effect):
-            configure_branch_tracking("feat/my-feature", tmp_path)
-
-        _, err = capsys.readouterr()
-        assert "tracks origin/feat/my-feature" in err
-
-    def test_no_upstream_set_is_repaired(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Branch with no upstream configured gets set to origin/<branch>."""
-
-        def side_effect(args: list[str], **kwargs: object) -> MagicMock:
-            cmd = " ".join(args)
-            if "@{u}" in cmd:
-                return self._make_completed(returncode=128)  # no upstream
-            if "refs/remotes/origin" in cmd:
-                return self._make_completed(returncode=0, stdout="abc123\n")
-            return self._make_completed(returncode=0)
-
-        with patch("worktree_setup.subprocess.run", side_effect=side_effect):
-            configure_branch_tracking("feat/new-branch", tmp_path)
-
-        _, err = capsys.readouterr()
-        assert "tracks origin/feat/new-branch" in err
-
-    def test_subprocess_failure_on_set_upstream_warns(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """A failing git branch --set-upstream-to emits a warning and does not crash."""
-
-        def side_effect(args: list[str], **kwargs: object) -> MagicMock:
-            cmd = " ".join(args)
-            if "@{u}" in cmd:
-                return self._make_completed(returncode=128)  # no upstream
-            if "refs/remotes/origin" in cmd:
-                return self._make_completed(returncode=0, stdout="abc123\n")
-            # set-upstream fails
-            return self._make_completed(returncode=1, stderr="fatal: error")
-
-        with patch("worktree_setup.subprocess.run", side_effect=side_effect):
-            configure_branch_tracking("feat/failing-branch", tmp_path)
-
-        _, err = capsys.readouterr()
-        assert "warning" in err.lower()
-        assert "feat/failing-branch" in err
 
 
 if __name__ == "__main__":

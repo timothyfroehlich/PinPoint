@@ -512,11 +512,7 @@ def get_branch() -> str:
 
 
 def get_current_upstream(branch: str, worktree_path: Path) -> str | None:
-    """Return the current upstream ref for *branch* (e.g. 'origin/main'), or None.
-
-    Returns None when the branch has no upstream configured or when the git
-    command fails (treated as "unset").
-    """
+    """Return current upstream ref (e.g. 'origin/main') or None if unset."""
     result = subprocess.run(
         [
             "git",
@@ -536,62 +532,47 @@ def get_current_upstream(branch: str, worktree_path: Path) -> str | None:
 
 
 def configure_branch_tracking(branch: str, worktree_path: Path) -> None:
-    """Set local upstream tracking for the worktree branch.
+    """Set the worktree branch's upstream to origin/<branch> if it exists.
 
-    `git worktree add /path -b new-branch origin/main` creates `new-branch`
-    pointing at origin/main but leaves the upstream as origin/main, so later
-    `git pull`/`git push` operate against main. This function fixes that:
-    if origin/<branch> exists, set the upstream to origin/<branch>; otherwise
-    remind the user to run `git push -u origin <branch>` on first push.
-
-    Only updates the upstream when it is currently unset or still points at
-    origin/main or origin/master (the stale default). If the branch already
-    has a custom upstream (e.g. origin/other-branch or upstream/feat/x) the
-    existing tracking is preserved.
-
-    Never auto-pushes (that would create remote branches for throwaway local
-    experiments). Failures are non-fatal — warn and continue.
+    Preserves custom upstreams; only fixes the stale origin/main default that
+    `git worktree add -b` leaves behind. Prints a reminder if no remote ref
+    yet. Failures are non-fatal.
     """
     if branch in ("main", "master", "HEAD"):
         return
 
-    # Check whether the upstream needs to be repaired before doing anything else.
-    current_upstream = get_current_upstream(branch, worktree_path)
-    if current_upstream is not None and current_upstream not in (
-        "origin/main",
-        "origin/master",
-        f"origin/{branch}",
-    ):
-        # Branch already has a non-default, non-stale upstream — leave it alone.
-        return
+    current = get_current_upstream(branch, worktree_path)
+    if current and current not in ("origin/main", "origin/master", f"origin/{branch}"):
+        return  # respect existing custom upstream
 
-    remote_check = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(worktree_path),
-            "rev-parse",
-            "--verify",
-            "--quiet",
-            f"refs/remotes/origin/{branch}",
-        ],
-        capture_output=True,
-        text=True,
+    has_remote = (
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(worktree_path),
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                f"refs/remotes/origin/{branch}",
+            ],
+            capture_output=True,
+        ).returncode
+        == 0
     )
 
-    if remote_check.returncode != 0:
+    if not has_remote:
         print(
-            f"worktree_setup: branch '{branch}' has no remote yet — "
-            f"run `git push -u origin {branch}` after your first commit",
+            f"worktree_setup: '{branch}' has no remote yet — "
+            f"run `git push -u origin {branch}` on first push",
             file=sys.stderr,
         )
         return
 
-    # Skip if already correctly configured.
-    if current_upstream == f"origin/{branch}":
+    if current == f"origin/{branch}":
         return
 
-    set_upstream = subprocess.run(
+    result = subprocess.run(
         [
             "git",
             "-C",
@@ -603,17 +584,12 @@ def configure_branch_tracking(branch: str, worktree_path: Path) -> None:
         capture_output=True,
         text=True,
     )
-
-    if set_upstream.returncode == 0:
-        print(
-            f"worktree_setup: branch '{branch}' tracks origin/{branch}",
-            file=sys.stderr,
-        )
+    if result.returncode == 0:
+        print(f"worktree_setup: '{branch}' tracks origin/{branch}", file=sys.stderr)
     else:
-        stderr = set_upstream.stderr.strip()
         print(
-            f"worktree_setup: warning: failed to set upstream for "
-            f"'{branch}' (exit {set_upstream.returncode}): {stderr}",
+            f"worktree_setup: warning: failed to set upstream for '{branch}' "
+            f"(exit {result.returncode}): {result.stderr.strip()}",
             file=sys.stderr,
         )
 
