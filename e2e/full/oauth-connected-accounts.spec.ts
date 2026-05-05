@@ -7,9 +7,11 @@
  *
  *  1. An email/password user sees the Connected Accounts section in settings.
  *  2. An anonymous user sees the "Continue with Discord" button on /login,
- *     and clicking it triggers the mocked OAuth flow that lands on /dashboard.
- *  3. An authenticated member can trigger Connect Discord and the UI reflects
- *     the linked state after a mock OAuth flow + direct DB setup.
+ *     and clicking it triggers the Supabase authorize redirect (intercepted by
+ *     the mock, which redirects back into the app).
+ *  3. An authenticated member can trigger Connect Discord, the mock intercepts
+ *     the authorize redirect, and after the DB identity is seeded the UI
+ *     reflects the linked state.
  *
  * The OAuth flow is mocked via Playwright route interception — no test reaches
  * a real external provider. See e2e/support/oauth-mocks.ts.
@@ -29,13 +31,15 @@ test.describe("OAuth + Connected Accounts", () => {
   test.describe("anonymous", () => {
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    test("Continue with Discord button on /login completes mocked OAuth flow", async ({
+    test("Continue with Discord button on /login triggers mocked OAuth flow", async ({
       page,
     }) => {
-      // Mock the OAuth flow so it doesn't hit real Discord or fail server-side
+      // Mock the OAuth flow so it doesn't hit real Discord.
+      // We redirect back to /login (a public page accessible to anonymous users)
+      // with a query param so we can verify the flow completed.
       await setupOAuthMock(page, {
         provider: "discord",
-        targetUrl: "/dashboard",
+        targetUrl: "/login?oauth_mock=true",
       });
 
       await page.goto("/login");
@@ -44,8 +48,12 @@ test.describe("OAuth + Connected Accounts", () => {
       });
       await expect(button).toBeVisible();
 
-      // We verify the flow completes and lands us on the target URL
-      await Promise.all([page.waitForURL(/\/dashboard/), button.click()]);
+      // Clicking the button triggers the server action → Supabase authorize →
+      // our mock intercepts and redirects back to /login?oauth_mock=true.
+      await Promise.all([
+        page.waitForURL((url) => url.searchParams.get("oauth_mock") === "true"),
+        button.click(),
+      ]);
     });
   });
 
@@ -70,16 +78,12 @@ test.describe("OAuth + Connected Accounts", () => {
     test("Connect Discord from /settings completes mocked OAuth flow and shows connected state", async ({
       page,
     }) => {
-      // Ensure we start from a clean state (not connected)
+      // Ensure we start from a clean (not connected) state.
       const userId = await getUserIdByEmail(TEST_USERS.member.email);
       await unlinkUserDiscordIdentity(userId);
 
-      // Pre-seed the identity so the UI reflects connected state after the mock redirect.
-      // We do this BEFORE clicking so the server-rendered component sees the correct
-      // state on the page load that follows the mock redirect.
-      await linkUserDiscordIdentity(userId, `mock_discord_${userId}`);
-
-      // Mock the OAuth flow. We land back on /settings with a query param.
+      // Set up the mock BEFORE navigating so the route handler is in place.
+      // We land back on /settings with a query param to signal the mock redirect.
       await setupOAuthMock(page, {
         provider: "discord",
         targetUrl: "/settings?mock_success=true",
@@ -92,6 +96,8 @@ test.describe("OAuth + Connected Accounts", () => {
       });
       await expect(connectBtn).toBeVisible();
 
+      // Click triggers: server action → Supabase authorize → mock intercepts →
+      // redirects to /settings?mock_success=true.
       await Promise.all([
         page.waitForURL(
           (url) => url.searchParams.get("mock_success") === "true"
@@ -99,15 +105,19 @@ test.describe("OAuth + Connected Accounts", () => {
         connectBtn.click(),
       ]);
 
-      // Force a reload to ensure the server-rendered component sees the new DB state
+      // Simulate what the real OAuth callback would do: insert the identity row.
+      // We do this AFTER the click (post-redirect) so the pre-navigation page
+      // still shows the correct "Connect" button.
+      await linkUserDiscordIdentity(userId, `mock_discord_${userId}`);
+
+      // Reload so the server-rendered component reads the updated DB state.
       await page.reload();
 
-      // Verify the UI now shows the connected state status text
+      // Verify the UI now shows the connected state.
       await expect(page.getByText("Connected", { exact: true })).toBeVisible({
         timeout: 15000,
       });
 
-      // Verify the UI now shows the disconnect button
       const disconnectBtn = page.getByRole("button", {
         name: /disconnect discord/i,
       });
