@@ -511,6 +511,30 @@ def get_branch() -> str:
     return result.stdout.strip()
 
 
+def get_current_upstream(branch: str, worktree_path: Path) -> str | None:
+    """Return the current upstream ref for *branch* (e.g. 'origin/main'), or None.
+
+    Returns None when the branch has no upstream configured or when the git
+    command fails (treated as "unset").
+    """
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(worktree_path),
+            "rev-parse",
+            "--abbrev-ref",
+            "--symbolic-full-name",
+            f"{branch}@{{u}}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
 def configure_branch_tracking(branch: str, worktree_path: Path) -> None:
     """Set local upstream tracking for the worktree branch.
 
@@ -520,10 +544,25 @@ def configure_branch_tracking(branch: str, worktree_path: Path) -> None:
     if origin/<branch> exists, set the upstream to origin/<branch>; otherwise
     remind the user to run `git push -u origin <branch>` on first push.
 
+    Only updates the upstream when it is currently unset or still points at
+    origin/main or origin/master (the stale default). If the branch already
+    has a custom upstream (e.g. origin/other-branch or upstream/feat/x) the
+    existing tracking is preserved.
+
     Never auto-pushes (that would create remote branches for throwaway local
     experiments). Failures are non-fatal — warn and continue.
     """
     if branch in ("main", "master", "HEAD"):
+        return
+
+    # Check whether the upstream needs to be repaired before doing anything else.
+    current_upstream = get_current_upstream(branch, worktree_path)
+    if current_upstream is not None and current_upstream not in (
+        "origin/main",
+        "origin/master",
+        f"origin/{branch}",
+    ):
+        # Branch already has a non-default, non-stale upstream — leave it alone.
         return
 
     remote_check = subprocess.run(
@@ -546,6 +585,10 @@ def configure_branch_tracking(branch: str, worktree_path: Path) -> None:
             f"run `git push -u origin {branch}` after your first commit",
             file=sys.stderr,
         )
+        return
+
+    # Skip if already correctly configured.
+    if current_upstream == f"origin/{branch}":
         return
 
     set_upstream = subprocess.run(
