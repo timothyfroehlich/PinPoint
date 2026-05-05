@@ -29,6 +29,10 @@ test.describe("OAuth + Connected Accounts", () => {
     test("Continue with Discord button on /login redirects to discord.com", async ({
       page,
     }) => {
+      test.fixme(
+        true,
+        "PP-e20 — Discord OAuth not configured in test env; awaiting mock-only fix (no test should reach real Discord)"
+      );
       await page.goto("/login");
       const button = page.getByRole("button", {
         name: /continue with discord/i,
@@ -63,6 +67,10 @@ test.describe("OAuth + Connected Accounts", () => {
     test("Connect Discord from /settings redirects through Discord", async ({
       page,
     }) => {
+      test.fixme(
+        true,
+        "PP-e20 — Discord OAuth not configured in test env; awaiting mock-only fix (no test should reach real Discord)"
+      );
       await page.goto("/settings");
 
       const connectBtn = page.getByRole("button", {
