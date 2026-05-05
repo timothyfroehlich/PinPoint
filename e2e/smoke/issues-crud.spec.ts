@@ -292,8 +292,14 @@ test.describe("Issues System", () => {
 
       // Self-assign via the "Me" quick-select (current user is excluded from
       // the alphabetical list and only appears as "Me" at the top of the picker)
-      await assigneePicker.click();
-      await page.getByTestId("assignee-option-me").click();
+      const meOption = page.getByTestId("assignee-option-me");
+      await expect(async () => {
+        if (!(await meOption.isVisible())) {
+          await assigneePicker.click();
+        }
+        await expect(meOption).toBeVisible({ timeout: 3000 });
+      }).toPass({ timeout: 30000 });
+      await meOption.click();
 
       // Verify the assignee name is now displayed
       await expect(assigneePicker).toContainText("Member User");
