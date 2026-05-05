@@ -14,7 +14,7 @@
 # On failure, exits with the failing suite's non-zero code and prints
 # which suite failed. Stops at the first failure.
 
-set -uo pipefail
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
