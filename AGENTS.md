@@ -312,6 +312,17 @@ Some work is well-suited for Claude in Web — the cloud session that runs in a 
 - Designed for efficient LLM consumption
 - Skills provide deep dives on-demand
 
+### Keeping specs aligned
+
+When you change UI behavior covered by `.agent/skills/pinpoint-design-bible/SKILL.md` or any
+archetype/spec doc, **edit those documents in place**. Do not append a "divergence note",
+"TODO: spec out of date", or end-of-file disclaimer describing how the implementation now
+differs — that style of accretion drove repeated Copilot/Claude review churn on PR #1270.
+
+If you find an existing divergence note while making changes, fold its content back into
+the canonical text and delete the note. The spec docs are the single source of truth; if
+implementation has drifted, the fix is to update the spec, not annotate the drift.
+
 ## Landing the Plane (Session Completion)
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
