@@ -62,8 +62,15 @@ vi.mock("~/lib/blob/client", () => ({
   deleteFromBlob: vi.fn(),
 }));
 
-import { getRecentIssuesAction } from "./actions";
+import { getRecentIssuesAction, submitPublicIssueAction } from "./actions";
 import { db } from "~/server/db";
+import { verifyTurnstileToken } from "~/lib/security/turnstile";
+import {
+  checkPublicIssueLimit,
+  formatResetTime,
+  getClientIp,
+} from "~/lib/rate-limit";
+import { createClient } from "~/lib/supabase/server";
 
 describe("getRecentIssuesAction", () => {
   beforeEach(() => {
@@ -299,5 +306,93 @@ describe("getRecentIssuesAction", () => {
         expect(result.message).toBe("Could not load recent issues");
       }
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// submitPublicIssueAction — CAPTCHA branching
+//
+// These tests focus narrowly on whether verifyTurnstileToken gets called and
+// what the action returns on CAPTCHA failure. They short-circuit at form
+// validation (empty FormData is rejected by parsePublicIssueForm) rather than
+// mocking the full happy path.
+// ---------------------------------------------------------------------------
+describe("submitPublicIssueAction — CAPTCHA branching", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getClientIp).mockResolvedValue("127.0.0.1");
+    vi.mocked(checkPublicIssueLimit).mockResolvedValue({
+      success: true,
+      reset: 0,
+    } as any);
+    vi.mocked(formatResetTime).mockReturnValue("0s");
+  });
+
+  it("skips verifyTurnstileToken when the user is logged in", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: "user-123" } } }),
+      },
+    } as any);
+    vi.mocked(verifyTurnstileToken).mockResolvedValue(true);
+
+    // Empty FormData fails parsePublicIssueForm, returning { error: "..." }
+    // BEFORE any further side effects. We don't care about that error — we
+    // only care that the CAPTCHA verifier was never called.
+    await submitPublicIssueAction({}, new FormData());
+
+    expect(verifyTurnstileToken).not.toHaveBeenCalled();
+  });
+
+  it("calls verifyTurnstileToken when the user is anonymous", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      },
+    } as any);
+    vi.mocked(verifyTurnstileToken).mockResolvedValue(true);
+
+    await submitPublicIssueAction({}, new FormData());
+
+    expect(verifyTurnstileToken).toHaveBeenCalledOnce();
+  });
+
+  it("returns CAPTCHA error when anonymous user fails verification", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      },
+    } as any);
+    vi.mocked(verifyTurnstileToken).mockResolvedValue(false);
+
+    const formData = new FormData();
+    formData.set("captchaToken", "invalid-token");
+
+    const result = await submitPublicIssueAction({}, formData);
+
+    expect(result).toEqual({
+      error: "CAPTCHA verification failed. Please try again.",
+    });
+  });
+
+  it("reads the token from the captchaToken FormData field", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      },
+    } as any);
+    vi.mocked(verifyTurnstileToken).mockResolvedValue(true);
+
+    const formData = new FormData();
+    formData.set("captchaToken", "valid-cf-token");
+
+    await submitPublicIssueAction({}, formData);
+
+    expect(verifyTurnstileToken).toHaveBeenCalledWith(
+      "valid-cf-token",
+      "127.0.0.1"
+    );
   });
 });

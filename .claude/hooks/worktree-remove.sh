@@ -21,6 +21,14 @@ fi
 MAIN_WT=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
 CLEANUP="$MAIN_WT/scripts/worktree_cleanup.py"
 
+# Flush bead state to DoltHub before tearing the worktree down.
+# Runs from main worktree (where the Dolt server data lives).
+# Non-blocking: cleanup proceeds even if the push fails.
+if command -v bd >/dev/null 2>&1; then
+  (cd "$MAIN_WT" && bd dolt push --quiet) >&2 \
+    || echo "Warning: bd dolt push failed (non-fatal)" >&2
+fi
+
 if [ -f "$CLEANUP" ]; then
   python3 "$CLEANUP" "$WORKTREE_PATH" >&2 || echo "Warning: cleanup failed" >&2
 fi
