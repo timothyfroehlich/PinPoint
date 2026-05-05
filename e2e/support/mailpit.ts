@@ -201,7 +201,15 @@ export class MailpitClient {
   }
 
   /**
-   * Extract password reset link from the latest email for a mailbox
+   * Extract password reset link from the latest email for a mailbox.
+   *
+   * Tries multiple extraction strategies in order:
+   * 1. href attribute in HTML body (covers /auth/v1/verify links)
+   * 2. Any URL containing /auth/v1/verify in the full body (HTML or text)
+   * 3. Any URL containing /auth/callback (newer Supabase formats that embed
+   *    the callback URL directly in the email)
+   *
+   * Logs the full email body and headers on failure so CI flakes are diagnosable.
    */
   async getPasswordResetLink(email: string): Promise<string> {
     const latest =
@@ -220,12 +228,43 @@ export class MailpitClient {
     }
 
     const detail = await this.getMessage(email, latest.ID);
-    const html = (detail.HTML ?? detail.Text ?? "").toString();
-    const match = PASSWORD_RESET_LINK_REGEX.exec(html);
-    if (!match?.[1]) {
-      throw new Error("Password reset link not found in email body");
+    const htmlBody = (detail.HTML ?? "").toString();
+    const textBody = (detail.Text ?? "").toString();
+
+    // Strategy 1: href attribute in HTML containing /auth/v1/verify
+    const hrefMatch = PASSWORD_RESET_LINK_REGEX.exec(htmlBody);
+    if (hrefMatch?.[1]) {
+      return decodeHtmlEntities(hrefMatch[1]);
     }
-    return decodeHtmlEntities(match[1]);
+
+    // Strategy 2: any URL containing /auth/v1/verify in either body
+    const fullBody = htmlBody || textBody;
+    const verifyUrlMatch =
+      /https?:\/\/[^\s"'<>)]*\/auth\/v1\/verify[^\s"'<>)]*/i.exec(fullBody);
+    if (verifyUrlMatch?.[0]) {
+      return decodeHtmlEntities(verifyUrlMatch[0]);
+    }
+
+    // Strategy 3: direct callback URL (newer Supabase versions embed the
+    // redirect_to URL directly with token_hash or code params)
+    const callbackUrlMatch =
+      /https?:\/\/[^\s"'<>)]*\/auth\/callback[^\s"'<>)]*/i.exec(fullBody);
+    if (callbackUrlMatch?.[0]) {
+      return decodeHtmlEntities(callbackUrlMatch[0]);
+    }
+
+    // All strategies failed — log everything so future failures are diagnosable
+    console.error(
+      `[Mailpit] Password reset link not found.\n` +
+        `  Message ID: ${detail.ID}\n` +
+        `  Subject: ${detail.Subject}\n` +
+        `  To: ${detail.To.map((r) => r.Address).join(", ")}\n` +
+        `  Date: ${detail.Date ?? "(unknown)"}\n` +
+        `  HTML body (${htmlBody.length} chars):\n${htmlBody || "(empty)"}\n` +
+        `  Text body (${textBody.length} chars):\n${textBody || "(empty)"}`
+    );
+
+    throw new Error("Password reset link not found in email body");
   }
 
   /**
