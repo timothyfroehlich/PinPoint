@@ -3,7 +3,7 @@
 **Date:** 2026-05-01
 **Bead:** `PP-yxw.9` (parent epic `PP-yxw` — Design Bible & Consistency)
 **Branch:** `feat/issue-detail-rework-PP-yxw.9`
-**Status:** Draft for review
+**Status:** Implemented in PR #1270
 
 ---
 
@@ -19,15 +19,15 @@ This rework belongs to the broader Design Bible & Consistency epic (`PP-yxw`, 17
 
 ## 2. What's Changing (Deltas)
 
-| #   | Delta                                                                                                                    | Files                                                                                                                |
-| --- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| D1  | Replace `IssueSidebar` (desktop) + bespoke mobile metadata strip with a single inline `IssueMetadata` component          | New: `src/components/issues/IssueMetadata.tsx`. Delete: `src/components/issues/IssueSidebar.tsx`. Modify: `page.tsx` |
-| D2  | Container-query reflow: ≥40rem (640px) → 2-column grid, below → 1-column stack                                           | In `IssueMetadata.tsx`                                                                                               |
-| D3  | Widen `PageHeader.title` from `string` to `string \| React.ReactNode` so `EditableIssueTitle` can be the title           | `src/components/layout/PageHeader.tsx`                                                                               |
-| D4  | Drop the desktop+mobile breadcrumb divergence; replace with single eyebrow row above title                               | `page.tsx`                                                                                                           |
-| D5  | Mobile-only sticky bottom comment composer (signed-in only)                                                              | New: `src/components/issues/StickyCommentComposer.tsx`                                                               |
-| D6  | Move `OwnerRequirementsCallout` to a single canonical location (inside timeline, after initial report, no `@xl:` gating) | `src/components/issues/IssueTimeline.tsx`, `page.tsx`                                                                |
-| D7  | Add new page archetype "Detail Page with Inline Metadata" to the design bible                                            | `.agent/skills/pinpoint-design-bible/SKILL.md` §5                                                                    |
+| #   | Delta                                                                                                           | Files                                                                                                                |
+| --- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| D1  | Replace `IssueSidebar` (desktop) + bespoke mobile metadata strip with a single inline `IssueMetadata` component | New: `src/components/issues/IssueMetadata.tsx`. Delete: `src/components/issues/IssueSidebar.tsx`. Modify: `page.tsx` |
+| D2  | Container-query reflow: `@xl:` (≈576px container width) → 2-column grid, below → 1-column stack                 | In `IssueMetadata.tsx`                                                                                               |
+| D3  | Widen `PageHeader.title` from `string` to `string \| React.ReactNode` so `EditableIssueTitle` can be the title  | `src/components/layout/PageHeader.tsx`                                                                               |
+| D4  | Drop the desktop+mobile breadcrumb divergence; replace with single eyebrow row above title                      | `page.tsx`                                                                                                           |
+| D5  | Mobile-only sticky bottom comment composer (signed-in only)                                                     | New: `src/components/issues/StickyCommentComposer.tsx`                                                               |
+| D6  | Move `OwnerRequirementsCallout` to a single canonical page-level location above metadata                        | `page.tsx`                                                                                                           |
+| D7  | Add new page archetype "Detail Page with Inline Metadata" to the design bible                                   | `.agent/skills/pinpoint-design-bible/SKILL.md` §5                                                                    |
 
 ---
 
@@ -72,13 +72,13 @@ This archetype is the source of the desktop/mobile divergence problem. It optimi
 **"Detail Page with Inline Metadata"** — to be added to design-bible §5:
 
 ```
-<PageContainer size="standard">       (max-w-6xl)
+<PageContainer size="narrow">         (max-w-3xl)
   <BackToIssuesLink />
   <Eyebrow />                          (issue ID + machine + game owner, single row)
   <PageHeader title={...}>             (widened — accepts ReactNode)
   <Subtitle />                         (reporter + date + watching count + watch toggle)
   <IssueMetadata />                    (NEW — labeled rows with container query)
-  <OwnerRequirementsCallout />         (when applicable; conditional, single location)
+  <OwnerRequirementsCallout />         (when applicable; page-level single location)
   <IssueTimeline />                    (unchanged — description + activity + comments)
   <AddCommentForm />                   (md+ inline; mobile uses sticky composer)
 </PageContainer>
@@ -118,18 +118,18 @@ interface IssueMetadataProps {
 - Outer wrapper: `container-type: inline-size` (sets up container query context)
 - Inner grid: `<div>` with `display: grid`, `grid-template-columns: 1fr` by default
 - 5 child rows, each: `<div>` with `grid-template-columns: 90px 1fr`, label on left, control on right
-- Below 40rem container width: stack of 5 rows
-- Above 40rem container width: 2-column grid, last row (Assignee) spans both columns
+- Below `@xl:` container width (≈576px): stack of 5 rows
+- At `@xl:` container width and above: 2-column grid, Assignee spans both columns
 
 **Rendering:**
 
-| Row | Label                               | Control                               | Permission gate           |
-| --- | ----------------------------------- | ------------------------------------- | ------------------------- |
-| 1   | `Status`                            | `UpdateIssueStatusForm` (existing)    | `issues.update.reporting` |
-| 2   | `Priority`                          | `UpdateIssuePriorityForm` (existing)  | `issues.update.triage`    |
-| 3   | `Severity`                          | `UpdateIssueSeverityForm` (existing)  | `issues.update.reporting` |
-| 4   | `Frequency`                         | `UpdateIssueFrequencyForm` (existing) | `issues.update.reporting` |
-| 5   | `Assignee` (spans 2 cols at ≥40rem) | `AssignIssueForm` (existing)          | `issues.update.triage`    |
+| Row | Label                              | Control                               | Permission gate           |
+| --- | ---------------------------------- | ------------------------------------- | ------------------------- |
+| 1   | `Assignee` (spans 2 cols at `@xl`) | `AssignIssueForm` (existing)          | `issues.update.triage`    |
+| 2   | `Status`                           | `UpdateIssueStatusForm` (existing)    | `issues.update.reporting` |
+| 3   | `Priority`                         | `UpdateIssuePriorityForm` (existing)  | `issues.update.triage`    |
+| 4   | `Severity`                         | `UpdateIssueSeverityForm` (existing)  | `issues.update.reporting` |
+| 5   | `Frequency`                        | `UpdateIssueFrequencyForm` (existing) | `issues.update.reporting` |
 
 When the user lacks permission for a given field, the form component renders the value as a static pill (no chevron, no popover). The matrix-driven gating already lives in each `Update*Form` component — `IssueMetadata` doesn't re-implement it.
 
@@ -143,7 +143,7 @@ When the user lacks permission for a given field, the form component renders the
 - Background: `bg-card` (per design-bible §2 surface hierarchy — content-bearing surface)
 - All transitions: `transition-colors duration-150` (per design-bible §11)
 - Color usage: each pill consumes its existing `*_CONFIG[value].styles` — no new color mapping
-- Container query selectors: `@container (min-width: 40rem)` (Tailwind v4: `@md:` if `@container` parent declared, but use raw CSS to be explicit about the threshold)
+- Container query selectors: Tailwind v4 container-query variants (`@container` parent plus `@xl:*` internals)
 
 **What this replaces:**
 
@@ -220,10 +220,10 @@ interface PageHeaderProps {
 
 **Layout:**
 
-- `position: fixed`, `bottom: 0`, `left: 0`, `right: 0`
-- `z-index`: `z-30` (above main content, below `BottomTabBar` at `z-50` — composer sits above tab bar? See §5.3.1)
-- Bottom padding: `pb-[env(safe-area-inset-bottom)]`
-- Background: `bg-card/95 backdrop-blur-sm` (frosted glass — matches navigation chrome per design-bible §2)
+- `position: fixed`, `bottom: calc(56px + env(safe-area-inset-bottom))`, `left: 0`, `right: 0`
+- `z-index`: `z-30` (above main content, below `BottomTabBar` at `z-50`)
+- Page override: `PageContainer` uses `pb-16 md:pb-10`; `MainLayout` already accounts for the tab bar and safe area
+- Background: `bg-card/90 backdrop-blur-sm` (frosted glass — matches navigation chrome per design-bible §2)
 - Border-top: `border-t border-outline-variant`
 
 **Visual:**
@@ -265,32 +265,32 @@ Tap on inline composer in timeline → scrolls into view + focuses. No sticky ba
 
 **Decision:** Option A. Sticky composer renders at `bottom: calc(56px + env(safe-area-inset-bottom))` to clear the tab bar.
 
-Content bottom padding for issue detail page must be increased to clear _both_ the tab bar AND the sticky composer:
+`MainLayout` already reserves bottom space for the mobile tab bar and safe area. The issue detail page adds only the extra composer clearance:
 
 ```
-pb-[calc(56px+52px+env(safe-area-inset-bottom))] md:pb-0
+pb-16 md:pb-10
 ```
 
-(56px tab bar + 52px composer = 108px total; document this as the new value for issue detail in design-bible §3 Shell Contract or as a per-route override.)
+This avoids double-counting `env(safe-area-inset-bottom)` while keeping the last timeline item clear of the sticky composer.
 
 ### 5.4 `OwnerRequirementsCallout` placement (D6)
 
-**Current:** Dual placement
+**Previous:** Dual placement
 
 - Mobile: rendered in page chrome inside the metadata block (`page.tsx` line 267-272)
 - Desktop `@xl:`: rendered inside `IssueTimeline` after the initial report event (`IssueTimeline.tsx` line 473-479, with `hidden @xl:ml-20 @xl:block`)
 
-**New:** Single canonical location — **inside `IssueTimeline`, after the initial report event, no `@xl:` gating.**
+**New:** Single canonical location — **page-level, above `IssueMetadata`.**
 
 - Removes the dual rendering
 - Visible at all viewports
-- Reads naturally as part of the conversation flow ("Here's the issue. The owner has these requirements. Now here's what happened next.")
-- Keeps it close to its semantic anchor (the issue itself)
+- Keeps the machine owner requirements visible before the editable issue fields
+- Treats owner requirements as machine context rather than a timeline event
 
 **Implementation:**
 
-- `IssueTimeline.tsx`: remove the `hidden @xl:ml-20 @xl:block` wrapper around `<OwnerRequirementsCallout>` — just render it inline after the initial report
-- `page.tsx`: remove the mobile-only `<OwnerRequirementsCallout>` block
+- `page.tsx`: render one `<OwnerRequirementsCallout>` above `IssueMetadata` when `ownerRequirements` is available
+- `IssueTimeline.tsx`: does not accept or render owner requirement props
 
 ### 5.5 Eyebrow + Subtitle rows (D4)
 
@@ -357,14 +357,14 @@ The metadata grid, timeline, description rendering — none of these are gated b
 
 ### 6.2 Layer 2: container queries (component internals)
 
-| Component                  | Query                           | Below threshold                                                       | Above threshold                    |
-| -------------------------- | ------------------------------- | --------------------------------------------------------------------- | ---------------------------------- |
-| `IssueMetadata`            | `@container (min-width: 40rem)` | 1-column stack                                                        | 2-column grid, Assignee spans both |
-| `IssueTimeline` (existing) | `@xl:` (~576px)                 | Vertical thread line hidden, avatars hidden, comment cards full-width | Thread line shown, avatars shown   |
+| Component                  | Query           | Below threshold                                                       | Above threshold                    |
+| -------------------------- | --------------- | --------------------------------------------------------------------- | ---------------------------------- |
+| `IssueMetadata`            | `@xl:` (≈576px) | 1-column stack                                                        | 2-column grid, Assignee spans both |
+| `IssueTimeline` (existing) | `@xl:` (≈576px) | Vertical thread line hidden, avatars hidden, comment cards full-width | Thread line shown, avatars shown   |
 
-`IssueMetadata` uses raw container queries (`@container` in CSS) rather than Tailwind v4's `@md:` shorthand because the threshold (40rem) is not a Tailwind default — being explicit avoids confusion.
+`IssueMetadata` uses Tailwind v4 container-query variants (`@container` on the wrapper, `@xl:*` on children) so it follows the same responsive vocabulary as the rest of the issue-detail components.
 
-The 40rem threshold is **tunable** during implementation. Acceptable range: 32rem (more aggressive 2-col, kicks in on tablets) to 48rem (more conservative).
+The `@xl:` threshold is intentionally narrower than the initial sketch; the metadata grid reads well at the issue detail page's `max-w-3xl` content width.
 
 ### 6.3 No viewport JS
 
@@ -431,9 +431,9 @@ Per design-bible §1 accessibility rule: every pill exposes a visible text label
 | `src/components/issues/IssueSidebar.tsx`              | **DELETE**               | Functionality moves into `IssueMetadata` + page subtitle row                                                                     |
 | `src/components/layout/PageHeader.tsx`                | **MODIFY**               | Widen `title` prop (3-line change)                                                                                               |
 | `src/app/(app)/m/[initials]/i/[issueNumber]/page.tsx` | **MODIFY**               | Remove dual breadcrumbs, mobile metadata strip, sidebar grid; add eyebrow + subtitle + `IssueMetadata` + `StickyCommentComposer` |
-| `src/components/issues/IssueTimeline.tsx`             | **MODIFY**               | Remove `@xl:` gating on `OwnerRequirementsCallout` (~3-line change)                                                              |
+| `src/components/issues/IssueTimeline.tsx`             | **MODIFY**               | Hide authenticated inline composer below `md:` so the mobile sticky composer is the only visible composer                        |
 | `src/components/issues/SidebarActions.tsx`            | **NO CHANGE** in this PR | `compact`, `rowLayout`, `only`, `exclude` props become unused. Cleanup is phase-2 (not required to land this rework)             |
-| `.agent/skills/pinpoint-design-bible/SKILL.md`        | **MODIFY**               | Add "Detail Page with Inline Metadata" archetype to §5; document the container-query 40rem threshold                             |
+| `.agent/skills/pinpoint-design-bible/SKILL.md`        | **MODIFY**               | Add "Detail Page with Inline Metadata" archetype to §5; document the `@xl:` container-query threshold                            |
 | `e2e/smoke/responsive-overflow.spec.ts`               | **VERIFY**               | Issue detail page is already in this spec; no changes expected, but must still pass                                              |
 
 ### 10.2 Slicing
@@ -478,7 +478,7 @@ E2E coverage: the responsive-overflow spec already covers issue detail. Add a fo
 | #   | Question                                                               | Decision / Owner                                                                                                                            |
 | --- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | Q1  | Does sticky composer expand inline on focus, or open a Sheet?          | **Sheet (recommended).** Reuses design-bible's modal vocabulary; cleaner than building inline expansion. Confirm during implementation.     |
-| Q2  | Container-query threshold (40rem vs 32rem vs 48rem)?                   | **40rem default.** Tunable during implementation if 2-col feels cramped at tablet sizes.                                                    |
+| Q2  | Container-query threshold (`@xl:` vs wider raw query)?                 | **`@xl:`.** Tailwind's container-query shorthand matches the shipped implementation and fits the `max-w-3xl` page width.                    |
 | Q3  | Should `SidebarActions` be deleted in this PR, or left for phase 2?    | **Phase 2.** Avoid scope creep; its props become unused but the file still works.                                                           |
 | Q4  | What about the `initial` field returned by `resolveIssueReporter`?     | The Reporter avatar in `IssueTimeline`'s initial report card already uses it. New subtitle row uses the name only (text). No change needed. |
 | Q5  | Add an issue-level three-dot menu (Edit issue, Delete issue, Archive)? | **Out of scope.** No such affordance exists today; introducing one is a separate feature, not part of this rework.                          |
@@ -503,32 +503,16 @@ E2E coverage: the responsive-overflow spec already covers issue detail. Add a fo
 
 This rework is complete when:
 
-1. **Visual** — desktop and mobile render the same metadata structure (5 labeled rows, with desktop ≥40rem container reflowing to 2-column)
+1. **Visual** — desktop and mobile render the same metadata structure (5 labeled rows, with `@xl:` container reflowing to 2-column)
 2. **Behavior** — all 5 editable fields editable with the same popovers as today; all 5 permission gates respected; title editing affordance preserved
 3. **No regressions** — `IssueTimeline` (initial report, comments, system events, image attachments, edit/delete menu, empty state, login-to-comment) renders identically
 4. **Sticky composer** — appears on mobile when signed in; opens Sheet on tap; submits via existing `AddCommentForm`
-5. **OwnerRequirementsCallout** — single render location (after initial report in timeline), visible at all viewports
+5. **OwnerRequirementsCallout** — single page-level render location above `IssueMetadata`, visible at all viewports
 6. **Tests** — `pnpm run preflight` clean. New `IssueMetadata` and `StickyCommentComposer` tests added. Existing E2E + integration tests updated for new structure.
 7. **Design bible** — §5 includes new "Detail Page with Inline Metadata" archetype
 8. **`PageHeader`** — accepts `string | ReactNode` for title; existing call sites unchanged
 
 ---
-
-## 13b. Post-implementation deltas (PR #1270)
-
-Three decisions in this spec diverged from the shipped implementation. Treat the
-shipped code as the source of truth — these notes exist so future readers don't
-re-implement against the original spec values.
-
-| Spec value                                                                                     | Shipped value                                 | Why it changed                                                                                                                                                                                                                     |
-| :--------------------------------------------------------------------------------------------- | :-------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IssueMetadata` 1-col → 2-col reflow at `@container (min-width: 40rem)` (≈640px), raw CSS      | `@xl:grid-cols-2` Tailwind variant (≈576px)   | Tailwind v4's `@xl:` shorthand is idiomatic in this codebase. The 64px-narrower threshold reflows on more devices (large phones in landscape, small tablets) at minimal cost.                                                      |
-| `OwnerRequirementsCallout` rendered inside `IssueTimeline` after the initial report event (D6) | Rendered at page level, above `IssueMetadata` | Design review during implementation: the ownership requirements describe the _machine_, not a timeline event. Hoisting it above the metadata grid makes it visible immediately on page load (no scroll), which matches its intent. |
-| `<PageContainer size="standard">` (max-w-6xl)                                                  | `<PageContainer size="narrow">` (max-w-3xl)   | Design review during implementation: at 1024px+ the metadata grid + timeline read better at 768px max-width. The wider container left a lot of empty space on the right. Issue detail is reading-content-shaped, not table-shaped. |
-
-The first two acceptance criteria below should be read with these deltas in
-mind: ≥40rem becomes ≥36rem, and "after initial report in timeline" becomes
-"above IssueMetadata at page level."
 
 ## 14. Brainstorming Provenance
 

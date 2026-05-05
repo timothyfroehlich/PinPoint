@@ -95,7 +95,7 @@ test.describe("StickyCommentComposer — mobile signed-out", () => {
     // (page.tsx gates on `accessLevel !== "unauthenticated"`), so the button
     // should not be present at all.
     const trigger = page.getByRole("button", { name: "Add a comment" });
-    await expect(trigger).not.toBeVisible();
+    await expect(trigger).toHaveCount(0);
 
     // The inline "Log in to comment" placeholder in IssueTimeline is the
     // canonical CTA for unauthenticated users.

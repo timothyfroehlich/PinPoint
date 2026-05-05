@@ -23,13 +23,8 @@ import { EditableIssueTitle } from "./editable-issue-title";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { formatDateTime } from "~/lib/dates";
-import { RelativeTime } from "~/components/issues/RelativeTime";
+import { IssueUpdatedTimestamp } from "~/components/issues/IssueUpdatedTimestamp";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 import {
   type OwnershipContext,
   checkPermission,
@@ -268,14 +263,10 @@ export default async function IssueDetailPage({
               <OwnerBadge size="sm" />
             )}
             <span className="text-muted-foreground/50">·</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span tabIndex={0}>
-                  Updated <RelativeTime value={issue.updatedAt} />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{formatDateTime(issue.updatedAt)}</TooltipContent>
-            </Tooltip>
+            <IssueUpdatedTimestamp
+              value={issue.updatedAt.toISOString()}
+              fallback={formatDateTime(issue.updatedAt)}
+            />
             <span className="text-muted-foreground/50">·</span>
             <span>{issue.watchers.length} watching</span>
             {accessLevel !== "unauthenticated" && (
