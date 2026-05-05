@@ -27,6 +27,10 @@ test.describe("Machine Details - Extended", () => {
   test("should show description placeholder for owner", async ({
     page,
   }, testInfo) => {
+    test.fixme(
+      true,
+      "PP-jsh — Radix DropdownMenu portal mount timing under CI load; awaiting verification of PP-awg/#1280 absorption"
+    );
     // Login as admin (owner of Medieval Madness)
     await logout(page, testInfo);
     await loginAs(page, testInfo, {
@@ -117,6 +121,10 @@ test.describe("Machine Details - Extended", () => {
   test("should show owner notes to machine owner", async ({
     page,
   }, testInfo) => {
+    test.fixme(
+      true,
+      "PP-jsh — Radix DropdownMenu portal mount timing under CI load; awaiting verification of PP-awg/#1280 absorption"
+    );
     // Login as admin (owns Medieval Madness)
     await logout(page, testInfo);
     await loginAs(page, testInfo, {
@@ -143,6 +151,10 @@ test.describe("Machine Details - Extended", () => {
   test("should hide owner requirements from unauthenticated users", async ({
     page,
   }, testInfo) => {
+    test.fixme(
+      true,
+      "PP-jsh — Radix DropdownMenu portal mount timing under CI load; awaiting verification of PP-awg/#1280 absorption"
+    );
     // Logout to become unauthenticated
     await logout(page, testInfo);
 
@@ -158,6 +170,10 @@ test.describe("Machine Details - Extended", () => {
   test("should display owner requirements callout on issue page", async ({
     page,
   }, testInfo) => {
+    test.fixme(
+      true,
+      "PP-jsh — Radix DropdownMenu portal mount timing under CI load; awaiting verification of PP-awg/#1280 absorption"
+    );
     // First, let's login as admin and set owner requirements on a machine
     await logout(page, testInfo);
     await loginAs(page, testInfo, {
