@@ -314,14 +314,19 @@ Some work is well-suited for Claude in Web — the cloud session that runs in a 
 
 ### Keeping specs aligned
 
-When you change UI behavior covered by `.agent/skills/pinpoint-design-bible/SKILL.md` or any
-archetype/spec doc, **edit those documents in place**. Do not append a "divergence note",
-"TODO: spec out of date", or end-of-file disclaimer describing how the implementation now
-differs — that style of accretion drove repeated Copilot/Claude review churn on PR #1270.
+When you change UI behavior covered by a living canonical spec — specifically
+`.agent/skills/pinpoint-design-bible/SKILL.md` and archetype docs under
+`.agent/skills/pinpoint-design-bible/archetypes/` — **edit those documents in place**.
+Do not append a "divergence note", "TODO: spec out of date", or end-of-file disclaimer
+describing how the implementation now differs.
 
-If you find an existing divergence note while making changes, fold its content back into
-the canonical text and delete the note. The spec docs are the single source of truth; if
-implementation has drifted, the fix is to update the spec, not annotate the drift.
+Historical dated artifacts (e.g., `docs/superpowers/specs/<date>-*.md`) are NOT subject to
+this rule — they are design records that should be left as-is.
+
+If you find an existing divergence note in a canonical spec while making changes, fold its
+content back into the canonical text and delete the note. Canonical spec docs are the single
+source of truth; if implementation has drifted, the fix is to update the spec, not annotate
+the drift.
 
 ## Landing the Plane (Session Completion)
 
