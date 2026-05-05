@@ -204,10 +204,12 @@ export class MailpitClient {
    * Extract password reset link from the latest email for a mailbox.
    *
    * Tries multiple extraction strategies in order:
-   * 1. href attribute in HTML body (covers /auth/v1/verify links)
-   * 2. Any URL containing /auth/v1/verify in the full body (HTML or text)
-   * 3. Any URL containing /auth/callback (newer Supabase formats that embed
-   *    the callback URL directly in the email)
+   * 1. href attribute in HTML body containing /verify with type=recovery
+   *    (current Supabase GoTrue format — the path is /verify, not
+   *    /auth/v1/verify; type=recovery disambiguates from signup/invite emails)
+   * 2. Any URL containing /verify with type=recovery in either body part
+   * 3. Any URL containing /auth/callback (defensive coverage for future
+   *    format drift where the callback URL appears directly in the email)
    *
    * Logs the full email body and headers on failure so CI flakes are diagnosable.
    */
@@ -231,25 +233,26 @@ export class MailpitClient {
     const htmlBody = (detail.HTML ?? "").toString();
     const textBody = (detail.Text ?? "").toString();
 
-    // Strategy 1: href attribute in HTML containing /auth/v1/verify
+    // Strategy 1: href in HTML containing /verify?...type=recovery
     const hrefMatch = PASSWORD_RESET_LINK_REGEX.exec(htmlBody);
     if (hrefMatch?.[1]) {
       return decodeHtmlEntities(hrefMatch[1]);
     }
 
-    // Strategy 2: bare URL containing /auth/v1/verify — search both bodies
-    // independently so a non-empty HTML part doesn't hide a text-only link
+    // Strategy 2: bare URL containing /verify with type=recovery — search
+    // both bodies independently so a non-empty HTML part doesn't hide a
+    // text-only link
     const verifyPattern =
-      /https?:\/\/[^\s"'<>)]*\/auth\/v1\/verify[^\s"'<>)]*/i;
+      /https?:\/\/[^\s"'<>)]*\/verify\?[^\s"'<>)]*type=recovery[^\s"'<>)]*/i;
     const verifyUrlMatch =
       verifyPattern.exec(htmlBody) ?? verifyPattern.exec(textBody);
     if (verifyUrlMatch?.[0]) {
       return decodeHtmlEntities(verifyUrlMatch[0]);
     }
 
-    // Strategy 3: direct callback URL (newer Supabase versions embed the
-    // redirect_to URL directly with token_hash or code params)
-    // Search both bodies independently for the same reason as above.
+    // Strategy 3: direct callback URL — defensive coverage for future
+    // Supabase formats that embed the /auth/callback URL directly with
+    // token_hash or code params. Search both bodies independently.
     const callbackPattern =
       /https?:\/\/[^\s"'<>)]*\/auth\/callback[^\s"'<>)]*/i;
     const callbackUrlMatch =
@@ -326,7 +329,12 @@ export class MailpitClient {
   }
 }
 
-const PASSWORD_RESET_LINK_REGEX = /href="([^"]*\/auth\/v1\/verify[^"]*)"/i;
+// Match href attributes that point to a /verify URL with type=recovery.
+// Current Supabase GoTrue serves password reset links from /verify (no
+// /auth/v1/ prefix). type=recovery disambiguates from signup/invite emails
+// that also use /verify but with type=signup or type=invite.
+const PASSWORD_RESET_LINK_REGEX =
+  /href="(http[^"]*\/verify\?[^"]*type=recovery[^"]*)"/i;
 
 const decodeHtmlEntities = (text: string): string =>
   text
