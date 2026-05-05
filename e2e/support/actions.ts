@@ -123,9 +123,12 @@ export async function logout(page: Page, _testInfo: TestInfo): Promise<void> {
   const signOutItem = page.getByTestId("user-menu-signout");
 
   // Radix dropdowns can be flaky to open under CI load if clicked before hydration
-  // or if the portal mount is delayed. We retry the click+assert sequence.
+  // or if the portal mount is delayed. We only click if the menu is not already
+  // open — re-clicking a Radix toggle closes the menu on the next retry.
   await expect(async () => {
-    await userMenu.click();
+    if (!(await signOutItem.isVisible())) {
+      await userMenu.click();
+    }
     await expect(signOutItem).toBeVisible({ timeout: 1000 });
   }).toPass({
     timeout: 10_000,

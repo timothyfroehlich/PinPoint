@@ -270,7 +270,10 @@ export async function linkUserDiscordIdentity(
         now(),
         now()
       )
-      ON CONFLICT (provider_id, provider) DO NOTHING;
+      ON CONFLICT (provider_id, provider) DO UPDATE
+        SET user_id = EXCLUDED.user_id,
+            identity_data = EXCLUDED.identity_data,
+            updated_at = now();
     `;
 
     // Also sync the mirror column in user_profiles
@@ -290,7 +293,11 @@ export async function linkUserDiscordIdentity(
 export async function unlinkUserDiscordIdentity(userId: string): Promise<void> {
   const postgresUrl =
     process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
-  if (!postgresUrl) return;
+  if (!postgresUrl) {
+    throw new Error(
+      "POSTGRES_URL_NON_POOLING / POSTGRES_URL not set. Check .env.local."
+    );
+  }
 
   const sql = postgres(postgresUrl, { connect_timeout: 3, max: 1 });
   try {

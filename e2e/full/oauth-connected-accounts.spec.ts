@@ -7,11 +7,12 @@
  *
  *  1. An email/password user sees the Connected Accounts section in settings.
  *  2. An anonymous user sees the "Continue with Discord" button on /login,
- *     and clicking it navigates to discord.com.
+ *     and clicking it triggers the mocked OAuth flow that lands on /dashboard.
+ *  3. An authenticated member can trigger Connect Discord and the UI reflects
+ *     the linked state after a mock OAuth flow + direct DB setup.
  *
- * Requires DISCORD_CLIENT_ID to be set in the test environment. If not set,
- * this spec skips (documented in the PR body: full OAuth round-trip is
- * verified on the Vercel preview deployment).
+ * The OAuth flow is mocked via Playwright route interception — no test reaches
+ * a real external provider. See e2e/support/oauth-mocks.ts.
  */
 
 import { test, expect } from "@playwright/test";
@@ -28,7 +29,7 @@ test.describe("OAuth + Connected Accounts", () => {
   test.describe("anonymous", () => {
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    test("Continue with Discord button on /login redirects to discord.com", async ({
+    test("Continue with Discord button on /login completes mocked OAuth flow", async ({
       page,
     }) => {
       // Mock the OAuth flow so it doesn't hit real Discord or fail server-side
@@ -66,13 +67,17 @@ test.describe("OAuth + Connected Accounts", () => {
       await expect(connectBtn).toBeVisible();
     });
 
-    test("Connect Discord from /settings redirects through Discord", async ({
+    test("Connect Discord from /settings completes mocked OAuth flow and shows connected state", async ({
       page,
     }) => {
       // Ensure we start from a clean state (not connected)
       const userId = await getUserIdByEmail(TEST_USERS.member.email);
-      console.log(`[Test] Member user ID: ${userId}`);
       await unlinkUserDiscordIdentity(userId);
+
+      // Pre-seed the identity so the UI reflects connected state after the mock redirect.
+      // We do this BEFORE clicking so the server-rendered component sees the correct
+      // state on the page load that follows the mock redirect.
+      await linkUserDiscordIdentity(userId, `mock_discord_${userId}`);
 
       // Mock the OAuth flow. We land back on /settings with a query param.
       await setupOAuthMock(page, {
@@ -86,21 +91,6 @@ test.describe("OAuth + Connected Accounts", () => {
         name: /connect discord/i,
       });
       await expect(connectBtn).toBeVisible();
-
-      // We trigger the click, which triggers the mock redirect, which lands us back here.
-      // After the redirect lands, we update the DB.
-      // This is a bit race-y, so we'll do the DB update BEFORE we click,
-      // then wait for the URL, then RELOAD to be 100% sure.
-      await linkUserDiscordIdentity(userId, "mock_discord_id_123");
-
-      // Verify DB state
-      const postgresUrl =
-        process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
-      const sql = (await import("postgres")).default(postgresUrl!, { max: 1 });
-      const rows =
-        await sql`SELECT count(*) FROM auth.identities WHERE user_id = ${userId}::uuid AND provider = 'discord'`;
-      console.log(`[Test] DB Identity count for ${userId}: ${rows[0].count}`);
-      await sql.end();
 
       await Promise.all([
         page.waitForURL(
