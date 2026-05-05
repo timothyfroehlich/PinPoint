@@ -1,11 +1,20 @@
+import type { FullConfig } from "@playwright/test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const execSyncMock = vi.fn();
+// spawnSync is used by the Docker preflight check. Default to success.
+const spawnSyncMock = vi.fn(() => ({ status: 0, error: null }));
 
 vi.mock("child_process", () => ({
   execSync: execSyncMock,
-  default: { execSync: execSyncMock },
+  spawnSync: spawnSyncMock,
+  default: { execSync: execSyncMock, spawnSync: spawnSyncMock },
 }));
+
+// The browser-binaries preflight only inspects projects in the config we
+// pass in. An empty `projects` array therefore disables browser checks for
+// these unit tests, keeping coverage focused on the DB orchestration flow.
+const EMPTY_CONFIG = { projects: [] } as unknown as FullConfig;
 
 // Mock postgres client for the pre-flight DB connectivity check
 const endMock = vi.fn();
@@ -34,6 +43,7 @@ describe("e2e/global-setup", () => {
   beforeEach(() => {
     vi.resetModules();
     execSyncMock.mockReset();
+    spawnSyncMock.mockReset().mockReturnValue({ status: 0, error: null });
     fetchMock.mockReset().mockResolvedValue({ ok: true });
     sqlTagMock.mockReset().mockResolvedValue([{ "?column?": 1 }]);
     endMock.mockReset();
@@ -48,7 +58,7 @@ describe("e2e/global-setup", () => {
     execSyncMock.mockReturnValue(undefined);
     const setup = await loadSetup();
 
-    await setup();
+    await setup(EMPTY_CONFIG);
 
     // Pre-flight: Supabase health check
     expect(fetchMock).toHaveBeenCalledWith(
@@ -83,7 +93,7 @@ describe("e2e/global-setup", () => {
 
     const setup = await loadSetup();
 
-    await setup();
+    await setup(EMPTY_CONFIG);
 
     expect(execSyncMock).toHaveBeenCalledWith("supabase db reset --yes", {
       stdio: "inherit",
@@ -103,7 +113,7 @@ describe("e2e/global-setup", () => {
     process.env.SKIP_SUPABASE_RESET = "true";
     const setup = await loadSetup();
 
-    await setup();
+    await setup(EMPTY_CONFIG);
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(execSyncMock).not.toHaveBeenCalled();
@@ -113,14 +123,18 @@ describe("e2e/global-setup", () => {
     fetchMock.mockRejectedValue(new Error("fetch failed"));
     const setup = await loadSetup();
 
-    await expect(setup()).rejects.toThrow("Supabase is not reachable");
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "Supabase is not reachable"
+    );
   });
 
   it("throws clear error when Postgres is not reachable", async () => {
     sqlTagMock.mockRejectedValue(new Error("connection refused"));
     const setup = await loadSetup();
 
-    await expect(setup()).rejects.toThrow("Cannot connect to Postgres");
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "Cannot connect to Postgres"
+    );
   });
 
   it("throws clear error when POSTGRES_URL is not set", async () => {
@@ -128,6 +142,8 @@ describe("e2e/global-setup", () => {
     delete process.env.POSTGRES_URL_NON_POOLING;
     const setup = await loadSetup();
 
-    await expect(setup()).rejects.toThrow("POSTGRES_URL is not set");
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "POSTGRES_URL is not set"
+    );
   });
 });
