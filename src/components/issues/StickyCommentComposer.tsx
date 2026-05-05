@@ -32,7 +32,7 @@ export function StickyCommentComposer({
         <SheetTrigger asChild>
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-full border border-outline-variant bg-background px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:border-primary/40 min-h-[44px]"
+            className="flex min-h-[44px] w-full items-center gap-2 rounded-full border border-outline-variant bg-background px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             aria-label="Add a comment"
           >
             <MessageSquarePlus className="size-4" aria-hidden="true" />

@@ -53,6 +53,9 @@ import {
   type TimelineEventData,
 } from "~/lib/timeline/types";
 
+const timestampTooltipTriggerClassName =
+  "rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 // ----------------------------------------------------------------------
 // Types
 // ----------------------------------------------------------------------
@@ -257,7 +260,10 @@ function TimelineItem({
                 <TooltipTrigger asChild>
                   <span
                     tabIndex={0}
-                    className="text-[11px] text-muted-foreground/60"
+                    className={cn(
+                      "text-[11px] text-muted-foreground/60",
+                      timestampTooltipTriggerClassName
+                    )}
                   >
                     <RelativeTime value={event.createdAt} />
                   </span>
@@ -298,7 +304,10 @@ function TimelineItem({
                     <TooltipTrigger asChild>
                       <span
                         tabIndex={0}
-                        className="text-xs text-muted-foreground/60"
+                        className={cn(
+                          "text-xs text-muted-foreground/60",
+                          timestampTooltipTriggerClassName
+                        )}
                       >
                         <RelativeTime value={event.createdAt} />
                       </span>
@@ -312,7 +321,10 @@ function TimelineItem({
                       <TooltipTrigger asChild>
                         <span
                           tabIndex={0}
-                          className="text-xs text-muted-foreground/40"
+                          className={cn(
+                            "text-xs text-muted-foreground/40",
+                            timestampTooltipTriggerClassName
+                          )}
                         >
                           &bull; edited <RelativeTime value={event.updatedAt} />
                         </span>

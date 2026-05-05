@@ -2,13 +2,12 @@
 
 import type React from "react";
 import { useEffect, useState } from "react";
-import { formatDateTime, formatRelative } from "~/lib/dates";
+import { formatRelative } from "~/lib/dates";
 
 interface RelativeTimeProps {
   value: Date | string;
-  /** Server/hydration label. Defaults to the absolute time, which is the
-   *  natural fallback for "X ago" strings and avoids `Date.now()`-induced
-   *  hydration mismatches. */
+  /** Server/hydration label. Defaults to an ISO instant so SSR and browser
+   *  hydration do not diverge across different default locales/time zones. */
   fallback?: string;
 }
 
@@ -43,7 +42,7 @@ export function RelativeTime({
   const resolvedFallback = (() => {
     if (fallback !== undefined) return fallback;
     const date = typeof value === "string" ? new Date(value) : value;
-    return Number.isNaN(date.getTime()) ? "" : formatDateTime(date);
+    return Number.isNaN(date.getTime()) ? "" : date.toISOString();
   })();
 
   return <>{label ?? resolvedFallback}</>;
