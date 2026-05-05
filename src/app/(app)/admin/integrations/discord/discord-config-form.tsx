@@ -136,7 +136,7 @@ export function DiscordConfigForm({
 
   // Build a per-field error map from the latest save result.
   const fieldErrors = React.useMemo(() => {
-    if (!saveState || saveState.ok) return {} as Record<string, string>;
+    if (!saveState || saveState.ok) return {};
     const map: Record<string, string> = {};
     for (const e of saveState.errors) map[e.field] = e.message;
     return map;

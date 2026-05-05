@@ -22,7 +22,6 @@ import {
 } from "~/lib/issues/status";
 import { formatIssueId } from "~/lib/issues/utils";
 import { exportIssuesSchema, exportFiltersSchema } from "./export-schema";
-import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 export type ExportIssuesResult = Result<
   { csv: string; fileName: string },
@@ -141,9 +140,7 @@ export async function exportIssuesAction(input: {
         formatIssueId(issue.machineInitials, issue.issueNumber),
         issue.machine.name,
         issue.title,
-        extractFirstParagraph(
-          issue.description as ProseMirrorDoc | string | null
-        ),
+        extractFirstParagraph(issue.description),
         getIssueStatusLabel(issue.status),
         getIssueSeverityLabel(issue.severity),
         getIssuePriorityLabel(issue.priority),

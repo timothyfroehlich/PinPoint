@@ -20,7 +20,7 @@ function installFetchMock(handler: (call: FetchCall) => Response): FetchCall[] {
     const call: FetchCall = { url, init };
     calls.push(call);
     return Promise.resolve(handler(call));
-  }) as typeof fetch;
+  });
   return calls;
 }
 
@@ -158,9 +158,7 @@ describe("sendDm", () => {
   });
 
   it("returns reason='transient' on network error", async () => {
-    globalThis.fetch = vi.fn(() =>
-      Promise.reject(new TypeError("network"))
-    ) as typeof fetch;
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError("network")));
     const result = await sendDm({
       botToken: "t",
       discordUserId: "u",

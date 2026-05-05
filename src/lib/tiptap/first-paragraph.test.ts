@@ -117,8 +117,6 @@ describe("extractFirstParagraph", () => {
   });
 
   it("handles legacy plain text strings", () => {
-    expect(
-      extractFirstParagraph("Plain text value" as unknown as ProseMirrorDoc)
-    ).toBe("Plain text value");
+    expect(extractFirstParagraph("Plain text value")).toBe("Plain text value");
   });
 });

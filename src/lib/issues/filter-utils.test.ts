@@ -35,7 +35,7 @@ describe("getSmartBadgeLabel", () => {
   });
 
   it("returns single status name when one selected", () => {
-    expect(getSmartBadgeLabel(["fixed" as IssueStatus])).toBe("Fixed");
+    expect(getSmartBadgeLabel(["fixed"])).toBe("Fixed");
   });
 
   it("returns 'N statuses' for mixed selection", () => {
