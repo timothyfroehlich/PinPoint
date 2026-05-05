@@ -164,7 +164,7 @@ conflicts across worktrees and force-push requirements on open PRs.
 5. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
 6. **NEVER** run `e2e:full` directly during iteration — that's what CI is for
 7. **Doing a final pre-review pass and want everything locally?** → `pnpm run e2e:all` (~10-15 min, runs `full` + `smoke` + root specs in **separate** Playwright invocations with a fresh `global-setup` between them so DB seed state cannot cross-contaminate)
-8. **NEVER** run `pnpm exec playwright test` without `--config=` — that picks up every spec under `e2e/` in a single Playwright process and cross-contaminates seeded state. Use `pnpm run e2e:all` if you actually want everything.
+8. **NEVER** invoke `pnpm exec playwright test` with no arguments (no spec path, no `--config=`) — the bare command picks up every spec under `e2e/` in a single Playwright process and cross-contaminates seeded state. Targeted invocations like `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (item 2) are fine. Use `pnpm run e2e:all` if you actually want everything.
 
 **Key rules for agents:**
 
