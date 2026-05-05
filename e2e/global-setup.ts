@@ -67,6 +67,13 @@ function checkDocker(): void {
     stdio: "ignore",
     timeout: 5000,
   });
+  if (result.error?.code === "ENOENT") {
+    throw new Error(
+      "Docker is not installed.\n" +
+        "  Install with: brew install --cask orbstack\n" +
+        "  Or: brew install docker"
+    );
+  }
   if (result.error || result.status !== 0) {
     throw new Error(
       "Docker daemon is not running. Supabase's local stack needs it.\n" +
