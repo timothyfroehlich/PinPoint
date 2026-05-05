@@ -118,10 +118,20 @@ export async function ensureLoggedIn(
 export async function logout(page: Page, _testInfo: TestInfo): Promise<void> {
   const userMenu = visibleUserMenu(page);
   await expect(userMenu).toBeVisible();
-  await userMenu.click();
+  await expect(userMenu).toBeEnabled();
 
   const signOutItem = page.getByTestId("user-menu-signout");
-  await expect(signOutItem).toBeVisible();
+
+  // Radix dropdowns can be flaky to open under CI load if clicked before hydration
+  // or if the portal mount is delayed. We retry the click+assert sequence.
+  await expect(async () => {
+    await userMenu.click();
+    await expect(signOutItem).toBeVisible({ timeout: 1000 });
+  }).toPass({
+    timeout: 10_000,
+    intervals: [500, 1000, 2000],
+  });
+
   await signOutItem.click();
 
   // Wait for redirect to public dashboard

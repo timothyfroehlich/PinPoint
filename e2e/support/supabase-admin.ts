@@ -211,18 +211,83 @@ export async function deleteTestIssueByNumber(
 }
 
 /**
- * Set the user_profiles.discord_user_id mirror for a test user.
- * Mirrors what the auth callback would write after a Discord OAuth link.
+ * Manually link a Discord identity to a user in the auth.identities table.
+ *
+ * Required for E2E mocks because the UI checks auth.identities to determine
+ * if a provider is linked. Since we bypass the real OAuth exchange, we
+ * must manually insert the identity record.
  */
-export async function setUserDiscordId(
+export async function linkUserDiscordIdentity(
   userId: string,
-  discordUserId: string | null
+  discordId: string
 ): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from("user_profiles")
-    .update({ discord_user_id: discordUserId })
-    .eq("id", userId);
-  if (error) throw error;
+  const postgresUrl =
+    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  if (!postgresUrl) {
+    throw new Error(
+      "POSTGRES_URL_NON_POOLING / POSTGRES_URL not set. Check .env.local."
+    );
+  }
+
+  const sql = postgres(postgresUrl, { connect_timeout: 3, max: 1 });
+  try {
+    // Insert into auth.identities.
+    // The unique constraint is on (provider_id, provider).
+    await sql`
+      INSERT INTO auth.identities (
+        provider_id,
+        user_id,
+        identity_data,
+        provider,
+        last_sign_in_at,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${discordId},
+        ${userId}::uuid,
+        ${JSON.stringify({ sub: discordId, provider_id: discordId })},
+        'discord',
+        now(),
+        now(),
+        now()
+      )
+      ON CONFLICT (provider_id, provider) DO NOTHING;
+    `;
+
+    // Also sync the mirror column in user_profiles
+    await sql`
+      UPDATE user_profiles
+      SET discord_user_id = ${discordId}
+      WHERE id = ${userId}::uuid;
+    `;
+  } finally {
+    await sql.end();
+  }
+}
+
+/**
+ * Manually unlink a Discord identity from a user.
+ */
+export async function unlinkUserDiscordIdentity(userId: string): Promise<void> {
+  const postgresUrl =
+    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  if (!postgresUrl) return;
+
+  const sql = postgres(postgresUrl, { connect_timeout: 3, max: 1 });
+  try {
+    await sql`
+      DELETE FROM auth.identities 
+      WHERE user_id = ${userId}::uuid AND provider = 'discord';
+    `;
+    await sql`
+      UPDATE user_profiles
+      SET discord_user_id = null
+      WHERE id = ${userId}::uuid;
+    `;
+  } finally {
+    await sql.end();
+  }
 }
 
 /**
