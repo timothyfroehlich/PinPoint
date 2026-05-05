@@ -226,6 +226,98 @@ export async function setUserDiscordId(
 }
 
 /**
+ * Manually link a Discord identity to a user in auth.identities.
+ *
+ * Simulates the DB state that a successful OAuth exchange would produce.
+ * Used in E2E tests where we cannot complete the real OAuth flow (CI uses
+ * dummy Discord credentials with no registered redirect URI).
+ *
+ * Also syncs the mirror column in user_profiles so the Test DM button and
+ * Discord DM delivery logic see the same state.
+ */
+export async function linkUserDiscordIdentity(
+  userId: string,
+  discordId: string
+): Promise<void> {
+  const postgresUrl =
+    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  if (!postgresUrl) {
+    throw new Error(
+      "POSTGRES_URL_NON_POOLING / POSTGRES_URL not set. Check .env.local."
+    );
+  }
+
+  const sql = postgres(postgresUrl, { connect_timeout: 3, max: 1 });
+  try {
+    await sql`
+      INSERT INTO auth.identities (
+        provider_id,
+        user_id,
+        identity_data,
+        provider,
+        last_sign_in_at,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${discordId},
+        ${userId}::uuid,
+        ${JSON.stringify({ sub: discordId, provider_id: discordId })},
+        'discord',
+        now(),
+        now(),
+        now()
+      )
+      ON CONFLICT (provider_id, provider) DO UPDATE
+        SET user_id = EXCLUDED.user_id,
+            identity_data = EXCLUDED.identity_data,
+            updated_at = now()
+    `;
+
+    await sql`
+      UPDATE user_profiles
+      SET discord_user_id = ${discordId}
+      WHERE id = ${userId}::uuid
+    `;
+  } finally {
+    await sql.end();
+  }
+}
+
+/**
+ * Remove the Discord identity from auth.identities for a user.
+ *
+ * Simulates what the unlinkProviderAction server action does, but directly
+ * — used for test cleanup after linkUserDiscordIdentity.
+ *
+ * Also clears the mirror column in user_profiles.
+ */
+export async function unlinkUserDiscordIdentity(userId: string): Promise<void> {
+  const postgresUrl =
+    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+  if (!postgresUrl) {
+    throw new Error(
+      "POSTGRES_URL_NON_POOLING / POSTGRES_URL not set. Check .env.local."
+    );
+  }
+
+  const sql = postgres(postgresUrl, { connect_timeout: 3, max: 1 });
+  try {
+    await sql`
+      DELETE FROM auth.identities
+      WHERE user_id = ${userId}::uuid AND provider = 'discord'
+    `;
+    await sql`
+      UPDATE user_profiles
+      SET discord_user_id = null
+      WHERE id = ${userId}::uuid
+    `;
+  } finally {
+    await sql.end();
+  }
+}
+
+/**
  * Disable the Discord integration (clears bot_token_vault_id + sets
  * enabled=false). Useful for after-test cleanup. Does NOT remove the
  * underlying vault secret — that's harmless leftover.
