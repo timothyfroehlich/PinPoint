@@ -237,31 +237,42 @@ export class MailpitClient {
       return decodeHtmlEntities(hrefMatch[1]);
     }
 
-    // Strategy 2: any URL containing /auth/v1/verify in either body
-    const fullBody = htmlBody || textBody;
+    // Strategy 2: bare URL containing /auth/v1/verify — search both bodies
+    // independently so a non-empty HTML part doesn't hide a text-only link
+    const verifyPattern =
+      /https?:\/\/[^\s"'<>)]*\/auth\/v1\/verify[^\s"'<>)]*/i;
     const verifyUrlMatch =
-      /https?:\/\/[^\s"'<>)]*\/auth\/v1\/verify[^\s"'<>)]*/i.exec(fullBody);
+      verifyPattern.exec(htmlBody) ?? verifyPattern.exec(textBody);
     if (verifyUrlMatch?.[0]) {
       return decodeHtmlEntities(verifyUrlMatch[0]);
     }
 
     // Strategy 3: direct callback URL (newer Supabase versions embed the
     // redirect_to URL directly with token_hash or code params)
+    // Search both bodies independently for the same reason as above.
+    const callbackPattern =
+      /https?:\/\/[^\s"'<>)]*\/auth\/callback[^\s"'<>)]*/i;
     const callbackUrlMatch =
-      /https?:\/\/[^\s"'<>)]*\/auth\/callback[^\s"'<>)]*/i.exec(fullBody);
+      callbackPattern.exec(htmlBody) ?? callbackPattern.exec(textBody);
     if (callbackUrlMatch?.[0]) {
       return decodeHtmlEntities(callbackUrlMatch[0]);
     }
 
-    // All strategies failed — log everything so future failures are diagnosable
+    // All strategies failed — log diagnostics so future CI flakes are diagnosable.
+    // Redact one-time token values to avoid leaking secrets into logs.
+    const redactTokens = (s: string): string =>
+      s
+        .replace(/([?&]token=)[^&"'\s<>)]+/gi, "$1[REDACTED]")
+        .replace(/([?&]token_hash=)[^&"'\s<>)]+/gi, "$1[REDACTED]")
+        .replace(/([?&]code=)[^&"'\s<>)]+/gi, "$1[REDACTED]");
     console.error(
       `[Mailpit] Password reset link not found.\n` +
         `  Message ID: ${detail.ID}\n` +
         `  Subject: ${detail.Subject}\n` +
         `  To: ${detail.To.map((r) => r.Address).join(", ")}\n` +
         `  Date: ${detail.Date ?? "(unknown)"}\n` +
-        `  HTML body (${htmlBody.length} chars):\n${htmlBody || "(empty)"}\n` +
-        `  Text body (${textBody.length} chars):\n${textBody || "(empty)"}`
+        `  HTML body (${htmlBody.length} chars):\n${redactTokens(htmlBody) || "(empty)"}\n` +
+        `  Text body (${textBody.length} chars):\n${redactTokens(textBody) || "(empty)"}`
     );
 
     throw new Error("Password reset link not found in email body");
