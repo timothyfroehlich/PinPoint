@@ -315,8 +315,7 @@ Some work is well-suited for Claude in Web — the cloud session that runs in a 
 ### Keeping specs aligned
 
 When you change UI behavior covered by a living canonical spec — specifically
-`.agent/skills/pinpoint-design-bible/SKILL.md` and archetype docs under
-`.agent/skills/pinpoint-design-bible/archetypes/` — **edit those documents in place**.
+`.agent/skills/pinpoint-design-bible/SKILL.md` (page/modal archetypes live inside as §5 and §17) — **edit those documents in place**.
 Do not append a "divergence note", "TODO: spec out of date", or end-of-file disclaimer
 describing how the implementation now differs.
 
