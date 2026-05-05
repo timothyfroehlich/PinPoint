@@ -511,6 +511,70 @@ def get_branch() -> str:
     return result.stdout.strip()
 
 
+def configure_branch_tracking(branch: str, worktree_path: Path) -> None:
+    """Set local upstream tracking for the worktree branch.
+
+    `git worktree add /path -b new-branch origin/main` creates `new-branch`
+    pointing at origin/main but leaves the upstream as origin/main, so later
+    `git pull`/`git push` operate against main. This function fixes that:
+    if origin/<branch> exists, set the upstream to origin/<branch>; otherwise
+    remind the user to run `git push -u origin <branch>` on first push.
+
+    Never auto-pushes (that would create remote branches for throwaway local
+    experiments). Failures are non-fatal — warn and continue.
+    """
+    if branch in ("main", "master", "HEAD"):
+        return
+
+    remote_check = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(worktree_path),
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            f"refs/remotes/origin/{branch}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    if remote_check.returncode != 0:
+        print(
+            f"worktree_setup: branch '{branch}' has no remote yet — "
+            f"run `git push -u origin {branch}` after your first commit",
+            file=sys.stderr,
+        )
+        return
+
+    set_upstream = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(worktree_path),
+            "branch",
+            f"--set-upstream-to=origin/{branch}",
+            branch,
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    if set_upstream.returncode == 0:
+        print(
+            f"worktree_setup: branch '{branch}' tracks origin/{branch}",
+            file=sys.stderr,
+        )
+    else:
+        stderr = set_upstream.stderr.strip()
+        print(
+            f"worktree_setup: warning: failed to set upstream for "
+            f"'{branch}' (exit {set_upstream.returncode}): {stderr}",
+            file=sys.stderr,
+        )
+
+
 def main() -> None:
     worktree_path = Path.cwd().resolve()
 
@@ -523,6 +587,7 @@ def main() -> None:
         return
 
     branch = get_branch()
+    configure_branch_tracking(branch, worktree_path)
     project_id = branch_to_project_id(branch)
     worktree_key = str(worktree_path)
 
