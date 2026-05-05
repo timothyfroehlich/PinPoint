@@ -70,14 +70,14 @@ function checkDocker(): void {
   if (result.error?.code === "ENOENT") {
     throw new Error(
       "Docker is not installed.\n" +
-        "  Install with: brew install --cask orbstack\n" +
-        "  Or: brew install docker"
+        "  Install OrbStack, Docker Desktop, or Docker Engine (whichever your platform supports).\n" +
+        "  Mac: brew install --cask orbstack"
     );
   }
   if (result.error || result.status !== 0) {
     throw new Error(
       "Docker daemon is not running. Supabase's local stack needs it.\n" +
-        "  Start OrbStack: open -a OrbStack\n" +
+        "  Start your Docker daemon (e.g., OrbStack, Docker Desktop, Colima, or `systemctl start docker`).\n" +
         "  Then wait a few seconds and re-run."
     );
   }
