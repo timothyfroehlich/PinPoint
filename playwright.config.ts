@@ -100,9 +100,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    // dev:e2e mirrors dev but re-exports empty Turnstile vars *after* sourcing
-    // .env.local, so real keys from that file cannot leak into the test server.
-    command: `PORT=${port} pnpm run dev:e2e`,
+    command: `PORT=${port} pnpm run dev`,
     url: `${baseURL}/api/health`,
     reuseExistingServer: !process.env["CI"],
     timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
