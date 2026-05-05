@@ -100,7 +100,9 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `PORT=${port} pnpm run dev`,
+    // dev:e2e mirrors dev but re-exports empty Turnstile vars *after* sourcing
+    // .env.local, so real keys from that file cannot leak into the test server.
+    command: `PORT=${port} pnpm run dev:e2e`,
     url: `${baseURL}/api/health`,
     reuseExistingServer: !process.env["CI"],
     timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
@@ -114,12 +116,6 @@ export default defineConfig({
     env: {
       PORT: String(port),
       MOCK_BLOB_STORAGE: process.env["MOCK_BLOB_STORAGE"] ?? "",
-      // Disable Turnstile in the dev server Playwright spawns. Empty values
-      // trip the existing graceful-bypass logic in src/lib/security/turnstile.ts
-      // (server) and src/components/security/TurnstileWidget.tsx (client) so
-      // tests do not need to manually clear these env vars.
-      NEXT_PUBLIC_TURNSTILE_SITE_KEY: "",
-      TURNSTILE_SECRET_KEY: "",
     },
   },
 });
