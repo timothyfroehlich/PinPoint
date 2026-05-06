@@ -1,0 +1,556 @@
+<h2>Authentic mockup — strategy α with real fields</h2>
+<p class="subtitle">Built from the actual schema, the real <code>STATUS_CONFIG</code> / <code>PRIORITY_CONFIG</code> / <code>SEVERITY_CONFIG</code> / <code>FREQUENCY_CONFIG</code> color tables, and the real permissions matrix. Editable pills reflect the field-family colors PinPoint already uses; the four pills are the four editable fields.</p>
+
+<style>
+  /* ── PinPoint pill color tokens (matched to STATUS_CONFIG / PRIORITY_CONFIG / SEVERITY_CONFIG / FREQUENCY_CONFIG) ── */
+  /* Severity: amber gradient */
+  .pill-severity-cosmetic { background: rgba(252,211,77,0.12); color: #fcd34d; border-color: #f59e0b; }
+  .pill-severity-minor { background: rgba(251,191,36,0.15); color: #fbbf24; border-color: #f59e0b; }
+  .pill-severity-major { background: rgba(245,158,11,0.18); color: #f59e0b; border-color: #f59e0b; }
+  .pill-severity-unplayable { background: rgba(217,119,6,0.20); color: #d97706; border-color: #f59e0b; }
+  /* Priority: purple gradient */
+  .pill-priority-low { background: rgba(88,28,135,0.5); color: #9333ea; border-color: #a855f7; }
+  .pill-priority-medium { background: rgba(107,33,168,0.5); color: #c084fc; border-color: #a855f7; }
+  .pill-priority-high { background: rgba(168,85,247,0.20); color: #e9d5ff; border-color: #a855f7; }
+  /* Frequency: cyan gradient */
+  .pill-frequency-intermittent { background: rgba(22,78,99,0.5); color: #0891b2; border-color: #06b6d4; }
+  .pill-frequency-frequent { background: rgba(8,145,178,0.5); color: #22d3ee; border-color: #06b6d4; }
+  .pill-frequency-constant { background: rgba(6,182,212,0.20); color: #a5f3fc; border-color: #06b6d4; }
+  /* Status: per-status colors */
+  .pill-status-new { background: rgba(6,182,212,0.20); color: #22d3ee; border-color: #06b6d4; }
+  .pill-status-confirmed { background: rgba(20,184,166,0.20); color: #2dd4bf; border-color: #14b8a6; }
+  .pill-status-in_progress { background: rgba(14,165,233,0.20); color: #38bdf8; border-color: #0ea5e9; }
+  .pill-status-need_parts { background: rgba(147,51,234,0.20); color: #d8b4fe; border-color: #9333ea; }
+  .pill-status-need_help { background: rgba(236,72,153,0.20); color: #f472b6; border-color: #ec4899; }
+  .pill-status-wait_owner { background: rgba(168,85,247,0.20); color: #c084fc; border-color: #a855f7; }
+  .pill-status-fixed { background: rgba(34,197,94,0.20); color: #4ade80; border-color: #22c55e; }
+  .pill-status-wai { background: rgba(113,113,122,0.20); color: #a1a1aa; border-color: #71717a; }
+
+  .device-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    align-items: start;
+  }
+  @media (max-width: 1100px) {
+    .device-grid { grid-template-columns: 1fr; }
+  }
+  /* Mobile device is always phone-sized regardless of parent column width */
+  .device.pp-mobile {
+    max-width: 360px;
+    margin: 0 auto;
+    border-radius: 28px;
+    border: 6px solid #1a1a1a;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+  .device.pp-mobile .device-label {
+    border-radius: 22px 22px 0 0;
+  }
+  .device {
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    background: #0d0d0d;
+    overflow: hidden;
+  }
+  .device-label {
+    background: #1a1a1a;
+    color: #888;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    font-family: ui-monospace, monospace;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .device-body {
+    padding: 16px;
+    color: #e0e0e0;
+  }
+
+  .pp-back {
+    color: #6b89c8;
+    font-size: 0.7rem;
+    margin-bottom: 8px;
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    text-decoration: none;
+  }
+  .pp-back:hover { color: #8aa9d8; }
+
+  .pp-eyebrow {
+    font-size: 0.7rem;
+    color: #888;
+    margin-bottom: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .pp-eyebrow .id {
+    font-family: ui-monospace, monospace;
+    font-weight: 700;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #2a2a2a;
+    padding: 1px 7px;
+    border-radius: 999px;
+    color: #aaa;
+  }
+  .pp-eyebrow .sep { color: #555; }
+  .pp-eyebrow .machine { color: #c0c0c0; font-weight: 500; text-decoration: none; }
+  .pp-eyebrow .machine:hover { color: #f0f0f0; }
+  .pp-eyebrow .owner-tag {
+    background: rgba(245,158,11,0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(245,158,11,0.4);
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+  }
+
+  .pp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #2a2a2a;
+    margin-bottom: 12px;
+  }
+  .pp-header-text { flex: 1; min-width: 0; }
+  .pp-title {
+    font-weight: 700;
+    font-size: 1.15rem;
+    line-height: 1.3;
+    color: #f0f0f0;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .pp-subtitle {
+    color: #888;
+    font-size: 0.7rem;
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .pp-subtitle .sep { color: #444; }
+  .pp-subtitle .reporter { color: #b0b0b0; }
+  .pp-subtitle .owner-flag {
+    background: rgba(245,158,11,0.10);
+    color: #fbbf24;
+    border: 1px solid rgba(245,158,11,0.3);
+    padding: 0px 5px;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    font-weight: 600;
+  }
+
+  .pp-status-hero {
+    flex-shrink: 0;
+    padding: 5px 12px;
+    border: 1px solid;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: filter 120ms;
+  }
+  .pp-status-hero:hover { filter: brightness(1.15); }
+  .pp-status-hero .ico {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+    display: inline-block;
+  }
+
+  /* ── Pill row ── */
+  .pp-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border: 1px solid;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: filter 120ms;
+  }
+  .pill:hover { filter: brightness(1.15); }
+  .pill .ico-svg {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+  }
+  .pill.assignee {
+    background: rgba(255,255,255,0.04);
+    color: #d0d0d0;
+    border-color: #3a3a3a;
+  }
+  .pill.assignee .avatar {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: #4a4a6a;
+    color: #fff;
+    font-size: 0.55rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pill.disabled { cursor: default; opacity: 0.7; }
+  .pill.disabled:hover { filter: none; }
+
+  /* OwnerRequirements callout */
+  .owner-callout {
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    font-size: 0.75rem;
+    color: #fbbf24;
+  }
+  .owner-callout strong { color: #fcd34d; }
+
+  /* Body */
+  .pp-section { margin-top: 18px; }
+  .pp-section-title {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #888;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+  .pp-prose {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 12px;
+    color: #c0c0c0;
+    font-size: 0.8rem;
+    line-height: 1.55;
+  }
+  .pp-prose p { margin: 0 0 0.5rem 0; }
+  .pp-prose p:last-child { margin: 0; }
+
+  /* Activity events */
+  .timeline-event {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    align-items: flex-start;
+    font-size: 0.72rem;
+  }
+  .timeline-event .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #3a3a3a;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+  .timeline-event.status .dot { background: #38bdf8; }
+  .timeline-event.assign .dot { background: #c084fc; }
+  .timeline-event.comment .dot { background: #fbbf24; }
+  .timeline-event-body {
+    flex: 1;
+    color: #b0b0b0;
+  }
+  .timeline-event-body .when { color: #666; font-size: 0.65rem; }
+  .timeline-event-body .who { color: #d0d0d0; font-weight: 500; }
+
+  .comment-block {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 4px;
+  }
+  .comment-block .meta {
+    font-size: 0.65rem;
+    color: #888;
+    margin-bottom: 4px;
+  }
+  .comment-block .meta .who { color: #d0d0d0; font-weight: 500; }
+
+  .add-comment-stub {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+    color: #555;
+    font-size: 0.75rem;
+    font-style: italic;
+  }
+
+  /* Mobile narrowing */
+  .pp-mobile { font-size: 0.85rem; }
+  .pp-mobile .pp-title { font-size: 1rem; }
+  .pp-mobile .pp-subtitle { font-size: 0.65rem; }
+  .pp-mobile .pill { font-size: 0.65rem; padding: 3px 8px; }
+  .pp-mobile .pp-prose { font-size: 0.7rem; }
+
+  /* Bottom callout */
+  .corrections {
+    margin-top: 2rem;
+    padding: 16px 18px;
+    background: rgba(108, 198, 255, 0.06);
+    border-left: 3px solid #6cc6ff;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.85rem;
+    color: #c0c0c0;
+    line-height: 1.55;
+  }
+  .corrections strong { color: #e0e0e0; }
+  .corrections h4 { color: #f0f0f0; margin: 0 0 8px 0; font-size: 0.95rem; }
+  .corrections .col-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 0.5rem;
+  }
+  @media (max-width: 800px) { .corrections .col-2 { grid-template-columns: 1fr; } }
+  .corrections ul { margin: 4px 0 0 0; padding-left: 18px; }
+  .corrections li { margin-bottom: 4px; }
+  .corrections li code {
+    background: #2a2a2a;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.8em;
+  }
+  .change-added { color: #6cc66c; }
+  .change-removed { color: #c66c6c; }
+  .change-fixed { color: #6cc6ff; }
+</style>
+
+<div class="device-grid">
+  <!-- ── Desktop ── -->
+  <div>
+    <div class="device">
+      <div class="device-label">Desktop · 1024px · member viewing own org</div>
+      <div class="device-body">
+        <a class="pp-back">← Back to Issues</a>
+        <div class="pp-eyebrow">
+          <span class="id">PIN-101</span>
+          <span class="sep">·</span>
+          <a class="machine">Iron Maiden</a>
+          <span class="sep">·</span>
+          <span style="color:#aaa;">Game Owner:</span>
+          <a class="machine">Tim F.</a>
+        </div>
+        <div class="pp-header">
+          <div class="pp-header-text">
+            <h3 class="pp-title">Flippers stuck mid-game after coil heat</h3>
+            <div class="pp-subtitle">
+              <span class="reporter">Reported by <strong>Tim F.</strong></span>
+              <span class="owner-flag">Owner</span>
+              <span class="sep">·</span>
+              <span>Apr 25</span>
+              <span class="sep">·</span>
+              <span>2 watching</span>
+              <span class="sep">·</span>
+              <span class="pill" style="font-size: 0.6rem; padding: 1px 7px; background: rgba(255,255,255,0.04); border-color: #3a3a3a; color: #aaa;">+ Watch</span>
+            </div>
+          </div>
+          <span class="pp-status-hero pill-status-in_progress">
+            <span class="ico"></span>
+            In Progress
+          </span>
+        </div>
+
+        <div class="pp-pills">
+          <span class="pill pill-priority-high">
+            <svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+            High
+          </span>
+          <span class="pill pill-severity-major">
+            <svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Major
+          </span>
+          <span class="pill pill-frequency-frequent">
+            <svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            Frequent
+          </span>
+          <span class="pill assignee">
+            <span class="avatar">TF</span>
+            Tim F.
+          </span>
+        </div>
+
+        <div class="owner-callout">
+          <strong>Owner action required:</strong> Iron Maiden has owner requirements set. Tim F. should review and respond to this issue.
+        </div>
+
+        <div class="pp-section">
+          <div class="pp-section-title">Description</div>
+          <div class="pp-prose">
+            <p>Both flippers stop responding mid-game after about 5 minutes of play.</p>
+            <p>Coil temperature feels much higher than normal — possible bad relay or wiring fault. Will check the bottom assembly tomorrow morning before opening.</p>
+          </div>
+        </div>
+
+        <div class="pp-section">
+          <div class="pp-section-title">Activity</div>
+          <div class="timeline-event status">
+            <div class="dot"></div>
+            <div class="timeline-event-body">
+              <span class="who">Tim F.</span> changed status <em>New</em> → <em>In Progress</em>
+              <div class="when">2h ago</div>
+            </div>
+          </div>
+          <div class="timeline-event assign">
+            <div class="dot"></div>
+            <div class="timeline-event-body">
+              <span class="who">Tim F.</span> assigned this to themselves
+              <div class="when">2h ago</div>
+            </div>
+          </div>
+          <div class="timeline-event comment">
+            <div class="dot"></div>
+            <div class="timeline-event-body">
+              <div><span class="who">Tim F.</span> commented · <span class="when">30m ago</span></div>
+              <div class="comment-block" style="margin-top: 4px;">
+                Coils smell hot. Probably a bad relay — ordering replacements tonight.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="add-comment-stub">Add a comment…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Mobile ── -->
+  <div>
+    <div class="device pp-mobile">
+      <div class="device-label">Mobile · 390px</div>
+      <div class="device-body">
+        <a class="pp-back">← Back</a>
+        <div class="pp-eyebrow" style="font-size: 0.6rem;">
+          <span class="id">PIN-101</span>
+          <span class="sep">·</span>
+          <a class="machine">Iron Maiden</a>
+        </div>
+        <div class="pp-header">
+          <div class="pp-header-text">
+            <h3 class="pp-title">Flippers stuck mid-game after coil heat</h3>
+            <div class="pp-subtitle" style="margin-top: 6px;">
+              <span class="reporter">Tim F.</span>
+              <span class="owner-flag">Owner</span>
+              <span class="sep">·</span>
+              <span>Apr 25</span>
+              <span class="sep">·</span>
+              <span>2 👁</span>
+            </div>
+          </div>
+          <span class="pp-status-hero pill-status-in_progress" style="font-size: 0.65rem; padding: 3px 8px;">
+            <span class="ico"></span>
+            In Progress
+          </span>
+        </div>
+
+        <div class="pp-pills" style="margin-bottom: 12px;">
+          <span class="pill pill-priority-high">High</span>
+          <span class="pill pill-severity-major">Major</span>
+          <span class="pill pill-frequency-frequent">Frequent</span>
+          <span class="pill assignee">
+            <span class="avatar">TF</span>
+            Tim F.
+          </span>
+          <span class="pill" style="background: rgba(255,255,255,0.04); border-color: #3a3a3a; color: #aaa; border-style: dashed;">+ Watch</span>
+        </div>
+
+        <div class="owner-callout" style="font-size: 0.65rem;">
+          <strong>Owner action:</strong> Iron Maiden has owner requirements. Tim should respond.
+        </div>
+
+        <div class="pp-section">
+          <div class="pp-section-title">Description</div>
+          <div class="pp-prose">
+            <p>Flippers stop responding mid-game after ~5 min. Coils run hot — possible bad relay.</p>
+          </div>
+        </div>
+
+        <div class="pp-section">
+          <div class="pp-section-title">Activity</div>
+          <div class="timeline-event status">
+            <div class="dot"></div>
+            <div class="timeline-event-body">
+              <span class="who">Tim F.</span>: New → In Progress
+              <div class="when">2h ago</div>
+            </div>
+          </div>
+          <div class="timeline-event comment">
+            <div class="dot"></div>
+            <div class="timeline-event-body">
+              <span class="who">Tim F.</span> commented · <span class="when">30m</span>
+              <div class="comment-block" style="margin-top: 4px;">Coils smell hot. Probably a bad relay.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="add-comment-stub" style="font-size: 0.7rem;">Add a comment…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="corrections">
+  <h4>Corrections from earlier mockups</h4>
+  Built from <code>src/server/db/schema.ts</code> issues table, <code>src/lib/issues/status.ts</code> color tables, and <code>src/lib/permissions/matrix.ts</code> access rules. All field names, values, colors, and editability match the live code.
+  <div class="col-2">
+    <div>
+      <strong class="change-added">Added (was missing)</strong>
+      <ul>
+        <li><span class="change-added">Severity</span> pill (cosmetic / minor / major / unplayable, amber gradient, AlertTriangle icon)</li>
+        <li><span class="change-added">Frequency</span> pill (intermittent / frequent / constant, cyan gradient, Repeat icon)</li>
+        <li><span class="change-added">OwnerRequirementsCallout</span> — appears between metadata and description when machine has owner requirements set</li>
+        <li><span class="change-added">Description as rich text</span> (ProseMirror jsonb) — supports paragraphs, formatting</li>
+        <li><span class="change-added">Real status palette</span> — 11 statuses with per-status colors (sky for In Progress, green for Fixed, etc.) — not a generic blue</li>
+        <li><span class="change-added">Permission tier split</span> — title/status/severity/frequency = <code>issues.update.reporting</code> (guest can edit own); priority/assignee = <code>issues.update.triage</code> (member+ only)</li>
+      </ul>
+    </div>
+    <div>
+      <strong class="change-removed">Removed (didn't exist)</strong>
+      <ul>
+        <li><span class="change-removed">Location pill</span> — no locations table in schema</li>
+        <li><span class="change-removed">Editable Machine pill</span> — machine is fixed at issue creation; URL identity, never re-assignable</li>
+      </ul>
+      <strong class="change-fixed" style="display:block;margin-top:8px;">Fixed</strong>
+      <ul>
+        <li><span class="change-fixed">Pill colors</span> follow the existing field-family system (severity=amber, priority=purple, frequency=cyan) — not generic gray</li>
+        <li><span class="change-fixed">Reporter modes</span> — schema has 4 mutually-exclusive modes (member, invited, anonymous-name/email, none); display name only per email-privacy rule</li>
+        <li><span class="change-fixed">Game Owner</span> — link only present when the machine has an owner; reporter gets an "Owner" flag when reporter IS the machine owner</li>
+        <li><span class="change-fixed">Issue ID badge</span> — uses <code>formatIssueId(initials, issueNumber)</code> pattern (e.g., PIN-101)</li>
+      </ul>
+    </div>
+  </div>
+
+  <strong style="display:block; margin-top: 1rem;">Editable fields — final list (4 pills + 1 hero):</strong>
+  <ul>
+    <li><strong>Status</strong> (hero pill, top-right) → grouped popover (Open/In Progress/Closed) with 11 options, tooltips, per-status icon+color</li>
+    <li><strong>Priority</strong> (pill) → 3 options, purple gradient, TrendingUp icon — <em>member+ only</em></li>
+    <li><strong>Severity</strong> (pill) → 4 options, amber gradient, AlertTriangle icon</li>
+    <li><strong>Frequency</strong> (pill) → 3 options, cyan gradient, Repeat icon</li>
+    <li><strong>Assignee</strong> (pill) → searchable list of members + admins (no guests) — <em>member+ only</em></li>
+  </ul>
+
+  <strong style="display:block; margin-top: 1rem;">Open question for next round:</strong>
+  Status hero is sized larger than the other pills (5px vs 4px padding, 0.75rem vs 0.7rem font). Does that read as "appropriately prominent" or as "the inconsistency I warned about earlier"? If the latter, we make status a regular pill in the same row as the other 4, just placed first or last for prominence.
+</div>

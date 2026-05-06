@@ -1,0 +1,54 @@
+"use client";
+
+import type React from "react";
+import { useEffect, useState } from "react";
+import { formatRelative } from "~/lib/dates";
+
+interface RelativeTimeProps {
+  value: Date | string;
+  /** Server/hydration label. Defaults to an ISO instant so SSR and browser
+   *  hydration do not diverge across different default locales/time zones. */
+  fallback?: string;
+}
+
+export function RelativeTime({
+  value,
+  fallback,
+}: RelativeTimeProps): React.JSX.Element {
+  const [label, setLabel] = useState<string | null>(null);
+
+  // Re-runs only when the instant changes, not the Date reference.
+  const depKey = value instanceof Date ? value.getTime() : value;
+
+  useEffect(() => {
+    const date = typeof value === "string" ? new Date(value) : value;
+    if (Number.isNaN(date.getTime())) {
+      // Reset label so a previous, now-stale value doesn't keep rendering when
+      // the prop changes to an invalid date — the resolved fallback should win.
+      setLabel(null);
+      return;
+    }
+
+    const update = (): void => {
+      try {
+        setLabel(formatRelative(date));
+      } catch (err) {
+        // formatDistanceToNow can throw RangeError on edge inputs; stay on fallback.
+        console.warn("[RelativeTime] formatRelative threw", err);
+      }
+    };
+    update();
+    const interval = window.setInterval(update, 60_000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [depKey]);
+
+  const resolvedFallback = (() => {
+    if (fallback !== undefined) return fallback;
+    const date = typeof value === "string" ? new Date(value) : value;
+    return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+  })();
+
+  return <>{label ?? resolvedFallback}</>;
+}

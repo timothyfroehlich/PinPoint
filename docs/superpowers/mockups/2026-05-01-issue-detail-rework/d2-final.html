@@ -1,0 +1,527 @@
+<h2>Direction 2 — final, with container-query 2-column desktop</h2>
+<p class="subtitle">Vertical labeled rows that pack into 2 columns when their container is wide enough (≥40rem / 640px). Mobile stays 1-column. Container query, not viewport breakpoint — the metadata block adapts to its own width, so it works anywhere it's placed.</p>
+
+<style>
+  /* Field-family colors */
+  .pill-severity-major { background: rgba(245,158,11,0.18); color: #f59e0b; border-color: #f59e0b; }
+  .pill-priority-high { background: rgba(168,85,247,0.20); color: #e9d5ff; border-color: #a855f7; }
+  .pill-frequency-frequent { background: rgba(8,145,178,0.5); color: #22d3ee; border-color: #06b6d4; }
+  .pill-status-in_progress { background: rgba(14,165,233,0.20); color: #38bdf8; border-color: #0ea5e9; }
+
+  .device-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    align-items: start;
+  }
+  @media (max-width: 1100px) {
+    .device-grid { grid-template-columns: 1fr; }
+  }
+
+  .device {
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    background: #0d0d0d;
+    overflow: hidden;
+  }
+  .device.pp-mobile {
+    max-width: 360px;
+    margin: 0 auto;
+    border-radius: 28px;
+    border: 6px solid #1a1a1a;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    position: relative;
+  }
+  .device-label {
+    background: #1a1a1a;
+    color: #888;
+    padding: 6px 12px;
+    font-size: 0.7rem;
+    font-family: ui-monospace, monospace;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .device.pp-mobile .device-label {
+    border-radius: 22px 22px 0 0;
+  }
+  .device-body {
+    padding: 16px;
+    color: #e0e0e0;
+  }
+  .device.pp-mobile .device-body {
+    padding: 12px 12px 60px 12px;
+  }
+
+  .pp-back {
+    color: #6b89c8;
+    font-size: 0.7rem;
+    margin-bottom: 8px;
+    display: inline-flex;
+    text-decoration: none;
+  }
+  .pp-eyebrow {
+    font-size: 0.65rem;
+    color: #888;
+    margin-bottom: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .pp-eyebrow .id {
+    font-family: ui-monospace, monospace;
+    font-weight: 700;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #2a2a2a;
+    padding: 1px 7px;
+    border-radius: 999px;
+    color: #aaa;
+  }
+  .pp-eyebrow .sep { color: #555; }
+  .pp-eyebrow .machine { color: #c0c0c0; font-weight: 500; text-decoration: none; }
+  .pp-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1.3;
+    color: #f0f0f0;
+    margin: 6px 0 0 0;
+    letter-spacing: -0.01em;
+  }
+  .pp-mobile .pp-title { font-size: 0.95rem; }
+  .pp-subtitle {
+    color: #888;
+    font-size: 0.7rem;
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .pp-mobile .pp-subtitle { font-size: 0.65rem; }
+  .pp-subtitle .sep { color: #444; }
+  .pp-subtitle .reporter { color: #b0b0b0; }
+  .pp-subtitle .owner-flag {
+    background: rgba(245,158,11,0.10);
+    color: #fbbf24;
+    border: 1px solid rgba(245,158,11,0.3);
+    padding: 0px 5px;
+    border-radius: 4px;
+    font-size: 0.6rem;
+    font-weight: 600;
+  }
+  .pp-subtitle .watch-toggle {
+    background: rgba(255,255,255,0.04);
+    color: #aaa;
+    border: 1px solid #3a3a3a;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.6rem;
+    cursor: pointer;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border: 1px solid;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: filter 120ms, transform 120ms;
+  }
+  .pp-mobile .pill { font-size: 0.65rem; padding: 4px 9px; }
+  .pill:hover {
+    filter: brightness(1.18);
+    transform: translateY(-1px);
+  }
+  .pill .ico-svg { width: 12px; height: 12px; flex-shrink: 0; stroke-width: 2.5; }
+  .pill .val { font-weight: 600; }
+  .pill .chevron { font-size: 0.65rem; opacity: 0.65; margin-left: 1px; }
+  .pill.assignee {
+    background: rgba(255,255,255,0.04);
+    color: #d0d0d0;
+    border-color: #3a3a3a;
+  }
+  .pill.assignee .avatar {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: #4a4a6a;
+    color: #fff;
+    font-size: 0.55rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ─── Container-query metadata grid ─── */
+  .pp-rows-container {
+    container-type: inline-size;
+    margin: 14px 0 16px 0;
+  }
+  .pp-rows {
+    display: grid;
+    grid-template-columns: 1fr;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.015);
+  }
+  .pp-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid #1f1f1f;
+    min-height: 44px;
+  }
+  .pp-row:last-child { border-bottom: none; }
+  .pp-row .row-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #888;
+    font-weight: 700;
+  }
+
+  /* When container ≥ 40rem (~640px), switch to 2-column grid */
+  @container (min-width: 40rem) {
+    .pp-rows {
+      grid-template-columns: 1fr 1fr;
+    }
+    .pp-row {
+      border-bottom: 1px solid #1f1f1f;
+      grid-template-columns: 90px 1fr;
+    }
+    /* Right-column rows get a left border to visually separate */
+    .pp-row:nth-child(even) {
+      border-left: 1px solid #1f1f1f;
+    }
+    /* Last row (Assignee, the 5th) spans both columns */
+    .pp-row.span-2 {
+      grid-column: 1 / -1;
+      border-left: none;
+    }
+    /* The "interior" rows (1,2,3,4) keep bottom borders */
+    .pp-row:nth-child(1), .pp-row:nth-child(2) {
+      border-bottom: 1px solid #1f1f1f;
+    }
+    .pp-row:nth-child(3), .pp-row:nth-child(4) {
+      border-bottom: 1px solid #1f1f1f;
+    }
+  }
+
+  .pp-mobile .pp-row { grid-template-columns: 78px 1fr; padding: 9px 12px; min-height: 40px; }
+
+  /* Body */
+  .owner-callout {
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    font-size: 0.72rem;
+    color: #fbbf24;
+  }
+  .owner-callout strong { color: #fcd34d; }
+  .pp-mobile .owner-callout { font-size: 0.65rem; padding: 8px 10px; }
+
+  .pp-section { margin-top: 16px; }
+  .pp-section-title {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #888;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+  .pp-prose {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 12px;
+    color: #c0c0c0;
+    font-size: 0.78rem;
+    line-height: 1.55;
+  }
+  .pp-mobile .pp-prose { font-size: 0.7rem; padding: 10px; }
+  .pp-prose p { margin: 0 0 0.5rem 0; }
+  .pp-prose p:last-child { margin: 0; }
+
+  .timeline-event {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    align-items: flex-start;
+    font-size: 0.72rem;
+  }
+  .pp-mobile .timeline-event { font-size: 0.65rem; }
+  .timeline-event .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #38bdf8;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+  .timeline-event-body { flex: 1; color: #b0b0b0; }
+  .timeline-event-body .when { color: #666; font-size: 0.65rem; }
+  .timeline-event-body .who { color: #d0d0d0; font-weight: 500; }
+
+  .desktop-composer {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+    color: #555;
+    font-size: 0.75rem;
+    font-style: italic;
+  }
+
+  .sticky-composer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #1a1a1a;
+    border-top: 1px solid #2a2a2a;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 0 0 22px 22px;
+  }
+  .sticky-composer .input {
+    flex: 1;
+    background: #0d0d0d;
+    border: 1px solid #2a2a2a;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 0.7rem;
+    color: #555;
+    font-style: italic;
+  }
+  .sticky-composer .send {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    background: #38bdf8;
+    color: #0d1f2c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.85rem;
+  }
+</style>
+
+<div class="device-grid">
+  <!-- Desktop -->
+  <div class="device">
+    <div class="device-label">Desktop · 1024px · D2 final (container ≥ 40rem → 2-col)</div>
+    <div class="device-body">
+      <a class="pp-back">← Back to Issues</a>
+      <div class="pp-eyebrow">
+        <span class="id">PIN-101</span>
+        <span class="sep">·</span>
+        <a class="machine">Iron Maiden</a>
+        <span class="sep">·</span>
+        <span style="color:#aaa;">Game Owner:</span>
+        <a class="machine">Tim F.</a>
+      </div>
+      <h3 class="pp-title">Flippers stuck mid-game after coil heat</h3>
+      <div class="pp-subtitle">
+        <span class="reporter">Reported by <strong>Tim F.</strong></span>
+        <span class="owner-flag">Owner</span>
+        <span class="sep">·</span>
+        <span>Apr 25</span>
+        <span class="sep">·</span>
+        <span>2 watching</span>
+        <span class="watch-toggle">+ Watch</span>
+      </div>
+
+      <div class="pp-rows-container">
+        <div class="pp-rows">
+          <div class="pp-row">
+            <span class="row-label">Status</span>
+            <span class="row-value">
+              <span class="pill pill-status-in_progress">
+                <svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+                <span class="val">In Progress</span><span class="chevron">▾</span>
+              </span>
+            </span>
+          </div>
+          <div class="pp-row">
+            <span class="row-label">Priority</span>
+            <span class="row-value">
+              <span class="pill pill-priority-high">
+                <svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+                <span class="val">High</span><span class="chevron">▾</span>
+              </span>
+            </span>
+          </div>
+          <div class="pp-row">
+            <span class="row-label">Severity</span>
+            <span class="row-value">
+              <span class="pill pill-severity-major">
+                <svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg>
+                <span class="val">Major</span><span class="chevron">▾</span>
+              </span>
+            </span>
+          </div>
+          <div class="pp-row">
+            <span class="row-label">Frequency</span>
+            <span class="row-value">
+              <span class="pill pill-frequency-frequent">
+                <svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/></svg>
+                <span class="val">Frequent</span><span class="chevron">▾</span>
+              </span>
+            </span>
+          </div>
+          <div class="pp-row span-2">
+            <span class="row-label">Assignee</span>
+            <span class="row-value">
+              <span class="pill assignee">
+                <span class="avatar">TF</span>
+                <span class="val">Tim F.</span><span class="chevron">▾</span>
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="owner-callout">
+        <strong>Owner action required:</strong> Iron Maiden has owner requirements set. Tim F. should review and respond to this issue.
+      </div>
+
+      <div class="pp-section">
+        <div class="pp-section-title">Description</div>
+        <div class="pp-prose">
+          <p>Both flippers stop responding mid-game after about 5 minutes of play. Coil temperature feels much higher than normal — possible bad relay or wiring fault.</p>
+        </div>
+      </div>
+
+      <div class="pp-section">
+        <div class="pp-section-title">Activity</div>
+        <div class="timeline-event">
+          <div class="dot"></div>
+          <div class="timeline-event-body">
+            <span class="who">Tim F.</span> changed status <em>New</em> → <em>In Progress</em>
+            <div class="when">2h ago</div>
+          </div>
+        </div>
+        <div class="timeline-event">
+          <div class="dot"></div>
+          <div class="timeline-event-body">
+            <span class="who">Tim F.</span> commented: "Coils smell hot. Probably a bad relay."
+            <div class="when">30m ago</div>
+          </div>
+        </div>
+      </div>
+      <div class="desktop-composer">Add a comment…</div>
+    </div>
+  </div>
+
+  <!-- Mobile -->
+  <div class="device pp-mobile">
+    <div class="device-label">Mobile · 360px (container &lt; 40rem → 1-col)</div>
+    <div class="device-body">
+      <a class="pp-back">← Back</a>
+      <div class="pp-eyebrow" style="font-size:0.6rem;">
+        <span class="id">PIN-101</span>
+        <span class="sep">·</span>
+        <a class="machine">Iron Maiden</a>
+      </div>
+      <h3 class="pp-title">Flippers stuck mid-game after coil heat</h3>
+      <div class="pp-subtitle">
+        <span class="reporter">Tim F.</span>
+        <span class="owner-flag">Owner</span>
+        <span class="sep">·</span>
+        <span>Apr 25</span>
+        <span class="sep">·</span>
+        <span>2 👁</span>
+        <span class="watch-toggle">+ Watch</span>
+      </div>
+
+      <div class="pp-rows-container">
+        <div class="pp-rows">
+          <div class="pp-row">
+            <span class="row-label">Status</span>
+            <span class="row-value">
+              <span class="pill pill-status-in_progress"><span class="val">In Progress</span><span class="chevron">▾</span></span>
+            </span>
+          </div>
+          <div class="pp-row">
+            <span class="row-label">Priority</span>
+            <span class="row-value">
+              <span class="pill pill-priority-high"><span class="val">High</span><span class="chevron">▾</span></span>
+            </span>
+          </div>
+          <div class="pp-row">
+            <span class="row-label">Severity</span>
+            <span class="row-value">
+              <span class="pill pill-severity-major"><span class="val">Major</span><span class="chevron">▾</span></span>
+            </span>
+          </div>
+          <div class="pp-row">
+            <span class="row-label">Frequency</span>
+            <span class="row-value">
+              <span class="pill pill-frequency-frequent"><span class="val">Frequent</span><span class="chevron">▾</span></span>
+            </span>
+          </div>
+          <div class="pp-row span-2">
+            <span class="row-label">Assignee</span>
+            <span class="row-value">
+              <span class="pill assignee"><span class="avatar">TF</span><span class="val">Tim F.</span><span class="chevron">▾</span></span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="owner-callout">
+        <strong>Owner action:</strong> Tim should respond — owner requirements set.
+      </div>
+
+      <div class="pp-section">
+        <div class="pp-section-title">Description</div>
+        <div class="pp-prose">Flippers stop responding mid-game after ~5 min. Coils run hot — possible bad relay.</div>
+      </div>
+
+      <div class="pp-section">
+        <div class="pp-section-title">Activity</div>
+        <div class="timeline-event">
+          <div class="dot"></div>
+          <div class="timeline-event-body"><span class="who">Tim F.</span>: New → In Progress<div class="when">2h ago</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="sticky-composer">
+      <div class="input">Add a comment…</div>
+      <div class="send">↑</div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 1.5rem; padding: 14px 18px; background: rgba(108, 198, 255, 0.06); border-left: 3px solid #6cc6ff; border-radius: 0 8px 8px 0; font-size: 0.85rem; color: #c0c0c0; line-height: 1.6;">
+  <strong style="color: #f0f0f0;">How the responsive flip works (educational note):</strong>
+  <ul style="margin: 6px 0 0 0; padding-left: 18px;">
+    <li><code>.pp-rows-container</code> sets <code>container-type: inline-size</code> — declares that descendants can query its width</li>
+    <li>Inside <code>@container (min-width: 40rem)</code>, the grid switches from 1 column to 2 columns and the Assignee row spans both columns</li>
+    <li>Below that breakpoint (mobile, narrow side panels, etc.) — single-column stack</li>
+    <li>The 40rem threshold is tunable. Could go to 32rem (more aggressive 2-col on tablets) or 48rem (more conservative)</li>
+  </ul>
+  <p style="margin: 10px 0 0 0;">
+    <strong style="color: #fcd34d;">Why container query, not viewport breakpoint:</strong> if we ever reuse this metadata block inside a narrower context (e.g., a comparison view, or a side panel), it'll automatically fall back to 1-col without any code change. Viewport breakpoints would be wrong about width whenever the component isn't in its "main column" context.
+  </p>
+</div>
+
+<div style="margin-top: 1rem; padding: 14px 18px; background: rgba(245, 158, 11, 0.06); border-left: 3px solid #f59e0b; border-radius: 0 8px 8px 0; font-size: 0.85rem; color: #c0c0c0; line-height: 1.55;">
+  <strong style="color: #fbbf24;">"Yes, but…" — what does the rest of that sentence say?</strong> I'm assuming the most likely completion is <strong>"yes, but only when the user is signed in"</strong> (so unauthenticated viewers don't see a composer they can't use). Surface a "Sign in to comment" link instead, or hide the composer entirely. Confirm or correct that interpretation when you next reply.
+</div>

@@ -1,0 +1,130 @@
+/**
+ * E2E Tests: StickyCommentComposer — visibility rules
+ *
+ * Covers three scenarios for the mobile-only fixed-bottom comment composer:
+ *
+ * 1. Mobile + signed-in:  sticky bar visible; tapping it opens a Sheet with
+ *    the comment form.
+ * 2. Mobile + signed-out: sticky bar absent (server-side gated); the inline
+ *    "Log in to comment" placeholder in IssueTimeline is the canonical CTA.
+ * 3. Desktop + signed-in: sticky bar hidden via `md:hidden`; the inline
+ *    composer at the end of the timeline is the only one.
+ */
+
+import { test, expect } from "@playwright/test";
+import { loginAs } from "../support/actions.js";
+import { seededIssues } from "../support/constants.js";
+
+// Use AFM issue 1 — confirmed publicly accessible without auth (public-routes-audit).
+// The initials + num are stable seeded values that never change across test runs.
+const ISSUE = seededIssues.AFM[0];
+const ISSUE_URL = `/m/AFM/i/${ISSUE.num}`;
+
+// ----------------------------------------------------------------------------
+// Scenario 1: Mobile, signed-in
+// ----------------------------------------------------------------------------
+
+test.describe("StickyCommentComposer — mobile signed-in", () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test("renders the sticky bar and opens the comment Sheet on tap", async ({
+    page,
+  }, testInfo) => {
+    await loginAs(page, testInfo);
+    await page.goto(ISSUE_URL);
+    await page.waitForLoadState("domcontentloaded");
+
+    // The sticky bar button must be visible at a 375px viewport (below md: breakpoint).
+    const trigger = page.getByRole("button", { name: "Add a comment" });
+    await expect(trigger).toBeVisible();
+
+    // Tapping the trigger opens the Sheet (Radix renders the dialog in a portal).
+    await trigger.click();
+
+    const sheet = page.getByRole("dialog");
+    await expect(sheet).toBeVisible();
+    // Scope to the SheetTitle (heading semantics) so we don't risk a strict-mode
+    // violation against the trigger button — which also has the text "Add a
+    // comment" but isn't a heading.
+    await expect(
+      sheet.getByRole("heading", { name: "Add a comment" })
+    ).toBeVisible();
+  });
+
+  test("only one Comment textarea is visible when sheet is open (no duplicate composer)", async ({
+    page,
+  }, testInfo) => {
+    await loginAs(page, testInfo);
+    await page.goto(ISSUE_URL);
+    await page.waitForLoadState("domcontentloaded");
+
+    // Open the sticky composer's sheet.
+    await page.getByRole("button", { name: "Add a comment" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // Wait for TipTap's dynamic import to mount the editor inside the dialog;
+    // without this the count assertion below can race with the lazy bundle.
+    await expect(dialog.getByLabel("Comment", { exact: true })).toBeVisible();
+
+    // Even though both the inline AddCommentForm (display:none via hidden md:flex)
+    // and the sheet's AddCommentForm are mounted, only the sheet's textarea
+    // should be visible. Guards against the regression where IssueTimeline
+    // fails to hide the inline composer on mobile when authenticated.
+    await expect(
+      page.getByLabel("Comment", { exact: true }).filter({ visible: true })
+    ).toHaveCount(1);
+  });
+});
+
+// ----------------------------------------------------------------------------
+// Scenario 2: Mobile, signed-out
+// ----------------------------------------------------------------------------
+
+test.describe("StickyCommentComposer — mobile signed-out", () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test("sticky bar absent; inline 'Log in to comment' placeholder visible", async ({
+    page,
+  }) => {
+    // Navigate without logging in.
+    await page.goto(ISSUE_URL);
+    await page.waitForLoadState("domcontentloaded");
+
+    // The StickyCommentComposer is NOT rendered server-side when unauthenticated
+    // (page.tsx gates on `accessLevel !== "unauthenticated"`), so the button
+    // should not be present at all.
+    const trigger = page.getByRole("button", { name: "Add a comment" });
+    await expect(trigger).toHaveCount(0);
+
+    // The inline "Log in to comment" placeholder in IssueTimeline is the
+    // canonical CTA for unauthenticated users.
+    await expect(page.getByTestId("login-to-comment")).toBeVisible();
+  });
+});
+
+// ----------------------------------------------------------------------------
+// Scenario 3: Desktop, signed-in
+// ----------------------------------------------------------------------------
+
+test.describe("StickyCommentComposer — desktop signed-in", () => {
+  test.use({ viewport: { width: 1024, height: 768 } });
+
+  test("sticky bar hidden at desktop viewport; inline composer is present", async ({
+    page,
+  }, testInfo) => {
+    await loginAs(page, testInfo);
+    await page.goto(ISSUE_URL);
+    await page.waitForLoadState("domcontentloaded");
+
+    // The StickyCommentComposer wrapper carries `md:hidden` (display:none at ≥768px).
+    // Playwright's toBeVisible() honours CSS visibility, so the button should
+    // not be visible even though the element may exist in the DOM.
+    const stickyTrigger = page.getByRole("button", { name: "Add a comment" });
+    await expect(stickyTrigger).not.toBeVisible();
+
+    // The inline AddCommentForm in IssueTimeline is the only composer at desktop.
+    // It is wrapped in data-testid="issue-comment-form".
+    await expect(page.getByTestId("issue-comment-form")).toBeVisible();
+  });
+});

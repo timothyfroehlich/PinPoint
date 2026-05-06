@@ -101,6 +101,16 @@ What you must NOT do is unchanged: never `supabase stop --all`, never `pkill`/`k
 
 When you stand up the stack just so you can run a test or a dev server, you can leave it running — the user can `supabase stop` (worktree-local) when they're done. Tell them in your handoff what's running and how to stop it.
 
+### Reproducing CI Failures Locally (Always Try)
+
+When CI surfaces a test failure, **always attempt to reproduce it locally before iterating fixes blind in CI**. Local repro is faster (seconds, not minutes), gives you full network/console/devtools access, and lets you pause with `--headed` to inspect DOM. Pushing speculative fixes and waiting on CI is the slow, expensive path.
+
+- Start with `pnpm exec playwright test <path/to/spec.ts:LINE> --project=chromium` (add `--headed` to watch). Match the project name CI used.
+- E2E tests sometimes share state via `beforeAll` across the same file's describe blocks. If a single-test run fails with "undefined" or missing fixtures, run the whole file (`pnpm exec playwright test <path/to/spec.ts>`) so prerequisite tests build the state.
+- For unit/integration: `pnpm test:unit -- <pattern>` or `pnpm test:integration -- <pattern>`.
+
+**If you're blocked starting the local stack** — orphan Docker containers squatting on ports, stale Supabase volumes, an unfamiliar hang, anything that the self-service section above doesn't cover — **ask the user for help instead of giving up on local repro**. They'd rather take 30 seconds to clear a port collision than wait for another CI cycle. Don't silently fall back to "let CI tell us."
+
 ### Branch Management
 
 **Creating branches** - Ensure proper remote tracking:
