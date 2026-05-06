@@ -323,11 +323,10 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       formData.append("ownerId", guestUser.id);
       formData.append("forcePromoteUserId", guestUser.id);
 
-      try {
-        await createMachineAction(undefined, formData);
-      } catch (e: any) {
-        // redirect throws — that's expected on success
-        expect(e.message).toBe("NEXT_REDIRECT");
+      const result = await createMachineAction(undefined, formData);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.redirectTo).toMatch(/^\/m\//);
       }
 
       // Verify promotion happened
@@ -432,11 +431,8 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       formData.append("initials", uniqueInitials);
       // No ownerId — should store NULL
 
-      try {
-        await createMachineAction(undefined, formData);
-      } catch (e: any) {
-        expect(e.message).toBe("NEXT_REDIRECT");
-      }
+      const result = await createMachineAction(undefined, formData);
+      expect(result.ok).toBe(true);
 
       const machine = await db.query.machines.findFirst({
         where: eq(machines.initials, uniqueInitials),
