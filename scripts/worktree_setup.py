@@ -511,6 +511,95 @@ def get_branch() -> str:
     return result.stdout.strip()
 
 
+def get_current_upstream(branch: str, worktree_path: Path) -> str | None:
+    """Return current upstream ref (e.g. 'origin/main') or None if unset."""
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(worktree_path),
+            "rev-parse",
+            "--abbrev-ref",
+            "--symbolic-full-name",
+            f"{branch}@{{u}}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def configure_branch_tracking(branch: str, worktree_path: Path) -> None:
+    """Set the worktree branch's upstream to origin/<branch> if it exists.
+
+    Preserves custom upstreams; only fixes the stale origin/main default that
+    `git worktree add -b` leaves behind. Prints a reminder if no remote ref
+    yet. Failures are non-fatal.
+    """
+    if branch in ("main", "master", "HEAD"):
+        return
+
+    current = get_current_upstream(branch, worktree_path)
+    if current and current not in ("origin/main", "origin/master", f"origin/{branch}"):
+        return  # respect existing custom upstream
+
+    has_remote = (
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(worktree_path),
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                f"refs/remotes/origin/{branch}",
+            ],
+            capture_output=True,
+        ).returncode
+        == 0
+    )
+
+    if not has_remote:
+        # Clear the stale origin/main upstream so `git pull` doesn't pull from main.
+        if current in ("origin/main", "origin/master"):
+            subprocess.run(
+                ["git", "-C", str(worktree_path), "branch", "--unset-upstream", branch],
+                capture_output=True,
+            )
+        print(
+            f"worktree_setup: '{branch}' has no remote yet — "
+            f"run `git push -u origin {shlex.quote(branch)}` on first push",
+            file=sys.stderr,
+        )
+        return
+
+    if current == f"origin/{branch}":
+        return
+
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(worktree_path),
+            "branch",
+            f"--set-upstream-to=origin/{branch}",
+            branch,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        print(f"worktree_setup: '{branch}' tracks origin/{branch}", file=sys.stderr)
+    else:
+        print(
+            f"worktree_setup: warning: failed to set upstream for '{branch}' "
+            f"(exit {result.returncode}): {result.stderr.strip()}",
+            file=sys.stderr,
+        )
+
+
 def main() -> None:
     worktree_path = Path.cwd().resolve()
 
@@ -523,6 +612,7 @@ def main() -> None:
         return
 
     branch = get_branch()
+    configure_branch_tracking(branch, worktree_path)
     project_id = branch_to_project_id(branch)
     worktree_key = str(worktree_path)
 

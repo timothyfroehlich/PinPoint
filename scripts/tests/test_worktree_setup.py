@@ -25,6 +25,18 @@ from worktree_setup import (
     save_manifest,
 )
 
+# Testing philosophy for worktree setup
+# ────────────────────────────────────────────────────────────────────────────
+# Worktree setup is infrastructure code: it runs once per worktree, fails
+# benignly (config not generated → fixable manually), and any error surfaces
+# immediately on the next branch switch. We primarily test by running it.
+#
+# Keep unit tests minimal. Focus on logic that's hard to verify by usage —
+# parsing env files, port allocation, ID derivation, JSON manifest correctness.
+# Don't add unit tests for git/subprocess interactions; those tests test mocks
+# more than real behavior, and the integration path (run the post-checkout
+# hook in a real worktree) is faster and more accurate.
+
 
 class TestParseEnvFile:
     """Test env file parsing."""
