@@ -193,11 +193,15 @@ conflicts across worktrees and force-push requirements on open PRs.
   - `pinpoint-prod` (Live, Pro plan) - **Real user data. STRICT SAFETY.** Daily backups with 7-day retention.
   - Preview branches are auto-created per PR via Supabase GitHub integration.
 - **Preview Deployments (Supabase Branching)**:
-  - Every PR gets an isolated Supabase branch database (auto-created, auto-deleted on PR close).
-  - The `Supabase Branch Setup` GHA workflow runs Drizzle migrations + seeding on each branch.
-  - Vercel preview deployments connect to branch DBs via the Supabase Vercel integration.
+  - **Default**: PRs do NOT get a usable Supabase branch DB (saves ~$0.32/day per branch).
+  - **To enable**: Add the `preview` label to the PR. Within ~5 min, the `Supabase Branch Setup`
+    GHA workflow runs Drizzle migrations + seed; the Vercel preview becomes functional.
+  - **Cleanup**: The `Supabase Branch Cleanup` cron (every 6h, also manually triggerable) deletes
+    branch DBs for PRs that no longer have `preview` or whose PR is closed.
+  - The Supabase Vercel Marketplace integration still auto-creates the branch DB on PR open, but
+    no migrations/seed run unless `preview` is labeled — making it non-functional by default.
   - Env var fallbacks in `server.ts`/`middleware.ts` handle both PinPoint and integration naming conventions.
-  - Cost: ~$0.32/day per open PR (Micro instance at $0.01344/hr).
+  - Cost model: ~$4.50/day (14 open PRs, all branches) → ~$1/day (3 labeled PRs) typical.
 - **Database Safety**:
   - Local: `db:reset` allowed.
   - Prod: **NEVER** `db:reset`. ONLY `db:migrate`.

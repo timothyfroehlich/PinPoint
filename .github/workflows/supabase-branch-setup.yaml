@@ -14,7 +14,7 @@ name: Supabase Branch Setup
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, labeled, unlabeled]
     branches: [main]
 
 permissions: read-all  # zizmor: ignore[excessive-permissions]
@@ -27,6 +27,7 @@ concurrency:
 jobs:
   wait-for-branch:
     name: Wait for Supabase Preview
+    if: contains(github.event.pull_request.labels.*.name, 'preview')
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.check.outputs.conclusion }}
