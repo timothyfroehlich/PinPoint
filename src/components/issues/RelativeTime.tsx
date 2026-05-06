@@ -22,7 +22,12 @@ export function RelativeTime({
 
   useEffect(() => {
     const date = typeof value === "string" ? new Date(value) : value;
-    if (Number.isNaN(date.getTime())) return;
+    if (Number.isNaN(date.getTime())) {
+      // Reset label so a previous, now-stale value doesn't keep rendering when
+      // the prop changes to an invalid date — the resolved fallback should win.
+      setLabel(null);
+      return;
+    }
 
     const update = (): void => {
       try {
