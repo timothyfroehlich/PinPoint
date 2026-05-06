@@ -4,9 +4,15 @@
 Streams timestamped events to stdout as GitHub Actions runs complete
 and polls for new Copilot reviews. One Monitor call handles both.
 
-Usage: ./scripts/workflow/pr-watch.py <PR_NUMBER>
-Exit 0: all checks passed, or stopped for new Copilot review
-Exit 1: one or more checks failed, or no matching runs found
+Usage: ./scripts/workflow/pr-watch.py [--audit | --force] <PR_NUMBER>
+  (no flag) Run the readiness audit, then watch CI + reviews.
+  --audit   Run only the readiness audit and exit (no watch loop).
+  --force   Skip the audit and watch unconditionally.
+
+Exit 0: all checks passed, or stopped for new Copilot review,
+        or (with --audit) the PR is ready for human review.
+Exit 1: one or more checks failed, no matching runs found,
+        or (with --audit) the PR is not ready.
 """
 
 from __future__ import annotations
@@ -18,6 +24,15 @@ import sys
 import threading
 import time
 from datetime import datetime, timezone
+
+REPO_OWNER = "timothyfroehlich"
+REPO_NAME = "PinPoint"
+COPILOT_LOGINS = (
+    "copilot-pull-request-reviewer",
+    "copilot-pull-request-reviewer[bot]",
+)
+READY_LABEL = "ready-for-review"
+CI_GATE_NAME = "CI Gate"
 
 REVIEW_POLL_INTERVAL = 60  # seconds — GitHub rate limit friendly
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
@@ -43,6 +58,135 @@ def gh(*args: str) -> str:
         raise RuntimeError(result.stderr.strip() or f"gh {args[0]} failed")
     return result.stdout.strip()
 
+
+# ---------------------------------------------------------------------------
+# Readiness audit
+# ---------------------------------------------------------------------------
+
+
+def get_review_threads(pr: int) -> list[dict]:
+    """Fetch every review thread for a PR, paginating via GraphQL cursor.
+
+    The `after:` argument is omitted on the first page because GraphQL rejects
+    empty strings for that input. Subsequent pages inline the cursor literally.
+    """
+    threads: list[dict] = []
+    cursor: str | None = None
+    while True:
+        after_arg = f', after: "{cursor}"' if cursor else ""
+        query = f"""
+        query {{
+          repository(owner: "{REPO_OWNER}", name: "{REPO_NAME}") {{
+            pullRequest(number: {pr}) {{
+              reviewThreads(first: 100{after_arg}) {{
+                pageInfo {{ hasNextPage endCursor }}
+                nodes {{
+                  isResolved
+                  comments(first: 1) {{ nodes {{ author {{ login }} }} }}
+                }}
+              }}
+            }}
+          }}
+        }}"""
+        data = json.loads(gh("api", "graphql", "-f", f"query={query}"))
+        rt = data["data"]["repository"]["pullRequest"]["reviewThreads"]
+        threads.extend(rt["nodes"])
+        if not rt["pageInfo"]["hasNextPage"]:
+            return threads
+        cursor = rt["pageInfo"]["endCursor"]
+
+
+def _unresolved_copilot(threads: list[dict]) -> int:
+    count = 0
+    for t in threads:
+        if t["isResolved"]:
+            continue
+        nodes = t["comments"]["nodes"]
+        if nodes and nodes[0]["author"]["login"] in COPILOT_LOGINS:
+            count += 1
+    return count
+
+
+def _ci_gate_state(pr: int) -> tuple[str, str]:
+    """Return (status, conclusion) for the CI Gate check, or ("", "") if absent."""
+    raw = gh("pr", "view", str(pr), "--json", "statusCheckRollup")
+    rollup = json.loads(raw).get("statusCheckRollup", [])
+    for check in rollup:
+        if check.get("name") == CI_GATE_NAME:
+            return check.get("status", ""), check.get("conclusion", "")
+    return "", ""
+
+
+def _fetch_merge_state(pr: int) -> tuple[str, set[str]]:
+    """Fetch (mergeStateStatus, labels). Retries once if state is UNKNOWN.
+
+    GitHub computes merge state lazily — the first probe often returns UNKNOWN
+    and the same query a moment later returns the real value.
+    """
+    for attempt in range(2):
+        data = json.loads(
+            gh("pr", "view", str(pr), "--json", "mergeStateStatus,labels")
+        )
+        merge_state = data["mergeStateStatus"]
+        labels = {lbl["name"] for lbl in data["labels"]}
+        if merge_state != "UNKNOWN" or attempt == 1:
+            return merge_state, labels
+        time.sleep(2)
+    return "UNKNOWN", set()
+
+
+def run_audit(pr: int) -> bool:
+    """Print a pass/fail report for review-readiness. Return True if all pass."""
+    merge_state, labels = _fetch_merge_state(pr)
+    ci_status, ci_conclusion = _ci_gate_state(pr)
+    unresolved = _unresolved_copilot(get_review_threads(pr))
+
+    bad_merge = merge_state in ("DIRTY", "CONFLICTING", "BEHIND")
+    merge_detail = f"mergeStateStatus={merge_state}"
+    if bad_merge:
+        merge_detail += " (resolve via `git fetch origin && git merge origin/main`)"
+
+    if not ci_status:
+        ci_check = (False, "CI Gate check not found")
+    elif ci_status != "COMPLETED":
+        ci_check = (False, f"in progress (status={ci_status})")
+    else:
+        ci_check = (
+            ci_conclusion in ("SUCCESS", "NEUTRAL", "SKIPPED"),
+            f"conclusion={ci_conclusion or 'unknown'}",
+        )
+
+    # ready-for-review is informational — orchestrator applies it after the
+    # audit passes, so its absence isn't a failure.
+    label_detail = (
+        "applied" if READY_LABEL in labels else "not applied (orchestrator applies)"
+    )
+
+    checks = [
+        (not bad_merge, "mergeable", merge_detail),
+        (ci_check[0], "ci-gate", ci_check[1]),
+        (
+            unresolved == 0,
+            "copilot-resolved",
+            "all resolved"
+            if unresolved == 0
+            else f"{unresolved} unresolved (run ./scripts/workflow/copilot-comments.sh {pr})",
+        ),
+        (True, "ready-label", label_detail),
+    ]
+
+    all_ok = all(ok for ok, _, _ in checks)
+    emit(f"Readiness audit for PR #{pr}: {'PASS' if all_ok else 'FAIL'}")
+    for ok, label, detail in checks:
+        emit(f"  {'✓' if ok else '✗'} {label}: {detail}")
+    if not all_ok:
+        emit("Use --force to watch anyway, or fix the items above.")
+    return all_ok
+
+
+# ---------------------------------------------------------------------------
+# CI run watcher
+# ---------------------------------------------------------------------------
 
 _PASSING_CONCLUSIONS = {"success", "skipped", "neutral"}
 
@@ -180,12 +324,39 @@ def write_failure_artifact(run_id: int) -> str:
     return path
 
 
-def main() -> int:
-    if len(sys.argv) != 2 or not sys.argv[1].isdigit():
-        print(f"Usage: {sys.argv[0]} <PR_NUMBER>", file=sys.stderr)
-        return 1
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
-    pr = int(sys.argv[1])
+
+def _parse_args(argv: list[str]) -> tuple[int, bool, bool] | None:
+    """Return (pr, audit_only, force) or None on usage error."""
+    audit_only = "--audit" in argv
+    force = "--force" in argv
+    rest = [a for a in argv[1:] if a not in ("--audit", "--force")]
+    if audit_only and force:
+        print("Error: --audit and --force are mutually exclusive.", file=sys.stderr)
+        return None
+    if len(rest) != 1 or not rest[0].isdigit():
+        print(
+            f"Usage: {argv[0]} [--audit | --force] <PR_NUMBER>",
+            file=sys.stderr,
+        )
+        return None
+    return int(rest[0]), audit_only, force
+
+
+def main() -> int:
+    parsed = _parse_args(sys.argv)
+    if parsed is None:
+        return 1
+    pr, audit_only, force = parsed
+
+    if audit_only:
+        return 0 if run_audit(pr) else 1
+
+    if not force and not run_audit(pr):
+        return 1
 
     try:
         pr_data = json.loads(
