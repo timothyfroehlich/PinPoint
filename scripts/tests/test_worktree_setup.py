@@ -25,6 +25,18 @@ from worktree_setup import (
     save_manifest,
 )
 
+# Testing philosophy for worktree setup
+# ────────────────────────────────────────────────────────────────────────────
+# Worktree setup is infrastructure code: it runs once per worktree, fails
+# benignly (config not generated → fixable manually), and any error surfaces
+# immediately on the next branch switch. We primarily test by running it.
+#
+# Keep unit tests minimal. Focus on logic that's hard to verify by usage —
+# parsing env files, port allocation, ID derivation, JSON manifest correctness.
+# Don't add unit tests for git/subprocess interactions; those tests test mocks
+# more than real behavior, and the integration path (run the post-checkout
+# hook in a real worktree) is faster and more accurate.
+
 
 class TestParseEnvFile:
     """Test env file parsing."""
@@ -186,6 +198,18 @@ class TestMergeEnvLocal:
         assert "MAILPIT_PORT=58324" in result
         assert "INBUCKET_SMTP_PORT=58325" in result
         assert "MAILPIT_SMTP_PORT=58325" in result
+
+    def test_turnstile_keys_are_commented_out(
+        self, tmp_path: Path, port_config: PortConfig
+    ) -> None:
+        result = merge_env_local(tmp_path, port_config)
+
+        # Keys must appear as commented-out lines so the widget doesn't render in local dev.
+        assert "# NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA" in result
+        assert "# TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA" in result
+        # Must NOT appear as active (uncommented) env vars.
+        assert "\nNEXT_PUBLIC_TURNSTILE_SITE_KEY=" not in result
+        assert "\nTURNSTILE_SECRET_KEY=" not in result
 
 
 class TestManagedKeys:

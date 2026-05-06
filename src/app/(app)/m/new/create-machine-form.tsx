@@ -25,6 +25,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 
 interface CreateMachineFormProps {
@@ -36,6 +46,7 @@ export function CreateMachineForm({
   allUsers,
   canSelectOwner,
 }: CreateMachineFormProps): React.JSX.Element {
+  const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, isPending] = useActionState<
     CreateMachineResult | undefined,
     FormData
@@ -48,12 +59,17 @@ export function CreateMachineForm({
   const [nameValue, setNameValue] = useState("");
   const [initialsValue, setInitialsValue] = useState("");
   const [ownerIdValue, setOwnerIdValue] = useState("");
+  // Bumped on reset to remount OwnerSelect (which holds its own internal state).
+  const [ownerSelectKey, setOwnerSelectKey] = useState(0);
 
   // Promote dialog state — populated when server returns ASSIGNEE_NOT_MEMBER
   const [promoteAssignee, setPromoteAssignee] = useState<
     AssigneeNotMemberMeta["assignee"] | null
   >(null);
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
+
+  // Clear-button confirmation
+  const [isClearOpen, setIsClearOpen] = useState(false);
 
   // Snapshot of the form's field values captured at first submission time,
   // so the promote-confirm re-submission has the correct data even if the
@@ -67,6 +83,14 @@ export function CreateMachineForm({
   // Track the last state we've already handled to avoid re-opening on cancel
   const handledStateRef = useRef<typeof state>(undefined);
 
+  const resetForm = (): void => {
+    formRef.current?.reset();
+    setNameValue("");
+    setInitialsValue("");
+    setOwnerIdValue("");
+    setOwnerSelectKey((k) => k + 1);
+  };
+
   // Open the promote dialog when server returns ASSIGNEE_NOT_MEMBER (once per state)
   useEffect(() => {
     if (
@@ -79,6 +103,17 @@ export function CreateMachineForm({
       handledStateRef.current = state;
       setPromoteAssignee(state.meta.assignee);
       setIsPromoteOpen(true);
+    }
+  }, [state]);
+
+  // Reset before client-side redirect (canonical CREATE-form pattern).
+  // The server action returns { ok: true, redirectTo } so we can clear local
+  // state before navigating; if navigation fails the user sees an empty form
+  // rather than stale values.
+  useEffect(() => {
+    if (state?.ok) {
+      resetForm();
+      window.location.assign(state.value.redirectTo);
     }
   }, [state]);
 
@@ -105,6 +140,9 @@ export function CreateMachineForm({
     setIsPromoteOpen(false);
     setPromoteAssignee(null);
   };
+
+  const hasAnyValue =
+    nameValue.length > 0 || initialsValue.length > 0 || ownerIdValue.length > 0;
 
   return (
     <>
@@ -169,8 +207,33 @@ export function CreateMachineForm({
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={isClearOpen} onOpenChange={setIsClearOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all fields?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove everything you&apos;ve entered. You can&apos;t
+              undo this.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                resetForm();
+                setIsClearOpen(false);
+              }}
+            >
+              Clear fields
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <form
         action={formAction}
+        ref={formRef}
         onSubmit={(e) => {
           // Snapshot field values at first submission time for use in confirmPromote
           const fd = new FormData(e.currentTarget);
@@ -233,6 +296,7 @@ export function CreateMachineForm({
         {/* Owner Select (Admin/Technician Only) */}
         {canSelectOwner && (
           <OwnerSelect
+            key={ownerSelectKey}
             users={users}
             onUsersChange={setUsers}
             onValueChange={setOwnerIdValue}
@@ -240,15 +304,24 @@ export function CreateMachineForm({
         )}
 
         {/* Actions */}
-        <div className="flex gap-3 pt-4">
+        <div className="flex flex-wrap gap-3 pt-4">
           <Button
             type="submit"
-            className="flex-1 bg-primary text-on-primary hover:bg-primary/90"
+            className="flex-1 min-w-[160px] bg-primary text-on-primary hover:bg-primary/90"
             loading={isPending}
           >
             Create Machine
           </Button>
-          <Link href="/m" className="flex-1">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!hasAnyValue || isPending}
+            onClick={() => setIsClearOpen(true)}
+            className="border-outline text-foreground hover:bg-surface-variant"
+          >
+            Clear
+          </Button>
+          <Link href="/m" className="flex-1 min-w-[120px]">
             <Button
               type="button"
               variant="outline"
