@@ -98,17 +98,27 @@ test.describe("OAuth + Connected Accounts", () => {
     test("Disconnect Discord appears after DB link; unlink reverts UI", async ({
       page,
     }, testInfo) => {
+      // Log in BEFORE inserting the Discord identity.
+      //
+      // GoTrue's signInWithPassword validates ALL identities for the user
+      // during authentication — inserting a synthetic identity row first and
+      // then trying to sign in causes a "Database error querying schema" 500
+      // from GoTrue (it rejects identity rows that don't fully match its
+      // internal schema expectations). Logging in first gives us a valid
+      // session; we then insert the identity and reload /settings, which reads
+      // identities via the lighter-weight getUserIdentities() call that only
+      // lists rows without the sign-in validation path.
+      await loginAs(page, testInfo, {
+        email: memberEmail,
+        password: "TestPassword123",
+      });
+
       // Simulate what a successful OAuth exchange would write to the DB.
       // Use the worker-specific prefix so parallel workers never produce the
       // same provider_id (user_profiles.discord_user_id is UNIQUE).
       const fakeDiscordId = `e2e-discord-${getTestPrefix()}`;
-      await linkUserDiscordIdentity(memberId, fakeDiscordId);
-
       try {
-        await loginAs(page, testInfo, {
-          email: memberEmail,
-          password: "TestPassword123",
-        });
+        await linkUserDiscordIdentity(memberId, fakeDiscordId);
         await page.goto("/settings");
 
         // The Connected Accounts section should now show Disconnect, not Connect.
