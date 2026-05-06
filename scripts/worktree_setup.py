@@ -321,9 +321,10 @@ def format_env_file(
         f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={managed_values['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY']}",
         f"SUPABASE_SERVICE_ROLE_KEY={managed_values['SUPABASE_SERVICE_ROLE_KEY']}",
         "",
-        "# Cloudflare Turnstile test keys (always pass for local dev)",
-        f"NEXT_PUBLIC_TURNSTILE_SITE_KEY={managed_values['NEXT_PUBLIC_TURNSTILE_SITE_KEY']}",
-        f"TURNSTILE_SECRET_KEY={managed_values['TURNSTILE_SECRET_KEY']}",
+        "# Turnstile keys are commented out for local dev so the widget doesn't render.",
+        "# To test CAPTCHA UI locally, uncomment these. Production sets them via Vercel env.",
+        f"# NEXT_PUBLIC_TURNSTILE_SITE_KEY={managed_values['NEXT_PUBLIC_TURNSTILE_SITE_KEY']}",
+        f"# TURNSTILE_SECRET_KEY={managed_values['TURNSTILE_SECRET_KEY']}",
     ]
 
     # Preserve custom user keys

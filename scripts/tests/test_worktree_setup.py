@@ -199,6 +199,18 @@ class TestMergeEnvLocal:
         assert "INBUCKET_SMTP_PORT=58325" in result
         assert "MAILPIT_SMTP_PORT=58325" in result
 
+    def test_turnstile_keys_are_commented_out(
+        self, tmp_path: Path, port_config: PortConfig
+    ) -> None:
+        result = merge_env_local(tmp_path, port_config)
+
+        # Keys must appear as commented-out lines so the widget doesn't render in local dev.
+        assert "# NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA" in result
+        assert "# TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA" in result
+        # Must NOT appear as active (uncommented) env vars.
+        assert "\nNEXT_PUBLIC_TURNSTILE_SITE_KEY=" not in result
+        assert "\nTURNSTILE_SECRET_KEY=" not in result
+
 
 class TestManagedKeys:
     """Test the managed key set."""
