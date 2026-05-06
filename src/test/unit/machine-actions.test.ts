@@ -150,10 +150,12 @@ describe("createMachineAction", () => {
     formData.append("initials", "MM");
     // No ownerId provided
 
-    try {
-      await createMachineAction(initialState, formData);
-    } catch (e: any) {
-      expect(e.message).toBe("NEXT_REDIRECT");
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.redirectTo).toBe("/m/MM");
+      expect(result.value.machineId).toBe("machine-123");
     }
 
     expect(db.insert).toHaveBeenCalled();
@@ -182,10 +184,12 @@ describe("createMachineAction", () => {
     // Explicitly empty ownerId
     formData.append("ownerId", "");
 
-    try {
-      await createMachineAction(initialState, formData);
-    } catch (e: any) {
-      expect(e.message).toBe("NEXT_REDIRECT");
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.redirectTo).toBe("/m/MM");
+      expect(result.value.machineId).toBe("machine-123");
     }
 
     expect(chain.values).toHaveBeenCalledWith(
@@ -245,10 +249,12 @@ describe("createMachineAction", () => {
     formData.append("name", "Medieval Madness");
     formData.append("initials", "MM");
 
-    try {
-      await createMachineAction(initialState, formData);
-    } catch (e: any) {
-      expect(e.message).toBe("NEXT_REDIRECT");
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.redirectTo).toBe("/m/MM");
+      expect(result.value.machineId).toBe("machine-123");
     }
 
     expect(db.insert).toHaveBeenCalled();
@@ -346,10 +352,12 @@ describe("createMachineAction", () => {
     formData.append("ownerId", guestUserId);
     formData.append("forcePromoteUserId", guestUserId);
 
-    try {
-      await createMachineAction(initialState, formData);
-    } catch (e: any) {
-      expect(e.message).toBe("NEXT_REDIRECT");
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.redirectTo).toBe("/m/MM");
+      expect(result.value.machineId).toBe("machine-123");
     }
 
     // Transaction should have been called
@@ -383,10 +391,12 @@ describe("createMachineAction", () => {
     formData.append("ownerId", guestUserId);
     formData.append("forcePromoteUserId", guestUserId);
 
-    try {
-      await createMachineAction(initialState, formData);
-    } catch (e: any) {
-      expect(e.message).toBe("NEXT_REDIRECT");
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.redirectTo).toBe("/m/MM");
+      expect(result.value.machineId).toBe("machine-123");
     }
 
     expect(db.transaction).toHaveBeenCalled();
