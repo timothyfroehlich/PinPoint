@@ -1,0 +1,40 @@
+# Supabase Branch Cleanup
+#
+# Deletes Supabase preview branch DBs for PRs that no longer have the
+# 'preview' label (or whose PR is closed). Runs every 6 hours and can be
+# triggered manually.
+#
+# Required GitHub Secrets (same as supabase-branch-setup.yaml):
+#   SUPABASE_ACCESS_TOKEN - from supabase.com/dashboard/account/tokens (90-day expiry)
+#   SUPABASE_PROJECT_ID   - production project ref (udhesuizjsgxfeotqybn)
+
+name: Supabase Branch Cleanup
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # every 6 hours
+  workflow_dispatch:        # manual trigger
+
+permissions:
+  pull-requests: read
+
+jobs:
+  prune:
+    name: Prune Unlabeled Branches
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}  # zizmor: ignore[secrets-outside-env]
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}  # zizmor: ignore[secrets-outside-env]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # ratchet:actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: supabase/setup-cli@b60b5899c73b63a2d2d651b1e90db8d4c9392f51  # ratchet:supabase/setup-cli@v1.6.0
+        with:
+          version: latest
+
+      - name: Prune unlabeled branches
+        run: bash scripts/workflow/prune-supabase-branches.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
