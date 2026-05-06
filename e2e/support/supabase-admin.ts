@@ -234,6 +234,13 @@ export async function setUserDiscordId(
  *
  * Also syncs the mirror column in user_profiles so the Test DM button and
  * Discord DM delivery logic see the same state.
+ *
+ * Both writes are wrapped in a transaction so auth.identities and
+ * user_profiles.discord_user_id never diverge if the second write fails.
+ *
+ * identity_data must include an `email` field — GoTrue reads all identities
+ * for the user during sign-in and throws "Database error querying schema" if
+ * any identity row is missing that field, which would break unrelated logins.
  */
 export async function linkUserDiscordIdentity(
   userId: string,
@@ -249,36 +256,35 @@ export async function linkUserDiscordIdentity(
 
   const sql = postgres(postgresUrl, { connect_timeout: 3, max: 1 });
   try {
-    await sql`
-      INSERT INTO auth.identities (
-        provider_id,
-        user_id,
-        identity_data,
-        provider,
-        last_sign_in_at,
-        created_at,
-        updated_at
-      )
-      VALUES (
-        ${discordId},
-        ${userId}::uuid,
-        ${JSON.stringify({ sub: discordId, provider_id: discordId })},
-        'discord',
-        now(),
-        now(),
-        now()
-      )
-      ON CONFLICT (provider_id, provider) DO UPDATE
-        SET user_id = EXCLUDED.user_id,
-            identity_data = EXCLUDED.identity_data,
-            updated_at = now()
-    `;
+    await sql.begin(async (tx) => {
+      await tx`
+        INSERT INTO auth.identities (
+          provider_id,
+          user_id,
+          identity_data,
+          provider,
+          last_sign_in_at,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ${discordId},
+          ${userId}::uuid,
+          ${JSON.stringify({ sub: discordId, provider_id: discordId, email: `${discordId}@discord.test` })},
+          'discord',
+          now(),
+          now(),
+          now()
+        )
+        ON CONFLICT (provider_id, provider) DO NOTHING
+      `;
 
-    await sql`
-      UPDATE user_profiles
-      SET discord_user_id = ${discordId}
-      WHERE id = ${userId}::uuid
-    `;
+      await tx`
+        UPDATE user_profiles
+        SET discord_user_id = ${discordId}
+        WHERE id = ${userId}::uuid
+      `;
+    });
   } finally {
     await sql.end();
   }
@@ -291,6 +297,9 @@ export async function linkUserDiscordIdentity(
  * — used for test cleanup after linkUserDiscordIdentity.
  *
  * Also clears the mirror column in user_profiles.
+ *
+ * Both writes are wrapped in a transaction so the two sources of truth stay
+ * in sync even if the profile update fails after the identity delete.
  */
 export async function unlinkUserDiscordIdentity(userId: string): Promise<void> {
   const postgresUrl =
@@ -303,15 +312,17 @@ export async function unlinkUserDiscordIdentity(userId: string): Promise<void> {
 
   const sql = postgres(postgresUrl, { connect_timeout: 3, max: 1 });
   try {
-    await sql`
-      DELETE FROM auth.identities
-      WHERE user_id = ${userId}::uuid AND provider = 'discord'
-    `;
-    await sql`
-      UPDATE user_profiles
-      SET discord_user_id = null
-      WHERE id = ${userId}::uuid
-    `;
+    await sql.begin(async (tx) => {
+      await tx`
+        DELETE FROM auth.identities
+        WHERE user_id = ${userId}::uuid AND provider = 'discord'
+      `;
+      await tx`
+        UPDATE user_profiles
+        SET discord_user_id = null
+        WHERE id = ${userId}::uuid
+      `;
+    });
   } finally {
     await sql.end();
   }

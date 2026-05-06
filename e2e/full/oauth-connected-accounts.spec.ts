@@ -21,13 +21,15 @@
  * The OAuth handshake itself (browser → Discord → callback → DB row) is
  * integration territory and is explicitly out of scope for CI (PP-e20).
  *
- * Requires DISCORD_CLIENT_ID to be set in the test environment so that the
- * providers registry considers Discord available and renders the buttons.
- * CI sets this to a dummy value via .github/actions/setup-supabase/action.yml.
+ * Requires DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET to be set in the test
+ * environment so that providers.discord.isAvailable() returns true and renders
+ * the buttons. CI sets both to dummy values via
+ * .github/actions/setup-supabase/action.yml.
  */
 
 import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions.js";
+import { getTestPrefix } from "../support/test-isolation.js";
 import {
   createTestUser,
   deleteTestUser,
@@ -38,8 +40,8 @@ import {
 
 test.describe("OAuth + Connected Accounts", () => {
   test.skip(
-    !process.env.DISCORD_CLIENT_ID,
-    "Requires DISCORD_CLIENT_ID in test env — Discord buttons won't render without it"
+    !process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET,
+    "Requires DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET — both are needed for providers.discord.isAvailable() to render the Discord buttons"
   );
 
   test.describe("anonymous", () => {
@@ -97,7 +99,9 @@ test.describe("OAuth + Connected Accounts", () => {
       page,
     }, testInfo) => {
       // Simulate what a successful OAuth exchange would write to the DB.
-      const fakeDiscordId = `e2e-discord-${Date.now()}`;
+      // Use the worker-specific prefix so parallel workers never produce the
+      // same provider_id (user_profiles.discord_user_id is UNIQUE).
+      const fakeDiscordId = `e2e-discord-${getTestPrefix()}`;
       await linkUserDiscordIdentity(memberId, fakeDiscordId);
 
       try {
