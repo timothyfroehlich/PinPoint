@@ -7,7 +7,6 @@
 
 "use server";
 
-import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import {
@@ -58,7 +57,7 @@ export interface AssigneeNotMemberMeta {
 }
 
 export type CreateMachineResult = Result<
-  { machineId: string },
+  { machineId: string; redirectTo: string },
   "VALIDATION" | "UNAUTHORIZED" | "SERVER" | "ASSIGNEE_NOT_MEMBER",
   AssigneeNotMemberMeta
 >;
@@ -260,11 +259,11 @@ export async function createMachineAction(
       }
 
       revalidatePath("/m");
-      redirect(`/m/${machine.initials}`);
+      return ok({
+        machineId: machine.id,
+        redirectTo: `/m/${machine.initials}`,
+      });
     } catch (error: unknown) {
-      if (isNextRedirectError(error)) {
-        throw error;
-      }
       if (isPgErrorCode(error, "23505")) {
         return err("VALIDATION", `Initials '${initials}' are already taken.`);
       }
@@ -365,12 +364,11 @@ export async function createMachineAction(
 
     revalidatePath("/m");
 
-    redirect(`/m/${machine.initials}`);
+    return ok({
+      machineId: machine.id,
+      redirectTo: `/m/${machine.initials}`,
+    });
   } catch (error: unknown) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
-
     if (isPgErrorCode(error, "23505")) {
       return err("VALIDATION", `Initials '${initials}' are already taken.`);
     }

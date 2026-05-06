@@ -60,6 +60,8 @@ trigger: always_on
   - Notification Error Handling
 - [Discriminated Union Props](./patterns/ui-patterns/discriminated-union-props.md) ⭐ **NEW**
   - Type-Safe Component Props for Multi-Type Components
+- [CREATE Form Reset Pattern](./patterns/create-form-reset.md) ⭐ **NEW**
+  - Return-redirect server actions, dual-pass reset (formRef + setState), Clear-button confirmation
 
 ## Adding New Patterns
 

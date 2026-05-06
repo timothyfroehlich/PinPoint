@@ -162,7 +162,9 @@ conflicts across worktrees and force-push requirements on open PRs.
 3. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
 4. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs
 5. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
-6. **NEVER** run `e2e:full` locally unless explicitly asked — that's what CI is for
+6. **NEVER** run `e2e:full` directly during iteration — that's what CI is for
+7. **Doing a final pre-review pass and want everything locally?** → `pnpm run e2e:all` (~10-15 min, runs `full` + `smoke` + root specs in **separate** Playwright invocations with a fresh `global-setup` between them so DB seed state cannot cross-contaminate)
+8. **NEVER** invoke `pnpm exec playwright test` with no arguments (no spec path, no `--config=`) — the bare command picks up every spec under `e2e/` in a single Playwright process and cross-contaminates seeded state. Targeted invocations like `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (item 2) are fine. Use `pnpm run e2e:all` if you actually want everything.
 
 **Key rules for agents:**
 
@@ -311,6 +313,21 @@ Some work is well-suited for Claude in Web — the cloud session that runs in a 
 - Actionable information only - focus on "what" and "how", not "why"
 - Designed for efficient LLM consumption
 - Skills provide deep dives on-demand
+
+### Keeping specs aligned
+
+When you change UI behavior covered by a living canonical spec — specifically
+`.agent/skills/pinpoint-design-bible/SKILL.md` (page/modal archetypes live inside as §5 and §17) — **edit those documents in place**.
+Do not append a "divergence note", "TODO: spec out of date", or end-of-file disclaimer
+describing how the implementation now differs.
+
+Historical dated artifacts (e.g., `docs/superpowers/specs/<date>-*.md`) are NOT subject to
+this rule — they are design records that should be left as-is.
+
+If you find an existing divergence note in a canonical spec while making changes, fold its
+content back into the canonical text and delete the note. Canonical spec docs are the single
+source of truth; if implementation has drifted, the fix is to update the spec, not annotate
+the drift.
 
 ## Landing the Plane (Session Completion)
 

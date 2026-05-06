@@ -32,6 +32,7 @@ export function LoginForm({
     FormData
   >(loginAction, undefined);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const hasTurnstile = Boolean(process.env["NEXT_PUBLIC_TURNSTILE_SITE_KEY"]);
   const enforceCaptcha = hasTurnstile && process.env.NODE_ENV !== "test";
 
@@ -91,7 +92,12 @@ export function LoginForm({
 
         {/* Remember Me */}
         <div className="flex items-center space-x-2">
-          <Checkbox id="rememberMe" name="rememberMe" defaultChecked />
+          <Checkbox
+            id="rememberMe"
+            name="rememberMe"
+            checked={rememberMe}
+            onCheckedChange={(checked) => setRememberMe(checked === true)}
+          />
           <Label
             htmlFor="rememberMe"
             className="text-sm font-normal cursor-pointer"

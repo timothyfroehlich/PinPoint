@@ -39,6 +39,16 @@ import { getLoginUrl } from "~/lib/login-url";
 import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 
 interface Machine {
   id: string;
@@ -80,6 +90,12 @@ export function UnifiedReportForm({
 }: UnifiedReportFormProps): React.JSX.Element {
   const searchParams = useSearchParams();
   const hasRestored = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [isClearOpen, setIsClearOpen] = useState(false);
+  const [editorResetKey, setEditorResetKey] = useState(0);
+  // Bumped to remount the Turnstile widget on reset — its internal "solved"
+  // state is otherwise out of sync with the cleared hidden token.
+  const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0);
   const [selectedMachineId, setSelectedMachineId] = useState(
     defaultMachineId ?? ""
   );
@@ -123,15 +139,57 @@ export function UnifiedReportForm({
     [machinesList, selectedMachineId]
   );
 
-  // Clear localStorage on successful submission, then redirect client-side
+  // Reset form state before navigating away on success (defense in depth).
+  // Even though we navigate, clearing first ensures: (1) if navigation fails
+  // the user sees an empty form, not stale values; (2) localStorage persistence
+  // effect (which short-circuits on state.success) sees clean values; (3) any
+  // back-button return to a still-mounted component shows a clean form.
   useEffect(() => {
-    if (state.success) {
-      window.localStorage.removeItem("report_form_state");
-      if (state.redirectTo) {
-        window.location.assign(state.redirectTo);
+    if (!state.success) return;
+
+    window.localStorage.removeItem("report_form_state");
+
+    // Native form reset — clears uncontrolled inputs (firstName/lastName/email/website)
+    formRef.current?.reset();
+
+    // Controlled state — preserve machine when URL param drove the page,
+    // since the user came here specifically to report on that machine.
+    setSelectedMachineId(defaultMachineId ?? "");
+    // If the machine was user-picked (URL didn't seed it), strip the
+    // ?machine= the dropdown's onChange wrote into the URL. Mirrors the
+    // Clear-button path so a back-nav or failed redirect leaves a clean URL.
+    if (!defaultMachineId && typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("machine")) {
+        params.delete("machine");
+        const query = params.toString();
+        window.history.replaceState(
+          null,
+          "",
+          query ? `?${query}` : window.location.pathname
+        );
       }
     }
-  }, [state.success, state.redirectTo]);
+    setTitle("");
+    setDescription(null);
+    setSeverity("minor");
+    setPriority("medium");
+    setFrequency("constant");
+    setStatus("new");
+    setAssignedTo("");
+    setWatchIssue(true);
+    setUploadedImages([]);
+    setTurnstileToken("");
+    // RichTextEditor and TurnstileWidget are uncontrolled internally —
+    // bumping their keys remounts them so visible state matches the cleared
+    // controlled state.
+    setEditorResetKey((k) => k + 1);
+    setTurnstileWidgetKey((k) => k + 1);
+
+    if (state.redirectTo) {
+      window.location.assign(state.redirectTo);
+    }
+  }, [state.success, state.redirectTo, defaultMachineId]);
 
   // Persistence: Restore from localStorage on mount
   useEffect(() => {
@@ -164,11 +222,16 @@ export function UnifiedReportForm({
       }
 
       if (parsed.machineId && !defaultMachineId) {
-        setSelectedMachineId(parsed.machineId);
-
-        // Sync URL with the restored machine when no machine param is present.
+        // PP-lql: Only restore the machineId if it still exists in the current
+        // machinesList. A stale UUID (deleted machine, different tenant,
+        // abandoned draft) would otherwise sit in selectedMachineId while the
+        // native <select> silently displays — and submits — the first option's
+        // value instead.
         const machine = machinesList.find((m) => m.id === parsed.machineId);
         if (machine) {
+          setSelectedMachineId(parsed.machineId);
+
+          // Sync URL with the restored machine when no machine param is present.
           const params = new URLSearchParams(searchParams.toString());
           params.set("machine", machine.initials);
           window.history.replaceState(null, "", `?${params.toString()}`);
@@ -222,6 +285,20 @@ export function UnifiedReportForm({
       setSelectedMachineId(defaultMachineId);
     }
   }, [defaultMachineId]);
+
+  // PP-lql defense in depth: if selectedMachineId references a machine that
+  // is not in the current list (deleted, tenant switched, etc.), reset to "".
+  // The native <select value="<stale-uuid>"> silently shows — and submits —
+  // the first option's value otherwise, leading to issues being filed against
+  // the wrong machine without any user-visible error.
+  useEffect(() => {
+    if (
+      selectedMachineId &&
+      !machinesList.some((m) => m.id === selectedMachineId)
+    ) {
+      setSelectedMachineId("");
+    }
+  }, [selectedMachineId, machinesList]);
 
   // Fetch recent issues when selected machine changes
   useEffect(() => {
@@ -284,7 +361,11 @@ export function UnifiedReportForm({
             </Alert>
           )}
 
-          <form action={formAction} className="space-y-3 md:space-y-4">
+          <form
+            action={formAction}
+            ref={formRef}
+            className="space-y-3 md:space-y-4"
+          >
             {/* Honeypot field for bot detection */}
             <input
               type="text"
@@ -375,6 +456,7 @@ export function UnifiedReportForm({
             <div className="space-y-1.5">
               <Label className="text-foreground">Description</Label>
               <RichTextEditor
+                key={editorResetKey}
                 content={description}
                 onChange={setDescription}
                 mentionsEnabled={userAuthenticated}
@@ -596,21 +678,92 @@ export function UnifiedReportForm({
                   value={turnstileToken}
                 />
                 <TurnstileWidget
+                  key={turnstileWidgetKey}
                   onVerify={handleTurnstileVerify}
                   onExpire={() => setTurnstileToken("")}
                 />
               </>
             )}
 
-            <Button
-              type="submit"
-              className="w-full bg-primary text-on-primary hover:bg-primary/90 mt-1 h-10 text-sm font-semibold"
-              loading={isPending}
-              disabled={isPending || (enforceCaptcha && !turnstileToken)}
-            >
-              Submit Issue Report
-            </Button>
+            <div className="flex flex-col-reverse gap-2 mt-1 sm:flex-row sm:items-center">
+              <Button
+                type="button"
+                variant="outline"
+                className="sm:w-auto h-10 text-sm font-semibold"
+                disabled={isPending}
+                onClick={() => setIsClearOpen(true)}
+              >
+                Clear
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-primary text-on-primary hover:bg-primary/90 h-10 text-sm font-semibold"
+                loading={isPending}
+                disabled={isPending || (enforceCaptcha && !turnstileToken)}
+              >
+                Submit Issue Report
+              </Button>
+            </div>
           </form>
+
+          <AlertDialog open={isClearOpen} onOpenChange={setIsClearOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear all fields?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This removes everything you&apos;ve entered. You can&apos;t
+                  undo this.
+                  {defaultMachineId &&
+                    " The machine selection will be kept since it came from the URL."}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  onClick={() => {
+                    window.localStorage.removeItem("report_form_state");
+                    formRef.current?.reset();
+                    setSelectedMachineId(defaultMachineId ?? "");
+                    // If the machine was user-picked (URL didn't seed it), the
+                    // dropdown's onChange wrote ?machine=… into the URL via
+                    // history.replaceState. Strip it so a reload doesn't re-select.
+                    // Read window.location.search (not the searchParams hook),
+                    // since replaceState mutations don't update useSearchParams.
+                    if (!defaultMachineId) {
+                      const params = new URLSearchParams(
+                        window.location.search
+                      );
+                      if (params.has("machine")) {
+                        params.delete("machine");
+                        const query = params.toString();
+                        window.history.replaceState(
+                          null,
+                          "",
+                          query ? `?${query}` : window.location.pathname
+                        );
+                      }
+                    }
+                    setTitle("");
+                    setDescription(null);
+                    setSeverity("minor");
+                    setPriority("medium");
+                    setFrequency("constant");
+                    setStatus("new");
+                    setAssignedTo("");
+                    setWatchIssue(true);
+                    setUploadedImages([]);
+                    setTurnstileToken("");
+                    setEditorResetKey((k) => k + 1);
+                    setTurnstileWidgetKey((k) => k + 1);
+                    setIsClearOpen(false);
+                  }}
+                >
+                  Clear fields
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         {/* Right Sidebar: Recent Issues (Desktop) */}

@@ -94,7 +94,7 @@
     "@tiptap/react": "^3.22.3",
     "@tiptap/starter-kit": "^3.22.3",
     "@tiptap/suggestion": "^3.22.3",
-    "@types/nodemailer": "^7.0.11",
+    "@types/nodemailer": "^8.0.0",
     "@types/zxcvbn": "^4.4.5",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.4",
