@@ -201,7 +201,17 @@ export class MailpitClient {
   }
 
   /**
-   * Extract password reset link from the latest email for a mailbox
+   * Extract password reset link from the latest email for a mailbox.
+   *
+   * Tries multiple extraction strategies in order:
+   * 1. href attribute in HTML body containing /verify with type=recovery
+   *    (current Supabase GoTrue format — the path is /verify, not
+   *    /auth/v1/verify; type=recovery disambiguates from signup/invite emails)
+   * 2. Any URL containing /verify with type=recovery in either body part
+   * 3. Any URL containing /auth/callback (defensive coverage for future
+   *    format drift where the callback URL appears directly in the email)
+   *
+   * Logs the full email body and headers on failure so CI flakes are diagnosable.
    */
   async getPasswordResetLink(email: string): Promise<string> {
     const latest =
@@ -220,12 +230,55 @@ export class MailpitClient {
     }
 
     const detail = await this.getMessage(email, latest.ID);
-    const html = (detail.HTML ?? detail.Text ?? "").toString();
-    const match = PASSWORD_RESET_LINK_REGEX.exec(html);
-    if (!match?.[1]) {
-      throw new Error("Password reset link not found in email body");
+    const htmlBody = (detail.HTML ?? "").toString();
+    const textBody = (detail.Text ?? "").toString();
+
+    // Strategy 1: href in HTML containing /verify?...type=recovery
+    const hrefMatch = PASSWORD_RESET_LINK_REGEX.exec(htmlBody);
+    if (hrefMatch?.[1]) {
+      return decodeHtmlEntities(hrefMatch[1]);
     }
-    return decodeHtmlEntities(match[1]);
+
+    // Strategy 2: bare URL containing /verify with type=recovery — search
+    // both bodies independently so a non-empty HTML part doesn't hide a
+    // text-only link
+    const verifyPattern =
+      /https?:\/\/[^\s"'<>)]*\/verify\?[^\s"'<>)]*type=recovery[^\s"'<>)]*/i;
+    const verifyUrlMatch =
+      verifyPattern.exec(htmlBody) ?? verifyPattern.exec(textBody);
+    if (verifyUrlMatch?.[0]) {
+      return decodeHtmlEntities(verifyUrlMatch[0]);
+    }
+
+    // Strategy 3: direct callback URL — defensive coverage for future
+    // Supabase formats that embed the /auth/callback URL directly with
+    // token_hash or code params. Search both bodies independently.
+    const callbackPattern =
+      /https?:\/\/[^\s"'<>)]*\/auth\/callback[^\s"'<>)]*/i;
+    const callbackUrlMatch =
+      callbackPattern.exec(htmlBody) ?? callbackPattern.exec(textBody);
+    if (callbackUrlMatch?.[0]) {
+      return decodeHtmlEntities(callbackUrlMatch[0]);
+    }
+
+    // All strategies failed — log diagnostics so future CI flakes are diagnosable.
+    // Redact one-time token values to avoid leaking secrets into logs.
+    const redactTokens = (s: string): string =>
+      s
+        .replace(/([?&]token=)[^&"'\s<>)]+/gi, "$1[REDACTED]")
+        .replace(/([?&]token_hash=)[^&"'\s<>)]+/gi, "$1[REDACTED]")
+        .replace(/([?&]code=)[^&"'\s<>)]+/gi, "$1[REDACTED]");
+    console.error(
+      `[Mailpit] Password reset link not found.\n` +
+        `  Message ID: ${detail.ID}\n` +
+        `  Subject: ${detail.Subject}\n` +
+        `  To: ${detail.To.map((r) => r.Address).join(", ")}\n` +
+        `  Date: ${detail.Date ?? "(unknown)"}\n` +
+        `  HTML body (${htmlBody.length} chars):\n${redactTokens(htmlBody) || "(empty)"}\n` +
+        `  Text body (${textBody.length} chars):\n${redactTokens(textBody) || "(empty)"}`
+    );
+
+    throw new Error("Password reset link not found in email body");
   }
 
   /**
@@ -276,7 +329,12 @@ export class MailpitClient {
   }
 }
 
-const PASSWORD_RESET_LINK_REGEX = /href="([^"]*\/auth\/v1\/verify[^"]*)"/i;
+// Match href attributes that point to a /verify URL with type=recovery.
+// Current Supabase GoTrue serves password reset links from /verify (no
+// /auth/v1/ prefix). type=recovery disambiguates from signup/invite emails
+// that also use /verify but with type=signup or type=invite.
+const PASSWORD_RESET_LINK_REGEX =
+  /href="(http[^"]*\/verify\?[^"]*type=recovery[^"]*)"/i;
 
 const decodeHtmlEntities = (text: string): string =>
   text
