@@ -1,11 +1,35 @@
+import type { FullConfig } from "@playwright/test";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const execSyncMock = vi.fn();
+// spawnSync is used by the Docker preflight check. Default to success.
+const spawnSyncMock = vi.fn(() => ({ status: 0, error: null }));
+
+// existsSync is used by the browser-binary preflight check. Default to true
+// (binary present) so non-browser tests are unaffected.
+const existsSyncMock = vi.fn(() => true);
 
 vi.mock("child_process", () => ({
   execSync: execSyncMock,
-  default: { execSync: execSyncMock },
+  spawnSync: spawnSyncMock,
+  default: { execSync: execSyncMock, spawnSync: spawnSyncMock },
 }));
+
+vi.mock("fs", () => ({
+  existsSync: existsSyncMock,
+  default: { existsSync: existsSyncMock },
+}));
+
+// The browser-binaries preflight only inspects projects in the config we
+// pass in. An empty `projects` array therefore disables browser checks for
+// these unit tests, keeping coverage focused on the DB orchestration flow.
+const EMPTY_CONFIG = { projects: [] } as unknown as FullConfig;
+
+// A minimal config with one chromium project, used to exercise the
+// browser-binary preflight with a real (mocked) path check.
+const CHROMIUM_CONFIG = {
+  projects: [{ use: { browserName: "chromium" } }],
+} as unknown as FullConfig;
 
 // Mock postgres client for the pre-flight DB connectivity check
 const endMock = vi.fn();
@@ -34,6 +58,8 @@ describe("e2e/global-setup", () => {
   beforeEach(() => {
     vi.resetModules();
     execSyncMock.mockReset();
+    spawnSyncMock.mockReset().mockReturnValue({ status: 0, error: null });
+    existsSyncMock.mockReset().mockReturnValue(true);
     fetchMock.mockReset().mockResolvedValue({ ok: true });
     sqlTagMock.mockReset().mockResolvedValue([{ "?column?": 1 }]);
     endMock.mockReset();
@@ -48,7 +74,14 @@ describe("e2e/global-setup", () => {
     execSyncMock.mockReturnValue(undefined);
     const setup = await loadSetup();
 
-    await setup();
+    await setup(EMPTY_CONFIG);
+
+    // Pre-flight: Docker check via spawnSync
+    expect(spawnSyncMock).toHaveBeenCalledWith(
+      "docker",
+      ["info"],
+      expect.any(Object)
+    );
 
     // Pre-flight: Supabase health check
     expect(fetchMock).toHaveBeenCalledWith(
@@ -83,7 +116,7 @@ describe("e2e/global-setup", () => {
 
     const setup = await loadSetup();
 
-    await setup();
+    await setup(EMPTY_CONFIG);
 
     expect(execSyncMock).toHaveBeenCalledWith("supabase db reset --yes", {
       stdio: "inherit",
@@ -103,7 +136,7 @@ describe("e2e/global-setup", () => {
     process.env.SKIP_SUPABASE_RESET = "true";
     const setup = await loadSetup();
 
-    await setup();
+    await setup(EMPTY_CONFIG);
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(execSyncMock).not.toHaveBeenCalled();
@@ -113,14 +146,18 @@ describe("e2e/global-setup", () => {
     fetchMock.mockRejectedValue(new Error("fetch failed"));
     const setup = await loadSetup();
 
-    await expect(setup()).rejects.toThrow("Supabase is not reachable");
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "Supabase is not reachable"
+    );
   });
 
   it("throws clear error when Postgres is not reachable", async () => {
     sqlTagMock.mockRejectedValue(new Error("connection refused"));
     const setup = await loadSetup();
 
-    await expect(setup()).rejects.toThrow("Cannot connect to Postgres");
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "Cannot connect to Postgres"
+    );
   });
 
   it("throws clear error when POSTGRES_URL is not set", async () => {
@@ -128,6 +165,52 @@ describe("e2e/global-setup", () => {
     delete process.env.POSTGRES_URL_NON_POOLING;
     const setup = await loadSetup();
 
-    await expect(setup()).rejects.toThrow("POSTGRES_URL is not set");
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "POSTGRES_URL is not set"
+    );
+  });
+
+  it("throws daemon-down error when Docker exits with non-zero status", async () => {
+    spawnSyncMock.mockReturnValue({ status: 1, error: null });
+    const setup = await loadSetup();
+
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "Docker daemon is not running"
+    );
+  });
+
+  it("throws not-installed error when Docker returns ENOENT", async () => {
+    const enoent = Object.assign(new Error("spawn docker ENOENT"), {
+      code: "ENOENT",
+    });
+    spawnSyncMock.mockReturnValue({ status: null, error: enoent });
+    const setup = await loadSetup();
+
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "Docker is not installed"
+    );
+  });
+
+  it("throws install hint when a required browser binary is missing", async () => {
+    // existsSync returns false → binary absent → should suggest install
+    existsSyncMock.mockReturnValue(false);
+    const setup = await loadSetup();
+
+    await expect(setup(CHROMIUM_CONFIG)).rejects.toThrow(
+      "pnpm exec playwright install"
+    );
+  });
+
+  it("checks Docker before Supabase health (ordering)", async () => {
+    // Fail Docker so we never reach Supabase; if fetch were called first the
+    // test order would be inverted.
+    spawnSyncMock.mockReturnValue({ status: 1, error: null });
+    const setup = await loadSetup();
+
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "Docker daemon is not running"
+    );
+    // Supabase health check must NOT have been attempted
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
