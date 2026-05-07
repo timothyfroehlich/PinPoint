@@ -154,6 +154,8 @@ export const reassignIssueMachineSchema = z.object({
   newMachineInitials: z
     .string()
     .trim()
-    .min(1, "Pick a machine to move this issue to")
-    .max(20, "Invalid machine"),
+    .min(2, "Initials must be at least 2 characters")
+    .max(6, "Initials must be at most 6 characters")
+    .regex(/^[A-Z0-9]+$/i, "Only letters and numbers allowed")
+    .transform((val) => val.toUpperCase()),
 });

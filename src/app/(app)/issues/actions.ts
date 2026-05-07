@@ -41,7 +41,12 @@ import {
   reassignIssueMachine,
 } from "~/services/issues";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import { userProfiles, issueComments, issueImages } from "~/server/db/schema";
+import {
+  userProfiles,
+  issueComments,
+  issueImages,
+  machines,
+} from "~/server/db/schema";
 import {
   type ProseMirrorDoc,
   docToPlainText,
@@ -1056,6 +1061,19 @@ export async function reassignIssueMachineAction(
         "UNAUTHORIZED",
         "You do not have permission to reassign this issue"
       );
+    }
+
+    if (newMachineInitials === currentIssue.machineInitials) {
+      return err("VALIDATION", "Issue is already on this machine");
+    }
+
+    const destinationMachine = await db.query.machines.findFirst({
+      where: eq(machines.initials, newMachineInitials),
+      columns: { initials: true },
+    });
+
+    if (!destinationMachine) {
+      return err("NOT_FOUND", "Destination machine not found");
     }
 
     const result = await reassignIssueMachine({

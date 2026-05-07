@@ -147,8 +147,9 @@ export default async function IssueDetailPage({
           columns: { name: true, role: true },
         })
       : Promise.resolve(null),
-    // Fetch all machines for the reassign-machine picker. Cheap given the org's
-    // machine count and rendered only when the viewer has permission.
+    // Fetch all machines for the reassign-machine picker. Loaded unconditionally
+    // alongside the issue query so both resolve in a single parallel batch;
+    // permission gating is applied after the data arrives (userCanReassign below).
     db.query.machines.findMany({
       columns: { initials: true, name: true },
       orderBy: asc(machines.name),

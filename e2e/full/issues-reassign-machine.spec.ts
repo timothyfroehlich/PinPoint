@@ -6,7 +6,7 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
+import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
 import {
   fillReportForm,
@@ -14,14 +14,10 @@ import {
 } from "../support/page-helpers.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
-const createdIssueIds = new Set<string>();
-
-const rememberIssueId = (page: Page): void => {
-  const issueId = extractIdFromUrl(page.url());
-  if (issueId) {
-    createdIssueIds.add(issueId);
-  }
-};
+// Prefix shared across all tests in this file; cleaned up in afterEach by title
+// prefix so cleanup works regardless of URL pattern (issues now live at
+// /m/<initials>/i/<number>, not /issues/<uuid>).
+const ISSUE_PREFIX = "E2E Reassign";
 
 async function createIssueOnMachine(
   page: Page,
@@ -39,17 +35,14 @@ async function createIssueOnMachine(
     }
   );
   await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
-  rememberIssueId(page);
   return page.url();
 }
 
 test.describe("Issue reassignment", () => {
   test.afterEach(async ({ request }) => {
-    if (!createdIssueIds.size) return;
     await cleanupTestEntities(request, {
-      issueIds: Array.from(createdIssueIds),
+      issueTitlePrefix: ISSUE_PREFIX,
     });
-    createdIssueIds.clear();
   });
 
   test.describe("as technician", () => {
@@ -61,7 +54,7 @@ test.describe("Issue reassignment", () => {
       const fromInitials = seededMachines.addamsFamily.initials;
       const toInitials = seededMachines.humptyDumpty.initials;
       const toName = seededMachines.humptyDumpty.name;
-      const issueTitle = `Reassign me ${Date.now().toString()}`;
+      const issueTitle = `${ISSUE_PREFIX} ${Date.now().toString()}`;
 
       await createIssueOnMachine(page, fromInitials, issueTitle);
 
@@ -118,7 +111,7 @@ test.describe("Issue reassignment", () => {
       // be hidden entirely (canReassign is false → IssueActionsMenu returns
       // null).
       const fromInitials = seededMachines.addamsFamily.initials;
-      const issueTitle = `Member view ${Date.now().toString()}`;
+      const issueTitle = `${ISSUE_PREFIX} Member view ${Date.now().toString()}`;
 
       await createIssueOnMachine(page, fromInitials, issueTitle);
 
