@@ -100,7 +100,7 @@ describe("Email Transport Integration", () => {
       typeof data === "object" &&
       data !== null &&
       "messages" in data &&
-      Array.isArray((data as { messages: unknown }).messages)
+      Array.isArray(data.messages)
     ) {
       messages = (data as { messages: MailpitMessage[] }).messages;
     } else if (Array.isArray(data)) {

@@ -144,7 +144,7 @@ describe("discordChannel.deliver", () => {
     expect(sendDm).toHaveBeenCalledWith({
       botToken: "tok",
       discordUserId: "discord-1",
-      content: expect.stringContaining("AFM-01") as unknown as string,
+      content: expect.stringContaining("AFM-01"),
     });
   });
 

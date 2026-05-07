@@ -76,7 +76,7 @@ export const getIssues = cache(
 
     // Query issues with filters
     // Type assertion needed because Drizzle infers status as string, not IssueStatus
-    return (await db.query.issues.findMany({
+    return await db.query.issues.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
       orderBy: desc(issues.createdAt),
       columns: ISSUE_LIST_COLUMNS,
@@ -101,6 +101,6 @@ export const getIssues = cache(
           },
         },
       },
-    })) as IssueListItem[];
+    });
   }
 );
