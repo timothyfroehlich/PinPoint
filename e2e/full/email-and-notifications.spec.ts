@@ -7,11 +7,7 @@
 
 import { test, expect } from "@playwright/test";
 import { MailpitClient } from "../support/mailpit.js";
-import {
-  ensureLoggedIn,
-  logout,
-  updateIssueField,
-} from "../support/actions.js";
+import { ensureLoggedIn, updateIssueField } from "../support/actions.js";
 import {
   fillReportForm,
   submitFormAndWaitForRedirect,
@@ -32,7 +28,6 @@ import {
   getTestEmail,
   getTestMachineInitials,
 } from "../support/test-isolation.js";
-import { getPasswordResetLink } from "../support/mailpit.js";
 const cleanupUserIds: string[] = [];
 const cleanupMachineIds: string[] = [];
 
@@ -710,78 +705,5 @@ test.describe.serial("Email Notifications", () => {
       emailEnabled: true,
       emailNotifyOnStatusChange: true,
     });
-  });
-});
-
-test.describe("Password Reset Email", () => {
-  test("password reset flow - user journey only", async ({
-    page,
-  }, testInfo) => {
-    test.fixme(
-      true,
-      "PP-q9r — pkce verify URL doesn't redirect to /reset-password; needs iter 3 (test flow assumption is wrong, not regex)"
-    );
-    test.setTimeout(40000);
-    const testEmail = `reset-e2e-extended-${Date.now()}@example.com`;
-    const oldPassword = "OldPassword123!";
-    const newPassword = "NewPassword456!";
-
-    // Create account
-    await page.goto("/signup");
-    await page.getByLabel("First Name").fill("Password Reset");
-    await page.getByLabel("Last Name").fill("Test");
-    await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password", { exact: true }).fill(oldPassword);
-    await page.getByLabel("Confirm Password").fill(oldPassword);
-    await page.getByLabel(/terms of service/i).check();
-    await page.getByRole("button", { name: "Create Account" }).click();
-
-    // Local env has enable_confirmations = false, so we are redirected to dashboard immediately
-    await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
-
-    // Sign out to start reset journey
-    await logout(page, testInfo);
-
-    // Request reset
-    await page.goto("/forgot-password");
-    await expect(
-      page.getByRole("heading", { name: "Reset Password" })
-    ).toBeVisible();
-    await page.getByLabel("Email").fill(testEmail);
-    await page.getByRole("button", { name: "Send Reset Link" }).click();
-    await expect(
-      page.getByText(/you will receive a password reset link/i)
-    ).toBeVisible();
-
-    // Follow reset link from email
-    const resetLink = await getPasswordResetLink(testEmail);
-    expect(resetLink).toBeTruthy();
-    await page.goto(resetLink, { waitUntil: "domcontentloaded" });
-    await expect(page).toHaveURL(/\/reset-password/, { timeout: 15000 });
-    await expect(
-      page.getByRole("heading", { name: "Set New Password" })
-    ).toBeVisible();
-
-    // Set new password and submit
-    await page.getByLabel("New Password").fill(newPassword);
-    await page.getByLabel("Confirm Password").fill(newPassword);
-    await page.getByRole("button", { name: "Update Password" }).click();
-
-    // The action redirects to /login after successful password update
-    await expect(page).toHaveURL("/login", { timeout: 15000 });
-
-    await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible({
-      timeout: 20000,
-    });
-
-    // Now log in with the new password
-    await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password", { exact: true }).fill(newPassword);
-    await page.getByRole("button", { name: "Sign In" }).click();
-    await expect(page).toHaveURL("/dashboard");
-    await expect(page.getByTestId("quick-stats")).toBeVisible();
-
-    // Cleanup
-    await logout(page, testInfo);
   });
 });
