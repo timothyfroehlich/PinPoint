@@ -29,7 +29,7 @@ jobs:
       deps: ${{ steps.deps-filter.outputs.deps }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -74,7 +74,7 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -109,7 +109,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -149,7 +149,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -189,7 +189,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -229,7 +229,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -290,7 +290,7 @@ jobs:
     needs: [setup, typecheck, lint, format, linters, test-unit, test-integration]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -335,7 +335,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -380,7 +380,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -431,7 +431,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -492,7 +492,7 @@ jobs:
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -547,7 +547,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -627,7 +627,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -707,7 +707,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -788,7 +788,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -893,7 +893,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -914,7 +914,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
@@ -1004,7 +1004,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df  # ratchet:step-security/harden-runner@v2.18.0
+        uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40  # ratchet:step-security/harden-runner@v2.19.0
         with:
           egress-policy: audit
 
