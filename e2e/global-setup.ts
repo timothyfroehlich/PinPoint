@@ -33,7 +33,7 @@ const BROWSER_ENGINES: Record<BrowserName, { executablePath(): string }> = {
 function checkBrowserBinaries(config: FullConfig): void {
   const needed = new Set<BrowserName>();
   for (const project of config.projects) {
-    const name = (project.use.browserName ?? "chromium") as BrowserName;
+    const name = project.use.browserName ?? "chromium";
     if (name in BROWSER_ENGINES) needed.add(name);
   }
 
