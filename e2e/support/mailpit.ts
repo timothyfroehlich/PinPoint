@@ -201,34 +201,6 @@ export class MailpitClient {
   }
 
   /**
-   * Extract password reset link from the latest email for a mailbox
-   */
-  async getPasswordResetLink(email: string): Promise<string> {
-    const latest =
-      (await this.waitForEmail(email, {
-        subjectContains: "Reset",
-        timeout: 30000,
-        pollIntervalMs: 750,
-      })) ??
-      (await this.waitForEmail(email, {
-        timeout: 30000,
-        pollIntervalMs: 750,
-      }));
-
-    if (!latest) {
-      throw new Error(`No messages found for ${email}`);
-    }
-
-    const detail = await this.getMessage(email, latest.ID);
-    const html = (detail.HTML ?? detail.Text ?? "").toString();
-    const match = PASSWORD_RESET_LINK_REGEX.exec(html);
-    if (!match?.[1]) {
-      throw new Error("Password reset link not found in email body");
-    }
-    return decodeHtmlEntities(match[1]);
-  }
-
-  /**
 
      * Delete all messages for a specific email
 
@@ -276,8 +248,6 @@ export class MailpitClient {
   }
 }
 
-const PASSWORD_RESET_LINK_REGEX = /href="([^"]*\/auth\/v1\/verify[^"]*)"/i;
-
 const decodeHtmlEntities = (text: string): string =>
   text
     .replace(/&amp;/g, "&")
@@ -295,9 +265,6 @@ export const deleteAllMessages = async (email?: string): Promise<void> => {
   }
   await mailpitClient.deleteAllMessages();
 };
-
-export const getPasswordResetLink = async (email: string): Promise<string> =>
-  mailpitClient.getPasswordResetLink(email);
 
 export const getSignupLink = async (email: string): Promise<string> =>
   mailpitClient.getSignupLink(email);
