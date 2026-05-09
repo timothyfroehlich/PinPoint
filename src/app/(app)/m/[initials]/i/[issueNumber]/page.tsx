@@ -71,8 +71,8 @@ export default async function IssueDetailPage({
   }
 
   // CORE-PERF-003: parallelize what's safe before role is known; the roster
-  // fetch is gated below on triage permission.
-  const [issue, currentUserProfile, allMachines] = await Promise.all([
+  // and machine-list fetches are gated below on permission.
+  const [issue, currentUserProfile] = await Promise.all([
     // Query issue with all relations
     db.query.issues.findFirst({
       where: and(
@@ -153,13 +153,6 @@ export default async function IssueDetailPage({
           columns: { name: true, role: true },
         })
       : Promise.resolve(null),
-    // Fetch all machines for the reassign-machine picker. Loaded unconditionally
-    // alongside the issue query so both resolve in a single parallel batch;
-    // permission gating is applied after the data arrives (userCanReassign below).
-    db.query.machines.findMany({
-      columns: { initials: true, name: true },
-      orderBy: asc(machines.name),
-    }),
   ]);
 
   if (!issue) {
@@ -183,15 +176,29 @@ export default async function IssueDetailPage({
     accessLevel,
     ownershipContext
   );
-  const allUsers = canTriage
-    ? await db
-        .select({ id: userProfiles.id, name: userProfiles.name })
-        .from(userProfiles)
-        .where(notInArray(userProfiles.role, ["guest"]))
-        .orderBy(asc(userProfiles.name))
-    : issue.assignedToUser
-      ? [issue.assignedToUser]
-      : [];
+  const userCanReassign = checkPermission(
+    "issues.reassign",
+    accessLevel,
+    ownershipContext
+  );
+
+  // Both gated queries run in parallel; viewers without the relevant
+  // permission skip the round-trip entirely.
+  const [allUsers, allMachines] = await Promise.all([
+    canTriage
+      ? db
+          .select({ id: userProfiles.id, name: userProfiles.name })
+          .from(userProfiles)
+          .where(notInArray(userProfiles.role, ["guest"]))
+          .orderBy(asc(userProfiles.name))
+      : Promise.resolve(issue.assignedToUser ? [issue.assignedToUser] : []),
+    userCanReassign
+      ? db.query.machines.findMany({
+          columns: { initials: true, name: true },
+          orderBy: asc(machines.name),
+        })
+      : Promise.resolve([]),
+  ]);
 
   const ownerName = getMachineOwnerName(issueWithRelations);
   const reporter = resolveIssueReporter(issueWithRelations);
@@ -202,11 +209,6 @@ export default async function IssueDetailPage({
   // Compute title edit permission
   const userCanEditTitle = checkPermission(
     "issues.update.reporting",
-    accessLevel,
-    ownershipContext
-  );
-  const userCanReassign = checkPermission(
-    "issues.reassign",
     accessLevel,
     ownershipContext
   );
@@ -266,7 +268,6 @@ export default async function IssueDetailPage({
                   issueId={issue.id}
                   currentInitials={initials}
                   machines={allMachines}
-                  canReassign={userCanReassign}
                 />
               ) : undefined
             }

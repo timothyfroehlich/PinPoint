@@ -18,7 +18,6 @@ import {
   userProfiles,
   issueComments,
   issueImages,
-  machines,
 } from "~/server/db/schema";
 import { log } from "~/lib/logger";
 import { serverActionError } from "~/lib/observability/report-error";
@@ -1068,40 +1067,31 @@ export async function reassignIssueMachineAction(
       return err("VALIDATION", "Issue is already on this machine");
     }
 
-    const destinationMachine = await db.query.machines.findFirst({
-      where: eq(machines.initials, newMachineInitials),
-      columns: { initials: true },
-    });
-
-    if (!destinationMachine) {
-      return err("NOT_FOUND", "Destination machine not found");
-    }
-
     const result = await reassignIssueMachine({
       issueId,
       newMachineInitials,
       userId: user.id,
     });
 
-    // Refresh the source/destination machine lists so they reflect the move.
-    // DO NOT revalidatePath() the user's current /m/<from>/i/<N> — even after
-    // we redirect away, an extra invalidation wouldn't help and just adds
-    // latency.
+    // Skip revalidating the current `/m/<from>/i/<N>` — we redirect away from
+    // it, and an extra invalidation just adds latency.
     revalidatePath(`/m/${result.fromInitials}`);
     revalidatePath(`/m/${result.toInitials}`);
 
-    // Server-side redirect rather than returning a Result with newUrl. The
-    // earlier "return ok({newUrl}) → client router.push" path racing against
-    // Next.js's implicit post-action refresh: once the action returned, the
-    // current page (/m/<from>/i/<N>) re-rendered, found no issue (it just
-    // moved), and server-redirected to /m/<from> — unmounting the form
-    // before its useEffect could push to the new URL. A direct redirect()
-    // here yields a single deterministic navigation. We never reach the
-    // implicit refresh, and the form unmounts cleanly during the navigation.
+    // Must be a server-side redirect, not a returned `ok({newUrl})` consumed
+    // by `router.push`: returning normally lets Next.js refresh the current
+    // page first, which now renders not-found and server-redirects to
+    // `/m/<from>` — unmounting the form before the client navigation runs.
     redirect(`/m/${result.toInitials}/i/${result.toIssueNumber.toString()}`);
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error;
+    }
+    if (
+      error instanceof Error &&
+      error.message.startsWith("Machine not found")
+    ) {
+      return err("NOT_FOUND", "Destination machine not found");
     }
     return serverActionError(error, "SERVER", "Failed to reassign issue", {
       action: "reassignIssueMachine",

@@ -16,22 +16,14 @@ interface IssueActionsMenuProps {
   issueId: string;
   currentInitials: string;
   machines: { initials: string; name: string }[];
-  canReassign: boolean;
 }
 
 export function IssueActionsMenu({
   issueId,
   currentInitials,
   machines,
-  canReassign,
-}: IssueActionsMenuProps): React.JSX.Element | null {
+}: IssueActionsMenuProps): React.JSX.Element {
   const [reassignOpen, setReassignOpen] = useState(false);
-
-  // Hide the trigger entirely if there are no actions for this user. Today
-  // that's just the reassign action; future menu items go here.
-  if (!canReassign) {
-    return null;
-  }
 
   return (
     <>
