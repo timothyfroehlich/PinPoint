@@ -54,7 +54,7 @@ export function useSearchFilters<T extends GenericFilters>(
     (updates: Partial<T>, options: UseSearchFiltersOptions = {}): void => {
       const params = new URLSearchParams();
       const currentFilters = filtersRef.current;
-      const merged = { ...currentFilters, ...updates } as T;
+      const merged = { ...currentFilters, ...updates };
 
       // Apply pagination reset if requested
       if (options.resetPagination && "page" in merged) {
