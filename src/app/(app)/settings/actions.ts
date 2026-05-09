@@ -176,6 +176,12 @@ export async function deleteAccountAction(
     // the error for manual cleanup but still sign out the user. The data is
     // already anonymized, so the user's information is protected.
     const adminClient = createAdminClient();
+
+    // Revoke all issued JWTs for this user before deletion. deleteUser() does
+    // not invalidate existing tokens, so we must revoke sessions first to
+    // prevent the deleted account from remaining accessible until JWT expiry.
+    await adminClient.auth.admin.signOut(userId, "global");
+
     const { error: deleteError } =
       await adminClient.auth.admin.deleteUser(userId);
 

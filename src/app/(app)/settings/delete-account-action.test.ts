@@ -18,11 +18,13 @@ vi.mock("~/lib/supabase/server", () => ({
 }));
 
 const mockDeleteUser = vi.fn();
+const mockAdminSignOut = vi.fn();
 vi.mock("~/lib/supabase/admin", () => ({
   createAdminClient: vi.fn(() => ({
     auth: {
       admin: {
         deleteUser: mockDeleteUser,
+        signOut: mockAdminSignOut,
       },
     },
   })),
@@ -90,6 +92,7 @@ describe("deleteAccountAction", () => {
     });
     mockSignOut.mockResolvedValue({ error: null });
     mockDeleteUser.mockResolvedValue({ error: null });
+    mockAdminSignOut.mockResolvedValue({ error: null });
     mockFindFirst.mockResolvedValue({
       id: "user-1",
       role: "member",
@@ -181,6 +184,8 @@ describe("deleteAccountAction", () => {
       deleteAccountAction(undefined, makeFormData("DELETE"))
     ).rejects.toThrow("NEXT_REDIRECT");
 
+    // Admin signOut must revoke all sessions before the auth row is deleted
+    expect(mockAdminSignOut).toHaveBeenCalledWith("user-1", "global");
     expect(mockDeleteUser).toHaveBeenCalledWith("user-1");
     expect(mockSignOut).toHaveBeenCalled();
     expect(redirect).toHaveBeenCalledWith("/");
