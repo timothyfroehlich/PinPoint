@@ -546,7 +546,7 @@ describe("Issue Service", () => {
     });
 
     it("throws when issue does not exist", async () => {
-      mockDb.query.issues.findFirst.mockResolvedValue(undefined as any);
+      mockDb.query.issues.findFirst.mockResolvedValue(undefined);
 
       await expect(
         reassignIssueMachine({
