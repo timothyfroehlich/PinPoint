@@ -2,7 +2,6 @@
 
 import type React from "react";
 import { useActionState, useEffect, useState, startTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import {
   reassignIssueMachineAction,
@@ -48,22 +47,15 @@ export function ReassignMachineForm({
   open,
   onOpenChange,
 }: ReassignMachineFormProps): React.JSX.Element {
-  const router = useRouter();
   const [state, formAction, isPending] = useActionState<
     ReassignIssueMachineResult | undefined,
     FormData
   >(reassignIssueMachineAction, undefined);
   const [selectedInitials, setSelectedInitials] = useState<string | null>(null);
 
-  // Navigate on success and close the dialog. We can't call router.push() from
-  // inside the action because the action returns a Result for useActionState,
-  // not a redirect — see actions.ts for the rationale.
-  useEffect(() => {
-    if (state?.ok) {
-      onOpenChange(false);
-      router.push(state.value.newUrl);
-    }
-  }, [state, router, onOpenChange]);
+  // The action redirects on success, so this form unmounts during the
+  // navigation — no client-side state.ok handler needed. The only
+  // post-action work happens here when the action returns an error Result.
 
   // Reset selection when the dialog reopens so the user starts fresh.
   useEffect(() => {

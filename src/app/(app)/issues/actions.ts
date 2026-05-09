@@ -8,6 +8,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { type z } from "zod";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
@@ -1080,21 +1081,22 @@ export async function reassignIssueMachineAction(
       userId: user.id,
     });
 
-    // Revalidate the source machine list (issue is gone) and both destination
-    // paths (issue lives there now). DO NOT revalidate the source issue path —
-    // the user is currently on it, and an eager refetch would server-redirect
-    // them to /m/<from> before the client useEffect can router.push to the new
-    // URL. The stale source-issue cache will refresh on next access anyway.
+    // Refresh the source/destination machine lists so they reflect the move.
+    // DO NOT revalidatePath() the user's current /m/<from>/i/<N> — even after
+    // we redirect away, an extra invalidation wouldn't help and just adds
+    // latency.
     revalidatePath(`/m/${result.fromInitials}`);
-    revalidatePath(
-      `/m/${result.toInitials}/i/${result.toIssueNumber.toString()}`
-    );
     revalidatePath(`/m/${result.toInitials}`);
 
-    return ok({
-      issueId,
-      newUrl: `/m/${result.toInitials}/i/${result.toIssueNumber.toString()}`,
-    });
+    // Server-side redirect rather than returning a Result with newUrl. The
+    // earlier "return ok({newUrl}) → client router.push" path racing against
+    // Next.js's implicit post-action refresh: once the action returned, the
+    // current page (/m/<from>/i/<N>) re-rendered, found no issue (it just
+    // moved), and server-redirected to /m/<from> — unmounting the form
+    // before its useEffect could push to the new URL. A direct redirect()
+    // here yields a single deterministic navigation. We never reach the
+    // implicit refresh, and the form unmounts cleanly during the navigation.
+    redirect(`/m/${result.toInitials}/i/${result.toIssueNumber.toString()}`);
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error;
