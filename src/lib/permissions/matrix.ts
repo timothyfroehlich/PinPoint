@@ -384,6 +384,24 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
     ],
   },
   {
+    id: "notifications",
+    label: "Notifications",
+    permissions: [
+      {
+        id: "notifications.manage_own",
+        label: "Manage own notifications",
+        description: "Mark notifications as read or dismiss them",
+        access: {
+          unauthenticated: false,
+          guest: true,
+          member: true,
+          technician: true,
+          admin: true,
+        },
+      },
+    ],
+  },
+  {
     id: "admin",
     label: "Administration",
     permissions: [

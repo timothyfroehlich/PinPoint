@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { notifications } from "~/server/db/schema";
+import { notifications, userProfiles } from "~/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { type Result, ok, err } from "~/lib/result";
 import { serverActionError } from "~/lib/observability/report-error";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 export type MarkAsReadResult = Result<
   { success: boolean },
@@ -23,6 +24,23 @@ export async function markAsReadAction(
 
   if (!user) {
     return err("UNAUTHORIZED", "Unauthorized");
+  }
+
+  const userProfile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+
+  if (
+    !checkPermission(
+      "notifications.manage_own",
+      getAccessLevel(userProfile?.role)
+    )
+  ) {
+    return err(
+      "UNAUTHORIZED",
+      "You do not have permission to manage notifications"
+    );
   }
 
   try {
@@ -58,6 +76,23 @@ export async function markAllAsReadAction(): Promise<MarkAsReadResult> {
 
   if (!user) {
     return err("UNAUTHORIZED", "Unauthorized");
+  }
+
+  const userProfile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+
+  if (
+    !checkPermission(
+      "notifications.manage_own",
+      getAccessLevel(userProfile?.role)
+    )
+  ) {
+    return err(
+      "UNAUTHORIZED",
+      "You do not have permission to manage notifications"
+    );
   }
 
   try {
