@@ -1,10 +1,13 @@
 /**
  * RLS Context Utilities
  *
- * Provides session context binding for Row Level Security enforcement.
+ * Provides session context binding used by integration tests to simulate
+ * RLS-enforced database contexts.
  *
- * SECURITY: Always use withUserContext for mutations that involve
- * user-scoped data. This ensures RLS policies have proper context.
+ * NOTE: App code does NOT enforce RLS via Drizzle. The Drizzle connection
+ * user has BYPASSRLS, so RLS policies are never evaluated for application
+ * queries. Authorization is handled by checkPermission() in server actions
+ * (see ~/lib/permissions/helpers).
  *
  * Pattern based on September 2024 implementation (commit c52e7732).
  */
@@ -23,9 +26,11 @@ export interface UserContext {
  *
  * Sets PostgreSQL session variables that RLS policies can check:
  * - request.user_id: Current user's UUID
- * - request.user_role: Current user's role (admin|member|guest)
+ * - request.user_role: Current user's role (see UserRole in ~/lib/types)
  *
- * IMPORTANT: Always wrap mutations in this helper to ensure RLS enforcement.
+ * Used by integration tests to simulate RLS-enforced contexts. App code does NOT enforce
+ * RLS via Drizzle (the connection user has BYPASSRLS); authorization is handled by
+ * checkPermission() in server actions (see ~/lib/permissions/helpers).
  *
  * @example
  * ```typescript
