@@ -428,7 +428,9 @@ export async function signupAction(
 /**
  * Logout Action
  *
- * Signs out the current user and clears their session.
+ * Signs out the user across all active sessions/devices (global scope) and
+ * clears the current browser's session cookie. Other browsers/devices will
+ * be logged out on their next request once the JWT is rejected.
  */
 export async function logoutAction(): Promise<void> {
   try {

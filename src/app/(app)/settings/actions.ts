@@ -181,7 +181,8 @@ export async function deleteAccountAction(
     // not invalidate existing tokens, so we must revoke sessions first to
     // prevent the deleted account from remaining accessible until JWT expiry.
     // Best-effort: log on failure but still proceed with deletion. The user's
-    // data is already anonymized, and tokens will expire naturally (~1h).
+    // data is already anonymized, and tokens will expire naturally per the
+    // configured Supabase access token TTL.
     const { error: signOutError } = await adminClient.auth.admin.signOut(
       userId,
       "global"
