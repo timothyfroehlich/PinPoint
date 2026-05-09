@@ -180,7 +180,19 @@ export async function deleteAccountAction(
     // Revoke all issued JWTs for this user before deletion. deleteUser() does
     // not invalidate existing tokens, so we must revoke sessions first to
     // prevent the deleted account from remaining accessible until JWT expiry.
-    await adminClient.auth.admin.signOut(userId, "global");
+    // Best-effort: log on failure but still proceed with deletion. The user's
+    // data is already anonymized, and tokens will expire naturally (~1h).
+    const { error: signOutError } = await adminClient.auth.admin.signOut(
+      userId,
+      "global"
+    );
+    if (signOutError) {
+      reportError(signOutError, {
+        action: "deleteAccountAuthSignOut",
+        bestEffort: true,
+        userId,
+      });
+    }
 
     const { error: deleteError } =
       await adminClient.auth.admin.deleteUser(userId);

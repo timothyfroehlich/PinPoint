@@ -184,9 +184,15 @@ describe("deleteAccountAction", () => {
       deleteAccountAction(undefined, makeFormData("DELETE"))
     ).rejects.toThrow("NEXT_REDIRECT");
 
-    // Admin signOut must revoke all sessions before the auth row is deleted
+    // Admin signOut must revoke all sessions BEFORE the auth row is deleted —
+    // otherwise issued JWTs remain valid until expiry (~1h).
     expect(mockAdminSignOut).toHaveBeenCalledWith("user-1", "global");
     expect(mockDeleteUser).toHaveBeenCalledWith("user-1");
+    const signOutOrder = mockAdminSignOut.mock.invocationCallOrder[0];
+    const deleteOrder = mockDeleteUser.mock.invocationCallOrder[0];
+    expect(signOutOrder).toBeDefined();
+    expect(deleteOrder).toBeDefined();
+    expect(signOutOrder).toBeLessThan(deleteOrder);
     expect(mockSignOut).toHaveBeenCalled();
     expect(redirect).toHaveBeenCalledWith("/");
   });
