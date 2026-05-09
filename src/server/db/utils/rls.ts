@@ -7,7 +7,7 @@
  * NOTE: App code does NOT enforce RLS via Drizzle. The Drizzle connection
  * user has BYPASSRLS, so RLS policies are never evaluated for application
  * queries. Authorization is handled by checkPermission() in server actions
- * per NON-NEGOTIABLE #14.
+ * (see ~/lib/permissions/helpers).
  *
  * Pattern based on September 2024 implementation (commit c52e7732).
  */
@@ -26,11 +26,11 @@ export interface UserContext {
  *
  * Sets PostgreSQL session variables that RLS policies can check:
  * - request.user_id: Current user's UUID
- * - request.user_role: Current user's role (admin|member|guest)
+ * - request.user_role: Current user's role (see UserRole in ~/lib/types)
  *
  * Used by integration tests to simulate RLS-enforced contexts. App code does NOT enforce
  * RLS via Drizzle (the connection user has BYPASSRLS); authorization is handled by
- * checkPermission() in server actions per NON-NEGOTIABLE #14.
+ * checkPermission() in server actions (see ~/lib/permissions/helpers).
  *
  * @example
  * ```typescript
