@@ -363,9 +363,6 @@ describe("Notification Formatting", () => {
 
     it("should return empty string when no secret is configured", () => {
       vi.stubEnv("UNSUBSCRIBE_SIGNING_SECRET", "");
-      // Need to delete the env var since empty string is falsy
-      // eslint-disable-next-line @typescript-eslint/dot-notation -- dynamic key deletion
-      delete process.env["UNSUBSCRIBE_SIGNING_SECRET"];
 
       const token = generateUnsubscribeToken("user-abc");
       expect(token).toBe("");
