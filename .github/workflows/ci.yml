@@ -463,7 +463,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@b60b5899c73b63a2d2d651b1e90db8d4c9392f51  # ratchet:supabase/setup-cli@v1.6.0
+        uses: supabase/setup-cli@df56b21da46c98abb12a9804e4fb1f657773e333  # ratchet:supabase/setup-cli@v2.0.0
         with:
           version: latest
 
@@ -524,7 +524,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@b60b5899c73b63a2d2d651b1e90db8d4c9392f51  # ratchet:supabase/setup-cli@v1.6.0
+        uses: supabase/setup-cli@df56b21da46c98abb12a9804e4fb1f657773e333  # ratchet:supabase/setup-cli@v2.0.0
         with:
           version: latest
 
@@ -579,7 +579,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@b60b5899c73b63a2d2d651b1e90db8d4c9392f51  # ratchet:supabase/setup-cli@v1.6.0
+        uses: supabase/setup-cli@df56b21da46c98abb12a9804e4fb1f657773e333  # ratchet:supabase/setup-cli@v2.0.0
         with:
           version: latest
 
@@ -659,7 +659,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@b60b5899c73b63a2d2d651b1e90db8d4c9392f51  # ratchet:supabase/setup-cli@v1.6.0
+        uses: supabase/setup-cli@df56b21da46c98abb12a9804e4fb1f657773e333  # ratchet:supabase/setup-cli@v2.0.0
         with:
           version: latest
 
@@ -739,7 +739,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@b60b5899c73b63a2d2d651b1e90db8d4c9392f51  # ratchet:supabase/setup-cli@v1.6.0
+        uses: supabase/setup-cli@df56b21da46c98abb12a9804e4fb1f657773e333  # ratchet:supabase/setup-cli@v2.0.0
         with:
           version: latest
 
@@ -820,7 +820,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@b60b5899c73b63a2d2d651b1e90db8d4c9392f51  # ratchet:supabase/setup-cli@v1.6.0
+        uses: supabase/setup-cli@df56b21da46c98abb12a9804e4fb1f657773e333  # ratchet:supabase/setup-cli@v2.0.0
         with:
           version: latest
 
