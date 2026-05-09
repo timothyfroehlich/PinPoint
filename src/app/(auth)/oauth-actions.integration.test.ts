@@ -33,7 +33,7 @@ function makeIdentity(provider: string): UserIdentity {
     created_at: new Date().toISOString(),
     last_sign_in_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  } as UserIdentity;
+  };
 }
 
 describe("link -> unlink round-trip", () => {

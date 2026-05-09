@@ -43,7 +43,37 @@ test.describe("StickyCommentComposer — mobile signed-in", () => {
 
     const sheet = page.getByRole("dialog");
     await expect(sheet).toBeVisible();
-    await expect(sheet.getByText("Add a comment")).toBeVisible();
+    // Scope to the SheetTitle (heading semantics) so we don't risk a strict-mode
+    // violation against the trigger button — which also has the text "Add a
+    // comment" but isn't a heading.
+    await expect(
+      sheet.getByRole("heading", { name: "Add a comment" })
+    ).toBeVisible();
+  });
+
+  test("only one Comment textarea is visible when sheet is open (no duplicate composer)", async ({
+    page,
+  }, testInfo) => {
+    await loginAs(page, testInfo);
+    await page.goto(ISSUE_URL);
+    await page.waitForLoadState("domcontentloaded");
+
+    // Open the sticky composer's sheet.
+    await page.getByRole("button", { name: "Add a comment" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // Wait for TipTap's dynamic import to mount the editor inside the dialog;
+    // without this the count assertion below can race with the lazy bundle.
+    await expect(dialog.getByLabel("Comment", { exact: true })).toBeVisible();
+
+    // Even though both the inline AddCommentForm (display:none via hidden md:flex)
+    // and the sheet's AddCommentForm are mounted, only the sheet's textarea
+    // should be visible. Guards against the regression where IssueTimeline
+    // fails to hide the inline composer on mobile when authenticated.
+    await expect(
+      page.getByLabel("Comment", { exact: true }).filter({ visible: true })
+    ).toHaveCount(1);
   });
 });
 
@@ -65,7 +95,7 @@ test.describe("StickyCommentComposer — mobile signed-out", () => {
     // (page.tsx gates on `accessLevel !== "unauthenticated"`), so the button
     // should not be present at all.
     const trigger = page.getByRole("button", { name: "Add a comment" });
-    await expect(trigger).not.toBeVisible();
+    await expect(trigger).toHaveCount(0);
 
     // The inline "Log in to comment" placeholder in IssueTimeline is the
     // canonical CTA for unauthenticated users.

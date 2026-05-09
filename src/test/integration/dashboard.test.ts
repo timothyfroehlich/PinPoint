@@ -29,10 +29,7 @@ import {
   createTestIssue,
   createTestUser,
 } from "~/test/helpers/factories";
-import {
-  deriveMachineStatus,
-  type IssueForStatus,
-} from "~/lib/machines/status";
+import { deriveMachineStatus } from "~/lib/machines/status";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 
 describe("Dashboard Queries (PGlite)", () => {
@@ -514,7 +511,7 @@ describe("Dashboard Queries (PGlite)", () => {
 
       // Calculate machines needing service
       const machinesNeedingService = allMachines.filter((machine) => {
-        const status = deriveMachineStatus(machine.issues as IssueForStatus[]);
+        const status = deriveMachineStatus(machine.issues);
         return status !== "operational";
       }).length;
 

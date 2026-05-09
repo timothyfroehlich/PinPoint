@@ -217,7 +217,17 @@ test.describe("Issues System", () => {
       ).toBeVisible();
 
       await expect(page.getByTestId("issue-timeline")).toBeVisible();
-      await expect(page.getByTestId("issue-comment-form")).toBeVisible();
+      // Authenticated mobile uses StickyCommentComposer (sticky bar with
+      // "Add a comment" button); desktop shows the inline composer at the end
+      // of the timeline. Either is the canonical comment composer for its
+      // viewport — assert on whichever applies.
+      if (isMobile) {
+        await expect(
+          page.getByRole("button", { name: "Add a comment" })
+        ).toBeVisible();
+      } else {
+        await expect(page.getByTestId("issue-comment-form")).toBeVisible();
+      }
       await expect(page.getByRole("heading", { name: "Activity" })).toHaveCount(
         isMobile ? 0 : 1
       );
@@ -282,8 +292,14 @@ test.describe("Issues System", () => {
 
       // Self-assign via the "Me" quick-select (current user is excluded from
       // the alphabetical list and only appears as "Me" at the top of the picker)
-      await assigneePicker.click();
-      await page.getByTestId("assignee-option-me").click();
+      const meOption = page.getByTestId("assignee-option-me");
+      await expect(async () => {
+        if (!(await meOption.isVisible())) {
+          await assigneePicker.click();
+        }
+        await expect(meOption).toBeVisible({ timeout: 3000 });
+      }).toPass({ timeout: 30000 });
+      await meOption.click();
 
       // Verify the assignee name is now displayed
       await expect(assigneePicker).toContainText("Member User");

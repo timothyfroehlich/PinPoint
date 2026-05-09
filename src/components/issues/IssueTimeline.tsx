@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useTransition } from "react";
-import { formatRelative, formatDateTime } from "~/lib/dates";
+import { formatDateTime } from "~/lib/dates";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
 import { OwnerBadge } from "~/components/issues/OwnerBadge";
+import { RelativeTime } from "~/components/issues/RelativeTime";
 import { isUserMachineOwner } from "~/lib/issues/owner";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
@@ -51,6 +52,9 @@ import {
   formatTimelineEvent,
   type TimelineEventData,
 } from "~/lib/timeline/types";
+
+const timestampTooltipTriggerClassName =
+  "rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 // ----------------------------------------------------------------------
 // Types
@@ -254,8 +258,14 @@ function TimelineItem({
               )}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="text-[11px] text-muted-foreground/60">
-                    {formatRelative(event.createdAt)}
+                  <span
+                    tabIndex={0}
+                    className={cn(
+                      "text-[11px] text-muted-foreground/60",
+                      timestampTooltipTriggerClassName
+                    )}
+                  >
+                    <RelativeTime value={event.createdAt} />
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -292,8 +302,14 @@ function TimelineItem({
                   <span className="text-muted-foreground/40">&bull;</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="text-xs text-muted-foreground/60">
-                        {formatRelative(event.createdAt)}
+                      <span
+                        tabIndex={0}
+                        className={cn(
+                          "text-xs text-muted-foreground/60",
+                          timestampTooltipTriggerClassName
+                        )}
+                      >
+                        <RelativeTime value={event.createdAt} />
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -303,8 +319,14 @@ function TimelineItem({
                   {isEdited && !isIssue && (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="text-xs text-muted-foreground/40">
-                          &bull; edited {formatRelative(event.updatedAt)}
+                        <span
+                          tabIndex={0}
+                          className={cn(
+                            "text-xs text-muted-foreground/40",
+                            timestampTooltipTriggerClassName
+                          )}
+                        >
+                          &bull; edited <RelativeTime value={event.updatedAt} />
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -482,9 +504,15 @@ export function IssueTimeline({
         </div>
       </div>
 
-      {/* Add Comment Form */}
+      {/* Add Comment Form — hidden below md: when authenticated because
+          StickyCommentComposer is the canonical mobile composer. The
+          unauthenticated "Log in to comment" placeholder stays visible at all
+          viewports since there is no sticky composer for guests. */}
       <div
-        className="relative flex gap-4 pt-2"
+        className={cn(
+          "relative flex gap-4 pt-2",
+          currentUserRole !== "unauthenticated" && "hidden md:flex"
+        )}
         data-testid="issue-comment-form"
       >
         <div className="hidden w-16 flex-none flex-col items-center @xl:flex">

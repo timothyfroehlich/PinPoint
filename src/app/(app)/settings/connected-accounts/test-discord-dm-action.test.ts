@@ -84,7 +84,7 @@ describe("testDiscordDmAction", () => {
     expect(sendDm).toHaveBeenCalledWith({
       botToken: "t",
       discordUserId: "d1",
-      content: expect.stringContaining("Test DM") as unknown as string,
+      content: expect.stringContaining("Test DM"),
     });
   });
 

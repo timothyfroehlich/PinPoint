@@ -5,10 +5,7 @@ import { db } from "~/server/db";
 import { machines as machinesTable, userProfiles } from "~/server/db/schema";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { desc, eq } from "drizzle-orm";
-import {
-  deriveMachineStatus,
-  type IssueForStatus,
-} from "~/lib/machines/status";
+import { deriveMachineStatus } from "~/lib/machines/status";
 import { isOnTheFloor } from "~/lib/machines/presence";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -125,7 +122,7 @@ export default async function MachinesPage({
 
   // Derive status and prepare for filtering
   const machinesWithStatus = allMachines.map((machine) => {
-    const status = deriveMachineStatus(machine.issues as IssueForStatus[]);
+    const status = deriveMachineStatus(machine.issues);
     const openIssuesCount = machine.issues.filter(
       (issue) => !(CLOSED_STATUSES as readonly string[]).includes(issue.status)
     ).length;

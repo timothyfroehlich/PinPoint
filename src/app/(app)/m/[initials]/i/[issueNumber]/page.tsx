@@ -8,7 +8,6 @@ import { eq, asc, and, notInArray } from "drizzle-orm";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueMetadata } from "~/components/issues/IssueMetadata";
 import { StickyCommentComposer } from "~/components/issues/StickyCommentComposer";
-import { IssueActionsMenu } from "./issue-actions-menu";
 import { OwnerBadge } from "~/components/issues/OwnerBadge";
 import { WatchButton } from "~/components/issues/WatchButton";
 import {
@@ -21,20 +20,18 @@ import type { IssueWithAllRelations } from "~/lib/types";
 import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
 import { getLastIssuesPath } from "~/lib/cookies/preferences";
 import { EditableIssueTitle } from "./editable-issue-title";
+import { IssueActionsMenu } from "./issue-actions-menu";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
-import { formatRelative, formatDateTime } from "~/lib/dates";
+import { formatDateTime } from "~/lib/dates";
+import { IssueUpdatedTimestamp } from "~/components/issues/IssueUpdatedTimestamp";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 import {
   type OwnershipContext,
   checkPermission,
   getAccessLevel,
 } from "~/lib/permissions/helpers";
+import { reportError } from "~/lib/observability/report-error";
 
 /**
  * Issue Detail Page
@@ -56,7 +53,16 @@ export default async function IssueDetailPage({
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+  if (authError) {
+    // Backend glitch: keep rendering (as unauthenticated) rather than crash,
+    // but capture the error so the silent guest-downgrade is observable.
+    reportError(authError, {
+      action: "issue-detail-page.auth.getUser",
+      bestEffort: true,
+    });
+  }
 
   const issueNum = parseInt(issueNumber, 10);
 
@@ -64,8 +70,9 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
-  // CORE-PERF-003: Execute independent queries in parallel to avoid waterfall
-  const [issue, allUsers, currentUserProfile, allMachines] = await Promise.all([
+  // CORE-PERF-003: parallelize what's safe before role is known; the roster
+  // fetch is gated below on triage permission.
+  const [issue, currentUserProfile, allMachines] = await Promise.all([
     // Query issue with all relations
     db.query.issues.findFirst({
       where: and(
@@ -101,6 +108,12 @@ export default async function IssueDetailPage({
             name: true,
           },
         },
+        assignedToUser: {
+          columns: {
+            id: true,
+            name: true,
+          },
+        },
         invitedReporter: {
           columns: {
             id: true,
@@ -131,16 +144,9 @@ export default async function IssueDetailPage({
         },
       },
     }),
-    // Fetch all members/admins for assignment dropdown (Restrict to actual users)
-    db
-      .select({
-        id: userProfiles.id,
-        name: userProfiles.name,
-      })
-      .from(userProfiles)
-      .where(notInArray(userProfiles.role, ["guest"]))
-      .orderBy(asc(userProfiles.name)),
-    // Fetch current user's profile for timeline permissions
+    // Fetch current user's profile for permission-aware rendering and to
+    // gate the (potentially expensive + privacy-sensitive) assignee roster
+    // fetch below.
     user?.id
       ? db.query.userProfiles.findFirst({
           where: eq(userProfiles.id, user.id),
@@ -160,19 +166,38 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
-  // Cast issue to IssueWithAllRelations for type safety
   const issueWithRelations = issue as unknown as IssueWithAllRelations;
-  const ownerName = getMachineOwnerName(issueWithRelations);
-  const reporter = resolveIssueReporter(issueWithRelations);
-  const ownerRequirements = user
-    ? (issue.machine.ownerRequirements ?? undefined)
-    : undefined;
   const accessLevel = getAccessLevel(currentUserProfile?.role);
   const ownershipContext: OwnershipContext = {
     userId: user?.id,
     reporterId: issueWithRelations.reportedBy,
     machineOwnerId: getMachineOwnerId(issueWithRelations),
   };
+
+  // Don't serialize the member roster to viewers who can't open the picker —
+  // privacy + payload regression with no benefit. Non-triage viewers still get
+  // the currently-assigned user so AssignIssueForm's readonly path can display
+  // their name instead of "Unassigned".
+  const canTriage = checkPermission(
+    "issues.update.triage",
+    accessLevel,
+    ownershipContext
+  );
+  const allUsers = canTriage
+    ? await db
+        .select({ id: userProfiles.id, name: userProfiles.name })
+        .from(userProfiles)
+        .where(notInArray(userProfiles.role, ["guest"]))
+        .orderBy(asc(userProfiles.name))
+    : issue.assignedToUser
+      ? [issue.assignedToUser]
+      : [];
+
+  const ownerName = getMachineOwnerName(issueWithRelations);
+  const reporter = resolveIssueReporter(issueWithRelations);
+  const ownerRequirements = user
+    ? (issue.machine.ownerRequirements ?? undefined)
+    : undefined;
 
   // Compute title edit permission
   const userCanEditTitle = checkPermission(
@@ -191,10 +216,7 @@ export default async function IssueDetailPage({
 
   return (
     <>
-      <PageContainer
-        size="narrow"
-        className="pb-[calc(56px+64px+env(safe-area-inset-bottom))] md:pb-10"
-      >
+      <PageContainer size="narrow" className="pb-16 md:pb-10">
         <div className="space-y-2">
           <BackToIssuesLink href={issuesPath} className="md:hidden" />
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -264,14 +286,10 @@ export default async function IssueDetailPage({
               <OwnerBadge size="sm" />
             )}
             <span className="text-muted-foreground/50">·</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span suppressHydrationWarning>
-                  Updated {formatRelative(issue.updatedAt)}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{formatDateTime(issue.updatedAt)}</TooltipContent>
-            </Tooltip>
+            <IssueUpdatedTimestamp
+              value={issue.updatedAt.toISOString()}
+              fallback={formatDateTime(issue.updatedAt)}
+            />
             <span className="text-muted-foreground/50">·</span>
             <span>{issue.watchers.length} watching</span>
             {accessLevel !== "unauthenticated" && (
@@ -301,7 +319,7 @@ export default async function IssueDetailPage({
         />
 
         <section className="@container">
-          <h2 className="hidden md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-5">
+          <h2 className="hidden @md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-5">
             Activity
           </h2>
           <IssueTimeline

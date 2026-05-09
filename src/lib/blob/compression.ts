@@ -25,7 +25,7 @@ export async function compressImage(
   try {
     const compressedFile = await imageCompression(file, options);
     // Ensure the original filename is preserved as the output might be named 'blob'
-    return new File([compressedFile as Blob], file.name, {
+    return new File([compressedFile], file.name, {
       type: (compressedFile as Blob).type,
       lastModified: Date.now(),
     });

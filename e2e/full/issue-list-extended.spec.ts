@@ -134,7 +134,7 @@ test.describe("Issue List Features - Extended", () => {
 
   test("should persist filters when navigating to issue detail and back", async ({
     page,
-  }, testInfo) => {
+  }) => {
     // 1. Go to issues and apply a severity filter
     await page.goto("/issues");
     await page.getByTestId("filter-severity").click();
@@ -153,12 +153,10 @@ test.describe("Issue List Features - Extended", () => {
     // Wait for navigation to issue detail
     await expect(page).toHaveURL(/\/m\/[A-Z]+\/i\/\d+/);
 
-    // 3. Return to the filtered issue list
-    if (testInfo.project.name.includes("Mobile")) {
-      await page.goBack();
-    } else {
-      await page.getByRole("link", { name: "Back to Issues" }).click();
-    }
+    // 3. Return to the filtered issue list. The issue detail page keeps its
+    // explicit back link mobile-only; desktop path persistence is covered by
+    // the AppHeader Issues link test below.
+    await page.goBack();
     await expect(page).toHaveURL(/severity=major/);
 
     // Verify filter badge is still visible

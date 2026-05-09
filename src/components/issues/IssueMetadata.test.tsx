@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from "vitest";
 import type { ReactElement } from "react";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { IssueMetadata } from "./IssueMetadata";
-import { type IssueWithAllRelations } from "~/lib/types";
 
 vi.mock("~/app/(app)/issues/actions", () => ({
   assignIssueAction: vi.fn(),
@@ -21,36 +20,12 @@ function renderWithProviders(ui: ReactElement) {
 
 const fixtureIssue = {
   id: "issue-1",
-  title: "Flippers stuck",
+  assignedTo: "user-1",
   status: "in_progress",
   priority: "high",
   severity: "major",
   frequency: "frequent",
-  assignedTo: "user-1",
-  reportedBy: "user-1",
-  invitedReportedBy: null,
-  reporterName: null,
-  reporterEmail: null,
-  machineInitials: "PIN",
-  issueNumber: 101,
-  createdAt: new Date("2026-04-25"),
-  updatedAt: new Date("2026-04-25"),
-  closedAt: null,
-  description: null,
-  machine: {
-    id: "machine-1",
-    name: "Iron Maiden",
-    initials: "PIN",
-    ownerRequirements: null,
-    owner: null,
-    invitedOwner: null,
-  },
-  reportedByUser: { id: "user-1", name: "Tim F." },
-  invitedReporter: null,
-  comments: [],
-  images: [],
-  watchers: [],
-} as unknown as IssueWithAllRelations;
+} satisfies Parameters<typeof IssueMetadata>[0]["issue"];
 
 const fixtureUsers = [{ id: "user-1", name: "Tim F." }];
 const fixtureOwnership = {
@@ -92,6 +67,10 @@ describe("IssueMetadata", () => {
   });
 
   it("applies @xl:col-span-2 to the Assignee row so it spans both columns at @xl: width", () => {
+    // Structural contract: the Assignee row MUST span both columns at @xl:
+    // (otherwise the 2-column reflow lays out as 3+2 which is broken). This is
+    // intentionally tested at the class level because the contract is layout
+    // intent, not visual styling.
     renderWithProviders(
       <IssueMetadata
         issue={fixtureIssue}
@@ -105,8 +84,8 @@ describe("IssueMetadata", () => {
     expect(assigneeRow).toHaveClass("@xl:col-span-2");
   });
 
-  it("applies @xl:grid-cols-2 to the inner grid for 2-column reflow", () => {
-    renderWithProviders(
+  it("forwards accessLevel — member sees interactive forms, unauthenticated sees readonly", () => {
+    const { container: memberContainer, unmount } = renderWithProviders(
       <IssueMetadata
         issue={fixtureIssue}
         allUsers={fixtureUsers}
@@ -115,60 +94,43 @@ describe("IssueMetadata", () => {
         ownershipContext={fixtureOwnership}
       />
     );
-    const grid = screen.getByTestId("issue-metadata-grid");
-    expect(grid).toHaveClass("grid-cols-1");
-    expect(grid).toHaveClass("@xl:grid-cols-2");
-  });
-
-  it("applies @xl:border-l to even-numbered rows for visual column separation at @xl:", () => {
-    renderWithProviders(
-      <IssueMetadata
-        issue={fixtureIssue}
-        allUsers={fixtureUsers}
-        currentUserId="user-1"
-        accessLevel="member"
-        ownershipContext={fixtureOwnership}
-      />
-    );
-    expect(screen.getByTestId("issue-metadata-row-priority")).toHaveClass(
-      "@xl:border-l"
-    );
-    expect(screen.getByTestId("issue-metadata-row-frequency")).toHaveClass(
-      "@xl:border-l"
-    );
-  });
-
-  it("does not apply @xl:border-l to Status or Severity (left-column) rows", () => {
-    renderWithProviders(
-      <IssueMetadata
-        issue={fixtureIssue}
-        allUsers={fixtureUsers}
-        currentUserId="user-1"
-        accessLevel="member"
-        ownershipContext={fixtureOwnership}
-      />
-    );
-    expect(screen.getByTestId("issue-metadata-row-status")).not.toHaveClass(
-      "@xl:border-l"
-    );
-    expect(screen.getByTestId("issue-metadata-row-severity")).not.toHaveClass(
-      "@xl:border-l"
-    );
-  });
-
-  it("forwards accessLevel to form children — unauthenticated renders differently than member", () => {
-    const { container: memberContainer } = renderWithProviders(
-      <IssueMetadata
-        issue={fixtureIssue}
-        allUsers={fixtureUsers}
-        currentUserId="user-1"
-        accessLevel="member"
-        ownershipContext={fixtureOwnership}
-      />
-    );
-    const memberHTML = memberContainer.innerHTML;
+    // Member: each editable field renders a server-action <form data-form="...">
+    // (the forms internally branch on accessLevel and the unauthenticated variant
+    // renders a static IssueBadge instead).
+    expect(
+      memberContainer.querySelectorAll('form[data-form="update-status"]')
+    ).toHaveLength(1);
+    expect(
+      memberContainer.querySelectorAll('form[data-form="update-priority"]')
+    ).toHaveLength(1);
+    expect(screen.queryByTestId("assignee-readonly")).not.toBeInTheDocument();
+    unmount();
 
     const { container: anonContainer } = renderWithProviders(
+      <IssueMetadata
+        issue={fixtureIssue}
+        allUsers={[]}
+        currentUserId={null}
+        accessLevel="unauthenticated"
+        ownershipContext={fixtureOwnership}
+      />
+    );
+    expect(
+      anonContainer.querySelectorAll('form[data-form="update-status"]')
+    ).toHaveLength(0);
+    expect(
+      anonContainer.querySelectorAll('form[data-form="update-priority"]')
+    ).toHaveLength(0);
+    expect(screen.getByTestId("assignee-readonly")).toBeInTheDocument();
+  });
+
+  it("unauthenticated path displays the assignee name from allUsers", () => {
+    // Regression guard: AssignIssueForm reads the assignee name via
+    // `users.find(u => u.id === assignedToId)?.name ?? "Unassigned"` in the
+    // readonly branch. If the lookup silently fails (e.g. allUsers not threaded
+    // through, or assignedToId truncated), the readonly cell would display
+    // "Unassigned" instead of the actual user's name.
+    renderWithProviders(
       <IssueMetadata
         issue={fixtureIssue}
         allUsers={fixtureUsers}
@@ -177,11 +139,7 @@ describe("IssueMetadata", () => {
         ownershipContext={fixtureOwnership}
       />
     );
-    const anonHTML = anonContainer.innerHTML;
-
-    // If accessLevel reaches the forms, the rendered output should differ.
-    // The forms use accessLevel to gate their interactive UI, so member mode and
-    // unauthenticated mode produce structurally different DOM.
-    expect(memberHTML).not.toBe(anonHTML);
+    const readonly = screen.getByTestId("assignee-readonly");
+    expect(readonly).toHaveTextContent("Tim F.");
   });
 });
