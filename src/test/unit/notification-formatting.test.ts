@@ -313,7 +313,7 @@ describe("Notification Formatting", () => {
     });
 
     it("should include unsubscribe link when userId and secret are provided", () => {
-      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret-key");
+      vi.stubEnv("UNSUBSCRIBE_SIGNING_SECRET", "test-secret-key");
 
       const html = getEmailHtml({
         type: "new_issue",
@@ -341,7 +341,7 @@ describe("Notification Formatting", () => {
 
   describe("Unsubscribe Token", () => {
     it("should generate a consistent HMAC token", () => {
-      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret");
+      vi.stubEnv("UNSUBSCRIBE_SIGNING_SECRET", "test-secret");
 
       const token1 = generateUnsubscribeToken("user-abc");
       const token2 = generateUnsubscribeToken("user-abc");
@@ -352,7 +352,7 @@ describe("Notification Formatting", () => {
     });
 
     it("should generate different tokens for different users", () => {
-      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret");
+      vi.stubEnv("UNSUBSCRIBE_SIGNING_SECRET", "test-secret");
 
       const token1 = generateUnsubscribeToken("user-1");
       const token2 = generateUnsubscribeToken("user-2");
@@ -362,10 +362,10 @@ describe("Notification Formatting", () => {
     });
 
     it("should return empty string when no secret is configured", () => {
-      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+      vi.stubEnv("UNSUBSCRIBE_SIGNING_SECRET", "");
       // Need to delete the env var since empty string is falsy
       // eslint-disable-next-line @typescript-eslint/dot-notation -- dynamic key deletion
-      delete process.env["SUPABASE_SERVICE_ROLE_KEY"];
+      delete process.env["UNSUBSCRIBE_SIGNING_SECRET"];
 
       const token = generateUnsubscribeToken("user-abc");
       expect(token).toBe("");
@@ -374,7 +374,7 @@ describe("Notification Formatting", () => {
     });
 
     it("should verify a valid token", () => {
-      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret");
+      vi.stubEnv("UNSUBSCRIBE_SIGNING_SECRET", "test-secret");
 
       const token = generateUnsubscribeToken("user-abc");
       expect(verifyUnsubscribeToken("user-abc", token)).toBe(true);
@@ -383,7 +383,7 @@ describe("Notification Formatting", () => {
     });
 
     it("should reject an invalid token", () => {
-      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret");
+      vi.stubEnv("UNSUBSCRIBE_SIGNING_SECRET", "test-secret");
 
       expect(verifyUnsubscribeToken("user-abc", "invalid-token")).toBe(false);
 
@@ -391,7 +391,7 @@ describe("Notification Formatting", () => {
     });
 
     it("should reject a token for the wrong user", () => {
-      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret");
+      vi.stubEnv("UNSUBSCRIBE_SIGNING_SECRET", "test-secret");
 
       const token = generateUnsubscribeToken("user-1");
       expect(verifyUnsubscribeToken("user-2", token)).toBe(false);

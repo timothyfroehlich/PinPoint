@@ -45,11 +45,21 @@ const EMAIL_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
 };
 
 /**
+ * Returns the HMAC signing secret for unsubscribe tokens.
+ * Uses UNSUBSCRIBE_SIGNING_SECRET, which must be set independently of the
+ * Supabase service role key so that Supabase key rotation does not invalidate
+ * outstanding unsubscribe URLs.
+ */
+function getUnsubscribeSigningSecret(): string {
+  return process.env["UNSUBSCRIBE_SIGNING_SECRET"] ?? "";
+}
+
+/**
  * Generate an HMAC-signed unsubscribe token for a user.
- * Uses SUPABASE_SERVICE_ROLE_KEY as the signing secret.
+ * Uses UNSUBSCRIBE_SIGNING_SECRET as the signing secret.
  */
 export function generateUnsubscribeToken(userId: string): string {
-  const secret = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  const secret = getUnsubscribeSigningSecret();
   if (!secret) {
     return "";
   }
