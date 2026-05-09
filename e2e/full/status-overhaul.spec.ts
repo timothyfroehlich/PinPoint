@@ -19,10 +19,6 @@ test.describe("Status Overhaul E2E", () => {
   });
 
   test("should create issue and verify all 4 badges", async ({ page }) => {
-    test.fixme(
-      true,
-      "PP-v7g — Radix Select portal mount timing under CI load; awaiting verification of PP-awg/#1280 absorption"
-    );
     const machine = seededMachines.addamsFamily;
 
     // 1. Create Issue
