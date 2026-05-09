@@ -429,9 +429,9 @@ export async function signupAction(
  * Logout Action
  *
  * Signs out the current device's session only (local scope). Other devices
- * remain signed in until the user explicitly chooses "sign out everywhere"
- * or the JWT expires naturally. Account deletion (deleteAccountAction) does
- * a global revocation separately so a deleted account can't outlive its row.
+ * remain signed in until they sign out themselves or their JWT expires
+ * naturally. Account deletion (deleteAccountAction) does a global revocation
+ * separately so a deleted account can't outlive its row.
  */
 export async function logoutAction(): Promise<void> {
   try {

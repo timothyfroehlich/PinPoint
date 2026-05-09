@@ -56,6 +56,11 @@ vi.mock("~/lib/logger", () => ({
   },
 }));
 
+const mockReportError = vi.fn();
+vi.mock("~/lib/observability/report-error", () => ({
+  reportError: (...args: unknown[]) => mockReportError(...args),
+}));
+
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(() => {
     throw new RedirectError();
@@ -185,7 +190,8 @@ describe("deleteAccountAction", () => {
     ).rejects.toThrow("NEXT_REDIRECT");
 
     // Admin signOut must revoke all sessions BEFORE the auth row is deleted —
-    // otherwise issued JWTs remain valid until expiry (~1h).
+    // otherwise issued JWTs remain valid until they expire per the configured
+    // Supabase access token TTL.
     expect(mockAdminSignOut).toHaveBeenCalledWith("user-1", "global");
     expect(mockDeleteUser).toHaveBeenCalledWith("user-1");
     const signOutOrder = mockAdminSignOut.mock.invocationCallOrder[0];
@@ -209,5 +215,26 @@ describe("deleteAccountAction", () => {
 
     expect(mockSignOut).toHaveBeenCalled();
     expect(redirect).toHaveBeenCalledWith("/");
+  });
+
+  it("reports admin signOut errors but still proceeds with deletion", async () => {
+    const signOutErr = { message: "supabase signOut failed" };
+    mockAdminSignOut.mockResolvedValue({ error: signOutErr });
+
+    await expect(
+      deleteAccountAction(undefined, makeFormData("DELETE"))
+    ).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(mockReportError).toHaveBeenCalledWith(
+      signOutErr,
+      expect.objectContaining({
+        action: "deleteAccountAuthSignOut",
+        bestEffort: true,
+        userId: "user-1",
+      })
+    );
+    // Deletion must still run even when token revocation reports an error,
+    // because anonymized data has been committed and the row needs to go.
+    expect(mockDeleteUser).toHaveBeenCalledWith("user-1");
   });
 });
