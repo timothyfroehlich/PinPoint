@@ -116,7 +116,7 @@ export type UpdateIssueTitleResult = Result<
 >;
 
 export type ReassignIssueMachineResult = Result<
-  { issueId: string; newUrl: string },
+  { issueId: string },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
 
@@ -998,9 +998,11 @@ export async function updateIssueTitleAction(
  *
  * Moves an issue from one machine to another. Reserves a fresh issue number
  * on the destination machine; the old number on the source becomes a permanent
- * gap. Returns the new canonical URL so the client can navigate after success
- * (visiting the old `/m/<from>/i/<N>` URL after a move now redirects to
- * `/m/<from>` because the issue is no longer found there).
+ * gap. On success the action calls `redirect()` server-side to navigate the
+ * user to `/m/<to>/i/<N>` — the function never returns an `ok` Result, only
+ * `err` Results for failure cases. (Visiting the old `/m/<from>/i/<N>` URL
+ * after a move now redirects to `/m/<from>` because the issue is no longer
+ * found there.)
  */
 export async function reassignIssueMachineAction(
   _prevState: ReassignIssueMachineResult | undefined,
