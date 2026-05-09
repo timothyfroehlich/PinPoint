@@ -62,6 +62,7 @@ MANAGED_ENV_KEYS = {
     "SUPABASE_SERVICE_ROLE_KEY",
     "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
     "TURNSTILE_SECRET_KEY",
+    "UNSUBSCRIBE_SIGNING_SECRET",
 }
 
 CONFIG_HEADER = """\
@@ -325,6 +326,10 @@ def format_env_file(
         "# To test CAPTCHA UI locally, uncomment these. Production sets them via Vercel env.",
         f"# NEXT_PUBLIC_TURNSTILE_SITE_KEY={managed_values['NEXT_PUBLIC_TURNSTILE_SITE_KEY']}",
         f"# TURNSTILE_SECRET_KEY={managed_values['TURNSTILE_SECRET_KEY']}",
+        "",
+        "# Unsubscribe-link HMAC signing secret (local-dev placeholder).",
+        "# Production uses a real `openssl rand -hex 32` value set in Vercel env.",
+        f"UNSUBSCRIBE_SIGNING_SECRET={managed_values['UNSUBSCRIBE_SIGNING_SECRET']}",
     ]
 
     # Preserve custom user keys
@@ -390,6 +395,9 @@ def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
         "SUPABASE_SERVICE_ROLE_KEY": LOCAL_SUPABASE_SERVICE_ROLE_KEY,
         "NEXT_PUBLIC_TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
         "TURNSTILE_SECRET_KEY": "1x0000000000000000000000000000000AA",
+        # Local-dev signing secret for unsubscribe-link HMAC tokens. Production
+        # uses a real `openssl rand -hex 32` value (set in Vercel env).
+        "UNSUBSCRIBE_SIGNING_SECRET": "local-dev-only-not-a-real-secret-0000000000000000000000000000000000",
     }
 
     return format_env_file(managed_values, user_values, port_config)

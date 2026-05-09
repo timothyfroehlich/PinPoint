@@ -114,6 +114,8 @@ export default defineConfig({
     env: {
       PORT: String(port),
       MOCK_BLOB_STORAGE: process.env["MOCK_BLOB_STORAGE"] ?? "",
+      UNSUBSCRIBE_SIGNING_SECRET:
+        process.env["UNSUBSCRIBE_SIGNING_SECRET"] ?? "",
     },
   },
 });
