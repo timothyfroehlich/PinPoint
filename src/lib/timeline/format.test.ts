@@ -97,7 +97,7 @@ describe("formatTimelineEvent", () => {
       toMachineName: "Kiss Pro",
     };
     expect(formatTimelineEvent(event)).toBe(
-      "Moved from MM-7 (Medieval Madness) to KP-12 (Kiss Pro)"
+      "Moved from MM-07 (Medieval Madness) to KP-12 (Kiss Pro)"
     );
   });
 

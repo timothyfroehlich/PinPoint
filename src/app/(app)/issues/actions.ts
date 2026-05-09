@@ -12,7 +12,13 @@ import { type z } from "zod";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
+import {
+  issues,
+  userProfiles,
+  issueComments,
+  issueImages,
+  machines,
+} from "~/server/db/schema";
 import { log } from "~/lib/logger";
 import { serverActionError } from "~/lib/observability/report-error";
 import {
@@ -41,12 +47,6 @@ import {
   reassignIssueMachine,
 } from "~/services/issues";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import {
-  userProfiles,
-  issueComments,
-  issueImages,
-  machines,
-} from "~/server/db/schema";
 import {
   type ProseMirrorDoc,
   docToPlainText,
@@ -998,8 +998,8 @@ export async function updateIssueTitleAction(
  * Moves an issue from one machine to another. Reserves a fresh issue number
  * on the destination machine; the old number on the source becomes a permanent
  * gap. Returns the new canonical URL so the client can navigate after success
- * (the old URL would 404 since this page redirects when the issue isn't found
- * on the requested machine).
+ * (visiting the old `/m/<from>/i/<N>` URL after a move now redirects to
+ * `/m/<from>` because the issue is no longer found there).
  */
 export async function reassignIssueMachineAction(
   _prevState: ReassignIssueMachineResult | undefined,
@@ -1031,9 +1031,7 @@ export async function reassignIssueMachineAction(
       where: eq(issues.id, issueId),
       columns: {
         machineInitials: true,
-        issueNumber: true,
         reportedBy: true,
-        assignedTo: true,
       },
       with: {
         machine: { columns: { ownerId: true } },

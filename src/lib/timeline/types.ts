@@ -11,6 +11,7 @@ import {
   PRIORITY_CONFIG,
   FREQUENCY_CONFIG,
 } from "~/lib/issues/status";
+import { formatIssueId } from "~/lib/issues/utils";
 
 /**
  * Structured timeline event payload.
@@ -60,7 +61,7 @@ export function formatTimelineEvent(event: TimelineEventData): string {
     case "title_changed":
       return `Title changed from "${event.from}" to "${event.to}"`;
     case "machine_reassigned":
-      return `Moved from ${event.fromInitials}-${event.fromIssueNumber.toString()} (${event.fromMachineName}) to ${event.toInitials}-${event.toIssueNumber.toString()} (${event.toMachineName})`;
+      return `Moved from ${formatIssueId(event.fromInitials, event.fromIssueNumber)} (${event.fromMachineName}) to ${formatIssueId(event.toInitials, event.toIssueNumber)} (${event.toMachineName})`;
     default:
       return assertUnreachableEvent(event);
   }

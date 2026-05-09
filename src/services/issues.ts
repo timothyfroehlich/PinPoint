@@ -882,9 +882,6 @@ export async function reassignIssueMachine({
       columns: {
         machineInitials: true,
         issueNumber: true,
-        title: true,
-        assignedTo: true,
-        reportedBy: true,
       },
       with: {
         machine: { columns: { name: true } },
