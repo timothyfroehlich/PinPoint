@@ -6,8 +6,9 @@ import { serverActionError } from "~/lib/observability/report-error";
 import { type Result, ok, err } from "~/lib/result";
 import { toggleIssueWatcher } from "~/services/issues";
 import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
+import { issues, userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 export type ToggleWatcherResult = Result<
   { isWatching: boolean },
@@ -27,6 +28,15 @@ export async function toggleWatcherAction(
   }
 
   try {
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (!checkPermission("issues.watch", getAccessLevel(userProfile?.role))) {
+      return err("UNAUTHORIZED", "You do not have permission to watch issues");
+    }
+
     const result = await toggleIssueWatcher({ issueId, userId: user.id });
 
     const issue = await db.query.issues.findFirst({
