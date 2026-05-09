@@ -428,9 +428,10 @@ export async function signupAction(
 /**
  * Logout Action
  *
- * Signs out the user across all active sessions/devices (global scope) and
- * clears the current browser's session cookie. Other browsers/devices will
- * be logged out on their next request once the JWT is rejected.
+ * Signs out the current device's session only (local scope). Other devices
+ * remain signed in until the user explicitly chooses "sign out everywhere"
+ * or the JWT expires naturally. Account deletion (deleteAccountAction) does
+ * a global revocation separately so a deleted account can't outlive its row.
  */
 export async function logoutAction(): Promise<void> {
   try {
@@ -441,7 +442,7 @@ export async function logoutAction(): Promise<void> {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { error } = await supabase.auth.signOut({ scope: "global" });
+    const { error } = await supabase.auth.signOut({ scope: "local" });
 
     if (error) {
       log.error(
