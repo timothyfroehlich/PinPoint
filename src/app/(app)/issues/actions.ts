@@ -1082,11 +1082,11 @@ export async function reassignIssueMachineAction(
       userId: user.id,
     });
 
-    // Revalidate both old and new paths so issue lists on each machine reflect
-    // the move.
-    revalidatePath(
-      `/m/${result.fromInitials}/i/${result.fromIssueNumber.toString()}`
-    );
+    // Revalidate the source machine list (issue is gone) and both destination
+    // paths (issue lives there now). DO NOT revalidate the source issue path —
+    // the user is currently on it, and an eager refetch would server-redirect
+    // them to /m/<from> before the client useEffect can router.push to the new
+    // URL. The stale source-issue cache will refresh on next access anyway.
     revalidatePath(`/m/${result.fromInitials}`);
     revalidatePath(
       `/m/${result.toInitials}/i/${result.toIssueNumber.toString()}`
