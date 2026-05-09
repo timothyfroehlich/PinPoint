@@ -44,14 +44,31 @@ const EMAIL_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   },
 };
 
+let warnedMissingSecret = false;
+
 /**
  * Returns the HMAC signing secret for unsubscribe tokens.
  * Uses UNSUBSCRIBE_SIGNING_SECRET, which must be set independently of the
  * Supabase service role key so that Supabase key rotation does not invalidate
  * outstanding unsubscribe URLs.
+ *
+ * Logs once in production if the secret is missing — without it, unsubscribe
+ * links are omitted from outgoing emails and any incoming /api/unsubscribe
+ * request will reject, which is a CAN-SPAM compliance risk worth surfacing.
  */
 function getUnsubscribeSigningSecret(): string {
-  return process.env["UNSUBSCRIBE_SIGNING_SECRET"] ?? "";
+  const secret = process.env["UNSUBSCRIBE_SIGNING_SECRET"] ?? "";
+  if (!secret && !warnedMissingSecret) {
+    warnedMissingSecret = true;
+    if (process.env["VERCEL_ENV"] === "production") {
+      log.error(
+        { action: "unsubscribe.signingSecretMissing" },
+        "UNSUBSCRIBE_SIGNING_SECRET not set in production — unsubscribe links " +
+          "will be omitted from outgoing emails and incoming requests will reject."
+      );
+    }
+  }
+  return secret;
 }
 
 /**
