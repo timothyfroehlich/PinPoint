@@ -26,24 +26,24 @@ export async function markAsReadAction(
     return err("UNAUTHORIZED", "Unauthorized");
   }
 
-  const userProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-
-  if (
-    !checkPermission(
-      "notifications.manage_own",
-      getAccessLevel(userProfile?.role)
-    )
-  ) {
-    return err(
-      "UNAUTHORIZED",
-      "You do not have permission to manage notifications"
-    );
-  }
-
   try {
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !checkPermission(
+        "notifications.manage_own",
+        getAccessLevel(userProfile?.role)
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to manage notifications"
+      );
+    }
+
     await db
       .delete(notifications)
       .where(
@@ -78,24 +78,24 @@ export async function markAllAsReadAction(): Promise<MarkAsReadResult> {
     return err("UNAUTHORIZED", "Unauthorized");
   }
 
-  const userProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-
-  if (
-    !checkPermission(
-      "notifications.manage_own",
-      getAccessLevel(userProfile?.role)
-    )
-  ) {
-    return err(
-      "UNAUTHORIZED",
-      "You do not have permission to manage notifications"
-    );
-  }
-
   try {
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !checkPermission(
+        "notifications.manage_own",
+        getAccessLevel(userProfile?.role)
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to manage notifications"
+      );
+    }
+
     await db
       .delete(notifications)
       .where(and(eq(notifications.userId, user.id)));

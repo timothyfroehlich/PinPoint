@@ -27,16 +27,16 @@ export async function toggleWatcherAction(
     return err("UNAUTHORIZED", "Unauthorized");
   }
 
-  const userProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-
-  if (!checkPermission("issues.watch", getAccessLevel(userProfile?.role))) {
-    return err("UNAUTHORIZED", "You do not have permission to watch issues");
-  }
-
   try {
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (!checkPermission("issues.watch", getAccessLevel(userProfile?.role))) {
+      return err("UNAUTHORIZED", "You do not have permission to watch issues");
+    }
+
     const result = await toggleIssueWatcher({ issueId, userId: user.id });
 
     const issue = await db.query.issues.findFirst({
