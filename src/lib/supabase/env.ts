@@ -9,16 +9,16 @@ export function getSupabaseEnv(): SupabaseEnv {
     process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? process.env["SUPABASE_URL"];
 
   // Supabase docs often refer to "publishable" keys, while some integrations still use
-  // "anon" naming. Support both.
+  // "anon" naming. Support both NEXT_PUBLIC_ variants. Non-NEXT_PUBLIC_ variants are
+  // excluded: this helper is used in client bundles and non-prefixed env vars would
+  // never reach the browser.
   const publishableKey =
     process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
-    process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"] ??
-    process.env["SUPABASE_PUBLISHABLE_KEY"] ??
-    process.env["SUPABASE_ANON_KEY"];
+    process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
 
   if (!url || !publishableKey) {
     throw new Error(
-      "Missing Supabase env vars: set NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) and one of NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_PUBLISHABLE_KEY, or SUPABASE_ANON_KEY."
+      "Missing Supabase env vars: set NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) and one of NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY."
     );
   }
 

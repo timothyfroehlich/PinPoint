@@ -15,13 +15,13 @@ import { createClient } from "@supabase/supabase-js";
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- Supabase createClient has complex generic return type
 export function createAdminClient() {
   const url =
-    process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? process.env["SUPABASE_URL"];
+    process.env["SUPABASE_URL"] ?? process.env["NEXT_PUBLIC_SUPABASE_URL"];
 
   const serviceRoleKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
 
   if (!url || !serviceRoleKey) {
     throw new Error(
-      "Missing Supabase admin env vars: set NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY."
+      "Missing Supabase admin env vars: set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY."
     );
   }
 
