@@ -1,0 +1,419 @@
+<h2>Pill row organization</h2>
+<p class="subtitle">Three ways to break up the flat 8-pill row. Same data, different organization. Pick the structure that gives you the cleanest scanning experience.</p>
+
+<style>
+  .org-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+
+  .org-option {
+    cursor: pointer;
+    border: 2px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 1.25rem;
+    background: #161616;
+    transition: border-color 150ms;
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 1.25rem;
+    align-items: start;
+  }
+  @media (max-width: 1100px) {
+    .org-option { grid-template-columns: 1fr; }
+  }
+  .org-option:hover { border-color: #6cc6ff; }
+  .org-option.selected {
+    border-color: #6cc6ff;
+    box-shadow: 0 0 0 3px rgba(108, 198, 255, 0.18);
+  }
+
+  .org-meta { display: flex; flex-direction: column; gap: 0.5rem; }
+  .org-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .org-letter {
+    font-weight: 700;
+    color: #6cc6ff;
+    font-size: 1.1rem;
+  }
+  .org-title {
+    font-weight: 600;
+    color: #f0f0f0;
+  }
+  .org-tagline {
+    font-size: 0.85rem;
+    color: #a0a0a0;
+    line-height: 1.5;
+  }
+  .pros-cons-mini {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    line-height: 1.45;
+  }
+  .pros-cons-mini .pros { color: #6cc66c; }
+  .pros-cons-mini .cons { color: #c66c6c; }
+  .pros-cons-mini ul { margin: 4px 0 0 0; padding-left: 1rem; }
+  .pros-cons-mini li { margin-bottom: 3px; }
+
+  /* Device frame */
+  .device {
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    background: #0d0d0d;
+    overflow: hidden;
+  }
+  .device-label {
+    background: #1a1a1a;
+    color: #888;
+    padding: 5px 10px;
+    font-size: 0.7rem;
+    font-family: ui-monospace, monospace;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .device-body {
+    padding: 14px;
+    color: #e0e0e0;
+  }
+
+  .pp-back {
+    color: #6b89c8;
+    font-size: 0.7rem;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .pp-eyebrow {
+    color: #888;
+    font-size: 0.65rem;
+    font-family: ui-monospace, monospace;
+    margin-bottom: 2px;
+  }
+  .pp-eyebrow .ctx {
+    color: #aaa;
+    font-family: inherit;
+  }
+  .pp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #2a2a2a;
+    margin-bottom: 12px;
+  }
+  .pp-header-text { flex: 1; min-width: 0; }
+  .pp-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    line-height: 1.3;
+    color: #f0f0f0;
+    margin: 2px 0 0 0;
+  }
+  .pp-subtitle {
+    color: #888;
+    font-size: 0.7rem;
+    margin-top: 6px;
+  }
+  .pp-status-hero {
+    background: #1a3a4a;
+    color: #6cc6ff;
+    border: 1px solid #2a5a7a;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  /* Pill base */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #1a1a1a;
+    color: #c0c0c0;
+    border: 1px solid #2a2a2a;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    cursor: pointer;
+  }
+  .pill .ico { color: #777; }
+  .pill .key { color: #888; font-size: 0.6rem; }
+  .pill .val { color: #e0e0e0; font-weight: 500; }
+  .pill.priority { color: #ffaa66; border-color: #6a4a2a; }
+  .pill.priority .val { color: #ffaa66; }
+  .pill.editable { background: #1f1f1f; }
+  .pill.static {
+    background: transparent;
+    cursor: default;
+    border-color: #1f1f1f;
+    color: #888;
+  }
+  .pill.static .val { color: #b0b0b0; font-weight: 400; }
+
+  .pp-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pp-block {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: #888;
+    font-size: 0.7rem;
+    margin-bottom: 6px;
+  }
+  .pp-section { margin-top: 14px; }
+  .pp-section-title {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+
+  /* Variant α: Reduce + reorganize */
+  .alpha-watch-cluster {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 0.65rem;
+    color: #888;
+  }
+  .alpha-watch-cluster .pill {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+  }
+
+  /* Variant β: Group with separators */
+  .beta-divider {
+    width: 1px;
+    background: #2a2a2a;
+    margin: 0 4px;
+    align-self: stretch;
+  }
+  .beta-group {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+  }
+  .beta-group-label {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #666;
+    margin-right: 4px;
+    font-weight: 600;
+  }
+
+  /* Variant γ: Two-tier rows */
+  .gamma-tier-1 {
+    margin-bottom: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .gamma-tier-2 {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding-top: 6px;
+    border-top: 1px dashed #2a2a2a;
+  }
+  .gamma-tier-2 .pill {
+    background: transparent;
+    border-color: transparent;
+    padding: 2px 4px;
+    color: #888;
+  }
+  .gamma-tier-2 .pill .val { color: #aaa; font-weight: 400; }
+</style>
+
+<div class="org-grid" data-multiselect>
+
+  <!-- ─────── Variant α: Reduce + reorganize ─────── -->
+  <div class="org-option option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="org-meta">
+      <div class="org-head">
+        <span class="org-letter">α</span>
+        <span class="org-title">Reduce: 3 editable pills, push the rest into header chrome</span>
+      </div>
+      <p class="org-tagline">Pull <strong>identity context</strong> (machine, location) into a small eyebrow above the title. Pull <strong>engagement signals</strong> (reporter, created, watchers) into a footer subtitle line. The pill row becomes only what you actually edit: <strong>Priority, Assignee, Machine</strong>.</p>
+      <div class="pros-cons-mini">
+        <div class="pros"><strong>Pros</strong><ul>
+          <li>Pill row earns its visual weight — only edit-frequent fields</li>
+          <li>Identity/context lives in the title area where it's read first</li>
+          <li>Cleanest mobile (3 pills wrap nicely)</li>
+          <li>Closest to Linear's actual practice</li>
+        </ul></div>
+        <div class="cons"><strong>Cons</strong><ul>
+          <li>Header is denser — eyebrow + title + status + subtitle</li>
+          <li>Watchers count is small in the subtitle, not pill-sized</li>
+          <li>"More" panel becomes redundant — everything's on screen</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="device">
+      <div class="device-label">Desktop · 1024px</div>
+      <div class="device-body">
+        <a class="pp-back">← Back to Issues</a>
+        <div class="pp-header">
+          <div class="pp-header-text">
+            <div class="pp-eyebrow">#PIN-101 · <span class="ctx">Pinballz / Iron Maiden</span></div>
+            <h3 class="pp-title">Flippers stuck on Iron Maiden</h3>
+            <div class="pp-subtitle">Reported by Tim F. <span style="color:#ffaa66;">(Owner)</span> · 2 days ago · <span style="color:#aaa;">2 watching</span> · <span class="pill" style="font-size:0.6rem;padding:1px 6px;">+ Watch</span></div>
+          </div>
+          <span class="pp-status-hero">● In Progress</span>
+        </div>
+        <div class="pp-pills">
+          <span class="pill priority editable"><span class="ico">▲</span><span class="val">High</span></span>
+          <span class="pill editable"><span class="ico">👤</span><span class="val">Tim F.</span></span>
+          <span class="pill editable"><span class="ico">🎮</span><span class="val">Iron Maiden</span></span>
+        </div>
+        <div class="pp-section">
+          <div class="pp-section-title">Description</div>
+          <div class="pp-block">Both flippers stop responding mid-game…</div>
+        </div>
+        <div class="pp-section">
+          <div class="pp-section-title">Activity</div>
+          <div class="pp-block">Tim F. assigned · 2h</div>
+          <div class="pp-block">Status: New → In Progress · 1h</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────── Variant β: Grouped with separators ─────── -->
+  <div class="org-option option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="org-meta">
+      <div class="org-head">
+        <span class="org-letter">β</span>
+        <span class="org-title">Group: keep all 8 pills, organize by role</span>
+      </div>
+      <p class="org-tagline">Same pill row, but split into semantic groups with vertical dividers. Group 1 = state (priority). Group 2 = people (assignee). Group 3 = context (machine, location). Group 4 = engagement (watchers, reporter, created, watch).</p>
+      <div class="pros-cons-mini">
+        <div class="pros"><strong>Pros</strong><ul>
+          <li>Nothing's hidden — every field visible</li>
+          <li>Scanning by group is faster than by individual pill</li>
+          <li>Same vocabulary at every viewport</li>
+        </ul></div>
+        <div class="cons"><strong>Cons</strong><ul>
+          <li>Dividers add visual chrome the design bible hasn't defined</li>
+          <li>Mobile wrap breaks groups across lines awkwardly</li>
+          <li>Still 8 pills — high cognitive load even with organization</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="device">
+      <div class="device-label">Desktop · 1024px</div>
+      <div class="device-body">
+        <a class="pp-back">← Back to Issues</a>
+        <div class="pp-header">
+          <div class="pp-header-text">
+            <div class="pp-eyebrow">#PIN-101</div>
+            <h3 class="pp-title">Flippers stuck on Iron Maiden</h3>
+          </div>
+          <span class="pp-status-hero">● In Progress</span>
+        </div>
+        <div class="pp-pills" style="align-items: center;">
+          <div class="beta-group">
+            <span class="pill priority editable"><span class="ico">▲</span><span class="val">High</span></span>
+          </div>
+          <div class="beta-divider"></div>
+          <div class="beta-group">
+            <span class="pill editable"><span class="ico">👤</span><span class="val">Tim F.</span></span>
+          </div>
+          <div class="beta-divider"></div>
+          <div class="beta-group">
+            <span class="pill editable"><span class="ico">🎮</span><span class="val">Iron Maiden</span></span>
+            <span class="pill static"><span class="ico">📍</span><span class="val">Pinballz</span></span>
+          </div>
+          <div class="beta-divider"></div>
+          <div class="beta-group">
+            <span class="pill static"><span class="ico">👁</span><span class="val">2</span></span>
+            <span class="pill static"><span class="ico">🪪</span><span class="val">Tim F.</span></span>
+            <span class="pill static"><span class="ico">📅</span><span class="val">Apr 25</span></span>
+            <span class="pill" style="border-style: dashed;"><span class="val">+ Watch</span></span>
+          </div>
+        </div>
+        <div class="pp-section">
+          <div class="pp-section-title">Description</div>
+          <div class="pp-block">Both flippers stop responding mid-game…</div>
+        </div>
+        <div class="pp-section">
+          <div class="pp-section-title">Activity</div>
+          <div class="pp-block">Tim F. assigned · 2h</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────── Variant γ: Two-tier rows ─────── -->
+  <div class="org-option option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="org-meta">
+      <div class="org-head">
+        <span class="org-letter">γ</span>
+        <span class="org-title">Two-tier: editable row above, static row below</span>
+      </div>
+      <p class="org-tagline">Tier 1 (filled, prominent) holds the editable pills. Tier 2 (transparent, lighter) holds the static reference data. Visually distinct; tier 1 is where you act, tier 2 is what you read.</p>
+      <div class="pros-cons-mini">
+        <div class="pros"><strong>Pros</strong><ul>
+          <li>Strong visual hierarchy: action vs reference</li>
+          <li>Tier 2 can wrap independently without confusing tier 1</li>
+          <li>Anonymous user mode is natural — tier 1 just goes static (still distinct from tier 2)</li>
+        </ul></div>
+        <div class="cons"><strong>Cons</strong><ul>
+          <li>Two pill styles to maintain in the design system</li>
+          <li>Vertical space cost — adds a row</li>
+          <li>Boundary between "editable" and "static" can feel arbitrary (machine: editable but feels like context)</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="device">
+      <div class="device-label">Desktop · 1024px</div>
+      <div class="device-body">
+        <a class="pp-back">← Back to Issues</a>
+        <div class="pp-header">
+          <div class="pp-header-text">
+            <div class="pp-eyebrow">#PIN-101</div>
+            <h3 class="pp-title">Flippers stuck on Iron Maiden</h3>
+          </div>
+          <span class="pp-status-hero">● In Progress</span>
+        </div>
+        <div class="gamma-tier-1">
+          <span class="pill priority editable"><span class="ico">▲</span><span class="val">High</span></span>
+          <span class="pill editable"><span class="ico">👤</span><span class="val">Tim F.</span></span>
+          <span class="pill editable"><span class="ico">🎮</span><span class="val">Iron Maiden</span></span>
+          <span class="pill" style="border-style: dashed; background:transparent;"><span class="val">+ Watch</span></span>
+        </div>
+        <div class="gamma-tier-2">
+          <span class="pill static"><span class="ico">📍</span><span class="val">Pinballz</span></span>
+          <span class="pill static"><span class="ico">🪪</span><span class="val">Tim F. (Owner)</span></span>
+          <span class="pill static"><span class="ico">👁</span><span class="val">2 watching</span></span>
+          <span class="pill static"><span class="ico">📅</span><span class="val">Apr 25</span></span>
+        </div>
+        <div class="pp-section">
+          <div class="pp-section-title">Description</div>
+          <div class="pp-block">Both flippers stop responding mid-game…</div>
+        </div>
+        <div class="pp-section">
+          <div class="pp-section-title">Activity</div>
+          <div class="pp-block">Tim F. assigned · 2h</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p style="margin-top: 1.5rem; padding: 14px; background: rgba(108, 198, 255, 0.06); border-left: 3px solid #6cc6ff; border-radius: 0 6px 6px 0; font-size: 0.85rem; color: #c0c0c0; line-height: 1.55;">
+  <strong style="color: #e0e0e0;">My recommendation: α.</strong> The right move is fewer pills, not more organization for too many. A 3-pill row (Priority / Assignee / Machine) reads as "the things you change about this issue" — that's a clean concept. Identity (location, machine) belongs in the title eyebrow because that's how you contextually find the issue. Engagement (watchers, reporter, created) belongs in the subtitle because it's about people and time, not state. β just lipsticks the pig (8 pills is still 8 pills). γ is structurally sound but pays a vertical-space tax for a real-estate problem α solves by relocating, not stacking.
+</p>

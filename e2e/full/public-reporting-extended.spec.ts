@@ -162,8 +162,11 @@ test.describe("Public Issue Reporting - Extended", () => {
     await issueRow.getByTestId("issue-title").click();
     await expect(page).toHaveURL(/\/m\/[A-Z0-9]+\/i\/\d+/);
 
-    // 6. Verify status badge shows 'New' on the detail page
-    const statusBadge = page.getByTestId("issue-status-badge").first();
-    await expect(statusBadge).toHaveText(/New/i);
+    // 6. Verify status display shows 'New' on the detail page.
+    // The detail page uses an interactive StatusSelect for authenticated users
+    // (testid: issue-status-select). The select trigger renders the current
+    // status label as its visible value.
+    const statusSelect = page.getByTestId("issue-status-select").first();
+    await expect(statusSelect).toContainText(/New/i);
   });
 });

@@ -14,10 +14,10 @@ test.describe("Reporter Variations E2E", () => {
     // AFM Issue 1 is reportedBy member@test.com
     const issue = seededIssues.AFM[0];
     await page.goto(`/m/AFM/i/${issue.num}`);
-    const sidebar = page.getByTestId("issue-sidebar");
+    const subtitle = page.getByTestId("issue-detail-subtitle");
 
     // Check for member name in the reporter section
-    await expect(sidebar).toContainText("Member User");
+    await expect(subtitle).toContainText("Member User");
 
     // Check timeline initial report (use .first() to avoid strict mode violation from multiple "Member User" entries)
     await expect(
@@ -34,27 +34,27 @@ test.describe("Reporter Variations E2E", () => {
     // TAF Issue 1 is reporterName: 'John Guest', reporterEmail: 'john@guest.com'
     const issue = seededIssues.TAF[0];
     await page.goto(`/m/TAF/i/${issue.num}`);
-    const sidebar = page.getByTestId("issue-sidebar");
+    const subtitle = page.getByTestId("issue-detail-subtitle");
 
-    await expect(sidebar).toContainText("John Guest");
+    await expect(subtitle).toContainText("John Guest");
   });
 
   test("should display guest with name only correctly", async ({ page }) => {
     // BK Issue 2 is reporterName: 'League Player'
     const issue = seededIssues.BK[1];
     await page.goto(`/m/BK/i/${issue.num}`);
-    const sidebar = page.getByTestId("issue-sidebar");
+    const subtitle = page.getByTestId("issue-detail-subtitle");
 
-    await expect(sidebar).toContainText("League Player");
+    await expect(subtitle).toContainText("League Player");
   });
 
   test("should display guest with email only correctly", async ({ page }) => {
     // TAF Issue 3 is reporterEmail: 'display@bug.com'
     const issue = seededIssues.TAF[2];
     await page.goto(`/m/TAF/i/${issue.num}`);
-    const sidebar = page.getByTestId("issue-sidebar");
+    const subtitle = page.getByTestId("issue-detail-subtitle");
 
-    await expect(sidebar).toContainText("Anonymous");
+    await expect(subtitle).toContainText("Anonymous");
   });
 
   test("should display fully anonymous reporter correctly", async ({
@@ -63,9 +63,9 @@ test.describe("Reporter Variations E2E", () => {
     // GDZ Issue 3 is truly anonymous - no reportedBy, reporterName, reporterEmail, or invitedUserId
     const issue = seededIssues.GDZ[2];
     await page.goto(`/m/GDZ/i/${issue.num}`);
-    const sidebar = page.getByTestId("issue-sidebar");
+    const subtitle = page.getByTestId("issue-detail-subtitle");
 
-    await expect(sidebar).toContainText("Anonymous");
+    await expect(subtitle).toContainText("Anonymous");
   });
 
   test("should display invited user reporter correctly (legacy logic)", async ({
@@ -74,9 +74,9 @@ test.describe("Reporter Variations E2E", () => {
     // TAF Issue 2 is invitedReportedBy (Invited Guest)
     const issue = seededIssues.TAF[1];
     await page.goto(`/m/TAF/i/${issue.num}`);
-    const sidebar = page.getByTestId("issue-sidebar");
+    const subtitle = page.getByTestId("issue-detail-subtitle");
 
-    await expect(sidebar).toContainText("Invited Guest");
+    await expect(subtitle).toContainText("Invited Guest");
     await expect(
       page
         .getByTestId("timeline-author-name")
@@ -99,9 +99,9 @@ test.describe("Reporter Variations E2E", () => {
     // AFM Issue 1 is reportedBy member@test.com
     const issue = seededIssues.AFM[0];
     await page.goto(`/m/AFM/i/${issue.num}`);
-    const sidebar = page.getByTestId("issue-sidebar");
+    const subtitle = page.getByTestId("issue-detail-subtitle");
 
-    // Check for reporter name in sidebar
-    await expect(sidebar).toContainText("Member User");
+    // Check for reporter name in subtitle
+    await expect(subtitle).toContainText("Member User");
   });
 });

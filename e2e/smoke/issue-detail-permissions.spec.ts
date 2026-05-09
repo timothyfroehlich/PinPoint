@@ -99,9 +99,22 @@ test.describe("Issue detail permission-aware UI", () => {
         page.getByRole("button", { name: /watch issue|unwatch issue/i })
       ).toBeVisible();
 
-      // Comment input should be visible (not the login prompt)
+      // Comment input should be available (not the login prompt). On mobile
+      // the textarea lives inside the StickyCommentComposer Sheet (closed by
+      // default) — tap the trigger to open it. On desktop the inline composer
+      // is visible at the end of the timeline. Scope the label query so we
+      // don't match the hidden inline textarea on mobile (strict mode).
       await expect(page.getByTestId("login-to-comment")).toHaveCount(0);
-      await expect(page.getByLabel("Comment", { exact: true })).toBeVisible();
+      const isMobile = testInfo.project.name.includes("Mobile");
+      if (isMobile) {
+        await page.getByRole("button", { name: "Add a comment" }).click();
+      }
+      const composerScope = isMobile
+        ? page.getByRole("dialog", { name: "Add a comment" })
+        : page.getByTestId("issue-comment-form");
+      await expect(
+        composerScope.getByLabel("Comment", { exact: true })
+      ).toBeVisible();
     });
   });
 
@@ -165,9 +178,22 @@ test.describe("Issue detail permission-aware UI", () => {
         page.getByRole("button", { name: /watch issue|unwatch issue/i })
       ).toBeVisible();
 
-      // Comment input should be visible
+      // Comment input should be available (not the login prompt). On mobile
+      // the textarea lives inside the StickyCommentComposer Sheet (closed by
+      // default) — tap the trigger to open it. On desktop the inline composer
+      // is visible at the end of the timeline. Scope the label query so we
+      // don't match the hidden inline textarea on mobile (strict mode).
       await expect(page.getByTestId("login-to-comment")).toHaveCount(0);
-      await expect(page.getByLabel("Comment", { exact: true })).toBeVisible();
+      const isMobile = testInfo.project.name.includes("Mobile");
+      if (isMobile) {
+        await page.getByRole("button", { name: "Add a comment" }).click();
+      }
+      const composerScope = isMobile
+        ? page.getByRole("dialog", { name: "Add a comment" })
+        : page.getByTestId("issue-comment-form");
+      await expect(
+        composerScope.getByLabel("Comment", { exact: true })
+      ).toBeVisible();
     });
   });
 });

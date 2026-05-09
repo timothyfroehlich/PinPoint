@@ -1,0 +1,289 @@
+<h2>Mobile metadata strategy</h2>
+<p class="subtitle">How should the issue detail page handle metadata (assignee, status, priority, machine, location, watchers, reporter, created date) on mobile? Pick the option that best matches how you want PinPoint to feel.</p>
+
+<style>
+  .mobile-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+  @media (max-width: 900px) {
+    .mobile-options { grid-template-columns: 1fr; }
+  }
+  .strategy-card {
+    cursor: pointer;
+    border: 2px solid var(--color-outline-variant, #2a2a2a);
+    border-radius: 12px;
+    padding: 1rem;
+    background: var(--color-surface, #161616);
+    transition: border-color 150ms ease, transform 150ms ease;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .strategy-card:hover { border-color: var(--color-primary, #7aa2f7); }
+  .strategy-card.selected {
+    border-color: var(--color-primary, #7aa2f7);
+    box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.18);
+  }
+  .strategy-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .strategy-letter {
+    font-weight: 700;
+    color: var(--color-primary, #7aa2f7);
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .strategy-title {
+    font-weight: 600;
+    color: var(--color-on-surface, #e0e0e0);
+  }
+  .strategy-tagline {
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant, #a0a0a0);
+    line-height: 1.4;
+  }
+  .phone-frame {
+    align-self: center;
+    width: 220px;
+    border: 1px solid #333;
+    border-radius: 14px;
+    background: #0d0d0d;
+    overflow: hidden;
+    font-size: 10px;
+  }
+  .phone-frame.light { background: #fbfbfb; color: #1a1a1a; border-color: #d0d0d0; }
+  .phone-bar {
+    background: #1f1f1f;
+    color: #888;
+    padding: 4px 8px;
+    font-size: 9px;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .phone-frame.light .phone-bar { background: #f0f0f0; color: #666; border-bottom-color: #e0e0e0; }
+  .phone-body { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .ph-h1 {
+    font-weight: 600;
+    font-size: 11px;
+    color: #e8e8e8;
+    line-height: 1.3;
+  }
+  .phone-frame.light .ph-h1 { color: #1a1a1a; }
+  .ph-meta {
+    color: #888;
+    font-size: 9px;
+  }
+  .phone-frame.light .ph-meta { color: #666; }
+  .ph-card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .phone-frame.light .ph-card { background: #fff; border-color: #e0e0e0; }
+  .ph-card-title {
+    font-weight: 600;
+    font-size: 9px;
+    color: #c0c0c0;
+    margin-bottom: 2px;
+  }
+  .phone-frame.light .ph-card-title { color: #444; }
+  .ph-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+  }
+  .ph-row .key { color: #888; }
+  .phone-frame.light .ph-row .key { color: #777; }
+  .ph-row .val { color: #e0e0e0; }
+  .phone-frame.light .ph-row .val { color: #1a1a1a; }
+  .ph-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+  .ph-pill {
+    background: #2a2a2a;
+    color: #c0c0c0;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 8px;
+    border: 1px solid #333;
+  }
+  .phone-frame.light .ph-pill { background: #eaeaea; color: #333; border-color: #d0d0d0; }
+  .ph-pill.status { background: #1a3a4a; color: #6cc6ff; border-color: #2a5a7a; }
+  .ph-pill.prio { background: #4a2a1a; color: #ffaa66; border-color: #6a4a2a; }
+  .ph-block {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: #888;
+    font-size: 9px;
+    min-height: 32px;
+  }
+  .phone-frame.light .ph-block { background: #fff; border-color: #e0e0e0; color: #555; }
+  .ph-divider { border: none; border-top: 1px solid #2a2a2a; margin: 2px 0; }
+  .phone-frame.light .ph-divider { border-top-color: #e8e8e8; }
+  .ph-strip {
+    background: #1a1a1a;
+    border-top: 1px solid #2a2a2a;
+    border-bottom: 1px solid #2a2a2a;
+    padding: 4px 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 8px;
+  }
+  .pros-cons-mini {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    margin-top: 0.5rem;
+  }
+  .pros-cons-mini .pros { color: #6cc66c; }
+  .pros-cons-mini .cons { color: #c66c6c; }
+  .pros-cons-mini ul { margin: 0; padding-left: 1rem; }
+  .pros-cons-mini li { margin-bottom: 2px; }
+</style>
+
+<div class="mobile-options" data-multiselect>
+
+  <!-- A: GitHub-style structural reflow -->
+  <div class="strategy-card option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="strategy-head">
+      <span class="strategy-letter">A</span>
+      <span class="strategy-title">Sidebar reflows below activity</span>
+    </div>
+    <p class="strategy-tagline">Same Details Card desktop and mobile — just stacked at the bottom on small screens. GitHub's pattern.</p>
+    <div class="phone-frame">
+      <div class="phone-bar">9:41 — Issue PIN-101</div>
+      <div class="phone-body">
+        <div class="ph-h1">Flippers stuck on Iron Maiden</div>
+        <div class="ph-meta">Open · #PIN-101</div>
+        <div class="ph-block">Description preview…</div>
+        <div class="ph-block">Activity timeline (3 events)…</div>
+        <div class="ph-block" style="min-height: 24px;">Add a comment…</div>
+        <hr class="ph-divider" />
+        <div class="ph-card">
+          <div class="ph-card-title">Details</div>
+          <div class="ph-row"><span class="key">Status</span><span class="val">In Progress</span></div>
+          <div class="ph-row"><span class="key">Priority</span><span class="val">High</span></div>
+          <div class="ph-row"><span class="key">Assignee</span><span class="val">Tim F.</span></div>
+          <div class="ph-row"><span class="key">Machine</span><span class="val">Iron Maiden</span></div>
+          <div class="ph-row"><span class="key">Reporter</span><span class="val">Anonymous</span></div>
+          <div class="ph-row"><span class="key">Created</span><span class="val">Apr 25</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="pros-cons-mini">
+      <div class="pros"><strong>Pros</strong><ul><li>One Card definition, two layouts</li><li>Familiar GitHub pattern</li><li>Edit affordances same as desktop</li></ul></div>
+      <div class="cons"><strong>Cons</strong><ul><li>Metadata buried below long activity</li><li>Mobile users scroll a lot to edit status</li></ul></div>
+    </div>
+  </div>
+
+  <!-- B: Sidebar-on-top -->
+  <div class="strategy-card option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="strategy-head">
+      <span class="strategy-letter">B</span>
+      <span class="strategy-title">Sidebar above activity</span>
+    </div>
+    <p class="strategy-tagline">Same Details Card, but on mobile it sits between the title and the activity stream. Surfaces editability immediately.</p>
+    <div class="phone-frame">
+      <div class="phone-bar">9:41 — Issue PIN-101</div>
+      <div class="phone-body">
+        <div class="ph-h1">Flippers stuck on Iron Maiden</div>
+        <div class="ph-meta">Open · #PIN-101</div>
+        <div class="ph-card">
+          <div class="ph-card-title">Details</div>
+          <div class="ph-row"><span class="key">Status</span><span class="val">In Progress</span></div>
+          <div class="ph-row"><span class="key">Priority</span><span class="val">High</span></div>
+          <div class="ph-row"><span class="key">Assignee</span><span class="val">Tim F.</span></div>
+          <div class="ph-row"><span class="key">Machine</span><span class="val">Iron Maiden</span></div>
+        </div>
+        <div class="ph-block">Description preview…</div>
+        <div class="ph-block">Activity timeline (3 events)…</div>
+        <div class="ph-block" style="min-height: 24px;">Add a comment…</div>
+      </div>
+    </div>
+    <div class="pros-cons-mini">
+      <div class="pros"><strong>Pros</strong><ul><li>Status/assignee always visible above the fold</li><li>Same component, just reordered</li><li>Encourages quick triage on phone</li></ul></div>
+      <div class="cons"><strong>Cons</strong><ul><li>Pushes the actual issue content (description) below the metadata</li><li>Less "reading" focused</li></ul></div>
+    </div>
+  </div>
+
+  <!-- C: Linear-style consistent badge strip -->
+  <div class="strategy-card option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="strategy-head">
+      <span class="strategy-letter">C</span>
+      <span class="strategy-title">Pill strip at every viewport</span>
+    </div>
+    <p class="strategy-tagline">Linear's pattern. Replace the whole sidebar concept with a compact horizontal pill row of editable badges. Same visual at desktop and mobile.</p>
+    <div class="phone-frame">
+      <div class="phone-bar">9:41 — Issue PIN-101</div>
+      <div class="phone-body">
+        <div class="ph-h1">Flippers stuck on Iron Maiden</div>
+        <div class="ph-meta">Open · #PIN-101</div>
+        <div class="ph-pills">
+          <span class="ph-pill status">In Progress</span>
+          <span class="ph-pill prio">High</span>
+          <span class="ph-pill">Tim F.</span>
+          <span class="ph-pill">Iron Maiden</span>
+          <span class="ph-pill">2 watching</span>
+        </div>
+        <div class="ph-block">Description preview…</div>
+        <div class="ph-block">Activity timeline (3 events)…</div>
+        <div class="ph-block" style="min-height: 24px;">Add a comment…</div>
+      </div>
+    </div>
+    <div class="pros-cons-mini">
+      <div class="pros"><strong>Pros</strong><ul><li>True desktop/mobile parity</li><li>Most compact, content-forward</li><li>Modernest feel</li></ul></div>
+      <div class="cons"><strong>Cons</strong><ul><li>Biggest refactor — kills the Card abstraction</li><li>Reporter/created date need a "more" affordance</li><li>Furthest from current shape</li></ul></div>
+    </div>
+  </div>
+
+  <!-- D: Minimal align-chrome -->
+  <div class="strategy-card option" data-choice="d" onclick="toggleSelect(this)">
+    <div class="strategy-head">
+      <span class="strategy-letter">D</span>
+      <span class="strategy-title">Keep mobile strip — fix the chrome</span>
+    </div>
+    <p class="strategy-tagline">Lowest-risk path. Keep today's bespoke mobile metadata strip, but replace its <code>border-y py-2</code> with proper Card chrome and align tokens. No structural change.</p>
+    <div class="phone-frame">
+      <div class="phone-bar">9:41 — Issue PIN-101</div>
+      <div class="phone-body">
+        <div class="ph-h1">Flippers stuck on Iron Maiden</div>
+        <div class="ph-meta">Open · #PIN-101</div>
+      </div>
+      <div class="ph-strip">
+        <span class="ph-pill status">In Progress</span>
+        <span class="ph-pill prio">High</span>
+        <span class="ph-pill">Tim F.</span>
+        <span class="ph-pill">Iron Maiden</span>
+      </div>
+      <div class="phone-body">
+        <div class="ph-block">Description preview…</div>
+        <div class="ph-block">Activity timeline (3 events)…</div>
+        <div class="ph-block" style="min-height: 24px;">Add a comment…</div>
+      </div>
+    </div>
+    <div class="pros-cons-mini">
+      <div class="pros"><strong>Pros</strong><ul><li>Smallest diff — fastest ship</li><li>Preserves familiar mobile shape</li><li>Lowest risk to other archetypes</li></ul></div>
+      <div class="cons"><strong>Cons</strong><ul><li>Still two metadata vocabularies (sidebar Card + mobile strip)</li><li>Doesn't actually solve "consistency between desktop and mobile" — just polishes the divergence</li></ul></div>
+    </div>
+  </div>
+
+</div>
+
+<p style="margin-top: 2rem; font-size: 0.9rem; color: var(--color-on-surface-variant, #888);">
+  My recommendation: <strong>A (GitHub-style reflow)</strong> — it's the smallest structural change that actually delivers desktop/mobile consistency, since the Details Card definition is shared. C is the most modern but the biggest refactor. D papers over the divergence rather than fixing it.
+</p>

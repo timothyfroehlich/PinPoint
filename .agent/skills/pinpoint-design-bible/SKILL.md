@@ -144,9 +144,15 @@ When building a new page, pick the closest archetype and follow its pattern.
 
 `max-w-7xl` -- Filters + card grid `md:grid-cols-2 lg:grid-cols-3`.
 
-### Detail Page with Sidebar (issue detail)
+### Detail Page with Sidebar (machine detail)
 
 `grid md:grid-cols-[minmax(0,1fr)_320px]` -- Sidebar `hidden md:block`, collapses to inline strips on mobile.
+**Note:** Issue detail migrated off this archetype (see "Detail Page with Inline Metadata" below). Machine and Location detail still use this pattern.
+
+### Detail Page with Inline Metadata (issue detail)
+
+`max-w-3xl` (PageContainer `size="narrow"`) single-column main flow. Metadata uses `IssueMetadata` (container query reflows 1-col → 2-col at `@xl:`). Mobile sticky comment composer opens a `Sheet`. Reading-content-shaped pages prefer `narrow` over `standard` — issue detail is text + form rows, not a dashboard.
+**Note:** Replaces "Detail Page with Sidebar" for issue detail; eliminates desktop/mobile divergence. Use for new detail pages; migrate existing sidebar pages opportunistically.
 
 ### Detail Page with Internal Grid (machine detail)
 
@@ -246,16 +252,16 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 
 ## 9. Typography Scale
 
-| Element                    | Classes                                                                  |
-| :------------------------- | :----------------------------------------------------------------------- |
-| Page title (desktop)       | `text-3xl font-bold`                                                     |
-| Page title (mobile detail) | `text-xl font-extrabold`                                                 |
-| Section heading            | `text-xl font-semibold`                                                  |
-| Card title (normal)        | `text-base`                                                              |
-| Card title (compact)       | `text-sm`                                                                |
-| Metadata / labels          | `text-xs text-muted-foreground`                                          |
-| Issue IDs                  | `font-mono` (e.g., AFM-3)                                                |
-| Machine name in cards      | `text-xs font-medium underline decoration-primary/30 underline-offset-2` |
+| Element                  | Classes                                                                  |
+| :----------------------- | :----------------------------------------------------------------------- |
+| Page title (desktop)     | `text-3xl font-bold`                                                     |
+| Page title (detail page) | `text-3xl font-bold`                                                     |
+| Section heading          | `text-xl font-semibold`                                                  |
+| Card title (normal)      | `text-base`                                                              |
+| Card title (compact)     | `text-sm`                                                                |
+| Metadata / labels        | `text-xs text-muted-foreground`                                          |
+| Issue IDs                | `font-mono` (e.g., AFM-3)                                                |
+| Machine name in cards    | `text-xs font-medium underline decoration-primary/30 underline-offset-2` |
 
 **Text wrapping (text-balance / text-pretty):**
 
