@@ -176,6 +176,25 @@ export async function deleteAccountAction(
     // the error for manual cleanup but still sign out the user. The data is
     // already anonymized, so the user's information is protected.
     const adminClient = createAdminClient();
+
+    // Revoke all issued JWTs for this user before deletion. deleteUser() does
+    // not invalidate existing tokens, so we must revoke sessions first to
+    // prevent the deleted account from remaining accessible until JWT expiry.
+    // Best-effort: log on failure but still proceed with deletion. The user's
+    // data is already anonymized, and tokens will expire naturally per the
+    // configured Supabase access token TTL.
+    const { error: signOutError } = await adminClient.auth.admin.signOut(
+      userId,
+      "global"
+    );
+    if (signOutError) {
+      reportError(signOutError, {
+        action: "deleteAccountAuthSignOut",
+        bestEffort: true,
+        userId,
+      });
+    }
+
     const { error: deleteError } =
       await adminClient.auth.admin.deleteUser(userId);
 
