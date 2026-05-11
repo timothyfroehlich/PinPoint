@@ -604,6 +604,7 @@ jobs:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
+          UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
         run: pnpm exec playwright test e2e/smoke --project=chromium
 
       - name: Upload Playwright report
@@ -684,6 +685,7 @@ jobs:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
+          UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
         run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome"
 
       - name: Upload Playwright report
@@ -764,6 +766,7 @@ jobs:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
+          UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
         run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium
 
       - name: Upload Playwright report
@@ -850,6 +853,7 @@ jobs:
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
+          UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
         run: |
           pnpm exec playwright test --config=playwright.config.smoke.ts \
             --project=chromium --project="Mobile Chrome" \
@@ -861,6 +865,7 @@ jobs:
           PLAYWRIGHT_STDOUT: "pipe"
           PLAYWRIGHT_STDERR: "pipe"
           PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
+          UNSUBSCRIBE_SIGNING_SECRET: "ci-test-only-not-a-real-secret-0000000000000000000000000000000000"
         run: |
           pnpm exec playwright test --config=playwright.config.full.ts \
             --project=chromium --project="Mobile Chrome" \
