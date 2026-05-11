@@ -32,6 +32,15 @@ const tables = [
   "user_profiles",
   "invited_users",
   "unconfirmed_users",
+  "discord_integration_config",
+];
+
+// Trigger/helper functions in the public schema. CASCADE drops dependent
+// triggers (e.g., handle_new_user's trigger on auth.users), so the auth
+// schema itself stays untouched. Migrations recreate these.
+const functions = [
+  "public.handle_new_user()",
+  "public.get_discord_config()",
 ];
 
 const client = postgres(databaseUrl);
@@ -44,10 +53,16 @@ async function dropTables() {
     await client.unsafe(`DROP TABLE IF EXISTS "${table}" CASCADE;`);
   }
 
+  for (const fn of functions) {
+    // Static function names defined above; CASCADE removes auth.users triggers
+    // that reference handle_new_user without modifying the auth schema itself.
+    await client.unsafe(`DROP FUNCTION IF EXISTS ${fn} CASCADE;`);
+  }
+
   // Drop Drizzle migrations schema to force re-migration
   await client.unsafe(`DROP SCHEMA IF EXISTS drizzle CASCADE;`);
 
-  console.log("✅ Tables dropped.");
+  console.log("✅ Tables and functions dropped.");
 }
 
 dropTables()
