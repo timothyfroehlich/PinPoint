@@ -2,6 +2,27 @@ import { withSentryConfig } from "@sentry/nextjs";
 import createMDX from "@next/mdx";
 import type { NextConfig } from "next";
 
+// Fail the Vercel build (rather than deploy and 500 at runtime) when a
+// required production secret is missing. Skipped on local builds and
+// vercel-dev because VERCEL_ENV is only set in Vercel build/runtime
+// environments. Preview deploys are also validated since Tim sets prod
+// secrets in both Production and Preview scopes.
+function assertVercelDeploymentEnv(): void {
+  const env = process.env["VERCEL_ENV"];
+  if (env !== "production" && env !== "preview") return;
+
+  const required = ["UNSUBSCRIBE_SIGNING_SECRET"];
+  const missing = required.filter((name) => !process.env[name]);
+  if (missing.length === 0) return;
+
+  throw new Error(
+    `Deployment aborted: missing required ${env} env var(s): ${missing.join(", ")}. ` +
+      "Set them in Vercel → Project Settings → Environment Variables for the affected scope."
+  );
+}
+
+assertVercelDeploymentEnv();
+
 const nextConfig: NextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
   reactStrictMode: true,

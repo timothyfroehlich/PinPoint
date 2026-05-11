@@ -62,6 +62,7 @@ MANAGED_ENV_KEYS = {
     "SUPABASE_SERVICE_ROLE_KEY",
     "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
     "TURNSTILE_SECRET_KEY",
+    "UNSUBSCRIBE_SIGNING_SECRET",
 }
 
 CONFIG_HEADER = """\
@@ -325,6 +326,10 @@ def format_env_file(
         "# To test CAPTCHA UI locally, uncomment these. Production sets them via Vercel env.",
         f"# NEXT_PUBLIC_TURNSTILE_SITE_KEY={managed_values['NEXT_PUBLIC_TURNSTILE_SITE_KEY']}",
         f"# TURNSTILE_SECRET_KEY={managed_values['TURNSTILE_SECRET_KEY']}",
+        "",
+        "# Unsubscribe-link HMAC signing secret (local-dev placeholder).",
+        "# Production uses a real `openssl rand -hex 32` value set in Vercel env.",
+        f"UNSUBSCRIBE_SIGNING_SECRET={managed_values['UNSUBSCRIBE_SIGNING_SECRET']}",
     ]
 
     # Preserve custom user keys
@@ -348,6 +353,50 @@ def _read_user_keys(env_file: Path) -> dict[str, str]:
     return {k: v for k, v in existing.items() if k not in MANAGED_ENV_KEYS}
 
 
+# Local-dev placeholder for UNSUBSCRIBE_SIGNING_SECRET. Real production values
+# come from Vercel env. We treat the secret as managed (so it lives in the
+# managed slot of the file) but preserve any non-placeholder value the
+# developer set, so chmod-+w / edit / regenerate doesn't stomp the real value.
+UNSUBSCRIBE_SIGNING_SECRET_PLACEHOLDER = (
+    "local-dev-only-not-a-real-secret-0000000000000000000000000000000000"
+)
+
+
+def _read_managed_value(env_file: Path, key: str) -> str | None:
+    """Read a single MANAGED key's existing value from a .env.local file.
+
+    Bypasses the MANAGED_ENV_KEYS filter so callers can preserve user-set
+    values for keys that are conceptually managed (e.g., signing secrets).
+    Returns None when the file or key is absent.
+    """
+    if not env_file.exists():
+        return None
+    existing = parse_env_file(env_file)
+    return existing.get(key)
+
+
+def _resolve_unsubscribe_secret(worktree_path: Path, main_path: Path | None) -> str:
+    """Pick the best UNSUBSCRIBE_SIGNING_SECRET for this worktree.
+
+    Precedence (target > main > placeholder), and any value that is not the
+    placeholder wins over the placeholder. This means a developer's real
+    secret in main's .env.local automatically propagates to fresh worktrees,
+    and a per-worktree edit is preserved across regenerations.
+    """
+    candidates: list[str | None] = [
+        _read_managed_value(worktree_path / ".env.local", "UNSUBSCRIBE_SIGNING_SECRET"),
+    ]
+    if main_path is not None and main_path != worktree_path:
+        candidates.append(
+            _read_managed_value(main_path / ".env.local", "UNSUBSCRIBE_SIGNING_SECRET")
+        )
+
+    for value in candidates:
+        if value and value != UNSUBSCRIBE_SIGNING_SECRET_PLACEHOLDER:
+            return value
+    return UNSUBSCRIBE_SIGNING_SECRET_PLACEHOLDER
+
+
 def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
     """Generate .env.local content, preserving user-provided custom keys.
 
@@ -359,6 +408,7 @@ def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
     """
     target_keys = _read_user_keys(worktree_path / ".env.local")
 
+    main_path: Path | None = None
     main_keys: dict[str, str] = {}
     try:
         main_path = get_main_worktree()
@@ -371,6 +421,8 @@ def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
 
     # Target wins; main fills gaps.
     user_values = {**main_keys, **target_keys}
+
+    unsubscribe_secret = _resolve_unsubscribe_secret(worktree_path, main_path)
 
     managed_values = {
         "NEXT_PUBLIC_SUPABASE_URL": f"http://localhost:{port_config.api_port}",
@@ -390,6 +442,10 @@ def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
         "SUPABASE_SERVICE_ROLE_KEY": LOCAL_SUPABASE_SERVICE_ROLE_KEY,
         "NEXT_PUBLIC_TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
         "TURNSTILE_SECRET_KEY": "1x0000000000000000000000000000000AA",
+        # Unsubscribe-link HMAC signing secret. Falls back to a placeholder
+        # only when no real value is set; preserves any developer-set value
+        # so chmod-+w / edit / regenerate doesn't overwrite it.
+        "UNSUBSCRIBE_SIGNING_SECRET": unsubscribe_secret,
     }
 
     return format_env_file(managed_values, user_values, port_config)

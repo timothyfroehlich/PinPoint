@@ -325,10 +325,19 @@ export async function deleteTestMachine(machineId: string) {
 
 /**
  * Generate an unsubscribe token for E2E tests.
- * Uses the same HMAC-SHA256 algorithm as src/lib/notification-formatting.ts.
+ * Uses the same HMAC-SHA256 algorithm and signing secret as
+ * src/lib/notifications/channels/email-channel.ts. The test client must
+ * derive tokens using the same UNSUBSCRIBE_SIGNING_SECRET that the dev
+ * server uses to verify them, otherwise verification fails.
  */
 export function generateUnsubscribeTokenForTest(userId: string): string {
-  return createHmac("sha256", SUPABASE_SERVICE_ROLE_KEY)
+  const secret = process.env.UNSUBSCRIBE_SIGNING_SECRET;
+  if (!secret) {
+    throw new Error(
+      "Missing UNSUBSCRIBE_SIGNING_SECRET — required for unsubscribe E2E tests. Set it in .env.local (and in CI workflow env)."
+    );
+  }
+  return createHmac("sha256", secret)
     .update(userId + ":unsubscribe")
     .digest("hex");
 }
