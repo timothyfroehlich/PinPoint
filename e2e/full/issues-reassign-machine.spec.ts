@@ -107,9 +107,9 @@ test.describe("Issue reassignment", () => {
     test("does not expose the reassign action when the member does not own the machine", async ({
       page,
     }) => {
-      // Member is not the owner of TAF in the seed data, so the kebab should
-      // be hidden entirely (canReassign is false → IssueActionsMenu returns
-      // null).
+      // Member is not the owner of TAF in the seed data, so the page omits
+      // the `actions` prop on PageHeader (userCanReassign is false), and
+      // IssueActionsMenu is never rendered.
       const fromInitials = seededMachines.addamsFamily.initials;
       const issueTitle = `${ISSUE_PREFIX} Member view ${Date.now().toString()}`;
 

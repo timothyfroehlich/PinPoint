@@ -232,10 +232,15 @@ def get_existing_slot(worktree_path: str) -> int | None:
 
 
 def branch_to_project_id(branch_name: str) -> str:
-    """Convert a branch name to a valid Supabase project ID."""
+    """Convert a branch name to a valid Supabase project ID.
+
+    Supabase rejects project IDs longer than 40 chars or ending in a hyphen
+    (Docker container naming constraint). We rstrip after truncation to handle
+    the case where the cut lands on a separator.
+    """
     project_id = re.sub(r"[^a-z0-9-]", "-", branch_name.lower())
-    project_id = re.sub(r"-+", "-", f"pinpoint-{project_id}").strip("-")
-    return project_id[:50]
+    project_id = re.sub(r"-+", "-", project_id).strip("-")
+    return project_id[:40].rstrip("-")
 
 
 def generate_config_toml(worktree_path: Path, port_config: PortConfig) -> str:
