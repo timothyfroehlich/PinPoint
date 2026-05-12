@@ -58,7 +58,7 @@ If you’re trying to understand how to implement something, read:
 
 ## Testing Overview
 
-PinPoint uses the following test types (see `docs/TESTING_PLAN.md` for details):
+PinPoint uses the following test types (see the `pinpoint-testing` skill at `.agent/skills/pinpoint-testing/SKILL.md` for details):
 
 - **Unit Tests** (`pnpm test`)
   - Location: `src/test/unit/**`
