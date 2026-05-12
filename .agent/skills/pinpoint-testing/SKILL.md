@@ -50,7 +50,7 @@ Before writing a new test, check the canonical location for that bug class. Most
 | Form-state lifecycle (clear / reset / optimistic)                  | `src/app/(app)/**/<form>.test.tsx`, `src/components/**/<form>.test.tsx`                                                                                               |
 | Comment audit trail (delete / edit)                                | `src/test/unit/delete-comment-audit.test.ts`                                                                                                                          |
 | Auth actions (signup / login / logout)                             | `src/test/integration/supabase/auth-actions.test.ts`                                                                                                                  |
-| Notifications / Mailpit dispatch                                   | `src/test/integration/supabase/notifications.test.ts`, `src/test/unit/notification-formatting.test.ts`                                                                |
+| Notifications / Mailpit dispatch                                   | `src/test/integration/notifications.test.ts`, `src/test/unit/notification-formatting.test.ts`                                                                         |
 | External services (Discord, Vercel Blob, OAuth providers, captcha) | `src/lib/<service>/client.test.ts` with the SDK mocked at the boundary — NEVER live in E2E (rule #17)                                                                 |
 | TipTap render / markdown serialization                             | `src/lib/tiptap/render.test.ts`, `src/lib/markdown.test.ts`                                                                                                           |
 
