@@ -2,7 +2,10 @@ import { test, expect } from "@playwright/test";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cleanupTestEntities } from "../support/cleanup.js";
-import { fillReportForm } from "../support/page-helpers.js";
+import {
+  fillReportForm,
+  submitFormAndWaitForRedirect,
+} from "../support/page-helpers.js";
 import { loginAs } from "../support/actions.js";
 import { TEST_USERS } from "../support/constants.js";
 
@@ -108,8 +111,13 @@ test.describe("Image Upload Reporting", () => {
     // We should wait for the toast or the image to appear.
     await expect(page.getByText("Image uploaded successfully")).toBeVisible();
 
-    // 5. Submit
-    await page.getByRole("button", { name: "Submit Issue Report" }).click();
+    // 5. Submit — use the redirect helper so Mobile Chrome / WebKit don't
+    // race on Server-Action navigation (PP-7nb pattern).
+    await submitFormAndWaitForRedirect(
+      page,
+      page.getByRole("button", { name: "Submit Issue Report" }),
+      { awayFrom: "/report" }
+    );
 
     // 6. Verify Redirection to Issue Detail
     await expect(page).toHaveURL(/\/i\/\d+/);
@@ -121,6 +129,14 @@ test.describe("Image Upload Reporting", () => {
     // The image itself appears in the initial report card inside the timeline
     const image = page.getByRole("img", { name: "test-image.png" }).first();
     await expect(image).toBeVisible();
+
+    // Wait for hydration before clicking — the helper completes navigation on
+    // domcontentloaded, but the timeline image's click handler is bound by
+    // React during hydration. On Mobile Chrome the click could fire before
+    // hydration and silently no-op, leaving the lightbox unopened.
+    await page
+      .waitForLoadState("networkidle", { timeout: 5000 })
+      .catch(() => undefined);
 
     // Optional: Click to open lightbox
     await image.click();
