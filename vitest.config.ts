@@ -65,6 +65,10 @@ export default defineConfig(({ mode }) => {
               "src/test/integration/supabase/**/*.test.ts",
               "src/test/integration/supabase/**/*.test.tsx",
             ],
+            // PGlite WASM init in beforeAll exceeds the default 10s under
+            // preflight contention — this project runs in parallel with
+            // `test:integration`, and both spin up PGlite workers (PP-2on.3).
+            hookTimeout: 30000,
           },
         },
       ],
