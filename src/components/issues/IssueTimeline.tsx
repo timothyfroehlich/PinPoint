@@ -258,15 +258,15 @@ function TimelineItem({
               )}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span
-                    tabIndex={0}
+                  <button
+                    type="button"
                     className={cn(
-                      "text-[11px] text-muted-foreground/60",
+                      "cursor-help bg-transparent p-0 text-[11px] text-muted-foreground/60 [font:inherit]",
                       timestampTooltipTriggerClassName
                     )}
                   >
                     <RelativeTime value={event.createdAt} />
-                  </span>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent>
                   {formatDateTime(event.createdAt)}
@@ -302,15 +302,15 @@ function TimelineItem({
                   <span className="text-muted-foreground/40">&bull;</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span
-                        tabIndex={0}
+                      <button
+                        type="button"
                         className={cn(
-                          "text-xs text-muted-foreground/60",
+                          "cursor-help bg-transparent p-0 text-xs text-muted-foreground/60 [font:inherit]",
                           timestampTooltipTriggerClassName
                         )}
                       >
                         <RelativeTime value={event.createdAt} />
-                      </span>
+                      </button>
                     </TooltipTrigger>
                     <TooltipContent>
                       {formatDateTime(event.createdAt)}
@@ -319,15 +319,15 @@ function TimelineItem({
                   {isEdited && !isIssue && (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span
-                          tabIndex={0}
+                        <button
+                          type="button"
                           className={cn(
-                            "text-xs text-muted-foreground/40",
+                            "cursor-help bg-transparent p-0 text-xs text-muted-foreground/40 [font:inherit]",
                             timestampTooltipTriggerClassName
                           )}
                         >
                           &bull; edited <RelativeTime value={event.updatedAt} />
-                        </span>
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent>
                         {formatDateTime(event.updatedAt)}
