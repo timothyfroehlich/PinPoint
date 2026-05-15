@@ -157,16 +157,20 @@ test.describe.serial("Comment Edit and Delete", () => {
       await loginAs(page, testInfo);
       await page.goto(issueUrl);
 
+      const resetCheckText = "Temporary comment for reset check";
       const commentEditor = page.getByLabel("Comment", { exact: true });
       await expect(commentEditor).toBeVisible({ timeout: 10000 });
       await commentEditor.click();
-      await page.keyboard.type("Temporary comment for reset check");
+      await page.keyboard.type(resetCheckText);
 
       await page.getByRole("button", { name: "Add Comment" }).click();
 
-      // Wait for the toast / timeline update to confirm submit succeeded
+      // Scope to the timeline to confirm the comment was persisted and rendered,
+      // not just that the text exists in the editor before clear
       await expect(
-        page.getByText("Temporary comment for reset check")
+        page
+          .locator('[data-testid^="timeline-item-"]')
+          .filter({ hasText: resetCheckText })
       ).toBeVisible({ timeout: 10000 });
 
       // The ProseMirror contenteditable should be empty after reset
