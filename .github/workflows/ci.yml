@@ -61,9 +61,10 @@ jobs:
               - 'pnpm-lock.yaml'
       - name: Determine code changes
         id: set-code
+        env:
+          HAS_CODE: ${{ steps.filter.outputs.has_code }}
         run: |
-          has_code="${{ steps.filter.outputs.has_code }}"
-          if [ "$has_code" = "true" ]; then
+          if [ "$HAS_CODE" = "true" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
