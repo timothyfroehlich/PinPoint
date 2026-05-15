@@ -119,6 +119,18 @@ export function renderMarkdownToHtml(markdown: string): string {
       "hr",
       "a",
     ],
+    // Raw-text elements: when stripped, their text content is dropped (not
+    // re-parsed by the browser). Mitigates GHSA-rpr9-rxv7-x643 (xmp passthrough).
+    nonTextTags: [
+      "script",
+      "style",
+      "textarea",
+      "option",
+      "xmp",
+      "noscript",
+      "noembed",
+      "noframes",
+    ],
     allowedAttributes: {
       a: ["href", "class", "target", "rel"],
     },

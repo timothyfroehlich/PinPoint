@@ -154,6 +154,18 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
     "blockquote",
     "hr",
   ],
+  // Raw-text elements: when stripped, their text content is dropped (not
+  // re-parsed by the browser). Mitigates GHSA-rpr9-rxv7-x643 (xmp passthrough).
+  nonTextTags: [
+    "script",
+    "style",
+    "textarea",
+    "option",
+    "xmp",
+    "noscript",
+    "noembed",
+    "noframes",
+  ],
   allowedAttributes: {
     a: ["href", "class", "data-mention-id", "target", "rel"],
     span: ["class"],
