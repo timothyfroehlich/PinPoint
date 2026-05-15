@@ -1,4 +1,5 @@
 import sanitizeHtml from "sanitize-html";
+import { NON_TEXT_TAGS } from "~/lib/sanitize-html-config";
 
 export function escapeHtml(value: string): string {
   return value
@@ -119,18 +120,7 @@ export function renderMarkdownToHtml(markdown: string): string {
       "hr",
       "a",
     ],
-    // Raw-text elements: when stripped, their text content is dropped (not
-    // re-parsed by the browser). Mitigates GHSA-rpr9-rxv7-x643 (xmp passthrough).
-    nonTextTags: [
-      "script",
-      "style",
-      "textarea",
-      "option",
-      "xmp",
-      "noscript",
-      "noembed",
-      "noframes",
-    ],
+    nonTextTags: [...NON_TEXT_TAGS],
     allowedAttributes: {
       a: ["href", "class", "target", "rel"],
     },

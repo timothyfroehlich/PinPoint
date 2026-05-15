@@ -3,6 +3,7 @@ import { Buffer } from "node:buffer";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import sanitizeHtml from "sanitize-html";
 import { log } from "~/lib/logger";
+import { NON_TEXT_TAGS } from "~/lib/sanitize-html-config";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getSiteUrl } from "~/lib/url";
 import type {
@@ -38,18 +39,7 @@ const EMAIL_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
     "pre",
     "s",
   ],
-  // Raw-text elements: when stripped, their text content is dropped (not
-  // re-parsed by the browser). Mitigates GHSA-rpr9-rxv7-x643 (xmp passthrough).
-  nonTextTags: [
-    "script",
-    "style",
-    "textarea",
-    "option",
-    "xmp",
-    "noscript",
-    "noembed",
-    "noframes",
-  ],
+  nonTextTags: [...NON_TEXT_TAGS],
   allowedAttributes: {
     a: ["href"],
     span: ["style"],

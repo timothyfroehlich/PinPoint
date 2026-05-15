@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import sanitizeHtml from "sanitize-html";
 import { escapeHtml } from "~/lib/markdown";
+import { NON_TEXT_TAGS } from "~/lib/sanitize-html-config";
 import {
   type ProseMirrorDoc,
   type ProseMirrorMark,
@@ -154,18 +155,7 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
     "blockquote",
     "hr",
   ],
-  // Raw-text elements: when stripped, their text content is dropped (not
-  // re-parsed by the browser). Mitigates GHSA-rpr9-rxv7-x643 (xmp passthrough).
-  nonTextTags: [
-    "script",
-    "style",
-    "textarea",
-    "option",
-    "xmp",
-    "noscript",
-    "noembed",
-    "noframes",
-  ],
+  nonTextTags: [...NON_TEXT_TAGS],
   allowedAttributes: {
     a: ["href", "class", "data-mention-id", "target", "rel"],
     span: ["class"],
