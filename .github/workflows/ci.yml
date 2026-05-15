@@ -18,8 +18,8 @@ concurrency:
 
 jobs:
   # Detect which files changed to skip expensive jobs for docs-only changes.
-  # Uses predicate-quantifier: 'every' with a negative filter so that code=true
-  # unless EVERY changed file is docs-only. New/unknown directories default to
+  # Uses predicate-quantifier: 'some' with negative patterns so that has_code=true
+  # when ANY changed file is NOT docs-only. New/unknown directories default to
   # running full CI — the safe failure mode.
   changes:
     name: Detect Changes
@@ -39,16 +39,17 @@ jobs:
       - id: filter
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d  # ratchet:dorny/paths-filter@v4.0.1
         with:
-          predicate-quantifier: "every"
+          predicate-quantifier: "some"
           filters: |
-            docs_only:
-              - 'docs/**'
-              - '**/*.md'
-              - '.beads/**'
-              - '.agent/**'
-              - '.claude/**'
-              - 'LICENSE'
-              - '.gitignore'
+            has_code:
+              - '**'
+              - '!docs/**'
+              - '!**/*.md'
+              - '!.beads/**'
+              - '!.agent/**'
+              - '!.claude/**'
+              - '!LICENSE'
+              - '!.gitignore'
       # Separate filter for dependency changes using default "some" quantifier
       # so deps=true when ANY changed file is a dependency file (not ALL).
       - id: deps-filter
@@ -61,10 +62,11 @@ jobs:
       - name: Determine code changes
         id: set-code
         run: |
-          if [ "${{ steps.filter.outputs.docs_only }}" = "true" ]; then
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          else
+          has_code="${{ steps.filter.outputs.has_code }}"
+          if [ "$has_code" = "true" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
           fi
   # Setup job caches dependencies for reuse by other jobs
   setup:
