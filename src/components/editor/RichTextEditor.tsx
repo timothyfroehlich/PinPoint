@@ -167,7 +167,10 @@ export const RichTextEditor = forwardRef<
     ref,
     () => ({
       clear: () => {
-        editor?.commands.clearContent(true);
+        // clearContent(false) avoids firing onUpdate, which would call onChange()
+        // with an empty-paragraph doc and overwrite the null state already set
+        // by the caller (AddCommentForm's success effect calling setComment(null)).
+        editor?.commands.clearContent(false);
       },
       focus: () => {
         editor?.commands.focus();
