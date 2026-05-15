@@ -261,7 +261,7 @@ function TimelineItem({
                   <button
                     type="button"
                     className={cn(
-                      "cursor-help bg-transparent p-0 text-[11px] text-muted-foreground/60 [font:inherit]",
+                      "cursor-help bg-transparent p-0 text-[11px] text-muted-foreground/60",
                       timestampTooltipTriggerClassName
                     )}
                   >
@@ -305,7 +305,7 @@ function TimelineItem({
                       <button
                         type="button"
                         className={cn(
-                          "cursor-help bg-transparent p-0 text-xs text-muted-foreground/60 [font:inherit]",
+                          "cursor-help bg-transparent p-0 text-xs text-muted-foreground/60",
                           timestampTooltipTriggerClassName
                         )}
                       >
@@ -322,7 +322,7 @@ function TimelineItem({
                         <button
                           type="button"
                           className={cn(
-                            "cursor-help bg-transparent p-0 text-xs text-muted-foreground/40 [font:inherit]",
+                            "cursor-help bg-transparent p-0 text-xs text-muted-foreground/40",
                             timestampTooltipTriggerClassName
                           )}
                         >
