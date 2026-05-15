@@ -1,6 +1,6 @@
 ---
 name: pinpoint-testing
-description: Testing strategy, test pyramid (70% unit/25% integration/5% E2E), PGlite patterns, Playwright best practices. Use when writing tests, debugging test failures, or when user mentions testing/test/spec/E2E.
+description: Testing strategy, bug-class-driven layer selection, PGlite patterns, Playwright best practices. Use when writing tests, debugging test failures, or when user mentions testing/test/spec/E2E.
 ---
 
 # PinPoint Testing Guide
@@ -15,13 +15,46 @@ Use this skill when:
 - Understanding test patterns and organization
 - User mentions: "test", "testing", "spec", "E2E", "Playwright", "Vitest", "coverage"
 
-## Quick Reference
+## Bug Classes & Cheapest Catching Layer
 
-### Test Distribution (100-150 tests total)
+There is no numeric target for test counts. Total-test-count is a vanity metric. The right question per test is:
 
-- **70% Unit (~70-100)**: Pure functions, utilities, validation
-- **25% Integration (~25-35)**: DB queries with worker-scoped PGlite
-- **5% E2E (~5-10)**: Critical flows (Playwright)
+> _What class of bug does this test catch, and is the chosen layer the cheapest one that catches that class?_
+
+| Class | What it catches                                                | Cheapest catching layer                                                                                                                                                                   |
+| ----- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A** | Auth redirect / route protection                               | Integration (middleware) or thin E2E set                                                                                                                                                  |
+| **B** | Server Action wiring (form → action → DB → response)           | **Integration** (PGlite + direct action call)                                                                                                                                             |
+| **C** | Form-state lifecycle (reset / optimistic / rollback)           | **RTL unit**                                                                                                                                                                              |
+| **D** | Layout / overflow / hydration regression                       | **Smoke E2E** (`responsive-overflow.spec.ts` is canonical)                                                                                                                                |
+| **E** | Permission enforcement (role X can / cannot mutate)            | **Integration**                                                                                                                                                                           |
+| **F** | Multi-step user journey (login → mutate → verify across pages) | **E2E** (the only class E2E genuinely owns)                                                                                                                                               |
+| **G** | Pure logic (validators, formatters, dates)                     | Unit                                                                                                                                                                                      |
+| **H** | Pure UI state (open / close, focus, keyboard nav)              | RTL unit                                                                                                                                                                                  |
+| **I** | DB query correctness (filters, joins, ordering)                | Integration (PGlite)                                                                                                                                                                      |
+| **J** | Third-party integration                                        | **Boundary-mocked** unit/integration. NEVER live external services in E2E except our owned local stack (Mailpit, PGlite, local Supabase including local Storage). See AGENTS.md rule #17. |
+
+E2E earns its slot when the test is genuinely class F. Most other classes have a cheaper home. The 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`) found that 36 of 48 specs were partially or fully misallocated — write the cheapest layer that catches the bug class, not the most thorough one.
+
+## Where Existing Coverage Lives (Look Here First)
+
+Before writing a new test, check the canonical location for that bug class. Most new tests should _extend an existing file_, not create a new one — the audit found agents creating duplicate coverage because they couldn't see what already existed.
+
+| Testing…                                                           | Look first at…                                                                                                                                                        |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Permission enforcement (role-gated UI / actions)                   | `src/test/integration/issue-detail-permissions.test.ts`, `src/test/unit/components/issues/issue-detail-permissions.test.tsx`                                          |
+| Server Action wiring (action → DB write → response)                | `src/server/actions/**/*.test.ts`, `src/test/integration/supabase/issue-services.test.ts`                                                                             |
+| DB query correctness (filters / joins / order)                     | `src/test/integration/supabase/*.test.ts`, `src/test/unit/lib/<feature>/filters-queries.test.ts`                                                                      |
+| Middleware / route protection                                      | `src/lib/supabase/middleware.test.ts` — the `publicRoutes` / `protectedRoutes` `it.each` arrays are the canonical place to add new routes (one line, not an E2E spec) |
+| Component UI state (open / close, focus, RTL)                      | `src/components/**/*.test.tsx`, `src/test/unit/components/**/*.test.tsx`                                                                                              |
+| Form-state lifecycle (clear / reset / optimistic)                  | `src/app/(app)/**/<form>.test.tsx`, `src/components/**/<form>.test.tsx`                                                                                               |
+| Comment audit trail (delete / edit)                                | `src/test/unit/delete-comment-audit.test.ts`                                                                                                                          |
+| Auth actions (signup / login / logout)                             | `src/test/integration/supabase/auth-actions.test.ts`                                                                                                                  |
+| Notifications / Mailpit dispatch                                   | `src/test/integration/notifications.test.ts`, `src/test/unit/notification-formatting.test.ts`                                                                         |
+| External services (Discord, Vercel Blob, OAuth providers, captcha) | `src/lib/<service>/client.test.ts` with the SDK mocked at the boundary — NEVER live in E2E (rule #17)                                                                 |
+| TipTap render / markdown serialization                             | `src/lib/tiptap/render.test.ts`, `src/lib/markdown.test.ts`                                                                                                           |
+
+If the canonical location doesn't exist yet, that's a signal you may need to create a new test file at that layer — but check the table first.
 
 ### Commands
 
@@ -106,14 +139,14 @@ The line you're walking is "synthesizing state inside a third party's domain." R
 Read these files for comprehensive testing guidance:
 
 ```bash
-# Full testing strategy and patterns
-cat docs/TESTING_PLAN.md
-
 # E2E-specific patterns with Playwright
 cat docs/E2E_BEST_PRACTICES.md
 
 # Testing-related non-negotiables
 cat docs/NON_NEGOTIABLES.md | grep -A 10 "## Testing"
+
+# 2026-05 E2E suite audit (per-spec verdicts and bug-class framework history)
+cat docs/testing/e2e-audit-2026-05.md
 ```
 
 ## Code Examples
@@ -204,35 +237,7 @@ test.describe("Issue Creation Flow", () => {
 });
 ```
 
-## Testing Patterns from TESTING_PLAN.md
-
-### What to Test at Each Level
-
-**Unit Tests (70%)**:
-
-- Pure functions and utilities
-- Input validation (Zod schemas)
-- Type guards and converters
-- Business logic calculations
-- Error handling in isolated functions
-
-**Integration Tests (25%)**:
-
-- Database queries (Drizzle with PGlite)
-- Server Action data access layers
-- Auth flows (Supabase SSR)
-- API route handlers
-- Multi-step workflows involving DB
-
-**E2E Tests (5%)**:
-
-- Critical user journeys (login, create issue, resolve issue)
-- Form submissions with validation
-- Navigation and routing
-- Auth state persistence
-- Mobile responsiveness (if critical)
-
-### Test Organization
+## Test Organization
 
 ```
 src/test/
@@ -384,7 +389,7 @@ Before committing tests:
 
 ## Additional Resources
 
-- Full testing strategy: `docs/TESTING_PLAN.md`
 - E2E best practices: `docs/E2E_BEST_PRACTICES.md`
+- 2026-05 E2E suite audit: `docs/testing/e2e-audit-2026-05.md`
 - Non-negotiables: `docs/NON_NEGOTIABLES.md` (CORE-TEST-\* rules)
 - Playwright docs: Use Context7 MCP for latest patterns
