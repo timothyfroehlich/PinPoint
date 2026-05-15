@@ -15,6 +15,31 @@ vi.mock("~/app/(app)/issues/actions", () => ({
   addCommentAction: vi.fn(),
 }));
 
+// Mock the dynamic RichTextEditor so tests don't require a DOM/TipTap runtime.
+// The mock exposes the imperative handle (clear, focus) via forwardRef so that
+// AddCommentForm's editorRef wiring works correctly.
+// Uses an async factory to avoid the hoisting constraint that prevents top-level
+// variable access inside synchronous vi.mock() factories.
+vi.mock("~/components/editor/RichTextEditorDynamic", async () => {
+  const { forwardRef, useImperativeHandle } = await import("react");
+  interface Handle {
+    clear: () => void;
+    focus: () => void;
+  }
+  return {
+    RichTextEditor: forwardRef<Handle>(function MockRichTextEditor(
+      _props: unknown,
+      ref
+    ) {
+      useImperativeHandle(ref, () => ({
+        clear: vi.fn(),
+        focus: vi.fn(),
+      }));
+      return null;
+    }),
+  };
+});
+
 // Mock useActionState
 const mockUseActionState = vi.fn();
 

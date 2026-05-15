@@ -1,7 +1,12 @@
 // src/components/editor/RichTextEditor.tsx
 "use client";
 
-import React, { useMemo, useEffect } from "react";
+import React, {
+  useMemo,
+  useEffect,
+  useImperativeHandle,
+  forwardRef,
+} from "react";
 import {
   useEditor,
   EditorContent,
@@ -19,6 +24,11 @@ import { EditorToolbar } from "./EditorToolbar";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { cn } from "~/lib/utils";
 
+export interface RichTextEditorHandle {
+  clear: () => void;
+  focus: () => void;
+}
+
 interface RichTextEditorProps {
   content: ProseMirrorDoc | null;
   onChange: (doc: ProseMirrorDoc) => void;
@@ -30,16 +40,22 @@ interface RichTextEditorProps {
   ariaLabel?: string | undefined;
 }
 
-export function RichTextEditor({
-  content,
-  onChange,
-  mentionsEnabled = false,
-  placeholder = "Write something...",
-  compact = false,
-  disabled = false,
-  className,
-  ariaLabel,
-}: RichTextEditorProps): React.JSX.Element {
+export const RichTextEditor = forwardRef<
+  RichTextEditorHandle,
+  RichTextEditorProps
+>(function RichTextEditor(
+  {
+    content,
+    onChange,
+    mentionsEnabled = false,
+    placeholder = "Write something...",
+    compact = false,
+    disabled = false,
+    className,
+    ariaLabel,
+  }: RichTextEditorProps,
+  ref
+) {
   const extensions = useMemo(() => {
     const list: AnyExtension[] = [
       StarterKit.configure({
@@ -147,6 +163,22 @@ export function RichTextEditor({
     },
   });
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      clear: () => {
+        // clearContent(false) avoids firing onUpdate, which would call onChange()
+        // with an empty-paragraph doc and overwrite the null state already set
+        // by the caller (AddCommentForm's success effect calling setComment(null)).
+        editor?.commands.clearContent(false);
+      },
+      focus: () => {
+        editor?.commands.focus();
+      },
+    }),
+    [editor]
+  );
+
   // Sync external content changes (e.g. when restoring draft from localStorage)
   // We only set it if the editor is currently empty to prevent overwriting user input
   useEffect(() => {
@@ -167,4 +199,4 @@ export function RichTextEditor({
       <EditorContent editor={editor} />
     </div>
   );
-}
+});
