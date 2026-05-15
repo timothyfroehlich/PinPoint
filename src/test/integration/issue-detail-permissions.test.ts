@@ -13,7 +13,9 @@ describe("Issue detail permission states (integration)", () => {
   let ownerId: string;
   let reporterId: string;
   let outsiderGuestId: string;
+  let guestReporterId: string;
   let issueId: string;
+  let guestOwnedIssueId: string;
 
   beforeEach(async () => {
     const db = await getTestDb();
@@ -54,6 +56,21 @@ describe("Issue detail permission states (integration)", () => {
       .returning();
     outsiderGuestId = guest.id;
 
+    // Distinct guest user who is the reporter of a separate issue — exercises
+    // the "guest on own issue" path with a fixture role that actually matches
+    // the AccessLevel under test.
+    const [guestReporter] = await db
+      .insert(userProfiles)
+      .values(
+        createTestUser({
+          id: "00000000-0000-0000-0000-000000000104",
+          role: "guest",
+          email: "guest-reporter-perm@test.com",
+        })
+      )
+      .returning();
+    guestReporterId = guestReporter.id;
+
     const [machine] = await db
       .insert(machines)
       .values(
@@ -80,15 +97,31 @@ describe("Issue detail permission states (integration)", () => {
       })
       .returning();
     issueId = issue.id;
+
+    const [guestIssue] = await db
+      .insert(issues)
+      .values({
+        machineInitials: machine.initials,
+        issueNumber: 2,
+        title: "Guest-reported issue",
+        severity: "minor",
+        priority: "low",
+        frequency: "occasional",
+        status: "new",
+        reportedBy: guestReporterId,
+      })
+      .returning();
+    guestOwnedIssueId = guestIssue.id;
   });
 
   const buildContext = async (
     accessLevel: AccessLevel,
-    userId?: string
+    userId?: string,
+    targetIssueId: string = issueId
   ): Promise<OwnershipContext> => {
     const db = await getTestDb();
     const issue = await db.query.issues.findFirst({
-      where: eq(issues.id, issueId),
+      where: eq(issues.id, targetIssueId),
       with: {
         machine: {
           columns: { ownerId: true, invitedOwnerId: true },
@@ -148,12 +181,14 @@ describe("Issue detail permission states (integration)", () => {
   // reporting fields (status, severity, frequency) but not triage fields
   // (priority, assignee). This is the permission-enforcement boundary that the
   // smoke spec "Guest on own issue" test was exercising via browser.
+  // Uses the dedicated guest-reporter fixture + guest-owned issue so the
+  // accessLevel under test matches the seeded user role.
 
   it("allows guest to update reporting fields on their own issue", async () => {
     const state = getPermissionState(
       "issues.update.reporting",
       "guest",
-      await buildContext("guest", reporterId)
+      await buildContext("guest", guestReporterId, guestOwnedIssueId)
     );
     expect(state).toEqual({ allowed: true });
   });
@@ -162,7 +197,7 @@ describe("Issue detail permission states (integration)", () => {
     const state = getPermissionState(
       "issues.update.triage",
       "guest",
-      await buildContext("guest", reporterId)
+      await buildContext("guest", guestReporterId, guestOwnedIssueId)
     );
     expect(state).toEqual({ allowed: false, reason: "role" });
   });

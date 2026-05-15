@@ -204,19 +204,21 @@ describe("Issue detail permission-aware UI", () => {
     );
 
     // For members, all update forms render interactive controls (not readonly
-    // badges). Verify the form containers are present.
-    const container = screen.getByTestId("issue-metadata-grid").closest("div");
+    // badges). Query directly from the grid element — closest("div") always
+    // returns the element itself, so an extra nullable hop adds no safety and
+    // hides failures behind a confusing matcher error.
+    const grid = screen.getByTestId("issue-metadata-grid");
     expect(
-      container?.querySelectorAll('form[data-form="update-status"]')
+      grid.querySelectorAll('form[data-form="update-status"]')
     ).toHaveLength(1);
     expect(
-      container?.querySelectorAll('form[data-form="update-priority"]')
+      grid.querySelectorAll('form[data-form="update-priority"]')
     ).toHaveLength(1);
     expect(
-      container?.querySelectorAll('form[data-form="update-severity"]')
+      grid.querySelectorAll('form[data-form="update-severity"]')
     ).toHaveLength(1);
     expect(
-      container?.querySelectorAll('form[data-form="update-frequency"]')
+      grid.querySelectorAll('form[data-form="update-frequency"]')
     ).toHaveLength(1);
     // Assignee picker trigger enabled (triage allowed for members)
     const trigger = screen.getByTestId("assignee-picker-trigger");

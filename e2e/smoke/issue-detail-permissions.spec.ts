@@ -1,8 +1,10 @@
 /**
  * Smoke: Issue detail page renders for an unauthenticated visitor.
  *
- * Coverage goal: D-class — "page loads without 500" for each role.
- * All permission-enforcement assertions (E-class) live in:
+ * Coverage goal: D-class — "page loads without 500" for the unauthenticated
+ * path. Authenticated render is already covered by e2e/smoke/issues-crud.spec.ts
+ * (which uses STORAGE_STATE.member). All permission-enforcement assertions
+ * (E-class) live in:
  *   src/test/integration/issue-detail-permissions.test.ts
  * All UI-state assertions (H-class) live in:
  *   src/test/unit/components/issues/issue-detail-permissions.test.tsx
@@ -15,13 +17,18 @@ test.describe("Issue detail smoke — unauthenticated render", () => {
     page,
   }) => {
     const issue = seededIssues.AFM[0];
-    await page.goto(`/m/AFM/i/${issue.num}`);
+    const response = await page.goto(`/m/AFM/i/${issue.num}`);
+
+    // Assert the server actually returned 2xx — a 500 error page can still
+    // render with a URL match and an h1, so the response status is the
+    // load-bearing assertion for this D-class smoke.
+    expect(response?.ok(), "issue detail page should respond 2xx").toBe(true);
 
     // Confirm the page did not redirect to an error or login page.
     await expect(page).toHaveURL(`/m/AFM/i/${issue.num}`);
 
     // The issue title heading is the canonical signal that the detail page
-    // rendered successfully (not a 500 / redirect / blank screen).
+    // rendered successfully (not a redirect / blank screen).
     await expect(
       page.getByRole("main").getByRole("heading", { level: 1 })
     ).toBeVisible();
