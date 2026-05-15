@@ -143,4 +143,36 @@ describe("Issue detail permission states (integration)", () => {
     );
     expect(state).toEqual({ allowed: true });
   });
+
+  // E-class: the "own" conditional — guest as reporter of the issue can update
+  // reporting fields (status, severity, frequency) but not triage fields
+  // (priority, assignee). This is the permission-enforcement boundary that the
+  // smoke spec "Guest on own issue" test was exercising via browser.
+
+  it("allows guest to update reporting fields on their own issue", async () => {
+    const state = getPermissionState(
+      "issues.update.reporting",
+      "guest",
+      await buildContext("guest", reporterId)
+    );
+    expect(state).toEqual({ allowed: true });
+  });
+
+  it("denies guest triage updates even on their own issue", async () => {
+    const state = getPermissionState(
+      "issues.update.triage",
+      "guest",
+      await buildContext("guest", reporterId)
+    );
+    expect(state).toEqual({ allowed: false, reason: "role" });
+  });
+
+  it("allows member reporting updates on any issue", async () => {
+    const state = getPermissionState(
+      "issues.update.reporting",
+      "member",
+      await buildContext("member", ownerId)
+    );
+    expect(state).toEqual({ allowed: true });
+  });
 });
