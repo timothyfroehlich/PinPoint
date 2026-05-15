@@ -1,4 +1,5 @@
 import sanitizeHtml from "sanitize-html";
+import { NON_TEXT_TAGS } from "~/lib/sanitize-html-config";
 
 export function escapeHtml(value: string): string {
   return value
@@ -119,6 +120,7 @@ export function renderMarkdownToHtml(markdown: string): string {
       "hr",
       "a",
     ],
+    nonTextTags: [...NON_TEXT_TAGS],
     allowedAttributes: {
       a: ["href", "class", "target", "rel"],
     },
