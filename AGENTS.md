@@ -27,6 +27,7 @@
 15. **Process Safety**: NEVER kill processes system-wide. Do NOT run `pkill`, `killall`, use `kill` with PIDs obtained from broad selectors like `pgrep`, run `supabase stop --all`, or use any command that terminates services beyond your current worktree. Only stop services you explicitly started in your current session. Violating this destroys other agents' environments and the user's running work.
 16. **Two-Layer Responsive Framework**: Viewport breakpoints (`md:`, `lg:`) for page structure (show/hide sections, grid columns). Container queries (`@lg:`, `@xl:`) for component internals (flex direction, padding, column count). Never mix both for the same layout decision. No `window.innerWidth`, `useMediaQuery`, or `matchMedia` — use CSS. `sm:` is padding/spacing only. The sole documented exception is `use-table-responsive-columns` for IssueList (PP-rs9).
 17. **Test What We Own**: Tests must verify PinPoint's code at the boundary of services we don't control, not simulate the service's internals. Building scaffolding that synthesizes a third party's internal state (raw DB writes into `auth.identities`, captcha-verification mocks, OAuth handshake fakes, email-template regex extraction) is a signal you're testing the wrong thing. Cover PinPoint's contribution with unit tests; cover "the page renders without 500" with a smoke test; reserve integration/E2E for when the test exercises the contracted public API of a real running service. External services other than our owned local stack (Mailpit, PGlite, local Supabase including local Storage) MUST be mocked at the SDK boundary — driving live Discord webhooks, real OAuth provider redirects, vendor email templates, or any production third-party endpoint from an E2E spec is a class-J violation. **Class-J self-check before merging an E2E spec** — two layers, both must pass: (1) `rg 'https?://' e2e/path/to/spec.ts` for direct URLs in the spec source — must return only `localhost`/`127.0.0.1`/owned-domain hits. (2) `rg 'https?://' src/lib/ src/server/actions/` for the SDK clients and server actions the spec triggers — any non-localhost production URL there must live inside an SDK client module that has a corresponding `*.test.ts` mocking `fetch` at the boundary. The dangerous case is layer 2: a spec with a clean source that triggers a server action which fires live `fetch("https://discord.com/...")`. Any production third-party hostname (`discord.com`, `googleapis.com`, OAuth providers, etc.) reachable from an E2E run is a class-J signal — delete the spec and add the SDK-boundary mock. Diagnostic: "If this ran against production with real credentials, would the same code pass?" If no, the test is wrong. Casework: PP-e20 (OAuth identity disconnect), PP-uc8 (Turnstile captcha), PP-q9r (Supabase password-reset email format). Skill deep-dive: `pinpoint-testing` § "Test What We Own".
+18. **Merge for main sync, NEVER rebase**: Update a feature branch from `main` with `git fetch origin && git merge origin/main`. **NEVER `git rebase origin/main`**. Rebase rewrites SHAs → requires force-push → teammate guardrails block force-push and Tim does not authorize. Even a 1-commit branch costs a 30-minute push-permission detour after a rebase. Section 4 Branch Management has the rule + the ⚠️ REBASE TRAP callout with casework. If you find yourself typing `rebase` against `origin/main`, STOP and use `merge`.
 
 ## 3. Agent Skills (Progressive Disclosure)
 
@@ -125,11 +126,27 @@ pushing to main.
 
 **Syncing with main** - Always merge, never rebase:
 
+> ⚠️ **REBASE TRAP — STOP IF YOU'RE TYPING `git rebase origin/main`** ⚠️
+>
+> Rebasing a feature branch against `main` rewrites every commit's SHA, which forces a
+> force-push to update the PR. **Teammate guardrails block force-push and Tim does not
+> authorize it.** Even on a 1-commit branch, you'll lose 20+ minutes negotiating push
+> permission for a sync that should have been a normal push.
+>
+> **Use `git merge origin/main` instead.** Merge commit preserves SHAs, normal push works,
+> CI re-runs against the merge commit. This is commandment #18 and it is the rule.
+
 - `git fetch origin && git merge origin/main` (preferred)
 - **NOT**: `git rebase origin/main` (rewrites history, causes issues with worktrees and PRs)
 
-**Why**: Merge commits preserve history and work cleanly with git worktrees. Rebasing can cause
-conflicts across worktrees and force-push requirements on open PRs.
+**Why**: Merge commits preserve history and work cleanly with git worktrees. Rebasing
+causes conflicts across worktrees and force-push requirements on open PRs.
+
+**Casework (2026-05-15, audit-cleanup wave)**: Lead instructed 3 Wave 0 teammates to
+`git rebase origin/main` to absorb a freshly-merged audit-fix PR. All 3 teammates'
+permission layers blocked the resulting force-push (correctly — they had no transcript
+authorization). Tim granted a one-time exception. With `git merge origin/main`, each
+teammate would have done a normal `git push` and shipped without intervention.
 
 ### Commit Safety
 
