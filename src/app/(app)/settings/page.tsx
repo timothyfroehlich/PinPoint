@@ -8,7 +8,7 @@ import {
   notificationPreferences,
   machines,
 } from "~/server/db/schema";
-import { eq, and, ne, count, inArray } from "drizzle-orm";
+import { eq, and, ne, count } from "drizzle-orm";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { isDiscordIntegrationEnabled } from "~/lib/discord/config";
 import { ProfileForm } from "./profile-form";
@@ -16,6 +16,7 @@ import { ConnectedAccountsSection } from "./connected-accounts/connected-account
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
 import { ChangePasswordSection } from "./change-password-section";
 import { DeleteAccountSection } from "./delete-account-section";
+import { getReassignmentTargets } from "./account-deletion";
 import { Separator } from "~/components/ui/separator";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -56,23 +57,16 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     throw new Error("Failed to create notification preferences");
   }
 
-  // Fetch owned machines count and potential reassignment targets
+  // Fetch owned machines count and potential reassignment targets.
+  // The reassignment-target query lives in account-deletion.ts so the
+  // integration test in src/test/integration/account-deletion.test.ts can
+  // exercise the same filter logic (regression coverage for PP-aby).
   const [ownedMachinesResult, membersResult] = await Promise.all([
     db
       .select({ count: count() })
       .from(machines)
       .where(eq(machines.ownerId, user.id)),
-    db
-      .select({ id: userProfiles.id, name: userProfiles.name })
-      .from(userProfiles)
-      .where(
-        and(
-          ne(userProfiles.id, user.id),
-          // Guests cannot own machines (matrix: machines.edit guest:false).
-          // Only member+ are valid reassignment targets. (PP-hci)
-          inArray(userProfiles.role, ["member", "technician", "admin"])
-        )
-      ),
+    getReassignmentTargets(user.id),
   ]);
 
   const ownedMachineCount = ownedMachinesResult[0]?.count ?? 0;

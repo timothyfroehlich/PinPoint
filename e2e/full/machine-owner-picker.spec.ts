@@ -7,9 +7,14 @@
  * 1. Promote dialog opens when a guest owner is selected and form is submitted
  * 2. Confirming the promote dialog creates the machine and promotes the guest
  *
- * H-class UI state tests (guest visibility filter, checkbox toggle, typed
- * search, InviteUserDialog form fields) have been downgraded to RTL per the
- * 2026-05 audit row #28 → src/components/machines/OwnerSelect.test.tsx.
+ * H-class UI state for the OwnerSelect picker (guest visibility filter,
+ * checkbox toggle, typed search) is covered by RTL in
+ * `src/components/machines/OwnerSelect.test.tsx` per the 2026-05 audit row #28.
+ *
+ * The InviteUserDialog form-field checks (no role field, sendInvite default)
+ * were also removed from this E2E. Their RTL replacement is gated on audit
+ * row #25 (form-resets, P3) — to be created at
+ * `src/components/users/InviteUserDialog.test.tsx`.
  */
 
 import { test, expect, type Page } from "@playwright/test";

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   userProfiles,
@@ -20,7 +20,10 @@ import {
   createTestMachine,
   createTestIssue,
 } from "~/test/helpers/factories";
-import { anonymizeUserReferences } from "~/app/(app)/settings/account-deletion";
+import {
+  anonymizeUserReferences,
+  getReassignmentTargets,
+} from "~/app/(app)/settings/account-deletion";
 import { randomUUID } from "node:crypto";
 
 describe("Account Deletion Anonymization (PGlite)", () => {
@@ -180,9 +183,11 @@ describe("Account Deletion Anonymization (PGlite)", () => {
 
 describe("Account Deletion Reassign Picker — guest filter (PP-hci / PP-aby)", () => {
   /**
-   * Class-I integration test — verifies the Drizzle query used by
-   * settings/page.tsx to populate the reassignment picker excludes
-   * guests and only returns member-or-above users.
+   * Class-I integration test — exercises the production
+   * `getReassignmentTargets` helper used by settings/page.tsx to populate
+   * the reassignment picker. Calling the real helper (not a copy of the
+   * query) guarantees that any future drift in the role filter is caught
+   * by this regression test.
    *
    * Replaces e2e/full/account-deletion-reassign-picker.spec.ts which
    * was downgraded per the 2026-05 audit (row #16, DOWNGRADE-integration).
@@ -226,18 +231,9 @@ describe("Account Deletion Reassign Picker — guest filter (PP-hci / PP-aby)", 
       }),
     ]);
 
-    // Mirror the exact query from settings/page.tsx (the membersResult subquery).
-    // Guests must be excluded; member, technician, and admin must be included.
-    const membersResult = await db
-      .select({ id: userProfiles.id, name: userProfiles.name })
-      .from(userProfiles)
-      .where(
-        and(
-          ne(userProfiles.id, deletingUserId),
-          inArray(userProfiles.role, ["member", "technician", "admin"])
-        )
-      );
-
+    // Call the production helper directly — drift in the role filter will
+    // fail this assertion.
+    const membersResult = await getReassignmentTargets(deletingUserId, db);
     const resultIds = membersResult.map((r) => r.id);
 
     // Guest must NOT appear
