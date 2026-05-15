@@ -7,6 +7,8 @@
  */
 import dynamic from "next/dynamic";
 
+export type { RichTextEditorHandle } from "~/components/editor/RichTextEditor";
+
 export const RichTextEditor = dynamic(
   () =>
     import("~/components/editor/RichTextEditor").then(

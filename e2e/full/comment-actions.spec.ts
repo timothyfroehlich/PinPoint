@@ -151,6 +151,32 @@ test.describe.serial("Comment Edit and Delete", () => {
       await page.keyboard.press("Escape");
     });
 
+    test("editor body is empty after successful comment submit", async ({
+      page,
+    }, testInfo) => {
+      await loginAs(page, testInfo);
+      await page.goto(issueUrl);
+
+      const resetCheckText = "Temporary comment for reset check";
+      const commentEditor = page.getByLabel("Comment", { exact: true });
+      await expect(commentEditor).toBeVisible({ timeout: 10000 });
+      await commentEditor.click();
+      await page.keyboard.type(resetCheckText);
+
+      await page.getByRole("button", { name: "Add Comment" }).click();
+
+      // Scope to the timeline to confirm the comment was persisted and rendered,
+      // not just that the text exists in the editor before clear
+      await expect(
+        page
+          .locator('[data-testid^="timeline-item-"]')
+          .filter({ hasText: resetCheckText })
+      ).toBeVisible({ timeout: 10000 });
+
+      // The ProseMirror contenteditable should be empty after reset
+      await expect(commentEditor).toHaveText("", { timeout: 5000 });
+    });
+
     test("author can edit their own comment", async ({ page }, testInfo) => {
       await loginAs(page, testInfo);
       await page.goto(issueUrl);

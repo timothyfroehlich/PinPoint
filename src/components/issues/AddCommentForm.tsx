@@ -12,7 +12,10 @@ import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { type ImageMetadata } from "~/types/images";
-import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
+import {
+  RichTextEditor,
+  type RichTextEditorHandle,
+} from "~/components/editor/RichTextEditorDynamic";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface AddCommentFormProps {
@@ -23,6 +26,7 @@ export function AddCommentForm({
   issueId,
 }: AddCommentFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
+  const editorRef = useRef<RichTextEditorHandle>(null);
   const [state, formAction, isPending] = useActionState<
     AddCommentResult | undefined,
     FormData
@@ -36,6 +40,8 @@ export function AddCommentForm({
       formRef.current?.reset();
       setUploadedImages([]);
       setComment(null);
+      editorRef.current?.clear();
+      editorRef.current?.focus();
     }
   }, [state]);
 
@@ -52,6 +58,7 @@ export function AddCommentForm({
         value={JSON.stringify(uploadedImages)}
       />
       <RichTextEditor
+        ref={editorRef}
         content={comment}
         onChange={setComment}
         mentionsEnabled={true}
