@@ -35,7 +35,7 @@ Customize: remove Copilot line for trivial changes, add task-specific items.
 ## Step 2: Dispatch the Subagent
 
 ```
-Task(
+Agent(
   subagent_type: "general-purpose",
   model: "sonnet",
   isolation: "worktree",
