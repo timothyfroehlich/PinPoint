@@ -278,8 +278,10 @@ export async function createNotification(
       if (r.status === "rejected") {
         // Channel.deliver() is expected to catch its own errors and return
         // {ok:false}. A rejection here means a bug — log at error level and report to Sentry.
+        // bestEffort: true because notification fan-out is a post-commit side-effect;
+        // failures here do not affect the primary user-facing action.
         reportError(r.reason, {
-          bestEffort: false,
+          bestEffort: true,
           action: "notifications.dispatch.fanout",
         });
       }
