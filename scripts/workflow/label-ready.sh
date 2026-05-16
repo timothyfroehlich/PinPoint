@@ -8,6 +8,14 @@
 #   ./scripts/workflow/label-ready.sh 918 --cleanup          # Also remove worktree
 #   ./scripts/workflow/label-ready.sh 918 --force             # Label even with Copilot comments
 #   ./scripts/workflow/label-ready.sh 918 --dry-run           # Show what would happen
+#
+# Copilot review currency gate (PP-pny0):
+#   After CI passes, verifies the latest Copilot review covers the head commit.
+#   - head newer than last review AND elapsed < 600s → exit 1 (WAIT)
+#   - head newer than last review AND elapsed >= 600s → WARN and proceed
+#   - review is current (review timestamp >= head commit timestamp) → proceed
+#   - no Copilot reviews at all → proceed (some PRs legitimately skip Copilot)
+#   - --force bypasses this gate
 
 set -euo pipefail
 
@@ -72,6 +80,61 @@ if [ "$failed" -gt 0 ]; then
 fi
 
 echo "CI: All checks passed."
+
+# Gate: Copilot review currency (PP-pny0)
+# Verifies the latest Copilot review covers the current head commit.
+# ISO 8601 timestamps from GitHub are always UTC (Z suffix), so string
+# comparison is lexicographically correct (same logic as copilot-comments.sh).
+COPILOT_CURRENCY_THRESHOLD=600  # seconds; elapsed >= threshold → WARN and proceed
+
+if [ "$FORCE" = "false" ]; then
+    latest_review=$(gh api "repos/timothyfroehlich/PinPoint/pulls/${PR}/reviews" \
+        --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | .submitted_at // empty' 2>/dev/null) || latest_review=""
+
+    if [ -n "$latest_review" ]; then
+        head_sha=$(gh api "repos/timothyfroehlich/PinPoint/pulls/${PR}" --jq '.head.sha // empty' 2>/dev/null) || head_sha=""
+        if [ -n "$head_sha" ]; then
+            head_date=$(gh api "repos/timothyfroehlich/PinPoint/commits/${head_sha}" --jq '.commit.committer.date // empty' 2>/dev/null) || head_date=""
+
+            if [ -n "$head_date" ] && [[ "$head_date" > "$latest_review" ]]; then
+                # Head commit is newer than last Copilot review — compute elapsed seconds.
+                # Both macOS (BSD date -jf) and Linux (GNU date -d) need TZ=UTC to parse
+                # the trailing Z as UTC rather than the local timezone.
+                if date --version >/dev/null 2>&1; then
+                    # GNU date (Linux)
+                    head_epoch=$(TZ=UTC date -d "$head_date" +%s 2>/dev/null) || head_epoch=0
+                    now_epoch=$(date +%s)
+                else
+                    # BSD date (macOS) — strip trailing Z, parse with explicit TZ=UTC
+                    head_date_noz="${head_date%Z}"
+                    head_epoch=$(TZ=UTC date -jf "%Y-%m-%dT%H:%M:%S" "$head_date_noz" +%s 2>/dev/null) || head_epoch=0
+                    now_epoch=$(date +%s)
+                fi
+
+                if [ "$head_epoch" -gt 0 ]; then
+                    elapsed=$(( now_epoch - head_epoch ))
+                    if [ "$elapsed" -lt "$COPILOT_CURRENCY_THRESHOLD" ]; then
+                        echo "WAIT: Copilot review pending for ${elapsed}s since push (threshold: ${COPILOT_CURRENCY_THRESHOLD}s). Use --force to override."
+                        exit 1
+                    else
+                        echo "WARN: Copilot review not received after ${elapsed}s — proceeding."
+                    fi
+                else
+                    echo "WARN: Could not parse head commit date '${head_date}' — skipping currency check."
+                fi
+            elif [ -n "$head_date" ]; then
+                echo "Copilot: review is current."
+            else
+                echo "WARN: Could not fetch head commit date — skipping currency check."
+            fi
+        else
+            echo "WARN: Could not fetch head SHA — skipping currency check."
+        fi
+    else
+        # No Copilot reviews at all — some PRs legitimately skip (e.g. Dependabot).
+        echo "Copilot: no reviews found — skipping currency check."
+    fi
+fi
 
 # Check Copilot comments (unresolved threads only via GraphQL)
 # shellcheck disable=SC2016
