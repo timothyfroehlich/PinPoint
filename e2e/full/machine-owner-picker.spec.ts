@@ -12,8 +12,8 @@
  * `src/components/machines/OwnerSelect.test.tsx` per the 2026-05 audit row #28.
  *
  * The InviteUserDialog form-field checks (no role field, sendInvite default)
- * were also removed from this E2E. Their RTL replacement is gated on audit
- * row #25 (form-resets, P3) — to be created at
+ * were also removed from this E2E. No replacement test exists yet; audit
+ * row #25 (form-resets, P3) tracks creating
  * `src/components/users/InviteUserDialog.test.tsx`.
  */
 
