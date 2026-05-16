@@ -1,199 +1,36 @@
+/**
+ * Smoke: Issue detail page renders for an unauthenticated visitor.
+ *
+ * Coverage goal: D-class — "page loads without 500" for the unauthenticated
+ * path. Authenticated render is already covered by e2e/smoke/issues-crud.spec.ts
+ * (which uses STORAGE_STATE.member). All permission-enforcement assertions
+ * (E-class) live in:
+ *   src/test/integration/issue-detail-permissions.test.ts
+ * All UI-state assertions (H-class) live in:
+ *   src/test/unit/components/issues/issue-detail-permissions.test.tsx
+ */
 import { test, expect } from "@playwright/test";
-import {
-  expectIssueFieldDisabled,
-  expectIssueFieldEnabled,
-  loginAs,
-} from "../support/actions.js";
-import { seededIssues, TEST_USERS } from "../support/constants.js";
+import { seededIssues } from "../support/constants.js";
 
-test.describe("Issue detail permission-aware UI", () => {
-  test.describe("Unauthenticated visitor", () => {
-    test("sees read-only badges instead of selects", async ({ page }) => {
-      const issue = seededIssues.AFM[0];
-      await page.goto(`/m/AFM/i/${issue.num}`);
+test.describe("Issue detail smoke — unauthenticated render", () => {
+  test("page loads without error for unauthenticated visitor", async ({
+    page,
+  }) => {
+    const issue = seededIssues.AFM[0];
+    const response = await page.goto(`/m/AFM/i/${issue.num}`);
 
-      await expect(page).toHaveURL(`/m/AFM/i/${issue.num}`);
+    // Assert the server actually returned 2xx — a 500 error page can still
+    // render with a URL match and an h1, so the response status is the
+    // load-bearing assertion for this D-class smoke.
+    expect(response?.ok(), "issue detail page should respond 2xx").toBe(true);
 
-      // All four field selects should be absent for unauthenticated users
-      await expect(page.getByTestId("issue-status-select")).toHaveCount(0);
-      await expect(page.getByTestId("issue-severity-select")).toHaveCount(0);
-      await expect(page.getByTestId("issue-priority-select")).toHaveCount(0);
-      await expect(page.getByTestId("issue-frequency-select")).toHaveCount(0);
+    // Confirm the page did not redirect to an error or login page.
+    await expect(page).toHaveURL(`/m/AFM/i/${issue.num}`);
 
-      // Read-only badges should be visible (use first() since badges appear in both header and sidebar)
-      await expect(
-        page.getByTestId("issue-status-badge").filter({ visible: true }).first()
-      ).toBeVisible();
-      await expect(
-        page
-          .getByTestId("issue-severity-badge")
-          .filter({ visible: true })
-          .first()
-      ).toBeVisible();
-      await expect(
-        page
-          .getByTestId("issue-priority-badge")
-          .filter({ visible: true })
-          .first()
-      ).toBeVisible();
-      await expect(
-        page
-          .getByTestId("issue-frequency-badge")
-          .filter({ visible: true })
-          .first()
-      ).toBeVisible();
-
-      // Assignee should be read-only
-      await expect(
-        page.getByTestId("assignee-readonly").filter({ visible: true }).first()
-      ).toBeVisible();
-
-      // Watch button should be hidden
-      await expect(
-        page.getByRole("button", { name: /watch issue/i })
-      ).toHaveCount(0);
-      await expect(
-        page.getByRole("button", { name: /unwatch issue/i })
-      ).toHaveCount(0);
-
-      // Comment: login prompt visible
-      await expect(page.getByTestId("login-to-comment")).toBeVisible();
-    });
-  });
-
-  test.describe("Guest on another user's issue", () => {
-    test("sees disabled controls for all fields", async ({
-      page,
-    }, testInfo) => {
-      await loginAs(page, testInfo, {
-        email: TEST_USERS.guest.email,
-        password: TEST_USERS.guest.password,
-      });
-
-      const otherIssue = seededIssues.AFM[0]; // reported by member
-      await page.goto(`/m/AFM/i/${otherIssue.num}`);
-
-      await expectIssueFieldDisabled(page, "status");
-      await expectIssueFieldDisabled(page, "severity");
-      await expectIssueFieldDisabled(page, "priority");
-      await expectIssueFieldDisabled(page, "frequency");
-
-      await expect(
-        page.getByTestId("assignee-picker-trigger").filter({ visible: true })
-      ).toBeDisabled();
-    });
-
-    test("can see watch button and comment input", async ({
-      page,
-    }, testInfo) => {
-      await loginAs(page, testInfo, {
-        email: TEST_USERS.guest.email,
-        password: TEST_USERS.guest.password,
-      });
-
-      const otherIssue = seededIssues.AFM[0];
-      await page.goto(`/m/AFM/i/${otherIssue.num}`);
-
-      // Watch button should be visible for authenticated users
-      await expect(
-        page.getByRole("button", { name: /watch issue|unwatch issue/i })
-      ).toBeVisible();
-
-      // Comment input should be available (not the login prompt). On mobile
-      // the textarea lives inside the StickyCommentComposer Sheet (closed by
-      // default) — tap the trigger to open it. On desktop the inline composer
-      // is visible at the end of the timeline. Scope the label query so we
-      // don't match the hidden inline textarea on mobile (strict mode).
-      await expect(page.getByTestId("login-to-comment")).toHaveCount(0);
-      const isMobile = testInfo.project.name.includes("Mobile");
-      if (isMobile) {
-        await page.getByRole("button", { name: "Add a comment" }).click();
-      }
-      const composerScope = isMobile
-        ? page.getByRole("dialog", { name: "Add a comment" })
-        : page.getByTestId("issue-comment-form");
-      await expect(
-        composerScope.getByLabel("Comment", { exact: true })
-      ).toBeVisible();
-    });
-  });
-
-  test.describe("Guest on own issue", () => {
-    test("has enabled status, severity, frequency but disabled priority and assignee", async ({
-      page,
-    }, testInfo) => {
-      await loginAs(page, testInfo, {
-        email: TEST_USERS.guest.email,
-        password: TEST_USERS.guest.password,
-      });
-
-      const ownIssue = seededIssues.AFM[1]; // reported by guest
-      await page.goto(`/m/AFM/i/${ownIssue.num}`);
-
-      await expectIssueFieldEnabled(page, "status");
-      await expectIssueFieldEnabled(page, "severity");
-      await expectIssueFieldEnabled(page, "frequency");
-
-      await expectIssueFieldDisabled(page, "priority");
-
-      await expect(
-        page.getByTestId("assignee-picker-trigger").filter({ visible: true })
-      ).toBeDisabled();
-    });
-  });
-
-  test.describe("Member", () => {
-    test("has all controls enabled", async ({ page }, testInfo) => {
-      await loginAs(page, testInfo, {
-        email: TEST_USERS.member.email,
-        password: TEST_USERS.member.password,
-      });
-
-      const issue = seededIssues.AFM[0];
-      await page.goto(`/m/AFM/i/${issue.num}`);
-
-      await expectIssueFieldEnabled(page, "status");
-      await expectIssueFieldEnabled(page, "severity");
-      await expectIssueFieldEnabled(page, "priority");
-      await expectIssueFieldEnabled(page, "frequency");
-
-      await expect(
-        page.getByTestId("assignee-picker-trigger").filter({ visible: true })
-      ).toBeEnabled();
-    });
-
-    test("can see watch button and comment input", async ({
-      page,
-    }, testInfo) => {
-      await loginAs(page, testInfo, {
-        email: TEST_USERS.member.email,
-        password: TEST_USERS.member.password,
-      });
-
-      const issue = seededIssues.AFM[0];
-      await page.goto(`/m/AFM/i/${issue.num}`);
-
-      // Watch button should be visible
-      await expect(
-        page.getByRole("button", { name: /watch issue|unwatch issue/i })
-      ).toBeVisible();
-
-      // Comment input should be available (not the login prompt). On mobile
-      // the textarea lives inside the StickyCommentComposer Sheet (closed by
-      // default) — tap the trigger to open it. On desktop the inline composer
-      // is visible at the end of the timeline. Scope the label query so we
-      // don't match the hidden inline textarea on mobile (strict mode).
-      await expect(page.getByTestId("login-to-comment")).toHaveCount(0);
-      const isMobile = testInfo.project.name.includes("Mobile");
-      if (isMobile) {
-        await page.getByRole("button", { name: "Add a comment" }).click();
-      }
-      const composerScope = isMobile
-        ? page.getByRole("dialog", { name: "Add a comment" })
-        : page.getByTestId("issue-comment-form");
-      await expect(
-        composerScope.getByLabel("Comment", { exact: true })
-      ).toBeVisible();
-    });
+    // The issue title heading is the canonical signal that the detail page
+    // rendered successfully (not a redirect / blank screen).
+    await expect(
+      page.getByRole("main").getByRole("heading", { level: 1 })
+    ).toBeVisible();
   });
 });
