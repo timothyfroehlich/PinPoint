@@ -11,12 +11,16 @@
  * In-Reply-To + References on every notification.
  */
 
-const DOMAIN = "pinpoint.app";
+// Must match the domain of `EMAIL_FROM` in `src/lib/email/transport.ts`. RFC
+// 5322 / convention is for synthetic Message-IDs to use a domain the sender
+// controls; strict mail providers may reject (or downgrade) IDs from unrelated
+// domains.
+const DOMAIN = "pinpoint.austinpinballcollective.org";
 
 /**
  * Returns the stable synthetic root Message-ID for a given issue.
  *
- * Format: <issue-PP-1234@pinpoint.app>
+ * Format: <issue-PP-1234@pinpoint.austinpinballcollective.org>
  *
  * The value is deterministic (no randomness) so it is safe to call on every
  * delivery without persisting the ID to the database.

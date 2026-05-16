@@ -7,7 +7,7 @@ import {
 describe("getIssueRootMessageId", () => {
   it("returns a stable Message-ID in angle-bracket format", () => {
     expect(getIssueRootMessageId("PP-1234")).toBe(
-      "<issue-PP-1234@pinpoint.app>"
+      "<issue-PP-1234@pinpoint.austinpinballcollective.org>"
     );
   });
 
@@ -25,8 +25,12 @@ describe("getIssueRootMessageId", () => {
 describe("getThreadingHeaders", () => {
   it("returns inReplyTo and references pointing to the same root ID", () => {
     const headers = getThreadingHeaders("PP-1234");
-    expect(headers.inReplyTo).toBe("<issue-PP-1234@pinpoint.app>");
-    expect(headers.references).toBe("<issue-PP-1234@pinpoint.app>");
+    expect(headers.inReplyTo).toBe(
+      "<issue-PP-1234@pinpoint.austinpinballcollective.org>"
+    );
+    expect(headers.references).toBe(
+      "<issue-PP-1234@pinpoint.austinpinballcollective.org>"
+    );
   });
 
   it("inReplyTo and references are always equal (single-root threading)", () => {

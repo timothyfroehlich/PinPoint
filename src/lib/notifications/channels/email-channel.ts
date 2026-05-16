@@ -190,8 +190,14 @@ export function getEventTypeLabel(type: NotificationType): string {
       return "New Comment";
     case "mentioned":
       return "You Were Mentioned";
-    default:
+    case "machine_ownership_changed":
+      // Not issue-tied; the email subject already carries the label, so the
+      // body header is empty.
       return "";
+    default: {
+      const exhaustive: never = type;
+      return exhaustive;
+    }
   }
 }
 

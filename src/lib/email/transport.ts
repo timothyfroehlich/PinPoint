@@ -12,9 +12,9 @@ export interface EmailParams {
   to: string;
   subject: string;
   html: string;
-  /** RFC 5322 In-Reply-To header value (e.g. "<issue-PP-1234@pinpoint.app>") */
+  /** RFC 5322 In-Reply-To header value (e.g. "<issue-PP-1234@pinpoint.austinpinballcollective.org>") */
   inReplyTo?: string | undefined;
-  /** RFC 5322 References header value (e.g. "<issue-PP-1234@pinpoint.app>") */
+  /** RFC 5322 References header value (e.g. "<issue-PP-1234@pinpoint.austinpinballcollective.org>") */
   references?: string | undefined;
 }
 

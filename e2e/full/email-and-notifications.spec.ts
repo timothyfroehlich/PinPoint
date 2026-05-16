@@ -683,7 +683,18 @@ test.describe.serial("Email Notifications", () => {
     expect(emailAfterStatusChange).not.toBeNull();
     // Subject now uses stable per-issue format — issue title is present.
     expect(emailAfterStatusChange?.subject).toContain(issueTitle);
-    // "Status Changed" has moved from the subject to the email body (PP-04c).
+
+    // Subjects collapsed to a single per-issue format under PP-04c, so the
+    // event-type label moved to the body. Fetch the body and assert it shows
+    // this email is for the status change — otherwise the assertion above
+    // could still pass if any other issue-tied email had arrived.
+    const messageId = emailAfterStatusChange?.ID;
+    if (!messageId) {
+      throw new Error("Expected captured email to have a Mailpit message ID");
+    }
+    const detail = await mailpit.getMessage(testAdminEmail, messageId);
+    const body = (detail.HTML ?? detail.Text ?? "").toString();
+    expect(body).toContain("Status Changed");
   });
 
   test("should unsubscribe via confirmation page", async ({ page }) => {
