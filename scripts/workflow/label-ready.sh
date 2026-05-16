@@ -88,13 +88,27 @@ echo "CI: All checks passed."
 COPILOT_CURRENCY_THRESHOLD=600  # seconds; elapsed >= threshold → WARN and proceed
 
 if [ "$FORCE" = "false" ]; then
-    latest_review=$(gh api "repos/timothyfroehlich/PinPoint/pulls/${PR}/reviews" \
-        --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | .submitted_at // empty' 2>/dev/null) || latest_review=""
+    # Paginate to cover long-running PRs with >30 review cycles. Run jq on the
+    # merged output (not via --jq) so sort_by/last operates across all pages.
+    # Distinguish API failure from "no Copilot reviews": failure exits 1 per
+    # scripts/workflow/AGENTS.md ("label-ready must fail closed on Copilot
+    # API errors unless --force").
+    if ! reviews_json=$(gh api --paginate "repos/timothyfroehlich/PinPoint/pulls/${PR}/reviews" 2>/dev/null); then
+        echo "FAIL: Could not query Copilot reviews from GitHub API. Use --force to override."
+        exit 1
+    fi
+    latest_review=$(echo "$reviews_json" | jq -r '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | .submitted_at // empty')
 
     if [ -n "$latest_review" ]; then
-        head_sha=$(gh api "repos/timothyfroehlich/PinPoint/pulls/${PR}" --jq '.head.sha // empty' 2>/dev/null) || head_sha=""
+        if ! head_sha=$(gh api "repos/timothyfroehlich/PinPoint/pulls/${PR}" --jq '.head.sha // empty' 2>/dev/null); then
+            echo "FAIL: Could not fetch PR head SHA from GitHub API. Use --force to override."
+            exit 1
+        fi
         if [ -n "$head_sha" ]; then
-            head_date=$(gh api "repos/timothyfroehlich/PinPoint/commits/${head_sha}" --jq '.commit.committer.date // empty' 2>/dev/null) || head_date=""
+            if ! head_date=$(gh api "repos/timothyfroehlich/PinPoint/commits/${head_sha}" --jq '.commit.committer.date // empty' 2>/dev/null); then
+                echo "FAIL: Could not fetch head commit metadata from GitHub API. Use --force to override."
+                exit 1
+            fi
 
             if [ -n "$head_date" ] && [[ "$head_date" > "$latest_review" ]]; then
                 # Head commit is newer than last Copilot review — compute elapsed seconds.
