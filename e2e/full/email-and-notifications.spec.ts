@@ -647,25 +647,43 @@ test.describe.serial("Email Notifications", () => {
         .getByRole("heading", { level: 1, name: new RegExp(titlePattern) })
     ).toBeVisible();
 
-    // Clear the "new issue" email
+    // Wait for the "new issue" email to arrive so we know the pre-state count.
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    mailpit.clearMailbox(testAdminEmail);
+    // Count emails with the stable subject before triggering the status change.
+    // clearMailbox() is a no-op, so we track count instead of clearing.
+    const emailsBeforeStatusChange = await mailpit.getMessages(testAdminEmail);
+    const countBefore = emailsBeforeStatusChange.filter((m) =>
+      m.Subject.includes(issueTitle)
+    ).length;
 
     // Update status (uses viewport-aware helper — works on both desktop and mobile)
     await updateIssueField(page, "status", "in_progress");
 
-    // Wait for status change email - filter by "Status Changed" prefix since
-    // clearMailbox() is a no-op and the "New Issue" email (also containing
-    // issueTitle) is still in the mailbox.
-    const emailAfterStatusChange = await mailpit.waitForEmail(testAdminEmail, {
-      subjectContains: "Status Changed",
-      timeout: 30000,
-      pollIntervalMs: 750,
-    });
+    // Since PP-04c, all issue-tied notifications share a stable subject format
+    // "[MachineName] PP-XX: Issue Title" — the event type ("Status Changed")
+    // has moved to the email body. We wait until a NEW email with that stable
+    // subject arrives (count goes above the pre-status-change count).
+    let emailAfterStatusChange = null;
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      const allEmails = await mailpit.getMessages(testAdminEmail);
+      const matching = allEmails
+        .filter((m) => m.Subject.includes(issueTitle))
+        .sort(
+          (a, b) =>
+            new Date(b.Date ?? 0).getTime() - new Date(a.Date ?? 0).getTime()
+        );
+      if (matching.length > countBefore) {
+        emailAfterStatusChange = matching[0] ?? null;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 750));
+    }
 
     expect(emailAfterStatusChange).not.toBeNull();
-    expect(emailAfterStatusChange?.subject).toContain("Status Changed");
+    // Subject now uses stable per-issue format — issue title is present.
     expect(emailAfterStatusChange?.subject).toContain(issueTitle);
+    // "Status Changed" has moved from the subject to the email body (PP-04c).
   });
 
   test("should unsubscribe via confirmation page", async ({ page }) => {
