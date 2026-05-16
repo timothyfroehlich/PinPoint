@@ -17,7 +17,8 @@ import {
 } from "~/app/(app)/notifications/actions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatRelative } from "~/lib/dates";
+import { formatDateTime } from "~/lib/dates";
+import { RelativeTime } from "~/components/issues/RelativeTime";
 import type { NotificationType } from "~/lib/notifications";
 
 /** Minimal notification shape for client rendering (CORE-SEC-006) */
@@ -167,7 +168,10 @@ export function NotificationList({
                     </div>
                   </div>
                   <span className="text-xs text-muted-foreground self-end">
-                    {formatRelative(notification.createdAt)}
+                    <RelativeTime
+                      value={notification.createdAt}
+                      fallback={formatDateTime(notification.createdAt)}
+                    />
                   </span>
                 </Link>
               </DropdownMenuItem>
