@@ -1,4 +1,4 @@
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, count, eq, inArray, ne } from "drizzle-orm";
 import { db as globalDb, type Db } from "~/server/db";
 import {
   issueComments,
@@ -7,6 +7,46 @@ import {
   machines,
   userProfiles,
 } from "~/server/db/schema";
+
+/**
+ * Reassignment target shape returned by {@link getReassignmentTargets}.
+ *
+ * Only the fields needed by the picker UI are exposed (CORE-SEC-006).
+ */
+export interface ReassignmentTarget {
+  id: string;
+  name: string;
+}
+
+/**
+ * Returns the list of users eligible to receive ownership of the deleting
+ * user's machines.
+ *
+ * Guests are excluded because the matrix forbids guest:machines.edit
+ * (PP-hci) — only `member`, `technician`, and `admin` roles can own
+ * machines. The deleting user themselves is also excluded.
+ *
+ * This is the single source of truth for the reassignment picker query.
+ * Used by both `settings/page.tsx` (production) and
+ * `src/test/integration/account-deletion.test.ts` (regression coverage
+ * for PP-aby). Drifting the filter here updates both call sites.
+ */
+export async function getReassignmentTargets(
+  deletingUserId: string,
+  db: Db = globalDb
+): Promise<ReassignmentTarget[]> {
+  return db
+    .select({ id: userProfiles.id, name: userProfiles.name })
+    .from(userProfiles)
+    .where(
+      and(
+        ne(userProfiles.id, deletingUserId),
+        // Guests cannot own machines (matrix: machines.edit guest:false).
+        // Only member+ are valid reassignment targets. (PP-hci)
+        inArray(userProfiles.role, ["member", "technician", "admin"])
+      )
+    );
+}
 
 export async function anonymizeUserReferences(
   userId: string,

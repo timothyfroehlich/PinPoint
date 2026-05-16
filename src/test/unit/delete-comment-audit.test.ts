@@ -1,11 +1,20 @@
 /**
- * Unit Tests: Comment Deletion Audit Trail
+ * Unit Tests: Comment Actions (add, edit, delete)
  *
- * Tests that deleting a comment converts it to an audit trail message
- * rather than actually deleting the row.
+ * Tests that:
+ * - addCommentAction persists a comment on happy path
+ * - editCommentAction updates a comment when the author makes the call, and
+ *   returns UNAUTHORIZED for non-authors (including admins trying to edit
+ *   another user's comment — i.e. admins can delete but cannot edit others)
+ * - deleteCommentAction converts a comment to an audit trail message
+ *   rather than actually deleting the row
  */
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import { deleteCommentAction } from "~/app/(app)/issues/actions";
+import {
+  addCommentAction,
+  editCommentAction,
+  deleteCommentAction,
+} from "~/app/(app)/issues/actions";
 
 // Mock Next.js modules
 vi.mock("next/cache", () => ({
@@ -63,7 +72,7 @@ vi.mock("~/lib/logger", () => ({
   },
 }));
 
-// Mock services (not used for delete, but imported)
+// Mock services
 vi.mock("~/services/issues", () => ({
   updateIssueStatus: vi.fn(),
   updateIssueSeverity: vi.fn(),
@@ -77,6 +86,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { log } from "~/lib/logger";
+import { addIssueComment, updateIssueComment } from "~/services/issues";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -385,6 +395,157 @@ describe("deleteCommentAction - Audit Trail", () => {
         expect(result.code).toBe("VALIDATION");
       }
       expect(getMockUpdate()).not.toHaveBeenCalled();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// addCommentAction
+// ---------------------------------------------------------------------------
+
+// Minimal ProseMirror doc with content so docToPlainText returns non-empty.
+const validCommentDoc = {
+  type: "doc",
+  content: [
+    {
+      type: "paragraph",
+      content: [{ type: "text", text: "Hello world" }],
+    },
+  ],
+};
+
+describe("addCommentAction", () => {
+  const validIssueId = "987e6543-e21b-12d3-a456-426614174000";
+  const mockUserId = "user-123";
+  const initialState = undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: mockUserId } },
+        }),
+      },
+    } as unknown as SupabaseClient);
+
+    vi.mocked(db.query.issues.findFirst).mockResolvedValue({
+      machineInitials: "MM",
+      issueNumber: 1,
+    } as any);
+
+    vi.mocked(addIssueComment).mockResolvedValue(undefined as any);
+  });
+
+  it("persists the comment and revalidates the issue page on happy path", async () => {
+    const formData = new FormData();
+    formData.append("issueId", validIssueId);
+    formData.append("comment", JSON.stringify(validCommentDoc));
+
+    const result = await addCommentAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    expect(vi.mocked(addIssueComment)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueId: validIssueId,
+        userId: mockUserId,
+      })
+    );
+    expect(revalidatePath).toHaveBeenCalledWith("/m/MM/i/1");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// editCommentAction
+// ---------------------------------------------------------------------------
+
+describe("editCommentAction", () => {
+  const validCommentId = "123e4567-e89b-12d3-a456-426614174000";
+  const validIssueId = "987e6543-e21b-12d3-a456-426614174000";
+  const mockUserId = "user-123";
+  const mockAdminId = "admin-456";
+  const initialState = undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    vi.mocked(db.query.issues.findFirst).mockResolvedValue({
+      machineInitials: "MM",
+      issueNumber: 1,
+    } as any);
+
+    vi.mocked(updateIssueComment).mockResolvedValue(undefined as any);
+  });
+
+  describe("when the author edits their own comment", () => {
+    beforeEach(() => {
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: mockUserId } },
+          }),
+        },
+      } as unknown as SupabaseClient);
+
+      vi.mocked(db.query.issueComments.findFirst).mockResolvedValue({
+        id: validCommentId,
+        issueId: validIssueId,
+        authorId: mockUserId,
+        content: "Original content",
+        isSystem: false,
+      } as any);
+    });
+
+    it("updates the comment and revalidates the issue page", async () => {
+      const formData = new FormData();
+      formData.append("commentId", validCommentId);
+      formData.append("comment", JSON.stringify(validCommentDoc));
+
+      const result = await editCommentAction(initialState, formData);
+
+      expect(result.ok).toBe(true);
+      expect(vi.mocked(updateIssueComment)).toHaveBeenCalledWith(
+        expect.objectContaining({ commentId: validCommentId })
+      );
+      expect(revalidatePath).toHaveBeenCalledWith("/m/MM/i/1");
+    });
+  });
+
+  describe("when a non-author (including admin) tries to edit another user's comment", () => {
+    // This covers the E2E assertion that admins see Delete but NOT Edit on
+    // others' comments: the server action enforces this at the action boundary.
+    beforeEach(() => {
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: mockAdminId } },
+          }),
+        },
+      } as unknown as SupabaseClient);
+
+      // Comment belongs to a different user
+      vi.mocked(db.query.issueComments.findFirst).mockResolvedValue({
+        id: validCommentId,
+        issueId: validIssueId,
+        authorId: mockUserId, // different from mockAdminId
+        content: "Another user's comment",
+        isSystem: false,
+      } as any);
+    });
+
+    it("returns UNAUTHORIZED and does not call updateIssueComment", async () => {
+      const formData = new FormData();
+      formData.append("commentId", validCommentId);
+      formData.append("comment", JSON.stringify(validCommentDoc));
+
+      const result = await editCommentAction(initialState, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+      expect(vi.mocked(updateIssueComment)).not.toHaveBeenCalled();
     });
   });
 });
