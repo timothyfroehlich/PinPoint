@@ -8,7 +8,7 @@
  * - Unauthenticated visitors don't see the page heading
  *
  * The full admin-form behaviour (validate buttons, save round-trip,
- * unsaved-changes guard) is covered by `e2e/full/admin-discord-integration.spec.ts`.
+ * unsaved-changes guard) is covered by `src/test/integration/admin/discord-integration-actions.test.ts`.
  */
 
 import { test, expect } from "@playwright/test";
