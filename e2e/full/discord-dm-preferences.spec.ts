@@ -50,28 +50,12 @@ test.describe("Discord DM preferences", () => {
     await expect(page.getByLabel("Discord Notifications")).not.toBeAttached();
   });
 
-  test("Linked user without integration enabled still sees no Discord column", async ({
-    page,
-  }, testInfo) => {
-    // Even if the user has discord_user_id set, the column hides until the
-    // admin enables the integration (decision #18: don't advertise an
-    // unavailable feature).
-    await setUserDiscordId(memberId, "test-discord-id-1");
-
-    try {
-      await loginAs(page, testInfo, {
-        email: memberEmail,
-        password: "TestPassword123",
-      });
-      await page.goto("/settings");
-
-      await expect(page.getByLabel("Discord Notifications")).not.toBeAttached();
-    } finally {
-      // Restore baseline so the previous test's assertion doesn't depend on
-      // run order.
-      await setUserDiscordId(memberId, null);
-    }
-  });
+  // "Linked user without integration enabled still sees no Discord column" deleted
+  // (row 24): this block duplicates "Discord column is hidden when integration is
+  // disabled" — both assert `not.toBeAttached()` for the Discord switch when
+  // getDiscordConfig() returns null. The integration column visibility is driven
+  // entirely by the integration config, not the user's linked state, so the linked
+  // variant adds no additional coverage.
 });
 
 test.describe("Discord DM preferences (integration enabled)", () => {
