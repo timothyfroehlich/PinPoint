@@ -21,55 +21,6 @@ test.describe("Image Upload Reporting", () => {
     });
   });
 
-  test("should upload image and persist it to issue", async ({ page }) => {
-    // 1. Prepare
-    await page.goto("/report");
-    const select = page.getByTestId("machine-select");
-    await select.selectOption({ index: 1 });
-    await expect(page).toHaveURL(/machine=/);
-
-    // 2. Fill Form
-    const issueTitle = `${IMAGE_UPLOAD_PREFIX} ${Date.now()}`;
-    await fillReportForm(page, {
-      title: issueTitle,
-      description: "Testing image persistence.",
-      includePriority: false,
-    });
-
-    // 3. Upload Image
-    // Use a test PNG from fixtures (2.3KB) that meets the 1KB minimum validation requirement
-    const testImagePath = join(__dirname, "..", "fixtures", "test-image.png");
-
-    await page.setInputFiles(
-      'input[data-testid="image-upload-input"]',
-      testImagePath
-    );
-
-    // 4. Verify Preview appears
-    // The preview card has a generic "Issue image" alt text or the filename
-    // Verify preview
-    await expect(page.getByText("Image uploaded successfully")).toBeVisible();
-    await expect(
-      page.getByRole("img", { name: "test-image.png" })
-    ).toBeVisible();
-
-    // 5. Submit
-    await page.getByRole("button", { name: "Submit Issue Report" }).click();
-
-    // 6. Verify Success & Navigation
-    // Anonymous user goes to success page, then we can click the link to view the issue if we were logged in,
-    // but here we are anonymous. The success page doesn't link to the issue for anonymous users for privacy/security
-    // (unless we change that flow, but currently it doesn't).
-
-    // Wait, the action redirects:
-    // "Redirect logic: 2. Anonymous users go to success page"
-    await expect(page).toHaveURL("/report/success");
-
-    // To verify persistence, we need to login as an admin or verify via DB/API.
-    // Or we can modify the test to login first.
-    // Let's login first to get redirected to the issue page directly.
-  });
-
   test("authenticated user should see uploaded image on issue page", async ({
     page,
   }, testInfo) => {
