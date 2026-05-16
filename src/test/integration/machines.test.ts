@@ -12,6 +12,10 @@ import { machines, issues } from "~/server/db/schema";
 import { createTestMachine, createTestIssue } from "~/test/helpers/factories";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { createMachineSchema } from "~/app/(app)/m/schemas";
+import {
+  applyMachineFilters,
+  type MachineWithDerivedStatus,
+} from "~/lib/machines/filters-queries";
 
 describe("Machine CRUD Operations (PGlite)", () => {
   // Set up worker-scoped PGlite and auto-cleanup after each test
@@ -407,5 +411,148 @@ describe("Machine CRUD Operations (PGlite)", () => {
         .where(eq(issues.machineInitials, machine.initials));
       expect(afterDelete).toHaveLength(0);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Machine Presence Status (downgrades from e2e/full/machine-presence-status.spec.ts)
+//
+// Replaced E2E tests (all B/D/I class):
+//   - "create test machine and issue for presence tests" (class-B setup)
+//   - "issue is visible in issues list while machine is on the floor" (class-I — covered by issue-filtering.test.ts)
+//   - "edit modal shows presence dropdown and updates status" (class-B action, class-H UI)
+//   - "detail page shows presence badge and inactive banner" (class-D rendering)
+//   - "machine list hides non-floor machines by default" (class-I filter)
+//   - "presence filter reveals non-floor machines" (class-I filter)
+//   - "issues list excludes issues from inactive machines" (class-I — covered by issue-filtering.test.ts)
+//
+// Note: Issue-list exclusion logic is already covered in
+//   src/test/integration/supabase/issue-filtering.test.ts ("excludes issues from
+//   inactive machines by default" and "includes inactive machine issues when
+//   includeInactiveMachines is true").
+// ---------------------------------------------------------------------------
+
+describe("Machine Presence Status (PGlite)", () => {
+  setupTestDb();
+
+  it("should default presenceStatus to 'on_the_floor' on creation", async () => {
+    const db = await getTestDb();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "PS1" }))
+      .returning();
+
+    const result = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(result?.presenceStatus).toBe("on_the_floor");
+  });
+
+  it("should persist presenceStatus update to 'on_loan'", async () => {
+    const db = await getTestDb();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "PS2" }))
+      .returning();
+
+    await db
+      .update(machines)
+      .set({ presenceStatus: "on_loan" })
+      .where(eq(machines.id, machine.id));
+
+    const result = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(result?.presenceStatus).toBe("on_loan");
+  });
+
+  it("should support all valid presence statuses", async () => {
+    const db = await getTestDb();
+    const statusToInitials: Record<string, string> = {
+      on_the_floor: "OTF",
+      off_the_floor: "OFF",
+      on_loan: "OLN",
+      pending_arrival: "PND",
+      removed: "REM",
+    } as const;
+
+    for (const [status, initials] of Object.entries(statusToInitials)) {
+      const [machine] = await db
+        .insert(machines)
+        .values(
+          createTestMachine({
+            initials,
+            presenceStatus: status as
+              | "on_the_floor"
+              | "off_the_floor"
+              | "on_loan"
+              | "pending_arrival"
+              | "removed",
+          })
+        )
+        .returning();
+
+      const result = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(result?.presenceStatus).toBe(status);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Machine Presence Filtering via applyMachineFilters
+// (covers the list-page "machine list hides non-floor / filter reveals" E2E tests)
+// ---------------------------------------------------------------------------
+
+describe("Machine Presence Filtering (applyMachineFilters)", () => {
+  const makeEntry = (
+    overrides: Partial<MachineWithDerivedStatus>
+  ): MachineWithDerivedStatus => ({
+    id: "test-id",
+    name: "Test Machine",
+    initials: "TM",
+    status: "operational",
+    presenceStatus: "on_the_floor",
+    openIssuesCount: 0,
+    createdAt: new Date(),
+    ...overrides,
+  });
+
+  const onFloor = makeEntry({ initials: "OF", presenceStatus: "on_the_floor" });
+  const onLoan = makeEntry({ initials: "OL", presenceStatus: "on_loan" });
+  const offFloor = makeEntry({
+    initials: "FF",
+    presenceStatus: "off_the_floor",
+  });
+
+  it("returns all machines when no presence filter is set", () => {
+    const result = applyMachineFilters([onFloor, onLoan, offFloor], {});
+    expect(result).toHaveLength(3);
+  });
+
+  it("filters to only on-the-floor machines when presence=['on_the_floor']", () => {
+    const result = applyMachineFilters([onFloor, onLoan, offFloor], {
+      presence: ["on_the_floor"],
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]?.initials).toBe("OF");
+  });
+
+  it("reveals on-loan machines when presence=['on_loan']", () => {
+    const result = applyMachineFilters([onFloor, onLoan, offFloor], {
+      presence: ["on_loan"],
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]?.initials).toBe("OL");
+  });
+
+  it("returns multiple presence statuses when presence has multiple values", () => {
+    const result = applyMachineFilters([onFloor, onLoan, offFloor], {
+      presence: ["on_loan", "off_the_floor"],
+    });
+    expect(result).toHaveLength(2);
+    expect(result.map((m) => m.initials)).toContain("OL");
+    expect(result.map((m) => m.initials)).toContain("FF");
   });
 });
