@@ -35,13 +35,31 @@ export function EditableIssueTitle({
     FormData
   >(updateIssueTitleAction, undefined);
 
-  // Focus input when entering edit mode
+  // Track edit sessions so a state.ok=false left over from a previous
+  // (already-canceled) edit doesn't bleed into the onBlur logic of a fresh
+  // edit session. useActionState has no built-in reset, so we tag the
+  // session that owned an error and only suppress the auto-cancel for
+  // that session.
+  const editSessionRef = useRef(0);
+  const erroredSessionRef = useRef<number | null>(null);
+
+  // Focus input + bump the session counter when entering edit mode
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
+    if (isEditing) {
+      editSessionRef.current += 1;
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      }
     }
   }, [isEditing]);
+
+  // Tag the current edit session whenever the action returns an error
+  useEffect(() => {
+    if (state?.ok === false) {
+      erroredSessionRef.current = editSessionRef.current;
+    }
+  }, [state]);
 
   // Re-sync editValue when title prop changes (e.g., from server revalidation)
   useEffect(() => {
@@ -110,11 +128,15 @@ export function EditableIssueTitle({
           onBlur={() => {
             // Small delay to allow form submit to fire first
             window.setTimeout(() => {
-              // Skip cancel if the previous submission errored — the
-              // user's typed edit would otherwise be silently discarded
-              // when they move focus to read the error toast. Press
-              // Escape to explicitly abandon a failed edit.
-              if (!isPending && state?.ok !== false) {
+              // Skip cancel if THIS edit session's submission errored —
+              // the user's typed edit would otherwise be silently
+              // discarded when they move focus to read the error toast.
+              // Press Escape to explicitly abandon a failed edit. The
+              // session-counter check ensures a stale error from a
+              // previous session doesn't block a fresh session's cancel.
+              const currentSessionErrored =
+                erroredSessionRef.current === editSessionRef.current;
+              if (!isPending && !currentSessionErrored) {
                 handleCancel();
               }
             }, 200);
