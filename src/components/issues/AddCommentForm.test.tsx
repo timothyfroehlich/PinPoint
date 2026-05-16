@@ -15,9 +15,10 @@ vi.mock("~/app/(app)/issues/actions", () => ({
   addCommentAction: vi.fn(),
 }));
 
-// Mock the dynamic RichTextEditor so tests don't require a DOM/TipTap runtime.
-// The mock exposes the imperative handle (clear, focus) via forwardRef so that
-// AddCommentForm's editorRef wiring works correctly.
+// Mock the dynamic RichTextEditor so tests don't require a DOM/TipTap runtime
+// (next/dynamic + TipTap use browser APIs unavailable in the jsdom environment).
+// The mock implements the RichTextEditorHandle interface via forwardRef so the
+// component can wire a ref without runtime errors.
 // Uses an async factory to avoid the hoisting constraint that prevents top-level
 // variable access inside synchronous vi.mock() factories.
 vi.mock("~/components/editor/RichTextEditorDynamic", async () => {
