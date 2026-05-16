@@ -110,7 +110,11 @@ export function EditableIssueTitle({
           onBlur={() => {
             // Small delay to allow form submit to fire first
             window.setTimeout(() => {
-              if (!isPending) {
+              // Skip cancel if the previous submission errored — the
+              // user's typed edit would otherwise be silently discarded
+              // when they move focus to read the error toast. Press
+              // Escape to explicitly abandon a failed edit.
+              if (!isPending && state?.ok !== false) {
                 handleCancel();
               }
             }, 200);
