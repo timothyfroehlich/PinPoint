@@ -72,6 +72,17 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/cvh-poll.sh",
+            "timeout": 10000
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {
