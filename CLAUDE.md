@@ -31,11 +31,11 @@
 
 ### Worktree Dispatch Safety
 
-Two upstream Claude Code bugs require active enforcement when the user asks you to dispatch subagents with `isolation: "worktree"`:
+Two upstream Claude Code bugs require active enforcement when the user asks you to dispatch subagents via `Agent(isolation: "worktree")`. "Main worktree" below means the original repository clone — the worktree where `.git/` is a directory, not a file pointing into `.git/worktrees/`. It is **not** about being on the `main` branch.
 
-1. **Dispatch only from the main checkout.** If your CWD is inside `.claude/worktrees/agent-*` or any non-primary worktree, **refuse and explain**: upstream bug [anthropics/claude-code#47548](https://github.com/anthropics/claude-code/issues/47548) silently switches the parent worktree's branch to the subagent's new branch when dispatched from a nested worktree — even at N=1. Tell the user you need to switch back to the main checkout first, or ask whether they want to accept the risk.
+1. **Dispatch only from the main worktree.** If your CWD is inside `.claude/worktrees/agent-*` or any other linked (non-primary) worktree, **refuse and explain**: upstream bug [anthropics/claude-code#47548](https://github.com/anthropics/claude-code/issues/47548) silently switches the parent worktree's branch to the subagent's new branch when dispatched from a linked worktree — even at N=1. Tell the user you need to switch back to the main worktree first, or ask whether they want to accept the risk.
 
-2. **Limit to N≤2 `isolation: "worktree"` calls per message.** N≥3 in a single parallel batch hits a `.git/config.lock` race ([anthropics/claude-code#47266](https://github.com/anthropics/claude-code/issues/47266)) — 2 of 3 typically fail. If the user requests 3+, push back: offer to serialize (dispatch 2, wait for them to start, then dispatch the rest), or explain the risk.
+2. **Serialize: one `isolation: "worktree"` Agent call per message.** Two or more parallel `Agent(isolation: "worktree")` calls in a single message can race on `.git/config.lock` ([anthropics/claude-code#47266](https://github.com/anthropics/claude-code/issues/47266)) — the upstream reproducer is N=3 with 2 of 3 failing, and we have no evidence that N=2 is reliably safe. Dispatch one, confirm its worktree appeared on disk, then dispatch the next. If the user asks for 2+ in one message, push back: explain the race, offer to serialize.
 
 If the user explicitly overrides ("yes, do it anyway"), proceed. These rules require push-back + explanation, not silent compliance.
 

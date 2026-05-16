@@ -103,9 +103,9 @@ Present options to user. Before proceeding, verify tasks are independent:
 
 > **Known bug — team_name**: `isolation: "worktree"` is silently ignored when `team_name` is set. For Agent Teams, create worktrees manually with `git worktree add`.
 >
-> **Known bug — dispatch-from-nested-worktree** (anthropics/claude-code#47548): Dispatching `Agent(isolation: "worktree")` from inside a non-primary worktree (e.g., `.claude/worktrees/agent-*`) silently switches the parent worktree's branch to the subagent's new branch. Fires at N=1. **Always dispatch from the main checkout.**
+> **Known bug — dispatch-from-linked-worktree** (anthropics/claude-code#47548): Dispatching `Agent(isolation: "worktree")` from inside a linked (non-primary) worktree, e.g. `.claude/worktrees/agent-*`, silently switches the parent worktree's branch to the subagent's new branch. Fires at N=1. **Always dispatch from the main worktree** — the original clone where `.git/` is a directory.
 >
-> **Known bug — parallel-batch race** (anthropics/claude-code#47266): Sending 3+ `Agent(isolation: "worktree")` calls in a single message causes a `.git/config.lock` race — 2 of 3 typically fail. **Limit to N≤2 `isolation: "worktree"` calls per message.** If you need 3+, serialize: dispatch 2, wait for them to start, then dispatch the rest.
+> **Known bug — parallel-batch race** (anthropics/claude-code#47266): Parallel `Agent(isolation: "worktree")` calls in one message can race on `.git/config.lock`. Upstream reproducer is N=3 with 2 of 3 failing; we have no evidence N=2 is reliably safe. **Serialize: one `Agent(isolation: "worktree")` call per message.** Dispatch, confirm the new `.claude/worktrees/agent-*` directory appeared, then dispatch the next.
 
 Manual worktree creation is for the lead's own use or Agent Teams worktree setup:
 
@@ -120,7 +120,7 @@ git worktree add ../pinpoint-worktrees/<branch-name> -b <branch-name>
 ### Option A: Standalone Subagents (Primary)
 
 ```
-Task(
+Agent(
   subagent_type: "general-purpose",
   model: "sonnet",
   isolation: "worktree",
@@ -151,7 +151,7 @@ git worktree add ../pinpoint-worktrees/feat-<branch-name> -b feat/<branch-name>
 ```
 
 ```
-Task(
+Agent(
   subagent_type: "general-purpose",
   model: "sonnet",
   team_name: "pinpoint-<summary>",
@@ -292,14 +292,14 @@ If a subagent can't be resumed (GC'd), spawn a new one on the same branch.
 
 ## Error Recovery
 
-| Problem                                 | Fix                                                                                                     |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Subagent fails to create PR             | Check output, verify worktree state, resume with context                                                |
-| Permission denied on worktree           | Add paths to `.claude/settings.json`, restart session                                                   |
-| Worktree creation fails                 | `supabase stop` (current worktree only — **never** `--all`), then re-create with `git worktree add`     |
-| Agent Teams isolation broken            | Known bug. Use standalone subagents (Option A) instead                                                  |
-| `.git/config.lock` race on N≥3 dispatch | anthropics/claude-code#47266. Serialize: dispatch ≤2, wait, then dispatch rest                          |
-| Parent branch flips after dispatch      | anthropics/claude-code#47548. You dispatched from a nested worktree. Always dispatch from main checkout |
-| Hooks fire from wrong directory         | Hooks skip for non-worktree CWD. Safeword: `touch .claude-hook-bypass`                                  |
-| Session dies with active team           | `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>`                                                  |
-| Husky post-checkout hook fails          | Check `.husky/post-checkout` for merge conflict markers                                                 |
+| Problem                                      | Fix                                                                                                                                    |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Subagent fails to create PR                  | Check output, verify worktree state, resume with context                                                                               |
+| Permission denied on worktree                | Add paths to `.claude/settings.json`, restart session                                                                                  |
+| Worktree creation fails                      | `supabase stop` (current worktree only — **never** `--all`), then re-create with `git worktree add`                                    |
+| Agent Teams isolation broken                 | Known bug. Use standalone subagents (Option A) instead                                                                                 |
+| `.git/config.lock` race on parallel dispatch | anthropics/claude-code#47266. Serialize: one `Agent(isolation: "worktree")` per message, confirm worktree appeared, then dispatch next |
+| Parent branch flips after dispatch           | anthropics/claude-code#47548. You dispatched from a linked worktree. Always dispatch from the main worktree                            |
+| Hooks fire from wrong directory              | Hooks skip for non-worktree CWD. Safeword: `touch .claude-hook-bypass`                                                                 |
+| Session dies with active team                | `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>`                                                                                 |
+| Husky post-checkout hook fails               | Check `.husky/post-checkout` for merge conflict markers                                                                                |
