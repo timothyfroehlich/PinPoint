@@ -11,6 +11,7 @@ import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestUser } from "~/test/helpers/factories";
 import {
   issues,
+  issueWatchers,
   machines,
   userProfiles,
   issueComments,
@@ -483,6 +484,81 @@ describe("Issue Service Functions (Integration)", () => {
 
       const systemEvents = events.filter((e) => e.isSystem);
       expect(systemEvents).toHaveLength(0);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Watch flag default behavior (audit row 7, class-B integration tests)
+  //
+  // Verifies that createIssue() inserts the reporter into issue_watchers when
+  // autoWatchReporter=true (the default), and does NOT insert when
+  // autoWatchReporter=false.
+  //
+  // Bug class B: server action wiring — the form's watchIssue checkbox must
+  // actually control the DB write. This layer is cheaper than E2E because it
+  // calls createIssue() directly without a browser and asserts the DB state.
+  // -----------------------------------------------------------------------
+  describe("Watch flag default behavior", () => {
+    it("auto-watches the reporter when autoWatchReporter is true (default)", async () => {
+      const db = await getTestDb();
+
+      const issue = await createIssue({
+        title: "Auto-watched issue",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reportedBy: testUser.id,
+        // autoWatchReporter defaults to true — omitting it exercises the default
+      });
+
+      // Verify the reporter was inserted into issue_watchers
+      const watchers = await db
+        .select()
+        .from(issueWatchers)
+        .where(eq(issueWatchers.issueId, issue.id));
+
+      expect(watchers).toHaveLength(1);
+      expect(watchers[0]?.userId).toBe(testUser.id);
+    });
+
+    it("does not auto-watch the reporter when autoWatchReporter is false", async () => {
+      const db = await getTestDb();
+
+      const issue = await createIssue({
+        title: "Unwatched issue",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reportedBy: testUser.id,
+        autoWatchReporter: false,
+      });
+
+      // Verify NO row was inserted into issue_watchers for this issue
+      const watchers = await db
+        .select()
+        .from(issueWatchers)
+        .where(eq(issueWatchers.issueId, issue.id));
+
+      expect(watchers).toHaveLength(0);
+    });
+
+    it("does not insert a watcher row when there is no authenticated reporter", async () => {
+      const db = await getTestDb();
+
+      // Guest/anonymous report — reportedBy is null, so the watcher insert
+      // is skipped regardless of the autoWatchReporter flag.
+      const issue = await createIssue({
+        title: "Anonymous issue",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reportedBy: null,
+        autoWatchReporter: true,
+      });
+
+      const watchers = await db
+        .select()
+        .from(issueWatchers)
+        .where(eq(issueWatchers.issueId, issue.id));
+
+      expect(watchers).toHaveLength(0);
     });
   });
 
