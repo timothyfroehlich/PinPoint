@@ -234,8 +234,14 @@ def get_existing_slot(worktree_path: str) -> int | None:
 # fit Docker's 63-char container name limit. The longest active service prefix
 # observed in practice is `supabase_inbucket_` (18 chars); `supabase_edge_runtime_`
 # (22 chars) is a future risk. Capping project_id at 40 leaves headroom for
-# either, and the leading `pinpoint-` (9 chars) leaves 31 readable chars for
-# the branch portion.
+# either.
+#
+# For short branches whose sanitized form fits in 40 chars, the whole readable
+# name is preserved (e.g., "pinpoint-main"). For long branches, the readable
+# portion is truncated to MAX_READABLE_LEN (31) and an 8-char hash is appended;
+# of those 31 chars the leading "pinpoint-" consumes 9, leaving up to 22 chars
+# of branch text (potentially fewer after rstrip("-") trims a truncation that
+# landed on a hyphen).
 MAX_PROJECT_ID_LEN = 40
 HASH_SUFFIX_LEN = 8
 # +1 for the "-" separator joining the readable part to the hash.
