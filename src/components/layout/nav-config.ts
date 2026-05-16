@@ -9,6 +9,6 @@ export interface NavItem {
 
 export const NAV_ITEMS = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Issues", href: "/issues", icon: AlertTriangle },
   { title: "Machines", href: "/m", icon: Gamepad2 },
+  { title: "Issues", href: "/issues", icon: AlertTriangle },
 ] as const satisfies readonly NavItem[];
