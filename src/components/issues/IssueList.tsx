@@ -14,7 +14,8 @@ import {
 import { EmptyState } from "~/components/ui/empty-state";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
-import { formatRelative } from "~/lib/dates";
+import { formatDateTime } from "~/lib/dates";
+import { RelativeTime } from "~/components/issues/RelativeTime";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -576,7 +577,10 @@ export function IssueList({
                     {visibleColumns.modified && (
                       <td className="px-4 py-4 text-right min-w-[150px] max-w-[150px]">
                         <span className="text-xs font-medium text-foreground leading-tight line-clamp-2">
-                          {formatRelative(issue.updatedAt)}
+                          <RelativeTime
+                            value={issue.updatedAt}
+                            fallback={formatDateTime(issue.updatedAt)}
+                          />
                         </span>
                       </td>
                     )}
