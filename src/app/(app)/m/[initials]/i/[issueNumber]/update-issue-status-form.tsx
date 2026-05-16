@@ -82,9 +82,10 @@ export function UpdateIssueStatusForm({
 
   useEffect(() => {
     if (state && !state.ok) {
+      setSelectedStatus(currentStatus);
       toast.error(state.message);
     }
-  }, [state]);
+  }, [state, currentStatus]);
 
   // Auto-submit form when pending status changes
   useEffect(() => {
