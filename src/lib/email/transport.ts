@@ -12,6 +12,10 @@ export interface EmailParams {
   to: string;
   subject: string;
   html: string;
+  /** RFC 5322 In-Reply-To header value (e.g. "<issue-PP-1234@pinpoint.app>") */
+  inReplyTo?: string | undefined;
+  /** RFC 5322 References header value (e.g. "<issue-PP-1234@pinpoint.app>") */
+  references?: string | undefined;
 }
 
 export interface EmailResult {
@@ -38,13 +42,26 @@ export class ResendTransport implements EmailTransport {
     this.client = new Resend(apiKey);
   }
 
-  async send({ to, subject, html }: EmailParams): Promise<EmailResult> {
+  async send({
+    to,
+    subject,
+    html,
+    inReplyTo,
+    references,
+  }: EmailParams): Promise<EmailResult> {
     try {
+      // Build optional RFC 5322 threading headers.
+      // Resend supports arbitrary custom headers via the `headers` field.
+      const headers: Record<string, string> = {};
+      if (inReplyTo) headers["In-Reply-To"] = inReplyTo;
+      if (references) headers["References"] = references;
+
       const data = await this.client.emails.send({
         from: EMAIL_FROM,
         to,
         subject,
         html,
+        ...(Object.keys(headers).length > 0 ? { headers } : {}),
       });
 
       return { success: true, data };
@@ -76,13 +93,21 @@ export class SMTPTransport implements EmailTransport {
     });
   }
 
-  async send({ to, subject, html }: EmailParams): Promise<EmailResult> {
+  async send({
+    to,
+    subject,
+    html,
+    inReplyTo,
+    references,
+  }: EmailParams): Promise<EmailResult> {
     try {
       const info = (await this.transporter.sendMail({
         from: EMAIL_FROM,
         to,
         subject,
         html,
+        ...(inReplyTo ? { inReplyTo } : {}),
+        ...(references ? { references } : {}),
       })) as unknown;
 
       return { success: true, data: info };

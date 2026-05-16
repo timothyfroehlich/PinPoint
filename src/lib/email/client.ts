@@ -66,6 +66,8 @@ export async function sendEmail({
   to,
   subject,
   html,
+  inReplyTo,
+  references,
 }: EmailParams): Promise<EmailResult> {
   log.info({ to, subject }, "[Email] Attempting to send email");
 
@@ -77,7 +79,13 @@ export async function sendEmail({
     return { success: false, error: "No transport configured" };
   }
 
-  const result = await transport.send({ to, subject, html });
+  const result = await transport.send({
+    to,
+    subject,
+    html,
+    inReplyTo,
+    references,
+  });
   if (result.success) {
     log.info({ to, subject }, "[Email] Email sent successfully");
   } else {
