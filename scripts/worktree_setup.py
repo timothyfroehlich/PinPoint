@@ -60,8 +60,6 @@ MANAGED_ENV_KEYS = {
     "DEV_AUTOLOGIN_PASSWORD",
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
-    "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
-    "TURNSTILE_SECRET_KEY",
     "UNSUBSCRIBE_SIGNING_SECRET",
 }
 
@@ -322,11 +320,6 @@ def format_env_file(
         f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={managed_values['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY']}",
         f"SUPABASE_SERVICE_ROLE_KEY={managed_values['SUPABASE_SERVICE_ROLE_KEY']}",
         "",
-        "# Turnstile keys are commented out for local dev so the widget doesn't render.",
-        "# To test CAPTCHA UI locally, uncomment these. Production sets them via Vercel env.",
-        f"# NEXT_PUBLIC_TURNSTILE_SITE_KEY={managed_values['NEXT_PUBLIC_TURNSTILE_SITE_KEY']}",
-        f"# TURNSTILE_SECRET_KEY={managed_values['TURNSTILE_SECRET_KEY']}",
-        "",
         "# Unsubscribe-link HMAC signing secret (local-dev placeholder).",
         "# Production uses a real `openssl rand -hex 32` value set in Vercel env.",
         f"UNSUBSCRIBE_SIGNING_SECRET={managed_values['UNSUBSCRIBE_SIGNING_SECRET']}",
@@ -440,8 +433,6 @@ def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
         "DEV_AUTOLOGIN_PASSWORD": "TestPassword123",
         "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": LOCAL_SUPABASE_PUBLISHABLE_KEY,
         "SUPABASE_SERVICE_ROLE_KEY": LOCAL_SUPABASE_SERVICE_ROLE_KEY,
-        "NEXT_PUBLIC_TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
-        "TURNSTILE_SECRET_KEY": "1x0000000000000000000000000000000AA",
         # Unsubscribe-link HMAC signing secret. Falls back to a placeholder
         # only when no real value is set; preserves any developer-set value
         # so chmod-+w / edit / regenerate doesn't overwrite it.
