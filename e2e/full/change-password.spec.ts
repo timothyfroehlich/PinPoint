@@ -58,6 +58,13 @@ test.describe("Change Password", () => {
 
     await expect(form.getByRole("button", { name: "Saved!" })).toBeVisible();
 
+    // --- Verify password inputs are cleared after successful save ---
+    await expect(page.locator('input[name="currentPassword"]')).toHaveValue("");
+    await expect(page.locator('input[name="newPassword"]')).toHaveValue("");
+    await expect(page.locator('input[name="confirmNewPassword"]')).toHaveValue(
+      ""
+    );
+
     // --- Verify new password works ---
     await logout(page, testInfo);
 
