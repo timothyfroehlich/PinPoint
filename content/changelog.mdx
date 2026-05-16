@@ -1,5 +1,71 @@
 {/* This file is auto-updated by the weekly changelog workflow. Newest entries at top. */}
 
+## May 11, 2026
+
+### New Features
+
+- **Issue Detail Page Updates** — Machine status, severity, priority, and other details now appear inline on the issue page; on mobile, the comment box is pinned to the bottom of the screen so you can reply without scrolling back up
+
+### Bug Fixes
+
+- After posting a comment, the text editor now automatically clears and refocuses so you can immediately start typing the next one without any extra clicks
+- Signing out now ends your session on all devices at once; deleting your account immediately revokes all active sessions everywhere
+
+---
+
+## May 4, 2026
+
+### New Features
+
+- **Discord Notifications** — If you have connected your Discord account, PinPoint can now send you direct messages for issue assignments, status changes, and new comments; configure which events trigger a DM in your notification preferences
+- **Skip CAPTCHA When Signed In** — The issue report form no longer shows the CAPTCHA challenge when you are already logged in, making it faster to report problems
+
+### Bug Fixes
+
+- Fixed a bug where the report form could submit against the wrong machine if a previously selected machine was no longer in the list — the dropdown now resets to a blank selection instead of silently falling back to the first option
+- Fixed the login form forgetting your "Remember me" choice when an error occurred and you corrected your credentials
+
+---
+
+## April 27, 2026
+
+### New Features
+
+- **Discord Login** — You can now sign in with your Discord account; existing email accounts can link Discord via Connected Accounts in Settings so you can use either method
+- **Discord Admin Integration** — Admins can configure a Discord bot token and server in the new Integrations page under Admin settings to enable Discord notifications for the organization
+- **Improved Picker Dropdowns** — The machine owner and issue assignee dropdowns now use a searchable command palette with role badges, making it much easier to find the right person on large member lists
+- **Promote Guest to Member When Assigning as Owner** — When you set a guest as a machine owner, PinPoint now prompts you to promote them to member in the same action so you don't need to do it separately
+
+### Bug Fixes
+
+- Fixed a bug where guest users appeared as options in the machine reassignment picker when deleting an account — only members, technicians, and admins are now shown
+- When a page section encounters an unexpected error, you now see a targeted error message with a recovery link specific to that section rather than a full-page crash
+- When a rich text comment or description fails to render, you now see a clear "This content failed to render" notice with a "Report this" button instead of a blank area
+
+---
+
+## April 20, 2026
+
+### New Features
+
+- **CSV Export** — Download a spreadsheet of all issues from the Issues list page or from any machine's detail page; the export matches your current filters and includes all key fields such as status, severity, priority, assignee, and timestamps
+- **Refreshed Color Palette** — The app's accent color has been updated from purple to teal to better complement the APC neon-green primary color; status badges and UI highlights now use a more cohesive palette
+- **Hover Glow on Cards** — Machine cards and issue cards now show a subtle glow when you hover over them, making it clearer which items are clickable
+
+### Bug Fixes
+
+- Fixed the pagination controls not appearing when navigating to a page number beyond the last page of results
+
+---
+
+## April 13, 2026
+
+### New Features
+
+- **Consistent Page Layout** — All pages now use a standardized header and container layout, giving every section of the app a more polished and uniform look
+
+---
+
 ## April 6, 2026
 
 ### New Features
