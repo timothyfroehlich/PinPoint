@@ -8,6 +8,7 @@ Not a CLI tool — no argparse, no subcommands. Operates on $PWD.
 """
 
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -229,11 +230,35 @@ def get_existing_slot(worktree_path: str) -> int | None:
 # =============================================================================
 
 
+# Supabase container names follow `supabase_<service>_<project_id>` and must
+# fit Docker's 63-char container name limit. The longest active service prefix
+# observed in practice is `supabase_inbucket_` (18 chars); `supabase_edge_runtime_`
+# (22 chars) is a future risk. Capping project_id at 40 leaves headroom for
+# either, and the leading `pinpoint-` (9 chars) leaves 31 readable chars for
+# the branch portion.
+MAX_PROJECT_ID_LEN = 40
+HASH_SUFFIX_LEN = 8
+# +1 for the "-" separator joining the readable part to the hash.
+MAX_READABLE_LEN = MAX_PROJECT_ID_LEN - HASH_SUFFIX_LEN - 1
+
+
 def branch_to_project_id(branch_name: str) -> str:
-    """Convert a branch name to a valid Supabase project ID."""
-    project_id = re.sub(r"[^a-z0-9-]", "-", branch_name.lower())
-    project_id = re.sub(r"-+", "-", f"pinpoint-{project_id}").strip("-")
-    return project_id[:50]
+    """Convert a branch name to a valid Supabase project ID.
+
+    Short branches keep their full readable name (e.g., "main" → "pinpoint-main").
+    Long branches are truncated and suffixed with an 8-char sha256 hash of the
+    original branch name, preserving uniqueness across worktrees on different
+    long branches that share a common prefix.
+
+    Cap is 40 chars; see MAX_PROJECT_ID_LEN comment above for why.
+    """
+    sanitized = re.sub(r"[^a-z0-9-]", "-", branch_name.lower())
+    full = re.sub(r"-+", "-", f"pinpoint-{sanitized}").strip("-")
+    if len(full) <= MAX_PROJECT_ID_LEN:
+        return full
+    digest = hashlib.sha256(branch_name.encode("utf-8")).hexdigest()[:HASH_SUFFIX_LEN]
+    readable = full[:MAX_READABLE_LEN].rstrip("-")
+    return f"{readable}-{digest}"
 
 
 def generate_config_toml(worktree_path: Path, port_config: PortConfig) -> str:
