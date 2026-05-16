@@ -221,8 +221,8 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 
 ### AppHeader (always rendered, two-tier responsive)
 
-- **Wide desktop (>= lg):** Logo, APC logo, nav links (icon+text), spacer, Report Issue (icon+text), HelpMenu, NotificationList, UserMenu.
-- **Tablet (md–lg):** Logo, nav links (icon-only), spacer, Report Issue (icon-only), HelpMenu, NotificationList, UserMenu. APC logo hidden.
+- **Wide desktop (>= lg):** Logo, APC logo, nav links (Dashboard, Machines, Issues — icon+text), spacer, Report Issue button (secondary variant, icon+text), HelpMenu, NotificationList, UserMenu.
+- **Tablet (md–lg):** Logo, nav links (Dashboard, Machines, Issues — icon-only), spacer, Report button (secondary variant, icon + "Report" label), HelpMenu, NotificationList, UserMenu. APC logo hidden.
 - **Mobile (< md):** Logo, spacer, NotificationList, UserMenu. Nav links and Report Issue use `hidden md:flex`.
 - **Unauthenticated:** NotificationList + UserMenu replaced by Sign In / Sign Up buttons.
 - **Admin link:** Inside UserMenu dropdown (role-gated, not a top-level nav item).
@@ -235,7 +235,7 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 
 ### BottomTabBar (mobile only, `md:hidden`)
 
-- **Primary tabs:** Dashboard, Issues, Machines, Report Issue.
+- **Primary tabs:** Dashboard, Machines, Issues, Report Issue. Order matches the desktop `AppHeader` because `BottomTabBar` spreads the same `NAV_ITEMS` array.
 - **More tab:** Opens `Sheet` (bottom drawer) with Feedback, What's New, Help, About, Admin (role-gated).
 
 ### Shared rules
@@ -307,7 +307,7 @@ Before building something new, check if one of these already exists:
 | :------------------------------------ | :---------------------------------------------------------------------------------------------- |
 | `AppHeader`                           | Two-tier responsive header. Icon-only nav at `md:`, icon+text at `lg:`. APC logo at `lg:` only. |
 | `HelpMenu`                            | Dropdown with Feedback, What's New, Help, About. Badge dot for unread changelog.                |
-| `BottomTabBar`                        | Mobile tab bar (`md:hidden`). Dashboard, Issues, Machines, Report, More.                        |
+| `BottomTabBar`                        | Mobile tab bar (`md:hidden`). Dashboard, Machines, Issues, Report, More.                        |
 | `IssueBadgeGrid`                      | Status/severity/priority/frequency display                                                      |
 | `IssueBadge`                          | Individual status badge with color                                                              |
 | `IssueCard`                           | Issue summary card (normal/compact)                                                             |
