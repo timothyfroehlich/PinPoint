@@ -28,3 +28,15 @@
   the actual issue, stop and ask the user for guidance.
 - For simple PRs (< 5 files changed), do not spawn more than 2 sub-agents.
 - Do not over-engineer or spawn excessive parallel agents for straightforward tasks.
+
+### Worktree Dispatch Safety
+
+Two upstream Claude Code bugs require active enforcement when the user asks you to dispatch subagents with `isolation: "worktree"`:
+
+1. **Dispatch only from the main checkout.** If your CWD is inside `.claude/worktrees/agent-*` or any non-primary worktree, **refuse and explain**: upstream bug [anthropics/claude-code#47548](https://github.com/anthropics/claude-code/issues/47548) silently switches the parent worktree's branch to the subagent's new branch when dispatched from a nested worktree — even at N=1. Tell the user you need to switch back to the main checkout first, or ask whether they want to accept the risk.
+
+2. **Limit to N≤2 `isolation: "worktree"` calls per message.** N≥3 in a single parallel batch hits a `.git/config.lock` race ([anthropics/claude-code#47266](https://github.com/anthropics/claude-code/issues/47266)) — 2 of 3 typically fail. If the user requests 3+, push back: offer to serialize (dispatch 2, wait for them to start, then dispatch the rest), or explain the risk.
+
+If the user explicitly overrides ("yes, do it anyway"), proceed. These rules require push-back + explanation, not silent compliance.
+
+See `pinpoint-orchestrator` skill Phase 2 for the full technical record.

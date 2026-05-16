@@ -314,8 +314,10 @@ For multiple independent tasks, use worktree-isolated subagents.
 
 - DON'T use Agent Teams as default — standalone subagents have working worktree isolation
 - DON'T forget to check Copilot comments before merging
+- DON'T dispatch `isolation: "worktree"` subagents from inside a nested worktree — see "Worktree Dispatch Safety" in CLAUDE.md
+- DON'T dispatch 3+ `isolation: "worktree"` subagents in one message — see "Worktree Dispatch Safety" in CLAUDE.md
 
-See `pinpoint-orchestrator` skill for the full workflow.
+See `pinpoint-orchestrator` skill for the full workflow and known-bug details.
 
 ### Claude in Web Candidates
 
