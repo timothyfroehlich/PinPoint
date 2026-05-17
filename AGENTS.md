@@ -28,6 +28,20 @@
 16. **Two-Layer Responsive Framework**: Viewport breakpoints (`md:`, `lg:`) for page structure (show/hide sections, grid columns). Container queries (`@lg:`, `@xl:`) for component internals (flex direction, padding, column count). Never mix both for the same layout decision. No `window.innerWidth`, `useMediaQuery`, or `matchMedia` — use CSS. `sm:` is padding/spacing only. The sole documented exception is `use-table-responsive-columns` for IssueList (PP-rs9).
 17. **Test What We Own**: Tests must verify PinPoint's code at the boundary of services we don't control, not simulate the service's internals. Building scaffolding that synthesizes a third party's internal state (raw DB writes into `auth.identities`, captcha-verification mocks, OAuth handshake fakes, email-template regex extraction) is a signal you're testing the wrong thing. Cover PinPoint's contribution with unit tests; cover "the page renders without 500" with a smoke test; reserve integration/E2E for when the test exercises the contracted public API of a real running service. External services other than our owned local stack (Mailpit, PGlite, local Supabase including local Storage) MUST be mocked at the SDK boundary — driving live Discord webhooks, real OAuth provider redirects, vendor email templates, or any production third-party endpoint from an E2E spec is a class-J violation. **Class-J self-check before merging an E2E spec** — two layers, both must pass: (1) `rg 'https?://' e2e/path/to/spec.ts` for direct URLs in the spec source — must return only `localhost`/`127.0.0.1`/owned-domain hits. (2) `rg 'https?://' src/lib/ src/server/actions/` for the SDK clients and server actions the spec triggers — any non-localhost production URL there must live inside an SDK client module that has a corresponding `*.test.ts` mocking `fetch` at the boundary. The dangerous case is layer 2: a spec with a clean source that triggers a server action which fires live `fetch("https://discord.com/...")`. Any production third-party hostname (`discord.com`, `googleapis.com`, OAuth providers, etc.) reachable from an E2E run is a class-J signal — delete the spec and add the SDK-boundary mock. Diagnostic: "If this ran against production with real credentials, would the same code pass?" If no, the test is wrong. Casework: PP-e20 (OAuth identity disconnect), PP-uc8 (Turnstile captcha), PP-q9r (Supabase password-reset email format). Skill deep-dive: `pinpoint-testing` § "Test What We Own".
 18. **Merge for main sync, NEVER rebase**: Update a feature branch from `main` with `git fetch origin && git merge origin/main`. **NEVER `git rebase origin/main`**. Rebase rewrites SHAs → requires force-push → teammate guardrails block force-push and Tim does not authorize. Even a 1-commit branch costs a 30-minute push-permission detour after a rebase. Section 4 Branch Management has the rule + the ⚠️ REBASE TRAP callout with casework. If you find yourself typing `rebase` against `origin/main`, STOP and use `merge`.
+19. **Main Worktree Stays on `main` — No Branch Checkouts**: Agents MUST NEVER run `git checkout <feature-branch>` OR `git checkout -b <new-branch>` from the main worktree (the original clone where `.git/` is a directory). This applies even to simple `git checkout -b` + push from one session — Slingshot's cross-session repro (PP-cvh, 2026-05-16 16:34 and 16:46 CDT) showed that concurrent normal git ops across sessions are sufficient to corrupt HEAD pointers in other sessions without any `Agent(isolation:worktree)` dispatch required. The main worktree exists for three things only: pulling `main`, dispatching subagents, and running cross-cutting tools (briefing, status). **All branch work goes in a linked worktree**: either `Agent(isolation:"worktree")` (automatic) or `git worktree add ../pinpoint-worktrees/<branch> -b <branch>` (manual). References: PP-46z (root-cause investigation), PP-bg45 (structural fix), anthropics/claude-code#47266 (config.lock race), anthropics/claude-code#47548 (parent-branch flip on linked-worktree dispatch).
+
+> ⚠️ **BRANCH CHECKOUT TRAP — STOP IF YOU'RE TYPING `git checkout` IN THE MAIN WORKTREE** ⚠️
+>
+> Casework (2026-05-16, Claude-Slingshot, PP-cvh thread): Slingshot ran a plain
+> `git checkout -b fix/edit-form-reset-bugs-PP-az4` + `git push` from the main worktree
+> while Claude-Spinner was running `gh pr merge` in the same session. Spinner's HEAD silently
+> flipped to Slingshot's new branch twice (16:34 CDT, 16:46 CDT). No `Agent(isolation:worktree)`
+> dispatch was involved on either side — just ordinary concurrent git operations.
+>
+> **Use a linked worktree instead.** Linked worktrees are OS-level isolated git state — a
+> branch checkout in one worktree cannot affect another's HEAD. The `.husky/post-checkout` guard
+> (PP-bg45) will print a loud alarm if the main worktree leaves `main`, but it fires after the
+> checkout and cannot prevent the corruption from propagating cross-session.
 
 ## 3. Agent Skills (Progressive Disclosure)
 
@@ -314,8 +328,8 @@ For multiple independent tasks, use worktree-isolated subagents.
 
 - DON'T use Agent Teams as default — standalone subagents have working worktree isolation
 - DON'T forget to check Copilot comments before merging
-- DON'T dispatch `Agent(isolation: "worktree")` from a linked (non-primary) worktree — see "Worktree Dispatch Safety" in CLAUDE.md
-- DON'T fire 2+ `Agent(isolation: "worktree")` calls in a single message — serialize them, see "Worktree Dispatch Safety" in CLAUDE.md
+- DON'T dispatch `Agent(isolation: "worktree")` from a linked (non-primary) worktree — see "Worktree Dispatch Safety" in CLAUDE.md (bug #47548, WorktreeCreate hook cannot fix this)
+- DON'T fire N+ `Agent(isolation: "worktree")` calls without the WorktreeCreate hook active — with the hook any N is safe from the main worktree (flock serializes); without it, serialize to N=1-per-message
 
 See `pinpoint-orchestrator` skill for the full workflow and known-bug details.
 
