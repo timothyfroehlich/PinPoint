@@ -80,6 +80,20 @@ case "$TRANSCRIPT_PATH" in
   */subagents/*) exit 0 ;;
 esac
 
+# --- Rotation check (stub in PR #1357; real check in follow-up rotation PR) ---
+ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
+if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
+  # shellcheck source=huddle-rotation-check.sh disable=SC1091
+  source "$ROTATION_CHECK_SCRIPT"
+  if huddle_rotation_needed; then
+    # Real "rotation needed" output lands in the follow-up PR. For now this
+    # branch is unreachable (stub returns 1).
+    printf '## ⚠️ Huddle rotation needed\n\n'
+    printf 'See docs/superpowers/specs/2026-05-17-huddle-system-design.md §7.2\n'
+    exit 0
+  fi
+fi
+
 SESSION_ID=""
 if [[ -n "$INPUT" ]]; then
   SESSION_ID=$(
