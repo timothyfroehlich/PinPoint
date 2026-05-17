@@ -101,12 +101,13 @@ if [[ -z "$AGENT_NAME" ]]; then
   AGENT_NAME="${CLAUDE_AGENT_NAME:-}"
 fi
 
-# Build jq self-filter expression. AGENT_NAME is treated as a literal string —
-# jq's --arg already shell-quotes it, but we go through string concat for the
-# select() body so the filter expression remains simple. Agent names should be
-# alphanumeric (Plunger, Spinner, etc.); anything weirder is on the user.
+# Build jq self-filter expression. We accept both forms of sign-off to be
+# forgiving of typos and convention drift:
+#   --Claude-<Name>   (canonical — 44 of 45 PP-cvh sign-offs use this form)
+#   --<Name>          (shorthand — observed in the wild, e.g. "—Spinner")
+# Agent names should be alphanumeric (Plunger, Spinner, etc.).
 if [[ -n "$AGENT_NAME" ]]; then
-  SELF_FILTER="| select(.text | endswith(\"—Claude-$AGENT_NAME\") | not)"
+  SELF_FILTER="| select(((.text | endswith(\"—Claude-$AGENT_NAME\")) or (.text | endswith(\"—$AGENT_NAME\"))) | not)"
 else
   SELF_FILTER=""
 fi
