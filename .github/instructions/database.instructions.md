@@ -7,9 +7,9 @@ applyTo: "src/server/db/**/*.ts,src/server/db/schema.ts"
 ## Core Tenets
 
 - Direct Drizzle usage (no DAL/service layer unless pattern repeats ≥3 times).
-- Schema evolves by direct file edit (no migration files during pre-beta).
+- Schema changes use Drizzle migrations: `pnpm run db:generate` (creates SQL + snapshot) → `pnpm run db:migrate` (applies locally). Production has real user data — never bypass migrations.
 - Single-tenant: no organizationId filtering logic.
-- Maintain snake_case in schema; convert carefully only where needed at boundaries.
+- Maintain snake_case in schema (CORE-TS-004); convert to camelCase at boundaries (CORE-TS-003), never inside schema files.
 
 ## Schema Rules
 
@@ -70,7 +70,9 @@ export async function getMachineWithIssues(id: string) {
 
 - Reintroducing multi-tenant organization scoping.
 - Using raw SQL string interpolation (always parameterize or rely on Drizzle builder).
-- Creating migration files or applying schema diffs via migrations in pre-beta stage.
+- `drizzle-kit push` or any ad-hoc schema sync — always go through `db:generate` + `db:migrate`.
+- camelCase identifiers in schema (use `snake_case` for tables, columns, constraints).
+- Querying Supabase's internal `auth.users` table from app code — use `user_profiles` instead (CORE-SSR-007). Exceptions: `supabase/seed.sql` triggers, `pglite.ts` test setup.
 - Adding abstraction layers (repositories, services) without repetition justification.
 
 ## Type Considerations
@@ -98,4 +100,4 @@ export async function getMachineWithIssues(id: string) {
 
 ---
 
-Last Updated: 2025-11-09
+Last Updated: 2026-05-17 (corrected pre-beta stale claim — Drizzle migrations are required; added CORE-SSR-007 auth.users ban)
