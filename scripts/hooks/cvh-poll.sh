@@ -41,6 +41,13 @@
 
 set -euo pipefail
 
+# Fail-open on missing dependencies — this hook runs on every UserPromptSubmit
+# and MUST NOT block a user prompt because jq or python3 aren't installed.
+# (bd is also required but its absence is handled inline at the call site.)
+for dep in jq python3; do
+  command -v "$dep" >/dev/null 2>&1 || exit 0
+done
+
 # --- Read UserPromptSubmit hook JSON from stdin (best-effort) ---
 # Reads stdin if present so we can extract session_id for self-filter lookup.
 # Falls through silently if payload is empty or malformed — the hook MUST NOT
@@ -64,8 +71,13 @@ except Exception:
 fi
 
 STATE_DIR="$HOME/.config/pinpoint"
-BASENAME="$(basename "$PWD")"
-STATE_FILE="$STATE_DIR/cvh-last-seen-$BASENAME"
+# Derive a per-checkout key from the FULL absolute path, not just basename —
+# multiple worktrees/clones can have the same leaf directory name (e.g. two
+# "PinPoint" checkouts), and a basename collision would let one session
+# advance the cursor and silently swallow the other's coordination posts.
+# We use the SHA-256 prefix of `pwd -P` for a collision-resistant, filename-safe key.
+CWD_KEY=$(printf '%s' "$(pwd -P)" | python3 -c 'import sys,hashlib; print(hashlib.sha256(sys.stdin.read().encode()).hexdigest()[:16])')
+STATE_FILE="$STATE_DIR/cvh-last-seen-$CWD_KEY"
 
 mkdir -p "$STATE_DIR"
 
@@ -101,25 +113,32 @@ if [[ -z "$AGENT_NAME" ]]; then
   AGENT_NAME="${CLAUDE_AGENT_NAME:-}"
 fi
 
-# Build jq self-filter expression. We accept both forms of sign-off to be
-# forgiving of typos and convention drift:
+# Build the self-filter as a jq script that takes the agent name as --arg
+# (NOT interpolated into the jq source string), so a name containing quotes,
+# backslashes, or jq syntax can't break the filter. We accept both forms of
+# sign-off to be forgiving of typos and convention drift:
 #   --Claude-<Name>   (canonical — 44 of 45 PP-cvh sign-offs use this form)
 #   --<Name>          (shorthand — observed in the wild, e.g. "—Spinner")
-# Agent names should be alphanumeric (Plunger, Spinner, etc.).
-if [[ -n "$AGENT_NAME" ]]; then
-  SELF_FILTER="| select(((.text | endswith(\"—Claude-$AGENT_NAME\")) or (.text | endswith(\"—$AGENT_NAME\"))) | not)"
-else
-  SELF_FILTER=""
-fi
+# When $name is empty, the filter is a no-op (all comments pass).
+JQ_SCRIPT='[
+  .[]
+  | select(.created_at > $last)
+  | select($name == ""
+           or (((.text | endswith("—Claude-" + $name))
+                or (.text | endswith("—" + $name))) | not))
+] | sort_by(.created_at)'
 
-# Filter to comments newer than last-seen, excluding self
-NEW_COMMENTS="$(
+# Filter to comments newer than last-seen, excluding self.
+# Both jq calls below could fail in pathological cases (e.g. malformed JSON);
+# treat any failure as "no comments to inject" and exit silently.
+NEW_COMMENTS=$(
   printf '%s' "$COMMENTS_JSON" | jq -r \
     --arg last "$LAST_SEEN" \
-    "[.[] | select(.created_at > \$last) $SELF_FILTER] | sort_by(.created_at)"
-)"
+    --arg name "$AGENT_NAME" \
+    "$JQ_SCRIPT" 2>/dev/null
+) || exit 0
 
-COUNT="$(printf '%s' "$NEW_COMMENTS" | jq 'length')"
+COUNT=$(printf '%s' "$NEW_COMMENTS" | jq 'length' 2>/dev/null) || exit 0
 
 if [[ "$COUNT" -eq 0 ]]; then
   exit 0

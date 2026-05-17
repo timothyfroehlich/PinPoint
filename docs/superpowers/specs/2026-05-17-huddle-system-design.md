@@ -208,8 +208,10 @@ Triggered when a session detects `today_bead.date < today_local_date`. The
 lead agent dispatches a single rotation subagent. The subagent runs
 `huddle-rotate.sh`, which:
 
-1. **Acquire lock** via `lockf -t 30` (macOS) or `flock -x -w 30` (Linux) on
-   `~/.config/pinpoint/huddle-rotation.lock`.
+1. **Acquire lock** via `lockf -t 60` (macOS) or `flock -x -w 60` (Linux) on
+   `~/.config/pinpoint/huddle-rotation.lock`. 60s allows the slowest case
+   (LLM-driven summarization of a long day's chatter) to complete without
+   spurious timeouts from a peer's concurrent rotation attempt.
 2. **Re-check date** inside the lock. If rotation is no longer needed (a
    peer session got there first), release lock and exit 0.
 3. **Create new beads (orphan)** — do not point at them yet:
@@ -495,6 +497,5 @@ foundation is on main. Brand-new bead to be filed when PR #1357 lands.
 - **Monthly summary format** — same shape as daily, but rollup-of-rollups.
   Likely shorter (the dailies are already summaries).
 - **N default value** — starting at 5. Tunable in `settings.n_dailies_to_inject`.
-- **Lock timeout** — 30s matches PP-bg45's worktree lock. Should be plenty
-  for the rotation work but can be bumped if summarization sometimes
-  exceeds.
+- **Lock timeout** — 60s. Larger than PP-bg45's worktree lock (30s) because
+  this lock covers LLM-driven summarization, which can be the slowest step.

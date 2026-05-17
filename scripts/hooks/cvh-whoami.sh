@@ -49,16 +49,24 @@ project_transcript_dir() {
 }
 
 # Best-effort: newest top-level transcript .jsonl (excluding subagents/ subdir).
+# Use bash globbing with `nullglob` so we can detect the empty case BEFORE
+# invoking ls — without the guard, `find ... | xargs ls -t` runs `ls -t`
+# with no args (which lists CWD) and returns an unrelated basename.
 discover_session_id() {
   local dir
   dir=$(project_transcript_dir)
   if [[ ! -d "$dir" ]]; then
     return 1
   fi
+  local files=()
+  shopt -s nullglob
+  files=("$dir"/*.jsonl)
+  shopt -u nullglob
+  if [[ ${#files[@]} -eq 0 ]]; then
+    return 1
+  fi
   local newest
-  newest=$(find "$dir" -maxdepth 1 -name '*.jsonl' -print0 2>/dev/null \
-    | xargs -0 ls -t 2>/dev/null \
-    | head -1)
+  newest=$(ls -t "${files[@]}" 2>/dev/null | head -1) || return 1
   if [[ -z "$newest" ]]; then
     return 1
   fi
@@ -80,6 +88,13 @@ case "$cmd" in
     name="${2:-}"
     if [[ -z "$name" ]]; then
       echo "Usage: cvh-whoami.sh register NAME [SESSION_ID]" >&2
+      exit 1
+    fi
+    # Restrict names to alphanumeric + underscore + hyphen. Defense in depth:
+    # cvh-poll.sh passes the name via jq --arg (safe under any input), but
+    # validating at registration keeps the JSON file clean and grep-friendly.
+    if [[ ! "$name" =~ ^[A-Za-z0-9_-]+$ ]]; then
+      echo "cvh-whoami.sh: NAME must be alphanumeric (plus _ and -); got: $name" >&2
       exit 1
     fi
     sid="${3:-}"

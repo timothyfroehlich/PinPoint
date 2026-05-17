@@ -75,7 +75,9 @@ if [[ -n "$NAME" ]]; then
   printf '## PP-cvh identity\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
   printf 'Your session_id: `%s`\n' "$SESSION_ID"
-  printf 'Registered as: **Claude-%s** (self-filter active for your own posts)\n' "$NAME"
+  printf 'Registered as: **Claude-%s** (self-filter active for your own posts)\n\n' "$NAME"
+  printf 'If this scrolls out of context later, recall your name with:\n\n'
+  printf '    bash scripts/hooks/cvh-whoami.sh whoami %s\n' "$SESSION_ID"
 else
   printf '## PP-cvh identity — registration needed\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
