@@ -161,7 +161,7 @@ check_no_merge_conflict() {
       return 0
       ;;
     CONFLICTING)
-      echo "BLOCK: no_conflict: CONFLICTING — resolve conflict and re-push"
+      echo "BLOCK: no_conflict: CONFLICTING"
       return 1
       ;;
     UNKNOWN)

@@ -38,10 +38,14 @@ process.stdin.on("end", () => {
       isMergeAttempt = true;
       detail = "gh pr merge";
     }
-    // Match raw API merge: `gh api -X PUT .../pulls/N/merge` (same anchoring).
-    const ghApiMerge =
-      /(?:^|;|&&|\|\||\||&|\n|\$\(|<\(|\(|`)\s*gh\s+api\s+.*-X\s+(PUT|POST)\b.*\/pulls\/\d+\/merge\b/;
-    if (ghApiMerge.test(stripped)) {
+    // Match raw API merge: requires (1) `gh api` at a command-start position,
+    // (2) a /pulls/N/merge path, and (3) a write method via `-X` or `--method`.
+    // Patterns AND together so flag order doesn't matter — `gh api repos/X/Y/pulls/1/merge -X PUT`
+    // is just as caught as `gh api -X PUT repos/X/Y/pulls/1/merge`.
+    const ghApiStart = /(?:^|;|&&|\|\||\||&|\n|\$\(|<\(|\(|`)\s*gh\s+api\b/;
+    const mergePath = /\/pulls\/\d+\/merge\b/;
+    const writeMethod = /(?:-X|--method)[\s=]+(?:PUT|POST)\b/;
+    if (ghApiStart.test(stripped) && mergePath.test(stripped) && writeMethod.test(stripped)) {
       isMergeAttempt = true;
       detail = "gh api PUT .../merge";
     }

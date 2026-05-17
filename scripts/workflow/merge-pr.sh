@@ -55,10 +55,16 @@ GATE_FAILURES=()
 
 run_gate() {
   local name=$1 fn=$2 enforced=$3
-  local output rc
+  local output rc=0
   output=$("$fn" "$PR") || rc=$?
-  rc=${rc:-0}
-  echo "$output"
+  # Fail-closed visibility: if a gate exits non-zero without emitting a status
+  # token (e.g. gh/jq/API failure under pipefail), surface a synthetic FAIL so
+  # the structured-output contract isn't broken by a blank line.
+  if [ -z "$output" ] && [ "$rc" -ne 0 ]; then
+    echo "FAIL: $name: gate exited rc=$rc with no output (likely gh/jq/API failure — see stderr)"
+  else
+    echo "$output"
+  fi
   if [ "$rc" -ne 0 ]; then
     if [ "$FORCE" = "true" ] && [ "$enforced" = "false" ]; then
       echo "  (--force: $name gate non-pass, but bypass allowed)"
