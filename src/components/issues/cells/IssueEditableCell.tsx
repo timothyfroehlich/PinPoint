@@ -39,6 +39,7 @@ interface EditableCellProps {
  * Shows loading state during updates
  */
 export function IssueEditableCell({
+  issue,
   field,
   config,
   options,
@@ -81,7 +82,7 @@ export function IssueEditableCell({
             >
               <opt.icon className={cn("h-3.5 w-3.5", opt.iconColor)} />
               <span className="flex-1">{opt.label}</span>
-              {opt.label === config.label && (
+              {opt.value === issue[field as keyof typeof issue] && (
                 <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
               )}
             </DropdownMenuItem>
