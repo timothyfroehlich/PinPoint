@@ -22,6 +22,7 @@ vi.mock("~/server/db", () => ({
 
 vi.mock("~/lib/notifications", () => ({
   createNotification: vi.fn(),
+  getChannels: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("~/lib/logger", () => ({
@@ -116,7 +117,9 @@ describe("Issue Service", () => {
           issueTitle: "Test Issue",
           machineName: "Test Machine",
           formattedIssueId: "MM-01",
+          issueDescription: undefined,
         },
+        expect.anything(),
         expect.anything()
       );
     });
@@ -161,6 +164,7 @@ describe("Issue Service", () => {
           type: "issue_assigned",
           issueDescription: "Left flipper is stuck",
         }),
+        expect.anything(),
         expect.anything()
       );
     });
@@ -214,6 +218,7 @@ describe("Issue Service", () => {
           formattedIssueId: "MM-01",
           issueDescription: "New Issue Description",
         },
+        expect.anything(),
         expect.anything()
       );
     });
@@ -289,6 +294,7 @@ describe("Issue Service", () => {
           formattedIssueId: "MM-01",
           commentContent: "My comment",
         },
+        expect.anything(),
         expect.anything()
       );
     });
@@ -320,6 +326,7 @@ describe("Issue Service", () => {
           type: "issue_status_changed",
           newStatus: "fixed",
         }),
+        expect.anything(),
         expect.anything()
       );
 

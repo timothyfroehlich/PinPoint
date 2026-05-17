@@ -12,7 +12,7 @@ import {
   createTimelineEvent,
   type TimelineEventData,
 } from "~/lib/timeline/events";
-import { createNotification } from "~/lib/notifications";
+import { createNotification, getChannels } from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
 import { formatIssueId } from "~/lib/issues/utils";
@@ -139,6 +139,9 @@ export async function createIssue({
   assignedTo,
   autoWatchReporter = true,
 }: CreateIssueParams): Promise<Issue> {
+  // Resolve channels outside the transaction to avoid an HTTP round-trip
+  // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
+  const channels = await getChannels();
   return await db.transaction(async (tx) => {
     // 1. Lock machine row and get next number (Atomic increment)
     const [updatedMachine] = await tx
@@ -240,7 +243,8 @@ export async function createIssue({
           formattedIssueId: formattedId,
           issueDescription: plainDescription,
         },
-        tx
+        tx,
+        channels
       );
 
       // Extract and notify mentions — batch all mentioned users into one call
@@ -262,7 +266,8 @@ export async function createIssue({
               formattedIssueId: formattedId,
               commentContent,
             },
-            tx
+            tx,
+            channels
           );
         }
       }
@@ -291,6 +296,9 @@ export async function updateIssueStatus({
   oldStatus: string;
   newStatus: string;
 }> {
+  // Resolve channels outside the transaction to avoid an HTTP round-trip
+  // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
+  const channels = await getChannels();
   return await db.transaction(async (tx) => {
     // Get current issue to check old status
     const currentIssue = await tx.query.issues.findFirst({
@@ -357,7 +365,8 @@ export async function updateIssueStatus({
           ),
           newStatus: status,
         },
-        tx
+        tx,
+        channels
       );
     } catch (error) {
       reportError(error, {
@@ -381,6 +390,9 @@ export async function addIssueComment({
   userId,
   imagesMetadata = [],
 }: AddIssueCommentParams): Promise<IssueComment> {
+  // Resolve channels outside the transaction to avoid an HTTP round-trip
+  // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
+  const channels = await getChannels();
   return await db.transaction(async (tx) => {
     // 1. Insert Comment
     const [comment] = await tx
@@ -447,7 +459,8 @@ export async function addIssueComment({
           formattedIssueId: formattedId,
           commentContent: plainTextContent,
         },
-        tx
+        tx,
+        channels
       );
 
       // Extract and notify mentions — batch all mentioned users into one call
@@ -467,7 +480,8 @@ export async function addIssueComment({
             formattedIssueId: formattedId,
             commentContent: plainTextContent,
           },
-          tx
+          tx,
+          channels
         );
       }
     } catch (error) {
@@ -529,6 +543,9 @@ export async function assignIssue({
   assignedTo,
   actorId,
 }: AssignIssueParams): Promise<void> {
+  // Resolve channels outside the transaction to avoid an HTTP round-trip
+  // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
+  const channels = await getChannels();
   await db.transaction(async (tx) => {
     // Get current issue
     const currentIssue = await tx.query.issues.findFirst({
@@ -618,7 +635,8 @@ export async function assignIssue({
               currentIssue.issueNumber
             ),
           },
-          tx
+          tx,
+          channels
         );
       }
     } catch (error) {
