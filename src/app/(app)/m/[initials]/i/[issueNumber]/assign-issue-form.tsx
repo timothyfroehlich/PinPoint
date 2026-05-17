@@ -89,8 +89,7 @@ export function AssignIssueForm({
   );
 
   return (
-    <form action={formAction}>
-      <input type="hidden" name="issueId" value={issueId} />
+    <div>
       {permissionState.allowed ? (
         picker
       ) : (
@@ -102,6 +101,6 @@ export function AssignIssueForm({
       {state && !state.ok && (
         <p className="text-sm text-destructive">{state.message}</p>
       )}
-    </form>
+    </div>
   );
 }
