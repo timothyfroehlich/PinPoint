@@ -7,6 +7,7 @@ import {
   createMachineTimelineEvent,
   createMachineComment,
   softDeleteMachineComment,
+  getMachineTimeline,
 } from "~/lib/timeline/machine-events";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
@@ -138,6 +139,120 @@ describe("machine-events helpers (PGlite)", () => {
       expect(row.deletedAt).toBeInstanceOf(Date);
       expect(row.deletedBy).toBe(user.id);
       expect(row.content).toEqual(doc);
+    });
+  });
+
+  describe("getMachineTimeline", () => {
+    it("returns rows newest-first, scoped to machineId", async () => {
+      const { db, user, machine } = await seed();
+      const otherMachine = createTestMachine({ initials: "ZZ" });
+      await db.insert(machines).values(otherMachine);
+
+      await createMachineTimelineEvent(
+        machine.id,
+        {
+          sourceType: "lifecycle",
+          tag: "lifecycle",
+          eventData: { kind: "machine_added" },
+          actorId: user.id,
+        },
+        db
+      );
+      await new Promise((r) => setTimeout(r, 5));
+      await createMachineComment(
+        machine.id,
+        {
+          content: { type: "doc", content: [] },
+          tag: "maintenance",
+          authorId: user.id,
+        },
+        db
+      );
+      await createMachineTimelineEvent(
+        otherMachine.id,
+        {
+          sourceType: "lifecycle",
+          tag: "lifecycle",
+          eventData: { kind: "machine_added" },
+        },
+        db
+      );
+
+      const rows = await getMachineTimeline(db, { machineId: machine.id });
+
+      expect(rows).toHaveLength(2);
+      expect(rows[0].sourceType).toBe("comment");
+      expect(rows[1].sourceType).toBe("lifecycle");
+      expect(rows.every((r) => r.machineId === machine.id)).toBe(true);
+    });
+
+    it("filters by tag when provided", async () => {
+      const { db, user, machine } = await seed();
+      await createMachineComment(
+        machine.id,
+        {
+          content: { type: "doc", content: [] },
+          tag: "maintenance",
+          authorId: user.id,
+        },
+        db
+      );
+      await createMachineComment(
+        machine.id,
+        {
+          content: { type: "doc", content: [] },
+          tag: "cleaning",
+          authorId: user.id,
+        },
+        db
+      );
+
+      const rows = await getMachineTimeline(db, {
+        machineId: machine.id,
+        tag: "maintenance",
+      });
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].tag).toBe("maintenance");
+    });
+
+    it("includes soft-deleted rows (UI handles tombstone display)", async () => {
+      const { db, user, machine } = await seed();
+      await createMachineComment(
+        machine.id,
+        {
+          content: { type: "doc", content: [] },
+          tag: "maintenance",
+          authorId: user.id,
+        },
+        db
+      );
+      const [row] = await db.select().from(timelineEvents);
+      await softDeleteMachineComment(row.id, { deletedBy: user.id }, db);
+
+      const rows = await getMachineTimeline(db, { machineId: machine.id });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].deletedAt).toBeInstanceOf(Date);
+    });
+
+    it("surfaces authorName and deletedByName via joined user_profiles", async () => {
+      const { db, user, machine } = await seed();
+      await createMachineComment(
+        machine.id,
+        {
+          content: { type: "doc", content: [] },
+          tag: "maintenance",
+          authorId: user.id,
+        },
+        db
+      );
+      const [inserted] = await db.select().from(timelineEvents);
+      await softDeleteMachineComment(inserted.id, { deletedBy: user.id }, db);
+
+      const rows = await getMachineTimeline(db, { machineId: machine.id });
+      const expectedName = `${user.firstName} ${user.lastName}`;
+      expect(rows[0].authorName).toBe(expectedName);
+      expect(rows[0].deletedByName).toBe(expectedName);
     });
   });
 });

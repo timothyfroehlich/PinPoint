@@ -884,7 +884,7 @@ git commit -m "feat(machines): formatMachineEvent text renderer (PP-0x98)"
 - Modify: `src/lib/timeline/machine-events.ts` (add export)
 - Create: integration test (append to `machine-timeline-events.test.ts`)
 
-- [ ] **Step 1: Write failing tests (append to existing file)**
+- [x] **Step 1: Write failing tests (append to existing file)**
 
 Append to `src/test/integration/supabase/machine-timeline-events.test.ts`:
 
@@ -990,7 +990,7 @@ describe("getMachineTimeline", () => {
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: FAIL — `getMachineTimeline` not exported.
 
-- [ ] **Step 3: Implement the query**
+- [x] **Step 3: Implement the query**
 
 Append to `src/lib/timeline/machine-events.ts`:
 
@@ -1063,7 +1063,7 @@ Add `alias` to the `drizzle-orm` import. Note: this query intentionally does NOT
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: PASS — all 7 tests green (4 existing + 3 new).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/timeline/machine-events.ts src/test/integration/supabase/machine-timeline-events.test.ts
