@@ -240,7 +240,7 @@ Script emits structured status tokens:
 
 On any FAIL: script removes `ready-for-review` label if present (the label's contract is "click-merge-without-thinking"; if a gate fails at merge time, that contract is broken). Exit 1.
 
-On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --delete-branch --match-head-sha=<sha>`. TOCTOU-safe — if a new commit lands between gate check and merge, GitHub rejects the merge (`--match-head-sha` mismatch).
+On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --delete-branch --match-head-commit=<sha>`. TOCTOU-safe — if a new commit lands between gate check and merge, GitHub rejects the merge (`--match-head-commit` mismatch).
 
 ### 4.3 Escape hatches
 

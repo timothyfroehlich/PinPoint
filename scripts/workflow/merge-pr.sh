@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # merge-pr.sh — composite gate-then-merge enforcer.
 # Re-evaluates all 4 PR gates at merge time (TOCTOU safety vs label-time gates),
-# squash-merges with --match-head-sha if all pass, removes ready-for-review label on failure.
+# squash-merges with --match-head-commit if all pass, removes ready-for-review label on failure.
 #
 # Usage: merge-pr.sh <PR> [--dry-run] [--force] [--bypass-merge-requirements]
 #   --dry-run                     Print would-do summary, take no action.
@@ -121,7 +121,7 @@ echo "RESULT: all gates passed"
 
 # Build merge args. --admin invokes admin-merge mode on GitHub, which overrides
 # branch-protection rules (failed required checks, missing reviews, etc.).
-MERGE_ARGS=(--squash --delete-branch --match-head-sha="$PR_HEAD_SHA")
+MERGE_ARGS=(--squash --delete-branch --match-head-commit="$PR_HEAD_SHA")
 if [ "$BYPASS_REQS" = "true" ]; then
   MERGE_ARGS+=(--admin)
 fi
