@@ -71,16 +71,25 @@ LOCK_FILE="$LOCK_DIR/worktree-add.lock"
 mkdir -p "$LOCK_DIR"
 
 # --- Detect platform locking tool ---
-# macOS: lockf(1) — ships with macOS, backed by flock(2)
-# Linux: flock(1) — from util-linux
+# macOS: lockf(1) — ships with macOS at /usr/bin/lockf, backed by flock(2)
+# Linux: flock(1) — from util-linux (installed by default on every major distro)
+#
+# We fail closed (exit non-zero) when neither is available. The hook's whole
+# purpose is to serialize `git worktree add` across sessions; running without
+# a lock would leave parallel dispatch racy while the docs claim it's safe —
+# the worst-of-both-worlds. A loud failure tells the user to install the tool;
+# silent unsafety would mask the very bug PP-bg45 was filed to fix.
 LOCK_TOOL=""
 if command -v lockf >/dev/null 2>&1; then
   LOCK_TOOL="macos"
 elif command -v flock >/dev/null 2>&1; then
   LOCK_TOOL="linux"
 else
-  echo "worktree-create.sh: WARNING — neither lockf nor flock found; running without serialization lock" >&2
-  LOCK_TOOL="none"
+  echo "worktree-create.sh: ERROR — neither lockf nor flock found in PATH." >&2
+  echo "  The WorktreeCreate hook requires one to serialize parallel dispatches." >&2
+  echo "  macOS: /usr/bin/lockf ships with the OS." >&2
+  echo "  Linux: \`apt install util-linux\` or equivalent for your distro." >&2
+  exit 1
 fi
 
 # Exponential backoff: integer milliseconds, using shell arithmetic (no bc dependency).
@@ -147,8 +156,5 @@ case "$LOCK_TOOL" in
     # flock -x: exclusive lock; -w 30: wait up to 30s.
     # --no-fork: run in the same process (avoids a subshell overhead).
     flock -x -w 30 "$LOCK_FILE" bash -c 'do_worktree_add'
-    ;;
-  none)
-    do_worktree_add
     ;;
 esac
