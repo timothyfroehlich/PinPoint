@@ -253,6 +253,13 @@
       "when": 1778293378773,
       "tag": "0035_lock_handle_new_user",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1779056488823,
+      "tag": "0036_strange_freak",
+      "breakpoints": true
     }
   ]
 }

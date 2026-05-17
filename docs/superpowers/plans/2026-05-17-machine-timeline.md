@@ -289,7 +289,7 @@ git commit -m "feat(machines): MachineTimelineEventData discriminated union (PP-
 - Modify: `src/server/db/schema.ts` (add table)
 - Generated: `drizzle/00XX_*.sql` (Drizzle generates)
 
-- [ ] **Step 1: Add the table to schema.ts**
+- [x] **Step 1: Add the table to schema.ts**
 
 Open `src/server/db/schema.ts`. After the `issueComments` table definition, add:
 
@@ -337,17 +337,17 @@ import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-type
 
 Check existing imports — `index`, `jsonb`, `text`, `timestamp`, `uuid`, `pgTable` should already be imported.
 
-- [ ] **Step 2: Generate the migration**
+- [x] **Step 2: Generate the migration**
 
 Run: `pnpm db:generate`
 Expected: Drizzle creates `drizzle/00XX_<name>.sql` adding the `timeline_events` table + two indexes, plus a snapshot under `drizzle/meta/`. Verify the SQL contains `CREATE TABLE "timeline_events"`, both indexes, and the four foreign-key constraints.
 
-- [ ] **Step 3: Apply migration locally**
+- [x] **Step 3: Apply migration locally**
 
 Run: `pnpm db:migrate`
 Expected: Migration applies cleanly. Verify with `pnpm db:generate` — should report "No schema changes".
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/server/db/schema.ts drizzle/00XX_*.sql drizzle/meta/

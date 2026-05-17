@@ -76,6 +76,7 @@ export default defineConfig({
     "invited_users",
     "machine_watchers",
     "discord_integration_config",
+    "timeline_events",
   ],
   schemaFilter: ["public"],
   verbose: true,
