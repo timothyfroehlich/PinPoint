@@ -8,26 +8,32 @@
 **Style**: Explain pros/cons. Teach, don't just fix.
 **Constraint**: PR reviews are AI-generated; apply critical thinking.
 
-## 2. Critical Non-Negotiables (The "10 Commandments")
+## 2. Critical Non-Negotiables
+
+### §2.1 Implementation Rules
+
+1. **Drizzle Migrations**: We use Drizzle ORM, NOT Supabase migrations. Never use `drizzle-kit push`. Use `db:generate` + `db:migrate`. Supabase migration config is disabled (`db.migrations.enabled = false`).
+2. **Worker-Scoped PGlite**: No per-test DB instances (causes lockups). Use shared worker.
+3. **Server Components Default**: "use client" only for interaction leaves.
+4. **Progressive Enhancement**: `<form action={serverAction}>`. No inline handlers.
+5. **Supabase SSR**: `createClient()` -> `auth.getUser()` immediately. No logic in between.
+6. **Type Safety**: No `any`, no `!`, no unsafe `as`. This project uses ts-strictest.
+7. **Path Aliases**: Always use `~/` (e.g., `~/lib/utils`).
+8. **Code Cleanliness**: Follow Rule of Three. DRY up code only after 3rd duplication.
+9. **Interaction Coverage at the Cheapest Layer**: Every clickable user-facing element must be exercised by at least one test at the cheapest layer that catches its bug class. Multi-step user journeys (login → mutate → verify across pages) require E2E. Server Action wiring, permission checks, and DB query correctness require integration tests (PGlite + direct action call). Pure form-state and UI logic require RTL unit tests. Smoke E2E covers "page renders without 500" and layout regression only. Adding an E2E test for a clickable that catches a class-B/E/I bug is misallocation, not coverage. Bug-class table and decision tree: `pinpoint-testing` skill § "Bug Classes & Cheapest Catching Layer".
+10. **Email Privacy**: User email addresses must NEVER be displayed outside of admin views and the user's own settings page. Use names, "Anonymous", or role labels instead. This applies to UI, seed data, timeline events, and any client-facing serialization.
+11. **Permissions Matrix Accuracy**: The permissions matrix (`matrix.ts`) must match actual server action enforcement. The help page auto-generates from the matrix — if it drifts, users see wrong information. Update both when changing auth logic.
+12. **Matrix-Only Permissions**: All permission checks MUST use `checkPermission()` from the matrix system (`~/lib/permissions/helpers`). No standalone permission functions outside `src/lib/permissions/`. The help page auto-generates from the matrix — if enforcement diverges, users see wrong information.
+13. **Two-Layer Responsive Framework**: Viewport breakpoints (`md:`, `lg:`) for page structure (show/hide sections, grid columns). Container queries (`@lg:`, `@xl:`) for component internals (flex direction, padding, column count). Never mix both for the same layout decision. No `window.innerWidth`, `useMediaQuery`, or `matchMedia` — use CSS. `sm:` is padding/spacing only. The sole documented exception is `use-table-responsive-columns` for IssueList (PP-rs9).
+14. **Test What We Own**: Tests must verify PinPoint's code at the boundary of services we don't control, not simulate the service's internals. Building scaffolding that synthesizes a third party's internal state (raw DB writes into `auth.identities`, captcha-verification mocks, OAuth handshake fakes, email-template regex extraction) is a signal you're testing the wrong thing. Cover PinPoint's contribution with unit tests; cover "the page renders without 500" with a smoke test; reserve integration/E2E for when the test exercises the contracted public API of a real running service. External services other than our owned local stack (Mailpit, PGlite, local Supabase including local Storage) MUST be mocked at the SDK boundary — driving live Discord webhooks, real OAuth provider redirects, vendor email templates, or any production third-party endpoint from an E2E spec is a class-J violation. **Class-J self-check before merging an E2E spec** — two layers, both must pass: (1) `rg 'https?://' e2e/path/to/spec.ts` for direct URLs in the spec source — must return only `localhost`/`127.0.0.1`/owned-domain hits. (2) `rg 'https?://' src/lib/ src/server/actions/` for the SDK clients and server actions the spec triggers — any non-localhost production URL there must live inside an SDK client module that has a corresponding `*.test.ts` mocking `fetch` at the boundary. The dangerous case is layer 2: a spec with a clean source that triggers a server action which fires live `fetch("https://discord.com/...")`. Any production third-party hostname (`discord.com`, `googleapis.com`, OAuth providers, etc.) reachable from an E2E run is a class-J signal — delete the spec and add the SDK-boundary mock. Diagnostic: "If this ran against production with real credentials, would the same code pass?" If no, the test is wrong. Casework: PP-e20 (OAuth identity disconnect), PP-uc8 (Turnstile captcha), PP-q9r (Supabase password-reset email format). Skill deep-dive: `pinpoint-testing` § "Test What We Own".
+
+### §2.2 Workflow Rules
 
 1. **Escape parentheses** in paths (e.g., `src/app/\(app\)/page.tsx`).
-2. **Drizzle Migrations**: We use Drizzle ORM, NOT Supabase migrations. Never use `drizzle-kit push`. Use `db:generate` + `db:migrate`. Supabase migration config is disabled (`db.migrations.enabled = false`).
-3. **Worker-Scoped PGlite**: No per-test DB instances (causes lockups). Use shared worker.
-4. **Server Components Default**: "use client" only for interaction leaves.
-5. **Progressive Enhancement**: `<form action={serverAction}>`. No inline handlers.
-6. **Supabase SSR**: `createClient()` -> `auth.getUser()` immediately. No logic in between.
-7. **Type Safety**: No `any`, no `!`, no unsafe `as`. This project uses ts-strictest.
-8. **Path Aliases**: Always use `~/` (e.g., `~/lib/utils`).
-9. **Preflight**: Must run `pnpm run preflight` before commit.
-10. **Code Cleanliness**: Follow Rule of Three. DRY up code only after 3rd duplication.
-11. **Interaction Coverage at the Cheapest Layer**: Every clickable user-facing element must be exercised by at least one test at the cheapest layer that catches its bug class. Multi-step user journeys (login → mutate → verify across pages) require E2E. Server Action wiring, permission checks, and DB query correctness require integration tests (PGlite + direct action call). Pure form-state and UI logic require RTL unit tests. Smoke E2E covers "page renders without 500" and layout regression only. Adding an E2E test for a clickable that catches a class-B/E/I bug is misallocation, not coverage. Bug-class table and decision tree: `pinpoint-testing` skill § "Bug Classes & Cheapest Catching Layer".
-12. **Email Privacy**: User email addresses must NEVER be displayed outside of admin views and the user's own settings page. Use names, "Anonymous", or role labels instead. This applies to UI, seed data, timeline events, and any client-facing serialization.
-13. **Permissions Matrix Accuracy**: The permissions matrix (`matrix.ts`) must match actual server action enforcement. The help page auto-generates from the matrix — if it drifts, users see wrong information. Update both when changing auth logic.
-14. **Matrix-Only Permissions**: All permission checks MUST use `checkPermission()` from the matrix system (`~/lib/permissions/helpers`). No standalone permission functions outside `src/lib/permissions/`. The help page auto-generates from the matrix — if enforcement diverges, users see wrong information.
-15. **Process Safety**: NEVER kill processes system-wide. Do NOT run `pkill`, `killall`, use `kill` with PIDs obtained from broad selectors like `pgrep`, run `supabase stop --all`, or use any command that terminates services beyond your current worktree. Only stop services you explicitly started in your current session. Violating this destroys other agents' environments and the user's running work.
-16. **Two-Layer Responsive Framework**: Viewport breakpoints (`md:`, `lg:`) for page structure (show/hide sections, grid columns). Container queries (`@lg:`, `@xl:`) for component internals (flex direction, padding, column count). Never mix both for the same layout decision. No `window.innerWidth`, `useMediaQuery`, or `matchMedia` — use CSS. `sm:` is padding/spacing only. The sole documented exception is `use-table-responsive-columns` for IssueList (PP-rs9).
-17. **Test What We Own**: Tests must verify PinPoint's code at the boundary of services we don't control, not simulate the service's internals. Building scaffolding that synthesizes a third party's internal state (raw DB writes into `auth.identities`, captcha-verification mocks, OAuth handshake fakes, email-template regex extraction) is a signal you're testing the wrong thing. Cover PinPoint's contribution with unit tests; cover "the page renders without 500" with a smoke test; reserve integration/E2E for when the test exercises the contracted public API of a real running service. External services other than our owned local stack (Mailpit, PGlite, local Supabase including local Storage) MUST be mocked at the SDK boundary — driving live Discord webhooks, real OAuth provider redirects, vendor email templates, or any production third-party endpoint from an E2E spec is a class-J violation. **Class-J self-check before merging an E2E spec** — two layers, both must pass: (1) `rg 'https?://' e2e/path/to/spec.ts` for direct URLs in the spec source — must return only `localhost`/`127.0.0.1`/owned-domain hits. (2) `rg 'https?://' src/lib/ src/server/actions/` for the SDK clients and server actions the spec triggers — any non-localhost production URL there must live inside an SDK client module that has a corresponding `*.test.ts` mocking `fetch` at the boundary. The dangerous case is layer 2: a spec with a clean source that triggers a server action which fires live `fetch("https://discord.com/...")`. Any production third-party hostname (`discord.com`, `googleapis.com`, OAuth providers, etc.) reachable from an E2E run is a class-J signal — delete the spec and add the SDK-boundary mock. Diagnostic: "If this ran against production with real credentials, would the same code pass?" If no, the test is wrong. Casework: PP-e20 (OAuth identity disconnect), PP-uc8 (Turnstile captcha), PP-q9r (Supabase password-reset email format). Skill deep-dive: `pinpoint-testing` § "Test What We Own".
-18. **Merge for main sync, NEVER rebase**: Update a feature branch from `main` with `git fetch origin && git merge origin/main`. **NEVER `git rebase origin/main`**. Rebase rewrites SHAs → requires force-push → teammate guardrails block force-push and Tim does not authorize. Even a 1-commit branch costs a 30-minute push-permission detour after a rebase. Section 4 Branch Management has the rule + the ⚠️ REBASE TRAP callout with casework. If you find yourself typing `rebase` against `origin/main`, STOP and use `merge`.
+2. **Preflight**: Must run `pnpm run preflight` before commit.
+3. **Process Safety**: NEVER kill processes system-wide. Do NOT run `pkill`, `killall`, use `kill` with PIDs obtained from broad selectors like `pgrep`, run `supabase stop --all`, or use any command that terminates services beyond your current worktree. Only stop services you explicitly started in your current session. Violating this destroys other agents' environments and the user's running work.
+4. **Merge for main sync, NEVER rebase**: Update a feature branch from `main` with `git fetch origin && git merge origin/main`. **NEVER `git rebase origin/main`**. Rebase rewrites SHAs → requires force-push → teammate guardrails block force-push and Tim does not authorize. Even a 1-commit branch costs a 30-minute push-permission detour after a rebase. Section 4 Branch Management has the rule + the ⚠️ REBASE TRAP callout with casework. If you find yourself typing `rebase` against `origin/main`, STOP and use `merge`.
+5. **Root Checkout Is Read-Only — All Work Happens In Worktrees**: The root checkout (main worktree — the original clone where `.git/` is a directory) is ALWAYS on `main`. No work is ever performed there: no code edits, no branch creation, no `git checkout`, no committing. Its only roles are pulling `main` fast-forward, dispatching subagents, and running cross-cutting tools (briefing, dashboard, beads). For any work — even a one-line fix — use a worktree: dispatch via `Agent(isolation:"worktree")` for substantive work, or use `EnterWorktree` to jump into an existing worktree for quick inline work. (PP-46z, PP-bg45; cross-session HEAD corruption reproduced 2026-05-16 with plain `git checkout -b` + push from the root checkout — no agent dispatch involved.)
 
 ## 3. Agent Skills (Progressive Disclosure)
 
@@ -115,9 +121,9 @@ When CI surfaces a test failure, **always attempt to reproduce it locally before
 
 ### Branch Management
 
-**Creating branches** - Ensure proper remote tracking:
+**Creating branches** — Branch work happens in a worktree, not the root checkout (see §2.2 "Root Checkout Is Read-Only"). Claude Code handles this automatically via `Agent(isolation:"worktree")`. When creating a branch manually inside a worktree, ensure proper remote tracking:
 
-- `git checkout -b feature/name` then `git push -u origin feature/name`
+- Inside the worktree: `git checkout -b feature/name` then `git push -u origin feature/name`
 - **NOT**: `git checkout -b feature/name origin/main` (tracks main, not your branch)
 - Verify: `git branch -vv` shows `[origin/feature/name]`, not `[origin/main]`
 
@@ -134,7 +140,7 @@ pushing to main.
 > permission for a sync that should have been a normal push.
 >
 > **Use `git merge origin/main` instead.** Merge commit preserves SHAs, normal push works,
-> CI re-runs against the merge commit. This is commandment #18 and it is the rule.
+> CI re-runs against the merge commit. This is §2.2 "Merge for main sync, NEVER rebase" and it is the rule.
 
 - `git fetch origin && git merge origin/main` (preferred)
 - **NOT**: `git rebase origin/main` (rewrites history, causes issues with worktrees and PRs)
@@ -314,8 +320,8 @@ For multiple independent tasks, use worktree-isolated subagents.
 
 - DON'T use Agent Teams as default — standalone subagents have working worktree isolation
 - DON'T forget to check Copilot comments before merging
-- DON'T dispatch `Agent(isolation: "worktree")` from a linked (non-primary) worktree — see "Worktree Dispatch Safety" in CLAUDE.md
-- DON'T fire 2+ `Agent(isolation: "worktree")` calls in a single message — serialize them, see "Worktree Dispatch Safety" in CLAUDE.md
+- DON'T dispatch `Agent(isolation: "worktree")` from a linked (non-primary) worktree — see "Worktree Dispatch Safety" in CLAUDE.md (bug #47548, WorktreeCreate hook cannot fix this)
+- DON'T fire N+ `Agent(isolation: "worktree")` calls without the WorktreeCreate hook active — with the hook any N is safe from the main worktree (flock serializes); without it, serialize to N=1-per-message
 
 See `pinpoint-orchestrator` skill for the full workflow and known-bug details.
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   getEmailHtml,
   getEmailSubject,
+  getEventTypeLabel,
   generateUnsubscribeToken,
   verifyUnsubscribeToken,
 } from "~/lib/notifications/channels/email-channel";
@@ -247,6 +248,146 @@ describe("Notification Formatting", () => {
         formattedIssueId: "A+B-42",
       });
       expect(html).toContain('href="http://test.com/issues"');
+    });
+  });
+
+  describe("Subject normalization — issue-tied types collapse to stable format", () => {
+    const MACHINE = "Medieval Madness";
+    const ISSUE_ID = "MM-01";
+    const TITLE = "Broken flipper";
+    const EXPECTED_SUBJECT = `[${MACHINE}] ${ISSUE_ID}: ${TITLE}`;
+
+    it("new_issue uses stable subject", () => {
+      expect(getEmailSubject("new_issue", TITLE, MACHINE, ISSUE_ID)).toBe(
+        EXPECTED_SUBJECT
+      );
+    });
+
+    it("issue_assigned uses stable subject", () => {
+      expect(getEmailSubject("issue_assigned", TITLE, MACHINE, ISSUE_ID)).toBe(
+        EXPECTED_SUBJECT
+      );
+    });
+
+    it("issue_status_changed uses stable subject", () => {
+      expect(
+        getEmailSubject(
+          "issue_status_changed",
+          TITLE,
+          MACHINE,
+          ISSUE_ID,
+          "Fixed"
+        )
+      ).toBe(EXPECTED_SUBJECT);
+    });
+
+    it("new_comment uses stable subject", () => {
+      expect(getEmailSubject("new_comment", TITLE, MACHINE, ISSUE_ID)).toBe(
+        EXPECTED_SUBJECT
+      );
+    });
+
+    it("mentioned uses stable subject", () => {
+      expect(getEmailSubject("mentioned", TITLE, MACHINE, ISSUE_ID)).toBe(
+        EXPECTED_SUBJECT
+      );
+    });
+
+    it("all five issue-tied types produce the same subject for the same issue", () => {
+      const types = [
+        "new_issue",
+        "issue_assigned",
+        "issue_status_changed",
+        "new_comment",
+        "mentioned",
+      ] as const;
+      const subjects = types.map((t) =>
+        getEmailSubject(t, TITLE, MACHINE, ISSUE_ID, "Fixed")
+      );
+      expect(new Set(subjects).size).toBe(1);
+    });
+
+    it("falls back gracefully when formattedIssueId is missing", () => {
+      expect(getEmailSubject("new_issue", TITLE, MACHINE, undefined)).toBe(
+        `[${MACHINE}] ${TITLE}`
+      );
+    });
+  });
+
+  describe("Event-type label in body (formerly in subject)", () => {
+    it("new_issue body contains 'New Issue' event label", () => {
+      const html = getEmailHtml({
+        type: "new_issue",
+        issueTitle: "Broken flipper",
+        machineName: "Medieval Madness",
+        formattedIssueId: "MM-01",
+      });
+      expect(html).toContain("New Issue");
+    });
+
+    it("issue_assigned body contains 'Issue Assigned' event label", () => {
+      const html = getEmailHtml({
+        type: "issue_assigned",
+        issueTitle: "Broken flipper",
+        machineName: "Medieval Madness",
+        formattedIssueId: "MM-01",
+      });
+      expect(html).toContain("Issue Assigned");
+    });
+
+    it("issue_status_changed body contains 'Status Changed' event label", () => {
+      const html = getEmailHtml({
+        type: "issue_status_changed",
+        issueTitle: "Broken flipper",
+        machineName: "Medieval Madness",
+        formattedIssueId: "MM-01",
+        newStatus: "Fixed",
+      });
+      expect(html).toContain("Status Changed");
+    });
+
+    it("new_comment body contains 'New Comment' event label", () => {
+      const html = getEmailHtml({
+        type: "new_comment",
+        issueTitle: "Broken flipper",
+        machineName: "Medieval Madness",
+        formattedIssueId: "MM-01",
+      });
+      expect(html).toContain("New Comment");
+    });
+
+    it("mentioned body contains 'You Were Mentioned' event label", () => {
+      const html = getEmailHtml({
+        type: "mentioned",
+        issueTitle: "Broken flipper",
+        machineName: "Medieval Madness",
+        formattedIssueId: "MM-01",
+      });
+      expect(html).toContain("You Were Mentioned");
+    });
+
+    it("machine_ownership_changed body has no event-type label h3", () => {
+      const html = getEmailHtml({
+        type: "machine_ownership_changed",
+        machineName: "Medieval Madness",
+        newStatus: "added",
+      });
+      // No h3 event label for non-issue-tied type
+      expect(html).not.toContain("<h3 style=");
+    });
+  });
+
+  describe("getEventTypeLabel", () => {
+    it("returns correct labels for all issue-tied types", () => {
+      expect(getEventTypeLabel("new_issue")).toBe("New Issue");
+      expect(getEventTypeLabel("issue_assigned")).toBe("Issue Assigned");
+      expect(getEventTypeLabel("issue_status_changed")).toBe("Status Changed");
+      expect(getEventTypeLabel("new_comment")).toBe("New Comment");
+      expect(getEventTypeLabel("mentioned")).toBe("You Were Mentioned");
+    });
+
+    it("returns empty string for machine_ownership_changed (not issue-tied)", () => {
+      expect(getEventTypeLabel("machine_ownership_changed")).toBe("");
     });
   });
 

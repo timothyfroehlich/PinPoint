@@ -150,6 +150,21 @@ describe("AppHeader", () => {
       expect(screen.getByTestId("nav-machines")).toHaveAttribute("href", "/m");
     });
 
+    it("renders nav links in Dashboard, Machines, Issues order", () => {
+      render(<AppHeader {...defaultAuthProps} />);
+
+      const mainNav = screen.getByRole("navigation", { name: "main" });
+      const navTestIds = Array.from(
+        mainNav.querySelectorAll("[data-testid^='nav-']")
+      ).map((el) => el.getAttribute("data-testid"));
+
+      expect(navTestIds).toEqual([
+        "nav-dashboard",
+        "nav-machines",
+        "nav-issues",
+      ]);
+    });
+
     it("uses issuesPath for the Issues link", () => {
       render(
         <AppHeader {...defaultAuthProps} issuesPath="/issues?status=open" />
