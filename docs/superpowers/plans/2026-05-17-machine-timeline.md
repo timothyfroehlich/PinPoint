@@ -53,7 +53,7 @@
 - Create: `src/lib/timeline/machine-tags.ts`
 - Create: `src/lib/timeline/machine-tags.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `src/lib/timeline/machine-tags.test.ts`:
 
@@ -112,12 +112,12 @@ describe("machine-tags", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm exec vitest run src/lib/timeline/machine-tags.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement the module**
+- [x] **Step 3: Implement the module**
 
 Create `src/lib/timeline/machine-tags.ts`:
 
@@ -164,12 +164,12 @@ export function getTagLabel(tag: TimelineTag): string {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm exec vitest run src/lib/timeline/machine-tags.test.ts`
 Expected: PASS — 6 tests green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/timeline/machine-tags.ts src/lib/timeline/machine-tags.test.ts
