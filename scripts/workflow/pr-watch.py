@@ -168,7 +168,7 @@ def run_audit(pr: int) -> bool:
             "copilot-resolved",
             "all resolved"
             if unresolved == 0
-            else f"{unresolved} unresolved (run ./scripts/workflow/copilot-comments.sh {pr})",
+            else f"{unresolved} unresolved (use MCP pull_request_read to inspect threads)",
         ),
         (True, "ready-label", label_detail),
     ]
