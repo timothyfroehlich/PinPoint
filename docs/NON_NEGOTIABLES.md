@@ -243,7 +243,7 @@ trigger: always_on
 **CORE-TEST-005:** Interaction Coverage at the Cheapest Catching Layer
 
 - **Severity:** Required
-- **Why:** Tests that verify element existence without exercising the handler miss broken wiring (PR #894 pattern). But E2E is not always the cheapest layer that catches that bug class — see AGENTS.md rule #11 and the 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`).
+- **Why:** Tests that verify element existence without exercising the handler miss broken wiring (PR #894 pattern). But E2E is not always the cheapest layer that catches that bug class — see AGENTS.md §2.1 "Interaction Coverage at the Cheapest Layer" and the 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`).
 - **Do:** Every clickable user-facing element must be exercised by at least one test that actually invokes its handler. Pick the layer by bug class: multi-step journeys → E2E; Server Action wiring / permissions / DB queries → integration (PGlite + direct action call); pure form-state / UI logic → RTL unit.
 - **Don't:** Only assert `toBeVisible()` without testing the interaction. Also don't reflexively write E2E for every clickable — integration or RTL is usually faster and more thorough for class-B / E / I bugs.
 

@@ -229,8 +229,8 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 
 ### AppHeader (always rendered, two-tier responsive)
 
-- **Wide desktop (>= lg):** Logo, APC logo, nav links (icon+text), spacer, Report Issue (icon+text), HelpMenu, NotificationList, UserMenu.
-- **Tablet (md–lg):** Logo, nav links (icon-only), spacer, Report Issue (icon-only), HelpMenu, NotificationList, UserMenu. APC logo hidden.
+- **Wide desktop (>= lg):** Logo, APC logo, nav links (Dashboard, Machines, Issues — icon+text), spacer, Report Issue button (secondary variant, icon+text), HelpMenu, NotificationList, UserMenu.
+- **Tablet (md–lg):** Logo, nav links (Dashboard, Machines, Issues — icon-only), spacer, Report button (secondary variant, icon + "Report" label), HelpMenu, NotificationList, UserMenu. APC logo hidden.
 - **Mobile (< md):** Logo, spacer, NotificationList, UserMenu. Nav links and Report Issue use `hidden md:flex`.
 - **Unauthenticated:** NotificationList + UserMenu replaced by Sign In / Sign Up buttons.
 - **Admin link:** Inside UserMenu dropdown (role-gated, not a top-level nav item).
@@ -243,7 +243,7 @@ Use shadcn defaults: `CardHeader` (px-6 pt-6 pb-3), `CardContent` (px-6 pb-6). O
 
 ### BottomTabBar (mobile only, `md:hidden`)
 
-- **Primary tabs:** Dashboard, Issues, Machines, Report Issue.
+- **Primary tabs:** Dashboard, Machines, Issues, Report Issue. Order matches the desktop `AppHeader` because `BottomTabBar` spreads the same `NAV_ITEMS` array.
 - **More tab:** Opens `Sheet` (bottom drawer) with Feedback, What's New, Help, About, Admin (role-gated).
 
 ### Shared rules
@@ -315,7 +315,7 @@ Before building something new, check if one of these already exists:
 | :------------------------------------ | :---------------------------------------------------------------------------------------------- |
 | `AppHeader`                           | Two-tier responsive header. Icon-only nav at `md:`, icon+text at `lg:`. APC logo at `lg:` only. |
 | `HelpMenu`                            | Dropdown with Feedback, What's New, Help, About. Badge dot for unread changelog.                |
-| `BottomTabBar`                        | Mobile tab bar (`md:hidden`). Dashboard, Issues, Machines, Report, More.                        |
+| `BottomTabBar`                        | Mobile tab bar (`md:hidden`). Dashboard, Machines, Issues, Report, More.                        |
 | `IssueBadgeGrid`                      | Status/severity/priority/frequency display                                                      |
 | `IssueBadge`                          | Individual status badge with color                                                              |
 | `IssueCard`                           | Issue summary card (normal/compact)                                                             |
@@ -414,7 +414,7 @@ When something happens in response to user action, where should they see feedbac
 | Long-running background work (uploads)            | Toast with progress indicator                                                                       |
 | Short in-place work (counter increment)           | Immediate UI update, no notification                                                                |
 
-**Why server-side redirect instead of `toast.success() + router.push()`?** The project's progressive-enhancement rule (AGENTS.md #5) requires forms to work without JavaScript. `<form action={serverAction}>` + server-side `redirect(...)` works with JS off; a `toast.success()` + `router.push()` pattern only fires after hydration. If a success toast is genuinely needed on the destination page, persist a one-time success state (e.g., via a search param or short-lived cookie read in the destination route) and render it there.
+**Why server-side redirect instead of `toast.success() + router.push()`?** The project's progressive-enhancement rule (AGENTS.md §2.1 "Progressive Enhancement") requires forms to work without JavaScript. `<form action={serverAction}>` + server-side `redirect(...)` works with JS off; a `toast.success()` + `router.push()` pattern only fires after hydration. If a success toast is genuinely needed on the destination page, persist a one-time success state (e.g., via a search param or short-lived cookie read in the destination route) and render it there.
 
 **Rule of thumb:** If the user initiated it and waited → feedback. If it was instant or invisible → no feedback.
 

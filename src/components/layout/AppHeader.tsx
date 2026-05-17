@@ -31,8 +31,8 @@ interface AppHeaderProps {
 /**
  * Unified application header that replaces Sidebar + MobileHeader.
  *
- * Desktop (>= lg): Logo, APC logo, nav links (icon+text), Report Issue (icon+text), HelpMenu, auth.
- * Tablet (md–lg): Logo, nav links (icon-only), Report Issue (icon-only), HelpMenu, auth.
+ * Desktop (>= lg): Logo, APC logo, nav links (icon+text), Report Issue button (icon+"Report Issue"), HelpMenu, auth.
+ * Tablet (md–lg): Logo, nav links (icon-only), Report button (icon+"Report"), HelpMenu, auth.
  * Mobile (< md): Logo, auth. Nav handled by BottomTabBar.
  */
 export function AppHeader({
@@ -124,13 +124,16 @@ export function AppHeader({
       <div className="hidden md:flex items-center gap-2">
         <Button
           asChild
-          variant="ghost"
           size="sm"
-          className="text-muted-foreground hover:text-primary gap-2"
+          variant="secondary"
+          className="gap-2"
           data-testid="nav-report-issue"
         >
           <Link href="/report" aria-label="Report Issue">
             <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
+            <span className="lg:hidden" aria-hidden="true">
+              Report
+            </span>
             <span className="hidden lg:inline" aria-hidden="true">
               Report Issue
             </span>

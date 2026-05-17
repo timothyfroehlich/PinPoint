@@ -64,9 +64,10 @@ export function UpdateIssueFrequencyForm({
 
   useEffect(() => {
     if (state && !state.ok) {
+      setSelectedFrequency(currentFrequency);
       toast.error(state.message);
     }
-  }, [state]);
+  }, [state, currentFrequency]);
 
   const permissionState = getPermissionState(
     "issues.update.reporting",

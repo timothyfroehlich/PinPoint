@@ -101,4 +101,38 @@ describe("NotificationPreferencesForm", () => {
       "#connected-accounts"
     );
   });
+
+  it("re-syncs PreferenceRow switches when preferences change (PP-az4)", () => {
+    // Regression: PreferenceRow Switches use defaultChecked, which is only
+    // read at mount. Without the resetKey-on-preferences-change effect, a
+    // server-revalidated preferences prop would leave the visible switch
+    // state stale.
+    const initialPrefs: NotificationPreferencesData = {
+      ...defaultPreferences,
+      emailNotifyOnAssigned: true,
+    };
+    const updatedPrefs: NotificationPreferencesData = {
+      ...defaultPreferences,
+      emailNotifyOnAssigned: false,
+    };
+
+    const { container, rerender } = render(
+      <NotificationPreferencesForm preferences={initialPrefs} />
+    );
+
+    const getSwitch = (id: string): HTMLButtonElement | null =>
+      container.querySelector<HTMLButtonElement>(`button#${id}`);
+
+    expect(getSwitch("emailNotifyOnAssigned")).toHaveAttribute(
+      "data-state",
+      "checked"
+    );
+
+    rerender(<NotificationPreferencesForm preferences={updatedPrefs} />);
+
+    expect(getSwitch("emailNotifyOnAssigned")).toHaveAttribute(
+      "data-state",
+      "unchecked"
+    );
+  });
 });

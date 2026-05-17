@@ -65,9 +65,10 @@ export function UpdateIssuePriorityForm({
 
   useEffect(() => {
     if (state && !state.ok) {
+      setSelectedPriority(currentPriority);
       toast.error(state.message);
     }
-  }, [state]);
+  }, [state, currentPriority]);
 
   const permissionState = getPermissionState(
     "issues.update.triage",

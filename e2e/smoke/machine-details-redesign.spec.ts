@@ -1,21 +1,41 @@
 /**
  * E2E Tests: Machine Details Redesign
  *
- * Tests the redesigned (now tabbed) machine details page: Info tab card
- * content, Service tab issues section, and CSV export. Inline editing and
- * owner management tests are in e2e/full/machine-details-extended.spec.ts.
+ * Tests the redesigned (now tabbed) machine details page and the absorbed
+ * machine-list overflow check. Inline editing and owner management tests are
+ * in e2e/full/machine-details-extended.spec.ts.
  *
- * Notes after the tabbed-layout PR:
+ * AUDIT 2026-05 (Wave 3a, Rows 26 + 27):
+ *   Row 27 — Kept: layout-D overflow check + CSV-F multi-step download journey.
+ *   Row 27 — Downgraded to RTL (IssuesExpando.test.tsx + ExportButton.test.tsx):
+ *     - "should show issues expando collapsed by default" (class-H)
+ *     - "should expand and collapse issues section" (class-H)
+ *     - "should show Report Issue button in header" (class-H)
+ *   Row 26 — Absorbed from e2e/smoke/machines-crud.spec.ts (now deleted):
+ *     - machines list page overflow check (class-D)
+ *   Row 26 — Downgraded to integration/unit (machine-actions.test.ts):
+ *     - "non-admin cannot access /m/new page" (class-E)
+ *     - "should display seeded test machines with correct statuses" (class-B/D)
+ *     - "should display machine issues on detail page via expando" (class-H — RTL)
+ *     - "should display machine owner to all logged-in users" (class-D/H — RTL)
+ *
+ * TABBED-LAYOUT NOTES (post-merge):
  * - The persistent header is identity-only (`[initials] | name`); status,
- *   owner display, and Report Issue button all moved off it. Open-issue
- *   count + status surface as a colored badge on the Service tab itself.
+ *   owner display, and Report Issue button moved off it. Open-issue count +
+ *   status surface as a colored badge on the Service tab itself.
  * - The issues section is no longer a collapsible expando; it renders an
- *   always-open list inside the Service tab.
+ *   always-open list inside the Service tab (`/m/[initials]/maintenance`).
+ * - The export button moved with the issues list onto the Service tab.
  */
 
 import { test, expect } from "@playwright/test";
-import { assertNoHorizontalOverflow, ensureLoggedIn } from "../support/actions";
-import { seededMachines } from "../support/constants";
+import {
+  assertNoHorizontalOverflow,
+  ensureLoggedIn,
+  loginAs,
+  logout,
+} from "../support/actions";
+import { seededMachines, TEST_USERS } from "../support/constants";
 import { clearMachineField } from "../support/supabase-admin";
 
 test.describe("Machine Details Redesign", () => {
@@ -58,6 +78,30 @@ test.describe("Machine Details Redesign", () => {
 
     // Cards render flat (no expando) — section is always open in this design.
     await expect(page.getByTestId("issue-card").first()).toBeVisible();
+  });
+
+  // Absorbed from e2e/smoke/machines-crud.spec.ts (Row 26 MERGE):
+  // overflow check on the machines list page (/m)
+  test("should display machine list page without horizontal overflow", async ({
+    page,
+  }, testInfo) => {
+    // Login as admin to ensure "Add Machine" button renders (exercises full list layout)
+    await logout(page, testInfo);
+    await loginAs(page, testInfo, {
+      email: TEST_USERS.admin.email,
+      password: TEST_USERS.admin.password,
+    });
+
+    await page.goto("/m?availability=all");
+    await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
+    await assertNoHorizontalOverflow(page);
+
+    // Restore default user
+    await logout(page, testInfo);
+    await loginAs(page, testInfo, {
+      email: TEST_USERS.member.email,
+      password: TEST_USERS.member.password,
+    });
   });
 
   test("Service tab exports machine issues to CSV", async ({ page }) => {
