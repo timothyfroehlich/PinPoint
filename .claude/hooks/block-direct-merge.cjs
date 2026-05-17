@@ -25,29 +25,28 @@ process.stdin.on("end", () => {
 
   if (tool === "Bash") {
     const cmd = String(toolInput.command || "");
-    // Strip quoted strings so `echo "gh pr merge"` / `rg "gh pr merge"` / doc heredocs
-    // mentioning the command don't trip the guard. Basic stripper — does not handle
-    // nested quoting perfectly, but covers the common false-positive class.
-    const stripped = cmd
-      .replace(/'[^']*'/g, "''")
-      .replace(/"(?:\\.|[^"\\])*"/g, '""');
-    // Match `gh pr merge` only when it's an actual command (start of line or right
-    // after a control operator), not buried inside arguments or substrings.
-    const ghMerge = /(?:^|;|&&|\|\||\||&|\n|\$\(|<\(|\(|`)\s*gh\s+pr\s+merge\b/;
-    if (ghMerge.test(stripped) && !/--help\b/.test(stripped)) {
-      isMergeAttempt = true;
-      detail = "gh pr merge";
-    }
-    // Match raw API merge: requires (1) `gh api` at a command-start position,
-    // (2) a /pulls/N/merge path, and (3) a write method via `-X` or `--method`.
-    // Patterns AND together so flag order doesn't matter — `gh api repos/X/Y/pulls/1/merge -X PUT`
-    // is just as caught as `gh api -X PUT repos/X/Y/pulls/1/merge`.
-    const ghApiStart = /(?:^|;|&&|\|\||\||&|\n|\$\(|<\(|\(|`)\s*gh\s+api\b/;
-    const mergePath = /\/pulls\/\d+\/merge\b/;
-    const writeMethod = /(?:-X|--method)[\s=]+(?:PUT|POST)\b/;
-    if (ghApiStart.test(stripped) && mergePath.test(stripped) && writeMethod.test(stripped)) {
-      isMergeAttempt = true;
-      detail = "gh api PUT .../merge";
+    // Prefix gate: skip all regex work when nothing gh-related is present, and
+    // pass any --help invocation symmetrically (`gh pr merge --help`, `gh api --help`).
+    if (cmd.includes("gh") && !/--help\b/.test(cmd)) {
+      // Strip quoted content so mentions in `echo`/`rg`/docs/heredocs don't false-positive.
+      const stripped = cmd
+        .replace(/'[^']*'/g, "''")
+        .replace(/"(?:\\.|[^"\\])*"/g, '""');
+      const cmdStart = /(?:^|;|&&|\|\||\||&|\n|\$\(|<\(|\(|`)\s*/;
+      const ghMerge = new RegExp(cmdStart.source + "gh\\s+pr\\s+merge\\b");
+      if (ghMerge.test(stripped)) {
+        isMergeAttempt = true;
+        detail = "gh pr merge";
+      }
+      // gh api ... /pulls/N/merge — AND three patterns so flag order doesn't matter.
+      // mergePath is the cheapest discriminator — test first to short-circuit.
+      const mergePath = /\/pulls\/\d+\/merge\b/;
+      const writeMethod = /(?:-X|--method)[\s=]+(?:PUT|POST)\b/;
+      const ghApiStart = new RegExp(cmdStart.source + "gh\\s+api\\b");
+      if (mergePath.test(stripped) && writeMethod.test(stripped) && ghApiStart.test(stripped)) {
+        isMergeAttempt = true;
+        detail = "gh api PUT .../merge";
+      }
     }
   } else if (tool === "mcp__github__merge_pull_request") {
     isMergeAttempt = true;
