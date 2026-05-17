@@ -622,7 +622,7 @@ Implementation notes (filed during execution):
 - Create: `src/lib/timeline/format-machine-event.ts`
 - Create: `src/lib/timeline/format-machine-event.test.ts`
 
-- [ ] **Step 1: Write failing unit tests**
+- [x] **Step 1: Write failing unit tests**
 
 Create `src/lib/timeline/format-machine-event.test.ts`:
 
@@ -795,12 +795,12 @@ describe("formatMachineEvent", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm exec vitest run src/lib/timeline/format-machine-event.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement the formatter**
+- [x] **Step 3: Implement the formatter**
 
 Create `src/lib/timeline/format-machine-event.ts`:
 
@@ -863,12 +863,12 @@ export function formatMachineEvent(event: MachineTimelineEventData): string {
 
 Verify `~/lib/issue/status-labels` exports `getIssueStatusLabel`. If the helper has a different name (look in `src/lib/issue/`), update the import. If no such helper exists, inline the status label map next to `PRESENCE_LABELS` using values from `STATUS_CONFIG` in `src/lib/issue/status.ts` (or equivalent — see existing issue timeline rendering).
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm exec vitest run src/lib/timeline/format-machine-event.test.ts`
 Expected: PASS — all 16 tests green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/timeline/format-machine-event.ts src/lib/timeline/format-machine-event.test.ts
@@ -985,7 +985,7 @@ describe("getMachineTimeline", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: FAIL — `getMachineTimeline` not exported.
@@ -1058,7 +1058,7 @@ export async function getMachineTimeline(
 
 Add `alias` to the `drizzle-orm` import. Note: this query intentionally does NOT JOIN `machines` — the caller already knows the machine. It DOES join `userProfiles` twice (author + deleter) for display names.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: PASS — all 7 tests green (4 existing + 3 new).
@@ -1139,7 +1139,7 @@ describe("createMachineAction emits auto-events", () => {
 
 If `withTestAuth`, `seedOrg`, or `seedUser` don't exist, find their canonical equivalents in `src/test/integration/supabase/helpers/`. The existing pattern is documented in `.agent/skills/pinpoint-testing/SKILL.md` § "Server Actions with Auth" — follow whatever is currently established. Adjust the test seed scaffolding to match.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: FAIL — `createMachineAction` does not yet emit timeline events.
@@ -1191,7 +1191,7 @@ if (machine.ownerId) {
 
 Match the existing variable naming (the auth pattern likely already resolves `currentUserId` earlier in the action). If the action doesn't already use a `tx` variable, wrap the insert + emit in `db.transaction(async (tx) => {...})`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: PASS — both new tests green.
@@ -1307,7 +1307,7 @@ describe("updateMachineAction emits per-field auto-events", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: FAIL — the action doesn't yet emit per-field events.
@@ -1400,7 +1400,7 @@ if (
 
 Match the field-name conventions in `updateMachineAction`'s actual schema (e.g., `presenceStatus` vs `availability`). Inspect the existing implementation before editing.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: PASS — 4 new tests green.
@@ -1486,7 +1486,7 @@ describe("prose-field actions emit marker events", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: FAIL — 4 marker events not emitted.
@@ -1517,7 +1517,7 @@ Repeat for `updateMachineTournamentNotes` (kind: `"tournament_notes_updated"`), 
 
 Important: only emit if the prose actually changed. Use JSON.stringify equality on the `before`/`after` documents, or rely on the existing action's "no-op detection" if one exists. If the action currently writes unconditionally, add a `JSON.stringify(before.field) !== JSON.stringify(input.value)` guard around the emit so empty-edits don't spam the timeline.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: PASS — 4 new tests green.
@@ -1723,7 +1723,7 @@ describe("updateIssueStatusAction duplicate-writes to machine timeline", () => {
 
 The list of "closed" status enum values lives in the issue status config. Check `src/lib/issue/status.ts` (or the equivalent) for the canonical CLOSED_STATUSES const. Use whatever's already defined.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: FAIL — duplicate-write not in place.
@@ -1765,7 +1765,7 @@ await createMachineTimelineEvent(
 );
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: PASS — both new tests green.
@@ -1851,7 +1851,7 @@ describe("assignIssueAction duplicate-writes to machine timeline", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: FAIL.
@@ -1895,7 +1895,7 @@ if (newAssigneeId === null) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: PASS.
@@ -2241,7 +2241,7 @@ describe("deleteMachineCommentAction permission scenarios", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test:integration -- machine-timeline-permissions`
 Expected: FAIL — actions module not found.
@@ -2377,7 +2377,7 @@ export async function deleteMachineCommentAction(
 
 If `getAccessLevelForUser` doesn't exist with that exact name, find the canonical helper that turns a user-id into an access level enum value used by the matrix (look in `src/lib/permissions/`). Use whatever is established.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test:integration -- machine-timeline-permissions`
 Expected: PASS — 7 tests green (3 add + 4 delete).
@@ -2525,7 +2525,7 @@ describe("MachineTimelineTombstoneRow", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm exec vitest run src/components/machines/timeline/`
 Expected: FAIL — modules not found.
@@ -2698,7 +2698,7 @@ export function MachineTimelineTombstoneRow({
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm exec vitest run src/components/machines/timeline/`
 Expected: PASS — all row-renderer tests green.
@@ -2773,7 +2773,7 @@ describe("MachineTimelineComposer", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm exec vitest run src/components/machines/timeline/MachineTimelineComposer.test.tsx`
 Expected: FAIL — component not found.
@@ -2891,7 +2891,7 @@ export function MachineTimelineComposer({ machineId }: { machineId: string }) {
 
 Check that `RichTextEditor` accepts `content` + `onChange` props. If the existing component uses different prop names (e.g. `value`/`onValueChange`), adjust accordingly — look at how the issue comment composer uses it for the canonical pattern.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm exec vitest run src/components/machines/timeline/MachineTimelineComposer.test.tsx`
 Expected: PASS.
@@ -2969,7 +2969,7 @@ describe("MachineTimelineFilter", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm exec vitest run src/components/machines/timeline/MachineTimelineFilter.test.tsx`
 Expected: FAIL — module not found.
@@ -3034,7 +3034,7 @@ export function MachineTimelineFilter({
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm exec vitest run src/components/machines/timeline/MachineTimelineFilter.test.tsx`
 Expected: PASS.
