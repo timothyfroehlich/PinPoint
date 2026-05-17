@@ -240,7 +240,7 @@ Script emits structured status tokens:
 
 On any FAIL: script removes `ready-for-review` label if present (the label's contract is "click-merge-without-thinking"; if a gate fails at merge time, that contract is broken). Exit 1.
 
-On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --delete-branch --match-head-commit=<sha>`. TOCTOU-safe — if a new commit lands between gate check and merge, GitHub rejects the merge (`--match-head-commit` mismatch).
+On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --match-head-commit=<sha>`. TOCTOU-safe — if a new commit lands between gate check and merge, GitHub rejects the merge (`--match-head-commit` mismatch). Branch deletion is handled by the repo's auto-delete-branches setting, not by the merge command — passing `--delete-branch` from a worktree fails local cleanup because main is held by the root checkout.
 
 ### 4.3 Escape hatches
 
@@ -269,7 +269,7 @@ If you absolutely need to bypass the hook (e.g., merge-pr.sh itself is broken an
 
 ```bash
 touch .claude-merge-bypass
-gh pr merge <PR> --squash --delete-branch
+gh pr merge <PR> --squash
 ```
 
 The sentinel is single-use — deleted on the next merge attempt. Document in commit message WHY you bypassed.

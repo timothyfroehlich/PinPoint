@@ -121,7 +121,9 @@ echo "RESULT: all gates passed"
 
 # Build merge args. --admin invokes admin-merge mode on GitHub, which overrides
 # branch-protection rules (failed required checks, missing reviews, etc.).
-MERGE_ARGS=(--squash --delete-branch --match-head-commit="$PR_HEAD_SHA")
+# Branch deletion is handled by the repo's auto-delete setting — passing --delete-branch
+# from a worktree fails the local cleanup step because main is held by the root checkout.
+MERGE_ARGS=(--squash --match-head-commit="$PR_HEAD_SHA")
 if [ "$BYPASS_REQS" = "true" ]; then
   MERGE_ARGS+=(--admin)
 fi
