@@ -22,6 +22,17 @@
 #     "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/worktree-create.sh"
 #   No positional args are passed; all input comes from the JSON payload on stdin.
 #
+# Stdin payload fields (verified empirically via diagnostic dump, PP-pno7, 2026-05-16):
+#   {
+#     "session_id":        "<uuid>",
+#     "transcript_path":   "<path to .jsonl>",
+#     "cwd":               "<repo root absolute path>",   ← used as BASE_PATH
+#     "hook_event_name":   "WorktreeCreate",
+#     "name":              "agent-<hex>"                   ← used as worktree dir name + branch
+#   }
+#   The hook derives `BRANCH = worktree-${name}` to match Claude Code's native
+#   pre-hook naming convention (e.g., `worktree-agent-a20a236fe97a6d41c`).
+#
 # Platform: macOS uses /usr/bin/lockf (ships with macOS, backed by flock(2)).
 #   Linux uses flock(1) from util-linux. Detected at runtime.
 #
@@ -49,19 +60,22 @@ print(payload.get('$1') or '')
 " || exit $?
 }
 
-BASE_PATH=$(parse_field base_path)
-BRANCH=$(parse_field branch)
-ISOLATION_ID=$(parse_field isolation_id)
+BASE_PATH=$(parse_field cwd)
+NAME=$(parse_field name)
 
-if [ -z "$BASE_PATH" ] || [ -z "$BRANCH" ]; then
-  echo "worktree-create.sh: missing base_path or branch in hook input" >&2
+if [ -z "$BASE_PATH" ] || [ -z "$NAME" ]; then
+  echo "worktree-create.sh: missing cwd or name in hook input" >&2
   exit 1
 fi
 
-WORKTREE_PATH="${BASE_PATH}/.claude/worktrees/${ISOLATION_ID:-$BRANCH}"
+# Match Claude Code's pre-hook native naming so existing tooling (cleanup hook,
+# worktree manifest, orchestrator skill) continues to recognize the worktree.
+BRANCH="worktree-${NAME}"
+WORKTREE_PATH="${BASE_PATH}/.claude/worktrees/${NAME}"
 
-# Branch names commonly contain `/` (e.g. `feat/foo`); ensure the parent dir
-# under .claude/worktrees/ exists before `git worktree add` tries to write.
+# Ensure the parent directory exists before `git worktree add` tries to write.
+# (Claude Code's `name` is currently a flat `agent-<hex>` slug with no slashes,
+# but mkdir -p is cheap insurance against future name conventions.)
 mkdir -p "$(dirname "$WORKTREE_PATH")"
 
 # --- Lock file: ~/.config/pinpoint/worktree-add.lock ---
@@ -136,7 +150,7 @@ do_worktree_add() {
   done
 
   echo "worktree-create.sh: FAILED to create worktree after $max_retries attempts" >&2
-  echo "  base_path=$BASE_PATH  branch=$BRANCH  target=$WORKTREE_PATH" >&2
+  echo "  cwd=$BASE_PATH  branch=$BRANCH  target=$WORKTREE_PATH" >&2
   echo "  Last error: $last_stderr" >&2
   return 1
 }
