@@ -28,9 +28,12 @@ test.describe("Issue detail smoke — unauthenticated render", () => {
     await expect(page).toHaveURL(`/m/AFM/i/${issue.num}`);
 
     // The issue title heading is the canonical signal that the detail page
-    // rendered successfully (not a redirect / blank screen).
+    // rendered successfully (not a redirect / blank screen). Target the
+    // specific issue-title h1 — after the tabbed-layout PR, the persistent
+    // MachineDetailHeader also renders the machine name as an h1, so a bare
+    // `heading level=1` selector matches two elements.
     await expect(
-      page.getByRole("main").getByRole("heading", { level: 1 })
+      page.getByRole("heading", { level: 1, name: issue.title })
     ).toBeVisible();
   });
 });

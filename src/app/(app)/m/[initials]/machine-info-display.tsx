@@ -1,10 +1,16 @@
 import type React from "react";
+import { Calendar } from "lucide-react";
 import { EditButtonWithTooltip } from "./edit-button-tooltip";
+import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge";
+import { formatDate } from "~/lib/dates";
+import type { MachinePresenceStatus } from "~/lib/machines/presence";
 
 interface MachineInfoDisplayProps {
   machine: {
     name: string;
     initials: string;
+    createdAt: Date;
+    presenceStatus: MachinePresenceStatus;
     ownerId: string | null;
     invitedOwnerId: string | null;
     owner?: {
@@ -31,23 +37,7 @@ export function MachineInfoDisplay({
 }: MachineInfoDisplayProps): React.JSX.Element {
   return (
     <div className="space-y-4">
-      {/* Machine Name */}
-      <div className="space-y-1">
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-          Name
-        </p>
-        <p className="text-sm font-medium text-foreground">{machine.name}</p>
-      </div>
-
-      {/* Initials */}
-      <div className="space-y-1">
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-          Initials
-        </p>
-        <p className="text-sm font-medium text-foreground">
-          {machine.initials}
-        </p>
-      </div>
+      {/* Name + Initials removed — both are in the persistent header. */}
 
       {/* Owner */}
       <div className="space-y-1" data-testid="owner-display">
@@ -70,11 +60,30 @@ export function MachineInfoDisplay({
         )}
       </div>
 
-      {/* Edit button: hidden for unauth, disabled+tooltip for guest/non-owner member, active for owner/admin */}
+      {/* Added Date */}
+      <div className="space-y-1">
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+          Added Date
+        </p>
+        <div className="flex items-center gap-1.5 text-foreground">
+          <Calendar className="size-3 text-muted-foreground" />
+          <p className="text-sm font-medium">{formatDate(machine.createdAt)}</p>
+        </div>
+      </div>
+
+      {/* Availability */}
+      <div className="space-y-1">
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+          Availability
+        </p>
+        <MachinePresenceBadge status={machine.presenceStatus} size="sm" />
+      </div>
+
+      {/* Disabled-edit tooltip for users who can see but can't edit. The
+          enabled EditMachineDialog trigger is rendered by the parent. */}
       {!canEdit && isAuthenticated && editDeniedReason !== null && (
         <EditButtonWithTooltip reason={editDeniedReason} />
       )}
-      {/* When canEdit is true, the EditMachineDialog trigger is rendered by the parent */}
     </div>
   );
 }

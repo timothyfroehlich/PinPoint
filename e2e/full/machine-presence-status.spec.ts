@@ -40,8 +40,10 @@ test.describe("Machine Presence Status", () => {
       page.getByRole("heading", { name: machineName, exact: true })
     ).toBeVisible();
 
-    // Create an issue while machine is on the floor
-    await page.getByTestId("machine-report-issue").click();
+    // Create an issue while machine is on the floor. The machine-detail
+    // "Report Issue" button was removed in the tabbed-layout redesign — go
+    // straight to the report form with the machine query pre-filled.
+    await page.goto(`/report?machine=${machineInitials}`);
     await fillReportForm(page, {
       title: issueTitle,
       severity: "minor",
@@ -84,21 +86,16 @@ test.describe("Machine Presence Status", () => {
       page.getByRole("heading", { name: "Edit Machine" })
     ).toBeHidden();
     await page.reload();
+    // Presence renders as a colored badge in the Info tab's Availability cell.
+    // The old "This machine is currently <state>." banner was removed when
+    // the persistent header was minimized.
     await expect(page.getByText("On Loan").first()).toBeVisible();
-    await expect(
-      page.getByText("This machine is currently on loan.")
-    ).toBeVisible();
   });
 
-  test("detail page shows presence badge and inactive banner", async ({
-    page,
-  }) => {
+  test("detail page shows presence badge", async ({ page }) => {
     await page.goto(`/m/${machineInitials}`);
     await page.reload();
     await expect(page.getByText("On Loan").first()).toBeVisible();
-    await expect(
-      page.getByText("This machine is currently on loan.")
-    ).toBeVisible();
   });
 
   test("machine list hides non-floor machines by default", async ({ page }) => {

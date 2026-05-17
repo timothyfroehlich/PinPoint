@@ -154,9 +154,17 @@ When building a new page, pick the closest archetype and follow its pattern.
 `max-w-3xl` (PageContainer `size="narrow"`) single-column main flow. Metadata uses `IssueMetadata` (container query reflows 1-col → 2-col at `@xl:`). Mobile sticky comment composer opens a `Sheet`. Reading-content-shaped pages prefer `narrow` over `standard` — issue detail is text + form rows, not a dashboard.
 **Note:** Replaces "Detail Page with Sidebar" for issue detail; eliminates desktop/mobile divergence. Use for new detail pages; migrate existing sidebar pages opportunistically.
 
-### Detail Page with Internal Grid (machine detail)
+### Tabbed Detail Page (machine detail, multi-tab)
 
-`max-w-6xl` -- Single card body uses `lg:grid-cols-2` internally.
+`PageContainer size="standard"` wrapping a persistent header zone + URL-driven tab strip + tab content. Each tab is a real route, not client state — deep-linkable and back-button-friendly. Reference implementation: `src/app/(app)/m/[initials]/` (`layout.tsx` renders header + `MachineTabStrip`; sibling `page.tsx` and `{slug}/page.tsx` files render per-tab content).
+
+- **Persistent header**: identity-only — `[initials chip] [game name (truncates)]`. No status badge, no presence badge, no owner display, no primary action button. Not sticky on scroll. The rationale: identity stays in one place across tab navigation; everything else (status, owner, actions) moves into the tab content where it belongs to that tab's context.
+- **Per-tab status badge**: open-issue count + machine-status color render as a small colored pill appended to the relevant tab label (e.g., `Service [3]` in amber for `needs_service`). Hidden when count is 0. This single element carries both the urgency (color, from status) and the scale (number, from open-issue count) — replaces the persistent header's status display.
+- **Tab strip**: horizontal `flex` row inside `overflow-x-auto`. Active tab uses `border-b-2 border-primary text-primary`. A right-edge fade gradient (`pointer-events-none absolute bg-gradient-to-l from-background`) is rendered **only when the strip can scroll further right** — tracked via a `scroll` listener + `ResizeObserver` so the fade hides cleanly when all tabs already fit or when the user has scrolled to the end.
+- **Mobile**: same strip — scrolls horizontally when tabs don't fit. Client-side `scrollIntoView({ inline: 'center' })` on mount centers the active tab on deep-link.
+- **Desktop** (≥ md): typically fits all tabs in one row with no scroll; fade stays hidden.
+- **Data sharing**: layout + tab content share a `cache()`-wrapped query (e.g., `getMachineForLayout` in `_data.ts`) — both call the same function within one request and the second call returns the cached result. Layout calls `notFound()` for missing entities so children can assume existence.
+- **No shadcn `<Tabs>`**: that primitive is state-driven (client-only). URL-driven tabs are a navigation strip, not a tabs widget — build with `<Link>` + `usePathname()`.
 
 ### Form Page (report, create machine)
 

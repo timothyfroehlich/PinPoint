@@ -1,64 +1,51 @@
 import type React from "react";
 import { notFound } from "next/navigation";
 import { getUnifiedUsers } from "~/lib/users/queries";
-import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { machines, issues, userProfiles } from "~/server/db/schema";
-import { eq, notInArray, sql } from "drizzle-orm";
+import { userProfiles } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
+import { Calendar } from "lucide-react";
 import { deriveMachineStatus } from "~/lib/machines/status";
-import { getMachinePresenceLabel, isOnTheFloor } from "~/lib/machines/presence";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
-import { Calendar, Plus } from "lucide-react";
 import { MachineStatusBadge } from "~/components/machines/MachineStatusBadge";
 import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge";
-import { PageContainer } from "~/components/layout/PageContainer";
 import { formatDate } from "~/lib/dates";
-import { PageHeader } from "~/components/layout/PageHeader";
 import { headers } from "next/headers";
 import { resolveRequestUrl } from "~/lib/url";
-import { MachineInfoDisplay } from "./machine-info-display";
+import { EditButtonWithTooltip } from "./edit-button-tooltip";
 import { EditMachineDialog } from "./update-machine-form";
 import { QrCodeDialog } from "./qr-code-dialog";
 import { buildMachineReportUrl } from "~/lib/machines/report-url";
 import { generateQrPngDataUrl } from "~/lib/machines/qr";
-import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
 import { MachineTextFields } from "./machine-text-fields";
-import { IssuesExpando } from "./issues-expando";
 import {
   getAccessLevel,
   checkPermission,
   getPermissionDeniedReason,
   type OwnershipContext,
 } from "~/lib/permissions/index";
+import { getMachineForLayout } from "./_data";
 
 /**
- * Machine Detail Page (Public Route)
+ * Machine Info Tab (default route for /m/[initials]/)
  *
- * Full-width details pane with internal two-column layout:
- * - Left: machine metadata (initials, owner, status, dates, issue counts)
- * - Right: text fields (description, tournament notes, owner's requirements, owner's notes)
- *
- * Collapsible issues section below.
- * Permission-aware: unauthenticated users can view but not edit.
+ * Renders the machine info card with metadata and text fields. The persistent
+ * header zone + tab strip live in the sibling layout.tsx, and the open-issues
+ * list lives in the sibling Maintenance tab (`./maintenance/page.tsx`).
  */
-export default async function MachineDetailPage({
+export default async function MachineInfoTab({
   params,
 }: {
   params: Promise<{ initials: string }>;
 }): Promise<React.JSX.Element> {
-  // Await params (Next.js 15+ requirement)
   const { initials } = await params;
 
-  // Auth check - user may be null (public route)
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch current user profile only when authenticated
   const currentUserProfile = user
     ? await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, user.id),
@@ -66,79 +53,29 @@ export default async function MachineDetailPage({
       })
     : null;
 
-  // Compute access level and permissions
   const accessLevel = getAccessLevel(currentUserProfile?.role);
 
-  // Execute independent queries in parallel (CORE-PERF-001)
-  const [machine, totalIssuesCountResult] = await Promise.all([
-    // Query 1: Machine with OPEN issues only + new text fields
-    db.query.machines.findFirst({
-      where: eq(machines.initials, initials),
-      with: {
-        issues: {
-          // Filter to only OPEN issues to reduce payload
-          where: notInArray(issues.status, [...CLOSED_STATUSES]),
-          columns: {
-            id: true,
-            issueNumber: true,
-            title: true,
-            status: true,
-            severity: true,
-            priority: true,
-            frequency: true,
-            machineInitials: true,
-            createdAt: true,
-            reporterName: true,
-          },
-          orderBy: (issues, { desc }) => [desc(issues.createdAt)],
-        },
-        owner: {
-          columns: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-          },
-        },
-        invitedOwner: {
-          columns: {
-            id: true,
-            name: true,
-          },
-        },
-        watchers: {
-          columns: {
-            userId: true,
-            watchMode: true,
-          },
-        },
-      },
-    }),
-
-    // Query 2: Total count of ALL issues for this machine
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(issues)
-      .where(eq(issues.machineInitials, initials)),
-  ]);
-
-  // 404 if machine not found
+  const { machine } = await getMachineForLayout(initials);
   if (!machine) {
     notFound();
   }
+  // CLOSED_STATUSES is typed as a narrow tuple of just-closed statuses, so
+  // .includes() rejects the wider IssueStatus union. Widen the array's element
+  // type for the membership check.
+  const closedSet: ReadonlySet<string> = new Set(CLOSED_STATUSES);
+  const openIssues = machine.issues.filter((i) => !closedSet.has(i.status));
+  const totalIssuesCount = machine.issues.length;
 
-  // Build ownership context for permission checks
   const ownershipContext: OwnershipContext = {
     userId: user?.id,
     machineOwnerId: machine.ownerId ?? undefined,
   };
 
-  // Permission computations
   const canEdit = checkPermission(
     "machines.edit",
     accessLevel,
     ownershipContext
   );
-  const canWatch = checkPermission("machines.watch", accessLevel);
   const editDeniedReason = getPermissionDeniedReason(
     "machines.edit",
     accessLevel,
@@ -150,7 +87,6 @@ export default async function MachineDetailPage({
     !!user &&
     (user.id === machine.ownerId || user.id === machine.invitedOwnerId);
 
-  // Text field permissions
   const canEditOwnerNotes = checkPermission(
     "machines.edit.ownerNotes",
     accessLevel,
@@ -166,8 +102,6 @@ export default async function MachineDetailPage({
     ownershipContext
   );
 
-  // Only fetch allUsers when user can edit (needs OwnerSelect data)
-  // CORE-SEC-006: Map to minimal shape before passing to client components
   const allUsersRaw = canEdit
     ? await getUnifiedUsers({ includeEmails: false })
     : [];
@@ -180,17 +114,10 @@ export default async function MachineDetailPage({
     role: u.role,
   }));
 
-  const totalIssuesCount = totalIssuesCountResult[0]?.count ?? 0;
-  // machine.issues now contains only open issues due to the filter in the query
-  const openIssues = machine.issues;
-
-  // Derive machine status
   const machineStatus = deriveMachineStatus(openIssues);
 
-  // Generate QR data for modal using dynamic host resolution
   const headersList = await headers();
   const dynamicSiteUrl = resolveRequestUrl(headersList);
-
   const reportUrl = buildMachineReportUrl({
     siteUrl: dynamicSiteUrl,
     machineInitials: machine.initials,
@@ -198,168 +125,117 @@ export default async function MachineDetailPage({
   });
   const qrDataUrl = await generateQrPngDataUrl(reportUrl);
 
-  // Watch state (only for authenticated users)
-  const currentUserWatch = user
-    ? machine.watchers.find((w) => w.userId === user.id)
-    : undefined;
-  const isWatching = !!currentUserWatch;
-  const watchMode = currentUserWatch?.watchMode ?? "notify";
-
-  const presenceBadge = !isOnTheFloor(machine.presenceStatus) ? (
-    <MachinePresenceBadge status={machine.presenceStatus} size="md" />
-  ) : null;
-
-  const watchButton = canWatch ? (
-    <WatchMachineButton
-      machineId={machine.id}
-      initialIsWatching={isWatching}
-      initialWatchMode={watchMode}
-    />
-  ) : null;
-
-  const reportIssueButton = (
-    <Button className="bg-primary text-on-primary hover:bg-primary/90" asChild>
-      <Link
-        href={`/report?machine=${machine.initials}`}
-        data-testid="machine-report-issue"
-      >
-        <Plus className="mr-2 size-4" />
-        Report Issue
-      </Link>
-    </Button>
-  );
-
   return (
-    <PageContainer size="standard">
-      <PageHeader
-        title={machine.name}
-        titleAdornment={presenceBadge}
-        actions={reportIssueButton}
-      />
-
-      {/* Content */}
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div className="space-y-6">
-        {!isOnTheFloor(machine.presenceStatus) && (
-          <div className="rounded-md border border-outline-variant bg-surface-container px-4 py-2 text-sm text-muted-foreground">
-            This machine is currently{" "}
-            <strong>
-              {getMachinePresenceLabel(machine.presenceStatus).toLowerCase()}
-            </strong>
-            .
-          </div>
-        )}
-
-        {/* Full-width Details Card */}
-        <Card className="border-outline-variant bg-surface">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
-            <CardTitle className="text-xl text-foreground">
-              Machine Information
-            </CardTitle>
-            <QrCodeDialog
-              machineName={machine.name}
-              machineInitials={machine.initials}
-              qrDataUrl={qrDataUrl}
-              reportUrl={reportUrl}
-            />
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-              {/* Left Column: Machine Metadata */}
-              <div className="space-y-6">
-                {/* Static read-only display */}
-                <MachineInfoDisplay
-                  machine={machine}
-                  canEdit={canEdit}
-                  editDeniedReason={editDeniedReason}
-                  isAuthenticated={!!user}
-                />
-
-                {/* Edit button (active) - only shown when user has permission */}
-                {canEdit && user && (
-                  <EditMachineDialog
-                    machine={machine}
-                    allUsers={allUsers}
-                    canEditAnyMachine={canEditAnyMachine}
-                    isOwner={isOwner}
-                  />
+        {/* All identity + stats in one 2-col grid: Owner / Added Date,
+            Availability / Status, Open Issues / Total Issues. */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <div data-testid="owner-display">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Machine Owner
+            </p>
+            {machine.owner || machine.invitedOwner ? (
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-foreground">
+                  {machine.owner?.name ?? machine.invitedOwner?.name}
+                </p>
+                {machine.invitedOwner && !machine.owner && (
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                    (Invited)
+                  </span>
                 )}
-
-                <div className="space-y-4 border-t border-outline-variant/50 pt-6">
-                  {/* Status & Issues Count Row */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Status
-                      </p>
-                      <MachineStatusBadge status={machineStatus} size="xs" />
-                    </div>
-
-                    <div data-testid="detail-open-issues">
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Open Issues
-                      </p>
-                      <p
-                        className="text-xl font-bold text-foreground"
-                        data-testid="detail-open-issues-count"
-                      >
-                        {openIssues.length}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Date & Total Row */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Added Date
-                      </p>
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Calendar className="size-3" />
-                        <p className="text-xs font-medium">
-                          {formatDate(machine.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Total Issues
-                      </p>
-                      <p className="text-xl font-bold text-foreground">
-                        {totalIssuesCount}
-                      </p>
-                    </div>
-                  </div>
-                </div>
               </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No owner assigned</p>
+            )}
+          </div>
 
-              {/* Right Column: Text Fields */}
-              <div className="border-t border-outline-variant/50 pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
-                <MachineTextFields
-                  machineId={machine.id}
-                  description={machine.description}
-                  tournamentNotes={machine.tournamentNotes}
-                  ownerRequirements={machine.ownerRequirements}
-                  ownerNotes={machine.ownerNotes}
-                  canEditGeneral={canEdit}
-                  canEditOwnerNotes={canEditOwnerNotes}
-                  canViewOwnerRequirements={canViewOwnerRequirements}
-                  canViewOwnerNotes={canViewOwnerNotes}
-                />
-              </div>
+          <div>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Added Date
+            </p>
+            <div className="flex items-center gap-1.5 text-foreground">
+              <Calendar className="size-3 text-muted-foreground" />
+              <p className="text-sm font-medium">
+                {formatDate(machine.createdAt)}
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Collapsible Issues Section */}
-        <IssuesExpando
-          issues={openIssues}
-          machineName={machine.name}
-          machineInitials={machine.initials}
-          totalIssuesCount={totalIssuesCount}
-          watchButton={watchButton}
+          <div>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Availability
+            </p>
+            <MachinePresenceBadge status={machine.presenceStatus} size="sm" />
+          </div>
+
+          <div>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Status
+            </p>
+            <MachineStatusBadge status={machineStatus} size="xs" />
+          </div>
+
+          <div data-testid="detail-open-issues">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Open Issues
+            </p>
+            <p
+              className="text-xl font-bold text-foreground"
+              data-testid="detail-open-issues-count"
+            >
+              {openIssues.length}
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Total Issues
+            </p>
+            <p className="text-xl font-bold text-foreground">
+              {totalIssuesCount}
+            </p>
+          </div>
+        </div>
+
+        {/* Machine actions — Edit + QR. Sit at the bottom of the left column
+            so identity + stats read first. QR shows for everyone; Edit shows
+            as enabled for owner/admin, or as a disabled tooltip for other
+            auth'd users (guest / non-owner member). */}
+        <div className="space-y-3">
+          {canEdit && user ? (
+            <EditMachineDialog
+              machine={machine}
+              allUsers={allUsers}
+              canEditAnyMachine={canEditAnyMachine}
+              isOwner={isOwner}
+            />
+          ) : user && editDeniedReason !== null ? (
+            <EditButtonWithTooltip reason={editDeniedReason} />
+          ) : null}
+          <QrCodeDialog
+            machineName={machine.name}
+            machineInitials={machine.initials}
+            qrDataUrl={qrDataUrl}
+            reportUrl={reportUrl}
+          />
+        </div>
+      </div>
+
+      <div className="border-t border-outline-variant/50 pt-4 lg:border-t-0 lg:pt-0">
+        <MachineTextFields
+          machineId={machine.id}
+          description={machine.description}
+          tournamentNotes={machine.tournamentNotes}
+          ownerRequirements={machine.ownerRequirements}
+          ownerNotes={machine.ownerNotes}
+          canEditGeneral={canEdit}
+          canEditOwnerNotes={canEditOwnerNotes}
+          canViewOwnerRequirements={canViewOwnerRequirements}
+          canViewOwnerNotes={canViewOwnerNotes}
         />
       </div>
-    </PageContainer>
+    </div>
   );
 }

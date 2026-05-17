@@ -123,60 +123,32 @@ test.describe("Machines CRUD", () => {
 
   // Machine creation moved to integration/full suite
 
-  test("should display machine issues on detail page via expando", async ({
-    page,
-  }) => {
-    // Navigate to TAF using stable initials route
-    await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
+  test("should display machine issues on the Service tab", async ({ page }) => {
+    // Issues live on the Service tab (URL slug stays `maintenance`). The list
+    // renders flat — no expando wrapper after the tabbed-layout redesign.
+    await page.goto(`/m/${seededMachines.addamsFamily.initials}/maintenance`);
 
-    // Should show machine details
-    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    // Section wrapper is always present; cards render directly inside it.
+    await expect(page.getByTestId("issues-section")).toBeVisible();
 
-    // Verify open issues count section is visible
-    await expect(page.getByTestId("detail-open-issues")).toBeVisible();
-    await expect(page.getByTestId("detail-open-issues-count")).toBeVisible();
-
-    // Issues expando should be visible (collapsed by default)
-    const expando = page.getByTestId("issues-expando");
-    await expect(expando).toBeVisible();
-
-    // Click the expando trigger to expand
-    await page.getByTestId("issues-expando-trigger").click();
-
-    // Now issue cards should be visible
     const issueCards = page.getByTestId("issue-card");
-    const displayedCountText = await page
-      .getByTestId("detail-open-issues-count")
-      .textContent();
-    const displayedCount = Number(displayedCountText);
     const actualCardCount = await issueCards.count();
-
-    expect(actualCardCount).toBe(displayedCount);
-    expect(actualCardCount).toBeGreaterThan(0); // Ensure we have issues to display
+    expect(actualCardCount).toBeGreaterThan(0);
 
     // Verify specific seed issues are listed (using actual TAF seeded issues)
     await expect(page.getByText(seededIssues.TAF[0].title)).toBeVisible(); // "Thing flips the bird"
     await expect(page.getByText(seededIssues.TAF[1].title)).toBeVisible(); // "Bookcase not registering"
-
-    // Click trigger again to collapse
-    await page.getByTestId("issues-expando-trigger").click();
-
-    // Issue cards should no longer be visible
-    await expect(issueCards.first()).not.toBeVisible();
   });
 
   test("should display machine owner to all logged-in users", async ({
     page,
   }) => {
-    // Navigate to a machine detail page
+    // Navigate to a machine detail page (Info tab is the default).
     await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
 
-    // Machine Information card should be visible
-    await expect(
-      page.getByRole("heading", { name: "Machine Information" })
-    ).toBeVisible();
-
-    // As a member (default login), owner should be displayed in the static info display
+    // As a member (default login), owner should be displayed in the Info tab
+    // stats grid. The "Machine Information" CardHeader was removed in the
+    // tabbed-layout redesign — the Info tab IS the implicit context.
     const ownerDisplay = page.getByTestId("owner-display");
     await expect(ownerDisplay).toBeVisible();
 

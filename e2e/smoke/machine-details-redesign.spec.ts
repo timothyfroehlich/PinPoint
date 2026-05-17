@@ -1,9 +1,16 @@
 /**
  * E2E Tests: Machine Details Redesign
  *
- * Tests the redesigned machine details page layout, expando section,
- * and report issue button. Inline editing and owner management tests
- * are in e2e/full/machine-details-extended.spec.ts.
+ * Tests the redesigned (now tabbed) machine details page: Info tab card
+ * content, Service tab issues section, and CSV export. Inline editing and
+ * owner management tests are in e2e/full/machine-details-extended.spec.ts.
+ *
+ * Notes after the tabbed-layout PR:
+ * - The persistent header is identity-only (`[initials] | name`); status,
+ *   owner display, and Report Issue button all moved off it. Open-issue
+ *   count + status surface as a colored badge on the Service tab itself.
+ * - The issues section is no longer a collapsible expando; it renders an
+ *   always-open list inside the Service tab.
  */
 
 import { test, expect } from "@playwright/test";
@@ -25,84 +32,44 @@ test.describe("Machine Details Redesign", () => {
     );
   });
 
-  test("should display full-width details card with two-column layout", async ({
+  test("Info tab renders owner + stats grid without horizontal overflow", async ({
     page,
   }) => {
-    // Navigate to a machine that admin owns (Medieval Madness)
     await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
 
-    // Machine Information heading should be visible
-    await expect(
-      page.getByRole("heading", { name: "Machine Information" })
-    ).toBeVisible();
-
-    // Left column elements: name, initials, owner
+    // Owner cell in the 2-col stats grid
     await expect(page.getByTestId("owner-display")).toBeVisible();
 
-    // Status and issues counts should be visible
+    // Stats grid cells
     await expect(page.getByTestId("detail-open-issues")).toBeVisible();
     await expect(page.getByTestId("detail-open-issues-count")).toBeVisible();
 
-    // Verify no horizontal overflow on machine detail page
     await assertNoHorizontalOverflow(page);
   });
 
-  test("should show issues expando collapsed by default", async ({ page }) => {
-    await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
+  test("Service tab renders the issues section with cards visible", async ({
+    page,
+  }) => {
+    // Issues live on the Service tab (URL slug stays `maintenance`).
+    await page.goto(`/m/${seededMachines.addamsFamily.initials}/maintenance`);
 
-    const expando = page.getByTestId("issues-expando");
-    await expect(expando).toBeVisible();
+    // The wrapping section is always present.
+    await expect(page.getByTestId("issues-section")).toBeVisible();
 
-    // The trigger should show "Open Issues" text
-    const trigger = page.getByTestId("issues-expando-trigger");
-    await expect(trigger).toBeVisible();
-    await expect(trigger).toContainText("Open Issues");
-
-    // Issue cards should NOT be visible when collapsed
-    // (details element is closed by default)
-    await expect(page.getByTestId("issue-card").first()).not.toBeVisible();
-  });
-
-  test("should expand and collapse issues section", async ({ page }) => {
-    await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
-
-    // Click to expand
-    await page.getByTestId("issues-expando-trigger").click();
-
-    // Issue cards should now be visible
+    // Cards render flat (no expando) — section is always open in this design.
     await expect(page.getByTestId("issue-card").first()).toBeVisible();
-
-    // Click to collapse
-    await page.getByTestId("issues-expando-trigger").click();
-
-    // Issue cards should be hidden again
-    await expect(page.getByTestId("issue-card").first()).not.toBeVisible();
   });
 
-  test("should show Report Issue button in header", async ({ page }) => {
-    await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
+  test("Service tab exports machine issues to CSV", async ({ page }) => {
+    // Export button lives in the Service tab's section header.
+    await page.goto(`/m/${seededMachines.addamsFamily.initials}/maintenance`);
 
-    const reportButton = page.getByTestId("machine-report-issue");
-    await expect(reportButton).toBeVisible();
-    await expect(reportButton).toContainText("Report Issue");
-  });
+    const exportButton = page.getByTestId("export-csv-button");
+    await expect(exportButton).toBeVisible();
 
-  test("should export machine issues to CSV", async ({ page }) => {
-    // Navigate to TAF (The Addams Family) which has seeded issues
-    await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
-
-    // Wait for page to load
-    await expect(
-      page.getByRole("heading", { name: "Machine Information" })
-    ).toBeVisible();
-
-    // Set up download listener before clicking
     const downloadPromise = page.waitForEvent("download");
+    await exportButton.click();
 
-    // Click the export button (it's in the issues expando header)
-    await page.getByTestId("export-csv-button").click();
-
-    // Verify download was triggered
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(
       /^pinpoint-TAF-issues-\d{4}-\d{2}-\d{2}\.csv$/
