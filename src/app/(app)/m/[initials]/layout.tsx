@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { MachineDetailHeader } from "~/components/machines/MachineDetailHeader";
 import { MachineTabStrip } from "~/components/machines/MachineTabStrip";
-import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { getMachineForLayout } from "./_data";
 
@@ -21,11 +20,10 @@ export default async function MachineDetailLayout({
     notFound();
   }
 
-  const closedSet: ReadonlySet<string> = new Set(CLOSED_STATUSES);
-  const openIssues = machine.issues.filter((i) => !closedSet.has(i.status));
+  // `machine.issues` is open-only — filtered at the DB layer in `_data.ts`.
   const maintenance = {
-    openCount: openIssues.length,
-    status: deriveMachineStatus(openIssues),
+    openCount: machine.issues.length,
+    status: deriveMachineStatus(machine.issues),
   };
 
   return (

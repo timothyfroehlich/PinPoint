@@ -6,7 +6,6 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/index";
-import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { IssuesExpando } from "../issues-expando";
 import { getMachineForLayout } from "../_data";
 
@@ -58,16 +57,12 @@ export default async function MachineMaintenanceTab({
     />
   ) : null;
 
-  // Show only OPEN issues in the section — matches the tab badge's open
-  // count + status color. Closed-issue visibility returns when the filter
-  // bar lands (bead PP-0kta).
-  const closedSet: ReadonlySet<string> = new Set(CLOSED_STATUSES);
-  const openIssues = machine.issues.filter((i) => !closedSet.has(i.status));
-
+  // `machine.issues` is open-only (filtered at the DB layer in `_data.ts`).
+  // Closed-issue visibility returns when the filter bar lands (bead PP-0kta).
   return (
     <div className="space-y-6">
       <IssuesExpando
-        issues={openIssues}
+        issues={machine.issues}
         machineName={machine.name}
         machineInitials={machine.initials}
         watchButton={watchButton}

@@ -4,8 +4,9 @@ import { IssueCard, type IssueCardIssue } from "~/components/issues/IssueCard";
 import { MachineEmptyState } from "~/components/machines/MachineEmptyState";
 
 interface IssuesExpandoProps {
-  /** All issues for the machine. Filtering UI was removed pending a richer
-   *  filter bar design — for now, show everything. */
+  /** Issues to display. Caller is responsible for any filtering — the
+   *  Service tab currently passes open-only (to match the tab badge); a
+   *  richer filter bar (bead PP-0kta) will let callers pass other subsets. */
   issues: IssueCardIssue[];
   machineName: string;
   machineInitials: string;

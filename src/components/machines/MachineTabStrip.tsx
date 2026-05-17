@@ -44,11 +44,15 @@ export function MachineTabStrip({
 
   const base = `/m/${initials}`;
 
-  const activeSlug = ((): string => {
-    if (!pathname.startsWith(base)) return "";
-    const rest = pathname.slice(base.length).replace(/^\//, "");
+  // Return the matching slug only when the path matches a tab exactly —
+  // sub-routes like `/m/[initials]/i/[issueNumber]` should highlight no tab
+  // (don't misleadingly mark Info active when the user is reading an issue).
+  const activeSlug = ((): string | null => {
+    if (pathname === base) return "";
+    if (!pathname.startsWith(`${base}/`)) return null;
+    const rest = pathname.slice(base.length + 1);
     const first = rest.split("/")[0] ?? "";
-    return TABS.some((t) => t.slug === first) ? first : "";
+    return TABS.some((t) => t.slug !== "" && t.slug === first) ? first : null;
   })();
 
   // Track whether more tab content exists to the right of the visible scroll
@@ -85,7 +89,7 @@ export function MachineTabStrip({
     if (!scroller || !active) return;
     if (scroller.scrollWidth <= scroller.clientWidth) return;
     active.scrollIntoView({
-      behavior: "instant",
+      behavior: "auto",
       inline: "center",
       block: "nearest",
     });

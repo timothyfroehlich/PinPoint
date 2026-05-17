@@ -7,7 +7,6 @@ import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { Calendar } from "lucide-react";
 import { deriveMachineStatus } from "~/lib/machines/status";
-import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { MachineStatusBadge } from "~/components/machines/MachineStatusBadge";
 import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge";
 import { formatDate } from "~/lib/dates";
@@ -55,16 +54,12 @@ export default async function MachineInfoTab({
 
   const accessLevel = getAccessLevel(currentUserProfile?.role);
 
-  const { machine } = await getMachineForLayout(initials);
+  const { machine, totalIssuesCount } = await getMachineForLayout(initials);
   if (!machine) {
     notFound();
   }
-  // CLOSED_STATUSES is typed as a narrow tuple of just-closed statuses, so
-  // .includes() rejects the wider IssueStatus union. Widen the array's element
-  // type for the membership check.
-  const closedSet: ReadonlySet<string> = new Set(CLOSED_STATUSES);
-  const openIssues = machine.issues.filter((i) => !closedSet.has(i.status));
-  const totalIssuesCount = machine.issues.length;
+  // `machine.issues` is open-only (filtered at the DB layer in `_data.ts`).
+  const openIssues = machine.issues;
 
   const ownershipContext: OwnershipContext = {
     userId: user?.id,
