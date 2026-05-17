@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, userProfiles } from "~/server/db/schema";
+import { issues, machines, userProfiles } from "~/server/db/schema";
 import { eq, asc, and, notInArray } from "drizzle-orm";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueMetadata } from "~/components/issues/IssueMetadata";
@@ -20,6 +20,7 @@ import type { IssueWithAllRelations } from "~/lib/types";
 import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
 import { getLastIssuesPath } from "~/lib/cookies/preferences";
 import { EditableIssueTitle } from "./editable-issue-title";
+import { IssueActionsMenu } from "./issue-actions-menu";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { formatDateTime } from "~/lib/dates";
@@ -70,7 +71,7 @@ export default async function IssueDetailPage({
   }
 
   // CORE-PERF-003: parallelize what's safe before role is known; the roster
-  // fetch is gated below on triage permission.
+  // and machine-list fetches are gated below on permission.
   const [issue, currentUserProfile] = await Promise.all([
     // Query issue with all relations
     db.query.issues.findFirst({
@@ -175,15 +176,29 @@ export default async function IssueDetailPage({
     accessLevel,
     ownershipContext
   );
-  const allUsers = canTriage
-    ? await db
-        .select({ id: userProfiles.id, name: userProfiles.name })
-        .from(userProfiles)
-        .where(notInArray(userProfiles.role, ["guest"]))
-        .orderBy(asc(userProfiles.name))
-    : issue.assignedToUser
-      ? [issue.assignedToUser]
-      : [];
+  const userCanReassign = checkPermission(
+    "issues.reassign",
+    accessLevel,
+    ownershipContext
+  );
+
+  // Both gated queries run in parallel; viewers without the relevant
+  // permission skip the round-trip entirely.
+  const [allUsers, allMachines] = await Promise.all([
+    canTriage
+      ? db
+          .select({ id: userProfiles.id, name: userProfiles.name })
+          .from(userProfiles)
+          .where(notInArray(userProfiles.role, ["guest"]))
+          .orderBy(asc(userProfiles.name))
+      : Promise.resolve(issue.assignedToUser ? [issue.assignedToUser] : []),
+    userCanReassign
+      ? db.query.machines.findMany({
+          columns: { initials: true, name: true },
+          orderBy: asc(machines.name),
+        })
+      : Promise.resolve([]),
+  ]);
 
   const ownerName = getMachineOwnerName(issueWithRelations);
   const reporter = resolveIssueReporter(issueWithRelations);
@@ -246,6 +261,15 @@ export default async function IssueDetailPage({
                 canEdit={userCanEditTitle}
                 className="text-balance text-3xl font-bold tracking-tight"
               />
+            }
+            actions={
+              userCanReassign ? (
+                <IssueActionsMenu
+                  issueId={issue.id}
+                  currentInitials={initials}
+                  machines={allMachines}
+                />
+              ) : undefined
             }
           />
 

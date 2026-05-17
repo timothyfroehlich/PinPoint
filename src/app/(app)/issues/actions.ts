@@ -8,11 +8,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { type z } from "zod";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
+import {
+  issues,
+  userProfiles,
+  issueComments,
+  issueImages,
+} from "~/server/db/schema";
 import { log } from "~/lib/logger";
 import { serverActionError } from "~/lib/observability/report-error";
 import {
@@ -25,6 +31,7 @@ import {
   editCommentSchema,
   deleteCommentSchema,
   updateIssueTitleSchema,
+  reassignIssueMachineSchema,
   imagesMetadataArraySchema,
 } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
@@ -37,9 +44,9 @@ import {
   updateIssueFrequency,
   updateIssueComment,
   updateIssueTitle,
+  reassignIssueMachine,
 } from "~/services/issues";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import { userProfiles, issueComments, issueImages } from "~/server/db/schema";
 import {
   type ProseMirrorDoc,
   docToPlainText,
@@ -103,6 +110,11 @@ export type DeleteCommentResult = Result<
 >;
 
 export type UpdateIssueTitleResult = Result<
+  { issueId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+export type ReassignIssueMachineResult = Result<
   { issueId: string },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
@@ -976,6 +988,113 @@ export async function updateIssueTitleAction(
     }
     return serverActionError(error, "SERVER", "Failed to update title", {
       action: "updateIssueTitle",
+    });
+  }
+}
+
+/**
+ * Reassign Issue Machine Action
+ *
+ * Moves an issue from one machine to another. Reserves a fresh issue number
+ * on the destination machine; the old number on the source becomes a permanent
+ * gap. On success the action calls `redirect()` server-side to navigate the
+ * user to `/m/<to>/i/<N>` — the function never returns an `ok` Result, only
+ * `err` Results for failure cases. (Visiting the old `/m/<from>/i/<N>` URL
+ * after a move now redirects to `/m/<from>` because the issue is no longer
+ * found there.)
+ */
+export async function reassignIssueMachineAction(
+  _prevState: ReassignIssueMachineResult | undefined,
+  formData: FormData
+): Promise<ReassignIssueMachineResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return err("UNAUTHORIZED", "Unauthorized");
+  }
+
+  const validation = reassignIssueMachineSchema.safeParse({
+    issueId: toOptionalString(formData.get("issueId")),
+    newMachineInitials: toOptionalString(formData.get("newMachineInitials")),
+  });
+
+  if (!validation.success) {
+    const firstError = validation.error.issues[0];
+    return err("VALIDATION", firstError?.message ?? "Invalid input");
+  }
+
+  const { issueId, newMachineInitials } = validation.data;
+
+  try {
+    const currentIssue = await db.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: {
+        machineInitials: true,
+        reportedBy: true,
+      },
+      with: {
+        machine: { columns: { ownerId: true } },
+      },
+    });
+
+    if (!currentIssue) {
+      return err("NOT_FOUND", "Issue not found");
+    }
+
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    const accessLevel = getAccessLevel(userProfile?.role);
+    const ownershipCtx = {
+      userId: user.id,
+      reporterId: currentIssue.reportedBy,
+      machineOwnerId: currentIssue.machine.ownerId,
+    };
+
+    if (!checkPermission("issues.reassign", accessLevel, ownershipCtx)) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to reassign this issue"
+      );
+    }
+
+    if (newMachineInitials === currentIssue.machineInitials) {
+      return err("VALIDATION", "Issue is already on this machine");
+    }
+
+    const result = await reassignIssueMachine({
+      issueId,
+      newMachineInitials,
+      userId: user.id,
+    });
+
+    // Skip revalidating the current `/m/<from>/i/<N>` — we redirect away from
+    // it, and an extra invalidation just adds latency.
+    revalidatePath(`/m/${result.fromInitials}`);
+    revalidatePath(`/m/${result.toInitials}`);
+
+    // Must be a server-side redirect, not a returned `ok({newUrl})` consumed
+    // by `router.push`: returning normally lets Next.js refresh the current
+    // page first, which now renders not-found and server-redirects to
+    // `/m/<from>` — unmounting the form before the client navigation runs.
+    redirect(`/m/${result.toInitials}/i/${result.toIssueNumber.toString()}`);
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+    if (
+      error instanceof Error &&
+      error.message.startsWith("Machine not found")
+    ) {
+      return err("NOT_FOUND", "Destination machine not found");
+    }
+    return serverActionError(error, "SERVER", "Failed to reassign issue", {
+      action: "reassignIssueMachine",
     });
   }
 }
