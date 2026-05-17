@@ -26,10 +26,10 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 ./scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + Copilot + merge status table (all open PRs if no args)
 
 # Copilot thread inspection + reply → use MCP via pinpoint-pr-workflow skill Phase 3
-# (mcp__plugin_github_github__pull_request_read / add_reply_to_pull_request_comment / pull_request_review_write)
+# (mcp__github__pull_request_read / add_reply_to_pull_request_comment / pull_request_review_write)
 
 # Readiness label + merge: pinpoint-pr-workflow skill Phases 3.5 + 4
-# Apply label via mcp__plugin_github_github__issue_write or `gh pr edit --add-label`
+# Apply label via mcp__github__issue_write or `gh pr edit --add-label`
 bash scripts/workflow/merge-pr.sh <PR>                   # Composite gate-then-merge enforcer (--dry-run, --force)
 bash scripts/workflow/merge-pr.sh <PR> --dry-run         # Preview gate evaluation without merging
 
@@ -186,7 +186,7 @@ gh run view <run-id> --log-failed | tail -50
 **Copilot comments** → Inspect via MCP (see pinpoint-pr-workflow skill Phase 3.2-3.3), then resume subagent:
 
 ```
-mcp__plugin_github_github__pull_request_read(method: "get_review_comments", owner, repo, pullNumber, perPage: 100)
+mcp__github__pull_request_read(method: "get_review_comments", owner, repo, pullNumber, perPage: 100)
 ```
 
 **Infrastructure failures**:
@@ -200,7 +200,7 @@ gh run rerun <run-id> --failed
 See pinpoint-pr-workflow skill Phase 3.5. Apply `ready-for-review` after CI green + zero unresolved Copilot threads via:
 
 ```
-mcp__plugin_github_github__issue_write(method: "update", owner, repo, issue_number: <PR>, labels: [<existing>..., "ready-for-review"])
+mcp__github__issue_write(method: "update", owner, repo, issue_number: <PR>, labels: [<existing>..., "ready-for-review"])
 ```
 
 Or fallback: `gh pr edit <PR> --add-label ready-for-review`. Worktree cleanup is now a separate step: `python3 scripts/worktree_cleanup.py <path>`.

@@ -65,7 +65,7 @@ Prefer MCP `create_pull_request` for typed argument handling. Or use `gh pr crea
 
 MCP example:
 
-- Tool: `mcp__plugin_github_github__create_pull_request`
+- Tool: `mcp__github__create_pull_request`
 - Args: `owner: "timothyfroehlich"`, `repo: "PinPoint"`, `title: "<title>"`, `body: "<description>"`, `head: "<branch>"`, `base: "main"`, `draft: <true|false>`
 
 ### 2.2 PR description template
@@ -112,7 +112,7 @@ Exit 0 = all passed or stopped for new Copilot review. Exit 1 = failure — read
 Use MCP:
 
 ```
-mcp__plugin_github_github__pull_request_read(
+mcp__github__pull_request_read(
 method: "get_review_comments",
 owner: "timothyfroehlich",
 repo: "PinPoint",
@@ -140,7 +140,7 @@ For each unresolved Copilot thread, evaluate critically. Not all suggestions war
 1. Reply:
 
 ```
-mcp__plugin_github_github__add_reply_to_pull_request_comment(
+mcp__github__add_reply_to_pull_request_comment(
 owner: "timothyfroehlich",
 repo: "PinPoint",
 pullNumber: <PR>,
@@ -152,7 +152,7 @@ body: "Ignored: <one-sentence justification>. —Claude-<YourName>"
 2. Resolve:
 
 ```
-mcp__plugin_github_github__pull_request_review_write(
+mcp__github__pull_request_review_write(
 method: "resolve_thread",
 threadId: <PRRT_kwDOxxx from thread>,
 owner: "timothyfroehlich",
@@ -190,7 +190,7 @@ Once CI green + zero unresolved Copilot threads + Copilot reviewed head commit +
 3. Apply:
 
 ```
-mcp__plugin_github_github__issue_write(
+mcp__github__issue_write(
 method: "update",
 owner: "timothyfroehlich",
 repo: "PinPoint",

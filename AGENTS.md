@@ -277,11 +277,11 @@ When merging branches with competing migrations (both created same number):
 Full protocol lives in the `pinpoint-pr-workflow` skill (Phase 3). Summary:
 
 1. Read unresolved comments via MCP:
-   `mcp__plugin_github_github__pull_request_read(method: "get_review_comments", owner, repo, pullNumber, perPage: 100)`
+   `mcp__github__pull_request_read(method: "get_review_comments", owner, repo, pullNumber, perPage: 100)`
    Filter to threads where first comment's `author.login` is `copilot-pull-request-reviewer` or `copilot-pull-request-reviewer[bot]`.
 2. Fix the code, or decide to decline with justification.
 3. **Applied suggestions**: Copilot auto-resolves the thread when it detects your fix commit — no action needed.
-4. **Declined suggestions**: reply via `mcp__plugin_github_github__add_reply_to_pull_request_comment`, then resolve via `mcp__plugin_github_github__pull_request_review_write(method: "resolve_thread", threadId)`.
+4. **Declined suggestions**: reply via `mcp__github__add_reply_to_pull_request_comment`, then resolve via `mcp__github__pull_request_review_write(method: "resolve_thread", threadId)`.
 
 Sign replies with your agent name (`—Gemini`, `—Antigravity`, `—Claude`, `—Codex`, etc.).
 

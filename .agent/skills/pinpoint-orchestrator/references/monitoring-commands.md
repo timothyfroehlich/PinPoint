@@ -23,7 +23,7 @@ gh pr view <PR_NUMBER> --json statusCheckRollup \
 Preferred: use MCP via the `pinpoint-pr-workflow` skill (Phase 3.2-3.3).
 
 ```
-mcp__plugin_github_github__pull_request_read(
+mcp__github__pull_request_read(
   method: "get_review_comments",
   owner: "timothyfroehlich",
   repo: "PinPoint",
@@ -32,7 +32,7 @@ mcp__plugin_github_github__pull_request_read(
 )
 ```
 
-Filter to threads where `comments[0].author.login` is `copilot-pull-request-reviewer` or `copilot-pull-request-reviewer[bot]`. Each thread has `is_resolved` (snake_case), `is_outdated`, and a thread node ID (`PRRT_kwDOxxx`) for resolving via `mcp__plugin_github_github__pull_request_review_write(method: "resolve_thread", threadId)`.
+Filter to threads where `comments[0].author.login` is `copilot-pull-request-reviewer` or `copilot-pull-request-reviewer[bot]`. Each thread has `is_resolved` (snake_case), `is_outdated`, and a thread node ID (`PRRT_kwDOxxx`) for resolving via `mcp__github__pull_request_review_write(method: "resolve_thread", threadId)`.
 
 Fallback (raw REST):
 
