@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# cvh-whoami.sh — look up or register the current Claude session's PP-cvh name
+# huddle-whoami.sh — look up or register the current Claude session's huddle name
 #
 # Identity is keyed by Claude Code's session_id (a UUID). Names live in a single
-# JSON map at ~/.config/pinpoint/cvh-session-names.json so every session can be
-# inspected/edited from one place and the mapping persists across restarts.
+# JSON map at ~/.config/pinpoint/huddle-session-names.json so every session can
+# be inspected/edited from one place and the mapping persists across restarts.
 #
 # Subcommands:
 #   whoami [SESSION_ID]      Print the registered name for SESSION_ID (or the
@@ -26,7 +26,7 @@
 set -euo pipefail
 
 STATE_DIR="$HOME/.config/pinpoint"
-NAMES_JSON="$STATE_DIR/cvh-session-names.json"
+NAMES_JSON="$STATE_DIR/huddle-session-names.json"
 
 mkdir -p "$STATE_DIR"
 if [[ ! -f "$NAMES_JSON" ]]; then
@@ -66,6 +66,7 @@ discover_session_id() {
     return 1
   fi
   local newest
+  # shellcheck disable=SC2012  # session_id filenames are UUIDs (no special chars), ls is safe
   newest=$(ls -t "${files[@]}" 2>/dev/null | head -1) || return 1
   if [[ -z "$newest" ]]; then
     return 1
@@ -87,20 +88,20 @@ case "$cmd" in
   register)
     name="${2:-}"
     if [[ -z "$name" ]]; then
-      echo "Usage: cvh-whoami.sh register NAME [SESSION_ID]" >&2
+      echo "Usage: huddle-whoami.sh register NAME [SESSION_ID]" >&2
       exit 1
     fi
     # Restrict names to alphanumeric + underscore + hyphen. Defense in depth:
-    # cvh-poll.sh passes the name via jq --arg (safe under any input), but
+    # huddle-poll.sh passes the name via jq --arg (safe under any input), but
     # validating at registration keeps the JSON file clean and grep-friendly.
     if [[ ! "$name" =~ ^[A-Za-z0-9_-]+$ ]]; then
-      echo "cvh-whoami.sh: NAME must be alphanumeric (plus _ and -); got: $name" >&2
+      echo "huddle-whoami.sh: NAME must be alphanumeric (plus _ and -); got: $name" >&2
       exit 1
     fi
     sid="${3:-}"
     if [[ -z "$sid" ]]; then
       sid=$(discover_session_id) || {
-        echo "cvh-whoami.sh: could not discover session_id; pass it explicitly" >&2
+        echo "huddle-whoami.sh: could not discover session_id; pass it explicitly" >&2
         exit 1
       }
     fi
@@ -119,7 +120,7 @@ case "$cmd" in
     ;;
 
   *)
-    echo "Usage: cvh-whoami.sh [whoami|register NAME|list|discover] [SESSION_ID]" >&2
+    echo "Usage: huddle-whoami.sh [whoami|register NAME|list|discover] [SESSION_ID]" >&2
     exit 1
     ;;
 esac

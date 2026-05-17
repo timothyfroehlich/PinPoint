@@ -89,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/cvh-poll.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/huddle-poll.sh",
             "timeout": 10000
           }
         ]
@@ -101,7 +101,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/cvh-session-start.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/huddle-session-start.sh",
             "timeout": 5000
           }
         ]

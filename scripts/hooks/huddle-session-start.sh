@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# cvh-session-start.sh — SessionStart hook: announce session_id and registration state
+# huddle-session-start.sh — SessionStart hook: announce session_id and registration state
 #
 # Fires once at session start. Reads stdin JSON for `session_id`, looks up the
-# session's registered name in ~/.config/pinpoint/cvh-session-names.json, and
+# session's registered name in ~/.config/pinpoint/huddle-session-names.json, and
 # emits a brief block via stdout (which Claude Code surfaces as system context).
 #
 # Why this exists: agents can't reliably discover their own session_id when
@@ -10,8 +10,8 @@
 # project root, and `ls -t` is racy). The SessionStart hook is the only place
 # session_id is guaranteed-correct without an external diagnostic.
 #
-# Pairs with scripts/hooks/cvh-poll.sh (UserPromptSubmit) — that's the new-comment
-# injection hook; this one is just identity announcement.
+# Pairs with scripts/hooks/huddle-poll.sh (UserPromptSubmit) — that's the
+# new-comment injection hook; this one is just identity announcement.
 #
 # Stdin payload schema (per https://code.claude.com/docs/en/hooks):
 #   {
@@ -31,7 +31,7 @@
 set -euo pipefail
 
 STATE_DIR="$HOME/.config/pinpoint"
-NAMES_JSON="$STATE_DIR/cvh-session-names.json"
+NAMES_JSON="$STATE_DIR/huddle-session-names.json"
 mkdir -p "$STATE_DIR"
 
 # Read stdin JSON (best-effort; never fail SessionStart on parse errors)
@@ -77,14 +77,14 @@ if [[ -n "$NAME" ]]; then
   printf 'Your session_id: `%s`\n' "$SESSION_ID"
   printf 'Registered as: **Claude-%s** (self-filter active for your own posts)\n\n' "$NAME"
   printf 'If this scrolls out of context later, recall your name with:\n\n'
-  printf '    bash scripts/hooks/cvh-whoami.sh whoami %s\n' "$SESSION_ID"
+  printf '    bash scripts/hooks/huddle-whoami.sh whoami %s\n' "$SESSION_ID"
 else
   printf '## PP-cvh identity — registration needed\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
   printf 'Your session_id: `%s`\n\n' "$SESSION_ID"
   printf 'You are not yet registered in the PP-cvh self-filter map.\n'
   printf 'Ask the user what name to use, then run:\n\n'
-  printf '    bash scripts/hooks/cvh-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
+  printf '    bash scripts/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
   printf 'Until registered, your own comments on PP-cvh will re-inject into your context on every turn.\n'
 fi
 

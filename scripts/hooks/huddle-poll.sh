@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cvh-poll.sh — UserPromptSubmit hook: inject new PP-cvh coordination comments
+# huddle-poll.sh — UserPromptSubmit hook: inject new PP-cvh coordination comments
 #
 # Fires at the start of each agent turn. Outputs new comments as a system-reminder
 # block, or nothing if nothing is new (zero stdout = no injection).
@@ -13,31 +13,34 @@
 #     "permission_mode":  "default" | "plan" | "acceptEdits" | "auto" | "dontAsk" | "bypassPermissions",
 #     "prompt":           "<the user's message text>"
 #   }
-# We only read session_id; the rest is ignored.
+# We only read session_id and transcript_path (the latter for subagent detection;
+# the rest is ignored).
 #
-# State file: ~/.config/pinpoint/cvh-last-seen-<cwd-basename>
+# State file: ~/.config/pinpoint/huddle-last-seen-<cwd-hash>
 #   Per-checkout isolation: each worktree/session tracks independently.
 #
 # Self-filter (auto, no env config required): the UserPromptSubmit stdin payload
 # carries a `session_id` field. The hook reads it and looks up the agent's name
-# from `~/.config/pinpoint/cvh-session-names.json`, a JSON map of
+# from `~/.config/pinpoint/huddle-session-names.json`, a JSON map of
 # `{session_id: name}`. Comments ending with `—Claude-<that name>` are excluded
 # from the injection so an agent never re-injects its own coordination posts.
 #
 # Why a single JSON map instead of one file per session: agents who restart
 # (different transcript file, same logical "session") need a stable lookup their
 # resumed turn can perform. The map persists across restarts; the helper
-# `scripts/hooks/cvh-whoami.sh` lets an agent recall its own name at any time.
+# `scripts/hooks/huddle-whoami.sh` lets an agent recall its own name at any time.
 #
 # To register a session-to-name mapping (Tim, or the agent itself, runs once):
-#   bash scripts/hooks/cvh-whoami.sh register Slingshot
-# Or edit ~/.config/pinpoint/cvh-session-names.json directly.
+#   bash scripts/hooks/huddle-whoami.sh register Slingshot
+# Or edit ~/.config/pinpoint/huddle-session-names.json directly.
 #
 # Backward compat: also accepts legacy per-session files at
-# `~/.config/pinpoint/cvh-self-<session_id>` (deprecated) and the
-# `$CLAUDE_AGENT_NAME` env var (the original activation scheme).
+# `~/.config/pinpoint/cvh-self-<session_id>` (deprecated; predates the JSON map)
+# and the `$CLAUDE_AGENT_NAME` env var (the original activation scheme).
 #
-# Agent name suggestions: Plunger, Spinner, Slingshot, Kicker, Bumper, Flipper
+# Naming guidance: pick a short descriptive name based on your current work
+# (e.g. WorktreeHookFix, TestAudit, DesignBible). Full reference:
+# `.agent/skills/pinpoint-huddle/SKILL.md`.
 
 set -euo pipefail
 
@@ -77,7 +80,7 @@ STATE_DIR="$HOME/.config/pinpoint"
 # advance the cursor and silently swallow the other's coordination posts.
 # We use the SHA-256 prefix of `pwd -P` for a collision-resistant, filename-safe key.
 CWD_KEY=$(printf '%s' "$(pwd -P)" | python3 -c 'import sys,hashlib; print(hashlib.sha256(sys.stdin.read().encode()).hexdigest()[:16])')
-STATE_FILE="$STATE_DIR/cvh-last-seen-$CWD_KEY"
+STATE_FILE="$STATE_DIR/huddle-last-seen-$CWD_KEY"
 
 mkdir -p "$STATE_DIR"
 
@@ -92,12 +95,12 @@ fi
 COMMENTS_JSON="$(bd comments PP-cvh --json 2>/dev/null)" || { exit 0; }
 
 # Resolve self agent name. Priority order:
-#   1. ~/.config/pinpoint/cvh-session-names.json[session_id] (canonical)
+#   1. ~/.config/pinpoint/huddle-session-names.json[session_id] (canonical)
 #   2. ~/.config/pinpoint/cvh-self-<session_id> file (legacy, deprecated)
 #   3. $CLAUDE_AGENT_NAME env var (back-compat with original activation)
 #   4. unset → no self-filter applied
 AGENT_NAME=""
-NAMES_JSON="$STATE_DIR/cvh-session-names.json"
+NAMES_JSON="$STATE_DIR/huddle-session-names.json"
 if [[ -n "$SESSION_ID" ]]; then
   if [[ -f "$NAMES_JSON" ]]; then
     AGENT_NAME=$(jq -r --arg sid "$SESSION_ID" '.[$sid] // ""' "$NAMES_JSON" 2>/dev/null || echo "")
@@ -120,6 +123,7 @@ fi
 #   --Claude-<Name>   (canonical — 44 of 45 PP-cvh sign-offs use this form)
 #   --<Name>          (shorthand — observed in the wild, e.g. "—Spinner")
 # When $name is empty, the filter is a no-op (all comments pass).
+# shellcheck disable=SC2016  # $last and $name are jq variables, NOT shell vars
 JQ_SCRIPT='[
   .[]
   | select(.created_at > $last)
