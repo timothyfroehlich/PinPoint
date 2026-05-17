@@ -34,9 +34,24 @@ set -euo pipefail
 # --- Parse Claude Code WorktreeCreate hook JSON from stdin ---
 INPUT=$(cat)
 
-BASE_PATH=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('base_path',''))")
-BRANCH=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('branch',''))")
-ISOLATION_ID=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('isolation_id',''))")
+# Use `or ''` to normalize explicit JSON null → empty string (otherwise
+# .get('key', '') still returns None when the key is present with a null value,
+# and Python prints "None" — bypassing the -z check below).
+parse_field() {
+  echo "$INPUT" | python3 -c "
+import sys, json
+try:
+    payload = json.load(sys.stdin)
+except json.JSONDecodeError as exc:
+    sys.stderr.write(f'worktree-create.sh: invalid JSON on stdin: {exc}\n')
+    sys.exit(2)
+print(payload.get('$1') or '')
+" || exit $?
+}
+
+BASE_PATH=$(parse_field base_path)
+BRANCH=$(parse_field branch)
+ISOLATION_ID=$(parse_field isolation_id)
 
 if [ -z "$BASE_PATH" ] || [ -z "$BRANCH" ]; then
   echo "worktree-create.sh: missing base_path or branch in hook input" >&2
@@ -44,6 +59,10 @@ if [ -z "$BASE_PATH" ] || [ -z "$BRANCH" ]; then
 fi
 
 WORKTREE_PATH="${BASE_PATH}/.claude/worktrees/${ISOLATION_ID:-$BRANCH}"
+
+# Branch names commonly contain `/` (e.g. `feat/foo`); ensure the parent dir
+# under .claude/worktrees/ exists before `git worktree add` tries to write.
+mkdir -p "$(dirname "$WORKTREE_PATH")"
 
 # --- Lock file: ~/.config/pinpoint/worktree-add.lock ---
 # Shared across all Claude sessions on this host (kernel-level, not advisory-only).

@@ -14,12 +14,15 @@ BRANCH_CHECKOUT=$3
 #   3. The current HEAD (after the checkout) is not `main`.
 #
 # We check the post-checkout state, not the pre-checkout state. This catches all
-# cases: switching from main to a feature branch, or switching between two feature
-# branches — both are forbidden in the root checkout (commandment #19).
+# cases: switching from main to a feature branch, switching between two feature
+# branches, or landing on a detached HEAD — all forbidden in the root checkout
+# (AGENTS.md §2.2 "Root Checkout Is Read-Only").
 
 if [ "$BRANCH_CHECKOUT" = "1" ] && [ -d ".git" ]; then
+  # Detached HEAD returns empty from `symbolic-ref --short` — treat that as an
+  # alarm condition too (the checkout is no longer on `main` in any case).
   CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
-  if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ]; then
+  if [ "$CURRENT_BRANCH" != "main" ]; then
     echo "" >&2
     echo "╔══════════════════════════════════════════════════════════════════╗" >&2
     echo "║  ⚠️  WARNING: ROOT CHECKOUT IS NOT ON \`main\`                     ║" >&2
