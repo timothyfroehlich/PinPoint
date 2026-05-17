@@ -322,4 +322,4 @@ export async function createIssueAction(formData: FormData) {
 
 - Non-negotiables: `docs/NON_NEGOTIABLES.md`
 - Tech stack reference: `docs/tech-updates/INDEX.md`
-- Testing patterns: `docs/TESTING_PLAN.md`
+- Testing patterns: `pinpoint-testing` skill (`.agent/skills/pinpoint-testing/SKILL.md`)

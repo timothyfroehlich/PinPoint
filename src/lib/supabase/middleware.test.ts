@@ -205,6 +205,7 @@ describe("updateSession public route access", () => {
     "/about",
     "/help",
     "/help/permissions",
+    "/whats-new",
     "/privacy",
     "/terms",
     "/api/health",

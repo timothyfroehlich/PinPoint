@@ -169,7 +169,7 @@ export async function submitPublicIssueAction(
   // 5. Resolve reporter (user was loaded above; reuse it here)
   let reportedBy: string | null = user?.id ?? null;
   log.info(
-    { reportedBy, email: user?.email, action: "publicIssueReport" },
+    { reportedBy, hasEmail: !!user?.email, action: "publicIssueReport" },
     "Resolving reporter for public issue"
   );
   let reporterName: string | null = null;

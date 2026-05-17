@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useEffect } from "react";
+import { useActionState, useState, useEffect, useRef } from "react";
 import { SaveCancelButtons } from "~/components/save-cancel-buttons";
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
@@ -60,6 +60,9 @@ export function NotificationPreferencesForm({
   // Control visibility of feedback (flash message and button state)
   const [showFeedback, setShowFeedback] = useState(false);
 
+  // Reset key to force re-render on cancel and on server-revalidated preferences
+  const [resetKey, setResetKey] = useState(0);
+
   // Show feedback when state updates
   useEffect(() => {
     if (state) {
@@ -78,8 +81,18 @@ export function NotificationPreferencesForm({
     preferences.discordEnabled
   );
 
-  // Update state if preferences change (e.g. after server action)
+  // When preferences change from the server (e.g., after a successful save +
+  // revalidatePath), remount the form so PreferenceRow Switches — which use
+  // defaultChecked and only read it at mount — reflect the new values.
+  // Also re-sync the controlled main switches. Skip the first run so the
+  // initial mount doesn't trigger an unnecessary remount.
+  const isFirstPreferencesSync = useRef(true);
   useEffect(() => {
+    if (isFirstPreferencesSync.current) {
+      isFirstPreferencesSync.current = false;
+      return;
+    }
+    setResetKey((k) => k + 1);
     setEmailMainEnabled(preferences.emailEnabled);
     setInAppMainEnabled(preferences.inAppEnabled);
     setDiscordMainEnabled(preferences.discordEnabled);
@@ -87,13 +100,29 @@ export function NotificationPreferencesForm({
     preferences.emailEnabled,
     preferences.inAppEnabled,
     preferences.discordEnabled,
+    preferences.suppressOwnActions,
+    preferences.emailNotifyOnAssigned,
+    preferences.inAppNotifyOnAssigned,
+    preferences.discordNotifyOnAssigned,
+    preferences.emailNotifyOnStatusChange,
+    preferences.inAppNotifyOnStatusChange,
+    preferences.discordNotifyOnStatusChange,
+    preferences.emailNotifyOnNewComment,
+    preferences.inAppNotifyOnNewComment,
+    preferences.discordNotifyOnNewComment,
+    preferences.emailNotifyOnMentioned,
+    preferences.inAppNotifyOnMentioned,
+    preferences.discordNotifyOnMentioned,
+    preferences.emailNotifyOnNewIssue,
+    preferences.inAppNotifyOnNewIssue,
+    preferences.discordNotifyOnNewIssue,
+    preferences.emailWatchNewIssuesGlobal,
+    preferences.inAppWatchNewIssuesGlobal,
+    preferences.discordWatchNewIssuesGlobal,
   ]);
 
   const showDiscord = discordIntegrationEnabled;
   const discordRowDisabled = !discordMainEnabled || !userHasDiscord;
-
-  // Reset key to force re-render on cancel
-  const [resetKey, setResetKey] = useState(0);
 
   return (
     <form

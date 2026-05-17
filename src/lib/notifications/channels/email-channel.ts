@@ -3,8 +3,10 @@ import { Buffer } from "node:buffer";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import sanitizeHtml from "sanitize-html";
 import { log } from "~/lib/logger";
+import { NON_TEXT_TAGS } from "~/lib/sanitize-html-config";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getSiteUrl } from "~/lib/url";
+import { getThreadingHeaders } from "~/lib/notifications/email-threading";
 import type {
   NotificationChannel,
   NotificationPreferencesRow,
@@ -38,6 +40,7 @@ const EMAIL_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
     "pre",
     "s",
   ],
+  nonTextTags: [...NON_TEXT_TAGS],
   allowedAttributes: {
     a: ["href"],
     span: ["style"],
@@ -118,6 +121,21 @@ function getEmailFooter(userId?: string): string {
   `;
 }
 
+/**
+ * Returns the email subject for a notification.
+ *
+ * The five issue-tied types (new_issue, issue_assigned, issue_status_changed,
+ * new_comment, mentioned) all share the same stable format so that email
+ * clients thread them together under one row:
+ *
+ *   [MachineName] PP-1234: Issue Title
+ *
+ * The event type (what happened) has moved into the email body header so it
+ * remains visible once the thread is opened.
+ *
+ * machine_ownership_changed is NOT issue-tied and keeps its own distinct
+ * subject so it does not thread with issue notifications.
+ */
 export function getEmailSubject(
   type: NotificationType,
   issueTitle?: string,
@@ -128,15 +146,14 @@ export function getEmailSubject(
   const prefix = machineName ? `[${machineName}] ` : "";
   switch (type) {
     case "new_issue":
-      return `${prefix}New Issue ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     case "issue_assigned":
-      return `${prefix}Issue Assigned ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     case "issue_status_changed":
-      return `${prefix}Status Changed ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     case "new_comment":
-      return `${prefix}New Comment on ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     case "mentioned":
-      return `${prefix}You were mentioned in ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
+      // Stable subject for all issue-tied types — enables Gmail/Apple Mail threading.
+      return formattedIssueId
+        ? `${prefix}${formattedIssueId}: ${issueTitle}`
+        : `${prefix}${issueTitle}`;
     case "machine_ownership_changed":
       return newStatus === "removed"
         ? `${prefix}Ownership Update: You have been removed as an owner`
@@ -155,6 +172,33 @@ export interface EmailHtmlOptions {
   newStatus?: string | undefined;
   userId?: string | undefined;
   issueDescription?: string | undefined;
+}
+
+/**
+ * Returns the human-readable event-type label for issue-tied notifications.
+ * This label moves into the email body now that the subject is stable per issue.
+ */
+export function getEventTypeLabel(type: NotificationType): string {
+  switch (type) {
+    case "new_issue":
+      return "New Issue";
+    case "issue_assigned":
+      return "Issue Assigned";
+    case "issue_status_changed":
+      return "Status Changed";
+    case "new_comment":
+      return "New Comment";
+    case "mentioned":
+      return "You Were Mentioned";
+    case "machine_ownership_changed":
+      // Not issue-tied; the email subject already carries the label, so the
+      // body header is empty.
+      return "";
+    default: {
+      const exhaustive: never = type;
+      return exhaustive;
+    }
+  }
 }
 
 export function getEmailHtml({
@@ -199,6 +243,10 @@ export function getEmailHtml({
       break;
   }
 
+  // For issue-tied types, the event-type label moves into the body since the
+  // subject is now stable. We render it as a small h3 above the body text.
+  const eventLabel = getEventTypeLabel(type);
+
   const siteUrl = getSiteUrl();
   const sanitizedMachineName = machineName
     ? sanitizeHtml(machineName, EMAIL_SANITIZE_OPTIONS)
@@ -241,6 +289,7 @@ export function getEmailHtml({
 
   return `
       <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
+      ${eventLabel ? `<h3 style="color: #555; font-weight: 600; margin-bottom: 8px;">${eventLabel}</h3>` : ""}
       <div>${body}</div>
       ${showDescription ? `<blockquote>${sanitizedDescription}</blockquote>` : ""}
       <p><a href="${issueUrl}">View Issue</a></p>
@@ -278,6 +327,17 @@ export const emailChannel: NotificationChannel = {
 
     try {
       const { sendEmail } = await import("~/lib/email/client");
+
+      // Derive RFC 5322 threading headers for issue-tied notification types.
+      // machine_ownership_changed is not issue-tied and must not be threaded.
+      const isIssueTied =
+        ctx.type !== "machine_ownership_changed" &&
+        ctx.formattedIssueId !== undefined;
+      const threadingHeaders =
+        isIssueTied && ctx.formattedIssueId
+          ? getThreadingHeaders(ctx.formattedIssueId)
+          : undefined;
+
       await sendEmail({
         to: ctx.email,
         subject: getEmailSubject(
@@ -297,6 +357,7 @@ export const emailChannel: NotificationChannel = {
           userId: ctx.userId,
           issueDescription: ctx.issueDescription,
         }),
+        ...threadingHeaders,
       });
       return { ok: true };
     } catch (err) {

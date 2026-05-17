@@ -8,19 +8,16 @@ and removes the git worktree. One argument: the worktree path.
 
 import fcntl
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
 
+# Reuse the project-id derivation from worktree_setup so cleanup targets the
+# same container/volume names that setup created. (Python auto-adds this
+# script's directory to sys.path when invoked as `python3 worktree_cleanup.py`.)
+from worktree_setup import branch_to_project_id  # noqa: E402
+
 MANIFEST_PATH = Path.home() / ".config" / "pinpoint" / "worktree-slots.json"
-
-
-def branch_to_project_id(branch_name: str) -> str:
-    """Convert a branch name to a valid Supabase project ID."""
-    project_id = re.sub(r"[^a-z0-9-]", "-", branch_name.lower())
-    project_id = re.sub(r"-+", "-", f"pinpoint-{project_id}").strip("-")
-    return project_id[:50]
 
 
 def deallocate_slot(worktree_path: str) -> None:

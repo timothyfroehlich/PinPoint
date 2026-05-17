@@ -211,4 +211,4 @@ describe("Tests", () => {
 
 ## Questions?
 
-See `docs/TESTING_PLAN.md` for the full testing strategy.
+See the `pinpoint-testing` skill at `.agent/skills/pinpoint-testing/SKILL.md` for the full testing strategy.

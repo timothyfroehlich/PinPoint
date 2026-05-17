@@ -24,8 +24,15 @@ export function ChangePasswordSection(): React.JSX.Element {
     }
   }, [state]);
 
-  // Reset key to force re-render on cancel
+  // Reset key to force re-render on cancel or successful save
   const [resetKey, setResetKey] = useState(0);
+
+  // Clear password inputs after successful save by remounting the form
+  useEffect(() => {
+    if (state?.ok) {
+      setResetKey((k) => k + 1);
+    }
+  }, [state]);
 
   return (
     <form

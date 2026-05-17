@@ -1,6 +1,7 @@
 """Unit tests for worktree_setup.py env merging and port allocation."""
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -199,17 +200,17 @@ class TestMergeEnvLocal:
         assert "INBUCKET_SMTP_PORT=58325" in result
         assert "MAILPIT_SMTP_PORT=58325" in result
 
-    def test_turnstile_keys_are_commented_out(
+    def test_turnstile_keys_are_absent(
         self, tmp_path: Path, port_config: PortConfig
     ) -> None:
         result = merge_env_local(tmp_path, port_config)
 
-        # Keys must appear as commented-out lines so the widget doesn't render in local dev.
-        assert "# NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA" in result
-        assert "# TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA" in result
-        # Must NOT appear as active (uncommented) env vars.
-        assert "\nNEXT_PUBLIC_TURNSTILE_SITE_KEY=" not in result
-        assert "\nTURNSTILE_SECRET_KEY=" not in result
+        # Turnstile keys must not appear at all — not even commented out.
+        # The application already handles unset keys gracefully:
+        # - Client (TurnstileWidget): if (!siteKey) return null
+        # - Server (turnstile.ts): if (!secretKey && !production) return true
+        assert "NEXT_PUBLIC_TURNSTILE_SITE_KEY" not in result
+        assert "TURNSTILE_SECRET_KEY" not in result
 
 
 class TestManagedKeys:
@@ -232,8 +233,7 @@ class TestManagedKeys:
             "DEV_AUTOLOGIN_PASSWORD",
             "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
             "SUPABASE_SERVICE_ROLE_KEY",
-            "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
-            "TURNSTILE_SECRET_KEY",
+            "UNSUBSCRIBE_SIGNING_SECRET",
         }
         assert MANAGED_ENV_KEYS == expected_managed
 
@@ -545,11 +545,52 @@ class TestBranchToProjectId:
     def test_long_branch_name_truncated(self) -> None:
         long_name = "a" * 100
         result = branch_to_project_id(long_name)
-        assert len(result) <= 50
+        assert len(result) <= 40
 
     def test_trailing_special_chars_stripped(self) -> None:
         result = branch_to_project_id("my-feature///")
         assert not result.endswith("-")
+
+    def test_long_branch_uses_hash_suffix(self) -> None:
+        # The branch from PP-xwm casework that triggered Docker overflow.
+        long_branch = "feat/e2e-cleanup-admin-discord-downgrade-PP-t8o"
+        result = branch_to_project_id(long_branch)
+        assert len(result) == 40
+        assert result.startswith("pinpoint-feat-e2e-cleanup-admin")
+        # 8-char hex hash suffix joined by a single "-"
+        assert re.match(r"^pinpoint-.{22}-[0-9a-f]{8}$", result), result
+
+    def test_long_branch_hash_is_deterministic(self) -> None:
+        long_branch = "feat/some-very-long-branch-name-that-exceeds-the-cap"
+        assert branch_to_project_id(long_branch) == branch_to_project_id(long_branch)
+
+    def test_long_branches_with_common_prefix_get_distinct_ids(self) -> None:
+        # Same first N chars but different tail → hash must disambiguate.
+        a = branch_to_project_id("feat/very-long-shared-prefix-branch-alpha")
+        b = branch_to_project_id("feat/very-long-shared-prefix-branch-beta")
+        assert a != b
+
+    def test_long_branch_no_trailing_hyphen_after_truncation(self) -> None:
+        # Construct a branch where the 31-char readable portion would end
+        # exactly on a hyphen — rstrip must clean it before joining the hash.
+        long_branch = "feat-aaaaaaaaaaaaaaaaaaaaa-bbb-cc"
+        result = branch_to_project_id(long_branch)
+        assert "--" not in result
+        assert len(result) <= 40
+
+    def test_boundary_40_char_branch_no_hash(self) -> None:
+        # Exactly 31 char sanitized → "pinpoint-" + 31 = 40 chars, no hash.
+        branch = "a" * 31
+        result = branch_to_project_id(branch)
+        assert result == f"pinpoint-{'a' * 31}"
+        assert len(result) == 40
+
+    def test_boundary_41_char_branch_uses_hash(self) -> None:
+        # 32 char sanitized → "pinpoint-" + 32 = 41 chars, hash applied.
+        branch = "a" * 32
+        result = branch_to_project_id(branch)
+        assert len(result) == 40
+        assert re.match(r"^pinpoint-a{22}-[0-9a-f]{8}$", result), result
 
 
 if __name__ == "__main__":

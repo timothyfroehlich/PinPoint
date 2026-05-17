@@ -542,7 +542,7 @@ test("displays issues list", async ({ page }) => {
 });
 ```
 
-**Reference**: CORE-TEST-002 (NON_NEGOTIABLES.md), `docs/TESTING_PLAN.md`
+**Reference**: CORE-TEST-002 (NON_NEGOTIABLES.md), `pinpoint-testing` skill (`.agent/skills/pinpoint-testing/SKILL.md`)
 
 ---
 
@@ -582,7 +582,7 @@ test("creates user", async () => {
 });
 ```
 
-**Reference**: CORE-TEST-004 (NON_NEGOTIABLES.md), `docs/TESTING_PLAN.md`
+**Reference**: CORE-TEST-004 (NON_NEGOTIABLES.md), `pinpoint-testing` skill (`.agent/skills/pinpoint-testing/SKILL.md`)
 
 ---
 

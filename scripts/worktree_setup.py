@@ -8,6 +8,7 @@ Not a CLI tool — no argparse, no subcommands. Operates on $PWD.
 """
 
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -60,8 +61,6 @@ MANAGED_ENV_KEYS = {
     "DEV_AUTOLOGIN_PASSWORD",
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
-    "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
-    "TURNSTILE_SECRET_KEY",
     "UNSUBSCRIBE_SIGNING_SECRET",
 }
 
@@ -231,16 +230,41 @@ def get_existing_slot(worktree_path: str) -> int | None:
 # =============================================================================
 
 
+# Supabase container names follow `supabase_<service>_<project_id>` and must
+# fit Docker's 63-char container name limit. The longest active service prefix
+# observed in practice is `supabase_inbucket_` (18 chars); `supabase_edge_runtime_`
+# (22 chars) is a future risk. Capping project_id at 40 leaves headroom for
+# either.
+#
+# For short branches whose sanitized form fits in 40 chars, the whole readable
+# name is preserved (e.g., "pinpoint-main"). For long branches, the readable
+# portion is truncated to MAX_READABLE_LEN (31) and an 8-char hash is appended;
+# of those 31 chars the leading "pinpoint-" consumes 9, leaving up to 22 chars
+# of branch text (potentially fewer after rstrip("-") trims a truncation that
+# landed on a hyphen).
+MAX_PROJECT_ID_LEN = 40
+HASH_SUFFIX_LEN = 8
+# +1 for the "-" separator joining the readable part to the hash.
+MAX_READABLE_LEN = MAX_PROJECT_ID_LEN - HASH_SUFFIX_LEN - 1
+
+
 def branch_to_project_id(branch_name: str) -> str:
     """Convert a branch name to a valid Supabase project ID.
 
-    Supabase rejects project IDs longer than 40 chars or ending in a hyphen
-    (Docker container naming constraint). We rstrip after truncation to handle
-    the case where the cut lands on a separator.
+    Short branches keep their full readable name (e.g., "main" → "pinpoint-main").
+    Long branches are truncated and suffixed with an 8-char sha256 hash of the
+    original branch name, preserving uniqueness across worktrees on different
+    long branches that share a common prefix.
+
+    Cap is 40 chars; see MAX_PROJECT_ID_LEN comment above for why.
     """
-    project_id = re.sub(r"[^a-z0-9-]", "-", branch_name.lower())
-    project_id = re.sub(r"-+", "-", project_id).strip("-")
-    return project_id[:40].rstrip("-")
+    sanitized = re.sub(r"[^a-z0-9-]", "-", branch_name.lower())
+    full = re.sub(r"-+", "-", f"pinpoint-{sanitized}").strip("-")
+    if len(full) <= MAX_PROJECT_ID_LEN:
+        return full
+    digest = hashlib.sha256(branch_name.encode("utf-8")).hexdigest()[:HASH_SUFFIX_LEN]
+    readable = full[:MAX_READABLE_LEN].rstrip("-")
+    return f"{readable}-{digest}"
 
 
 def generate_config_toml(worktree_path: Path, port_config: PortConfig) -> str:
@@ -326,11 +350,6 @@ def format_env_file(
         "# Supabase keys (static for local dev)",
         f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={managed_values['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY']}",
         f"SUPABASE_SERVICE_ROLE_KEY={managed_values['SUPABASE_SERVICE_ROLE_KEY']}",
-        "",
-        "# Turnstile keys are commented out for local dev so the widget doesn't render.",
-        "# To test CAPTCHA UI locally, uncomment these. Production sets them via Vercel env.",
-        f"# NEXT_PUBLIC_TURNSTILE_SITE_KEY={managed_values['NEXT_PUBLIC_TURNSTILE_SITE_KEY']}",
-        f"# TURNSTILE_SECRET_KEY={managed_values['TURNSTILE_SECRET_KEY']}",
         "",
         "# Unsubscribe-link HMAC signing secret (local-dev placeholder).",
         "# Production uses a real `openssl rand -hex 32` value set in Vercel env.",
@@ -445,8 +464,6 @@ def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
         "DEV_AUTOLOGIN_PASSWORD": "TestPassword123",
         "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": LOCAL_SUPABASE_PUBLISHABLE_KEY,
         "SUPABASE_SERVICE_ROLE_KEY": LOCAL_SUPABASE_SERVICE_ROLE_KEY,
-        "NEXT_PUBLIC_TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
-        "TURNSTILE_SECRET_KEY": "1x0000000000000000000000000000000AA",
         # Unsubscribe-link HMAC signing secret. Falls back to a placeholder
         # only when no real value is set; preserves any developer-set value
         # so chmod-+w / edit / regenerate doesn't overwrite it.

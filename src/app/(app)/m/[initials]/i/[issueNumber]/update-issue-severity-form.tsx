@@ -66,9 +66,10 @@ export function UpdateIssueSeverityForm({
 
   useEffect(() => {
     if (state && !state.ok) {
+      setSelectedSeverity(currentSeverity);
       toast.error(state.message);
     }
-  }, [state]);
+  }, [state, currentSeverity]);
 
   const permissionState = getPermissionState(
     "issues.update.reporting",

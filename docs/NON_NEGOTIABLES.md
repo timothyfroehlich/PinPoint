@@ -230,7 +230,7 @@ trigger: always_on
 
 - **Severity:** Required
 - **Why:** Consistent structure
-- **Do:** Reference `docs/TESTING_PLAN.md` for test types and placement
+- **Do:** Reference the `pinpoint-testing` skill (`.agent/skills/pinpoint-testing/SKILL.md`) for bug-class-driven test layer selection
 - **Don't:** Mix test types or create per-test database instances
 
 **CORE-TEST-004:** Prefer Integration Tests for DB Logic
@@ -240,12 +240,12 @@ trigger: always_on
 - **Do:** Use integration tests (with PGlite) for service layer logic that primarily interacts with the database
 - **Don't:** Write unit tests that require extensive mocking of `db.query`, `db.transaction`, or method chains
 
-**CORE-TEST-005:** E2E Interaction Coverage for Clickable Elements
+**CORE-TEST-005:** Interaction Coverage at the Cheapest Catching Layer
 
 - **Severity:** Required
-- **Why:** Tests that verify element existence without clicking miss broken handlers (PR #894 pattern)
-- **Do:** If you add a clickable element (button, link, icon), write an E2E test that clicks it and verifies the outcome
-- **Don't:** Only assert `toBeVisible()` without testing the actual interaction
+- **Why:** Tests that verify element existence without exercising the handler miss broken wiring (PR #894 pattern). But E2E is not always the cheapest layer that catches that bug class — see AGENTS.md rule #11 and the 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`).
+- **Do:** Every clickable user-facing element must be exercised by at least one test that actually invokes its handler. Pick the layer by bug class: multi-step journeys → E2E; Server Action wiring / permissions / DB queries → integration (PGlite + direct action call); pure form-state / UI logic → RTL unit.
+- **Don't:** Only assert `toBeVisible()` without testing the interaction. Also don't reflexively write E2E for every clickable — integration or RTL is usually faster and more thorough for class-B / E / I bugs.
 
 ---
 
@@ -438,7 +438,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 
 **Cross-References:**
 
-- Testing patterns: `docs/TESTING_PLAN.md`
+- Testing patterns: `pinpoint-testing` skill (`.agent/skills/pinpoint-testing/SKILL.md`)
 - Product features: `docs/PRODUCT_SPEC.md`
 - Technical architecture: `docs/TECH_SPEC.md`
 - Discipline guidelines: `docs/DISCIPLINE.md`

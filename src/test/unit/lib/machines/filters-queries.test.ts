@@ -83,6 +83,34 @@ describe("applyMachineFilters", () => {
     expect(filtered).toHaveLength(3);
   });
 
+  it("combines search query and status filters (AND semantics)", () => {
+    // "Ball" matches both "Attack from Mars" (no) and "Medieval Madness" (no)
+    // Actually no machine name contains "Ball" in MOCK_MACHINES — use "Zone" + status
+    const filtered = applyMachineFilters(MOCK_MACHINES, {
+      q: "Zone",
+      status: ["needs_service"],
+    });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].initials).toBe("TZ");
+  });
+
+  it("combines search query and status filters — returns empty when no intersection", () => {
+    const filtered = applyMachineFilters(MOCK_MACHINES, {
+      q: "Zone",
+      status: ["unplayable"],
+    });
+    expect(filtered).toHaveLength(0);
+  });
+
+  it("combines owner and status filters", () => {
+    const filtered = applyMachineFilters(MOCK_MACHINES, {
+      owner: ["user-1"],
+      status: ["operational"],
+    });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].initials).toBe("AFM");
+  });
+
   it("filters by presence status", () => {
     const filtered = applyMachineFilters(MOCK_MACHINES, {
       presence: ["on_the_floor"],
