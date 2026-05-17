@@ -184,7 +184,7 @@ git commit -m "feat(machines): machine timeline tag system (TS const + Zod enum)
 
 - Create: `src/lib/timeline/machine-event-types.ts`
 
-- [ ] **Step 1: Create the type module**
+- [x] **Step 1: Create the type module**
 
 Create `src/lib/timeline/machine-event-types.ts`:
 
@@ -268,12 +268,12 @@ export type MachineTimelineEventKind = MachineTimelineEventData["kind"];
 
 Verify `~/lib/types/machine` exports `PresenceStatus`. If not, inline the union (`"on_the_floor" | "off_the_floor" | "on_loan" | "pending_arrival" | "removed"`) and add a `// TODO(PP-0x98): import from canonical location when factored out` comment, then fix in a later commit.
 
-- [ ] **Step 2: Verify TypeScript compiles**
+- [x] **Step 2: Verify TypeScript compiles**
 
 Run: `pnpm run typecheck`
 Expected: PASS — no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/lib/timeline/machine-event-types.ts
