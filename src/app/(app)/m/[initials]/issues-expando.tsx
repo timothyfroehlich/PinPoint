@@ -1,5 +1,3 @@
-"use client";
-
 import type React from "react";
 import { ExportButton } from "~/components/issues/ExportButton";
 import { IssueCard, type IssueCardIssue } from "~/components/issues/IssueCard";
