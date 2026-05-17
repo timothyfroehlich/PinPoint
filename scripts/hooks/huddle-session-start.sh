@@ -103,20 +103,33 @@ if [[ -f "$NAMES_JSON" ]]; then
 fi
 
 if [[ -n "$NAME" ]]; then
-  printf '## PP-cvh identity\n\n'
+  printf '## Huddle identity\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
   printf 'Your session_id: `%s`\n' "$SESSION_ID"
   printf 'Registered as: **Claude-%s** (self-filter active for your own posts)\n\n' "$NAME"
-  printf 'If this scrolls out of context later, recall your name with:\n\n'
-  printf '    bash scripts/hooks/huddle-whoami.sh whoami %s\n' "$SESSION_ID"
+  printf 'If this scrolls out of context later, recall your name with:\n'
+  printf '    bash scripts/hooks/huddle-whoami.sh whoami %s\n\n' "$SESSION_ID"
+  # shellcheck disable=SC2016  # backticks are literal Markdown
+  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md`\n'
 else
-  printf '## PP-cvh identity — registration needed\n\n'
+  printf '## Huddle identity — registration needed\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
   printf 'Your session_id: `%s`\n\n' "$SESSION_ID"
-  printf 'You are not yet registered in the PP-cvh self-filter map.\n'
-  printf 'Ask the user what name to use, then run:\n\n'
+  printf 'You are not yet registered in the huddle self-filter map.\n\n'
+  printf 'When you receive your first user prompt, derive a short descriptive name\n'
+  printf 'for yourself from what you'\''re being asked to do. The name should help Tim\n'
+  printf 'recognize at a glance what each parallel Claude is working on.\n\n'
+  printf 'Examples:\n'
+  printf '  WorktreeHookFix  fixing a worktree hook\n'
+  printf '  TestAudit        auditing test coverage\n'
+  printf '  DesignBible      working on the design bible\n'
+  printf '  DocsSync         keeping docs aligned\n\n'
+  printf 'Format: CamelCase, ASCII letters only, under ~20 chars.\n\n'
+  printf 'Register with:\n'
   printf '    bash scripts/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
-  printf 'Until registered, your own comments on PP-cvh will re-inject into your context on every turn.\n'
+  printf 'If the name is taken, the helper suggests variations.\n'
+  # shellcheck disable=SC2016  # backticks are literal Markdown
+  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md`\n'
 fi
 
 exit 0
