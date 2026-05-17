@@ -31,13 +31,10 @@ export default async function LoginPage({
 
   return (
     <Card className="border-border/70 bg-card/90 shadow-lg">
-      <CardHeader className="space-y-2">
+      <CardHeader>
         <CardTitle className="text-2xl font-bold text-foreground">
           Sign In
         </CardTitle>
-        <p className="text-pretty text-sm text-muted-foreground">
-          Enter your credentials to access your account
-        </p>
       </CardHeader>
 
       <CardContent className="space-y-6">

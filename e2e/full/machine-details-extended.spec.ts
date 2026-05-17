@@ -66,10 +66,12 @@ test.describe("Machine Details - Extended", () => {
       page.getByTestId("machine-owner-requirements-display")
     ).toContainText("Please handle with care - vintage machine");
 
-    // Now navigate to an issue for this machine to check the callout
-    // Medieval Madness has seeded issues - navigate to first one
-    // Expand issues expando first
-    await page.getByTestId("issues-expando-trigger").click();
+    // Now navigate to an issue for this machine to check the callout. The
+    // issues list lives on the Service tab and renders cards flat (no
+    // expando wrapper to expand).
+    await page.goto(
+      `/m/${seededMachines.medievalMadness.initials}/maintenance`
+    );
 
     // Click the first issue card
     const firstIssueCard = page.getByTestId("issue-card").first();

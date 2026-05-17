@@ -178,9 +178,8 @@ relation to open PRs). Reference bead ID and title. Wait for user confirmation b
 
 ## Relationship to Other Skills
 
-| Skill                      | When to Use                                                     |
-| -------------------------- | --------------------------------------------------------------- |
-| `pinpoint-briefing`        | Start of session — situational awareness and triage             |
-| `pinpoint-orchestrator`    | After briefing — dispatching parallel subagents for chosen work |
-| `pinpoint-github-monitor`  | During work — watching a specific PR's CI until green           |
-| `pinpoint-ready-to-review` | End of work — getting a PR merged                               |
+| Skill                   | When to Use                                                                                     |
+| ----------------------- | ----------------------------------------------------------------------------------------------- |
+| `pinpoint-briefing`     | Start of session — situational awareness and triage                                             |
+| `pinpoint-orchestrator` | After briefing — dispatching parallel subagents for chosen work                                 |
+| `pinpoint-pr-workflow`  | During & end of work — commit, CI watch, Copilot review (via MCP), readiness label, gated merge |
