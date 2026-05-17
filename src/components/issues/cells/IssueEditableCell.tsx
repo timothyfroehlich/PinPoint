@@ -14,9 +14,11 @@ import {
 } from "~/components/ui/dropdown-menu";
 import type { IssueListItem } from "~/lib/types";
 
+type EditableField = "status" | "priority" | "severity";
+
 interface EditableCellProps {
   issue: IssueListItem;
-  field: string;
+  field: EditableField;
   config: {
     label: string;
     icon: LucideIcon;
@@ -39,6 +41,7 @@ interface EditableCellProps {
  * Shows loading state during updates
  */
 export function IssueEditableCell({
+  issue,
   field,
   config,
   options,
@@ -81,7 +84,7 @@ export function IssueEditableCell({
             >
               <opt.icon className={cn("h-3.5 w-3.5", opt.iconColor)} />
               <span className="flex-1">{opt.label}</span>
-              {opt.label === config.label && (
+              {opt.value === issue[field] && (
                 <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
               )}
             </DropdownMenuItem>
