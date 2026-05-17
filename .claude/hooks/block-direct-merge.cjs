@@ -25,17 +25,27 @@ process.stdin.on("end", () => {
 
   if (tool === "Bash") {
     const cmd = String(toolInput.command || "");
-    // Match `gh pr merge` (with optional flags), but not `gh pr merge --help` (rare).
-    if (/\bgh\s+pr\s+merge\b/.test(cmd) && !/--help\b/.test(cmd)) {
+    // Strip quoted strings so `echo "gh pr merge"` / `rg "gh pr merge"` / doc heredocs
+    // mentioning the command don't trip the guard. Basic stripper — does not handle
+    // nested quoting perfectly, but covers the common false-positive class.
+    const stripped = cmd
+      .replace(/'[^']*'/g, "''")
+      .replace(/"(?:\\.|[^"\\])*"/g, '""');
+    // Match `gh pr merge` only when it's an actual command (start of line or right
+    // after a control operator), not buried inside arguments or substrings.
+    const ghMerge = /(?:^|;|&&|\|\||\||&|\n|\$\(|<\(|\(|`)\s*gh\s+pr\s+merge\b/;
+    if (ghMerge.test(stripped) && !/--help\b/.test(stripped)) {
       isMergeAttempt = true;
       detail = "gh pr merge";
     }
-    // Match raw API merge: `gh api -X PUT .../pulls/N/merge` or `curl .../merge`
-    if (/\bgh\s+api\s+.*-X\s+(PUT|POST)\b.*\/pulls\/\d+\/merge\b/.test(cmd)) {
+    // Match raw API merge: `gh api -X PUT .../pulls/N/merge` (same anchoring).
+    const ghApiMerge =
+      /(?:^|;|&&|\|\||\||&|\n|\$\(|<\(|\(|`)\s*gh\s+api\s+.*-X\s+(PUT|POST)\b.*\/pulls\/\d+\/merge\b/;
+    if (ghApiMerge.test(stripped)) {
       isMergeAttempt = true;
       detail = "gh api PUT .../merge";
     }
-  } else if (tool === "mcp__plugin_github_github__merge_pull_request") {
+  } else if (tool === "mcp__github__merge_pull_request") {
     isMergeAttempt = true;
     detail = "MCP merge_pull_request";
   }
