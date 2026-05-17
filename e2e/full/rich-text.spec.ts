@@ -1,6 +1,6 @@
 // e2e/smoke/rich-text.spec.ts
 import { test, expect } from "@playwright/test";
-import { loginAs, logout } from "../support/actions";
+import { loginAs } from "../support/actions";
 import { createTestUser, createTestMachine } from "../support/supabase-admin";
 import { getTestPrefix } from "../support/test-isolation";
 
@@ -85,18 +85,9 @@ test.describe("Rich Text and Mentions", () => {
       `@${mentionedDisplayName}`
     );
 
-    // 12. Check notification for mentioned user via the Bell dropdown
-    await logout(page, testInfo);
-    await loginAs(page, testInfo, { email: mentionedEmail });
-
-    // Open notification bell dropdown
-    await page
-      .getByRole("button", { name: /notifications/i })
-      .first()
-      .click();
-    await expect(
-      page.getByText(`Mentioned in ${machine.initials}-1`)
-    ).toBeVisible();
+    // Step 12 (mention notification delivery) moved to integration layer:
+    // src/test/integration/notifications.test.ts — "mentioned" describe block.
+    // The cross-session logout→login→bell timing was the source of PP-cfs.
   });
 
   test("allows adding comments with rich text", async ({ page }, testInfo) => {

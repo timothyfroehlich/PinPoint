@@ -672,4 +672,102 @@ describe("createNotification (Integration)", () => {
     expect(result).toHaveLength(1);
     expect(result[0].userId).toBe(newOwner.id);
   });
+
+  // PP-cfs: "mentioned" is excluded from the watcher fan-out and delivered
+  // only via additionalRecipientIds. These tests are the integration-layer
+  // replacement for the notification-bell check that was removed from
+  // e2e/full/rich-text.spec.ts to fix a cross-session timing flake.
+  describe("mentioned", () => {
+    it("delivers in-app notification to mentioned users, excluding the actor", async () => {
+      const db = await getTestDb();
+
+      const [actor] = await db
+        .insert(userProfiles)
+        .values(createTestUser({ email: "mention-actor@test.com" }))
+        .returning();
+      const [mentioned] = await db
+        .insert(userProfiles)
+        .values(createTestUser({ email: "mention-recipient@test.com" }))
+        .returning();
+      const [machine] = await db
+        .insert(machines)
+        .values(createTestMachine({ initials: "MN" }))
+        .returning();
+      const [issue] = await db
+        .insert(issues)
+        .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+        .returning();
+
+      await createNotification(
+        {
+          type: "mentioned",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: false,
+          additionalRecipientIds: [mentioned.id],
+          issueTitle: "Test issue",
+          machineName: machine.name,
+          formattedIssueId: "MN-01",
+        },
+        db
+      );
+
+      const result = await db.query.notifications.findMany();
+      expect(result).toHaveLength(1);
+      expect(result[0].userId).toBe(mentioned.id);
+      expect(result[0].type).toBe("mentioned");
+      expect(result[0].resourceId).toBe(issue.id);
+    });
+
+    it("skips in-app delivery when inAppNotifyOnMentioned is false but still sends email", async () => {
+      const db = await getTestDb();
+
+      const [actor] = await db
+        .insert(userProfiles)
+        .values(createTestUser({ email: "mention-actor2@test.com" }))
+        .returning();
+      const [mentioned] = await db
+        .insert(userProfiles)
+        .values(createTestUser({ email: "mention-pref@test.com" }))
+        .returning();
+      const [machine] = await db
+        .insert(machines)
+        .values(createTestMachine({ initials: "MP" }))
+        .returning();
+      const [issue] = await db
+        .insert(issues)
+        .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+        .returning();
+
+      await db.insert(notificationPreferences).values({
+        userId: mentioned.id,
+        inAppEnabled: true,
+        inAppNotifyOnMentioned: false,
+        emailEnabled: true,
+        emailNotifyOnMentioned: true,
+      });
+
+      await createNotification(
+        {
+          type: "mentioned",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: false,
+          additionalRecipientIds: [mentioned.id],
+          issueTitle: "Test issue",
+          machineName: machine.name,
+          formattedIssueId: "MP-01",
+        },
+        db
+      );
+
+      const inApp = await db.query.notifications.findMany();
+      expect(inApp).toHaveLength(0);
+      expect(sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "mention-pref@test.com" })
+      );
+    });
+  });
 });
