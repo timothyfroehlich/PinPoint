@@ -4,21 +4,38 @@
 # Fires at the start of each agent turn. Outputs new comments as a system-reminder
 # block, or nothing if nothing is new (zero stdout = no injection).
 #
+# Stdin payload schema (per https://code.claude.com/docs/en/hooks):
+#   {
+#     "session_id":       "<UUID>",
+#     "transcript_path":  "<path to .jsonl>",
+#     "cwd":              "<current working dir>",
+#     "hook_event_name":  "UserPromptSubmit",
+#     "permission_mode":  "default" | "plan" | "acceptEdits" | "auto" | "dontAsk" | "bypassPermissions",
+#     "prompt":           "<the user's message text>"
+#   }
+# We only read session_id; the rest is ignored.
+#
 # State file: ~/.config/pinpoint/cvh-last-seen-<cwd-basename>
 #   Per-checkout isolation: each worktree/session tracks independently.
 #
 # Self-filter (auto, no env config required): the UserPromptSubmit stdin payload
-# carries a `session_id` field. Each Claude session writes its own agent name to
-# `~/.config/pinpoint/cvh-self-<session_id>` once at startup. The hook reads that
-# file via the session_id from stdin and filters out comments ending with
-# `—Claude-<that name>` so an agent never re-injects its own coordination posts.
+# carries a `session_id` field. The hook reads it and looks up the agent's name
+# from `~/.config/pinpoint/cvh-session-names.json`, a JSON map of
+# `{session_id: name}`. Comments ending with `—Claude-<that name>` are excluded
+# from the injection so an agent never re-injects its own coordination posts.
 #
-# To register your session's name (run once per session, ideally early):
-#   echo "Slingshot" > ~/.config/pinpoint/cvh-self-"$CLAUDE_SESSION_ID"
-# Or have the agent run the equivalent inline (any session_id source it can reach).
+# Why a single JSON map instead of one file per session: agents who restart
+# (different transcript file, same logical "session") need a stable lookup their
+# resumed turn can perform. The map persists across restarts; the helper
+# `scripts/hooks/cvh-whoami.sh` lets an agent recall its own name at any time.
 #
-# Backward compat: if no session-keyed file exists, falls back to $CLAUDE_AGENT_NAME
-# from the environment (the previous activation scheme).
+# To register a session-to-name mapping (Tim, or the agent itself, runs once):
+#   bash scripts/hooks/cvh-whoami.sh register Slingshot
+# Or edit ~/.config/pinpoint/cvh-session-names.json directly.
+#
+# Backward compat: also accepts legacy per-session files at
+# `~/.config/pinpoint/cvh-self-<session_id>` (deprecated) and the
+# `$CLAUDE_AGENT_NAME` env var (the original activation scheme).
 #
 # Agent name suggestions: Plunger, Spinner, Slingshot, Kicker, Bumper, Flipper
 
@@ -62,12 +79,22 @@ fi
 # Fetch all PP-cvh comments as JSON
 COMMENTS_JSON="$(bd comments PP-cvh --json 2>/dev/null)" || { exit 0; }
 
-# Resolve self agent name. Priority: session-keyed file > env var > unset (no filter).
+# Resolve self agent name. Priority order:
+#   1. ~/.config/pinpoint/cvh-session-names.json[session_id] (canonical)
+#   2. ~/.config/pinpoint/cvh-self-<session_id> file (legacy, deprecated)
+#   3. $CLAUDE_AGENT_NAME env var (back-compat with original activation)
+#   4. unset → no self-filter applied
 AGENT_NAME=""
+NAMES_JSON="$STATE_DIR/cvh-session-names.json"
 if [[ -n "$SESSION_ID" ]]; then
-  SELF_FILE="$STATE_DIR/cvh-self-$SESSION_ID"
-  if [[ -f "$SELF_FILE" ]]; then
-    AGENT_NAME=$(cat "$SELF_FILE")
+  if [[ -f "$NAMES_JSON" ]]; then
+    AGENT_NAME=$(jq -r --arg sid "$SESSION_ID" '.[$sid] // ""' "$NAMES_JSON" 2>/dev/null || echo "")
+  fi
+  if [[ -z "$AGENT_NAME" ]]; then
+    SELF_FILE="$STATE_DIR/cvh-self-$SESSION_ID"
+    if [[ -f "$SELF_FILE" ]]; then
+      AGENT_NAME=$(cat "$SELF_FILE")
+    fi
   fi
 fi
 if [[ -z "$AGENT_NAME" ]]; then

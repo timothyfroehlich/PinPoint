@@ -94,6 +94,18 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/cvh-session-start.sh",
+            "timeout": 5000
+          }
+        ]
+      }
     ]
   },
   "enabledPlugins": {
