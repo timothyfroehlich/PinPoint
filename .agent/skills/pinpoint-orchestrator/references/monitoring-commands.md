@@ -20,13 +20,25 @@ gh pr view <PR_NUMBER> --json statusCheckRollup \
 
 ## Copilot Review Comments
 
-```bash
-# Preferred (uses project scripts)
-./scripts/workflow/copilot-comments.sh <PR>
+Preferred: use MCP via the `pinpoint-pr-workflow` skill (Phase 3.2-3.3).
 
-# Raw API
-gh api repos/timothyfroehlich/PinPoint/pulls/<PR_NUMBER>/comments \
-  --jq '.[] | select(.user.login == "Copilot") | "File: \(.path):\(.line // .original_line)\n\(.body)\n---"'
+```
+mcp__plugin_github_github__pull_request_read(
+  method: "get_review_comments",
+  owner: "timothyfroehlich",
+  repo: "PinPoint",
+  pullNumber: <PR>,
+  perPage: 100
+)
+```
+
+Filter to threads where `comments[0].author.login` is `copilot-pull-request-reviewer` or `copilot-pull-request-reviewer[bot]`. Each thread has `is_resolved` (snake_case), `is_outdated`, and a thread node ID (`PRRT_kwDOxxx`) for resolving via `mcp__plugin_github_github__pull_request_review_write(method: "resolve_thread", threadId)`.
+
+Fallback (raw REST):
+
+```bash
+gh api repos/timothyfroehlich/PinPoint/pulls/<PR_NUMBER>/comments --paginate \
+  --jq '.[] | select(.user.login | test("^copilot-pull-request-reviewer(\\[bot\\])?$")) | "File: \(.path):\(.line // .original_line)\n\(.body)\n---"'
 ```
 
 ## Worktree Status

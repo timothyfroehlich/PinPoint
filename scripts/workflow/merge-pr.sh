@@ -95,7 +95,8 @@ if [ "$DRY_RUN" = "true" ]; then
 fi
 
 # --- Execute merge ---
-# Bypass the block-direct-merge hook by setting the sentinel; hook deletes it on fire.
-touch .claude-merge-bypass
+# The block-direct-merge PreToolUse hook fires on top-level Claude Bash invocations only.
+# This `gh pr merge` runs as a subprocess of the script, so the hook does not see it —
+# no sentinel needed. (A leftover sentinel would silently bypass the next user-level merge.)
 gh pr merge "$PR" --squash --delete-branch --match-head-sha="$PR_HEAD_SHA"
 echo "MERGED: PR #$PR"
