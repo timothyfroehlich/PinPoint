@@ -40,6 +40,23 @@ if [[ ! -t 0 ]]; then
   INPUT=$(cat)
 fi
 
+# Skip subagent sessions (see huddle-poll.sh for rationale).
+TRANSCRIPT_PATH=""
+if [[ -n "$INPUT" ]]; then
+  TRANSCRIPT_PATH=$(
+    printf '%s' "$INPUT" | python3 -c "
+import sys, json
+try:
+    print(json.load(sys.stdin).get('transcript_path') or '')
+except Exception:
+    print('')
+" 2>/dev/null
+  ) || TRANSCRIPT_PATH=""
+fi
+case "$TRANSCRIPT_PATH" in
+  */subagents/*) exit 0 ;;
+esac
+
 SESSION_ID=""
 SOURCE=""
 if [[ -n "$INPUT" ]]; then

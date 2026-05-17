@@ -52,13 +52,33 @@ for dep in jq python3; do
 done
 
 # --- Read UserPromptSubmit hook JSON from stdin (best-effort) ---
-# Reads stdin if present so we can extract session_id for self-filter lookup.
+# Reads stdin if present so we can extract session_id and transcript_path.
 # Falls through silently if payload is empty or malformed — the hook MUST NOT
 # fail user prompts on parse errors.
 INPUT=""
 if [[ ! -t 0 ]]; then
   INPUT=$(cat)
 fi
+
+# Skip subagent sessions. Subagent transcripts live at
+# <project>/<session>/subagents/<agent>.jsonl, while top-level sessions land
+# at <project>/<session>.jsonl. Subagents are ephemeral and must not
+# participate in huddle coordination — they neither poll nor inject.
+TRANSCRIPT_PATH=""
+if [[ -n "$INPUT" ]]; then
+  TRANSCRIPT_PATH=$(
+    printf '%s' "$INPUT" | python3 -c "
+import sys, json
+try:
+    print(json.load(sys.stdin).get('transcript_path') or '')
+except Exception:
+    print('')
+" 2>/dev/null
+  ) || TRANSCRIPT_PATH=""
+fi
+case "$TRANSCRIPT_PATH" in
+  */subagents/*) exit 0 ;;
+esac
 
 SESSION_ID=""
 if [[ -n "$INPUT" ]]; then
