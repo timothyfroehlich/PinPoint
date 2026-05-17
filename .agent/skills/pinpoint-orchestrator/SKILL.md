@@ -24,24 +24,17 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 
 # PR monitoring
 ./scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + Copilot + merge status table (all open PRs if no args)
-./scripts/workflow/copilot-comments.sh <PR> [PR...]      # Copilot details (accepts multiple PRs)
-./scripts/workflow/copilot-comments.sh <PR> --raw        # JSON output for parsing
 
-# Copilot thread management (see AGENTS.md "GitHub Copilot Reviews" for full protocol)
-./scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg> # Reply + resolve one thread
-./scripts/workflow/resolve-copilot-threads.sh <PR>              # Bulk-resolve addressed threads
-./scripts/workflow/resolve-copilot-threads.sh <PR> --dry-run    # Preview without resolving
-./scripts/workflow/resolve-copilot-threads.sh <PR> --all        # Resolve ALL unresolved threads
+# Copilot thread inspection + reply → use MCP via pinpoint-pr-workflow skill Phase 3
+# (mcp__plugin_github_github__pull_request_read / add_reply_to_pull_request_comment / pull_request_review_write)
 
-# Readiness + cleanup
-./scripts/workflow/label-ready.sh <PR>                   # Label ready-for-review (checks CI + Copilot + draft)
-./scripts/workflow/label-ready.sh <PR> --cleanup         # Also remove associated worktree
-./scripts/workflow/label-ready.sh <PR> --force           # Label even with Copilot comments
-./scripts/workflow/label-ready.sh <PR> --dry-run         # Preview without acting
+# Readiness label + merge: pinpoint-pr-workflow skill Phases 3.5 + 4
+# Apply label via mcp__plugin_github_github__issue_write or `gh pr edit --add-label`
+bash scripts/workflow/merge-pr.sh <PR>                   # Composite gate-then-merge enforcer (--dry-run, --force)
+bash scripts/workflow/merge-pr.sh <PR> --dry-run         # Preview gate evaluation without merging
 
 # CI watching
-./scripts/workflow/pr-watch.py <PR>                      # Stream CI + review events (Monitor-tool compatible)
-./.agent/skills/pinpoint-commit/scripts/watch-ci.sh <PR> [timeout]  # Poll single PR CI (default 10min)
+./scripts/workflow/pr-watch.py <PR>                      # Stream CI + review events (Monitor-tool compatible; canonical)
 
 # Worktree health
 ./scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
@@ -190,10 +183,10 @@ Common resume scenarios:
 gh run view <run-id> --log-failed | tail -50
 ```
 
-**Copilot comments** → Get details, then resume subagent:
+**Copilot comments** → Inspect via MCP (see pinpoint-pr-workflow skill Phase 3.2-3.3), then resume subagent:
 
-```bash
-./scripts/workflow/copilot-comments.sh <PR>
+```
+mcp__plugin_github_github__pull_request_read(method: "get_review_comments", owner, repo, pullNumber, perPage: 100)
 ```
 
 **Infrastructure failures**:
@@ -204,10 +197,13 @@ gh run rerun <run-id> --failed
 
 ### Label Ready PRs
 
-```bash
-./scripts/workflow/label-ready.sh <PR>               # Label (keeps worktree)
-./scripts/workflow/label-ready.sh <PR> --cleanup     # Label + remove worktree
+See pinpoint-pr-workflow skill Phase 3.5. Apply `ready-for-review` after CI green + zero unresolved Copilot threads via:
+
 ```
+mcp__plugin_github_github__issue_write(method: "update", owner, repo, issue_number: <PR>, labels: [<existing>..., "ready-for-review"])
+```
+
+Or fallback: `gh pr edit <PR> --add-label ready-for-review`. Worktree cleanup is now a separate step: `python3 scripts/worktree_cleanup.py <path>`.
 
 ---
 
