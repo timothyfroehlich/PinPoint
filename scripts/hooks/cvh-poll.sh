@@ -7,16 +7,44 @@
 # State file: ~/.config/pinpoint/cvh-last-seen-<cwd-basename>
 #   Per-checkout isolation: each worktree/session tracks independently.
 #
-# Self-filter: set CLAUDE_AGENT_NAME in your environment to suppress re-injection of
-#   your own comments. Comments ending with "—Claude-$CLAUDE_AGENT_NAME" are skipped.
+# Self-filter (auto, no env config required): the UserPromptSubmit stdin payload
+# carries a `session_id` field. Each Claude session writes its own agent name to
+# `~/.config/pinpoint/cvh-self-<session_id>` once at startup. The hook reads that
+# file via the session_id from stdin and filters out comments ending with
+# `—Claude-<that name>` so an agent never re-injects its own coordination posts.
 #
-# Activation options:
-#   Shell rc:           export CLAUDE_AGENT_NAME=Plunger
-#   .claude/launch.json: add "env": {"CLAUDE_AGENT_NAME": "Plunger"} under the session entry
+# To register your session's name (run once per session, ideally early):
+#   echo "Slingshot" > ~/.config/pinpoint/cvh-self-"$CLAUDE_SESSION_ID"
+# Or have the agent run the equivalent inline (any session_id source it can reach).
+#
+# Backward compat: if no session-keyed file exists, falls back to $CLAUDE_AGENT_NAME
+# from the environment (the previous activation scheme).
 #
 # Agent name suggestions: Plunger, Spinner, Slingshot, Kicker, Bumper, Flipper
 
 set -euo pipefail
+
+# --- Read UserPromptSubmit hook JSON from stdin (best-effort) ---
+# Reads stdin if present so we can extract session_id for self-filter lookup.
+# Falls through silently if payload is empty or malformed — the hook MUST NOT
+# fail user prompts on parse errors.
+INPUT=""
+if [[ ! -t 0 ]]; then
+  INPUT=$(cat)
+fi
+
+SESSION_ID=""
+if [[ -n "$INPUT" ]]; then
+  SESSION_ID=$(
+    printf '%s' "$INPUT" | python3 -c "
+import sys, json
+try:
+    print(json.load(sys.stdin).get('session_id') or '')
+except Exception:
+    print('')
+" 2>/dev/null
+  ) || SESSION_ID=""
+fi
 
 STATE_DIR="$HOME/.config/pinpoint"
 BASENAME="$(basename "$PWD")"
@@ -34,8 +62,22 @@ fi
 # Fetch all PP-cvh comments as JSON
 COMMENTS_JSON="$(bd comments PP-cvh --json 2>/dev/null)" || { exit 0; }
 
-# Build jq self-filter expression
-AGENT_NAME="${CLAUDE_AGENT_NAME:-}"
+# Resolve self agent name. Priority: session-keyed file > env var > unset (no filter).
+AGENT_NAME=""
+if [[ -n "$SESSION_ID" ]]; then
+  SELF_FILE="$STATE_DIR/cvh-self-$SESSION_ID"
+  if [[ -f "$SELF_FILE" ]]; then
+    AGENT_NAME=$(cat "$SELF_FILE")
+  fi
+fi
+if [[ -z "$AGENT_NAME" ]]; then
+  AGENT_NAME="${CLAUDE_AGENT_NAME:-}"
+fi
+
+# Build jq self-filter expression. AGENT_NAME is treated as a literal string —
+# jq's --arg already shell-quotes it, but we go through string concat for the
+# select() body so the filter expression remains simple. Agent names should be
+# alphanumeric (Plunger, Spinner, etc.); anything weirder is on the user.
 if [[ -n "$AGENT_NAME" ]]; then
   SELF_FILTER="| select(.text | endswith(\"—Claude-$AGENT_NAME\") | not)"
 else
