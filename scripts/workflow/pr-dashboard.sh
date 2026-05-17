@@ -8,11 +8,21 @@
 
 set -euo pipefail
 
+# shellcheck source=./_pr-gates.sh
+# shellcheck disable=SC1091
+source "$(dirname "$0")/_pr-gates.sh"
+
+OWNER_REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+OWNER=$(cut -d/ -f1 <<< "$OWNER_REPO")
+REPO=$(cut -d/ -f2 <<< "$OWNER_REPO")
+
+LOGINS_JSON=$(printf '%s\n' "${COPILOT_LOGINS[@]}" | jq -R . | jq -s .)
+
 # Get PR list
 if [ $# -gt 0 ]; then
     PRS="$*"
 else
-    PRS=$(gh pr list --state open --json number --jq '.[].number' | sort -n)
+    PRS=$(gh pr list --state open --limit 100 --json number --jq '.[].number' | sort -n)
 fi
 
 if [ -z "$PRS" ]; then
@@ -52,32 +62,43 @@ for pr in $PRS; do
         ci_status="All passed"
     fi
 
-    # Copilot comments (unresolved threads only)
-    # shellcheck disable=SC2016
-    copilot_count=$(gh api graphql -f query="
-      {
-        repository(owner: \"timothyfroehlich\", name: \"PinPoint\") {
-          pullRequest(number: $pr) {
-            reviewThreads(first: 100) {
-              nodes {
-                isResolved
-                comments(first: 1) {
-                  nodes { author { login } }
+    # Copilot comments (unresolved threads only) — cursor-paginated to avoid first:100 truncation
+    copilot_count=0
+    cursor=""
+    has_next=true
+    copilot_ok=true
+    while [ "$has_next" = "true" ]; do
+        after_arg=""
+        [ -n "$cursor" ] && after_arg=", after: \"$cursor\""
+        # shellcheck disable=SC2016
+        resp=$(gh api graphql -f query="
+          {
+            repository(owner: \"$OWNER\", name: \"$REPO\") {
+              pullRequest(number: $pr) {
+                reviewThreads(first: 100$after_arg) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes {
+                    isResolved
+                    comments(first: 1) {
+                      nodes { author { login } }
+                    }
+                  }
                 }
               }
             }
-          }
-        }
-      }" --jq '
-      [.data.repository.pullRequest.reviewThreads.nodes[]
-       | select(.isResolved == false)
-       | select(.comments.nodes | length > 0)
-       | .comments.nodes[0] as $comment
-       | select(
-           $comment.author.login == "copilot-pull-request-reviewer"
-           or $comment.author.login == "copilot-pull-request-reviewer[bot]"
-         )]
-       | length' 2>/dev/null) || copilot_count="?"
+          }" 2>/dev/null) || { copilot_ok=false; break; }
+        page_count=$(jq --argjson logins "$LOGINS_JSON" '
+          [.data.repository.pullRequest.reviewThreads.nodes[]
+           | select(.isResolved == false)
+           | select(.comments.nodes | length > 0)
+           | .comments.nodes[0] as $comment
+           | select($logins | index($comment.author.login))]
+           | length' <<< "$resp") || { copilot_ok=false; break; }
+        copilot_count=$((copilot_count + page_count))
+        has_next=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<< "$resp")
+        cursor=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty' <<< "$resp")
+    done
+    [ "$copilot_ok" = "false" ] && copilot_count="?"
 
     # Merge status
     case "$merge_state" in
