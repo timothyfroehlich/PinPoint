@@ -92,13 +92,15 @@ export function MachineTabStrip({
   }, [activeSlug]);
 
   return (
-    <div className="relative border-b border-outline-variant">
-      <div
-        ref={scrollerRef}
-        className="flex overflow-x-auto scrollbar-none"
-        role="tablist"
-        aria-label="Machine sections"
-      >
+    // Route-driven navigation, not a stateful tabs widget. Per design bible
+    // §5 ("No shadcn `<Tabs>`") and the WAI-ARIA Tabs pattern's prerequisites
+    // (roving tabindex, aria-controls, panel relationships, keyboard handling)
+    // — use `<nav>` + `aria-current="page"` for the active route instead.
+    <nav
+      className="relative border-b border-outline-variant"
+      aria-label="Machine sections"
+    >
+      <div ref={scrollerRef} className="flex overflow-x-auto scrollbar-none">
         {TABS.map((tab) => {
           const isActive = tab.slug === activeSlug;
           const href = tab.slug ? `${base}/${tab.slug}` : base;
@@ -109,8 +111,6 @@ export function MachineTabStrip({
               key={tab.slug || "info"}
               href={href}
               ref={isActive ? activeTabRef : undefined}
-              role="tab"
-              aria-selected={isActive}
               aria-current={isActive ? "page" : undefined}
               data-testid={`machine-tab-${tab.slug || "info"}`}
               className={cn(
@@ -147,6 +147,6 @@ export function MachineTabStrip({
           className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-background to-transparent"
         />
       )}
-    </div>
+    </nav>
   );
 }

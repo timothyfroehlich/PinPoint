@@ -10,8 +10,10 @@ import { machines } from "~/server/db/schema";
  * via React `cache()` — the layout's call dedupes with the tab page's call
  * within a single request. Tabs are responsible for filtering issues to the
  * subset they want to show:
- *   - Info tab: derives status from open issues and shows open-issue count
- *   - Maintenance tab: shows all issues with a client-side filter toggle
+ *   - Info tab: derives status from open issues, shows open + total counts
+ *   - Service tab: currently renders only open issues (the section badge +
+ *     count are open-only); a richer filter bar is planned (bead PP-0kta)
+ *     that will let users switch between open / closed / all.
  */
 export const getMachineForLayout = cache(async (initials: string) => {
   const machine = await db.query.machines.findFirst({
