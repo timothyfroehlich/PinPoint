@@ -105,6 +105,18 @@ case "$cmd" in
         exit 1
       }
     fi
+    # Reject duplicate names: if any OTHER session_id already owns this name,
+    # registering it again would make the self-filter suppress both sessions'
+    # comments from each other. Re-registering your own session under the same
+    # name is allowed (idempotent).
+    existing=$(jq -r --arg name "$name" --arg sid "$sid" \
+      'to_entries | map(select(.value == $name and .key != $sid)) | .[0].key // ""' \
+      "$NAMES_JSON")
+    if [[ -n "$existing" ]]; then
+      echo "huddle-whoami.sh: name '$name' is already registered to session $existing" >&2
+      echo "Pick a different name (e.g. ${name}2, ${name}B) and retry." >&2
+      exit 1
+    fi
     tmp=$(mktemp)
     jq --arg sid "$sid" --arg name "$name" '. + {($sid): $name}' "$NAMES_JSON" > "$tmp"
     mv "$tmp" "$NAMES_JSON"
