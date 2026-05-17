@@ -13,7 +13,7 @@ Run this checklist BEFORE typing `test("...", async ({ page })`. The 2026-05 aud
 
 1. **What bug class does this catch?** See `pinpoint-testing` skill § "Bug Classes & Cheapest Catching Layer". Class A/B/C/E/G/H/I should not be E2E — integration or RTL unit is the right home.
 2. **Does an integration or unit test already cover this feature?** Run `rg -l "your-keyword" src/test/ src/` first (substitute the actual feature keyword). The audit found that agents create new specs because they can't see the existing tests — most of the time you should be extending an existing file, not creating a new one. See `pinpoint-testing` skill § "Where Existing Coverage Lives".
-3. **Class-J self-check (AGENTS.md rule #17)**: Does this spec hit any URL outside `localhost`, `127.0.0.1`, or our owned local stack (Mailpit, PGlite, local Supabase)? If yes → STOP. Mock the SDK at the boundary in `src/lib/<service>/client.test.ts`. Live Discord, real OAuth provider redirects, vendor email-template parsing are violations.
+3. **Class-J self-check (AGENTS.md §2.1 "Test What We Own")**: Does this spec hit any URL outside `localhost`, `127.0.0.1`, or our owned local stack (Mailpit, PGlite, local Supabase)? If yes → STOP. Mock the SDK at the boundary in `src/lib/<service>/client.test.ts`. Live Discord, real OAuth provider redirects, vendor email-template parsing are violations.
 4. **Would the assertion be the same if I called the Server Action directly with PGlite seeded data?** If yes → integration test, not E2E. The browser overhead buys nothing.
 5. **Is this a genuine multi-step user journey** that spans two or more page renders (e.g. login → mutate → verify across pages)? If no → almost certainly not E2E.
 

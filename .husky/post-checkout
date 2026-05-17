@@ -3,6 +3,46 @@ set -e
 # Args: previous HEAD, new HEAD, branch flag (1=branch change, 0=file checkout)
 BRANCH_CHECKOUT=$3
 
+# --- Main-worktree branch-flip guard (PP-bg45 / PP-46z) ---
+# Fires AFTER the checkout (can't prevent it), prints a loud alarm so the session
+# knows immediately that the main worktree is not on `main`.
+#
+# Detection conditions (ALL must be true):
+#   1. This is the main worktree (.git/ is a directory, not a "gitdir: ..." file).
+#      Linked worktrees have .git as a file — we only alarm in the primary clone.
+#   2. This is a branch checkout ($3 == 1), not a file checkout ($3 == 0).
+#   3. The current HEAD (after the checkout) is not `main`.
+#
+# We check the post-checkout state, not the pre-checkout state. This catches all
+# cases: switching from main to a feature branch, switching between two feature
+# branches, or landing on a detached HEAD — all forbidden in the root checkout
+# (AGENTS.md §2.2 "Root Checkout Is Read-Only").
+
+if [ "$BRANCH_CHECKOUT" = "1" ] && [ -d ".git" ]; then
+  # Detached HEAD returns empty from `symbolic-ref --short` — treat that as an
+  # alarm condition too (the checkout is no longer on `main` in any case).
+  CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+  if [ "$CURRENT_BRANCH" != "main" ]; then
+    echo "" >&2
+    echo "╔══════════════════════════════════════════════════════════════════╗" >&2
+    echo "║  ⚠️  WARNING: ROOT CHECKOUT IS NOT ON \`main\`                     ║" >&2
+    echo "╠══════════════════════════════════════════════════════════════════╣" >&2
+    echo "║  This is the primary clone. It must ALWAYS stay on \`main\`.      ║" >&2
+    echo "║  No work is performed here — use a worktree for everything.     ║" >&2
+    echo "║                                                                  ║" >&2
+    echo "║  To recover now:                                                 ║" >&2
+    echo "║    git checkout main && git pull --ff-only origin main           ║" >&2
+    echo "║                                                                  ║" >&2
+    echo "║  For branch work, use a linked worktree:                        ║" >&2
+    echo "║    Agent(isolation: \"worktree\")  — or —                         ║" >&2
+    echo "║    git worktree add ../pinpoint-worktrees/<branch> -b <branch>  ║" >&2
+    echo "║                                                                  ║" >&2
+    echo "║  References: PP-46z / PP-bg45 / PP-cvh (2026-05-16 21:47 CDT)  ║" >&2
+    echo "╚══════════════════════════════════════════════════════════════════╝" >&2
+    echo "" >&2
+  fi
+fi
+
 # --- BEGIN BEADS INTEGRATION v1.0.3 ---
 # This section is managed by beads. Do not remove these markers.
 if command -v bd >/dev/null 2>&1; then

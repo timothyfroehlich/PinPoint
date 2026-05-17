@@ -406,7 +406,7 @@ When something happens in response to user action, where should they see feedbac
 | Long-running background work (uploads)            | Toast with progress indicator                                                                       |
 | Short in-place work (counter increment)           | Immediate UI update, no notification                                                                |
 
-**Why server-side redirect instead of `toast.success() + router.push()`?** The project's progressive-enhancement rule (AGENTS.md #5) requires forms to work without JavaScript. `<form action={serverAction}>` + server-side `redirect(...)` works with JS off; a `toast.success()` + `router.push()` pattern only fires after hydration. If a success toast is genuinely needed on the destination page, persist a one-time success state (e.g., via a search param or short-lived cookie read in the destination route) and render it there.
+**Why server-side redirect instead of `toast.success() + router.push()`?** The project's progressive-enhancement rule (AGENTS.md §2.1 "Progressive Enhancement") requires forms to work without JavaScript. `<form action={serverAction}>` + server-side `redirect(...)` works with JS off; a `toast.success()` + `router.push()` pattern only fires after hydration. If a success toast is genuinely needed on the destination page, persist a one-time success state (e.g., via a search param or short-lived cookie read in the destination route) and render it there.
 
 **Rule of thumb:** If the user initiated it and waited → feedback. If it was instant or invisible → no feedback.
 

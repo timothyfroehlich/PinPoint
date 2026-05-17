@@ -21,18 +21,18 @@ There is no numeric target for test counts. Total-test-count is a vanity metric.
 
 > _What class of bug does this test catch, and is the chosen layer the cheapest one that catches that class?_
 
-| Class | What it catches                                                | Cheapest catching layer                                                                                                                                                                   |
-| ----- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A** | Auth redirect / route protection                               | Integration (middleware) or thin E2E set                                                                                                                                                  |
-| **B** | Server Action wiring (form → action → DB → response)           | **Integration** (PGlite + direct action call)                                                                                                                                             |
-| **C** | Form-state lifecycle (reset / optimistic / rollback)           | **RTL unit**                                                                                                                                                                              |
-| **D** | Layout / overflow / hydration regression                       | **Smoke E2E** (`responsive-overflow.spec.ts` is canonical)                                                                                                                                |
-| **E** | Permission enforcement (role X can / cannot mutate)            | **Integration**                                                                                                                                                                           |
-| **F** | Multi-step user journey (login → mutate → verify across pages) | **E2E** (the only class E2E genuinely owns)                                                                                                                                               |
-| **G** | Pure logic (validators, formatters, dates)                     | Unit                                                                                                                                                                                      |
-| **H** | Pure UI state (open / close, focus, keyboard nav)              | RTL unit                                                                                                                                                                                  |
-| **I** | DB query correctness (filters, joins, ordering)                | Integration (PGlite)                                                                                                                                                                      |
-| **J** | Third-party integration                                        | **Boundary-mocked** unit/integration. NEVER live external services in E2E except our owned local stack (Mailpit, PGlite, local Supabase including local Storage). See AGENTS.md rule #17. |
+| Class | What it catches                                                | Cheapest catching layer                                                                                                                                                                                  |
+| ----- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A** | Auth redirect / route protection                               | Integration (middleware) or thin E2E set                                                                                                                                                                 |
+| **B** | Server Action wiring (form → action → DB → response)           | **Integration** (PGlite + direct action call)                                                                                                                                                            |
+| **C** | Form-state lifecycle (reset / optimistic / rollback)           | **RTL unit**                                                                                                                                                                                             |
+| **D** | Layout / overflow / hydration regression                       | **Smoke E2E** (`responsive-overflow.spec.ts` is canonical)                                                                                                                                               |
+| **E** | Permission enforcement (role X can / cannot mutate)            | **Integration**                                                                                                                                                                                          |
+| **F** | Multi-step user journey (login → mutate → verify across pages) | **E2E** (the only class E2E genuinely owns)                                                                                                                                                              |
+| **G** | Pure logic (validators, formatters, dates)                     | Unit                                                                                                                                                                                                     |
+| **H** | Pure UI state (open / close, focus, keyboard nav)              | RTL unit                                                                                                                                                                                                 |
+| **I** | DB query correctness (filters, joins, ordering)                | Integration (PGlite)                                                                                                                                                                                     |
+| **J** | Third-party integration                                        | **Boundary-mocked** unit/integration. NEVER live external services in E2E except our owned local stack (Mailpit, PGlite, local Supabase including local Storage). See AGENTS.md §2.1 "Test What We Own". |
 
 E2E earns its slot when the test is genuinely class F. Most other classes have a cheaper home. The 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`) found that 36 of 48 specs were partially or fully misallocated — write the cheapest layer that catches the bug class, not the most thorough one.
 
@@ -51,7 +51,7 @@ Before writing a new test, check the canonical location for that bug class. Most
 | Comment audit trail (delete / edit)                                | `src/test/unit/delete-comment-audit.test.ts`                                                                                                                          |
 | Auth actions (signup / login / logout)                             | `src/test/integration/supabase/auth-actions.test.ts`                                                                                                                  |
 | Notifications / Mailpit dispatch                                   | `src/test/integration/notifications.test.ts`, `src/test/unit/notification-formatting.test.ts`                                                                         |
-| External services (Discord, Vercel Blob, OAuth providers, captcha) | `src/lib/<service>/client.test.ts` with the SDK mocked at the boundary — NEVER live in E2E (rule #17)                                                                 |
+| External services (Discord, Vercel Blob, OAuth providers, captcha) | `src/lib/<service>/client.test.ts` with the SDK mocked at the boundary — NEVER live in E2E (§2.1 "Test What We Own")                                                  |
 | TipTap render / markdown serialization                             | `src/lib/tiptap/render.test.ts`, `src/lib/markdown.test.ts`                                                                                                           |
 
 If the canonical location doesn't exist yet, that's a signal you may need to create a new test file at that layer — but check the table first.
@@ -92,7 +92,7 @@ pnpm run preflight                 # Full suite (~60s) - run before commit
 
 ## Test What We Own
 
-> See AGENTS.md rule #17 for the binding form.
+> See AGENTS.md §2.1 "Test What We Own" for the binding form.
 
 Tests must verify PinPoint's code at the boundary of services we don't control, not simulate the service's internals. If your test setup is building scaffolding that synthesizes a third party's internal state — raw DB writes into `auth.identities`, captcha-bypass mocks, OAuth handshake fakes, regex extraction from a vendor's email template — step back. You're testing their code, not yours. Cover PinPoint's contribution with unit tests; cover "the page renders without 500" with a smoke test; reserve integration/E2E for when the test exercises the contracted public API of a real running service.
 
@@ -130,7 +130,7 @@ Is the test setup synthesizing state that a third party owns?
 1. Identify PinPoint's actual contribution to the flow (usually 1-3 small functions or server actions).
 2. Verify those have unit tests; add them if not.
 3. Add a smoke test that the relevant page renders (no 500, key UI elements present).
-4. **Delete** the E2E that tried to synthesize the third party's state. Cite rule #17 in the PR.
+4. **Delete** the E2E that tried to synthesize the third party's state. Cite "Test What We Own" in the PR.
 
 The line you're walking is "synthesizing state inside a third party's domain." Real Supabase running locally with real auth flow → fine to E2E. Real DB writes verified through query results → fine to E2E. Real HTTP through middleware to a real route handler → fine to E2E. Faking what GoTrue / Cloudflare / Discord would have returned → not fine.
 
