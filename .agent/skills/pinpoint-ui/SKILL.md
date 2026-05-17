@@ -457,7 +457,7 @@ export default async function MachinesPage() {
 
 ### Responsive Grid
 
-Per the **Two-Layer Responsive Framework** (AGENTS.md rule #16): viewport breakpoints (`md:`, `lg:`, `xl:`) for page-level grid columns; container queries for component internals. **`sm:` is padding/spacing only — never `sm:grid-cols-*`.**
+Per the **Two-Layer Responsive Framework** (AGENTS.md §2.1 "Two-Layer Responsive Framework"): viewport breakpoints (`md:`, `lg:`, `xl:`) for page-level grid columns; container queries for component internals. **`sm:` is padding/spacing only — never `sm:grid-cols-*`.**
 
 ```typescript
 // Page-level grid (Layer 1, viewport breakpoints)

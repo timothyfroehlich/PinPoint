@@ -121,7 +121,7 @@ When CI surfaces a test failure, **always attempt to reproduce it locally before
 
 ### Branch Management
 
-**Creating branches** — Branch work happens in a worktree, not the root checkout (commandment #19). Claude Code handles this automatically via `Agent(isolation:"worktree")`. When creating a branch manually inside a worktree, ensure proper remote tracking:
+**Creating branches** — Branch work happens in a worktree, not the root checkout (see §2.2 "Root Checkout Is Read-Only"). Claude Code handles this automatically via `Agent(isolation:"worktree")`. When creating a branch manually inside a worktree, ensure proper remote tracking:
 
 - Inside the worktree: `git checkout -b feature/name` then `git push -u origin feature/name`
 - **NOT**: `git checkout -b feature/name origin/main` (tracks main, not your branch)
@@ -140,7 +140,7 @@ pushing to main.
 > permission for a sync that should have been a normal push.
 >
 > **Use `git merge origin/main` instead.** Merge commit preserves SHAs, normal push works,
-> CI re-runs against the merge commit. This is commandment #18 and it is the rule.
+> CI re-runs against the merge commit. This is §2.2 "Merge for main sync, NEVER rebase" and it is the rule.
 
 - `git fetch origin && git merge origin/main` (preferred)
 - **NOT**: `git rebase origin/main` (rewrites history, causes issues with worktrees and PRs)
