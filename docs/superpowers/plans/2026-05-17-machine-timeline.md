@@ -363,9 +363,9 @@ git commit -m "feat(db): add timeline_events table (PP-0x98)"
 - Create: `src/lib/timeline/machine-events.ts`
 - Create: `src/test/integration/supabase/machine-timeline-events.test.ts`
 
-- [ ] **Step 1: Write failing integration tests**
+- [x] **Step 1: Write failing integration tests**
 
-Create `src/test/integration/supabase/machine-timeline-events.test.ts`:
+Create `src/test/integration/machine-timeline-events.test.ts` (PGlite location; the supabase/ path in the original draft was wrong — those are Supabase-service tests, not PGlite tests):
 
 ```typescript
 import { describe, it, expect, beforeEach } from "vitest";
@@ -511,12 +511,12 @@ describe("machine-events helpers", () => {
 
 If `seedOrgWithMachine` doesn't exist, look in `src/test/integration/supabase/helpers/seed.ts` for the canonical seed helpers and either reuse an existing one (`seedOrgWithUser` + manual machine insert) or add `seedOrgWithMachine` to the helpers file in a small auxiliary step.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: FAIL — helpers module not found.
 
-- [ ] **Step 3: Implement the helpers**
+- [x] **Step 3: Implement the helpers**
 
 Create `src/lib/timeline/machine-events.ts`:
 
@@ -592,17 +592,26 @@ export async function softDeleteMachineComment(
 
 Verify `~/server/db/types` exports `TxOrDb` (it's the canonical alias). If not, look for `Tx | typeof db` patterns elsewhere and follow what `createTimelineEvent` in `src/lib/timeline/events.ts` does.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: PASS — all 4 helper tests green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
-git add src/lib/timeline/machine-events.ts src/test/integration/supabase/machine-timeline-events.test.ts
-git commit -m "feat(machines): machine-timeline write helpers (PP-0x98)"
+git add src/lib/timeline/machine-events.ts \
+        src/test/integration/machine-timeline-events.test.ts \
+        src/test/setup/pglite.ts \
+        src/test/setup/schema.sql
+git commit -m "feat(machines): machine-timeline write helpers + PGlite test infra (PP-0x98)"
 ```
+
+Implementation notes (filed during execution):
+
+- Real Drizzle transaction type is `DbTransaction` from `~/server/db`, not `TxOrDb` from `~/server/db/types`. Helpers default `tx = db` to mirror `createTimelineEvent` in `src/lib/timeline/events.ts`.
+- PGlite, not Supabase: tests use `setupTestDb()` + `getTestDb()` from `~/test/setup/pglite` with raw factories (`createTestUser`, `createTestMachine`) inserted directly via `db.insert(...).values(factory())`.
+- Pre-flight infra: added `await testDb.delete(schema.timelineEvents);` to `cleanupTestDb()` before all child-table deletes (FK ordering), and regenerated `src/test/setup/schema.sql` via `pnpm run test:_generate-schema` so the new table exists in the PGlite test schema.
 
 ---
 
