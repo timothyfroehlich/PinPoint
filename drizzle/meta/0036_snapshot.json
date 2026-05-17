@@ -1,5 +1,5 @@
 {
-  "id": "6fce081f-04bd-4cd2-90c3-4141eaaf1803",
+  "id": "86899c39-4b40-4379-b5b2-ed5735360264",
   "prevId": "bac32b91-2b2c-4f6d-ba6a-d2b3619a509f",
   "version": "7",
   "dialect": "postgresql",
@@ -1467,8 +1467,8 @@
         }
       },
       "indexes": {
-        "timeline_events_machine_created": {
-          "name": "timeline_events_machine_created",
+        "idx_timeline_events_machine_created": {
+          "name": "idx_timeline_events_machine_created",
           "columns": [
             {
               "expression": "machine_id",
@@ -1488,8 +1488,8 @@
           "method": "btree",
           "with": {}
         },
-        "timeline_events_machine_tag": {
-          "name": "timeline_events_machine_tag",
+        "idx_timeline_events_machine_tag": {
+          "name": "idx_timeline_events_machine_tag",
           "columns": [
             {
               "expression": "machine_id",

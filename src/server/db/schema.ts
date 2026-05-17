@@ -352,14 +352,14 @@ export const timelineEvents = pgTable(
       onDelete: "set null",
     }),
   },
-  (table) => ({
-    machineCreatedIdx: index("timeline_events_machine_created").on(
-      table.machineId,
-      table.createdAt.desc()
+  (t) => ({
+    machineCreatedIdx: index("idx_timeline_events_machine_created").on(
+      t.machineId,
+      t.createdAt.desc()
     ),
-    machineTagIdx: index("timeline_events_machine_tag").on(
-      table.machineId,
-      table.tag
+    machineTagIdx: index("idx_timeline_events_machine_tag").on(
+      t.machineId,
+      t.tag
     ),
   })
 );

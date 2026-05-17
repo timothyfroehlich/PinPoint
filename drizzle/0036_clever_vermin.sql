@@ -14,5 +14,5 @@ CREATE TABLE "timeline_events" (
 ALTER TABLE "timeline_events" ADD CONSTRAINT "timeline_events_machine_id_machines_id_fk" FOREIGN KEY ("machine_id") REFERENCES "public"."machines"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "timeline_events" ADD CONSTRAINT "timeline_events_author_id_user_profiles_id_fk" FOREIGN KEY ("author_id") REFERENCES "public"."user_profiles"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "timeline_events" ADD CONSTRAINT "timeline_events_deleted_by_user_profiles_id_fk" FOREIGN KEY ("deleted_by") REFERENCES "public"."user_profiles"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "timeline_events_machine_created" ON "timeline_events" USING btree ("machine_id","created_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "timeline_events_machine_tag" ON "timeline_events" USING btree ("machine_id","tag");
+CREATE INDEX "idx_timeline_events_machine_created" ON "timeline_events" USING btree ("machine_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "idx_timeline_events_machine_tag" ON "timeline_events" USING btree ("machine_id","tag");
