@@ -1,3 +1,8 @@
+---
+name: pinpoint-huddle
+description: Inter-session coordination via PP-cvh comments injected by SessionStart and UserPromptSubmit hooks. Use when you see a huddle identity announcement, an injected PP-cvh comments block, want to register a session name, or want to understand how parallel Claude sessions coordinate without re-injecting their own posts.
+---
+
 # pinpoint-huddle
 
 > **Use when:** you see a huddle SessionStart announcement or want to understand
