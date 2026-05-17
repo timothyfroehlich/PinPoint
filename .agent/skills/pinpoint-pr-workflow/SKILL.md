@@ -215,7 +215,15 @@ Direct `gh pr merge` and MCP `merge_pull_request` are blocked by hook. Use `merg
 bash scripts/workflow/merge-pr.sh <PR>
 ```
 
-Add `--dry-run` to preview, `--force` to bypass threads + currency gates (CI and no-merge-conflict gates always run).
+Flags (stackable, order-independent):
+
+- `--dry-run` — preview only, no action.
+- `--force` — bypass `currency` + `threads` gates. Requires manual permission approval.
+- `--bypass-merge-requirements` — bypass `ci` gate AND pass `--admin` to `gh pr merge`,
+  overriding GitHub branch-protection rules. Requires manual permission approval.
+
+Combine `--force --bypass-merge-requirements` to bypass `currency` + `threads` + `ci` together.
+The `no_conflict` gate is NEVER bypassable — GitHub rejects conflicting merges regardless of `--admin`.
 
 ### 4.2 Interpret output
 
@@ -234,19 +242,26 @@ On any FAIL: script removes `ready-for-review` label if present (the label's con
 
 On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --delete-branch --match-head-sha=<sha>`. TOCTOU-safe — if a new commit lands between gate check and merge, GitHub rejects the merge (`--match-head-sha` mismatch).
 
-### 4.3 --force escape hatch
+### 4.3 Escape hatches
 
-Use `--force` when:
+**`--force`** — for Copilot/review-state issues:
 
 - API failure on threads or currency gate where you've manually verified the underlying state is fine
-- Copilot has clearly silently-skipped a merge-from-main commit AND you've reviewed the diff manually
+- Copilot has silently-skipped a merge-from-main commit AND you've reviewed the diff manually
 - You're aware threads or currency gates would fail and you're explicitly accepting
 
-Do NOT use `--force` when:
+**`--bypass-merge-requirements`** — for CI/branch-protection issues:
 
-- CI is failing (gate doesn't bypass; this is intentional — never merge red CI)
-- Merge conflict exists (gate doesn't bypass; conflicts can't be ignored)
-- You haven't manually verified the underlying state
+- A required check is failing for known-irrelevant reasons (infrastructure flake, unrelated job)
+  AND you've manually verified the change is safe
+- An emergency hotfix where waiting for CI is not acceptable
+- Combine with `--force` when both review-state and CI gates need to be skipped
+
+Do NOT bypass when:
+
+- Merge conflict exists (`no_conflict` gate is never bypassable; conflicts can't be ignored)
+- You haven't manually verified the underlying state. Both flags require manual permission approval
+  in the chat — treat the approval prompt as a "are you sure?" checkpoint.
 
 ### 4.4 Bypass the hook (emergency only)
 

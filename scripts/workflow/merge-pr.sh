@@ -3,28 +3,36 @@
 # Re-evaluates all 4 PR gates at merge time (TOCTOU safety vs label-time gates),
 # squash-merges with --match-head-sha if all pass, removes ready-for-review label on failure.
 #
-# Usage: merge-pr.sh <PR> [--dry-run] [--force]
-#   --dry-run  Print would-do summary, take no action.
-#   --force    Bypass threads + currency gates ONLY. CI + no_conflict gates always run.
+# Usage: merge-pr.sh <PR> [--dry-run] [--force] [--bypass-merge-requirements]
+#   --dry-run                     Print would-do summary, take no action.
+#   --force                       Bypass currency + threads gates.
+#   --bypass-merge-requirements   Bypass ci gate AND pass --admin to gh pr merge
+#                                 (overrides GitHub branch-protection rules).
+#                                 Combine with --force to bypass currency + threads + ci together.
 #
-# Authorship check has no --force bypass; this script operates only on PRs you authored.
+# no_conflict gate is NEVER bypassable — GitHub rejects conflicting merges regardless of --admin.
+# Authorship gate has no bypass; this script operates only on PRs you authored.
+# Both --force and --bypass-merge-requirements require manual permission approval
+# (settings.json permissions.ask).
 
 set -euo pipefail
 
 PR=""
 DRY_RUN=false
 FORCE=false
+BYPASS_REQS=false
 
 for arg in "$@"; do
   case "$arg" in
-    --dry-run) DRY_RUN=true ;;
-    --force)   FORCE=true ;;
+    --dry-run)                   DRY_RUN=true ;;
+    --force)                     FORCE=true ;;
+    --bypass-merge-requirements) BYPASS_REQS=true ;;
     *) if [ -z "$PR" ]; then PR="$arg"; else echo "Error: unexpected argument $arg" >&2; exit 1; fi ;;
   esac
 done
 
 if [ -z "$PR" ] || ! [[ "$PR" =~ ^[0-9]+$ ]]; then
-  echo "Usage: $0 <PR> [--dry-run] [--force]" >&2
+  echo "Usage: $0 <PR> [--dry-run] [--force] [--bypass-merge-requirements]" >&2
   exit 1
 fi
 
@@ -51,10 +59,11 @@ echo "URL: $PR_URL"
 echo "Head SHA: $PR_HEAD_SHA"
 
 # --- Run all 4 gates, collect statuses ---
+# Per-gate bypass kind: "none" (never bypassable), "force" (--force), "admin" (--bypass-merge-requirements).
 GATE_FAILURES=()
 
 run_gate() {
-  local name=$1 fn=$2 enforced=$3
+  local name=$1 fn=$2 bypass_kind=$3
   local output rc=0
   output=$("$fn" "$PR") || rc=$?
   # Fail-closed visibility: if a gate exits non-zero without emitting a status
@@ -66,18 +75,32 @@ run_gate() {
     echo "$output"
   fi
   if [ "$rc" -ne 0 ]; then
-    if [ "$FORCE" = "true" ] && [ "$enforced" = "false" ]; then
-      echo "  (--force: $name gate non-pass, but bypass allowed)"
-    else
+    local bypassed=false
+    case "$bypass_kind" in
+      force)
+        if [ "$FORCE" = "true" ]; then
+          echo "  (--force: $name gate non-pass, bypassed)"
+          bypassed=true
+        fi
+        ;;
+      admin)
+        if [ "$BYPASS_REQS" = "true" ]; then
+          echo "  (--bypass-merge-requirements: $name gate non-pass, bypassed)"
+          bypassed=true
+        fi
+        ;;
+      none) : ;;
+    esac
+    if [ "$bypassed" = "false" ]; then
       GATE_FAILURES+=("$name")
     fi
   fi
 }
 
-run_gate ci check_ci true
-run_gate currency check_copilot_currency false
-run_gate threads check_unresolved_threads false
-run_gate no_conflict check_no_merge_conflict true
+run_gate ci          check_ci                  admin
+run_gate currency    check_copilot_currency    force
+run_gate threads     check_unresolved_threads  force
+run_gate no_conflict check_no_merge_conflict   none
 
 # --- Decide ---
 if [ ${#GATE_FAILURES[@]} -gt 0 ]; then
@@ -95,8 +118,16 @@ if [ ${#GATE_FAILURES[@]} -gt 0 ]; then
 fi
 
 echo "RESULT: all gates passed"
+
+# Build merge args. --admin invokes admin-merge mode on GitHub, which overrides
+# branch-protection rules (failed required checks, missing reviews, etc.).
+MERGE_ARGS=(--squash --delete-branch --match-head-sha="$PR_HEAD_SHA")
+if [ "$BYPASS_REQS" = "true" ]; then
+  MERGE_ARGS+=(--admin)
+fi
+
 if [ "$DRY_RUN" = "true" ]; then
-  echo "DRY RUN: would run: gh pr merge $PR --squash --delete-branch --match-head-sha=$PR_HEAD_SHA"
+  echo "DRY RUN: would run: gh pr merge $PR ${MERGE_ARGS[*]}"
   exit 0
 fi
 
@@ -104,5 +135,5 @@ fi
 # The block-direct-merge PreToolUse hook fires on top-level Claude Bash invocations only.
 # This `gh pr merge` runs as a subprocess of the script, so the hook does not see it —
 # no sentinel needed. (A leftover sentinel would silently bypass the next user-level merge.)
-gh pr merge "$PR" --squash --delete-branch --match-head-sha="$PR_HEAD_SHA"
+gh pr merge "$PR" "${MERGE_ARGS[@]}"
 echo "MERGED: PR #$PR"

@@ -2,6 +2,10 @@
   "permissions": {
     "deny": [
       "Bash(supabase db push:*)"
+    ],
+    "ask": [
+      "Bash(*merge-pr.sh*--force*)",
+      "Bash(*merge-pr.sh*--bypass-merge-requirements*)"
     ]
   },
   "enableAllProjectMcpServers": true,
