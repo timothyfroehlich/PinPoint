@@ -9,17 +9,21 @@
 # HEAD; PP-cvh thread 2026-05-16 21:47-21:48).
 #
 # Fix: wrap `git worktree add` with:
-#   1. lockf(1) on ~/.config/pinpoint/worktree-add.lock — kernel-level flock(2) exclusive
+#   1. Exclusive file lock on ~/.config/pinpoint/worktree-add.lock — kernel-level flock(2)
 #      lock, serializes ALL `git worktree add` operations across every Claude session on
-#      this host (not just within-session).
+#      this host (not just within-session). Uses lockf(1) on macOS or flock(1) on Linux.
 #   2. Retry + exponential backoff (5 retries, base 200ms) to absorb transient
 #      .git/config.lock contention from non-Claude git processes.
+#      Only lock-contention errors trigger a retry; permanent errors (e.g. "branch already
+#      exists", "path already exists") abort immediately with the error output.
 #
-# Platform: macOS. Uses /usr/bin/lockf (ships with macOS, backed by flock(2)).
-#   On Linux, replace `lockf -k` with `flock --no-fork -x` from util-linux.
+# Invocation: Claude Code calls this hook as a WorktreeCreate hook. The hook contract is
+#   JSON via stdin (not positional args). Registration in .claude/settings.json:
+#     "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/worktree-create.sh"
+#   No positional args are passed; all input comes from the JSON payload on stdin.
 #
-# Registration: .claude/settings.json hooks.WorktreeCreate runs this via
-#   `bash .claude/hooks/worktree-create.sh "$@"` (no executable bit required).
+# Platform: macOS uses /usr/bin/lockf (ships with macOS, backed by flock(2)).
+#   Linux uses flock(1) from util-linux. Detected at runtime.
 #
 # TODO (Tim): If you ever want to invoke this script directly (not via the hook),
 #   run: chmod +x .claude/hooks/worktree-create.sh
@@ -47,41 +51,85 @@ LOCK_DIR="$HOME/.config/pinpoint"
 LOCK_FILE="$LOCK_DIR/worktree-add.lock"
 mkdir -p "$LOCK_DIR"
 
-# lockf flags used:
-#   -k  keep the lock file after release (recommended for concurrency per lockf(1) man page;
-#       prevents delete/recreate races, guarantees lock ordering)
-#   -t 30  wait up to 30 seconds for the lock before giving up
-#
-# lockf wraps the inner do_worktree_add function, serializing it across sessions.
+# --- Detect platform locking tool ---
+# macOS: lockf(1) — ships with macOS, backed by flock(2)
+# Linux: flock(1) — from util-linux
+LOCK_TOOL=""
+if command -v lockf >/dev/null 2>&1; then
+  LOCK_TOOL="macos"
+elif command -v flock >/dev/null 2>&1; then
+  LOCK_TOOL="linux"
+else
+  echo "worktree-create.sh: WARNING — neither lockf nor flock found; running without serialization lock" >&2
+  LOCK_TOOL="none"
+fi
+
+# Exponential backoff: integer milliseconds, using shell arithmetic (no bc dependency).
+ms_to_sleep_args() {
+  local ms=$1
+  local secs=$((ms / 1000))
+  local frac=$(( (ms % 1000) ))
+  # Format as "N.NNN" for sleep (POSIX sleep accepts decimal on macOS/GNU)
+  printf '%d.%03d' "$secs" "$frac"
+}
+
+# Error patterns that indicate transient lock contention — retry-worthy.
+is_lock_contention() {
+  local stderr_text=$1
+  echo "$stderr_text" | grep -qE "could not lock config file|lock.*exists|File exists" 2>/dev/null
+}
+
 do_worktree_add() {
   local max_retries=5
   local delay_ms=200
   local attempt
+  local last_stderr=""
 
   for attempt in $(seq 1 "$max_retries"); do
-    if git -C "$BASE_PATH" worktree add "$WORKTREE_PATH" -b "$BRANCH" 2>/dev/null; then
+    last_stderr=$(git -C "$BASE_PATH" worktree add "$WORKTREE_PATH" -b "$BRANCH" 2>&1) && {
       echo "$WORKTREE_PATH"
       return 0
+    }
+
+    # Only retry on transient lock contention; abort immediately on permanent errors
+    if ! is_lock_contention "$last_stderr"; then
+      echo "worktree-create.sh: permanent error (not retrying):" >&2
+      echo "$last_stderr" >&2
+      return 1
     fi
 
     if [ "$attempt" -lt "$max_retries" ]; then
-      # Exponential backoff: 200ms, 400ms, 800ms, 1600ms ...
-      local sleep_sec
-      sleep_sec=$(echo "scale=3; $delay_ms / 1000" | bc)
-      echo "worktree-create.sh: attempt $attempt failed, retrying in ${delay_ms}ms..." >&2
-      sleep "$sleep_sec"
+      local sleep_arg
+      sleep_arg=$(ms_to_sleep_args "$delay_ms")
+      echo "worktree-create.sh: attempt $attempt lock contention, retrying in ${delay_ms}ms..." >&2
+      sleep "$sleep_arg"
       delay_ms=$((delay_ms * 2))
     fi
   done
 
   echo "worktree-create.sh: FAILED to create worktree after $max_retries attempts" >&2
   echo "  base_path=$BASE_PATH  branch=$BRANCH  target=$WORKTREE_PATH" >&2
+  echo "  Last error: $last_stderr" >&2
   return 1
 }
 
-export -f do_worktree_add
+export -f do_worktree_add is_lock_contention ms_to_sleep_args
 export BASE_PATH BRANCH WORKTREE_PATH
 
-# lockf -k: keep lock file (recommended); -t 30: wait up to 30s for the exclusive lock.
-# The subshell ensures do_worktree_add runs inside the lock.
-lockf -k -t 30 "$LOCK_FILE" bash -c 'do_worktree_add'
+# --- Acquire exclusive lock and run worktree add ---
+case "$LOCK_TOOL" in
+  macos)
+    # lockf -k: keep lock file (recommended for concurrency per lockf(1) man page;
+    # prevents delete/recreate races, guarantees lock ordering).
+    # -t 30: wait up to 30s for the lock before giving up.
+    lockf -k -t 30 "$LOCK_FILE" bash -c 'do_worktree_add'
+    ;;
+  linux)
+    # flock -x: exclusive lock; -w 30: wait up to 30s.
+    # --no-fork: run in the same process (avoids a subshell overhead).
+    flock -x -w 30 "$LOCK_FILE" bash -c 'do_worktree_add'
+    ;;
+  none)
+    do_worktree_add
+    ;;
+esac
