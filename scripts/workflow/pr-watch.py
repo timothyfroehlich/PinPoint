@@ -143,8 +143,6 @@ def run_audit(pr: int) -> bool:
 
     bad_merge = merge_state in ("DIRTY", "CONFLICTING", "BEHIND")
     merge_detail = f"mergeStateStatus={merge_state}"
-    if bad_merge:
-        merge_detail += " (resolve via `git fetch origin && git merge origin/main`)"
 
     if not ci_status:
         ci_check = (False, "CI Gate check not found")
@@ -179,8 +177,6 @@ def run_audit(pr: int) -> bool:
     emit(f"Readiness audit for PR #{pr}: {'PASS' if all_ok else 'FAIL'}")
     for ok, label, detail in checks:
         emit(f"  {'✓' if ok else '✗'} {label}: {detail}")
-    if not all_ok:
-        emit("Use --force to watch anyway, or fix the items above.")
     return all_ok
 
 
@@ -290,7 +286,6 @@ def watch_reviews(
             continue
         if count > baseline:
             emit("📝 New Copilot review posted")
-            emit(f"Run: ./scripts/workflow/copilot-comments.sh {pr}")
             review_seen.set()
             stop.set()
             return
@@ -370,8 +365,9 @@ def main() -> int:
     head_sha = pr_data["headRefOid"]
 
     active: list[dict] = []
+    runs: list[dict] = []
     for attempt in range(STARTUP_RETRIES):
-        runs: list[dict] = json.loads(
+        runs = json.loads(
             gh(
                 "run",
                 "list",
@@ -408,22 +404,9 @@ def main() -> int:
     if not active:
         # Fall back to recently completed runs for the same SHA — they may have
         # finished before we started watching (e.g., fast lint jobs).
-        all_runs: list[dict] = json.loads(
-            gh(
-                "run",
-                "list",
-                "--limit",
-                "50",
-                "--branch",
-                branch,
-                "--json",
-                "databaseId,status,conclusion,name,headSha",
-            )
-        )
+        # Reuse the last fetched runs list; no second gh run list call needed.
         completed = [
-            r
-            for r in all_runs
-            if r["headSha"] == head_sha and r["status"] == "completed"
+            r for r in runs if r["headSha"] == head_sha and r["status"] == "completed"
         ]
         if completed:
             failures = [
