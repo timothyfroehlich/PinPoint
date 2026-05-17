@@ -26,6 +26,16 @@
             "timeout": 5000
           }
         ]
+      },
+      {
+        "matcher": "Bash|mcp__plugin_github_github__merge_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-direct-merge.cjs",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "PostToolUse": [
