@@ -114,14 +114,28 @@ export async function ensureLoggedIn(
 
 /**
  * Logs out the current user via the User Menu.
+ *
+ * The Radix dropdown trigger flips `aria-expanded` to "true" once the menu is
+ * actually open. We assert that before reaching for the sign-out item so that
+ * a click intercepted by an overlay (e.g. a freshly-focused ProseMirror editor
+ * after creating an issue) surfaces as a clear "menu never opened" failure
+ * rather than the misleading "sign-out item not visible".
  */
 export async function logout(page: Page, _testInfo: TestInfo): Promise<void> {
   const userMenu = visibleUserMenu(page);
-  await expect(userMenu).toBeVisible();
-  await userMenu.click();
+
+  await expect(
+    userMenu,
+    "User menu trigger not visible — expected an authenticated AppHeader."
+  ).toBeVisible();
+
+  await openUserMenu(userMenu);
 
   const signOutItem = page.getByTestId("user-menu-signout");
-  await expect(signOutItem).toBeVisible();
+  await expect(
+    signOutItem,
+    "Sign-out item not visible even though the user menu reports open. The menu content may not have hydrated, or the testid was renamed."
+  ).toBeVisible();
   await signOutItem.click();
 
   // Wait for redirect to public dashboard
@@ -130,6 +144,31 @@ export async function logout(page: Page, _testInfo: TestInfo): Promise<void> {
   // Wait for the UI to settle into logged-out state (Sign In button visible)
   // AppHeader is unified — same testid on all viewports
   await expect(page.getByTestId("nav-signin")).toBeVisible({ timeout: 15000 });
+}
+
+/**
+ * Click the user-menu trigger and confirm it actually opened. Retries once
+ * if the first click loses to a focus/overlay race (common right after a form
+ * submit that leaves an editor focused).
+ */
+async function openUserMenu(
+  userMenu: ReturnType<typeof visibleUserMenu>
+): Promise<void> {
+  await userMenu.click();
+  try {
+    await expect(userMenu).toHaveAttribute("aria-expanded", "true", {
+      timeout: 3000,
+    });
+    return;
+  } catch {
+    // One retry — the first click sometimes loses to a focus race (e.g. a
+    // ProseMirror editor still holding focus right after a form submit).
+    await userMenu.click();
+    await expect(
+      userMenu,
+      "User menu did not open after two click attempts. aria-expanded never became 'true' — the click is likely being intercepted by an overlay (modal, editor focus trap, etc.)."
+    ).toHaveAttribute("aria-expanded", "true", { timeout: 3000 });
+  }
 }
 
 /**
