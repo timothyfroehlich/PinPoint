@@ -2,8 +2,9 @@
 # huddle-whoami.sh — look up or register the current Claude session's huddle name
 #
 # Identity is keyed by Claude Code's session_id (a UUID). Names live in a single
-# JSON map at ~/.config/pinpoint/huddle-session-names.json so every session can
-# be inspected/edited from one place and the mapping persists across restarts.
+# JSON map at <main-worktree>/.claude/huddle/session-names.json so every session
+# can be inspected/edited from one place and the mapping persists across
+# restarts. See huddle-lib.sh for the state-dir resolver.
 #
 # Subcommands:
 #   whoami [SESSION_ID]      Print the registered name for SESSION_ID (or the
@@ -25,8 +26,14 @@
 
 set -euo pipefail
 
-STATE_DIR="$HOME/.config/pinpoint"
-NAMES_JSON="$STATE_DIR/huddle-session-names.json"
+# shellcheck source=huddle-lib.sh disable=SC1091
+source "$(dirname "$0")/huddle-lib.sh"
+
+STATE_DIR=$(huddle_state_dir) || {
+  echo "huddle-whoami.sh: not inside a git checkout; can't locate huddle state" >&2
+  exit 1
+}
+NAMES_JSON="$STATE_DIR/session-names.json"
 
 mkdir -p "$STATE_DIR"
 if [[ ! -f "$NAMES_JSON" ]]; then

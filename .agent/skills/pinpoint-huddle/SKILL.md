@@ -99,15 +99,20 @@ Things NOT worth posting:
 | `scripts/hooks/huddle-session-start.sh`  | SessionStart          | Identity announcement; rotation check (currently stub) |
 | `scripts/hooks/huddle-whoami.sh`         | manual                | Register/lookup/list/discover session→name mappings    |
 | `scripts/hooks/huddle-rotation-check.sh` | sourced by both hooks | Date-compare for daily rotation (stub in PR #1357)     |
+| `scripts/hooks/huddle-lib.sh`            | sourced by all hooks  | Shared helpers (state-dir resolver)                    |
 
-## State files (all under `~/.config/pinpoint/`)
+## State files (all under `<main-worktree>/.claude/huddle/`)
 
-| File                           | Purpose                                                      |
-| ------------------------------ | ------------------------------------------------------------ |
-| `huddle-session-names.json`    | `{session_id: name}` map (canonical)                         |
-| `huddle-last-seen-<path-hash>` | Per-checkout poll cursor (most-recent injected `created_at`) |
-| `huddle-rotation.lock`         | flock target (rotation PR only)                              |
-| `huddle.config.json`           | Root bead ID + schema version (rotation PR only)             |
+The state directory is shared across all linked worktrees of the same clone
+(resolved via `git rev-parse --git-common-dir`). `.claude/huddle/` is
+git-ignored so the state stays machine-local.
+
+| File                    | Purpose                                                      |
+| ----------------------- | ------------------------------------------------------------ |
+| `session-names.json`    | `{session_id: name}` map (canonical)                         |
+| `last-seen-<path-hash>` | Per-checkout poll cursor (most-recent injected `created_at`) |
+| `rotation.lock`         | flock target (rotation PR only)                              |
+| `config.json`           | Root bead ID + schema version (rotation PR only)             |
 
 ## Self-filter rules
 

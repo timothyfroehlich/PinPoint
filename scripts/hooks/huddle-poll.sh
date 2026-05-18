@@ -16,12 +16,14 @@
 # We only read session_id and transcript_path (the latter for subagent detection;
 # the rest is ignored).
 #
-# State file: ~/.config/pinpoint/huddle-last-seen-<cwd-hash>
-#   Per-checkout isolation: each worktree/session tracks independently.
+# State file: <main-worktree>/.claude/huddle/last-seen-<cwd-hash>
+#   Per-checkout isolation: each worktree/session tracks independently, but
+#   the state directory is shared across all linked worktrees of the same
+#   clone (see huddle-lib.sh for resolver details).
 #
 # Self-filter (auto, no env config required): the UserPromptSubmit stdin payload
 # carries a `session_id` field. The hook reads it and looks up the agent's name
-# from `~/.config/pinpoint/huddle-session-names.json`, a JSON map of
+# from `<main-worktree>/.claude/huddle/session-names.json`, a JSON map of
 # `{session_id: name}`. Comments ending with `—Claude-<that name>` are excluded
 # from the injection so an agent never re-injects its own coordination posts.
 #
@@ -30,13 +32,12 @@
 # resumed turn can perform. The map persists across restarts; the helper
 # `scripts/hooks/huddle-whoami.sh` lets an agent recall its own name at any time.
 #
-# To register a session-to-name mapping (Tim, or the agent itself, runs once):
-#   bash scripts/hooks/huddle-whoami.sh register Slingshot
-# Or edit ~/.config/pinpoint/huddle-session-names.json directly.
+# To register a session-to-name mapping (the agent itself runs once):
+#   bash scripts/hooks/huddle-whoami.sh register <Name> <session_id>
 #
-# Backward compat: also accepts legacy per-session files at
-# `~/.config/pinpoint/cvh-self-<session_id>` (deprecated; predates the JSON map)
-# and the `$CLAUDE_AGENT_NAME` env var (the original activation scheme).
+# Backward compat: also accepts the `$CLAUDE_AGENT_NAME` env var (the original
+# activation scheme). The earlier per-session `cvh-self-<session_id>` fallback
+# was retired with the move to project-scoped state.
 #
 # Naming guidance: pick a short descriptive name based on your current work
 # (e.g. WorktreeHookFix, TestAudit, DesignBible). Full reference:
@@ -107,16 +108,27 @@ except Exception:
   ) || SESSION_ID=""
 fi
 
-STATE_DIR="$HOME/.config/pinpoint"
+# --- State directory resolution ---
+# Huddle state lives in <main-worktree>/.claude/huddle/ so it's shared
+# across all linked worktrees of the same clone. huddle-lib.sh provides
+# the resolver. If we can't find a git common-dir (e.g., hook fired outside
+# any PinPoint checkout), fail open silently — coordination is optional.
+LIB_SCRIPT="$(dirname "$0")/huddle-lib.sh"
+if [[ ! -f "$LIB_SCRIPT" ]]; then
+  exit 0
+fi
+# shellcheck source=huddle-lib.sh disable=SC1091
+source "$LIB_SCRIPT"
+STATE_DIR=$(huddle_state_dir) || exit 0
+mkdir -p "$STATE_DIR"
+
 # Derive a per-checkout key from the FULL absolute path, not just basename —
 # multiple worktrees/clones can have the same leaf directory name (e.g. two
 # "PinPoint" checkouts), and a basename collision would let one session
 # advance the cursor and silently swallow the other's coordination posts.
 # We use the SHA-256 prefix of `pwd -P` for a collision-resistant, filename-safe key.
 CWD_KEY=$(printf '%s' "$(pwd -P)" | python3 -c 'import sys,hashlib; print(hashlib.sha256(sys.stdin.read().encode()).hexdigest()[:16])')
-STATE_FILE="$STATE_DIR/huddle-last-seen-$CWD_KEY"
-
-mkdir -p "$STATE_DIR"
+STATE_FILE="$STATE_DIR/last-seen-$CWD_KEY"
 
 # Read last-seen timestamp (default "0" → older than any real ISO 8601 date)
 if [[ -f "$STATE_FILE" ]]; then
@@ -129,22 +141,13 @@ fi
 COMMENTS_JSON="$(bd comments PP-cvh --json 2>/dev/null)" || { exit 0; }
 
 # Resolve self agent name. Priority order:
-#   1. ~/.config/pinpoint/huddle-session-names.json[session_id] (canonical)
-#   2. ~/.config/pinpoint/cvh-self-<session_id> file (legacy, deprecated)
-#   3. $CLAUDE_AGENT_NAME env var (back-compat with original activation)
-#   4. unset → no self-filter applied
+#   1. <STATE_DIR>/session-names.json[session_id] (canonical)
+#   2. $CLAUDE_AGENT_NAME env var (back-compat with original activation)
+#   3. unset → no self-filter applied
 AGENT_NAME=""
-NAMES_JSON="$STATE_DIR/huddle-session-names.json"
-if [[ -n "$SESSION_ID" ]]; then
-  if [[ -f "$NAMES_JSON" ]]; then
-    AGENT_NAME=$(jq -r --arg sid "$SESSION_ID" '.[$sid] // ""' "$NAMES_JSON" 2>/dev/null || echo "")
-  fi
-  if [[ -z "$AGENT_NAME" ]]; then
-    SELF_FILE="$STATE_DIR/cvh-self-$SESSION_ID"
-    if [[ -f "$SELF_FILE" ]]; then
-      AGENT_NAME=$(cat "$SELF_FILE")
-    fi
-  fi
+NAMES_JSON="$STATE_DIR/session-names.json"
+if [[ -n "$SESSION_ID" ]] && [[ -f "$NAMES_JSON" ]]; then
+  AGENT_NAME=$(jq -r --arg sid "$SESSION_ID" '.[$sid] // ""' "$NAMES_JSON" 2>/dev/null || echo "")
 fi
 if [[ -z "$AGENT_NAME" ]]; then
   AGENT_NAME="${CLAUDE_AGENT_NAME:-}"

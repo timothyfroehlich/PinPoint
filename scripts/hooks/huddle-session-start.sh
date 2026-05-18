@@ -30,8 +30,16 @@
 
 set -euo pipefail
 
-STATE_DIR="$HOME/.config/pinpoint"
-NAMES_JSON="$STATE_DIR/huddle-session-names.json"
+# --- State directory resolution ---
+# See huddle-lib.sh for why state lives in <main-worktree>/.claude/huddle/.
+LIB_SCRIPT="$(dirname "$0")/huddle-lib.sh"
+if [[ ! -f "$LIB_SCRIPT" ]]; then
+  exit 0
+fi
+# shellcheck source=huddle-lib.sh disable=SC1091
+source "$LIB_SCRIPT"
+STATE_DIR=$(huddle_state_dir) || exit 0
+NAMES_JSON="$STATE_DIR/session-names.json"
 mkdir -p "$STATE_DIR"
 
 # Read stdin JSON (best-effort; never fail SessionStart on parse errors)
@@ -108,9 +116,9 @@ if [[ -n "$NAME" ]]; then
   printf 'Your session_id: `%s`\n' "$SESSION_ID"
   printf 'Registered as: **Claude-%s** (self-filter active for your own posts)\n\n' "$NAME"
   printf 'If this scrolls out of context later, recall your name with:\n'
-  printf '    bash ~/.claude/hooks/huddle-whoami.sh whoami %s\n\n' "$SESSION_ID"
+  printf '    bash scripts/hooks/huddle-whoami.sh whoami %s\n\n' "$SESSION_ID"
   # shellcheck disable=SC2016  # backticks are literal Markdown
-  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md` (after PR #1357 merges; user-level script always works regardless of branch).\n'
+  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md`\n'
 else
   printf '## Huddle identity — registration needed\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
@@ -126,11 +134,10 @@ else
   printf '  DocsSync         keeping docs aligned\n\n'
   printf 'Format: CamelCase, ASCII letters only, under ~20 chars.\n\n'
   printf 'Register with:\n'
-  printf '    bash ~/.claude/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
-  printf 'The user-level path works from any branch or worktree.\n'
+  printf '    bash scripts/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
   printf 'If the name is taken, the helper suggests variations.\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown
-  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md` (after PR #1357 merges).\n'
+  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md`\n'
 fi
 
 exit 0

@@ -6,6 +6,9 @@
 .claude-task-contract
 .claude/scheduled_tasks.lock
 
+# Huddle coordination state (runtime, machine-local)
+.claude/huddle/
+
 # dependencies
 /node_modules
 package-lock.json
