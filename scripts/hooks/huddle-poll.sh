@@ -122,12 +122,15 @@ source "$LIB_SCRIPT"
 STATE_DIR=$(huddle_state_dir) || exit 0
 mkdir -p "$STATE_DIR"
 
-# Derive a per-checkout key from the FULL absolute path, not just basename —
-# multiple worktrees/clones can have the same leaf directory name (e.g. two
-# "PinPoint" checkouts), and a basename collision would let one session
-# advance the cursor and silently swallow the other's coordination posts.
-# We use the SHA-256 prefix of `pwd -P` for a collision-resistant, filename-safe key.
-CWD_KEY=$(printf '%s' "$(pwd -P)" | python3 -c 'import sys,hashlib; print(hashlib.sha256(sys.stdin.read().encode()).hexdigest()[:16])')
+# Derive a per-checkout key from the worktree root (not the hook's CWD).
+# Earlier versions hashed `pwd -P`, but that varied if the hook fired from a
+# subdirectory of the checkout (e.g. `cd src/` then triggering a UserPromptSubmit
+# would land on a different cursor and replay already-seen comments).
+# `git rev-parse --show-toplevel` returns the current worktree's root path
+# (main or linked); same key regardless of where the hook fired within it.
+# We hash that path with SHA-256 for a collision-resistant, filename-safe key.
+WORKTREE_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+CWD_KEY=$(printf '%s' "$WORKTREE_ROOT" | python3 -c 'import sys,hashlib; print(hashlib.sha256(sys.stdin.read().encode()).hexdigest()[:16])')
 STATE_FILE="$STATE_DIR/last-seen-$CWD_KEY"
 
 # Read last-seen timestamp (default "0" → older than any real ISO 8601 date)
