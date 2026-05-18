@@ -64,15 +64,11 @@ interface EditMachineDialogProps {
     presenceStatus: MachinePresenceStatus;
     ownerId: string | null;
     invitedOwnerId: string | null;
-    owner?: {
-      id: string;
-      name: string;
-      avatarUrl?: string | null;
-    } | null;
-    invitedOwner?: {
-      id: string;
-      name: string;
-    } | null;
+    // Only `name` is consumed (display of current owner when the user lacks
+    // edit-owner permission). `id`/`avatarUrl` are intentionally excluded so
+    // unused server data never crosses the client boundary (CORE-SEC-006).
+    owner?: { name: string } | null;
+    invitedOwner?: { name: string } | null;
   };
   allUsers: OwnerSelectUser[];
   canEditAnyMachine: boolean;
