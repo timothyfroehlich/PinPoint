@@ -1553,7 +1553,7 @@ git commit -m "feat(machines): emit marker events for prose-field edits (PP-0x98
 - Modify: the issue create action (search for the create entry point in `src/app/(app)/issues/actions.ts` or wherever issues are created — see `src/services/issues.ts` for the actual mutation)
 - Create: `src/test/integration/supabase/issue-actions-machine-timeline.test.ts`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `src/test/integration/supabase/issue-actions-machine-timeline.test.ts`:
 
@@ -1615,12 +1615,12 @@ describe("createIssueAction duplicate-writes to machine timeline", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: FAIL — `timelineEvents` row is not emitted.
 
-- [ ] **Step 3: Add duplicate-write to `createIssueAction`**
+- [x] **Step 3: Add duplicate-write to `createIssueAction`**
 
 Open the issue create action. Search for the line that creates the issue row (look for `tx.insert(issues)`). Find the surrounding transaction. After the `issues` row is inserted and after `createTimelineEvent` is called for `issueComments`, add the parallel emit to `timelineEvents`:
 
@@ -1648,17 +1648,30 @@ await createMachineTimelineEvent(
 
 If the issue's reporter isn't readily available, use whatever name the existing `issueComments` system-event uses for "opened by" — match consistency.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: PASS — both assertions hold.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/(app)/issues/actions.ts src/services/issues.ts src/test/integration/supabase/issue-actions-machine-timeline.test.ts
 git commit -m "feat(machines): duplicate-write issue_opened to machine timeline (PP-0x98)"
 ```
+
+**Implementation note (PP-0x98 Task 10 actual landing, 2026-05-17):** The
+duplicate-write was added directly to the `createIssue` service function in
+`src/services/issues.ts` (not the action wrapper) since the transaction lives
+in the service layer. Test landed at
+`src/test/integration/machine-timeline-issue-actions.test.ts` (PGlite, not
+the supabase/ subdir). `openedByName` resolution: prefer
+`user_profiles.name` joined on `reportedBy`, fall back to `reporterName`,
+finally "Anonymous" — never `reporterEmail` (AGENTS.md rule 10). The
+existing lock+increment `.returning(...)` was extended with `id: machines.id`
+so the helper has the machine UUID. 3 new tests added; 64-test regression
+sweep (machine-timeline + machine-owner + supabase/issue-services + 2 unit
+files using createIssue) all pass.
 
 ---
 

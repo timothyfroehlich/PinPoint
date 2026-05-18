@@ -12,6 +12,7 @@ import {
   createTimelineEvent,
   type TimelineEventData,
 } from "~/lib/timeline/events";
+import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import { createNotification } from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
@@ -146,6 +147,7 @@ export async function createIssue({
       .set({ nextIssueNumber: sql`${machines.nextIssueNumber} + 1` })
       .where(eq(machines.initials, machineInitials))
       .returning({
+        id: machines.id,
         nextIssueNumber: machines.nextIssueNumber,
         name: machines.name,
         ownerId: machines.ownerId,
@@ -222,7 +224,44 @@ export async function createIssue({
         .onConflictDoNothing();
     }
 
-    // 5. Notifications
+    // 5. Duplicate-write `issue_opened` to machine timeline (PP-0x98)
+    //
+    // Email privacy (AGENTS.md rule 10): never persist reporter email here.
+    // Prefer the resolved user_profiles.name when `reportedBy` is set; fall
+    // back to the freeform `reporterName` (public report); finally "Anonymous".
+    let openedByName = "Anonymous";
+    if (reportedBy) {
+      const reporter = await tx.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, reportedBy),
+        columns: { name: true },
+      });
+      if (reporter) {
+        openedByName = reporter.name;
+      } else if (reporterName) {
+        openedByName = reporterName;
+      }
+    } else if (reporterName) {
+      openedByName = reporterName;
+    }
+
+    await createMachineTimelineEvent(
+      updatedMachine.id,
+      {
+        sourceType: "issue",
+        tag: "issue",
+        eventData: {
+          kind: "issue_opened",
+          issueId: issue.id,
+          issueNumber: issue.issueNumber,
+          openedByName,
+          title,
+        },
+        ...(reportedBy ? { actorId: reportedBy } : {}),
+      },
+      tx
+    );
+
+    // 6. Notifications
     try {
       const formattedId = formatIssueId(machineInitials, issueNumber);
       const plainDescription = description
