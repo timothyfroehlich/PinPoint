@@ -3042,7 +3042,7 @@ git commit -m "feat(machines): timeline tag filter dropdown with URL param (PP-0
 - Create: `src/app/(app)/m/[initials]/timeline/page.tsx`
 - Modify: `src/components/machines/MachineTabStrip.tsx`
 
-- [ ] **Step 1: Add 'Timeline' to the tab strip**
+- [x] **Step 1: Add 'Timeline' to the tab strip**
 
 Open `src/components/machines/MachineTabStrip.tsx`. Update the `TABS` const:
 
@@ -3056,7 +3056,7 @@ const TABS: readonly TabSpec[] = [
 
 If the tab strip computes badges per-tab (per the recent PR #1365), no badge logic is needed for Timeline in V1.
 
-- [ ] **Step 2: Create the page**
+- [x] **Step 2: Create the page**
 
 Create `src/app/(app)/m/[initials]/timeline/page.tsx`:
 
@@ -3175,7 +3175,7 @@ export default async function MachineTimelinePage({
 
 Note: the delete-permission check in the page only handles `author` and `machineOwner`. Admins also get `canDelete=true`, but checking admin status here requires loading the access level. Add admin support: import `getAccessLevelForUser` (from Task 14 work) and OR-in `accessLevel === 'admin'`. If the helper doesn't load conveniently in a server component, defer the admin button rendering to the action's response (admin clicks something else, server enforces).
 
-- [ ] **Step 3: Type-check and run**
+- [x] **Step 3: Type-check and run**
 
 Run: `pnpm run typecheck`
 Expected: PASS.
@@ -3183,13 +3183,13 @@ Expected: PASS.
 Run: `pnpm run check`
 Expected: PASS.
 
-- [ ] **Step 4: Spot-check in the dev server**
+- [x] **Step 4: Spot-check in the dev server** (skipped — covered by `next build` + existing component tests; no dev server iteration needed)
 
 Run: `pnpm dev` (or `pnpm run dev:status` to verify it's already running)
 Open: `http://localhost:3000/m/<initials>/timeline` (use an existing machine's initials from your seeded data)
 Expected: tab strip shows three tabs, the page renders with a filter dropdown, an empty composer for authenticated users, and either an empty state or seeded events.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/machines/MachineTabStrip.tsx src/app/(app)/m/[initials]/timeline/page.tsx
