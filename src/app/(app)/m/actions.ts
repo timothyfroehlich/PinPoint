@@ -33,6 +33,7 @@ import {
 } from "~/lib/tiptap/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
+import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -233,6 +234,42 @@ export async function createMachineAction(
             });
         }
 
+        // Lifecycle: emit machine_added (and owner_set if active owner)
+        // Atomic with the machine insert — if these fail, the machine rolls back.
+        await createMachineTimelineEvent(
+          newMachine.id,
+          {
+            sourceType: "lifecycle",
+            tag: "lifecycle",
+            eventData: { kind: "machine_added" },
+            actorId: user.id,
+          },
+          tx
+        );
+
+        if (newMachine.ownerId) {
+          const ownerProfile = await tx.query.userProfiles.findFirst({
+            where: eq(userProfiles.id, newMachine.ownerId),
+            columns: { id: true, name: true },
+          });
+          if (ownerProfile) {
+            await createMachineTimelineEvent(
+              newMachine.id,
+              {
+                sourceType: "lifecycle",
+                tag: "lifecycle",
+                eventData: {
+                  kind: "owner_set",
+                  toOwnerId: ownerProfile.id,
+                  toOwnerName: ownerProfile.name,
+                },
+                actorId: user.id,
+              },
+              tx
+            );
+          }
+        }
+
         return [newMachine];
       });
 
@@ -331,36 +368,76 @@ export async function createMachineAction(
   }
   // If no ownerId provided, leave both undefined — DB stores NULL (no defaulting to caller)
 
-  // Insert machine
+  // Insert machine + watcher + lifecycle events atomically.
   try {
-    const [machine] = await db
-      .insert(machines)
-      .values({
-        name,
-        initials,
-        ownerId: finalOwnerId,
-        invitedOwnerId: finalInvitedOwnerId,
-      })
-      .returning();
-
-    if (!machine) {
-      throw new Error("Machine creation failed");
-    }
-
-    // Auto-add owner to machine_watchers (full subscribe mode)
-    if (finalOwnerId) {
-      await db
-        .insert(machineWatchers)
+    const [machine] = await db.transaction(async (tx) => {
+      const [newMachine] = await tx
+        .insert(machines)
         .values({
-          machineId: machine.id,
-          userId: finalOwnerId,
-          watchMode: "subscribe",
+          name,
+          initials,
+          ownerId: finalOwnerId,
+          invitedOwnerId: finalInvitedOwnerId,
         })
-        .onConflictDoUpdate({
-          target: [machineWatchers.machineId, machineWatchers.userId],
-          set: { watchMode: "subscribe" },
+        .returning();
+
+      if (!newMachine) {
+        throw new Error("Machine creation failed");
+      }
+
+      // Auto-add owner to machine_watchers (full subscribe mode)
+      if (finalOwnerId) {
+        await tx
+          .insert(machineWatchers)
+          .values({
+            machineId: newMachine.id,
+            userId: finalOwnerId,
+            watchMode: "subscribe",
+          })
+          .onConflictDoUpdate({
+            target: [machineWatchers.machineId, machineWatchers.userId],
+            set: { watchMode: "subscribe" },
+          });
+      }
+
+      // Lifecycle: emit machine_added (and owner_set if active owner)
+      // Atomic with the machine insert — if these fail, the machine rolls back.
+      await createMachineTimelineEvent(
+        newMachine.id,
+        {
+          sourceType: "lifecycle",
+          tag: "lifecycle",
+          eventData: { kind: "machine_added" },
+          actorId: user.id,
+        },
+        tx
+      );
+
+      if (newMachine.ownerId) {
+        const ownerProfile = await tx.query.userProfiles.findFirst({
+          where: eq(userProfiles.id, newMachine.ownerId),
+          columns: { id: true, name: true },
         });
-    }
+        if (ownerProfile) {
+          await createMachineTimelineEvent(
+            newMachine.id,
+            {
+              sourceType: "lifecycle",
+              tag: "lifecycle",
+              eventData: {
+                kind: "owner_set",
+                toOwnerId: ownerProfile.id,
+                toOwnerName: ownerProfile.name,
+              },
+              actorId: user.id,
+            },
+            tx
+          );
+        }
+      }
+
+      return [newMachine];
+    });
 
     revalidatePath("/m");
 

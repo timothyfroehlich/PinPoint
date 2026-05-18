@@ -1079,7 +1079,7 @@ git commit -m "feat(machines): getMachineTimeline read query with tag filter (PP
 - Modify: `src/app/(app)/m/actions.ts:91` (`createMachineAction`)
 - Modify: `src/test/integration/supabase/machine-timeline-events.test.ts` (append)
 
-- [ ] **Step 1: Write failing integration test**
+- [x] **Step 1: Write failing integration test**
 
 Append to `src/test/integration/supabase/machine-timeline-events.test.ts`:
 
@@ -1144,7 +1144,7 @@ If `withTestAuth`, `seedOrg`, or `seedUser` don't exist, find their canonical eq
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: FAIL — `createMachineAction` does not yet emit timeline events.
 
-- [ ] **Step 3: Modify `createMachineAction` to emit auto-events**
+- [x] **Step 3: Modify `createMachineAction` to emit auto-events**
 
 Open `src/app/(app)/m/actions.ts:91`. Find the transaction block in `createMachineAction`. Immediately after the machine is inserted (and inside the same transaction), add:
 
@@ -1196,7 +1196,7 @@ Match the existing variable naming (the auth pattern likely already resolves `cu
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: PASS — both new tests green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/(app)/m/actions.ts src/test/integration/supabase/machine-timeline-events.test.ts
