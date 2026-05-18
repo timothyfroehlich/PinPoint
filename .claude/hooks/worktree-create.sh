@@ -110,7 +110,7 @@ fi
 ms_to_sleep_args() {
   local ms=$1
   local secs=$((ms / 1000))
-  local frac=$(( (ms % 1000) ))
+  local frac=$(( ms % 1000 ))
   # Format as "N.NNN" for sleep (POSIX sleep accepts decimal on macOS/GNU)
   printf '%d.%03d' "$secs" "$frac"
 }
