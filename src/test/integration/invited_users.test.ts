@@ -596,4 +596,55 @@ describe("Invited Users Integration", () => {
     expect(prefs?.emailNotifyOnNewIssue).toBe(true);
     expect(prefs?.inAppNotifyOnNewIssue).toBe(false);
   });
+
+  // Rule #12 (admin half): admins MUST be able to see real email addresses.
+  // The admin user-listing page calls getUnifiedUsers({ includeEmails: true }).
+  // This test ensures the returned values are actual email strings — not null,
+  // undefined, or any redacted form.
+  describe("Admin email visibility (Rule #12 admin half)", () => {
+    it("should return real email addresses for active users when includeEmails is true", async () => {
+      const db = await getTestDb();
+
+      const userId = "00000000-0000-0000-0000-000000000090";
+      const userEmail = "admin-visible@example.com";
+
+      await db.insert(authUsers).values({ id: userId, email: userEmail });
+      await db.insert(userProfiles).values({
+        id: userId,
+        email: userEmail,
+        firstName: "Visible",
+        lastName: "Admin",
+        role: "member",
+      });
+
+      const users = await getUnifiedUsers({ includeEmails: true });
+      const user = users.find((u) => u.id === userId);
+
+      expect(user).toBeDefined();
+      // The email must be the real string — not null, not undefined, not redacted.
+      expect(user?.email).toBe(userEmail);
+    });
+
+    it("should return real email addresses for invited users when includeEmails is true", async () => {
+      const db = await getTestDb();
+
+      const invitedEmail = "invited-admin-visible@example.com";
+      const [invited] = await db
+        .insert(invitedUsers)
+        .values({
+          firstName: "InvitedVisible",
+          lastName: "Admin",
+          email: invitedEmail,
+          role: "member",
+        })
+        .returning();
+
+      const users = await getUnifiedUsers({ includeEmails: true });
+      const user = users.find((u) => u.id === invited.id);
+
+      expect(user).toBeDefined();
+      // The email must be the real string — not null, not undefined, not redacted.
+      expect(user?.email).toBe(invitedEmail);
+    });
+  });
 });
