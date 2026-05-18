@@ -1424,7 +1424,7 @@ git commit -m "feat(machines): emit per-field lifecycle events on update (PP-0x9
 - Modify: `src/app/(app)/m/actions.ts:855` (`updateMachineOwnerNotes`)
 - Modify: integration test file (append)
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Append:
 
@@ -1486,12 +1486,18 @@ describe("prose-field actions emit marker events", () => {
 });
 ```
 
+Implementation note: actual action signatures are `(machineId, value)` (the
+plan example above is approximate). Tests were appended to
+`src/test/integration/machine-timeline-actions.test.ts` (not a new
+`machine-timeline-events` file) so the existing PGlite mocks and helpers
+are reused. Added a fifth `no-op edit` test covering the equality guard.
+
 - [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: FAIL — 4 marker events not emitted.
 
-- [ ] **Step 3: Modify each prose-field action**
+- [x] **Step 3: Modify each prose-field action**
 
 For each of the four actions, inside the transaction after the update statement, add the corresponding emit. Example for `updateMachineDescription`:
 
@@ -1517,12 +1523,21 @@ Repeat for `updateMachineTournamentNotes` (kind: `"tournament_notes_updated"`), 
 
 Important: only emit if the prose actually changed. Use JSON.stringify equality on the `before`/`after` documents, or rely on the existing action's "no-op detection" if one exists. If the action currently writes unconditionally, add a `JSON.stringify(before.field) !== JSON.stringify(input.value)` guard around the emit so empty-edits don't spam the timeline.
 
+Implementation note: all four actions delegate to one internal helper
+`updateMachineTextField`, so the change was made at a single edit point. A
+`PROSE_FIELD_TO_EVENT_KIND` map (with `as const satisfies Record<..., MachineTimelineEventKind>`)
+picks the right `kind` per field. The update is wrapped in `db.transaction`
+and the emit runs inside the tx when the diff is non-zero. JSON equality uses
+a canonical (sorted-keys) stringifier — PostgreSQL JSONB does not preserve
+source key order so plain `JSON.stringify` produces false-positive diffs after
+a round trip.
+
 - [x] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: PASS — 4 new tests green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/(app)/m/actions.ts src/test/integration/supabase/machine-timeline-events.test.ts

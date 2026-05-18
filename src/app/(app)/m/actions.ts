@@ -37,6 +37,40 @@ import {
   emitMachineCreated,
   emitMachineUpdated,
 } from "~/lib/timeline/machine-lifecycle-helpers";
+import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
+import { type MachineTimelineEventKind } from "~/lib/timeline/machine-event-types";
+
+/**
+ * Maps a prose-field column name to its marker lifecycle event kind. Used by
+ * `updateMachineTextField` to emit one timeline event per successful edit.
+ */
+const PROSE_FIELD_TO_EVENT_KIND = {
+  description: "description_updated",
+  tournamentNotes: "tournament_notes_updated",
+  ownerRequirements: "owner_requirements_updated",
+  ownerNotes: "owner_notes_updated",
+} as const satisfies Record<
+  "description" | "tournamentNotes" | "ownerRequirements" | "ownerNotes",
+  MachineTimelineEventKind
+>;
+
+/**
+ * Canonical-JSON serializer with deterministic key ordering. Used to compare
+ * before/after ProseMirror documents inside `updateMachineTextField` — PG
+ * stores JSONB without preserving the source key order, so a naive
+ * `JSON.stringify` round-trip would falsely report changes whenever the
+ * client-supplied key order differs from PG's normalized order.
+ */
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, val: unknown): unknown => {
+    if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+      const entries = Object.entries(val as Record<string, unknown>);
+      entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+      return Object.fromEntries(entries);
+    }
+    return val;
+  });
+}
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -1021,9 +1055,13 @@ async function updateMachineTextField(
         where: eq(userProfiles.id, user.id),
         columns: { role: true },
       }),
+      // Load the full machine row (rather than `columns: {...}`) so the
+      // current value of the prose field being edited is available for the
+      // before/after diff in the marker-event emit below. Using a dynamic
+      // `[field]: true` column projection would erase Drizzle's static type
+      // inference and force unsafe casts on every property access.
       db.query.machines.findFirst({
         where: eq(machines.id, machineId),
-        columns: { id: true, ownerId: true, initials: true },
       }),
     ]);
 
@@ -1054,11 +1092,39 @@ async function updateMachineTextField(
       );
     }
 
-    // Update the field
-    await db
-      .update(machines)
-      .set({ [field]: normalizedValue })
-      .where(eq(machines.id, machine.id));
+    // Compute change diff for the marker event. Compare the *normalized* value
+    // (post empty-doc → null normalization) against the stored value so that
+    // pure-whitespace edits collapse to no-ops and don't spam the timeline.
+    //
+    // Use a canonical (sorted-keys) JSON serializer because PostgreSQL JSONB
+    // doesn't preserve source key order — a round-tripped doc returns with
+    // PG's normalized key order which won't match the client's submission
+    // order under plain `JSON.stringify`.
+    const beforeValue: ProseMirrorDoc | null = machine[field];
+    const changed =
+      canonicalJson(beforeValue) !== canonicalJson(normalizedValue);
+
+    // Atomic: update + (optional) marker event emit. If the emit fails, the
+    // field update rolls back along with it.
+    await db.transaction(async (tx) => {
+      await tx
+        .update(machines)
+        .set({ [field]: normalizedValue })
+        .where(eq(machines.id, machine.id));
+
+      if (changed) {
+        await createMachineTimelineEvent(
+          machine.id,
+          {
+            sourceType: "lifecycle",
+            tag: "lifecycle",
+            eventData: { kind: PROSE_FIELD_TO_EVENT_KIND[field] },
+            actorId: user.id,
+          },
+          tx
+        );
+      }
+    });
 
     revalidatePath(`/m/${machine.initials}`);
 

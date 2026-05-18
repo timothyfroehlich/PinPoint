@@ -373,3 +373,150 @@ describe("updateMachineAction — timeline event emission (PP-0x98)", () => {
     expect(rows).toHaveLength(0);
   });
 });
+
+describe("prose-field actions emit marker events (PP-0x98)", () => {
+  setupTestDb();
+
+  async function makeUser(
+    role: "guest" | "member" | "technician" | "admin" = "member",
+    overrides: { firstName?: string; lastName?: string } = {}
+  ) {
+    const db = await getTestDb();
+    const id = randomUUID();
+    const firstName = overrides.firstName ?? "Test";
+    const lastName = overrides.lastName ?? "Owner";
+    await db.insert(authUsers).values({ id, email: `${id}@example.com` });
+    const [user] = await db
+      .insert(userProfiles)
+      .values({
+        id,
+        email: `${id}@example.com`,
+        firstName,
+        lastName,
+        role,
+      })
+      .returning();
+    return user;
+  }
+
+  async function mockAuth(userId: string) {
+    const { createClient } = await import("~/lib/supabase/server");
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: userId } } }),
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+  }
+
+  let proseMachineCounter = 0;
+  async function makeMachine(ownerId: string) {
+    const db = await getTestDb();
+    proseMachineCounter += 1;
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Prose Test Machine",
+        initials: `P${String(proseMachineCounter).padStart(3, "0")}`,
+        ownerId,
+      })
+      .returning();
+    return machine;
+  }
+
+  // Use the member-who-is-also-owner pattern: passes both `machines.edit`
+  // (owner condition) and `machines.edit.ownerNotes` (owner-only) so all four
+  // prose-field actions are authorized by the same test user.
+  const cases = [
+    {
+      label: "description",
+      kind: "description_updated" as const,
+      load: () =>
+        import("~/app/(app)/m/actions").then((m) => m.updateMachineDescription),
+    },
+    {
+      label: "tournamentNotes",
+      kind: "tournament_notes_updated" as const,
+      load: () =>
+        import("~/app/(app)/m/actions").then(
+          (m) => m.updateMachineTournamentNotes
+        ),
+    },
+    {
+      label: "ownerRequirements",
+      kind: "owner_requirements_updated" as const,
+      load: () =>
+        import("~/app/(app)/m/actions").then(
+          (m) => m.updateMachineOwnerRequirements
+        ),
+    },
+    {
+      label: "ownerNotes",
+      kind: "owner_notes_updated" as const,
+      load: () =>
+        import("~/app/(app)/m/actions").then((m) => m.updateMachineOwnerNotes),
+    },
+  ];
+
+  for (const c of cases) {
+    it(`${c.kind} emits a marker event`, async () => {
+      const db = await getTestDb();
+      const owner = await makeUser("member");
+      await mockAuth(owner.id);
+      const machine = await makeMachine(owner.id);
+      const action = await c.load();
+
+      const doc = {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "x" }] },
+        ],
+      } as const;
+
+      const result = await action(machine.id, doc);
+      expect(result.ok).toBe(true);
+
+      const rows = await db
+        .select()
+        .from(timelineEvents)
+        .where(eq(timelineEvents.machineId, machine.id));
+      const marker = rows.find(
+        (r) => (r.eventData as { kind: string } | null)?.kind === c.kind
+      );
+      expect(marker).toBeDefined();
+      expect(marker?.tag).toBe("lifecycle");
+      expect(marker?.sourceType).toBe("lifecycle");
+      expect(marker?.authorId).toBe(owner.id);
+    });
+  }
+
+  it("no-op edit emits NO marker event", async () => {
+    const db = await getTestDb();
+    const owner = await makeUser("member");
+    await mockAuth(owner.id);
+    const machine = await makeMachine(owner.id);
+    const { updateMachineDescription } = await import("~/app/(app)/m/actions");
+
+    const doc = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "x" }] }],
+    } as const;
+
+    // First edit: sets initial value, emits one event.
+    const first = await updateMachineDescription(machine.id, doc);
+    expect(first.ok).toBe(true);
+
+    // Second edit: same content, should emit NOTHING.
+    const second = await updateMachineDescription(machine.id, doc);
+    expect(second.ok).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    const descriptionMarkers = rows.filter(
+      (r) =>
+        (r.eventData as { kind: string } | null)?.kind === "description_updated"
+    );
+    expect(descriptionMarkers).toHaveLength(1);
+  });
+});
