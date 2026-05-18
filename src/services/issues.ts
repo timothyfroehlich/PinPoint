@@ -375,6 +375,44 @@ export async function updateIssueStatus({
       userId
     );
 
+    // 2b. Duplicate-write to machine timeline (atomic with status update, PP-0x98)
+    //
+    // Email privacy (AGENTS.md rule 10): closedByName resolves from
+    // user_profiles.name, never from email. Falls back to "Unknown User" if
+    // the profile row is missing (shouldn't happen given FK from authUsers).
+    const actor = await tx.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+      columns: { name: true },
+    });
+    const actorName = actor?.name ?? "Unknown User";
+
+    const eventData = isClosed
+      ? ({
+          kind: "issue_closed",
+          issueId,
+          issueNumber: currentIssue.issueNumber,
+          closedByName: actorName,
+          title: currentIssue.title,
+        } as const)
+      : ({
+          kind: "issue_status_changed",
+          issueId,
+          issueNumber: currentIssue.issueNumber,
+          from: oldStatus,
+          to: status,
+        } as const);
+
+    await createMachineTimelineEvent(
+      currentIssue.machine.id,
+      {
+        sourceType: "issue",
+        tag: "issue",
+        eventData,
+        ...(userId ? { actorId: userId } : {}),
+      },
+      tx
+    );
+
     log.info(
       { issueId, oldStatus, newStatus: status, action: "updateIssueStatus" },
       "Issue status updated"

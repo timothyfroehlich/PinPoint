@@ -22,6 +22,7 @@ import {
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
 
 // Route the production `db` import to the PGlite worker instance.
 vi.mock("~/server/db", async () => {
@@ -184,5 +185,149 @@ describe("createIssue duplicate-writes to machine timeline (PP-0x98)", () => {
       kind: "issue_opened",
       openedByName: "Anonymous",
     });
+  });
+});
+
+describe("updateIssueStatus duplicate-writes to machine timeline (PP-0x98)", () => {
+  setupTestDb();
+
+  async function makeUser(
+    overrides: { firstName?: string; lastName?: string } = {}
+  ) {
+    const db = await getTestDb();
+    const id = randomUUID();
+    await db.insert(authUsers).values({ id, email: `${id}@example.com` });
+    const [user] = await db
+      .insert(userProfiles)
+      .values({
+        id,
+        email: `${id}@example.com`,
+        firstName: overrides.firstName ?? "Test",
+        lastName: overrides.lastName ?? "Reporter",
+        role: "member",
+      })
+      .returning();
+    return user;
+  }
+
+  let machineCounter = 0;
+  async function makeMachine() {
+    const db = await getTestDb();
+    machineCounter += 1;
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Test Machine",
+        initials: `US${String(machineCounter).padStart(3, "0")}`,
+      })
+      .returning();
+    return machine;
+  }
+
+  async function seedIssue(
+    reporter: { id: string },
+    machine: { id: string; initials: string }
+  ) {
+    const { createIssue } = await import("~/services/issues");
+    return createIssue({
+      title: "x",
+      machineInitials: machine.initials,
+      severity: "minor",
+      priority: "low",
+      frequency: "intermittent",
+      status: "new",
+      reportedBy: reporter.id,
+      autoWatchReporter: false,
+    });
+  }
+
+  async function clearTimelineEventsForMachine(machineId: string) {
+    const db = await getTestDb();
+    await db
+      .delete(timelineEvents)
+      .where(eq(timelineEvents.machineId, machineId));
+  }
+
+  it("emits issue_closed when status changes to a closed status", async () => {
+    const db = await getTestDb();
+    const user = await makeUser({ firstName: "Tim", lastName: "Test" });
+    const machine = await makeMachine();
+    const issue = await seedIssue(user, machine);
+    // remove Task 10's issue_opened so we assert cleanly on the status change
+    await clearTimelineEventsForMachine(machine.id);
+
+    const { updateIssueStatus } = await import("~/services/issues");
+    const closedStatus = CLOSED_STATUSES[0]; // "fixed"
+    await updateIssueStatus({
+      issueId: issue.id,
+      status: closedStatus,
+      userId: user.id,
+    });
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].sourceType).toBe("issue");
+    expect(rows[0].tag).toBe("issue");
+    expect(rows[0].eventData).toMatchObject({
+      kind: "issue_closed",
+      issueId: issue.id,
+      issueNumber: issue.issueNumber,
+      closedByName: "Tim Test",
+      title: "x",
+    });
+    expect(rows[0].authorId).toBe(user.id);
+  });
+
+  it("emits issue_status_changed for an intermediate status transition", async () => {
+    const db = await getTestDb();
+    const user = await makeUser({ firstName: "Sam", lastName: "Smith" });
+    const machine = await makeMachine();
+    const issue = await seedIssue(user, machine);
+    await clearTimelineEventsForMachine(machine.id);
+
+    const { updateIssueStatus } = await import("~/services/issues");
+    await updateIssueStatus({
+      issueId: issue.id,
+      status: "in_progress",
+      userId: user.id,
+    });
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].eventData).toMatchObject({
+      kind: "issue_status_changed",
+      issueId: issue.id,
+      issueNumber: issue.issueNumber,
+      from: "new",
+      to: "in_progress",
+    });
+    expect(rows[0].authorId).toBe(user.id);
+  });
+
+  it("emits NO event when status didn't change (no-op shortcut)", async () => {
+    const db = await getTestDb();
+    const user = await makeUser();
+    const machine = await makeMachine();
+    const issue = await seedIssue(user, machine);
+    await clearTimelineEventsForMachine(machine.id);
+
+    const { updateIssueStatus } = await import("~/services/issues");
+    await updateIssueStatus({
+      issueId: issue.id,
+      status: "new",
+      userId: user.id,
+    });
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(rows).toHaveLength(0);
   });
 });

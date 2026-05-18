@@ -1682,7 +1682,7 @@ files using createIssue) all pass.
 - Modify: `src/app/(app)/issues/actions.ts:129` (`updateIssueStatusAction`) and/or `src/services/issues.ts:332` (where issue status changes happen and `createTimelineEvent` is called)
 - Modify: `src/test/integration/supabase/issue-actions-machine-timeline.test.ts` (append)
 
-- [ ] **Step 1: Write failing tests (append)**
+- [x] **Step 1: Write failing tests (append)**
 
 ```typescript
 import { updateIssueStatusAction } from "~/app/(app)/issues/actions";
@@ -1756,7 +1756,7 @@ The list of "closed" status enum values lives in the issue status config. Check 
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: FAIL — duplicate-write not in place.
 
-- [ ] **Step 3: Add duplicate-write to the status-change service**
+- [x] **Step 3: Add duplicate-write to the status-change service**
 
 Open `src/services/issues.ts:332` (where `createTimelineEvent` is called for `status_changed`). After that call, in the same transaction, add:
 
@@ -1798,12 +1798,24 @@ await createMachineTimelineEvent(
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: PASS — both new tests green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/services/issues.ts src/test/integration/supabase/issue-actions-machine-timeline.test.ts
 git commit -m "feat(machines): duplicate-write issue status changes to machine timeline (PP-0x98)"
 ```
+
+**Implementation note:** real Server Action shape is `(prevState, formData)`, so
+the duplicate-write was placed in the `updateIssueStatus` service
+(`src/services/issues.ts:285`) rather than the action layer — same transaction
+as the existing `createTimelineEvent` system row, atomic with the status update.
+`CLOSED_STATUSES` lives at `~/lib/issues/status` (plural). Tests live in
+`src/test/integration/machine-timeline-issue-actions.test.ts` (appended to
+Task 10's file, three new specs: closed, intermediate, no-op). `closedByName`
+resolves via `userProfiles.findFirst` with `name` column only — never email
+(AGENTS.md rule 10). All 6 tests in the file green; 36-test regression sweep
+(machine-timeline integration set) green; 44 unit tests touching
+`updateIssueStatus` green.
 
 ---
 
