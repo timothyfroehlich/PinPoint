@@ -208,8 +208,10 @@ export default async function MachineInfoTab({
                 presenceStatus: machine.presenceStatus,
                 ownerId: machine.ownerId,
                 invitedOwnerId: machine.invitedOwnerId,
-                owner: machine.owner,
-                invitedOwner: machine.invitedOwner,
+                owner: machine.owner ? { name: machine.owner.name } : null,
+                invitedOwner: machine.invitedOwner
+                  ? { name: machine.invitedOwner.name }
+                  : null,
               }}
               allUsers={allUsers}
               canEditAnyMachine={canEditAnyMachine}
