@@ -129,10 +129,17 @@ test.describe("Bottom Tab Bar (mobile only)", () => {
     await expect(moreButton).toBeVisible();
     await moreButton.click();
 
-    // Sheet should open with secondary nav items
-    await expect(page.getByTestId("more-sheet-help")).toBeVisible();
-    await expect(page.getByTestId("more-sheet-whats-new")).toBeVisible();
-    await expect(page.getByTestId("more-sheet-about")).toBeVisible();
+    // Wait for the Sheet to fully animate open before asserting on children.
+    // The Sheet is a Radix Dialog portal — scope assertions to the dialog
+    // so they resolve even if the surrounding page has shifted layout.
+    const moreSheet = page.getByRole("dialog");
+    await moreSheet.waitFor({ state: "visible", timeout: 5000 });
+
+    // Sheet should open with secondary nav items.
+    // Scope to the dialog so locators are anchored to the Sheet portal content.
+    await expect(moreSheet.getByTestId("more-sheet-help")).toBeVisible();
+    await expect(moreSheet.getByTestId("more-sheet-whats-new")).toBeVisible();
+    await expect(moreSheet.getByTestId("more-sheet-about")).toBeVisible();
   });
 
   test("More sheet shows User Management only for admin users", async ({
@@ -152,8 +159,13 @@ test.describe("Bottom Tab Bar (mobile only)", () => {
     const moreButton = page.getByRole("button", { name: /more options/i });
     await moreButton.click();
 
-    // User Management should be visible for admin role
-    await expect(page.getByTestId("more-sheet-admin")).toBeVisible();
+    // Wait for Sheet to animate open before asserting on children.
+    const moreSheet = page.getByRole("dialog");
+    await moreSheet.waitFor({ state: "visible", timeout: 5000 });
+
+    // User Management should be visible for admin role.
+    // Scope to the dialog so locators are anchored to the Sheet portal content.
+    await expect(moreSheet.getByTestId("more-sheet-admin")).toBeVisible();
     await expect(page.getByTestId("more-sheet-admin")).toHaveAttribute(
       "href",
       "/admin/users"
