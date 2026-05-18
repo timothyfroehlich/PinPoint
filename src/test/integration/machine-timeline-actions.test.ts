@@ -14,9 +14,15 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
-import { authUsers, timelineEvents, userProfiles } from "~/server/db/schema";
+import {
+  authUsers,
+  machines,
+  timelineEvents,
+  userProfiles,
+} from "~/server/db/schema";
 
 // Route the production `db` import to the PGlite worker instance.
 vi.mock("~/server/db", async () => {
@@ -173,5 +179,197 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
       toOwnerId: guest.id,
       toOwnerName: "Promoted Guest",
     });
+  });
+});
+
+describe("updateMachineAction — timeline event emission (PP-0x98)", () => {
+  setupTestDb();
+
+  async function makeUser(
+    role: "guest" | "member" | "technician" | "admin" = "admin",
+    overrides: { firstName?: string; lastName?: string } = {}
+  ) {
+    const db = await getTestDb();
+    const id = randomUUID();
+    const firstName = overrides.firstName ?? "Test";
+    const lastName = overrides.lastName ?? "Admin";
+    await db.insert(authUsers).values({ id, email: `${id}@example.com` });
+    const [user] = await db
+      .insert(userProfiles)
+      .values({
+        id,
+        email: `${id}@example.com`,
+        firstName,
+        lastName,
+        role,
+      })
+      .returning();
+    return user;
+  }
+
+  async function mockAuth(userId: string) {
+    const { createClient } = await import("~/lib/supabase/server");
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: userId } } }),
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+  }
+
+  let machineCounter = 0;
+  async function makeMachine(
+    opts: {
+      name?: string;
+      ownerId?: string | null;
+      presenceStatus?:
+        | "on_the_floor"
+        | "off_the_floor"
+        | "on_loan"
+        | "pending_arrival"
+        | "removed";
+    } = {}
+  ) {
+    const db = await getTestDb();
+    machineCounter += 1;
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: opts.name ?? "Medieval Madness",
+        initials: `T${String(machineCounter).padStart(3, "0")}`,
+        ownerId: opts.ownerId ?? undefined,
+        ...(opts.presenceStatus !== undefined && {
+          presenceStatus: opts.presenceStatus,
+        }),
+      })
+      .returning();
+    return machine;
+  }
+
+  it("emits name_changed when name changes", async () => {
+    const db = await getTestDb();
+    const admin = await makeUser("admin");
+    const machine = await makeMachine({ name: "Old Name" });
+    await mockAuth(admin.id);
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+
+    const formData = new FormData();
+    formData.append("id", machine.id);
+    formData.append("name", "New Name");
+
+    const result = await updateMachineAction(undefined, formData);
+    expect(result.ok).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sourceType).toBe("lifecycle");
+    expect(rows[0]?.tag).toBe("lifecycle");
+    expect(rows[0]?.eventData).toEqual({
+      kind: "name_changed",
+      from: "Old Name",
+      to: "New Name",
+    });
+    expect(rows[0]?.authorId).toBe(admin.id);
+  });
+
+  it("emits owner_changed when owner changes (named -> named)", async () => {
+    const db = await getTestDb();
+    const admin = await makeUser("admin");
+    const oldOwner = await makeUser("member", {
+      firstName: "Old",
+      lastName: "Owner",
+    });
+    const newOwner = await makeUser("member", {
+      firstName: "New",
+      lastName: "Owner",
+    });
+    const machine = await makeMachine({
+      name: "Attack From Mars",
+      ownerId: oldOwner.id,
+    });
+    await mockAuth(admin.id);
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+
+    const formData = new FormData();
+    formData.append("id", machine.id);
+    formData.append("name", machine.name); // unchanged
+    formData.append("ownerId", newOwner.id);
+
+    const result = await updateMachineAction(undefined, formData);
+    expect(result.ok).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.eventData).toEqual({
+      kind: "owner_changed",
+      fromOwnerId: oldOwner.id,
+      fromOwnerName: "Old Owner",
+      toOwnerId: newOwner.id,
+      toOwnerName: "New Owner",
+    });
+    expect(rows[0]?.authorId).toBe(admin.id);
+    expect(rows[0]?.sourceType).toBe("lifecycle");
+    expect(rows[0]?.tag).toBe("lifecycle");
+  });
+
+  it("emits presence_changed when presence changes", async () => {
+    const db = await getTestDb();
+    const admin = await makeUser("admin");
+    const machine = await makeMachine({
+      name: "Twilight Zone",
+      presenceStatus: "on_the_floor",
+    });
+    await mockAuth(admin.id);
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+
+    const formData = new FormData();
+    formData.append("id", machine.id);
+    formData.append("name", machine.name); // unchanged
+    formData.append("presenceStatus", "off_the_floor");
+
+    const result = await updateMachineAction(undefined, formData);
+    expect(result.ok).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.eventData).toEqual({
+      kind: "presence_changed",
+      from: "on_the_floor",
+      to: "off_the_floor",
+    });
+    expect(rows[0]?.authorId).toBe(admin.id);
+  });
+
+  it("emits NO event when no tracked field changed", async () => {
+    const db = await getTestDb();
+    const admin = await makeUser("admin");
+    const machine = await makeMachine({
+      name: "No Good Gofers",
+      presenceStatus: "on_the_floor",
+    });
+    await mockAuth(admin.id);
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+
+    const formData = new FormData();
+    formData.append("id", machine.id);
+    formData.append("name", machine.name); // unchanged
+    formData.append("presenceStatus", "on_the_floor"); // unchanged
+
+    const result = await updateMachineAction(undefined, formData);
+    expect(result.ok).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(rows).toHaveLength(0);
   });
 });

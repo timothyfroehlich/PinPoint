@@ -1212,7 +1212,7 @@ git commit -m "feat(machines): emit machine_added/owner_set timeline events on c
 - Modify: `src/app/(app)/m/actions.ts:395` (`updateMachineAction`)
 - Modify: integration test file (append)
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Append to `src/test/integration/supabase/machine-timeline-events.test.ts`:
 
@@ -1312,7 +1312,7 @@ describe("updateMachineAction emits per-field auto-events", () => {
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: FAIL — the action doesn't yet emit per-field events.
 
-- [ ] **Step 3: Modify `updateMachineAction`**
+- [x] **Step 3: Modify `updateMachineAction`**
 
 Open `src/app/(app)/m/actions.ts:395`. Inside the transaction, AFTER the update statement and BEFORE the transaction returns, fetch the previous row (before update), compare each tracked field, and emit an event per change. Pattern:
 
@@ -1405,7 +1405,7 @@ Match the field-name conventions in `updateMachineAction`'s actual schema (e.g.,
 Run: `pnpm test:integration -- machine-timeline-events`
 Expected: PASS — 4 new tests green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/(app)/m/actions.ts src/test/integration/supabase/machine-timeline-events.test.ts
