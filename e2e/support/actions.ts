@@ -1,4 +1,9 @@
-import { expect, type Page, type TestInfo } from "@playwright/test";
+import {
+  expect,
+  type Locator,
+  type Page,
+  type TestInfo,
+} from "@playwright/test";
 
 import { TEST_USERS } from "./constants.js";
 
@@ -37,9 +42,19 @@ export async function loginAs(
   // Wait for the UI to settle into either "ready to login" or "already logged in"
   await expect(emailInput.or(menu)).toBeVisible();
 
-  // If already logged in, we must log out first to ensure we are the correct user
+  // If already logged in, clear client state directly instead of driving the
+  // UI logout flow. This eliminates the entire "user-menu-signout not visible"
+  // flake class that affects tests switching identities mid-suite.
+  // PinPoint auth lives exclusively in HTTP cookies (no createBrowserClient /
+  // no indexedDB usage), so clearCookies() is the authoritative reset.
+  // localStorage + sessionStorage are cleared as hygiene (RichTextEditor
+  // drafts, report-form drafts).
   if (await menu.isVisible()) {
-    await logout(page, testInfo);
+    await page.context().clearCookies();
+    await page.evaluate(() => {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+    });
     await page.goto("/login");
     await expect(emailInput).toBeVisible();
   }
@@ -147,28 +162,40 @@ export async function logout(page: Page, _testInfo: TestInfo): Promise<void> {
 }
 
 /**
- * Click the user-menu trigger and confirm it actually opened. Retries once
- * if the first click loses to a focus/overlay race (common right after a form
- * submit that leaves an editor focused).
+ * Click a Radix dropdown trigger and confirm it actually opened. Retries once
+ * if the first click loses to a focus/overlay race.
+ *
+ * Radix sets `aria-expanded="true"` on the trigger once the dropdown is open.
+ * We assert that before proceeding so a click intercepted by an overlay (e.g.
+ * a freshly-focused ProseMirror editor) surfaces as a clear "dropdown never
+ * opened" failure rather than a missing-item failure downstream.
  */
-async function openUserMenu(
-  userMenu: ReturnType<typeof visibleUserMenu>
-): Promise<void> {
-  await userMenu.click();
+export async function openDropdownMenu(trigger: Locator): Promise<void> {
+  await trigger.click();
   try {
-    await expect(userMenu).toHaveAttribute("aria-expanded", "true", {
+    await expect(trigger).toHaveAttribute("aria-expanded", "true", {
       timeout: 3000,
     });
     return;
   } catch {
     // One retry — the first click sometimes loses to a focus race (e.g. a
     // ProseMirror editor still holding focus right after a form submit).
-    await userMenu.click();
+    await trigger.click();
     await expect(
-      userMenu,
-      "User menu did not open after two click attempts. aria-expanded never became 'true' — the click is likely being intercepted by an overlay (modal, editor focus trap, etc.)."
+      trigger,
+      "Dropdown trigger did not open after two click attempts. aria-expanded never became 'true' — the click is likely being intercepted by an overlay (modal, editor focus trap, etc.)."
     ).toHaveAttribute("aria-expanded", "true", { timeout: 3000 });
   }
+}
+
+/**
+ * Click the user-menu trigger and confirm it actually opened. Delegates to
+ * the generic openDropdownMenu helper.
+ */
+async function openUserMenu(
+  userMenu: ReturnType<typeof visibleUserMenu>
+): Promise<void> {
+  await openDropdownMenu(userMenu);
 }
 
 /**
