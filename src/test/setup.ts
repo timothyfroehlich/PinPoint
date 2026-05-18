@@ -57,4 +57,14 @@ if (typeof window !== "undefined") {
   // Mock scrollIntoView
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking scrollIntoView
   window.HTMLElement.prototype.scrollIntoView = function () {};
+
+  // Radix UI Select calls element.hasPointerCapture / releasePointerCapture on
+  // pointer events. jsdom does not implement these APIs. Add no-op stubs so any
+  // test that opens a Radix Select dropdown can proceed. (Promoted from
+  // MachineTimelineComposer.test.tsx after a second consumer appeared in Task 18.)
+  window.HTMLElement.prototype.hasPointerCapture = function (): boolean {
+    return false;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking releasePointerCapture
+  window.HTMLElement.prototype.releasePointerCapture = function (): void {};
 }

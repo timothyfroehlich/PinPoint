@@ -2899,7 +2899,7 @@ git commit -m "feat(machines): compact-on-focus timeline composer (PP-0x98)"
 - Create: `src/components/machines/timeline/MachineTimelineFilter.tsx`
 - Create: `src/components/machines/timeline/MachineTimelineFilter.test.tsx`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `src/components/machines/timeline/MachineTimelineFilter.test.tsx`:
 
@@ -2961,7 +2961,7 @@ describe("MachineTimelineFilter", () => {
 Run: `pnpm exec vitest run src/components/machines/timeline/MachineTimelineFilter.test.tsx`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement the filter**
+- [x] **Step 3: Implement the filter**
 
 Create `src/components/machines/timeline/MachineTimelineFilter.tsx`:
 
@@ -3026,7 +3026,7 @@ export function MachineTimelineFilter({
 Run: `pnpm exec vitest run src/components/machines/timeline/MachineTimelineFilter.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/machines/timeline/MachineTimelineFilter.tsx src/components/machines/timeline/MachineTimelineFilter.test.tsx

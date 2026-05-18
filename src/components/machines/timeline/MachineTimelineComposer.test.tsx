@@ -13,12 +13,6 @@ vi.mock("~/components/editor/RichTextEditor", () => ({
   RichTextEditor: () => null,
 }));
 
-// jsdom does not implement pointer capture APIs used by Radix UI Select.
-window.HTMLElement.prototype.hasPointerCapture = (): boolean => false;
-window.HTMLElement.prototype.releasePointerCapture = (): void => {
-  /* noop */
-};
-
 describe("MachineTimelineComposer", () => {
   it("renders compact (one-line) by default", () => {
     render(<MachineTimelineComposer machineId="m1" />);
