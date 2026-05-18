@@ -201,7 +201,16 @@ export default async function MachineInfoTab({
         <div className="space-y-3">
           {canEdit && user ? (
             <EditMachineDialog
-              machine={machine}
+              machine={{
+                id: machine.id,
+                name: machine.name,
+                initials: machine.initials,
+                presenceStatus: machine.presenceStatus,
+                ownerId: machine.ownerId,
+                invitedOwnerId: machine.invitedOwnerId,
+                owner: machine.owner,
+                invitedOwner: machine.invitedOwner,
+              }}
               allUsers={allUsers}
               canEditAnyMachine={canEditAnyMachine}
               isOwner={isOwner}
