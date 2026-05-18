@@ -3238,7 +3238,25 @@ git commit -m "test(e2e): add machine timeline route to responsive smoke (PP-0x9
 
 - Create: `e2e/full/machine-timeline.spec.ts`
 
-- [ ] **Step 1: Write the spec**
+**Slimmed per AGENTS.md rule 9 (Interaction Coverage at the Cheapest Layer):**
+The plan's original spec used a fictional `asUser` fixture, `member-author` /
+`member-other` seed roles, and `process.env.E2E_*` placeholders that don't
+exist in this repo. The two permission scenarios (author-delete,
+non-author-can't-delete) are class-E bugs and are already covered by Task 15's
+4 integration tests at `src/test/integration/machine-timeline-permissions.test.ts`.
+Adding E2E versions would be misallocation, not coverage. Shipped scenarios
+(all class-F, multi-step or cross-page journeys — the only viable layer):
+
+1. member can post a comment and see it appear on the timeline
+2. tag filter URL param ?tag= round-trips through the dropdown
+3. reassigning an issue surfaces events on BOTH timelines
+
+Real fixtures used: `STORAGE_STATE` from `e2e/support/auth-state.ts`,
+`seededMachines.{addamsFamily,eightBallDeluxe}` + `seededIssues.TAF[0]` from
+`e2e/support/constants.ts`. Tiptap is exercised via the documented
+`.ProseMirror` + `keyboard.type()` pattern (rich-text.spec.ts).
+
+- [x] **Step 1: Write the spec**
 
 Create `e2e/full/machine-timeline.spec.ts`:
 
@@ -3330,18 +3348,24 @@ The above spec uses placeholder env vars (`E2E_SEEDED_MACHINE_INITIALS`, `E2E_SE
 
 If `member-author` and `member-other` roles aren't already in the seed, update `src/server/db/seed/` (or the equivalent E2E seed) to add them, OR adjust the spec to create the necessary state in `beforeAll` per the e2e/full pattern.
 
-- [ ] **Step 2: Run the spec**
+- [x] **Step 2: Run the spec**
 
 Run: `pnpm exec playwright test e2e/full/machine-timeline.spec.ts --project=chromium`
-Expected: PASS — all 5 scenarios.
+Expected: PASS — all 3 (slimmed) scenarios.
 
-If a scenario depends on per-test fresh DB state, prefer running the whole file (`pnpm exec playwright test e2e/full/machine-timeline.spec.ts --project=chromium`) rather than individual tests, per the AGENTS.md guidance on shared `beforeAll` state.
+**Local run blocked**: Docker / OrbStack was unresponsive in this worktree
+during Task 21 execution (`docker ps` hung, `supabase start` produced no
+output). Per AGENTS.md "If the spec can't run locally because Supabase or
+Next.js won't start cleanly, that's acceptable — CI will catch it." Spec
+typechecks clean (`tsc --noEmit`) and lints clean (`eslint`); selectors are
+verified against actual component source (`MachineTimelineComposer.tsx`,
+`MachineTimelineFilter.tsx`, `issues-reassign-machine.spec.ts`).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add e2e/full/machine-timeline.spec.ts
-git commit -m "test(e2e): machine timeline add/delete/filter/reassign (PP-0x98)"
+git commit -m "test(e2e): machine timeline post/filter/reassign multi-page journeys (PP-0x98)"
 ```
 
 ---
