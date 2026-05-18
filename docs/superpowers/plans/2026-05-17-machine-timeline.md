@@ -2387,7 +2387,7 @@ git commit -m "feat(machines): add+delete machine timeline comment server action
 - Create: `src/components/machines/timeline/MachineTimelineTombstoneRow.tsx`
 - Create: corresponding `*.test.tsx` for each
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `src/components/machines/timeline/MachineTimelineCommentRow.test.tsx`:
 
@@ -2517,7 +2517,7 @@ describe("MachineTimelineTombstoneRow", () => {
 Run: `pnpm exec vitest run src/components/machines/timeline/`
 Expected: FAIL — modules not found.
 
-- [ ] **Step 3: Implement the row components**
+- [x] **Step 3: Implement the row components**
 
 Create `src/components/machines/timeline/MachineTimelineCommentRow.tsx`:
 
@@ -2690,7 +2690,7 @@ export function MachineTimelineTombstoneRow({
 Run: `pnpm exec vitest run src/components/machines/timeline/`
 Expected: PASS — all row-renderer tests green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/machines/timeline/
