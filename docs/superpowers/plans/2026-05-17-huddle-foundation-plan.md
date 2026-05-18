@@ -1,5 +1,13 @@
 # Huddle Foundation Implementation Plan
 
+> **Post-implementation note:** This plan as-written assumed state lived at
+> `~/.config/pinpoint/huddle-*`. During Task 7's review pass, the state
+> location was refactored to `<main-worktree>/.claude/huddle/` with
+> unprefixed filenames (`session-names.json`, `last-seen-<hash>`,
+> `config.json`, `rotation.lock`). See commit `ba80786e` and the updated
+> design spec / SKILL.md for the shipped layout. The plan body below is
+> preserved as a historical record of the original approach.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Finish the foundation portion of the huddle coordination system (PR #1357): rename the current `cvh-*` plumbing to `huddle-*`, add subagent-skip guards, introduce the rotation-check helper as a stub, ship self-documenting hooks, and package the system as a project skill.

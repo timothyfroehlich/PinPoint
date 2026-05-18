@@ -34,13 +34,13 @@ All scripts use the `huddle-` prefix:
 - `huddle-rotation-check.sh` — shared helper sourced by both hooks
 - `huddle-whoami.sh` — agent identity helper
 
-All config files in `~/.config/pinpoint/` use the `huddle-` or `huddle.`
-prefix:
+All state lives in `<main-worktree>/.claude/huddle/` (project-scoped,
+git-ignored, shared across linked worktrees via `git rev-parse --git-common-dir`):
 
-- `~/.config/pinpoint/huddle.config.json` — local config, holds root bead ID
-- `~/.config/pinpoint/huddle-session-names.json` — session_id → name mapping
-- `~/.config/pinpoint/huddle-last-seen-<path-hash>` — per-checkout poll cursor
-- `~/.config/pinpoint/huddle-rotation.lock` — flock target for rotation
+- `<main-worktree>/.claude/huddle/config.json` — local config, holds root bead ID
+- `<main-worktree>/.claude/huddle/session-names.json` — session_id → name mapping
+- `<main-worktree>/.claude/huddle/last-seen-<path-hash>` — per-checkout poll cursor
+- `<main-worktree>/.claude/huddle/rotation.lock` — flock target for rotation
 
 ## 3. Plugin Packaging
 
@@ -55,13 +55,13 @@ independently of the project. The plugin contains:
 Agents see plugin docs as a skill they can invoke; humans manage it via
 `enabledPlugins` in `~/.claude/settings.json`. The plugin is installed at
 project level via `scripts/hooks/` (already part of the PinPoint repo) and
-referenced from project `.claude/settings.json`. The plugin is also installable
-at user level (`~/.claude/hooks/`) for cross-project use, but the current focus
-is PinPoint-only.
+referenced from project `.claude/settings.json`. State lives in
+`<main-worktree>/.claude/huddle/` so it's project-scoped, not user-scoped — a
+clone of PinPoint boots the system without writing to the user's home dir.
 
 The PinPoint-specific bd issue identifiers (the rolling daily/monthly beads)
-are stored in `~/.config/pinpoint/huddle.config.json`, so the same plugin code
-works for any project that bootstraps its own huddle root.
+are stored in `<main-worktree>/.claude/huddle/config.json`, so the same plugin
+code works for any project that bootstraps its own huddle root.
 
 ## 4. System Architecture
 
@@ -110,7 +110,7 @@ Parent-child links via `bd dep add <child> <root> --type parent-child`.
   ~20 entries to bound size). Hooks read this directly without bd queries.
 - `last_rotation`: timestamp of the last successful rotation, for diagnostics.
 
-### 4.3 Local config file (`~/.config/pinpoint/huddle.config.json`)
+### 4.3 Local config file (`<main-worktree>/.claude/huddle/config.json`)
 
 ```json
 {
@@ -132,7 +132,7 @@ agent_type? }` where `source` is `startup` | `resume` | `clear` | `compact`.
 Logic, in order:
 
 1. **Skip if subagent:** if `transcript_path` contains `/subagents/`, exit 0.
-2. **Skip if not bootstrapped:** if `huddle.config.json` is missing OR
+2. **Skip if not bootstrapped:** if `config.json` is missing OR
    `root_bead_id` points to a nonexistent bead, emit the "bootstrap needed"
    notice (see §7.1) and exit.
 3. **Rotation check:** source `huddle-rotation-check.sh`. If the active
@@ -140,7 +140,7 @@ Logic, in order:
    (see §7.2) and skip steps 4-5. The lead agent dispatches a rotation
    subagent before continuing.
 4. **Identity announcement** (suppressed if `source == "compact"`): look up
-   the session's name in `huddle-session-names.json`. Emit either the
+   the session's name in `session-names.json`. Emit either the
    "registered as Claude-<Name>" block or the "registration needed" notice
    (see §7.3 and §7.4).
 5. **Summary injection** (suppressed if `source == "compact"`): inject the
@@ -161,8 +161,8 @@ Logic, in order:
    emit the rotation notice and skip step 4 — new comments must wait for the
    new today_bead to be created.
 4. **Poll for new comments:** read the current `today_bead.id` from
-   `huddle.config.json` + root notes. Run `bd comments <today_bead> --json`.
-   Filter to comments newer than `huddle-last-seen-<path-hash>` and not
+   `config.json` + root notes. Run `bd comments <today_bead> --json`.
+   Filter to comments newer than `last-seen-<path-hash>` and not
    signed by the current session (self-filter). Inject any matches as a
    system-reminder block. Update the last-seen file to the newest
    `created_at`.
@@ -170,7 +170,7 @@ Logic, in order:
 ### 5.3 `huddle-rotation-check.sh` (shared helper)
 
 Sourced by both hooks. Defines a single function `huddle_rotation_needed()`
-that returns 0 if rotation is needed, 1 if not. Reads `huddle.config.json`,
+that returns 0 if rotation is needed, 1 if not. Reads `config.json`,
 `bd show <root> --json`, compares `today_bead.date` to `date +%F`.
 
 Single source of truth for the detection logic.
@@ -179,7 +179,7 @@ Single source of truth for the detection logic.
 
 Invoked by the rotation subagent (dispatched by the lead agent when the
 rotation notice fires). Acquires the flock at
-`~/.config/pinpoint/huddle-rotation.lock` (same `lockf(1)` / `flock(1)`
+`<main-worktree>/.claude/huddle/rotation.lock` (same `lockf(1)` / `flock(1)`
 platform-detection pattern as PP-bg45's worktree-create.sh), then performs
 the rotation. See §6 for the rotation flow.
 
@@ -188,7 +188,7 @@ the rotation. See §6 for the rotation flow.
 One-time initialization. Idempotent — re-running on an already-bootstrapped
 project is a no-op that prints status. Creates the root epic, today's first
 daily bead, this month's monthly bead, writes
-`~/.config/pinpoint/huddle.config.json`, and initializes the root's notes
+`<main-worktree>/.claude/huddle/config.json`, and initializes the root's notes
 JSON.
 
 ### 5.6 `huddle-whoami.sh`
@@ -209,7 +209,7 @@ lead agent dispatches a single rotation subagent. The subagent runs
 `huddle-rotate.sh`, which:
 
 1. **Acquire lock** via `lockf -t 60` (macOS) or `flock -x -w 60` (Linux) on
-   `~/.config/pinpoint/huddle-rotation.lock`. 60s allows the slowest case
+   `<main-worktree>/.claude/huddle/rotation.lock`. 60s allows the slowest case
    (LLM-driven summarization of a long day's chatter) to complete without
    spurious timeouts from a peer's concurrent rotation attempt.
 2. **Re-check date** inside the lock. If rotation is no longer needed (a
@@ -255,7 +255,7 @@ To bootstrap, run:
     bash scripts/hooks/huddle-bootstrap.sh
 
 That creates the root bead, today's daily, this month's monthly, and writes
-~/.config/pinpoint/huddle.config.json with the IDs. Re-running the script
+<main-worktree>/.claude/huddle/config.json with the IDs. Re-running the script
 is safe — it's a no-op if already bootstrapped.
 ```
 
@@ -328,7 +328,7 @@ of those help Tim track who's doing what. The name describes the WORK.
 
 ### 8.1 Mapping storage
 
-`~/.config/pinpoint/huddle-session-names.json` — JSON map of `{session_id:
+`<main-worktree>/.claude/huddle/session-names.json` — JSON map of `{session_id:
 name}`. Persists across restarts and compactions because it's a regular file.
 The canonical lookup for both the SessionStart hook (announcement) and the
 poll hook (self-filter).
@@ -357,7 +357,7 @@ Names must be freeable over time — Tim will run many sessions named
 pick "TestAudit47" because every earlier audit's entry lingers.
 
 The rotation subagent, on each rotation it performs, prunes stale entries
-from `huddle-session-names.json`. For each entry, it scans recent huddle
+from `session-names.json`. For each entry, it scans recent huddle
 content (today's bead + last 14 daily beads' raw archives + monthly
 summaries) for any sign-off matching `—Claude-<Name>` or `—<Name>`. If no
 match is found in the last 14 days of content, the entry is evicted from
@@ -402,7 +402,7 @@ catches it.
 ### 9.4 Two sessions racing rotation
 
 Both sessions see "rotation needed" at the same time. Both dispatch a
-rotation subagent. The lock (`huddle-rotation.lock`) serializes them. The
+rotation subagent. The lock (`rotation.lock`) serializes them. The
 second subagent acquires the lock after the first finishes, re-checks the
 date inside the lock, sees rotation is no longer needed, and exits 0.
 Idempotent.
@@ -427,7 +427,7 @@ Caught by `huddle-whoami.sh register`'s uniqueness check. See §8.3.
 
 ### 9.7 Coord root deleted or closed
 
-If the bead pointed to by `huddle.config.json` is missing or closed, hooks
+If the bead pointed to by `config.json` is missing or closed, hooks
 fall back to the bootstrap path. Re-running `huddle-bootstrap.sh` creates
 a fresh root and rewrites the config. Comments from the old root are
 preserved (we don't delete it from bd) — they're orphaned but readable.

@@ -2,8 +2,9 @@
 # huddle-session-start.sh — SessionStart hook: announce session_id and registration state
 #
 # Fires once at session start. Reads stdin JSON for `session_id`, looks up the
-# session's registered name in ~/.config/pinpoint/huddle-session-names.json, and
-# emits a brief block via stdout (which Claude Code surfaces as system context).
+# session's registered name in <main-worktree>/.claude/huddle/session-names.json
+# (see huddle-lib.sh for the state-dir resolver), and emits a brief block via
+# stdout (which Claude Code surfaces as system context).
 #
 # Why this exists: agents can't reliably discover their own session_id when
 # multiple parallel sessions are active (transcripts share a directory keyed by

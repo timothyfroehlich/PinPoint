@@ -11,7 +11,8 @@
 #   docs/superpowers/specs/2026-05-17-huddle-system-design.md
 #
 # Design intent for the eventual real implementation:
-#   - Read ~/.config/pinpoint/huddle.config.json for root_bead_id
+#   - source huddle-lib.sh; resolve STATE_DIR via huddle_state_dir
+#   - Read <STATE_DIR>/config.json for root_bead_id
 #   - bd show <root> --json to extract today_bead.date from notes
 #   - Compare to $(date +%F) (local date)
 #   - Return 0 if mismatch (rotation needed), 1 if match (no rotation needed)
