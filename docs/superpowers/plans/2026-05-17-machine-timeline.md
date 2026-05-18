@@ -1826,112 +1826,45 @@ resolves via `userProfiles.findFirst` with `name` column only — never email
 - Modify: the issue assignment service path (search for where `assigned` / `unassigned` events emit to `issueComments` — in `src/services/issues.ts` per existing patterns)
 - Modify: integration test file (append)
 
-- [ ] **Step 1: Write failing tests (append)**
+- [x] **Step 1: Write failing tests (append)**
 
-```typescript
-import { assignIssueAction } from "~/app/(app)/issues/actions";
-
-describe("assignIssueAction duplicate-writes to machine timeline", () => {
-  it("emits issue_assigned when issue is assigned", async () => {
-    const { machine, user } = await seedOrgWithMachine(db());
-    const assignee = await seedUser(db(), { name: "Tim" });
-    await withTestAuth(user, async () => {
-      await createIssueAction({ machineId: machine.id, title: "x" });
-    });
-    const [issue] = await db().select().from(issues);
-    if (!issue) throw new Error("seed failed");
-    await db().delete(timelineEvents);
-
-    await withTestAuth(user, async () => {
-      await assignIssueAction({ id: issue.id, assigneeId: assignee.id });
-    });
-
-    const events = await db()
-      .select()
-      .from(timelineEvents)
-      .where(eq(timelineEvents.machineId, machine.id));
-    const assigned = events.find(
-      (e) =>
-        (e.eventData as MachineTimelineEventData)?.kind === "issue_assigned"
-    );
-    expect(assigned?.eventData).toMatchObject({
-      kind: "issue_assigned",
-      issueId: issue.id,
-      assigneeName: "Tim",
-    });
-  });
-
-  it("emits issue_unassigned when assignee is cleared", async () => {
-    const { machine, user } = await seedOrgWithMachine(db());
-    const assignee = await seedUser(db(), { name: "Tim" });
-    await withTestAuth(user, async () => {
-      await createIssueAction({ machineId: machine.id, title: "x" });
-    });
-    const [issue] = await db().select().from(issues);
-    if (!issue) throw new Error("seed failed");
-
-    await withTestAuth(user, async () => {
-      await assignIssueAction({ id: issue.id, assigneeId: assignee.id });
-    });
-    await db().delete(timelineEvents);
-    await withTestAuth(user, async () => {
-      await assignIssueAction({ id: issue.id, assigneeId: null });
-    });
-
-    const events = await db()
-      .select()
-      .from(timelineEvents)
-      .where(eq(timelineEvents.machineId, machine.id));
-    const unassigned = events.find(
-      (e) =>
-        (e.eventData as MachineTimelineEventData)?.kind === "issue_unassigned"
-    );
-    expect(unassigned).toBeDefined();
-  });
-});
-```
+Implemented in `src/test/integration/machine-timeline-issue-actions.test.ts` as a
+third top-level `describe("assignIssue duplicate-writes to machine timeline …")`
+block, calling the `assignIssue` service directly (not a server action) — same
+pattern as Tasks 10 + 11 so we exercise the service unit-of-work without the
+extra auth/cookie stack of an action wrapper.
 
 - [x] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: FAIL.
 
-- [ ] **Step 3: Add duplicate-write to assignment service**
+- [x] **Step 3: Add duplicate-write to assignment service**
 
-In the same `src/services/issues.ts` file (or wherever the `assigned`/`unassigned` events emit), after the existing `createTimelineEvent` calls, add the parallel emit pattern (assigned branch + unassigned branch):
+Done — but routed through the new `~/lib/timeline/issue-timeline-helpers`
+helpers (`emitIssueAssigned` / `emitIssueUnassigned`) instead of an inline
+`createMachineTimelineEvent` call. Tasks 10 + 11's emit blocks were migrated to
+the same helpers in the same commit (Rule of Three — Task 11 reviewer called
+this out and Task 13 will add 2 more emit sites). The helper hardcodes
+`sourceType: "issue"`, `tag: "issue"`, and the `actorId` spread, so all five
+issue-side variants now share one source of truth for that shape.
 
 ```typescript
-if (newAssigneeId === null) {
-  await createMachineTimelineEvent(
-    issue.machineId,
-    {
-      sourceType: "issue",
-      tag: "issue",
-      eventData: {
-        kind: "issue_unassigned",
-        issueId: issue.id,
-        issueNumber: issue.number,
-      },
-      actorId: actor.id,
-    },
-    tx
-  );
+if (assignedTo) {
+  await emitIssueAssigned(tx, {
+    machineId: currentIssue.machine.id,
+    issueId,
+    issueNumber: currentIssue.issueNumber,
+    assigneeName, // already resolved above
+    ...(actorId ? { actorId } : {}),
+  });
 } else {
-  await createMachineTimelineEvent(
-    issue.machineId,
-    {
-      sourceType: "issue",
-      tag: "issue",
-      eventData: {
-        kind: "issue_assigned",
-        issueId: issue.id,
-        issueNumber: issue.number,
-        assigneeName: newAssignee.name,
-      },
-      actorId: actor.id,
-    },
-    tx
-  );
+  await emitIssueUnassigned(tx, {
+    machineId: currentIssue.machine.id,
+    issueId,
+    issueNumber: currentIssue.issueNumber,
+    ...(actorId ? { actorId } : {}),
+  });
 }
 ```
 
@@ -1940,11 +1873,14 @@ if (newAssigneeId === null) {
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
-git add src/services/issues.ts src/test/integration/supabase/issue-actions-machine-timeline.test.ts
-git commit -m "feat(machines): duplicate-write issue assignment to machine timeline (PP-0x98)"
+git add src/services/issues.ts \
+        src/lib/timeline/issue-timeline-helpers.ts \
+        src/test/integration/machine-timeline-issue-actions.test.ts \
+        docs/superpowers/plans/2026-05-17-machine-timeline.md
+git commit -m "feat(issues): duplicate-write assign/unassign + extract issue-timeline-helpers (PP-0x98)"
 ```
 
 ---

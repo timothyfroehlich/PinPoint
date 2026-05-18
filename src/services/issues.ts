@@ -12,7 +12,13 @@ import {
   createTimelineEvent,
   type TimelineEventData,
 } from "~/lib/timeline/events";
-import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
+import {
+  emitIssueOpened,
+  emitIssueClosed,
+  emitIssueStatusChanged,
+  emitIssueAssigned,
+  emitIssueUnassigned,
+} from "~/lib/timeline/issue-timeline-helpers";
 import { createNotification } from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
@@ -244,22 +250,14 @@ export async function createIssue({
       openedByName = reporterName;
     }
 
-    await createMachineTimelineEvent(
-      updatedMachine.id,
-      {
-        sourceType: "issue",
-        tag: "issue",
-        eventData: {
-          kind: "issue_opened",
-          issueId: issue.id,
-          issueNumber: issue.issueNumber,
-          openedByName,
-          title,
-        },
-        ...(reportedBy ? { actorId: reportedBy } : {}),
-      },
-      tx
-    );
+    await emitIssueOpened(tx, {
+      machineId: updatedMachine.id,
+      issueId: issue.id,
+      issueNumber: issue.issueNumber,
+      openedByName,
+      title,
+      ...(reportedBy ? { actorId: reportedBy } : {}),
+    });
 
     // 6. Notifications
     try {
@@ -380,38 +378,30 @@ export async function updateIssueStatus({
     // Email privacy (AGENTS.md rule 10): closedByName resolves from
     // user_profiles.name, never from email. Falls back to "Unknown User" if
     // the profile row is missing (shouldn't happen given FK from authUsers).
-    const actor = await tx.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, userId),
-      columns: { name: true },
-    });
-    const actorName = actor?.name ?? "Unknown User";
-
-    const eventData = isClosed
-      ? ({
-          kind: "issue_closed",
-          issueId,
-          issueNumber: currentIssue.issueNumber,
-          closedByName: actorName,
-          title: currentIssue.title,
-        } as const)
-      : ({
-          kind: "issue_status_changed",
-          issueId,
-          issueNumber: currentIssue.issueNumber,
-          from: oldStatus,
-          to: status,
-        } as const);
-
-    await createMachineTimelineEvent(
-      currentIssue.machine.id,
-      {
-        sourceType: "issue",
-        tag: "issue",
-        eventData,
+    if (isClosed) {
+      const actor = await tx.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, userId),
+        columns: { name: true },
+      });
+      const closedByName = actor?.name ?? "Unknown User";
+      await emitIssueClosed(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        closedByName,
+        title: currentIssue.title,
         ...(userId ? { actorId: userId } : {}),
-      },
-      tx
-    );
+      });
+    } else {
+      await emitIssueStatusChanged(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        from: oldStatus,
+        to: status,
+        ...(userId ? { actorId: userId } : {}),
+      });
+    }
 
     log.info(
       { issueId, oldStatus, newStatus: status, action: "updateIssueStatus" },
@@ -667,6 +657,27 @@ export async function assignIssue({
       ? { type: "assigned", assigneeName }
       : { type: "unassigned" };
     await createTimelineEvent(issueId, event, tx, actorId);
+
+    // Duplicate-write to machine timeline (atomic with assignment update, PP-0x98)
+    //
+    // `assigneeName` was already resolved above (lines 639-646) from
+    // `user_profiles.name` — never from email (AGENTS.md rule 10).
+    if (assignedTo) {
+      await emitIssueAssigned(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        assigneeName,
+        ...(actorId ? { actorId } : {}),
+      });
+    } else {
+      await emitIssueUnassigned(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        ...(actorId ? { actorId } : {}),
+      });
+    }
 
     log.info(
       { issueId, assignedTo, assigneeName, action: "assignIssue" },

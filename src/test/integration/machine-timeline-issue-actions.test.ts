@@ -331,3 +331,156 @@ describe("updateIssueStatus duplicate-writes to machine timeline (PP-0x98)", () 
     expect(rows).toHaveLength(0);
   });
 });
+
+describe("assignIssue duplicate-writes to machine timeline (PP-0x98)", () => {
+  setupTestDb();
+
+  async function makeUser(
+    overrides: { firstName?: string; lastName?: string } = {}
+  ) {
+    const db = await getTestDb();
+    const id = randomUUID();
+    await db.insert(authUsers).values({ id, email: `${id}@example.com` });
+    const [user] = await db
+      .insert(userProfiles)
+      .values({
+        id,
+        email: `${id}@example.com`,
+        firstName: overrides.firstName ?? "Test",
+        lastName: overrides.lastName ?? "Reporter",
+        role: "member",
+      })
+      .returning();
+    return user;
+  }
+
+  let machineCounter = 0;
+  async function makeMachine() {
+    const db = await getTestDb();
+    machineCounter += 1;
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: "Test Machine",
+        initials: `AS${String(machineCounter).padStart(3, "0")}`,
+      })
+      .returning();
+    return machine;
+  }
+
+  async function seedIssue(
+    reporter: { id: string },
+    machine: { id: string; initials: string }
+  ) {
+    const { createIssue } = await import("~/services/issues");
+    return createIssue({
+      title: "x",
+      machineInitials: machine.initials,
+      severity: "minor",
+      priority: "low",
+      frequency: "intermittent",
+      status: "new",
+      reportedBy: reporter.id,
+      autoWatchReporter: false,
+    });
+  }
+
+  async function clearTimelineEventsForMachine(machineId: string) {
+    const db = await getTestDb();
+    await db
+      .delete(timelineEvents)
+      .where(eq(timelineEvents.machineId, machineId));
+  }
+
+  it("emits issue_assigned when an issue is assigned to a user", async () => {
+    const db = await getTestDb();
+    const reporter = await makeUser();
+    const assignee = await makeUser({ firstName: "Tim", lastName: "Test" });
+    const machine = await makeMachine();
+    const issue = await seedIssue(reporter, machine);
+    await clearTimelineEventsForMachine(machine.id);
+
+    const { assignIssue } = await import("~/services/issues");
+    await assignIssue({
+      issueId: issue.id,
+      assignedTo: assignee.id,
+      actorId: reporter.id,
+    });
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].sourceType).toBe("issue");
+    expect(rows[0].tag).toBe("issue");
+    expect(rows[0].eventData).toMatchObject({
+      kind: "issue_assigned",
+      issueId: issue.id,
+      issueNumber: issue.issueNumber,
+      assigneeName: "Tim Test",
+    });
+    expect(rows[0].authorId).toBe(reporter.id);
+  });
+
+  it("emits issue_unassigned when the assignee is cleared", async () => {
+    const db = await getTestDb();
+    const reporter = await makeUser();
+    const assignee = await makeUser();
+    const machine = await makeMachine();
+    const issue = await seedIssue(reporter, machine);
+
+    const { assignIssue } = await import("~/services/issues");
+    // First assign
+    await assignIssue({
+      issueId: issue.id,
+      assignedTo: assignee.id,
+      actorId: reporter.id,
+    });
+    // Clear timeline events from both seedIssue and the assign above
+    await clearTimelineEventsForMachine(machine.id);
+    // Then unassign
+    await assignIssue({
+      issueId: issue.id,
+      assignedTo: null,
+      actorId: reporter.id,
+    });
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].sourceType).toBe("issue");
+    expect(rows[0].tag).toBe("issue");
+    expect(rows[0].eventData).toMatchObject({
+      kind: "issue_unassigned",
+      issueId: issue.id,
+      issueNumber: issue.issueNumber,
+    });
+    expect(rows[0].authorId).toBe(reporter.id);
+  });
+
+  it("emits NO event when assignment is unchanged (no-op)", async () => {
+    const db = await getTestDb();
+    const reporter = await makeUser();
+    const machine = await makeMachine();
+    const issue = await seedIssue(reporter, machine);
+    // seedIssue creates with assignedTo: null implicitly
+    await clearTimelineEventsForMachine(machine.id);
+
+    const { assignIssue } = await import("~/services/issues");
+    // null → null no-op
+    await assignIssue({
+      issueId: issue.id,
+      assignedTo: null,
+      actorId: reporter.id,
+    });
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(rows).toHaveLength(0);
+  });
+});
