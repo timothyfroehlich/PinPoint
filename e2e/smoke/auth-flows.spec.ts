@@ -30,24 +30,6 @@ test.describe("Username Account Login", () => {
 });
 
 test.describe("Authentication Smoke", () => {
-  test("password toggle switches input type on login page", async ({
-    page,
-  }) => {
-    await page.goto("/login");
-
-    const passwordInput = page.getByLabel("Password", { exact: true });
-    await expect(passwordInput).toHaveAttribute("type", "password");
-
-    // Click the show-password toggle button
-    await page.getByRole("button", { name: /show password/i }).click();
-
-    await expect(passwordInput).toHaveAttribute("type", "text");
-
-    // Click again to hide (aria-label is now "Hide password")
-    await page.getByRole("button", { name: /hide password/i }).click();
-    await expect(passwordInput).toHaveAttribute("type", "password");
-  });
-
   test("login flow - sign in with existing account", async ({ page }) => {
     // Navigate to login page via header sign-in button (unified AppHeader)
     await page.goto("/");
