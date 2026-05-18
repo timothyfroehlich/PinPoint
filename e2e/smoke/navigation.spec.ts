@@ -135,10 +135,11 @@ test.describe("Bottom Tab Bar (mobile only)", () => {
     const moreSheet = page.getByRole("dialog");
     await moreSheet.waitFor({ state: "visible", timeout: 5000 });
 
-    // Sheet should open with secondary nav items
-    await expect(page.getByTestId("more-sheet-help")).toBeVisible();
-    await expect(page.getByTestId("more-sheet-whats-new")).toBeVisible();
-    await expect(page.getByTestId("more-sheet-about")).toBeVisible();
+    // Sheet should open with secondary nav items.
+    // Scope to the dialog so locators are anchored to the Sheet portal content.
+    await expect(moreSheet.getByTestId("more-sheet-help")).toBeVisible();
+    await expect(moreSheet.getByTestId("more-sheet-whats-new")).toBeVisible();
+    await expect(moreSheet.getByTestId("more-sheet-about")).toBeVisible();
   });
 
   test("More sheet shows User Management only for admin users", async ({
@@ -162,8 +163,9 @@ test.describe("Bottom Tab Bar (mobile only)", () => {
     const moreSheet = page.getByRole("dialog");
     await moreSheet.waitFor({ state: "visible", timeout: 5000 });
 
-    // User Management should be visible for admin role
-    await expect(page.getByTestId("more-sheet-admin")).toBeVisible();
+    // User Management should be visible for admin role.
+    // Scope to the dialog so locators are anchored to the Sheet portal content.
+    await expect(moreSheet.getByTestId("more-sheet-admin")).toBeVisible();
     await expect(page.getByTestId("more-sheet-admin")).toHaveAttribute(
       "href",
       "/admin/users"
