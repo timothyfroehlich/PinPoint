@@ -3204,11 +3204,11 @@ git commit -m "feat(machines): Timeline tab page + tab strip entry (PP-0x98)"
 
 - Modify: `e2e/smoke/responsive-overflow.spec.ts`
 
-- [ ] **Step 1: Inspect the existing route list**
+- [x] **Step 1: Inspect the existing route list**
 
 Open `e2e/smoke/responsive-overflow.spec.ts`. The spec covers a list of routes. Identify how the existing machine route is referenced — likely something like `/m/${initials}/`. Note that the suite uses `assertNoHorizontalOverflow()` from `e2e/support/actions.ts`.
 
-- [ ] **Step 2: Add the new route**
+- [x] **Step 2: Add the new route**
 
 In the routes array, add an entry for the timeline tab. The exact pattern depends on the existing structure, but the addition is roughly:
 
@@ -3218,12 +3218,12 @@ In the routes array, add an entry for the timeline tab. The exact pattern depend
 
 Use whatever variable holds the seeded machine initials in the spec. If the existing entries use a different shape, match it exactly.
 
-- [ ] **Step 3: Run the smoke spec**
+- [x] **Step 3: Run the smoke spec**
 
 Run: `pnpm exec playwright test e2e/smoke/responsive-overflow.spec.ts --project=chromium`
 Expected: PASS — new route renders without horizontal overflow at 1024×768.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add e2e/smoke/responsive-overflow.spec.ts
