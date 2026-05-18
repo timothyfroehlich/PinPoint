@@ -2706,7 +2706,7 @@ git commit -m "feat(machines): timeline row renderers (comment, system, tombston
 - Create: `src/components/machines/timeline/MachineTimelineComposer.tsx`
 - Create: `src/components/machines/timeline/MachineTimelineComposer.test.tsx`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `src/components/machines/timeline/MachineTimelineComposer.test.tsx`:
 
@@ -2765,7 +2765,7 @@ describe("MachineTimelineComposer", () => {
 Run: `pnpm exec vitest run src/components/machines/timeline/MachineTimelineComposer.test.tsx`
 Expected: FAIL — component not found.
 
-- [ ] **Step 3: Implement the composer**
+- [x] **Step 3: Implement the composer**
 
 Create `src/components/machines/timeline/MachineTimelineComposer.tsx`:
 
@@ -2883,7 +2883,7 @@ Check that `RichTextEditor` accepts `content` + `onChange` props. If the existin
 Run: `pnpm exec vitest run src/components/machines/timeline/MachineTimelineComposer.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/machines/timeline/MachineTimelineComposer.tsx src/components/machines/timeline/MachineTimelineComposer.test.tsx
