@@ -2023,11 +2023,11 @@ git commit -m "feat(machines): duplicate-write reassign dual rows to machine tim
 - Modify: `src/lib/permissions/matrix.ts`
 - Modify or Create: a unit/integration test for the matrix entry
 
-- [ ] **Step 1: Inspect the existing matrix**
+- [x] **Step 1: Inspect the existing matrix**
 
 Open `src/lib/permissions/matrix.ts`. Find an existing ownership-context entry — for example `issues.update.reporting` uses `own` semantics. Note the pattern: roles map to scopes (`'all' | 'own' | 'none'`), and `checkPermission(key, accessLevel, ownershipCtx)` uses the ctx to decide.
 
-- [ ] **Step 2: Add the new permission key**
+- [x] **Step 2: Add the new permission key**
 
 Add to the matrix:
 
@@ -2052,16 +2052,27 @@ Add to the matrix:
 
 Pick the path most consistent with existing matrix patterns. Look at `issues.update.reporting` for the closest precedent. Document the chosen approach in the matrix file with an inline comment.
 
-- [ ] **Step 3: Update `checkPermission` helper if a new scope was added**
+- [x] **Step 3: Update `checkPermission` helper if a new scope was added**
 
 If you took Option A above, open `src/lib/permissions/helpers.ts` (or wherever `checkPermission` is implemented) and extend the scope handling for `own_or_machine_owner`. Add a unit test alongside.
 
-- [ ] **Step 4: Run typecheck**
+> Implementation note (PP-0x98): Took Option A. Scope is spelled `own_or_owner`
+> to match the existing `OwnershipContext` field name (`machineOwnerId`) and
+> the precedent set by the `"own"` / `"owner"` literals. The helper resolves
+> `own_or_owner` as `userId === reporterId || userId === machineOwnerId`.
+> `hasPermission` / `requiresOwnershipCheck` / `isConditionalPermission` /
+> `getPermissionState` were all extended to handle the new variant. The help
+> page's `PermissionValueCell` renders `own_or_owner` via the existing
+> "Yours only" + legend ("Only for resources you created or own"), which
+> already covers the disjunction semantically; the per-row `description:`
+> field carries the specific "author OR machine owner OR admin" rule.
+
+- [x] **Step 4: Run typecheck**
 
 Run: `pnpm run typecheck`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/permissions/matrix.ts src/lib/permissions/helpers.ts src/lib/permissions/*.test.ts
