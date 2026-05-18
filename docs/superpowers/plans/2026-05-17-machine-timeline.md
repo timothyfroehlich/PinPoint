@@ -2088,7 +2088,7 @@ git commit -m "feat(permissions): add machine timeline comment delete permission
 - Create: `src/app/(app)/m/[initials]/timeline/actions.ts`
 - Create: `src/test/integration/supabase/machine-timeline-permissions.test.ts`
 
-- [ ] **Step 1: Write failing integration tests**
+- [x] **Step 1: Write failing integration tests**
 
 Create `src/test/integration/supabase/machine-timeline-permissions.test.ts`:
 
@@ -2233,7 +2233,7 @@ describe("deleteMachineCommentAction permission scenarios", () => {
 Run: `pnpm test:integration -- machine-timeline-permissions`
 Expected: FAIL — actions module not found.
 
-- [ ] **Step 3: Implement the actions**
+- [x] **Step 3: Implement the actions**
 
 Create `src/app/(app)/m/[initials]/timeline/actions.ts`:
 
@@ -2369,7 +2369,7 @@ If `getAccessLevelForUser` doesn't exist with that exact name, find the canonica
 Run: `pnpm test:integration -- machine-timeline-permissions`
 Expected: PASS — 7 tests green (3 add + 4 delete).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/(app)/m/[initials]/timeline/actions.ts src/test/integration/supabase/machine-timeline-permissions.test.ts
