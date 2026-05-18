@@ -74,9 +74,15 @@ test.describe("Rich Text and Mentions", () => {
     // 9. Submit issue
     await page.click('button[type="submit"]');
 
-    // 10. Verify on issue page
+    // 10. Verify on issue page. Target the issue-title h1 specifically —
+    // after the tabbed-machine-layout PR, the persistent MachineDetailHeader
+    // also renders the machine name as an h1, so a bare `locator("h1")`
+    // matches two elements (bead PP-wkom tracks the heading-hierarchy
+    // follow-up).
     await expect(page).toHaveURL(new RegExp(`/m/${machine.initials}/i/1`));
-    await expect(page.locator("h1")).toContainText("Test Rich Text Issue");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Test Rich Text Issue" })
+    ).toBeVisible();
 
     // 11. Verify rich text rendering
     const description = page.locator(".prose");

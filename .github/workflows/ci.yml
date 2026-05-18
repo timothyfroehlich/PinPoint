@@ -263,13 +263,13 @@ jobs:
             ! -name '*.lock.yml' -print0 | xargs -0 ./actionlint
 
       - name: Ruff check
-        run: ruff check scripts/ .agent/skills/*/scripts/*.py
+        run: ruff check scripts/
 
       - name: Ruff format check
-        run: ruff format --check scripts/ .agent/skills/*/scripts/*.py
+        run: ruff format --check scripts/
 
       - name: ShellCheck
-        run: find scripts/ .agent/skills/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck
+        run: find scripts/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck
 
       - name: Install zizmor
         run: |

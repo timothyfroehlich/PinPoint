@@ -2,6 +2,10 @@
   "permissions": {
     "deny": [
       "Bash(supabase db push:*)"
+    ],
+    "ask": [
+      "Bash(*merge-pr.sh*--force*)",
+      "Bash(*merge-pr.sh*--bypass-merge-requirements*)"
     ]
   },
   "enableAllProjectMcpServers": true,
@@ -23,6 +27,16 @@
           {
             "type": "command",
             "command": "node .claude/hooks/block-bad-shell-patterns.cjs",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|mcp__github__merge_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-direct-merge.cjs",
             "timeout": 5000
           }
         ]
