@@ -599,8 +599,9 @@ describe("Invited Users Integration", () => {
 
   // Rule #12 (admin half): admins MUST be able to see real email addresses.
   // The admin user-listing page calls getUnifiedUsers({ includeEmails: true }).
-  // This test ensures the returned values are actual email strings — not null,
-  // undefined, or any redacted form.
+  // These tests assert that the `email` field is present in each returned user
+  // and equals the value that was seeded — confirming the field is not omitted
+  // (which would happen if called without includeEmails: true).
   describe("Admin email visibility (Rule #12 admin half)", () => {
     it("should return real email addresses for active users when includeEmails is true", async () => {
       const db = await getTestDb();
@@ -621,7 +622,7 @@ describe("Invited Users Integration", () => {
       const user = users.find((u) => u.id === userId);
 
       expect(user).toBeDefined();
-      // The email must be the real string — not null, not undefined, not redacted.
+      // The email field must be present and equal the seeded value.
       expect(user?.email).toBe(userEmail);
     });
 
@@ -643,7 +644,7 @@ describe("Invited Users Integration", () => {
       const user = users.find((u) => u.id === invited.id);
 
       expect(user).toBeDefined();
-      // The email must be the real string — not null, not undefined, not redacted.
+      // The email field must be present and equal the seeded value.
       expect(user?.email).toBe(invitedEmail);
     });
   });
