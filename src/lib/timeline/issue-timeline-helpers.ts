@@ -7,6 +7,8 @@
  * - `emitIssueOpened` — used by `createIssue`
  * - `emitIssueClosed` / `emitIssueStatusChanged` — used by `updateIssueStatus`
  * - `emitIssueAssigned` / `emitIssueUnassigned` — used by `assignIssue`
+ * - `emitIssueReassignedOut` / `emitIssueReassignedIn` — used by
+ *   `reassignIssueMachine` (dual-write: one row on source, one on destination)
  *
  * All helpers:
  * - Run inside the caller's transaction (pass `tx`).
@@ -22,41 +24,15 @@
  * call sites already have it via `with: { machine: true }`.
  */
 
-import { eq } from "drizzle-orm";
-
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
 import type { DbTransaction } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
 
 export interface IssueEventCommon {
   machineId: string;
   issueId: string;
   issueNumber: number;
   actorId?: string;
-}
-
-/**
- * Resolve a display name from `user_profiles.name` (the generated
- * `first_name || ' ' || last_name` column). Falls back through the optional
- * `fallbackName` argument → `"Anonymous"`. NEVER touches email.
- *
- * Offered as a convenience for callers that need an actor name on the way
- * into one of the emit helpers; not required.
- */
-export async function resolveActorName(
-  tx: DbTransaction,
-  userId: string | null | undefined,
-  fallbackName?: string
-): Promise<string> {
-  if (userId) {
-    const profile = await tx.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, userId),
-      columns: { name: true },
-    });
-    if (profile) return profile.name;
-  }
-  return fallbackName ?? "Anonymous";
 }
 
 export async function emitIssueOpened(
@@ -118,6 +94,32 @@ export async function emitIssueUnassigned(
     kind: "issue_unassigned",
     issueId: args.issueId,
     issueNumber: args.issueNumber,
+  });
+}
+
+export async function emitIssueReassignedOut(
+  tx: DbTransaction,
+  args: IssueEventCommon & { toMachineId: string; toMachineName: string }
+): Promise<void> {
+  await emit(tx, args, {
+    kind: "issue_reassigned_out",
+    issueId: args.issueId,
+    issueNumber: args.issueNumber,
+    toMachineId: args.toMachineId,
+    toMachineName: args.toMachineName,
+  });
+}
+
+export async function emitIssueReassignedIn(
+  tx: DbTransaction,
+  args: IssueEventCommon & { fromMachineId: string; fromMachineName: string }
+): Promise<void> {
+  await emit(tx, args, {
+    kind: "issue_reassigned_in",
+    issueId: args.issueId,
+    issueNumber: args.issueNumber,
+    fromMachineId: args.fromMachineId,
+    fromMachineName: args.fromMachineName,
   });
 }
 

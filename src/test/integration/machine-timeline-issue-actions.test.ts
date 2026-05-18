@@ -484,3 +484,158 @@ describe("assignIssue duplicate-writes to machine timeline (PP-0x98)", () => {
     expect(rows).toHaveLength(0);
   });
 });
+
+describe("reassignIssueMachine duplicate-writes dual rows (PP-0x98)", () => {
+  setupTestDb();
+
+  async function makeUser(
+    overrides: { firstName?: string; lastName?: string } = {}
+  ) {
+    const db = await getTestDb();
+    const id = randomUUID();
+    await db.insert(authUsers).values({ id, email: `${id}@example.com` });
+    const [user] = await db
+      .insert(userProfiles)
+      .values({
+        id,
+        email: `${id}@example.com`,
+        firstName: overrides.firstName ?? "Test",
+        lastName: overrides.lastName ?? "Reporter",
+        role: "member",
+      })
+      .returning();
+    return user;
+  }
+
+  let machineCounter = 0;
+  async function makeMachine() {
+    const db = await getTestDb();
+    machineCounter += 1;
+    const [machine] = await db
+      .insert(machines)
+      .values({
+        name: `Test Machine ${String(machineCounter)}`,
+        initials: `RS${String(machineCounter).padStart(3, "0")}`,
+      })
+      .returning();
+    return machine;
+  }
+
+  async function seedIssue(
+    reporter: { id: string },
+    machine: { id: string; initials: string }
+  ) {
+    const { createIssue } = await import("~/services/issues");
+    return createIssue({
+      title: "x",
+      machineInitials: machine.initials,
+      severity: "minor",
+      priority: "low",
+      frequency: "intermittent",
+      status: "new",
+      reportedBy: reporter.id,
+      autoWatchReporter: false,
+    });
+  }
+
+  async function clearTimelineEventsForMachine(machineId: string) {
+    const db = await getTestDb();
+    await db
+      .delete(timelineEvents)
+      .where(eq(timelineEvents.machineId, machineId));
+  }
+
+  it("emits issue_reassigned_out on source AND issue_reassigned_in on destination", async () => {
+    const db = await getTestDb();
+    const reporter = await makeUser();
+    const source = await makeMachine();
+    const dest = await makeMachine();
+    const issue = await seedIssue(reporter, source);
+    const sourceIssueNumber = issue.issueNumber;
+    await clearTimelineEventsForMachine(source.id);
+    await clearTimelineEventsForMachine(dest.id);
+
+    const { reassignIssueMachine } = await import("~/services/issues");
+    await reassignIssueMachine({
+      issueId: issue.id,
+      newMachineInitials: dest.initials,
+      userId: reporter.id,
+    });
+
+    const sourceRows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, source.id));
+    const destRows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, dest.id));
+
+    expect(sourceRows).toHaveLength(1);
+    expect(destRows).toHaveLength(1);
+
+    expect(sourceRows[0].sourceType).toBe("issue");
+    expect(sourceRows[0].tag).toBe("issue");
+    expect(sourceRows[0].eventData).toMatchObject({
+      kind: "issue_reassigned_out",
+      issueId: issue.id,
+      issueNumber: sourceIssueNumber,
+      toMachineId: dest.id,
+      toMachineName: dest.name,
+    });
+
+    expect(destRows[0].sourceType).toBe("issue");
+    expect(destRows[0].tag).toBe("issue");
+    expect(destRows[0].eventData).toMatchObject({
+      kind: "issue_reassigned_in",
+      issueId: issue.id,
+      // issueNumber on destination is the NEW number (1, since it's the dest's first issue)
+      fromMachineId: source.id,
+      fromMachineName: source.name,
+    });
+
+    // Both events share the same createdAt (same transaction → Postgres now() is constant in a tx)
+    expect(sourceRows[0].createdAt.getTime()).toBe(
+      destRows[0].createdAt.getTime()
+    );
+  });
+
+  it("uses the NEW issue number for the destination row, OLD for the source row", async () => {
+    const db = await getTestDb();
+    const reporter = await makeUser();
+    const source = await makeMachine();
+    const dest = await makeMachine();
+    // Seed two issues on dest first so the next reservation lands at issueNumber=3
+    await seedIssue(reporter, dest);
+    await seedIssue(reporter, dest);
+    const issue = await seedIssue(reporter, source);
+    const sourceIssueNumber = issue.issueNumber; // 1 on source
+    await clearTimelineEventsForMachine(source.id);
+    await clearTimelineEventsForMachine(dest.id);
+
+    const { reassignIssueMachine } = await import("~/services/issues");
+    await reassignIssueMachine({
+      issueId: issue.id,
+      newMachineInitials: dest.initials,
+      userId: reporter.id,
+    });
+
+    const sourceRows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, source.id));
+    const destRows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, dest.id));
+
+    expect(sourceRows[0].eventData).toMatchObject({
+      kind: "issue_reassigned_out",
+      issueNumber: sourceIssueNumber, // OLD number (was 1 on source)
+    });
+    expect(destRows[0].eventData).toMatchObject({
+      kind: "issue_reassigned_in",
+      issueNumber: 3, // NEW number (third issue on dest)
+    });
+  });
+});

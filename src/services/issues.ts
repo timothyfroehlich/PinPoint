@@ -18,6 +18,8 @@ import {
   emitIssueStatusChanged,
   emitIssueAssigned,
   emitIssueUnassigned,
+  emitIssueReassignedOut,
+  emitIssueReassignedIn,
 } from "~/lib/timeline/issue-timeline-helpers";
 import { createNotification } from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
@@ -972,7 +974,7 @@ export async function reassignIssueMachine({
         issueNumber: true,
       },
       with: {
-        machine: { columns: { name: true } },
+        machine: { columns: { id: true, name: true } },
       },
     });
 
@@ -992,6 +994,7 @@ export async function reassignIssueMachine({
       .set({ nextIssueNumber: sql`${machines.nextIssueNumber} + 1` })
       .where(eq(machines.initials, newMachineInitials))
       .returning({
+        id: machines.id,
         nextIssueNumber: machines.nextIssueNumber,
         name: machines.name,
       });
@@ -1028,6 +1031,27 @@ export async function reassignIssueMachine({
       tx,
       userId
     );
+
+    // Dual-write: source machine timeline gets "reassigned_out", destination
+    // gets "reassigned_in". Both rows are atomic with the issue update (same
+    // transaction → same created_at via Postgres now()).
+    await emitIssueReassignedOut(tx, {
+      machineId: currentIssue.machine.id,
+      issueId,
+      issueNumber: fromIssueNumber, // OLD number, as it existed on source
+      toMachineId: destinationMachine.id,
+      toMachineName: destinationMachine.name,
+      ...(userId ? { actorId: userId } : {}),
+    });
+
+    await emitIssueReassignedIn(tx, {
+      machineId: destinationMachine.id,
+      issueId,
+      issueNumber: newIssueNumber, // NEW number, as it now exists on destination
+      fromMachineId: currentIssue.machine.id,
+      fromMachineName: currentIssue.machine.name,
+      ...(userId ? { actorId: userId } : {}),
+    });
 
     log.info(
       {

@@ -1892,7 +1892,7 @@ git commit -m "feat(issues): duplicate-write assign/unassign + extract issue-tim
 - Modify: `src/app/(app)/issues/actions.ts:1006` (`reassignIssueMachineAction`) and/or its service
 - Modify: integration test file (append)
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```typescript
 import { reassignIssueMachineAction } from "~/app/(app)/issues/actions";
@@ -1954,12 +1954,12 @@ describe("reassignIssueMachineAction duplicate-writes dual rows", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: FAIL.
 
-- [ ] **Step 3: Add dual-write to reassign service**
+- [x] **Step 3: Add dual-write to reassign service**
 
 In the reassign action's transaction, after the existing `createTimelineEvent` (the `machine_reassigned` event on `issueComments`), add two parallel emits to `timelineEvents`:
 
@@ -2002,12 +2002,12 @@ await createMachineTimelineEvent(
 );
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `pnpm test:integration -- issue-actions-machine-timeline`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/(app)/issues/actions.ts src/services/issues.ts src/test/integration/supabase/issue-actions-machine-timeline.test.ts
