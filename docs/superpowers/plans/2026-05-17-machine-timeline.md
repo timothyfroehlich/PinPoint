@@ -3376,28 +3376,28 @@ git commit -m "test(e2e): machine timeline post/filter/reassign multi-page journ
 
 - N/A — verification + push
 
-- [ ] **Step 1: Run preflight**
+- [x] **Step 1: Run preflight**
 
 Run: `pnpm run preflight`
 Expected: PASS — types, lint, format, unit tests, integration tests, build all green. If anything fails, fix and re-run before continuing.
 
-- [ ] **Step 2: Re-run smoke**
+- [x] **Step 2: Re-run smoke**
 
 Run: `pnpm run smoke`
 Expected: PASS — chromium + mobile chrome smoke green for all routes including new `/m/[initials]/timeline`.
 
-- [ ] **Step 3: Update spec to reflect "Status: Implemented"**
+- [x] **Step 3: Update spec to reflect "Status: Implemented"**
 
 Open `docs/superpowers/specs/2026-05-17-machine-timeline-design.md` and change `**Status**: Design` to `**Status**: Implemented (PP-0x98)`.
 
-- [ ] **Step 4: Commit the status change**
+- [x] **Step 4: Commit the status change**
 
 ```bash
 git add docs/superpowers/specs/2026-05-17-machine-timeline-design.md
 git commit -m "docs(machines): mark machine timeline spec as Implemented (PP-0x98)"
 ```
 
-- [ ] **Step 5: Push and open PR**
+- [x] **Step 5: Push and open PR**
 
 Run:
 

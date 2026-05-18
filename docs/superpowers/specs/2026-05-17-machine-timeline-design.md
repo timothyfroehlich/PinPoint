@@ -2,7 +2,7 @@
 
 **Date**: 2026-05-17
 **Bead**: PP-0x98
-**Status**: Design
+**Status**: Implemented (PP-0x98)
 
 ## Summary
 
