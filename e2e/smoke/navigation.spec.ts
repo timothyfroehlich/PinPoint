@@ -129,6 +129,12 @@ test.describe("Bottom Tab Bar (mobile only)", () => {
     await expect(moreButton).toBeVisible();
     await moreButton.click();
 
+    // Wait for the Sheet to fully animate open before asserting on children.
+    // The Sheet is a Radix Dialog portal — scope assertions to the dialog
+    // so they resolve even if the surrounding page has shifted layout.
+    const moreSheet = page.getByRole("dialog");
+    await moreSheet.waitFor({ state: "visible", timeout: 5000 });
+
     // Sheet should open with secondary nav items
     await expect(page.getByTestId("more-sheet-help")).toBeVisible();
     await expect(page.getByTestId("more-sheet-whats-new")).toBeVisible();
@@ -151,6 +157,10 @@ test.describe("Bottom Tab Bar (mobile only)", () => {
 
     const moreButton = page.getByRole("button", { name: /more options/i });
     await moreButton.click();
+
+    // Wait for Sheet to animate open before asserting on children.
+    const moreSheet = page.getByRole("dialog");
+    await moreSheet.waitFor({ state: "visible", timeout: 5000 });
 
     // User Management should be visible for admin role
     await expect(page.getByTestId("more-sheet-admin")).toBeVisible();
