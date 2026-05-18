@@ -108,9 +108,9 @@ if [[ -n "$NAME" ]]; then
   printf 'Your session_id: `%s`\n' "$SESSION_ID"
   printf 'Registered as: **Claude-%s** (self-filter active for your own posts)\n\n' "$NAME"
   printf 'If this scrolls out of context later, recall your name with:\n'
-  printf '    bash scripts/hooks/huddle-whoami.sh whoami %s\n\n' "$SESSION_ID"
+  printf '    bash ~/.claude/hooks/huddle-whoami.sh whoami %s\n\n' "$SESSION_ID"
   # shellcheck disable=SC2016  # backticks are literal Markdown
-  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md`\n'
+  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md` (after PR #1357 merges; user-level script always works regardless of branch).\n'
 else
   printf '## Huddle identity — registration needed\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
@@ -126,10 +126,11 @@ else
   printf '  DocsSync         keeping docs aligned\n\n'
   printf 'Format: CamelCase, ASCII letters only, under ~20 chars.\n\n'
   printf 'Register with:\n'
-  printf '    bash scripts/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
+  printf '    bash ~/.claude/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
+  printf 'The user-level path works from any branch or worktree.\n'
   printf 'If the name is taken, the helper suggests variations.\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown
-  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md`\n'
+  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md` (after PR #1357 merges).\n'
 fi
 
 exit 0
