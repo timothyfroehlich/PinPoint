@@ -131,6 +131,14 @@
       }
     ]
   },
+  "extraKnownMarketplaces": {
+    "googlechrome": {
+      "source": {
+        "source": "github",
+        "repo": "GoogleChrome/modern-web-guidance"
+      }
+    }
+  },
   "enabledPlugins": {
     "code-review@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
@@ -139,7 +147,8 @@
     "security-guidance@claude-plugins-official": true,
     "beads@beads-marketplace": true,
     "pr-review-toolkit@claude-plugins-official": true,
-    "explanatory-output-style@claude-plugins-official": true
+    "explanatory-output-style@claude-plugins-official": true,
+    "modern-web-guidance@googlechrome": true
   },
   "outputStyle": "Explanatory"
 }
