@@ -65,6 +65,22 @@ export async function createIssue(
 - The help page `/help/permissions` is auto-generated from the matrix — drift causes users to see incorrect capability information.
 - `true` = unconditional access, `"own"` = only resources the user created. Verify these match the actual `if` checks.
 
+## Matrix-Only Permissions (AGENTS.md §2.1 #12)
+
+- All permission checks MUST go through `checkPermission()` from `~/lib/permissions/helpers`. No standalone permission functions outside `src/lib/permissions/`.
+- The help page auto-generates from the matrix — divergent enforcement paths cause users to see wrong capability information.
+
+## Action Wiring in UI (CORE-ARCH-005 / 006 / 007)
+
+- **Forms**: `<form action={serverAction}>` — direct reference only. Never wrap inline: `action={async () => { await serverAction(); }}` breaks Next.js serialization (CORE-ARCH-005).
+- **Dropdown menus**: use `onSelect`, not `<form>` inside `DropdownMenuItem`. Radix unmounts content on close and you get "Form submission canceled because the form is not connected" (CORE-ARCH-006).
+- **Feedback**: use React 19 `useActionState` for validation + success states. No `setFlash()` / `readFlash()` flash-message helpers (CORE-ARCH-007).
+
+## Never Query auth.users (CORE-SSR-007)
+
+- Server actions and services must read user data from `user_profiles`, never from Supabase's internal `auth.users` table — breaks abstraction and may break with Supabase upgrades.
+- Exception: `supabase/seed.sql` triggers and `pglite.ts` test setup may reference `auth.users` for bootstrapping.
+
 ## Forbidden Patterns
 
 - Multi-tenant permission checks (obsolete).
@@ -113,4 +129,4 @@ export default async function NewIssuePage({
 
 ---
 
-Last Updated: 2025-11-09
+Last Updated: 2026-05-17 (added matrix-only permissions, CORE-ARCH-005/006/007 wiring, CORE-SSR-007 auth.users ban)

@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { useState } from "react";
 import { MessageSquarePlus } from "lucide-react";
 import {
   Sheet,
@@ -26,9 +27,11 @@ interface StickyCommentComposerProps {
 export function StickyCommentComposer({
   issueId,
 }: StickyCommentComposerProps): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+
   return (
     <div className="md:hidden fixed bottom-[calc(56px+env(safe-area-inset-bottom))] left-0 right-0 z-30 border-t border-outline-variant bg-card/90 backdrop-blur-sm px-4 py-2">
-      <Sheet>
+      <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <button
             type="button"
@@ -48,7 +51,12 @@ export function StickyCommentComposer({
             </SheetDescription>
           </SheetHeader>
           <div className="px-4 pb-4">
-            <AddCommentForm issueId={issueId} />
+            <AddCommentForm
+              issueId={issueId}
+              onSubmitSuccess={() => {
+                setOpen(false);
+              }}
+            />
           </div>
         </SheetContent>
       </Sheet>
