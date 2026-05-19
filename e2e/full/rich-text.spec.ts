@@ -11,7 +11,10 @@ import { getTestPrefix } from "../support/test-isolation";
  * 1. Editor loads and allows text entry
  * 2. Mention autocomplete triggers and works
  * 3. Rich text is rendered correctly
- * 4. Notifications are created for mentions
+ *
+ * Notification delivery for mentions is verified at cheaper layers:
+ * - src/services/issues.test.ts → createIssue mention-extraction wiring
+ * - src/test/integration/notifications.test.ts → "mentioned" describe block
  */
 
 test.describe("Rich Text and Mentions", () => {

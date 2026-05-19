@@ -698,6 +698,9 @@ describe("createNotification (Integration)", () => {
         .values(createTestIssue(machine.initials, { issueNumber: 1 }))
         .returning();
 
+      // Include the actor in additionalRecipientIds so that includeActor: false
+      // is exercised — without this, the actor was never a candidate and the
+      // exclusion branch was effectively untested.
       await createNotification(
         {
           type: "mentioned",
@@ -705,7 +708,7 @@ describe("createNotification (Integration)", () => {
           resourceType: "issue",
           actorId: actor.id,
           includeActor: false,
-          additionalRecipientIds: [mentioned.id],
+          additionalRecipientIds: [actor.id, mentioned.id],
           issueTitle: "Test issue",
           machineName: machine.name,
           formattedIssueId: "MN-01",
@@ -716,6 +719,7 @@ describe("createNotification (Integration)", () => {
       const result = await db.query.notifications.findMany();
       expect(result).toHaveLength(1);
       expect(result[0].userId).toBe(mentioned.id);
+      expect(result[0].userId).not.toBe(actor.id);
       expect(result[0].type).toBe("mentioned");
       expect(result[0].resourceId).toBe(issue.id);
     });
