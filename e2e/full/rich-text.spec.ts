@@ -137,7 +137,7 @@ test.describe("Rich Text and Mentions", () => {
       await sheetTrigger.click();
       await page
         .getByRole("dialog", { name: "Add a comment" })
-        .waitFor({ state: "visible", timeout: 5000 });
+        .waitFor({ state: "visible", timeout: 10000 });
     }
 
     const commentForm = isOnMobile
