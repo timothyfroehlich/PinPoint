@@ -149,6 +149,5 @@
     "pr-review-toolkit@claude-plugins-official": true,
     "explanatory-output-style@claude-plugins-official": true,
     "modern-web-guidance@googlechrome": true
-  },
-  "outputStyle": "Explanatory"
+  }
 }
