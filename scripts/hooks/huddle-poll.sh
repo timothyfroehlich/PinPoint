@@ -78,13 +78,18 @@ POLL_FILE="$PROJECT_DIR/.claude/.huddle-last-poll"
 # === FAST PATH (PostToolUse only — gated by HUDDLE_THROTTLE_SECONDS) ===
 # UserPromptSubmit calls this script without HUDDLE_THROTTLE_SECONDS set, so
 # this block is skipped entirely → identical to pre-throttle behavior.
+#
+# Subagent detection is deliberately NOT in the fast path: a bash glob over
+# the entire stdin payload would false-positive on any tool_input/tool_response
+# that contains the literal substring `/subagents/`. A top-level session
+# working with such paths would have ALL its PostToolUse fires silently
+# skipped. Instead, subagent skip happens in the slow path via the precise
+# jq-based check on `transcript_path` below — and that check runs BEFORE the
+# throttle marker write, so subagents still don't advance the throttle clock.
+# The only cost: subagent fires that pass the throttle window pay ~50-100ms
+# to reach the precise check. Rare and acceptable.
 THROTTLE_SECONDS="${HUDDLE_THROTTLE_SECONDS:-0}"
 if (( THROTTLE_SECONDS > 0 )); then
-  # Subagent skip via pure-bash glob match — no spawn. A false positive is
-  # benign (just an extra throttle skip); the slow path keeps its own precise
-  # jq-based check on `transcript_path` as defense in depth.
-  case "$INPUT" in *'/subagents/'*) exit 0 ;; esac
-
   if [[ -f "$POLL_FILE" ]]; then
     LAST_POLL=0
     read -r LAST_POLL < "$POLL_FILE" 2>/dev/null || LAST_POLL=0

@@ -82,11 +82,13 @@ If nothing's new, no block appears (zero tokens).
 
 ### Throttle override
 
-To poll PP-cvh more or less frequently on PostToolUse, edit
-`.claude/settings.json` and change the `HUDDLE_THROTTLE_SECONDS=180` env var
-on the PostToolUse hook command line. Set it to `60` for once-per-minute
-polling, or `0` to disable the PostToolUse path entirely (UserPromptSubmit
-continues to fire regardless).
+To change the PostToolUse throttle interval, edit `.claude/settings.json`
+and update `HUDDLE_THROTTLE_SECONDS=180` on the PostToolUse hook command line.
+Lower means more frequent polling — e.g. `60` for once-per-minute. **Setting
+the value to `0` (or removing the env var) makes the script poll on every
+tool call**, which is heavy bd load — useful for debugging only. To stop
+PostToolUse polling entirely, remove the entire PostToolUse entry from
+`.claude/settings.json` (UserPromptSubmit polling continues regardless).
 
 Subagent sessions (`Agent({...})` dispatches) are skipped on both events
 without writing the throttle marker, so a subagent's tool calls don't
