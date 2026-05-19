@@ -20,7 +20,7 @@
  * accept any `TimelineTag` and assume the caller has validated.
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
@@ -105,13 +105,16 @@ export async function softDeleteMachineComment(
   args: SoftDeleteArgs,
   tx: DbTransaction = db
 ): Promise<void> {
+  // Idempotent + race-safe: only the first concurrent delete writes the
+  // tombstone columns; subsequent attempts no-op rather than overwriting
+  // `deletedBy`/`deletedAt`. (PP-0x98 review)
   await tx
     .update(timelineEvents)
     .set({
       deletedAt: new Date(),
       deletedBy: args.deletedBy,
     })
-    .where(eq(timelineEvents.id, id));
+    .where(and(eq(timelineEvents.id, id), isNull(timelineEvents.deletedAt)));
 }
 
 export interface GetMachineTimelineArgs {
