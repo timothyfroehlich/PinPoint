@@ -6,8 +6,8 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/index";
-import { IssuesExpando } from "../issues-expando";
-import { getMachineForLayout } from "../_data";
+import { IssuesExpando } from "~/app/(app)/m/[initials]/issues-expando";
+import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
 
 /**
  * Machine Maintenance Tab (/m/[initials]/maintenance)
