@@ -284,17 +284,18 @@ When two or more Dependabot PRs that both touch `pnpm-lock.yaml` (or any lockfil
 
 **Rule:** when merging the first of two or more Dependabot PRs that both touch a lockfile, comment `@dependabot rebase` on each remaining Dependabot PR before merging it. Dependabot regenerates the lockfile against post-first-merge main and the duplicate is deduped automatically. Wait for the rebased CI to pass before invoking `merge-pr.sh` on the second PR.
 
-**Casework:** 2026-05-19 — PRs #1379 and #1381 each added `brace-expansion@5.0.6:` to `packages:` independently. Both merged within ~1 minute. Main's `Setup Dependencies` broke until PR #1383 shipped a manual dedup.
+**Casework:** 2026-05-19 — PRs #1379 and #1381 each added `brace-expansion@5.0.6:` to `packages:` independently. Both merged within ~1 minute. Main's `Setup Dependencies` broke until a manual dedup of `pnpm-lock.yaml` was bundled into PR #1383 (commit `505a1475`) alongside that PR's primary E2E locator fix.
 
 **Quick triage check before merging the second of two open Dependabot PRs:**
 
 ```bash
-# Does the second PR's branch share a lockfile baseline with current main?
-gh pr view <second_pr> --json baseRefOid --jq .baseRefOid
-git rev-parse origin/main
+# How many commits is the PR's branch behind origin/main?
+# behind_by > 0 means the PR's lockfile snapshot predates current main.
+pr_branch=$(gh pr view <second_pr> --json headRefName --jq .headRefName)
+gh api "repos/{owner}/{repo}/compare/main...$pr_branch" --jq '.behind_by'
 ```
 
-If `baseRefOid` is older than `origin/main`, request a rebase first.
+If `behind_by > 0`, comment `@dependabot rebase` on the PR and wait for the rebased CI to pass before invoking `merge-pr.sh`. Do not use `gh pr view --json baseRefOid` for this — `baseRefOid` is the base branch's current SHA at query time, so it always equals `origin/main` and cannot detect a stale PR head.
 
 ---
 
