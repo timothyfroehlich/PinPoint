@@ -1,4 +1,4 @@
-// e2e/smoke/rich-text.spec.ts
+// e2e/full/rich-text.spec.ts
 import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions";
 import { createTestUser, createTestMachine } from "../support/supabase-admin";
