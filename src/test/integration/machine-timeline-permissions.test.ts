@@ -268,4 +268,142 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
       expect(row.deletedAt).toBeNull();
     });
   });
+
+  describe("editMachineCommentAction permission scenarios", () => {
+    async function seedCommentByMember() {
+      const owner = await makeUser("member", { firstName: "Owner" });
+      const machine = await makeMachine(owner.id);
+      const member = await makeUser("member", { firstName: "Member" });
+      const otherMember = await makeUser("member", { firstName: "Other" });
+      const admin = await makeUser("admin", { firstName: "Admin" });
+
+      await mockAuth(member.id);
+      const { addMachineCommentAction } =
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
+      const insertResult = await addMachineCommentAction({
+        machineId: machine.id,
+        tag: "maintenance",
+        contentJson: VALID_DOC_JSON,
+      });
+      expect(insertResult.success).toBe(true);
+
+      const db = await getTestDb();
+      const rows = await db
+        .select()
+        .from(timelineEvents)
+        .where(eq(timelineEvents.machineId, machine.id));
+      const comment = rows[0];
+      return { machine, owner, member, otherMember, admin, comment };
+    }
+
+    const EDITED_DOC_JSON = JSON.stringify({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Edited" }] },
+      ],
+    });
+
+    it("author can edit own comment — content and tag both update", async () => {
+      const db = await getTestDb();
+      const { member, comment } = await seedCommentByMember();
+      await mockAuth(member.id);
+      const { editMachineCommentAction } =
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
+
+      const result = await editMachineCommentAction({
+        id: comment.id,
+        tag: "cleaning",
+        contentJson: EDITED_DOC_JSON,
+      });
+      expect(result.success).toBe(true);
+
+      const rows = await db
+        .select()
+        .from(timelineEvents)
+        .where(eq(timelineEvents.id, comment.id));
+      const row = rows[0];
+      expect(row).toBeDefined();
+      expect(row.tag).toBe("cleaning");
+      expect(row.content).toEqual(JSON.parse(EDITED_DOC_JSON));
+    });
+
+    it("machine owner CANNOT edit another member's comment (own only)", async () => {
+      const { owner, comment } = await seedCommentByMember();
+      await mockAuth(owner.id);
+      const { editMachineCommentAction } =
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
+
+      const result = await editMachineCommentAction({
+        id: comment.id,
+        tag: "cleaning",
+        contentJson: EDITED_DOC_JSON,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toBe("Forbidden");
+    });
+
+    it("site admin CANNOT edit another member's comment (own only, no global override)", async () => {
+      const { admin, comment } = await seedCommentByMember();
+      await mockAuth(admin.id);
+      const { editMachineCommentAction } =
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
+
+      const result = await editMachineCommentAction({
+        id: comment.id,
+        tag: "cleaning",
+        contentJson: EDITED_DOC_JSON,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toBe("Forbidden");
+    });
+
+    it("non-author non-owner non-admin member CANNOT edit", async () => {
+      const { otherMember, comment } = await seedCommentByMember();
+      await mockAuth(otherMember.id);
+      const { editMachineCommentAction } =
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
+
+      const result = await editMachineCommentAction({
+        id: comment.id,
+        tag: "cleaning",
+        contentJson: EDITED_DOC_JSON,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error).toBe("Forbidden");
+    });
+
+    it("editing a soft-deleted comment is rejected", async () => {
+      const { member, comment } = await seedCommentByMember();
+      await mockAuth(member.id);
+      const { deleteMachineCommentAction, editMachineCommentAction } =
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
+
+      const delResult = await deleteMachineCommentAction({ id: comment.id });
+      expect(delResult.success).toBe(true);
+
+      const editResult = await editMachineCommentAction({
+        id: comment.id,
+        tag: "cleaning",
+        contentJson: EDITED_DOC_JSON,
+      });
+      expect(editResult.success).toBe(false);
+      if (!editResult.success) expect(editResult.error).toBe("Already deleted");
+    });
+
+    it("editing rejects reserved tags (lifecycle, issue)", async () => {
+      const { member, comment } = await seedCommentByMember();
+      await mockAuth(member.id);
+      const { editMachineCommentAction } =
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
+
+      const result = await editMachineCommentAction({
+        id: comment.id,
+        // @ts-expect-error — userTagSchema rejects this at runtime; we want
+        // to exercise that path.
+        tag: "lifecycle",
+        contentJson: EDITED_DOC_JSON,
+      });
+      expect(result.success).toBe(false);
+    });
+  });
 });

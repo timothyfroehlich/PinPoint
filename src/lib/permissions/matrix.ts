@@ -423,6 +423,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "machines.timeline.comment.edit",
+        label: "Edit machine timeline comments",
+        description:
+          "Edit a comment on a machine's timeline. Authors only — even admins and machine owners cannot put words in someone else's mouth (mirrors `comments.edit` on issue comments).",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: "own",
+          technician: "own",
+          admin: "own",
+        },
+      },
+      {
         id: "machines.timeline.comment.delete",
         label: "Delete machine timeline comments",
         description:

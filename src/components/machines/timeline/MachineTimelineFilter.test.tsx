@@ -11,53 +11,77 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/m/AAA/timeline",
 }));
 
-describe("MachineTimelineFilter", () => {
-  it("renders the filter combobox", () => {
-    render(<MachineTimelineFilter currentTag={undefined} />);
-    expect(
-      screen.getByRole("combobox", { name: /filter/i })
-    ).toBeInTheDocument();
+describe("MachineTimelineFilter (multi-select, sticky-All)", () => {
+  it("renders the filter trigger with 'All tags' when empty", () => {
+    render(<MachineTimelineFilter currentTags={[]} />);
+    const trigger = screen.getByRole("button", { name: /filter by tag/i });
+    expect(trigger).toBeInTheDocument();
+    expect(trigger).toHaveTextContent(/all tags/i);
   });
 
-  it("offers 'All' + all five built-in tags (including reserved)", async () => {
+  it("opens to show 'All' + every built-in tag as checkbox items", async () => {
     const user = userEvent.setup();
-    render(<MachineTimelineFilter currentTag={undefined} />);
-    await user.click(screen.getByRole("combobox", { name: /filter/i }));
-    expect(screen.getByRole("option", { name: /^all$/i })).toBeInTheDocument();
+    render(<MachineTimelineFilter currentTags={[]} />);
+    await user.click(screen.getByRole("button", { name: /filter by tag/i }));
     expect(
-      screen.getByRole("option", { name: /lifecycle/i })
+      screen.getByRole("menuitemcheckbox", { name: /^all$/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("option", { name: /^issue$/i })
+      screen.getByRole("menuitemcheckbox", { name: /lifecycle/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("option", { name: /maintenance/i })
+      screen.getByRole("menuitemcheckbox", { name: /^issue$/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("option", { name: /^event$/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("option", { name: /cleaning/i })
+      screen.getByRole("menuitemcheckbox", { name: /maintenance/i })
     ).toBeInTheDocument();
   });
 
-  it("pushes ?tag=<value> when a tag is selected", async () => {
+  it("checking a specific tag pushes ?tag=<value>", async () => {
     pushMock.mockClear();
     const user = userEvent.setup();
-    render(<MachineTimelineFilter currentTag={undefined} />);
-    await user.click(screen.getByRole("combobox", { name: /filter/i }));
-    await user.click(screen.getByRole("option", { name: /maintenance/i }));
+    render(<MachineTimelineFilter currentTags={[]} />);
+    await user.click(screen.getByRole("button", { name: /filter by tag/i }));
+    await user.click(
+      screen.getByRole("menuitemcheckbox", { name: /maintenance/i })
+    );
     expect(pushMock).toHaveBeenCalledWith(
       expect.stringContaining("tag=maintenance")
     );
   });
 
-  it("pushes pathname without query when 'All' is selected", async () => {
+  it("checking 'All' clears the query string (back to all-tags state)", async () => {
     pushMock.mockClear();
     const user = userEvent.setup();
-    render(<MachineTimelineFilter currentTag="maintenance" />);
-    await user.click(screen.getByRole("combobox", { name: /filter/i }));
-    await user.click(screen.getByRole("option", { name: /^all$/i }));
+    render(<MachineTimelineFilter currentTags={["maintenance"]} />);
+    await user.click(screen.getByRole("button", { name: /filter by tag/i }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: /^all$/i }));
+    expect(pushMock).toHaveBeenCalledWith("/m/AAA/timeline");
+  });
+
+  it("when one tag is selected, the trigger shows that tag's label", () => {
+    render(<MachineTimelineFilter currentTags={["maintenance"]} />);
+    expect(
+      screen.getByRole("button", { name: /filter by tag/i })
+    ).toHaveTextContent(/maintenance/i);
+  });
+
+  it("when multiple tags are selected, the trigger shows '<n> tags'", () => {
+    render(<MachineTimelineFilter currentTags={["maintenance", "cleaning"]} />);
+    expect(
+      screen.getByRole("button", { name: /filter by tag/i })
+    ).toHaveTextContent(/2 tags/i);
+  });
+
+  it("toggling off the last specific tag drops back to '?tag=' missing (All)", async () => {
+    pushMock.mockClear();
+    const user = userEvent.setup();
+    render(<MachineTimelineFilter currentTags={["maintenance"]} />);
+    await user.click(screen.getByRole("button", { name: /filter by tag/i }));
+    // The maintenance row is shown checked; clicking it unchecks → empty set.
+    await user.click(
+      screen.getByRole("menuitemcheckbox", { name: /maintenance/i })
+    );
     expect(pushMock).toHaveBeenCalledWith("/m/AAA/timeline");
   });
 });

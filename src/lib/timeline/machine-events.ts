@@ -20,7 +20,7 @@
  * accept any `TimelineTag` and assume the caller has validated.
  */
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
@@ -52,6 +52,11 @@ export interface CreateMachineCommentArgs {
 
 export interface SoftDeleteArgs {
   deletedBy: string;
+}
+
+export interface UpdateMachineCommentArgs {
+  content: ProseMirrorDoc;
+  tag: TimelineTag;
 }
 
 /**
@@ -95,6 +100,33 @@ export async function createMachineComment(
 }
 
 /**
+ * Update a comment's content and/or tag.
+ *
+ * Guarded by `sourceType = 'comment' AND deleted_at IS NULL` so the caller
+ * cannot accidentally rewrite a system event row or a previously deleted
+ * comment. Auth is enforced upstream in the action.
+ */
+export async function updateMachineComment(
+  id: string,
+  args: UpdateMachineCommentArgs,
+  tx: DbTransaction = db
+): Promise<void> {
+  await tx
+    .update(timelineEvents)
+    .set({
+      content: args.content,
+      tag: args.tag,
+    })
+    .where(
+      and(
+        eq(timelineEvents.id, id),
+        eq(timelineEvents.sourceType, "comment"),
+        isNull(timelineEvents.deletedAt)
+      )
+    );
+}
+
+/**
  * Soft-delete a comment by stamping `deletedAt` and `deletedBy`.
  *
  * Intentionally does NOT clear `content` — UI can render "[deleted by X]"
@@ -119,7 +151,12 @@ export async function softDeleteMachineComment(
 
 export interface GetMachineTimelineArgs {
   machineId: string;
-  tag?: TimelineTag;
+  /**
+   * Tag filter. Omitted/empty array = no filter (all tags). A non-empty array
+   * matches rows whose `tag` is in the set (multi-select sticky-All UI on the
+   * client; see `MachineTimelineFilter`).
+   */
+  tags?: TimelineTag[];
 }
 
 export interface MachineTimelineRow {
@@ -175,7 +212,9 @@ export async function getMachineTimeline(
     .where(
       and(
         eq(timelineEvents.machineId, args.machineId),
-        args.tag ? eq(timelineEvents.tag, args.tag) : undefined
+        args.tags && args.tags.length > 0
+          ? inArray(timelineEvents.tag, args.tags)
+          : undefined
       )
     )
     // `createdAt` is `now()`, constant within a transaction, so multiple

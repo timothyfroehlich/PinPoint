@@ -2,9 +2,8 @@ import type React from "react";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 
+import { MachineTimelineActionsRow } from "~/components/machines/timeline/MachineTimelineActionsRow";
 import { MachineTimelineCommentRow } from "~/components/machines/timeline/MachineTimelineCommentRow";
-import { MachineTimelineComposer } from "~/components/machines/timeline/MachineTimelineComposer";
-import { MachineTimelineFilter } from "~/components/machines/timeline/MachineTimelineFilter";
 import { MachineTimelineSystemRow } from "~/components/machines/timeline/MachineTimelineSystemRow";
 import { MachineTimelineTombstoneRow } from "~/components/machines/timeline/MachineTimelineTombstoneRow";
 import {
@@ -50,11 +49,16 @@ export default async function MachineTimelinePage({
   });
   if (!machine) notFound();
 
-  // Validate the tag param (any invalid value is treated as "no filter").
-  const parsedTag = tagParam ? tagSchema.safeParse(tagParam) : null;
-  const tag: TimelineTag | undefined = parsedTag?.success
-    ? parsedTag.data
-    : undefined;
+  // Parse the CSV `?tag=a,b,c` query param into a validated TimelineTag[].
+  // Any unknown values are silently dropped — empty list = "All".
+  const tags: TimelineTag[] = tagParam
+    ? tagParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+        .map((s) => tagSchema.safeParse(s))
+        .flatMap((r) => (r.success ? [r.data] : []))
+    : [];
 
   // Resolve current user + access level for canDelete + composer gating.
   // AGENTS.md rule 5 (Supabase SSR): createClient() -> auth.getUser() with
@@ -83,15 +87,16 @@ export default async function MachineTimelinePage({
 
   const rows = await getMachineTimeline(db, {
     machineId: machine.id,
-    ...(tag ? { tag } : {}),
+    ...(tags.length > 0 ? { tags } : {}),
   });
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <MachineTimelineFilter currentTag={tag} />
-      </div>
-      {canCompose ? <MachineTimelineComposer machineId={machine.id} /> : null}
+      <MachineTimelineActionsRow
+        machineId={machine.id}
+        currentTags={tags}
+        canCompose={canCompose}
+      />
       <div>
         {rows.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
@@ -120,18 +125,29 @@ export default async function MachineTimelinePage({
 
             // User comment.
             if (row.sourceType === "comment" && row.content) {
-              // Matrix-only permission check (AGENTS.md rule 12). Admin
-              // override, own/owner OR semantics — all encoded in the matrix
-              // entry for `machines.timeline.comment.delete`.
-              const canDelete = currentUserId
+              // Matrix-only permission checks (AGENTS.md rule 12). Edit
+              // uses `own` semantics (author only — even admin/owner can't
+              // put words in someone else's mouth); delete uses
+              // `own_or_owner` with an admin override.
+              const ownership = currentUserId
+                ? {
+                    userId: currentUserId,
+                    reporterId: row.authorId,
+                    machineOwnerId: machine.ownerId,
+                  }
+                : null;
+              const canEdit = ownership
+                ? checkPermission(
+                    "machines.timeline.comment.edit",
+                    accessLevel,
+                    ownership
+                  )
+                : false;
+              const canDelete = ownership
                 ? checkPermission(
                     "machines.timeline.comment.delete",
                     accessLevel,
-                    {
-                      userId: currentUserId,
-                      reporterId: row.authorId,
-                      machineOwnerId: machine.ownerId,
-                    }
+                    ownership
                   )
                 : false;
               return (
@@ -145,6 +161,7 @@ export default async function MachineTimelinePage({
                     tag: rowTag,
                     content: row.content,
                   }}
+                  canEdit={canEdit}
                   canDelete={canDelete}
                 />
               );

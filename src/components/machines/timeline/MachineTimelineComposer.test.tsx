@@ -13,23 +13,15 @@ vi.mock("~/components/editor/RichTextEditor", () => ({
   RichTextEditor: () => null,
 }));
 
-describe("MachineTimelineComposer", () => {
-  it("renders compact (one-line) by default", () => {
-    render(<MachineTimelineComposer machineId="m1" />);
-    expect(screen.getByText(/what did you do/i)).toBeInTheDocument();
-    // Tag selector and Post button should NOT be visible in compact state:
-    expect(
-      screen.queryByRole("combobox", { name: /tag/i })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /post/i })
-    ).not.toBeInTheDocument();
-  });
-
-  it("expands to full editor on click", async () => {
-    const user = userEvent.setup();
-    render(<MachineTimelineComposer machineId="m1" />);
-    await user.click(screen.getByText(/what did you do/i));
+describe("MachineTimelineComposer (controlled form)", () => {
+  it("renders the editor + tag + post/cancel controls", () => {
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        onCancel={vi.fn()}
+        onPosted={vi.fn()}
+      />
+    );
     expect(screen.getByRole("combobox", { name: /tag/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /post/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
@@ -37,8 +29,13 @@ describe("MachineTimelineComposer", () => {
 
   it("offers only non-reserved tags in the selector", async () => {
     const user = userEvent.setup();
-    render(<MachineTimelineComposer machineId="m1" />);
-    await user.click(screen.getByText(/what did you do/i));
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        onCancel={vi.fn()}
+        onPosted={vi.fn()}
+      />
+    );
     await user.click(screen.getByRole("combobox", { name: /tag/i }));
     expect(
       screen.getByRole("option", { name: /maintenance/i })
@@ -57,14 +54,17 @@ describe("MachineTimelineComposer", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("collapses back to compact on Cancel", async () => {
+  it("invokes onCancel when Cancel is clicked", async () => {
     const user = userEvent.setup();
-    render(<MachineTimelineComposer machineId="m1" />);
-    await user.click(screen.getByText(/what did you do/i));
+    const onCancel = vi.fn();
+    render(
+      <MachineTimelineComposer
+        machineId="m1"
+        onCancel={onCancel}
+        onPosted={vi.fn()}
+      />
+    );
     await user.click(screen.getByRole("button", { name: /cancel/i }));
-    expect(screen.getByText(/what did you do/i)).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /post/i })
-    ).not.toBeInTheDocument();
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });

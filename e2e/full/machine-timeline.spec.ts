@@ -36,8 +36,8 @@ test.describe("Machine Timeline (PP-0x98)", () => {
 
       await page.goto(`/m/${machineA}/timeline`);
 
-      // Expand the composer (collapsed trigger renders "What did you do?").
-      await page.getByText(/what did you do/i).click();
+      // Expand the composer (collapsed trigger is a "New entry" button).
+      await page.getByRole("button", { name: /new entry/i }).click();
 
       // Select the "maintenance" tag via the composer's "Tag" combobox.
       // exact:true so we don't also match the filter's "Filter by tag" trigger.
@@ -62,8 +62,10 @@ test.describe("Machine Timeline (PP-0x98)", () => {
     }) => {
       await page.goto(`/m/${machineA}/timeline?tag=maintenance`);
 
-      // The MachineTimelineFilter's SelectTrigger has aria-label="Filter by tag".
-      const trigger = page.getByRole("combobox", { name: /filter by tag/i });
+      // MachineTimelineFilter is a multi-select dropdown; its trigger button
+      // is labelled "Filter by tag" and shows the currently selected tag (or
+      // "All tags" / "<n> tags").
+      const trigger = page.getByRole("button", { name: /filter by tag/i });
       await expect(trigger).toContainText(/maintenance/i);
     });
   });

@@ -29,38 +29,29 @@ const USER_TAGS = TIMELINE_TAGS.filter(
 
 interface Props {
   machineId: string;
+  onCancel: () => void;
+  onPosted: () => void;
 }
 
+/**
+ * Controlled compose form. The collapsed "+ New entry" trigger lives on the
+ * filter row (`MachineTimelineActionsRow`) so the parent owns the expand
+ * state — there is no longer an internal collapsed-trigger variant.
+ */
 export function MachineTimelineComposer({
   machineId,
+  onCancel,
+  onPosted,
 }: Props): React.ReactElement {
-  const [expanded, setExpanded] = useState(false);
   const [tag, setTag] = useState<TimelineTag>("maintenance");
   const [doc, setDoc] = useState<ProseMirrorDoc>({ type: "doc", content: [] });
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  if (!expanded) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          setExpanded(true);
-        }}
-        onFocus={() => {
-          setExpanded(true);
-        }}
-        className="flex w-full items-center gap-2 rounded-md border bg-card px-3 py-2 text-left text-sm text-muted-foreground hover:border-foreground/20"
-      >
-        What did you do?
-      </button>
-    );
-  }
-
   const handleCancel = (): void => {
-    setExpanded(false);
     setDoc({ type: "doc", content: [] });
     setError(null);
+    onCancel();
   };
 
   const handlePost = (): void => {
@@ -73,7 +64,7 @@ export function MachineTimelineComposer({
       });
       if (result.success) {
         setDoc({ type: "doc", content: [] });
-        setExpanded(false);
+        onPosted();
       } else {
         setError(result.error);
       }

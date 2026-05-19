@@ -233,7 +233,7 @@ describe("machine-events helpers (PGlite)", () => {
 
       const rows = await getMachineTimeline(db, {
         machineId: machine.id,
-        tag: "maintenance",
+        tags: ["maintenance"],
       });
 
       expect(rows).toHaveLength(1);

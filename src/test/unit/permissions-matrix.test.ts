@@ -198,6 +198,10 @@ describe("Permission hierarchy", () => {
     "machines.view.ownerNotes",
     "comments.edit",
     "comments.delete",
+    // Editing a machine-timeline comment is author-only at every level
+    // (admin included) — see matrix entry's rationale: putting words in
+    // someone else's mouth is worse than removing them.
+    "machines.timeline.comment.edit",
   ]);
 
   it("should grant admin all permissions that technician has (except excluded)", () => {

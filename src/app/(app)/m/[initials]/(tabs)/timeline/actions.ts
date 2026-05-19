@@ -25,6 +25,7 @@ import { createClient } from "~/lib/supabase/server";
 import {
   createMachineComment,
   softDeleteMachineComment,
+  updateMachineComment,
 } from "~/lib/timeline/machine-events";
 import { userTagSchema } from "~/lib/timeline/machine-tags";
 import { type ProseMirrorDoc, proseMirrorDocSchema } from "~/lib/tiptap/types";
@@ -35,6 +36,12 @@ type ActionResult = { success: true } | { success: false; error: string };
 
 const addSchema = z.object({
   machineId: z.string().uuid(),
+  tag: userTagSchema,
+  contentJson: z.string().min(1),
+});
+
+const editSchema = z.object({
+  id: z.string().uuid(),
   tag: userTagSchema,
   contentJson: z.string().min(1),
 });
@@ -121,6 +128,113 @@ export async function addMachineCommentAction(
         tag: parsed.data.tag,
         authorId: profile.id,
       },
+      tx
+    );
+  });
+
+  revalidatePath(`/m/${machine.initials}/timeline`);
+  return { success: true };
+}
+
+/**
+ * Edit an existing comment's content and tag.
+ *
+ * Permission: `machines.timeline.comment.edit` — `own` for all authenticated
+ * levels (admin included). Editing someone else's comment would put words in
+ * their mouth, so this differs from delete (which admins+owners get) — see
+ * the matrix entry's description.
+ */
+export async function editMachineCommentAction(
+  input: z.input<typeof editSchema>
+): Promise<ActionResult> {
+  // 1. Auth
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  // 2. Validate input (reserved-tag rejection in userTagSchema)
+  const parsed = editSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid input",
+    };
+  }
+
+  // 3. Validate ProseMirror content (matches addMachineCommentAction)
+  let content: ProseMirrorDoc;
+  try {
+    const raw = JSON.parse(parsed.data.contentJson) as unknown;
+    const validated = proseMirrorDocSchema.safeParse(raw);
+    if (!validated.success) {
+      return { success: false, error: "Invalid content" };
+    }
+    if (!validated.data.content || validated.data.content.length === 0) {
+      return { success: false, error: "Invalid content" };
+    }
+    content = raw as ProseMirrorDoc;
+  } catch {
+    return { success: false, error: "Invalid content JSON" };
+  }
+
+  // 4. Load comment row for matrix context
+  const row = await db.query.timelineEvents.findFirst({
+    where: eq(timelineEvents.id, parsed.data.id),
+    columns: {
+      id: true,
+      authorId: true,
+      machineId: true,
+      sourceType: true,
+      deletedAt: true,
+    },
+  });
+  if (row?.sourceType !== "comment") {
+    return { success: false, error: "Not found" };
+  }
+  if (row.deletedAt !== null) {
+    return { success: false, error: "Already deleted" };
+  }
+  if (!row.machineId) {
+    return { success: false, error: "Not editable" };
+  }
+
+  // 5. Load machine (need ownerId for context + initials for revalidate)
+  const machine = await db.query.machines.findFirst({
+    where: eq(machines.id, row.machineId),
+    columns: { id: true, initials: true, ownerId: true },
+  });
+  if (!machine) return { success: false, error: "Machine not found" };
+
+  // 6. Resolve actor access level
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+  if (!profile) return { success: false, error: "Profile not found" };
+
+  const accessLevel = getAccessLevel(profile.role);
+
+  // 7. Matrix gate
+  const allowed = checkPermission(
+    "machines.timeline.comment.edit",
+    accessLevel,
+    {
+      userId: user.id,
+      reporterId: row.authorId,
+      machineOwnerId: machine.ownerId,
+    }
+  );
+  if (!allowed) {
+    return { success: false, error: "Forbidden" };
+  }
+
+  // 8. Update
+  await db.transaction(async (tx) => {
+    await updateMachineComment(
+      parsed.data.id,
+      { content, tag: parsed.data.tag },
       tx
     );
   });
