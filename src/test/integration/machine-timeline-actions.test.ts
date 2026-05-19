@@ -48,6 +48,7 @@ vi.mock("next/cache", () => ({
 
 vi.mock("~/lib/notifications", () => ({
   createNotification: vi.fn().mockResolvedValue(undefined),
+  getChannels: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("~/lib/logger", () => ({

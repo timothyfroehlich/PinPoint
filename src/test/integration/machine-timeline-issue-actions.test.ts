@@ -32,6 +32,9 @@ vi.mock("~/server/db", async () => {
 
 vi.mock("~/lib/notifications", () => ({
   createNotification: vi.fn().mockResolvedValue(undefined),
+  // Hoisted by issues.ts (PP-rfc) — must be present in the mock so the
+  // dynamic import doesn't blow up with "No 'getChannels' export defined".
+  getChannels: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("~/lib/logger", () => ({
