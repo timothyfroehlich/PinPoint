@@ -108,7 +108,7 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
       await mockAuth(member.id);
 
       const { addMachineCommentAction } =
-        await import("~/app/(app)/m/[initials]/timeline/actions");
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
       const result = await addMachineCommentAction({
         machineId: machine.id,
         tag: "maintenance",
@@ -133,7 +133,7 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
       const machine = await makeMachine();
       await mockAuth(member.id);
       const { addMachineCommentAction } =
-        await import("~/app/(app)/m/[initials]/timeline/actions");
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
 
       const result = await addMachineCommentAction({
         machineId: machine.id,
@@ -152,7 +152,7 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
       const machine = await makeMachine();
       await mockAuthUnauthenticated();
       const { addMachineCommentAction } =
-        await import("~/app/(app)/m/[initials]/timeline/actions");
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
 
       const result = await addMachineCommentAction({
         machineId: machine.id,
@@ -168,7 +168,7 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
       const machine = await makeMachine();
       await mockAuth(guest.id);
       const { addMachineCommentAction } =
-        await import("~/app/(app)/m/[initials]/timeline/actions");
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
 
       const result = await addMachineCommentAction({
         machineId: machine.id,
@@ -191,7 +191,7 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
 
       await mockAuth(member.id);
       const { addMachineCommentAction } =
-        await import("~/app/(app)/m/[initials]/timeline/actions");
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
       const insertResult = await addMachineCommentAction({
         machineId: machine.id,
         tag: "maintenance",
@@ -213,7 +213,7 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
       const { member, comment } = await seedCommentByMember();
       await mockAuth(member.id);
       const { deleteMachineCommentAction } =
-        await import("~/app/(app)/m/[initials]/timeline/actions");
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
 
       const result = await deleteMachineCommentAction({ id: comment.id });
       expect(result.success).toBe(true);
@@ -232,7 +232,7 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
       const { owner, comment } = await seedCommentByMember();
       await mockAuth(owner.id);
       const { deleteMachineCommentAction } =
-        await import("~/app/(app)/m/[initials]/timeline/actions");
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
 
       const result = await deleteMachineCommentAction({ id: comment.id });
       expect(result.success).toBe(true);
@@ -242,7 +242,7 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
       const { admin, comment } = await seedCommentByMember();
       await mockAuth(admin.id);
       const { deleteMachineCommentAction } =
-        await import("~/app/(app)/m/[initials]/timeline/actions");
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
 
       const result = await deleteMachineCommentAction({ id: comment.id });
       expect(result.success).toBe(true);
@@ -253,7 +253,7 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
       const { otherMember, comment } = await seedCommentByMember();
       await mockAuth(otherMember.id);
       const { deleteMachineCommentAction } =
-        await import("~/app/(app)/m/[initials]/timeline/actions");
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
 
       const result = await deleteMachineCommentAction({ id: comment.id });
       expect(result.success).toBe(false);

@@ -40,7 +40,8 @@ test.describe("Machine Timeline (PP-0x98)", () => {
       await page.getByText(/what did you do/i).click();
 
       // Select the "maintenance" tag via the composer's "Tag" combobox.
-      await page.getByRole("combobox", { name: "Tag" }).click();
+      // exact:true so we don't also match the filter's "Filter by tag" trigger.
+      await page.getByRole("combobox", { name: "Tag", exact: true }).click();
       await page.getByRole("option", { name: /maintenance/i }).click();
 
       // The RichTextEditor is a Tiptap/ProseMirror surface — use the documented
@@ -94,14 +95,16 @@ test.describe("Machine Timeline (PP-0x98)", () => {
       });
 
       // 3. Source machine timeline shows the "moved to" system row.
+      // .first() — shared E2E state may include earlier reassigns of other
+      // issues on the same machine; we only care that the row exists.
       await page.goto(`/m/${machineA}/timeline`);
-      await expect(page.getByText(/moved to/i)).toBeVisible({
+      await expect(page.getByText(/moved to/i).first()).toBeVisible({
         timeout: 10_000,
       });
 
       // 4. Destination machine timeline shows the "received from" system row.
       await page.goto(`/m/${machineB}/timeline`);
-      await expect(page.getByText(/received from/i)).toBeVisible({
+      await expect(page.getByText(/received from/i).first()).toBeVisible({
         timeout: 10_000,
       });
     });

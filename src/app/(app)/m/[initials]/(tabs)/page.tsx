@@ -12,19 +12,19 @@ import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge
 import { formatDate } from "~/lib/dates";
 import { headers } from "next/headers";
 import { resolveRequestUrl } from "~/lib/url";
-import { EditButtonWithTooltip } from "./edit-button-tooltip";
-import { EditMachineDialog } from "./update-machine-form";
-import { QrCodeDialog } from "./qr-code-dialog";
+import { EditButtonWithTooltip } from "../edit-button-tooltip";
+import { EditMachineDialog } from "../update-machine-form";
+import { QrCodeDialog } from "../qr-code-dialog";
 import { buildMachineReportUrl } from "~/lib/machines/report-url";
 import { generateQrPngDataUrl } from "~/lib/machines/qr";
-import { MachineTextFields } from "./machine-text-fields";
+import { MachineTextFields } from "../machine-text-fields";
 import {
   getAccessLevel,
   checkPermission,
   getPermissionDeniedReason,
   type OwnershipContext,
 } from "~/lib/permissions/index";
-import { getMachineForLayout } from "./_data";
+import { getMachineForLayout } from "../_data";
 
 /**
  * Machine Info Tab (default route for /m/[initials]/)

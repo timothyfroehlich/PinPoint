@@ -3,7 +3,7 @@
 import type React from "react";
 import { useTransition } from "react";
 
-import { deleteMachineCommentAction } from "~/app/(app)/m/[initials]/timeline/actions";
+import { deleteMachineCommentAction } from "~/app/(app)/m/[initials]/(tabs)/timeline/actions";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";

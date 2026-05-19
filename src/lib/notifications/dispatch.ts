@@ -13,7 +13,14 @@ import type { IssueWatcher } from "~/lib/types/database";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
 import { getChannels } from "./channels/registry";
-import type { ChannelContext, DeliveryResult } from "./channels/types";
+import type {
+  ChannelContext,
+  DeliveryResult,
+  NotificationChannel,
+} from "./channels/types";
+
+export type { NotificationChannel };
+export { getChannels };
 
 type NotificationPreferences = typeof notificationPreferences.$inferSelect;
 
@@ -69,7 +76,8 @@ export async function createNotification(
     issueDescription,
     additionalRecipientIds,
   }: CreateNotificationProps,
-  tx: DbTransaction = db
+  tx: DbTransaction = db,
+  preResolvedChannels?: readonly NotificationChannel[]
 ): Promise<void> {
   log.debug(
     { type, resourceId, actorId, action: "createNotification" },
@@ -198,7 +206,11 @@ export async function createNotification(
 
   // 4. Fan-out per recipient using the channel registry.
   //    See src/lib/notifications/channels/registry.ts.
-  const channels = await getChannels();
+  //    Callers that open a DB transaction SHOULD resolve channels before
+  //    entering the transaction and pass them in as `preResolvedChannels` to
+  //    avoid an HTTP round-trip (Supabase Vault RPC) inside the transaction
+  //    window, which inflates connection-hold time on the pool.
+  const channels = preResolvedChannels ?? (await getChannels());
 
   // Rows for batched in-app insert (preserves historical single-INSERT).
   const notificationsToInsert: {

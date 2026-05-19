@@ -3,7 +3,7 @@
 import type React from "react";
 import { useState, useTransition } from "react";
 
-import { addMachineCommentAction } from "~/app/(app)/m/[initials]/timeline/actions";
+import { addMachineCommentAction } from "~/app/(app)/m/[initials]/(tabs)/timeline/actions";
 import { RichTextEditor } from "~/components/editor/RichTextEditor";
 import { Button } from "~/components/ui/button";
 import {

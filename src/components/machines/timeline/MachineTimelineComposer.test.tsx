@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MachineTimelineComposer } from "./MachineTimelineComposer";
 
-vi.mock("~/app/(app)/m/[initials]/timeline/actions", () => ({
+vi.mock("~/app/(app)/m/[initials]/(tabs)/timeline/actions", () => ({
   addMachineCommentAction: vi.fn(() => Promise.resolve({ success: true })),
 }));
 

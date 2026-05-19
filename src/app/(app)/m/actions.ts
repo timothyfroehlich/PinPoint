@@ -21,7 +21,7 @@ import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
-import { createNotification } from "~/lib/notifications";
+import { createNotification, getChannels } from "~/lib/notifications";
 import {
   reportError,
   serverActionError,
@@ -298,16 +298,21 @@ export async function createMachineAction(
       // Post-commit side effect — best-effort: do not fail the action on notification errors
       if (targetActive) {
         try {
-          await createNotification({
-            type: "machine_ownership_changed",
-            resourceId: machine.id,
-            resourceType: "machine",
-            actorId: user.id,
-            includeActor: false,
-            machineName: machine.name,
-            newStatus: "added",
-            additionalRecipientIds: [forcePromoteUserId],
-          });
+          const channels = await getChannels();
+          await createNotification(
+            {
+              type: "machine_ownership_changed",
+              resourceId: machine.id,
+              resourceType: "machine",
+              actorId: user.id,
+              includeActor: false,
+              machineName: machine.name,
+              newStatus: "added",
+              additionalRecipientIds: [forcePromoteUserId],
+            },
+            undefined,
+            channels
+          );
         } catch (sideEffectError: unknown) {
           reportError(sideEffectError, {
             action: "createMachineNotify",
@@ -659,6 +664,9 @@ export async function updateMachineAction(
 
       // Post-commit side effects — best-effort: do not fail the action on notification errors
       try {
+        // Resolve channels once for all notifications in this block (PP-rfc).
+        const channels = await getChannels();
+
         // Remove old owner watcher and notify them
         if (oldOwnerId && oldOwnerId !== machineOwnerId) {
           await db
@@ -669,30 +677,38 @@ export async function updateMachineAction(
                 eq(machineWatchers.userId, oldOwnerId)
               )
             );
-          await createNotification({
-            type: "machine_ownership_changed",
-            resourceId: machine.id,
-            resourceType: "machine",
-            actorId: user.id,
-            includeActor: false,
-            machineName: machine.name,
-            newStatus: "removed",
-            additionalRecipientIds: [oldOwnerId],
-          });
+          await createNotification(
+            {
+              type: "machine_ownership_changed",
+              resourceId: machine.id,
+              resourceType: "machine",
+              actorId: user.id,
+              includeActor: false,
+              machineName: machine.name,
+              newStatus: "removed",
+              additionalRecipientIds: [oldOwnerId],
+            },
+            undefined,
+            channels
+          );
         }
 
         // Notify new owner
         if (machineOwnerId && machineOwnerId !== oldOwnerId) {
-          await createNotification({
-            type: "machine_ownership_changed",
-            resourceId: machine.id,
-            resourceType: "machine",
-            actorId: user.id,
-            includeActor: false,
-            machineName: machine.name,
-            newStatus: "added",
-            additionalRecipientIds: [machineOwnerId],
-          });
+          await createNotification(
+            {
+              type: "machine_ownership_changed",
+              resourceId: machine.id,
+              resourceType: "machine",
+              actorId: user.id,
+              includeActor: false,
+              machineName: machine.name,
+              newStatus: "added",
+              additionalRecipientIds: [machineOwnerId],
+            },
+            undefined,
+            channels
+          );
         }
       } catch (sideEffectError: unknown) {
         reportError(sideEffectError, {
@@ -845,29 +861,40 @@ export async function updateMachineAction(
     // Post-commit side effects — best-effort: do not fail the action on notification errors
     if (shouldUpdateOwner) {
       try {
+        // Resolve channels once for all notifications in this block (PP-rfc).
+        const channels = await getChannels();
+
         if (oldOwnerId && oldOwnerId !== finalOwnerId) {
-          await createNotification({
-            type: "machine_ownership_changed",
-            resourceId: machine.id,
-            resourceType: "machine",
-            actorId: user.id,
-            includeActor: false,
-            machineName: machine.name,
-            newStatus: "removed",
-            additionalRecipientIds: [oldOwnerId],
-          });
+          await createNotification(
+            {
+              type: "machine_ownership_changed",
+              resourceId: machine.id,
+              resourceType: "machine",
+              actorId: user.id,
+              includeActor: false,
+              machineName: machine.name,
+              newStatus: "removed",
+              additionalRecipientIds: [oldOwnerId],
+            },
+            undefined,
+            channels
+          );
         }
         if (finalOwnerId && finalOwnerId !== oldOwnerId) {
-          await createNotification({
-            type: "machine_ownership_changed",
-            resourceId: machine.id,
-            resourceType: "machine",
-            actorId: user.id,
-            includeActor: false,
-            machineName: machine.name,
-            newStatus: "added",
-            additionalRecipientIds: [finalOwnerId],
-          });
+          await createNotification(
+            {
+              type: "machine_ownership_changed",
+              resourceId: machine.id,
+              resourceType: "machine",
+              actorId: user.id,
+              includeActor: false,
+              machineName: machine.name,
+              newStatus: "added",
+              additionalRecipientIds: [finalOwnerId],
+            },
+            undefined,
+            channels
+          );
         }
       } catch (sideEffectError: unknown) {
         reportError(sideEffectError, {

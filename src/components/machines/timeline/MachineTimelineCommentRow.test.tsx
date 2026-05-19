@@ -7,7 +7,7 @@ import { MachineTimelineCommentRow } from "./MachineTimelineCommentRow";
 // In a jsdom unit test we never invoke it — but the import needs to resolve
 // cleanly. Mocking at the module boundary keeps server-only imports
 // (next/cache, supabase) from being pulled in.
-vi.mock("~/app/(app)/m/[initials]/timeline/actions", () => ({
+vi.mock("~/app/(app)/m/[initials]/(tabs)/timeline/actions", () => ({
   deleteMachineCommentAction: vi.fn(() => Promise.resolve({ success: true })),
 }));
 
