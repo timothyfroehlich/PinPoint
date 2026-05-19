@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine, createTestUser } from "~/test/helpers/factories";
 import { machines, timelineEvents, userProfiles } from "~/server/db/schema";
@@ -148,6 +148,10 @@ describe("machine-events helpers (PGlite)", () => {
       const otherMachine = createTestMachine({ initials: "ZZ" });
       await db.insert(machines).values(otherMachine);
 
+      // Insert rows via the helpers, then force deterministic timestamps
+      // via direct UPDATEs. Avoids the prior wall-clock setTimeout(5) which
+      // could collide under same-ms inserts (random-UUID tie-breaker doesn't
+      // give insertion order). (PP-0x98 review)
       await createMachineTimelineEvent(
         machine.id,
         {
@@ -158,7 +162,6 @@ describe("machine-events helpers (PGlite)", () => {
         },
         db
       );
-      await new Promise((r) => setTimeout(r, 5));
       await createMachineComment(
         machine.id,
         {
@@ -177,6 +180,27 @@ describe("machine-events helpers (PGlite)", () => {
         },
         db
       );
+
+      // Pin the timestamps: lifecycle older than comment so newest-first
+      // assertion is unambiguous.
+      await db
+        .update(timelineEvents)
+        .set({ createdAt: new Date("2026-01-01T00:00:00Z") })
+        .where(
+          and(
+            eq(timelineEvents.machineId, machine.id),
+            eq(timelineEvents.sourceType, "lifecycle")
+          )
+        );
+      await db
+        .update(timelineEvents)
+        .set({ createdAt: new Date("2026-01-02T00:00:00Z") })
+        .where(
+          and(
+            eq(timelineEvents.machineId, machine.id),
+            eq(timelineEvents.sourceType, "comment")
+          )
+        );
 
       const rows = await getMachineTimeline(db, { machineId: machine.id });
 

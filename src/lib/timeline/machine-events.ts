@@ -31,6 +31,12 @@ import { timelineEvents, userProfiles } from "~/server/db/schema";
 
 type SystemSourceType = "lifecycle" | "issue";
 
+/**
+ * All valid values for `timeline_events.source_type`. Used as the column's
+ * `$type` annotation in the schema so reads/writes are statically checked.
+ */
+export type TimelineEventSourceType = SystemSourceType | "comment";
+
 export interface CreateTimelineEventArgs {
   sourceType: SystemSourceType;
   tag: TimelineTag;

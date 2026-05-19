@@ -65,6 +65,11 @@ function extractIssueLink(
   machineInitials: string | undefined
 ): { href: string; number: number } | null {
   if (!machineInitials) return null;
+  // `issue_reassigned_out` events live on the SOURCE machine's timeline,
+  // but the issue itself has moved away — `/m/<source>/i/<oldNumber>` no
+  // longer resolves (the reassign action redirects it to the destination).
+  // Render plain text instead of a broken link.
+  if (data.kind === "issue_reassigned_out") return null;
   if ("issueNumber" in data) {
     return {
       href: `/m/${machineInitials}/i/${String(data.issueNumber)}`,

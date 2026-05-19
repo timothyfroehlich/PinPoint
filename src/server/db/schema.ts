@@ -18,6 +18,8 @@ import { ISSUE_STATUS_VALUES, type IssueStatus } from "~/lib/issues/status";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { type TimelineEventData } from "~/lib/timeline/types";
 import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
+import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
+import { type TimelineTag } from "~/lib/timeline/machine-tags";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -340,8 +342,8 @@ export const timelineEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    sourceType: text("source_type").notNull(),
-    tag: text("tag").notNull(),
+    sourceType: text("source_type").$type<TimelineEventSourceType>().notNull(),
+    tag: text("tag").$type<TimelineTag>().notNull(),
     authorId: uuid("author_id").references(() => userProfiles.id, {
       onDelete: "set null",
     }),

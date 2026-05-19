@@ -11,10 +11,11 @@ const PRESENCE_LABELS: Record<MachinePresenceStatus, string> = {
 };
 
 function issueStatusLabel(value: string): string {
-  const config = (
-    STATUS_CONFIG as Record<string, { label: string } | undefined>
-  )[value];
-  return config?.label ?? value;
+  // Narrow via `in` rather than an unsafe cast (PP-0x98 review).
+  if (value in STATUS_CONFIG) {
+    return STATUS_CONFIG[value as keyof typeof STATUS_CONFIG].label;
+  }
+  return value;
 }
 
 export function formatMachineEvent(event: MachineTimelineEventData): string {
