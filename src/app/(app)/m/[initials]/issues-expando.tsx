@@ -1,88 +1,62 @@
-"use client";
-
 import type React from "react";
-import { useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { ExportButton } from "~/components/issues/ExportButton";
 import { IssueCard, type IssueCardIssue } from "~/components/issues/IssueCard";
 import { MachineEmptyState } from "~/components/machines/MachineEmptyState";
-import { cn } from "~/lib/utils";
 
 interface IssuesExpandoProps {
+  /** Issues to display. Caller is responsible for any filtering — the
+   *  Service tab currently passes open-only (to match the tab badge); a
+   *  richer filter bar (bead PP-0kta) will let callers pass other subsets. */
   issues: IssueCardIssue[];
   machineName: string;
   machineInitials: string;
-  totalIssuesCount: number;
   watchButton?: React.ReactNode;
 }
 
+/**
+ * IssuesExpando — issues section on the Maintenance tab.
+ *
+ * The expando wrapper was removed (YAGNI while this is the only section on
+ * the tab). When the Timeline section lands as a sibling, this file will
+ * likely become an AccordionItem inside an Accordion. The component name and
+ * file name are kept for now to minimize churn during design iteration.
+ */
 export function IssuesExpando({
   issues,
   machineName,
   machineInitials,
-  totalIssuesCount,
   watchButton,
 }: IssuesExpandoProps): React.JSX.Element {
-  const [isOpen, setIsOpen] = useState(false);
-
   return (
-    <details
-      open={isOpen}
-      onToggle={(e) => setIsOpen(e.currentTarget.open)}
-      className="rounded-lg border border-outline-variant bg-surface"
-      data-testid="issues-expando"
+    <section
+      className="border-b border-outline-variant pb-4"
+      data-testid="issues-section"
     >
-      <summary
-        className="flex cursor-pointer list-none items-center gap-2 px-6 py-4 text-foreground hover:bg-surface-variant/30"
-        data-testid="issues-expando-trigger"
-      >
-        <ChevronRight
-          className={cn(
-            "size-5 transition-transform duration-150",
-            isOpen && "rotate-90"
-          )}
-        />
-        <span className="text-lg font-semibold">
-          Open Issues ({issues.length})
-        </span>
-        {totalIssuesCount > issues.length && (
-          <span className="text-sm text-muted-foreground">
-            of {totalIssuesCount} total
-          </span>
-        )}
-        <div
-          className="ml-auto flex items-center gap-2"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }}
-        >
+      <div className="flex items-center justify-between gap-2 py-3">
+        <h2 className="text-lg font-semibold text-foreground">
+          Issues ({issues.length})
+        </h2>
+        <div className="flex items-center gap-2">
           {watchButton}
           <ExportButton machineInitials={machineInitials} />
         </div>
-      </summary>
-
-      <div className="border-t border-outline-variant px-6 py-4">
-        {issues.length === 0 ? (
-          <MachineEmptyState machineInitials={machineInitials} />
-        ) : (
-          <div className="space-y-3">
-            {issues.map((issue) => (
-              <IssueCard
-                key={issue.id}
-                issue={issue}
-                machine={{ name: machineName }}
-              />
-            ))}
-          </div>
-        )}
       </div>
-    </details>
+
+      {issues.length === 0 ? (
+        <MachineEmptyState machineInitials={machineInitials} />
+      ) : (
+        <div className="space-y-3">
+          {issues.map((issue) => (
+            <IssueCard
+              key={issue.id}
+              issue={issue}
+              machine={{ name: machineName }}
+              variant="compact"
+              badgeLayout="strip"
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

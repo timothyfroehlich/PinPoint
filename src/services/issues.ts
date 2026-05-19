@@ -12,7 +12,7 @@ import {
   createTimelineEvent,
   type TimelineEventData,
 } from "~/lib/timeline/events";
-import { createNotification } from "~/lib/notifications";
+import { createNotification, getChannels } from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
 import { formatIssueId } from "~/lib/issues/utils";
@@ -139,6 +139,9 @@ export async function createIssue({
   assignedTo,
   autoWatchReporter = true,
 }: CreateIssueParams): Promise<Issue> {
+  // Resolve channels outside the transaction to avoid an HTTP round-trip
+  // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
+  const channels = await getChannels();
   return await db.transaction(async (tx) => {
     // 1. Lock machine row and get next number (Atomic increment)
     const [updatedMachine] = await tx
@@ -240,7 +243,8 @@ export async function createIssue({
           formattedIssueId: formattedId,
           issueDescription: plainDescription,
         },
-        tx
+        tx,
+        channels
       );
 
       // Extract and notify mentions — batch all mentioned users into one call
@@ -262,7 +266,8 @@ export async function createIssue({
               formattedIssueId: formattedId,
               commentContent,
             },
-            tx
+            tx,
+            channels
           );
         }
       }
@@ -291,8 +296,30 @@ export async function updateIssueStatus({
   oldStatus: string;
   newStatus: string;
 }> {
+  // Pre-transaction no-op check: avoid the cost of resolving channels (HTTP
+  // round-trip via getDiscordConfig() Vault decrypt) AND opening a write
+  // transaction when the status is unchanged (PP-rfc, Copilot follow-up).
+  const preCheckIssue = await db.query.issues.findFirst({
+    where: eq(issues.id, issueId),
+    columns: { status: true },
+  });
+
+  if (!preCheckIssue) {
+    throw new Error("Issue not found");
+  }
+
+  if (preCheckIssue.status === status) {
+    return { issueId, oldStatus: preCheckIssue.status, newStatus: status };
+  }
+
+  // Resolve channels outside the transaction to avoid an HTTP round-trip
+  // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
+  const channels = await getChannels();
   return await db.transaction(async (tx) => {
-    // Get current issue to check old status
+    // Re-read inside the transaction so that subsequent mutations and the
+    // notification payload reflect the row's current state under the
+    // transaction's snapshot (and handle the unlikely race where it was
+    // deleted between the pre-check and the transaction).
     const currentIssue = await tx.query.issues.findFirst({
       where: eq(issues.id, issueId),
       columns: {
@@ -312,7 +339,7 @@ export async function updateIssueStatus({
 
     const oldStatus = currentIssue.status;
 
-    // No-op: skip if status hasn't changed
+    // Re-check inside the transaction in case of a race with another writer.
     if (oldStatus === status) {
       return { issueId, oldStatus, newStatus: status };
     }
@@ -357,7 +384,8 @@ export async function updateIssueStatus({
           ),
           newStatus: status,
         },
-        tx
+        tx,
+        channels
       );
     } catch (error) {
       reportError(error, {
@@ -381,6 +409,9 @@ export async function addIssueComment({
   userId,
   imagesMetadata = [],
 }: AddIssueCommentParams): Promise<IssueComment> {
+  // Resolve channels outside the transaction to avoid an HTTP round-trip
+  // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
+  const channels = await getChannels();
   return await db.transaction(async (tx) => {
     // 1. Insert Comment
     const [comment] = await tx
@@ -447,7 +478,8 @@ export async function addIssueComment({
           formattedIssueId: formattedId,
           commentContent: plainTextContent,
         },
-        tx
+        tx,
+        channels
       );
 
       // Extract and notify mentions — batch all mentioned users into one call
@@ -467,7 +499,8 @@ export async function addIssueComment({
             formattedIssueId: formattedId,
             commentContent: plainTextContent,
           },
-          tx
+          tx,
+          channels
         );
       }
     } catch (error) {
@@ -529,8 +562,30 @@ export async function assignIssue({
   assignedTo,
   actorId,
 }: AssignIssueParams): Promise<void> {
+  // Pre-transaction no-op check: avoid the cost of resolving channels (HTTP
+  // round-trip via getDiscordConfig() Vault decrypt) AND opening a write
+  // transaction when the assignment is unchanged (PP-rfc, Copilot follow-up).
+  const preCheckIssue = await db.query.issues.findFirst({
+    where: eq(issues.id, issueId),
+    columns: { assignedTo: true },
+  });
+
+  if (!preCheckIssue) {
+    throw new Error("Issue not found");
+  }
+
+  if (preCheckIssue.assignedTo === assignedTo) {
+    return;
+  }
+
+  // Only resolve channels when a notification will actually fire (a
+  // notification is only sent when assignedTo is non-null below).
+  const channels = assignedTo ? await getChannels() : undefined;
   await db.transaction(async (tx) => {
-    // Get current issue
+    // Re-read inside the transaction so that subsequent mutations and the
+    // notification payload reflect the row's current state under the
+    // transaction's snapshot (and handle the unlikely race where it was
+    // deleted between the pre-check and the transaction).
     const currentIssue = await tx.query.issues.findFirst({
       where: eq(issues.id, issueId),
       columns: {
@@ -553,7 +608,7 @@ export async function assignIssue({
       throw new Error("Issue not found");
     }
 
-    // No-op: skip if assignment hasn't changed
+    // Re-check inside the transaction in case of a race with another writer.
     if (currentIssue.assignedTo === assignedTo) {
       return;
     }
@@ -618,7 +673,8 @@ export async function assignIssue({
               currentIssue.issueNumber
             ),
           },
-          tx
+          tx,
+          channels
         );
       }
     } catch (error) {

@@ -74,9 +74,15 @@ test.describe("Rich Text and Mentions", () => {
     // 9. Submit issue
     await page.click('button[type="submit"]');
 
-    // 10. Verify on issue page
+    // 10. Verify on issue page. Target the issue-title h1 specifically —
+    // after the tabbed-machine-layout PR, the persistent MachineDetailHeader
+    // also renders the machine name as an h1, so a bare `locator("h1")`
+    // matches two elements (bead PP-wkom tracks the heading-hierarchy
+    // follow-up).
     await expect(page).toHaveURL(new RegExp(`/m/${machine.initials}/i/1`));
-    await expect(page.locator("h1")).toContainText("Test Rich Text Issue");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Test Rich Text Issue" })
+    ).toBeVisible();
 
     // 11. Verify rich text rendering
     const description = page.locator(".prose");
@@ -109,20 +115,42 @@ test.describe("Rich Text and Mentions", () => {
 
     await expect(page).toHaveURL(new RegExp(`/m/${machine.initials}/i/1`));
 
+    // On mobile (md: breakpoint hidden), AddCommentForm lives inside the
+    // StickyCommentComposer Sheet — open it before interacting with the editor.
+    // The inline form is hidden (hidden md:flex) on mobile; scope locators to
+    // the open dialog to avoid resolving to the hidden inline ProseMirror.
+    await page.waitForLoadState("domcontentloaded");
+    const sheetTrigger = page.getByRole("button", { name: "Add a comment" });
+    const isOnMobile = await sheetTrigger
+      .isVisible({ timeout: 3000 })
+      .catch(() => false);
+    if (isOnMobile) {
+      await sheetTrigger.click();
+      await page
+        .getByRole("dialog", { name: "Add a comment" })
+        .waitFor({ state: "visible", timeout: 10000 });
+    }
+
+    const commentForm = isOnMobile
+      ? page.getByRole("dialog", { name: "Add a comment" })
+      : page.getByTestId("issue-comment-form");
+
     // Add rich text comment
-    const editor = page.locator(".ProseMirror").last();
+    const editor = commentForm.locator(".ProseMirror");
+    await editor.waitFor({ state: "visible", timeout: 15000 });
     await editor.click();
     await page.keyboard.type("This is a ");
 
     // Test toolbar button (Commandment #11)
-    await page.click('button[aria-label="Toggle italic"]');
+    await commentForm.getByRole("button", { name: "Toggle italic" }).click();
     await page.keyboard.type("rich text");
-    await page.click('button[aria-label="Toggle italic"]');
+    await commentForm.getByRole("button", { name: "Toggle italic" }).click();
     await page.keyboard.type(" comment.");
 
-    await page.click('button:has-text("Add Comment")');
+    await commentForm.getByRole("button", { name: "Add Comment" }).click();
 
-    // Verify rendered comment
+    // Verify rendered comment — after submit, the Sheet closes on mobile
+    // and the comment appears in the timeline below.
     const lastComment = page.locator(".prose").last();
     await expect(lastComment.locator("em")).toContainText("rich text");
   });

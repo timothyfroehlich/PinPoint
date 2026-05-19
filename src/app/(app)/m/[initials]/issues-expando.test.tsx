@@ -3,17 +3,18 @@
  *
  * Covers H-class UI state tests downgraded from
  * e2e/smoke/machine-details-redesign.spec.ts (Wave 3a, Row 27) and
- * e2e/smoke/machines-crud.spec.ts (Wave 3a, Row 26):
- *   - expando collapsed by default
- *   - expand on click shows issue cards
- *   - collapse on second click hides issue cards
- *   - Report Issue button presence (moved here from smoke)
- *   - empty state when no issues
+ * e2e/smoke/machines-crud.spec.ts (Wave 3a, Row 26).
+ *
+ * After the tabbed-machine-layout PR, this component no longer renders an
+ * expando wrapper — the issues section is always open inside the Service
+ * tab. The "expand/collapse" assertions from the original Wave 3a downgrade
+ * are gone; in their place we cover the flat-section render contract: the
+ * `issues-section` wrapper, cards rendered directly, the export button, and
+ * the empty state.
  */
 
 import React from "react";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { IssuesExpando } from "./issues-expando";
 import type { IssueCardIssue } from "~/components/issues/IssueCard";
@@ -53,37 +54,26 @@ const makeIssue = (id: string, title: string): IssueCardIssue =>
 const defaultProps = {
   machineName: "Test Machine",
   machineInitials: "TM",
-  totalIssuesCount: 2,
   issues: [makeIssue("i1", "Broken flipper"), makeIssue("i2", "Bulb out")],
 };
 
 describe("IssuesExpando", () => {
-  it("renders collapsed by default — issue cards not visible", () => {
+  it("renders the issues section wrapper", () => {
     render(<IssuesExpando {...defaultProps} />);
-
-    // The expando container is present
-    expect(screen.getByTestId("issues-expando")).toBeInTheDocument();
-
-    // Trigger label is visible
-    expect(screen.getByTestId("issues-expando-trigger")).toBeInTheDocument();
-    expect(screen.getByTestId("issues-expando-trigger")).toHaveTextContent(
-      "Open Issues"
-    );
-
-    // Issue cards exist in DOM but are NOT visible (inside closed <details>)
-    const cards = screen.queryAllByTestId("issue-card");
-    expect(cards.length).toBeGreaterThan(0); // rendered in DOM
-    for (const card of cards) {
-      expect(card).not.toBeVisible();
-    }
+    expect(screen.getByTestId("issues-section")).toBeInTheDocument();
   });
 
-  it("expands and shows issue cards on trigger click", async () => {
-    const user = userEvent.setup();
+  it("renders the Issues count header reflecting the issue count", () => {
+    render(<IssuesExpando {...defaultProps} />);
+    expect(
+      screen.getByRole("heading", { name: "Issues (2)" })
+    ).toBeInTheDocument();
+  });
+
+  it("renders all issue cards directly — no expando toggle", () => {
     render(<IssuesExpando {...defaultProps} />);
 
-    await user.click(screen.getByTestId("issues-expando-trigger"));
-
+    // Cards render flat, visible by default.
     const cards = screen.getAllByTestId("issue-card");
     expect(cards).toHaveLength(2);
     expect(cards[0]).toBeVisible();
@@ -91,35 +81,24 @@ describe("IssuesExpando", () => {
     expect(cards[1]).toHaveTextContent("Bulb out");
   });
 
-  it("collapses and hides issue cards on second trigger click", async () => {
-    const user = userEvent.setup();
-    render(<IssuesExpando {...defaultProps} />);
-
-    // Expand
-    await user.click(screen.getByTestId("issues-expando-trigger"));
-    const cards = screen.getAllByTestId("issue-card");
-    expect(cards[0]).toBeVisible();
-
-    // Collapse
-    await user.click(screen.getByTestId("issues-expando-trigger"));
-    for (const card of screen.queryAllByTestId("issue-card")) {
-      expect(card).not.toBeVisible();
-    }
-  });
-
-  it("shows empty state when no issues are passed", async () => {
-    const user = userEvent.setup();
-    render(
-      <IssuesExpando {...defaultProps} issues={[]} totalIssuesCount={0} />
-    );
-
-    await user.click(screen.getByTestId("issues-expando-trigger"));
-    expect(screen.getByTestId("machine-empty-state")).toBeInTheDocument();
-    expect(screen.queryAllByTestId("issue-card")).toHaveLength(0);
-  });
-
-  it("renders the export CSV button in the trigger area", () => {
+  it("renders the export CSV button in the section header", () => {
     render(<IssuesExpando {...defaultProps} />);
     expect(screen.getByTestId("export-csv-button")).toBeInTheDocument();
+  });
+
+  it("renders the optional watch button when supplied", () => {
+    render(
+      <IssuesExpando
+        {...defaultProps}
+        watchButton={<button data-testid="watch-button">Watch</button>}
+      />
+    );
+    expect(screen.getByTestId("watch-button")).toBeInTheDocument();
+  });
+
+  it("shows the MachineEmptyState when no issues are passed", () => {
+    render(<IssuesExpando {...defaultProps} issues={[]} />);
+    expect(screen.getByTestId("machine-empty-state")).toBeInTheDocument();
+    expect(screen.queryAllByTestId("issue-card")).toHaveLength(0);
   });
 });

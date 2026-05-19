@@ -68,7 +68,16 @@ export function DeleteAccountSection({
         </div>
       )}
 
-      <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open);
+          if (!open) {
+            setConfirmText("");
+            setReassignTo("__unassigned__");
+          }
+        }}
+      >
         <AlertDialogTrigger asChild>
           <Button
             variant="destructive"
@@ -175,14 +184,7 @@ export function DeleteAccountSection({
             </AlertDialogHeader>
 
             <AlertDialogFooter className="gap-2 sm:gap-0">
-              <AlertDialogCancel
-                onClick={() => {
-                  setConfirmText("");
-                  setIsOpen(false);
-                }}
-              >
-                Keep Account
-              </AlertDialogCancel>
+              <AlertDialogCancel>Keep Account</AlertDialogCancel>
               <Button
                 type="submit"
                 variant="destructive"

@@ -33,28 +33,26 @@
 2. **Preflight**: Must run `pnpm run preflight` before commit.
 3. **Process Safety**: NEVER kill processes system-wide. Do NOT run `pkill`, `killall`, use `kill` with PIDs obtained from broad selectors like `pgrep`, run `supabase stop --all`, or use any command that terminates services beyond your current worktree. Only stop services you explicitly started in your current session. Violating this destroys other agents' environments and the user's running work.
 4. **Merge for main sync, NEVER rebase**: Update a feature branch from `main` with `git fetch origin && git merge origin/main`. **NEVER `git rebase origin/main`**. Rebase rewrites SHAs → requires force-push → teammate guardrails block force-push and Tim does not authorize. Even a 1-commit branch costs a 30-minute push-permission detour after a rebase. Section 4 Branch Management has the rule + the ⚠️ REBASE TRAP callout with casework. If you find yourself typing `rebase` against `origin/main`, STOP and use `merge`.
-5. **Root Checkout Is Read-Only — All Work Happens In Worktrees**: The root checkout (main worktree — the original clone where `.git/` is a directory) is ALWAYS on `main`. No work is ever performed there: no code edits, no branch creation, no `git checkout`, no committing. Its only roles are pulling `main` fast-forward, dispatching subagents, and running cross-cutting tools (briefing, dashboard, beads). For any work — even a one-line fix — use a worktree: dispatch via `Agent(isolation:"worktree")` for substantive work, or use `EnterWorktree` to jump into an existing worktree for quick inline work. (PP-46z, PP-bg45; cross-session HEAD corruption reproduced 2026-05-16 with plain `git checkout -b` + push from the root checkout — no agent dispatch involved.)
+5. **Root Checkout Is Read-Only — All Work Happens In Worktrees**: The root checkout (main worktree — the original clone where `.git/` is a directory) is ALWAYS on `main`. No work is ever performed there: no code edits, no branch creation, no `git checkout`, no committing. **This includes planning artifacts** — design specs in `docs/superpowers/specs/`, implementation plans in `docs/superpowers/plans/`, and any other write that would land as a commit. Plans need worktrees too. Its only roles are pulling `main` fast-forward, dispatching subagents, and running cross-cutting tools (briefing, dashboard, beads). For any work — even a one-line fix or a planning doc — use a worktree: dispatch via `Agent(isolation:"worktree")` for substantive work, or use `EnterWorktree` to jump into an existing worktree for quick inline work. (PP-46z, PP-bg45; cross-session HEAD corruption reproduced 2026-05-16 with plain `git checkout -b` + push from the root checkout — no agent dispatch involved.)
 
 ## 3. Agent Skills (Progressive Disclosure)
 
 **YOU MUST LOAD RELEVANT SKILLS FOR EVERY TASK.**
 If your tool does not support skills, read the file path directly.
 
-| Category       | Skill Name                       | Path                                                    | When to Use                                                                                   |
-| :------------- | :------------------------------- | :------------------------------------------------------ | :-------------------------------------------------------------------------------------------- |
-| **UI**         | `pinpoint-ui`                    | `.agent/skills/pinpoint-ui/SKILL.md`                    | Components, shadcn/ui, forms, responsive design.                                              |
-| **UI**         | `pinpoint-design-bible`          | `.agent/skills/pinpoint-design-bible/SKILL.md`          | Design system rules, page archetypes, spacing, surfaces. Use for any new UI work.             |
-| **TypeScript** | `pinpoint-typescript`            | `.agent/skills/pinpoint-typescript/SKILL.md`            | Type errors, generics, strict mode, Drizzle types.                                            |
-| **Testing**    | `pinpoint-testing`               | `.agent/skills/pinpoint-testing/SKILL.md`               | Writing tests, PGlite setup, Playwright.                                                      |
-| **Testing**    | `pinpoint-e2e`                   | `.agent/skills/pinpoint-e2e/SKILL.md`                   | E2E tests, worker isolation, stability patterns.                                              |
-| **Security**   | `pinpoint-security`              | `.agent/skills/pinpoint-security/SKILL.md`              | Auth flows, CSP, Zod validation, Supabase SSR.                                                |
-| **Patterns**   | `pinpoint-patterns`              | `.agent/skills/pinpoint-patterns/SKILL.md`              | Server Actions, architecture, data fetching.                                                  |
-| **Workflow**   | `pinpoint-briefing`              | `.agent/skills/pinpoint-briefing/SKILL.md`              | Session start health review: Sentry, PRs, main CI, new issues, audit, beads triage.           |
-| **Workflow**   | `pinpoint-commit`                | `.agent/skills/pinpoint-commit/SKILL.md`                | Intelligent commit-to-PR workflow and CI monitoring.                                          |
-| **Workflow**   | `pinpoint-ready-to-review`       | `.agent/skills/pinpoint-ready-to-review/SKILL.md`       | CI green + Copilot comments addressed + label applied. Use standalone when PR already exists. |
-| **Workflow**   | `pinpoint-github-monitor`        | `.agent/skills/pinpoint-github-monitor/SKILL.md`        | Monitoring GitHub Actions and build status.                                                   |
-| **Workflow**   | `pinpoint-orchestrator`          | `.agent/skills/pinpoint-orchestrator/SKILL.md`          | Parallel subagent work in worktrees (background agents or Claude Teams).                      |
-| **Workflow**   | `pinpoint-dispatch-e2e-teammate` | `.agent/skills/pinpoint-dispatch-e2e-teammate/SKILL.md` | Dispatching a teammate end-to-end (worktree + contract + prompt).                             |
+| Category       | Skill Name                       | Path                                                    | When to Use                                                                                                |
+| :------------- | :------------------------------- | :------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------- |
+| **UI**         | `pinpoint-ui`                    | `.agent/skills/pinpoint-ui/SKILL.md`                    | Components, shadcn/ui, forms, responsive design.                                                           |
+| **UI**         | `pinpoint-design-bible`          | `.agent/skills/pinpoint-design-bible/SKILL.md`          | Design system rules, page archetypes, spacing, surfaces. Use for any new UI work.                          |
+| **TypeScript** | `pinpoint-typescript`            | `.agent/skills/pinpoint-typescript/SKILL.md`            | Type errors, generics, strict mode, Drizzle types.                                                         |
+| **Testing**    | `pinpoint-testing`               | `.agent/skills/pinpoint-testing/SKILL.md`               | Writing tests, PGlite setup, Playwright.                                                                   |
+| **Testing**    | `pinpoint-e2e`                   | `.agent/skills/pinpoint-e2e/SKILL.md`                   | E2E tests, worker isolation, stability patterns.                                                           |
+| **Security**   | `pinpoint-security`              | `.agent/skills/pinpoint-security/SKILL.md`              | Auth flows, CSP, Zod validation, Supabase SSR.                                                             |
+| **Patterns**   | `pinpoint-patterns`              | `.agent/skills/pinpoint-patterns/SKILL.md`              | Server Actions, architecture, data fetching.                                                               |
+| **Workflow**   | `pinpoint-briefing`              | `.agent/skills/pinpoint-briefing/SKILL.md`              | Session start health review: Sentry, PRs, main CI, new issues, audit, beads triage.                        |
+| **Workflow**   | `pinpoint-pr-workflow`           | `.agent/skills/pinpoint-pr-workflow/SKILL.md`           | Full PR lifecycle: commit, push, CI watch, Copilot review (via MCP), readiness label, gate-enforced merge. |
+| **Workflow**   | `pinpoint-orchestrator`          | `.agent/skills/pinpoint-orchestrator/SKILL.md`          | Parallel subagent work in worktrees (background agents or Claude Teams).                                   |
+| **Workflow**   | `pinpoint-dispatch-e2e-teammate` | `.agent/skills/pinpoint-dispatch-e2e-teammate/SKILL.md` | Dispatching a teammate end-to-end (worktree + contract + prompt).                                          |
 
 ## 4. Environment & Workflow
 
@@ -276,26 +274,16 @@ When merging branches with competing migrations (both created same number):
 
 ### GitHub Copilot Reviews
 
-**Workflow for each comment:**
+Full protocol lives in the `pinpoint-pr-workflow` skill (Phase 3). Summary:
 
-1. Read unresolved comments via `./scripts/workflow/copilot-comments.sh <PR>`
-2. Fix the code, or decide to decline with justification
-3. **Applied suggestions**: Copilot auto-resolves the thread when it detects your fix commit — no action needed
-4. **Declined suggestions**: reply and resolve manually:
-
-```bash
-./scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Ignored: <why this is wrong/unnecessary>. —Claude"
-```
+1. Read unresolved comments via MCP:
+   `mcp__github__pull_request_read(method: "get_review_comments", owner, repo, pullNumber, perPage: 100)`
+   Filter to threads where first comment's `author.login` is `copilot-pull-request-reviewer` or `copilot-pull-request-reviewer[bot]`.
+2. Fix the code, or decide to decline with justification.
+3. **Applied suggestions**: Copilot auto-resolves the thread when it detects your fix commit — no action needed.
+4. **Declined suggestions**: reply via `mcp__github__add_reply_to_pull_request_comment`, then resolve via `mcp__github__pull_request_review_write(method: "resolve_thread", threadId)`.
 
 Sign replies with your agent name (`—Gemini`, `—Antigravity`, `—Claude`, `—Codex`, etc.).
-
-**Scripts:**
-
-```bash
-./scripts/workflow/copilot-comments.sh <PR>              # Show UNRESOLVED comments only
-./scripts/workflow/copilot-comments.sh <PR> --all         # Include resolved
-./scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + resolve one thread
-```
 
 **Rules:**
 

@@ -24,11 +24,33 @@ import { STORAGE_STATE } from "../support/auth-state.js";
 const testMachines = new Set<string>();
 const testEmails = new Set<string>();
 
-/** Open the owner picker popover. */
+/** Open the owner picker popover and wait for it to be interactive. */
 async function openOwnerPicker(page: Page) {
   await page.getByTestId("owner-select").click();
-  // Wait for the popover content to be visible (checkbox is a reliable anchor)
-  await expect(page.getByLabel(/Show guests and invited users/i)).toBeVisible();
+  // Wait for the search input to be visible — it's a reliable sign the
+  // popover is fully open and interactive.
+  await expect(page.getByPlaceholder("Search users...")).toBeVisible({
+    timeout: 5000,
+  });
+}
+
+/**
+ * Select a guest user by name using the search input.
+ *
+ * Searching bypasses the "Show guests and invited users" checkbox filter
+ * (per OwnerSelect: when query is non-empty, all matching users are shown).
+ * This is more robust on mobile viewports where the checkbox+list scroll
+ * interaction can miss clicks on CommandItem elements.
+ */
+async function selectGuestUserBySearch(page: Page, name: string) {
+  const searchInput = page.getByPlaceholder("Search users...");
+  await searchInput.fill(name);
+  const list = page.locator("[data-slot=command-list]");
+  const item = list
+    .locator("[data-slot=command-item]")
+    .filter({ hasText: name });
+  await expect(item).toBeVisible({ timeout: 5000 });
+  await item.click();
 }
 
 test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () => {
@@ -59,16 +81,10 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     await page.getByLabel(/Initials/i).fill(machineInitials);
     await page.getByLabel(/Machine Name/i).fill(`Owner Picker Test ${testId}`);
 
-    // Open picker and reveal guests
+    // Open picker and select guest via search (search bypasses the
+    // "Show guests" checkbox filter — more robust on mobile viewports).
     await openOwnerPicker(page);
-    const checkbox = page.getByLabel(/Show guests and invited users/i);
-    await checkbox.click();
-    await expect(checkbox).toBeChecked();
-
-    // Select the Guest User from the command list
-    const list = page.locator("[data-slot=command-list]");
-    await expect(list.getByText("Guest User")).toBeVisible();
-    await list.getByText("Guest User").click();
+    await selectGuestUserBySearch(page, "Guest User");
 
     // Owner trigger should show "Guest User" selected
     await expect(page.getByTestId("owner-select")).toContainText("Guest User");
@@ -111,16 +127,10 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
       .getByLabel(/Machine Name/i)
       .fill(`Owner Picker Confirm ${testId}`);
 
-    // Open picker and reveal guests
+    // Open picker and select guest via search (search bypasses the
+    // "Show guests" checkbox filter — more robust on mobile viewports).
     await openOwnerPicker(page);
-    const checkbox = page.getByLabel(/Show guests and invited users/i);
-    await checkbox.click();
-    await expect(checkbox).toBeChecked();
-
-    // Select Guest User
-    const list = page.locator("[data-slot=command-list]");
-    await expect(list.getByText("Guest User")).toBeVisible();
-    await list.getByText("Guest User").click();
+    await selectGuestUserBySearch(page, "Guest User");
 
     // Verify selection
     await expect(page.getByTestId("owner-select")).toContainText("Guest User");

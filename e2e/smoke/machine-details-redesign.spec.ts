@@ -1,9 +1,9 @@
 /**
  * E2E Tests: Machine Details Redesign
  *
- * Tests the redesigned machine details page layout and CSV export journey.
- * Inline editing and owner management tests are in
- * e2e/full/machine-details-extended.spec.ts.
+ * Tests the redesigned (now tabbed) machine details page and the absorbed
+ * machine-list overflow check. Inline editing and owner management tests are
+ * in e2e/full/machine-details-extended.spec.ts.
  *
  * AUDIT 2026-05 (Wave 3a, Rows 26 + 27):
  *   Row 27 — Kept: layout-D overflow check + CSV-F multi-step download journey.
@@ -18,6 +18,14 @@
  *     - "should display seeded test machines with correct statuses" (class-B/D)
  *     - "should display machine issues on detail page via expando" (class-H — RTL)
  *     - "should display machine owner to all logged-in users" (class-D/H — RTL)
+ *
+ * TABBED-LAYOUT NOTES (post-merge):
+ * - The persistent header is identity-only (`[initials] | name`); status,
+ *   owner display, and Report Issue button moved off it. Open-issue count +
+ *   status surface as a colored badge on the Service tab itself.
+ * - The issues section is no longer a collapsible expando; it renders an
+ *   always-open list inside the Service tab (`/m/[initials]/maintenance`).
+ * - The export button moved with the issues list onto the Service tab.
  */
 
 import { test, expect } from "@playwright/test";
@@ -44,26 +52,32 @@ test.describe("Machine Details Redesign", () => {
     );
   });
 
-  test("should display full-width details card with two-column layout", async ({
+  test("Info tab renders owner + stats grid without horizontal overflow", async ({
     page,
   }) => {
-    // Navigate to a machine that admin owns (Medieval Madness)
     await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
 
-    // Machine Information heading should be visible
-    await expect(
-      page.getByRole("heading", { name: "Machine Information" })
-    ).toBeVisible();
-
-    // Left column elements: name, initials, owner
+    // Owner cell in the 2-col stats grid
     await expect(page.getByTestId("owner-display")).toBeVisible();
 
-    // Status and issues counts should be visible
+    // Stats grid cells
     await expect(page.getByTestId("detail-open-issues")).toBeVisible();
     await expect(page.getByTestId("detail-open-issues-count")).toBeVisible();
 
-    // Verify no horizontal overflow on machine detail page
     await assertNoHorizontalOverflow(page);
+  });
+
+  test("Service tab renders the issues section with cards visible", async ({
+    page,
+  }) => {
+    // Issues live on the Service tab (URL slug stays `maintenance`).
+    await page.goto(`/m/${seededMachines.addamsFamily.initials}/maintenance`);
+
+    // The wrapping section is always present.
+    await expect(page.getByTestId("issues-section")).toBeVisible();
+
+    // Cards render flat (no expando) — section is always open in this design.
+    await expect(page.getByTestId("issue-card").first()).toBeVisible();
   });
 
   // Absorbed from e2e/smoke/machines-crud.spec.ts (Row 26 MERGE):
@@ -90,22 +104,16 @@ test.describe("Machine Details Redesign", () => {
     });
   });
 
-  test("should export machine issues to CSV", async ({ page }) => {
-    // Navigate to TAF (The Addams Family) which has seeded issues
-    await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
+  test("Service tab exports machine issues to CSV", async ({ page }) => {
+    // Export button lives in the Service tab's section header.
+    await page.goto(`/m/${seededMachines.addamsFamily.initials}/maintenance`);
 
-    // Wait for page to load
-    await expect(
-      page.getByRole("heading", { name: "Machine Information" })
-    ).toBeVisible();
+    const exportButton = page.getByTestId("export-csv-button");
+    await expect(exportButton).toBeVisible();
 
-    // Set up download listener before clicking
     const downloadPromise = page.waitForEvent("download");
+    await exportButton.click();
 
-    // Click the export button (it's in the issues expando header)
-    await page.getByTestId("export-csv-button").click();
-
-    // Verify download was triggered
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(
       /^pinpoint-TAF-issues-\d{4}-\d{2}-\d{2}\.csv$/

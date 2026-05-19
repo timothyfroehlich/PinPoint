@@ -20,10 +20,12 @@ import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface AddCommentFormProps {
   issueId: string;
+  onSubmitSuccess?: () => void;
 }
 
 export function AddCommentForm({
   issueId,
+  onSubmitSuccess,
 }: AddCommentFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const editorRef = useRef<RichTextEditorHandle>(null);
@@ -41,9 +43,10 @@ export function AddCommentForm({
       setUploadedImages([]);
       setComment(null);
       editorRef.current?.clear();
-      editorRef.current?.focus();
+      // Container handles focus / sheet-close / next-action.
+      onSubmitSuccess?.();
     }
-  }, [state]);
+  }, [state, onSubmitSuccess]);
 
   const handleUploadComplete = (imageData: ImageMetadata): void => {
     setUploadedImages((prev) => [...prev, imageData]);

@@ -129,10 +129,12 @@ test.describe("Issues System", () => {
       await addamsFamilyLink.click();
       await expect(page).toHaveURL(/\/m\/TAF/); // Expect TAF machine detail page
 
-      // Click "Submit Issue Report" button on machine page (scope to main content to avoid global header button)
-      await page.getByTestId("machine-report-issue").click();
-
-      // Should be on new issue page for TAF
+      // The machine-detail "Report Issue" button was removed in the tabbed
+      // layout redesign. Navigate to the report form directly with the
+      // machine pre-filled (URL contract this spec already asserted on).
+      await page.goto(
+        `/report?machine=${seededMachines.addamsFamily.initials}`
+      );
       await page.waitForURL(/\/report\?machine=TAF/);
 
       // Fill out remaining fields

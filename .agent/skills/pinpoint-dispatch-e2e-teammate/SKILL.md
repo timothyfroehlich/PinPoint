@@ -89,9 +89,11 @@ Report back with:
 
 ```bash
 ./scripts/workflow/pr-dashboard.sh          # overview of open PRs
-./scripts/workflow/copilot-comments.sh <PR> # check review status
+./scripts/workflow/pr-watch.py --audit <PR> # audit gate state (one-shot, structured tokens)
 gh pr checks <PR>                              # CI status
 ```
+
+For Copilot review details, use `pull_request_read(method: "get_review_comments")` via MCP — see `pinpoint-pr-workflow` skill Phase 3.
 
 ---
 

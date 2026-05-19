@@ -31,6 +31,10 @@ interface IssueCardProps {
   issue: IssueCardIssue;
   machine: { name: string };
   variant?: "normal" | "compact";
+  /** Badge arrangement. "normal" = 2-col grid on sm+ (default).
+   *  "strip" = horizontal flex-wrap row — better for narrow, edge-to-edge
+   *  lists where the badge grid would stack 4-deep vertically. */
+  badgeLayout?: "normal" | "strip";
   className?: string;
   showReporter?: boolean;
   dataTestId?: string;
@@ -40,6 +44,7 @@ export function IssueCard({
   issue,
   machine,
   variant = "normal",
+  badgeLayout = "normal",
   className,
   showReporter = false,
   dataTestId,
@@ -96,7 +101,7 @@ export function IssueCard({
               </div>
             </div>
             <div className="shrink-0">
-              <IssueBadgeGrid issue={issue} />
+              <IssueBadgeGrid issue={issue} variant={badgeLayout} />
             </div>
           </div>
         </CardHeader>

@@ -81,6 +81,19 @@ export function SeverityFilter({
 - Colors: Use semantic CSS variables defined in `globals.css` (Material Design 3 palette).
 - Avoid ad-hoc hex colors; prefer tokens.
 - Compose utility classes; limit custom CSS unless necessary.
+- **Class merging (CORE-UI-003)**: always `className={cn("default-classes", className)}` using `~/lib/utils`. Never ``className={`default-classes ${className}`}`` — template literals don't resolve Tailwind conflicts and break parent overrides.
+- **No inline styles** unless coordinates are truly dynamic (CORE-UI-004). Use Tailwind utilities or CSS variables.
+- **No hardcoded spacing on reusable primitives** (CORE-UI-002). A `Button` or `Input` must not own outer margins — let callers pass `className`.
+
+## Two-Layer Responsive Framework (CORE-RESP-001..004 / AGENTS.md §2.1 #13)
+
+PinPoint uses two distinct responsive layers — **never mix them for the same layout decision**:
+
+- **Viewport breakpoints** (`md:`, `lg:`, `xl:`) for **page structure** — show/hide sections, top-level grid columns, sidebar visibility.
+- **Container queries** (`@lg:`, `@xl:`, `@container`) for **component internals** — flex direction inside a card, padding inside a panel, column count of an embedded list. Components placed in variable-width containers (sidebars, dialogs) MUST use container queries.
+- `sm:` (640px) is **padding/spacing only** — never `sm:flex-row`, `sm:grid-cols-2`, `hidden sm:block`. The primary layout pivot is `md:` (768px).
+- **No JavaScript viewport detection** — no `window.innerWidth`, `useMediaQuery`, `matchMedia` hooks. Pure CSS. Sole documented exception: `use-table-responsive-columns` for IssueList (PP-rs9).
+- **New pages require overflow coverage** — add the route to `e2e/smoke/responsive-overflow.spec.ts`. Horizontal overflow is invisible to Playwright visibility assertions but breaks the user experience.
 
 ## Import Patterns
 
@@ -96,6 +109,11 @@ No deep relative imports (`../../../`).
 
 - Severity labels: always `minor`, `playable`, `unplayable` (never alternate synonyms).
 - Each issue must clearly reference a single machine in UI (no multi-select creation flow in MVP).
+
+## Server→Client Boundary (CORE-SEC-006 / CORE-SEC-007)
+
+- **Minimal RSC payload**: don't pass full ORM/domain objects (`UnifiedUser`, full profile records, full issue rows) as props to `"use client"` components. The RSC payload is visible in page source — leaking emails, roles, internal IDs even on authenticated pages. Map data to the minimal shape the component actually uses before crossing the boundary.
+- **Email privacy (CORE-SEC-007)**: never display `reporterEmail` (or any email) outside `/admin/*` views and the user's own settings page. Use the name hierarchy: `reportedByUser.name` → `invitedReporter.name` → `reporterName` → `"Anonymous"`. Applies to UI, timeline events, seed data, and any client-serialized response.
 
 ## Error & Loading Boundaries (Deferred)
 
@@ -118,4 +136,4 @@ No deep relative imports (`../../../`).
 
 ---
 
-Last Updated: 2025-11-09
+Last Updated: 2026-05-17 (added Two-Layer Responsive Framework CORE-RESP-001..004, cn() rule CORE-UI-003, CORE-SEC-006 minimal RSC payload, CORE-SEC-007 email privacy)

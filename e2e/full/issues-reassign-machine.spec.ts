@@ -13,6 +13,7 @@ import {
   submitFormAndWaitForRedirect,
 } from "../support/page-helpers.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
+import { openDropdownMenu } from "../support/actions.js";
 
 // Prefix shared across all tests in this file; cleaned up in afterEach by title
 // prefix so cleanup works regardless of URL pattern (issues now live at
@@ -58,8 +59,8 @@ test.describe("Issue reassignment", () => {
 
       await createIssueOnMachine(page, fromInitials, issueTitle);
 
-      // Open the kebab menu in the page header.
-      await page.getByTestId("issue-actions-menu-trigger").click();
+      // Open the kebab menu in the page header using the retry-on-race helper.
+      await openDropdownMenu(page.getByTestId("issue-actions-menu-trigger"));
       await page.getByTestId("issue-actions-menu-reassign").click();
 
       // Pick the destination machine in the AlertDialog combobox.

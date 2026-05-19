@@ -60,9 +60,14 @@ test.describe("Machines Public Access", () => {
       page.getByRole("heading", { name: seededMachines.medievalMadness.name })
     ).toBeVisible();
 
-    // Verify machine information is displayed
-    const machineCards = page.getByTestId("issue-card");
-    const issueCount = await machineCards.count();
+    // After the tabbed-machine-layout PR, issue cards live on the Service tab
+    // (`/m/[initials]/maintenance`), not the default Info tab. Navigate there
+    // to verify cards render for unauthenticated users.
+    await page.goto(
+      `/m/${seededMachines.medievalMadness.initials}/maintenance`
+    );
+    const issueCards = page.getByTestId("issue-card");
+    const issueCount = await issueCards.count();
     expect(issueCount).toBeGreaterThan(0);
   });
 });
