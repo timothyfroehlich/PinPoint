@@ -169,7 +169,10 @@ export async function getMachineTimeline(
         args.tag ? eq(timelineEvents.tag, args.tag) : undefined
       )
     )
-    .orderBy(desc(timelineEvents.createdAt));
+    // `createdAt` is `now()`, constant within a transaction, so multiple
+    // events emitted from a single tx share a timestamp. Tie-break on `id`
+    // so the feed order is deterministic across page loads (PP-0x98 review).
+    .orderBy(desc(timelineEvents.createdAt), desc(timelineEvents.id));
 
   return rows;
 }

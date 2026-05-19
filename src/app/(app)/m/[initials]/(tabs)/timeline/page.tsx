@@ -111,6 +111,13 @@ export default async function MachineTimelinePage({
               );
             }
 
+            // Validate `row.tag` at this read boundary — the DB column is
+            // unconstrained `text`, so a legacy/manual row could carry an
+            // out-of-enum value. Skip it rather than blind-casting (PP-0x98 review).
+            const parsedRowTag = tagSchema.safeParse(row.tag);
+            if (!parsedRowTag.success) return null;
+            const rowTag = parsedRowTag.data;
+
             // User comment.
             if (row.sourceType === "comment" && row.content) {
               // Matrix-only permission check (AGENTS.md rule 12). Admin
@@ -135,7 +142,7 @@ export default async function MachineTimelinePage({
                     createdAt: row.createdAt,
                     authorId: row.authorId,
                     authorName: row.authorName,
-                    tag: row.tag as TimelineTag,
+                    tag: rowTag,
                     content: row.content,
                   }}
                   canDelete={canDelete}
@@ -151,7 +158,7 @@ export default async function MachineTimelinePage({
                   row={{
                     id: row.id,
                     createdAt: row.createdAt,
-                    tag: row.tag as TimelineTag,
+                    tag: rowTag,
                     eventData: row.eventData,
                   }}
                   machineInitials={machine.initials}

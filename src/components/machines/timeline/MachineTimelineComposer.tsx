@@ -18,6 +18,7 @@ import {
   RESERVED_TAGS,
   getTagLabel,
   type TimelineTag,
+  userTagSchema,
 } from "~/lib/timeline/machine-tags";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
@@ -91,7 +92,11 @@ export function MachineTimelineComposer({
         <Select
           value={tag}
           onValueChange={(v) => {
-            setTag(v as TimelineTag);
+            // Validate via userTagSchema rather than blind-casting — guards
+            // against accidentally accepting a reserved tag if the Select
+            // options ever change (PP-0x98 review).
+            const parsed = userTagSchema.safeParse(v);
+            if (parsed.success) setTag(parsed.data);
           }}
         >
           <SelectTrigger aria-label="Tag" className="w-40">

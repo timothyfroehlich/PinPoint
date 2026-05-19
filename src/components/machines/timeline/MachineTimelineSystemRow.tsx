@@ -44,10 +44,10 @@ export function MachineTimelineSystemRow({
       <span>
         {issueLink ? (
           <>
-            {text.replace(/Issue #\d+/, "")}{" "}
             <Link href={issueLink.href} className="underline">
-              #{String(issueLink.number)}
+              Issue #{String(issueLink.number)}
             </Link>
+            {text.replace(/^Issue #\d+/, "")}
           </>
         ) : (
           text
