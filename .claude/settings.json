@@ -52,6 +52,15 @@
             "timeout": 5000
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HUDDLE_THROTTLE_SECONDS=180 bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/huddle-poll.sh",
+            "timeout": 10000
+          }
+        ]
       }
     ],
     "TaskCompleted": [

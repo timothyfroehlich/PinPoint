@@ -8,6 +8,7 @@
 
 # Huddle coordination state (runtime, machine-local)
 .claude/huddle/
+.claude/.huddle-last-poll
 
 # dependencies
 /node_modules

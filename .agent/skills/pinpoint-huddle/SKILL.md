@@ -1,6 +1,6 @@
 ---
 name: pinpoint-huddle
-description: Inter-session coordination via PP-cvh comments injected by SessionStart and UserPromptSubmit hooks. Use when you see a huddle identity announcement, an injected PP-cvh comments block, want to register a session name, or want to understand how parallel Claude sessions coordinate without re-injecting their own posts.
+description: Inter-session coordination via PP-cvh comments injected by SessionStart, UserPromptSubmit, and (throttled) PostToolUse hooks. Use when you see a huddle identity announcement, an injected PP-cvh comments block, want to register a session name, want to tune the PostToolUse throttle, or want to understand how parallel Claude sessions coordinate without re-injecting their own posts.
 ---
 
 # pinpoint-huddle
@@ -16,8 +16,9 @@ consuming thousands of tokens at every session start.
 
 ## What you'll see at session start
 
-The `huddle-session-start.sh` hook (registered in `~/.claude/settings.json`)
-fires when your session opens. It outputs one of two blocks into your context:
+The `huddle-session-start.sh` hook (registered in project-level
+`.claude/settings.json`) fires when your session opens. It outputs one of two
+blocks into your context:
 
 ### Identity announcement (you're registered)
 
@@ -54,10 +55,18 @@ Read the full notice, derive a name from your first user prompt, and register:
 - DO NOT use generic labels like `Worker1`
 - If the name's taken, the helper suggests variations; pick one and retry
 
-## What you'll see on every user prompt
+## What you'll see during normal work
 
-The `huddle-poll.sh` hook (registered as UserPromptSubmit) fires before each
-user turn. It polls the active coordination bead for new comments and injects
+The `huddle-poll.sh` hook fires from two events:
+
+- **`UserPromptSubmit`** — always polls before each user turn (unthrottled).
+- **`PostToolUse`** — polls at most once every `HUDDLE_THROTTLE_SECONDS`
+  seconds (default 180 = 3 min). Most tool calls hit a fast-path skip
+  (~10–30 ms wall clock) — the bd/jq slow path only runs at the throttle
+  cadence. This closes the gap for orchestrator-style sessions that go long
+  stretches between user prompts.
+
+When the hook finds new comments since this worktree's last cursor, it injects
 them as a system-reminder block:
 
     ## New PP-cvh coordination comments (N)
@@ -69,7 +78,19 @@ them as a system-reminder block:
 Comments signed by your own session (matching `—Claude-<YourName>` or
 `—<YourName>`) are filtered out — you won't see your own posts re-injected.
 
-If nothing's new since your last turn, no block appears (zero tokens).
+If nothing's new, no block appears (zero tokens).
+
+### Throttle override
+
+To poll PP-cvh more or less frequently on PostToolUse, edit
+`.claude/settings.json` and change the `HUDDLE_THROTTLE_SECONDS=180` env var
+on the PostToolUse hook command line. Set it to `60` for once-per-minute
+polling, or `0` to disable the PostToolUse path entirely (UserPromptSubmit
+continues to fire regardless).
+
+Subagent sessions (`Agent({...})` dispatches) are skipped on both events
+without writing the throttle marker, so a subagent's tool calls don't
+advance its parent agent's throttle clock.
 
 ## How to post coordination updates
 
@@ -93,13 +114,13 @@ Things NOT worth posting:
 
 ## Scripts
 
-| Script                                   | Trigger               | Purpose                                                |
-| ---------------------------------------- | --------------------- | ------------------------------------------------------ |
-| `scripts/hooks/huddle-poll.sh`           | UserPromptSubmit      | Inject new PP-cvh comments since last_seen             |
-| `scripts/hooks/huddle-session-start.sh`  | SessionStart          | Identity announcement; rotation check (currently stub) |
-| `scripts/hooks/huddle-whoami.sh`         | manual                | Register/lookup/list/discover session→name mappings    |
-| `scripts/hooks/huddle-rotation-check.sh` | sourced by both hooks | Date-compare for daily rotation (stub in PR #1357)     |
-| `scripts/hooks/huddle-lib.sh`            | sourced by all hooks  | Shared helpers (state-dir resolver)                    |
+| Script                                   | Trigger                                    | Purpose                                                |
+| ---------------------------------------- | ------------------------------------------ | ------------------------------------------------------ |
+| `scripts/hooks/huddle-poll.sh`           | UserPromptSubmit + PostToolUse (throttled) | Inject new PP-cvh comments since last_seen             |
+| `scripts/hooks/huddle-session-start.sh`  | SessionStart                               | Identity announcement; rotation check (currently stub) |
+| `scripts/hooks/huddle-whoami.sh`         | manual                                     | Register/lookup/list/discover session→name mappings    |
+| `scripts/hooks/huddle-rotation-check.sh` | sourced by both hooks                      | Date-compare for daily rotation (stub in PR #1357)     |
+| `scripts/hooks/huddle-lib.sh`            | sourced by all hooks                       | Shared helpers (state-dir resolver)                    |
 
 ## State files (all under `<main-worktree>/.claude/huddle/`)
 
@@ -113,6 +134,12 @@ git-ignored so the state stays machine-local.
 | `last-seen-<path-hash>` | Per-checkout poll cursor (most-recent injected `created_at`) |
 | `rotation.lock`         | flock target (rotation PR only)                              |
 | `config.json`           | Root bead ID + schema version (rotation PR only)             |
+
+Plus one per-worktree file outside the shared state dir:
+
+| File                                            | Purpose                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------- |
+| `$CLAUDE_PROJECT_DIR/.claude/.huddle-last-poll` | Throttle marker (epoch seconds) for PostToolUse; gates the fast-path skip |
 
 ## Self-filter rules
 

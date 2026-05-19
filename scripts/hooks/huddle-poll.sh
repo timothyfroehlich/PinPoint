@@ -1,43 +1,49 @@
 #!/usr/bin/env bash
-# huddle-poll.sh — UserPromptSubmit hook: inject new PP-cvh coordination comments
+# huddle-poll.sh — poll PP-cvh for new coordination comments and inject them
 #
-# Fires at the start of each agent turn. Outputs new comments as a system-reminder
-# block, or nothing if nothing is new (zero stdout = no injection).
+# Fires from two registered hook events (see .claude/settings.json):
+#   - UserPromptSubmit  → always polls (no throttle env var set)
+#   - PostToolUse       → polls at most once per HUDDLE_THROTTLE_SECONDS
+# Outputs new comments as a system-reminder block on stdout, or nothing if
+# nothing is new (zero stdout = no injection).
 #
 # Stdin payload schema (per https://code.claude.com/docs/en/hooks):
-#   {
-#     "session_id":       "<UUID>",
-#     "transcript_path":  "<path to .jsonl>",
-#     "cwd":              "<current working dir>",
-#     "hook_event_name":  "UserPromptSubmit",
-#     "permission_mode":  "default" | "plan" | "acceptEdits" | "auto" | "dontAsk" | "bypassPermissions",
-#     "prompt":           "<the user's message text>"
-#   }
-# We only read session_id and transcript_path (the latter for subagent detection;
-# the rest is ignored).
+#   UserPromptSubmit:
+#     { session_id, transcript_path, cwd, hook_event_name,
+#       permission_mode, prompt }
+#   PostToolUse:
+#     { session_id, transcript_path, cwd, hook_event_name,
+#       permission_mode, tool_name, tool_input, tool_response }
+# We only read session_id and transcript_path (the latter for subagent
+# detection); other fields are ignored.
 #
-# State file: <main-worktree>/.claude/huddle/last-seen-<cwd-hash>
-#   Per-checkout isolation: each worktree/session tracks independently, but
-#   the state directory is shared across all linked worktrees of the same
-#   clone (see huddle-lib.sh for resolver details).
+# Throttle (PostToolUse only): set HUDDLE_THROTTLE_SECONDS=N in the hook
+# command line to gate the slow path to once per N seconds per worktree.
+# When unset/zero, the throttle block is skipped entirely → identical to
+# pre-throttle behavior. The fast-path skip is the dominant cost path during
+# active tool-call bursts; target wall clock <30ms (one date +%s spawn).
 #
-# Self-filter (auto, no env config required): the UserPromptSubmit stdin payload
-# carries a `session_id` field. The hook reads it and looks up the agent's name
-# from `<main-worktree>/.claude/huddle/session-names.json`, a JSON map of
-# `{session_id: name}`. Comments ending with `—Claude-<that name>` are excluded
-# from the injection so an agent never re-injects its own coordination posts.
+# Throttle marker: $CLAUDE_PROJECT_DIR/.claude/.huddle-last-poll, one line
+# of epoch seconds. Written on every slow-path entry (whether or not new
+# comments were found) — "I polled and there was nothing" is still a poll.
+# Written BEFORE the bd fetch so that bd-broken states still get backoff
+# instead of triggering one hammer per tool call.
 #
-# Why a single JSON map instead of one file per session: agents who restart
-# (different transcript file, same logical "session") need a stable lookup their
-# resumed turn can perform. The map persists across restarts; the helper
-# `scripts/hooks/huddle-whoami.sh` lets an agent recall its own name at any time.
+# State file: <main-worktree>/.claude/huddle/last-seen-<sha256-of-worktree-root>
+#   Per-checkout cursor advancing only when new comments are injected.
+#   Shared across all linked worktrees via huddle-lib.sh's git-common-dir
+#   resolver.
 #
-# To register a session-to-name mapping (the agent itself runs once):
+# Self-filter (auto, no env config required): the stdin payload carries a
+# `session_id` field. The hook looks up the agent's name from
+# <main-worktree>/.claude/huddle/session-names.json (a JSON
+# `{session_id: name}` map). Comments ending with `—Claude-<name>` or
+# `—<name>` are excluded from injection so an agent never re-sees its own
+# coordination posts. To register a session→name mapping:
 #   bash scripts/hooks/huddle-whoami.sh register <Name> <session_id>
 #
-# Backward compat: also accepts the `$CLAUDE_AGENT_NAME` env var (the original
-# activation scheme). The earlier per-session `cvh-self-<session_id>` fallback
-# was retired with the move to project-scoped state.
+# Backward compat: also accepts the $CLAUDE_AGENT_NAME env var (the original
+# activation scheme).
 #
 # Naming guidance: pick a short descriptive name based on your current work
 # (e.g. WorktreeHookFix, TestAudit, DesignBible). Full reference:
@@ -46,20 +52,52 @@
 set -euo pipefail
 
 # Fail-open on missing dependencies — this hook runs on every UserPromptSubmit
-# and MUST NOT block a user prompt because jq or python3 aren't installed.
-# (bd is also required but its absence is handled inline at the call site.)
+# and PostToolUse and MUST NOT block a user prompt or tool call because jq or
+# python3 aren't installed. (bd is also required but its absence is handled
+# inline at the call site.)
 for dep in jq python3; do
   command -v "$dep" >/dev/null 2>&1 || exit 0
 done
 
-# --- Read UserPromptSubmit hook JSON from stdin (best-effort) ---
-# Reads stdin if present so we can extract session_id and transcript_path.
-# Falls through silently if payload is empty or malformed — the hook MUST NOT
-# fail user prompts on parse errors.
+# --- Read hook JSON from stdin (best-effort, spawn-free) ---
+# Use the bash `read` builtin with -d '' (read until NUL → effectively until
+# EOF for JSON payloads) instead of $(cat) to avoid a subshell+fork on the
+# fast path. Read failure on EOF is expected; `|| true` keeps `set -e` happy.
 INPUT=""
 if [[ ! -t 0 ]]; then
-  INPUT=$(cat)
+  IFS= read -r -d '' INPUT || true
 fi
+
+# Throttle marker path (used by fast-path check and slow-path write).
+# CLAUDE_PROJECT_DIR is set by the Claude Code harness for hook invocations;
+# the fallback to $PWD is defensive (and matches the settings.json pattern
+# `bash "${CLAUDE_PROJECT_DIR:-.}"/...`).
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
+POLL_FILE="$PROJECT_DIR/.claude/.huddle-last-poll"
+
+# === FAST PATH (PostToolUse only — gated by HUDDLE_THROTTLE_SECONDS) ===
+# UserPromptSubmit calls this script without HUDDLE_THROTTLE_SECONDS set, so
+# this block is skipped entirely → identical to pre-throttle behavior.
+THROTTLE_SECONDS="${HUDDLE_THROTTLE_SECONDS:-0}"
+if (( THROTTLE_SECONDS > 0 )); then
+  # Subagent skip via pure-bash glob match — no spawn. A false positive is
+  # benign (just an extra throttle skip); the slow path keeps its own precise
+  # jq-based check on `transcript_path` as defense in depth.
+  case "$INPUT" in *'/subagents/'*) exit 0 ;; esac
+
+  if [[ -f "$POLL_FILE" ]]; then
+    LAST_POLL=0
+    read -r LAST_POLL < "$POLL_FILE" 2>/dev/null || LAST_POLL=0
+    if [[ "$LAST_POLL" =~ ^[0-9]+$ ]]; then
+      NOW=$(date +%s)
+      if (( NOW - LAST_POLL < THROTTLE_SECONDS )); then
+        exit 0  # throttled — skip this fire
+      fi
+    fi
+  fi
+fi
+
+# === SLOW PATH ===
 
 # Skip subagent sessions. Subagent transcripts live at
 # <project>/<session>/subagents/<agent>.jsonl, while top-level sessions land
@@ -80,6 +118,12 @@ fi
 case "$TRANSCRIPT_PATH" in
   */subagents/*) exit 0 ;;
 esac
+
+# Mark the throttle now — we're committed to a poll. Writing the marker before
+# the bd fetch means that if bd is broken or slow, future PostToolUse fires
+# still respect the throttle window instead of hammering a sick bd.
+mkdir -p "$(dirname "$POLL_FILE")" 2>/dev/null || true
+date +%s > "$POLL_FILE" 2>/dev/null || true
 
 # --- Rotation check (stub in PR #1357; real check in follow-up rotation PR) ---
 ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
