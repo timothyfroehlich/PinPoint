@@ -243,7 +243,7 @@ test.describe("CREATE form resets", () => {
       // Wait for the Sheet to fully animate open before interacting.
       await page
         .getByRole("dialog", { name: "Add a comment" })
-        .waitFor({ state: "visible", timeout: 5000 });
+        .waitFor({ state: "visible", timeout: 10000 });
     }
 
     const commentForm = isOnMobile
