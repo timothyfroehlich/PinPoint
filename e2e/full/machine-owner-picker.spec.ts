@@ -46,8 +46,11 @@ async function selectGuestUserBySearch(page: Page, name: string) {
   const searchInput = page.getByPlaceholder("Search users...");
   await searchInput.fill(name);
   const list = page.locator("[data-slot=command-list]");
-  await expect(list.getByText(name)).toBeVisible({ timeout: 5000 });
-  await list.getByText(name).click();
+  const item = list
+    .locator("[data-slot=command-item]")
+    .filter({ hasText: name });
+  await expect(item).toBeVisible({ timeout: 5000 });
+  await item.click();
 }
 
 test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () => {
