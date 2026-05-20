@@ -18,9 +18,19 @@ concurrency:
 
 jobs:
   # Detect which files changed to skip expensive jobs for docs-only changes.
-  # Uses predicate-quantifier: 'some' with negative patterns so that has_code=true
-  # when ANY changed file is NOT docs-only. New/unknown directories default to
-  # running full CI — the safe failure mode.
+  # Uses predicate-quantifier: 'every' with a positive '**' plus negative
+  # exclusions. A changed file counts as "code" only when it matches every
+  # pattern — i.e. it matches '**' (always) AND is NOT under any excluded
+  # path. `has_code` is true if at least one changed file is "code". A
+  # docs-only PR (only excluded paths touched) produces has_code=false and
+  # downstream expensive jobs cascade-skip via `setup`'s `if:` gate. New /
+  # unknown directories default to running full CI — the safe failure mode.
+  #
+  # Why 'every' and not 'some': under 'some', the positive '**' matches every
+  # file by itself, short-circuiting the negative exclusions and forcing
+  # has_code=true on every PR. PR #1327 / PP-r5v shipped 'some' and the
+  # filter never fired (e.g. PR #1386, a single .agent/skills/*.md change,
+  # still ran the full E2E suite).
   changes:
     name: Detect Changes
     runs-on: ubuntu-latest
@@ -39,7 +49,7 @@ jobs:
       - id: filter
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d  # ratchet:dorny/paths-filter@v4.0.1
         with:
-          predicate-quantifier: "some"
+          predicate-quantifier: "every"
           filters: |
             has_code:
               - '**'
@@ -47,6 +57,7 @@ jobs:
               - '!**/*.md'
               - '!.beads/**'
               - '!.agent/**'
+              - '!.agents/**'
               - '!.claude/**'
               - '!LICENSE'
               - '!.gitignore'
