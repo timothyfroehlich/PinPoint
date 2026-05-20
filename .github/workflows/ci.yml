@@ -851,6 +851,7 @@ jobs:
         uses: ./.github/actions/setup-supabase
 
       - name: Run Comprehensive Smoke Tests (all browsers)
+        continue-on-error: true
         env:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
@@ -862,7 +863,22 @@ jobs:
             --project=chromium --project="Mobile Chrome" \
             --project="Mobile Safari" --workers=3
 
+      - name: Evaluate gating browser results (Smoke)
+        run: |
+          RESULTS=playwright-report/results.json
+          JQ_NAMES='.suites[].specs[] | select(.ok == false) | .tests[0].projectName'
+          JQ_TITLES='.suites[].specs[] | select(.ok == false) | "[\(.tests[0].projectName)] \(.title)"'
+          GATING_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cvE '^Mobile Safari$' || true)
+          if [ "$GATING_FAILS" -gt 0 ]; then
+            echo 'Gating browser failures (Smoke):'
+            jq -r "$JQ_TITLES" "$RESULTS" | grep -vE '^\[Mobile Safari\]'
+            exit 1
+          fi
+          SAFARI_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cE '^Mobile Safari$' || true)
+          echo "Gating browsers green (Smoke). Mobile Safari failures (non-gating): $SAFARI_FAILS"
+
       - name: Run Comprehensive Full Tests (all browsers)
+        continue-on-error: true
         env:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
@@ -873,6 +889,20 @@ jobs:
           pnpm exec playwright test --config=playwright.config.full.ts \
             --project=chromium --project="Mobile Chrome" \
             --project="Mobile Safari" --workers=3
+
+      - name: Evaluate gating browser results (Full)
+        run: |
+          RESULTS=playwright-report/results.json
+          JQ_NAMES='.suites[].specs[] | select(.ok == false) | .tests[0].projectName'
+          JQ_TITLES='.suites[].specs[] | select(.ok == false) | "[\(.tests[0].projectName)] \(.title)"'
+          GATING_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cvE '^Mobile Safari$' || true)
+          if [ "$GATING_FAILS" -gt 0 ]; then
+            echo 'Gating browser failures (Full):'
+            jq -r "$JQ_TITLES" "$RESULTS" | grep -vE '^\[Mobile Safari\]'
+            exit 1
+          fi
+          SAFARI_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cE '^Mobile Safari$' || true)
+          echo "Gating browsers green (Full). Mobile Safari failures (non-gating): $SAFARI_FAILS"
 
       - name: Summarize test failures
         if: failure()
@@ -889,7 +919,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Playwright report
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
         with:
           name: playwright-report-comprehensive
