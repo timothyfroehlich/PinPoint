@@ -48,6 +48,31 @@ STATE_DIR=$(huddle_state_dir) || exit 0
 NAMES_JSON="$STATE_DIR/session-names.json"
 mkdir -p "$STATE_DIR"
 
+# --- Bootstrap check ---
+# If config.json is missing, emit the user-visible bootstrap notice and exit.
+# This is the only hook that emits the notice; huddle-poll.sh exits silently.
+CONFIG_FILE="$STATE_DIR/config.json"
+ROOT_ID=""
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  MAIN_ROOT=$(dirname "$(git rev-parse --git-common-dir 2>/dev/null || echo ".")" 2>/dev/null || echo "<main-worktree>")
+  printf '## ⚠️ Huddle not bootstrapped\n\n'
+  printf 'The huddle coordination system is not set up yet. It maintains a daily bead\n'
+  printf 'for agents to coordinate on, summarizes each day'\''s chatter into ~50-token\n'
+  printf 'digests so it stays cheap to read, and rotates at local midnight.\n\n'
+  printf 'To bootstrap, run:\n'
+  printf '    bash scripts/hooks/huddle-bootstrap.sh\n\n'
+  printf 'That creates the root bead, today'\''s daily, this month'\''s monthly, and writes\n'
+  printf '%s/.agents/huddle/config.json with the IDs. Re-running is safe.\n' "$MAIN_ROOT"
+  exit 0
+fi
+ROOT_ID=$(jq -r '.root_bead_id // ""' "$CONFIG_FILE" 2>/dev/null)
+if [[ -z "$ROOT_ID" ]]; then
+  printf '## ⚠️ Huddle not bootstrapped\n\n'
+  printf 'config.json exists but has no root_bead_id. Re-run:\n'
+  printf '    bash scripts/hooks/huddle-bootstrap.sh\n'
+  exit 0
+fi
+
 # Read stdin JSON (best-effort; never fail SessionStart on parse errors)
 INPUT=""
 if [[ ! -t 0 ]]; then
@@ -72,16 +97,31 @@ case "$TRANSCRIPT_PATH" in
   *) ;;
 esac
 
-# --- Rotation check (stub in PR #1357; real check in follow-up rotation PR) ---
+# --- Rotation check ---
 ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
 if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
   # shellcheck source=huddle-rotation-check.sh disable=SC1091
   source "$ROTATION_CHECK_SCRIPT"
   if huddle_rotation_needed; then
-    # Real "rotation needed" output lands in the follow-up PR. For now this
-    # branch is unreachable (stub returns 1).
+    STORED_DATE=""
+    NOTES_STR_ROT=$(bd show "$ROOT_ID" --json 2>/dev/null | jq -r '.[0].notes // ""' 2>/dev/null || echo "")
+    if [[ -n "$NOTES_STR_ROT" ]]; then
+      STORED_DATE=$(printf '%s' "$NOTES_STR_ROT" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('today_bead', {}).get('date', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+    fi
+    NOW_DATE=$(date +%F)
     printf '## ⚠️ Huddle rotation needed\n\n'
-    printf 'See docs/superpowers/specs/2026-05-17-huddle-system-design.md §7.2\n'
+    printf 'The active coordination bead points to date %s, but today is %s.\n' "$STORED_DATE" "$NOW_DATE"
+    printf 'Before continuing, dispatch the rotation subagent — it will summarize\n'
+    printf 'the previous day, create today'\''s bead, update pointers, and post\n'
+    printf '"continued in" markers on closed beads.\n\n'
+    printf 'Dispatch template in .agents/skills/pinpoint-huddle/SKILL.md.\n'
     exit 0
   fi
 fi
@@ -103,7 +143,7 @@ except Exception:
   )" || { SESSION_ID=""; SOURCE=""; }
 fi
 
-# If we have no session_id, silently exit — the user's PP-cvh participation is optional.
+# If we have no session_id, silently exit — huddle participation is optional.
 if [[ -z "$SESSION_ID" ]]; then
   exit 0
 fi
@@ -149,6 +189,75 @@ else
   printf 'If the name is taken, the helper suggests variations.\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown
   printf 'Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`\n'
+fi
+
+# --- Summary injection (§5.1 step 5) ---
+# Inject monthly summary description + N most-recent daily bead descriptions.
+# Suppressed on compact (already returned early above via SOURCE check).
+# Fails open: any bd error exits silently without noise.
+ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || { exit 0; }
+NOTES_STR=$(printf '%s' "$ROOT_JSON" | jq -r '.[0].notes // ""' 2>/dev/null) || { exit 0; }
+if [[ -z "$NOTES_STR" ]]; then
+  exit 0
+fi
+
+N_DAILIES=$(printf '%s' "$NOTES_STR" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('settings', {}).get('n_dailies_to_inject', 5))
+except Exception:
+    print(5)
+" 2>/dev/null || echo "5")
+
+MONTHLY_BEAD_ID=$(printf '%s' "$NOTES_STR" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('monthly_bead', {}).get('id', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+
+RECENT_DAILIES=$(printf '%s' "$NOTES_STR" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    items = n.get('recent_dailies', [])
+    for item in items:
+        print(item.get('id', '') + '\t' + item.get('date', ''))
+except Exception:
+    pass
+" 2>/dev/null || echo "")
+
+# Gather content — only emit the section header if there's something to show
+MONTHLY_DESC=""
+if [[ -n "$MONTHLY_BEAD_ID" ]]; then
+  MONTHLY_DESC=$(bd show "$MONTHLY_BEAD_ID" --json 2>/dev/null | jq -r '.[0].description // ""' 2>/dev/null || echo "")
+fi
+
+if [[ -z "$MONTHLY_DESC" && -z "$RECENT_DAILIES" ]]; then
+  exit 0
+fi
+
+printf '\n## Huddle recent activity\n\n'
+
+if [[ -n "$MONTHLY_BEAD_ID" && -n "$MONTHLY_DESC" && "$MONTHLY_DESC" != "null" ]]; then
+  MONTHLY_TITLE=$(bd show "$MONTHLY_BEAD_ID" --json 2>/dev/null | jq -r '.[0].title // "Monthly summary"' 2>/dev/null || echo "Monthly summary")
+  printf '### %s\n\n%s\n\n' "$MONTHLY_TITLE" "$MONTHLY_DESC"
+fi
+
+if [[ -n "$RECENT_DAILIES" ]]; then
+  DAILY_COUNT=0
+  while IFS=$'\t' read -r daily_id daily_date; do
+    [[ -z "$daily_id" ]] && continue
+    [[ "$DAILY_COUNT" -ge "$N_DAILIES" ]] && break
+    DAILY_DESC=$(bd show "$daily_id" --json 2>/dev/null | jq -r '.[0].description // ""' 2>/dev/null || echo "")
+    if [[ -n "$DAILY_DESC" && "$DAILY_DESC" != "null" ]]; then
+      printf '### Daily %s (%s)\n\n%s\n\n' "$daily_date" "$daily_id" "$DAILY_DESC"
+    fi
+    DAILY_COUNT=$(( DAILY_COUNT + 1 ))
+  done <<< "$RECENT_DAILIES"
 fi
 
 exit 0
