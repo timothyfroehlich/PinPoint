@@ -240,7 +240,7 @@ trigger: always_on
 **CORE-PERF-003:** Image priority and preconnect discipline
 
 - **Severity:** Required
-- **Why:** `priority` (which emits `fetchpriority="high"`, Baseline Widely available since Sep 2025) is a zero-sum signal — every prioritized image deprioritizes every other resource. Marking non-LCP images as `priority` (e.g., the 32px header logo, a sidebar logo, an image inside a closed dialog) burns budget the browser can't reclaim. Likewise, the first request to a known image origin pays full DNS + TLS handshake cost unless preconnected.
+- **Why:** `priority` (which emits `fetchpriority="high"`, Baseline Widely available) is a zero-sum signal — every prioritized image deprioritizes every other resource. Marking non-LCP images as `priority` (e.g., the 32px header logo, a sidebar logo, an image inside a closed dialog) burns budget the browser can't reclaim. Likewise, the first request to a known image origin pays full DNS + TLS handshake cost unless preconnected.
 - **Do:** Set `priority` on exactly one image per page — the LCP candidate — and only when you've confirmed it is above the fold for the dominant viewport. Always provide `sizes` for images that render at non-`100vw`. Add `<link rel="preconnect">` in the root layout for known image origins (e.g., Vercel Blob bucket).
 - **Don't:** Sprinkle `priority` on logos, hero variants, or pre-mounted dialog images "just in case." Don't omit `sizes` on `priority` images.
 - **Reference:** modern-web-guidance `optimize-image-priority`, `optimize-preload-priority`.
@@ -433,7 +433,7 @@ trigger: always_on
 
 - **Severity:** Critical
 - **Why:** Pinning a clear floor is what makes a "modern web" basis useful — every UI decision is anchored to the set of HTML / CSS / JS features the browser platform considers cross-browser stable. **Baseline Widely available** means a feature has been available in all major engines for ~2.5 years and is safe without fallbacks. Aim higher and Safari users break; aim lower and the bundle bloats with polyfills for features already shipping natively.
-- **Do:** Reach for Baseline Widely available primitives directly: `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, native form validation, `fetchpriority`, CSS Grid `auto-fit/minmax`, `text-balance`/`text-pretty`. No feature detection or polyfill needed.
+- **Do:** Reach for Baseline Widely available primitives directly: `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, native form validation, `fetchpriority`, CSS Grid `auto-fit/minmax`. (`text-wrap: balance` / `text-pretty` are Newly available — see `pinpoint-design-bible` §19 deferred list; the existing §9 typography rule uses them selectively, which predates and is grandfathered into this policy.) No feature detection or polyfill needed.
 - **Don't:** Adopt Baseline Newly available features (Popover API, View Transitions, anchor positioning, scroll-driven animations, `interestfor`, the `closedby` attribute) without a per-feature opt-in documented in `pinpoint-design-bible` §19. Don't add a polyfill for any Widely-available feature.
 - **Reference:** `pinpoint-design-bible` §19 Browser Support Policy. To check a feature's status, search the modern-web-guidance catalog (CORE-UI-006) — every guide notes its Baseline status.
 
@@ -453,8 +453,9 @@ trigger: always_on
 
 - **Severity:** Required
 - **Why:** WCAG 2.4.1 Level A. Without it, keyboard users tab through the AppHeader navigation on every single page load before reaching content. PinPoint's header has 6+ tab stops; that's a hard daily-driver cost for any keyboard-first user.
-- **Do:** First child of `<body>` (in `src/app/layout.tsx`) is `<a href="#main-content" className="sr-only focus:not-sr-only ...">Skip to main content</a>`. The `<main>` element in `MainLayout.tsx` carries `id="main-content"` and `tabIndex={-1}`.
+- **Do:** The first child of `<body>` (in `src/app/layout.tsx`) must be `<a href="#main-content" className="sr-only focus:not-sr-only ...">Skip to main content</a>`. The `<main>` element in `MainLayout.tsx` must carry `id="main-content"` and `tabIndex={-1}`.
 - **Don't:** Ship a layout that puts content behind the header in tab order with no skip affordance.
+- **Status:** Not yet implemented; implementation tracked under beads epic PP-kqbk (child PP-kqbk.3). New layouts must satisfy this rule.
 
 **CORE-A11Y-002:** `motion-reduce:` pairs with every animation utility
 
@@ -488,9 +489,10 @@ trigger: always_on
 **CORE-A11Y-006:** `inert` for non-interactive background regions
 
 - **Severity:** Required
-- **Why:** The `inert` global attribute (Baseline Widely available since Mar 2022) removes an element and all its descendants from the tab order, click handling, and the accessibility tree in one declarative step. `aria-hidden` alone is weaker — it removes from the AT tree but not from the tab order, so keyboard focus can still tab into background content. When a modal opens, the background should be `inert`.
-- **Do:** When opening a modal that doesn't use native `<dialog>.showModal()` (Radix Dialog, Sheet, AlertDialog, Drawer), set `inert` on the page root or the sibling containing background content. Native `<dialog>` handles this automatically via top-layer.
+- **Why:** The `inert` global attribute (Baseline Widely available) removes an element and all its descendants from the tab order, click handling, and the accessibility tree in one declarative step. `aria-hidden` alone is weaker — it removes from the AT tree but not from the tab order, so keyboard focus can still tab into background content. When a modal opens, the background should be `inert`.
+- **Do:** When opening a modal that doesn't use native `<dialog>.showModal()` (Radix Dialog, Sheet, AlertDialog, Drawer), set `inert` on the page root or the sibling containing background content. Wire `anyModalOpen` state once in `ClientProviders.tsx` (the same place that hosts the existing `<TooltipProvider>`) and consume it via React context — don't track open state per modal. Radix's `onOpenChange` callback feeds this context. Native `<dialog>` handles this automatically via top-layer.
 - **Don't:** Rely on `aria-hidden="true"` + pointer-events tricks alone. Don't manually manage focus trapping when `inert` does it for you.
+- **Status:** Not yet implemented; tracked under PP-kqbk.8.
 
 ---
 
@@ -507,25 +509,27 @@ trigger: always_on
 
 - **Severity:** Critical
 - **Why:** Password managers and browser autofill key on the `autocomplete` attribute. Wrong or missing tokens mean credentials don't autofill, generated passwords aren't offered, and the confirm-password field gets autofilled with the user's existing password — silently breaking the flow.
-- **Do:** Sign-in form: `autocomplete="username"` on email + `id="current-password"` on the password field with `autocomplete="current-password"`. Sign-up form: `autocomplete="username"` on email, `autocomplete="new-password"` on the new password field, `autocomplete="off"` on the confirm-password field. Anonymous-reporter forms get `autocomplete="given-name"`, `family-name"`, `email"`. Domain-specific pickers that should NOT be autofilled (e.g., machine selector) set `autocomplete="off"` explicitly.
+- **Do:** Sign-in form: `autocomplete="username"` on email + `id="current-password"` on the password field with `autocomplete="current-password"`. Sign-up form: `autocomplete="username"` on email, `autocomplete="new-password"` on the new password field, `autocomplete="off"` on the confirm-password field. Anonymous-reporter forms get `autocomplete="given-name"`, `autocomplete="family-name"`, `autocomplete="email"`. Domain-specific pickers that should NOT be autofilled (e.g., machine selector) set `autocomplete="off"` explicitly.
 - **Don't:** Put `autocomplete="new-password"` on the confirm field. Don't share an `id` between login and signup password fields. Don't omit the attribute on anonymous-reporter forms.
 - **Reference:** modern-web-guidance `autofill-sign-in-form`, `autofill-sign-up-form`, `autofill-address-form`.
 
 **CORE-FORM-003:** `:user-invalid` styling on the shared Input primitive
 
 - **Severity:** Required
-- **Why:** `:user-invalid` (Baseline Widely available since Nov 2023) flips a CSS pseudo-class on form controls only **after** the user has interacted with them — no premature red rings on page load, no JS state mirroring, no event listeners. The shared `<Input>` already has `aria-invalid:` styling; pair it with `:user-invalid:` and the browser does the rest.
-- **Do:** `src/components/ui/input.tsx` (and `textarea.tsx`, `select.tsx`) carry the equivalent of `[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40` so every input automatically picks up post-interaction invalid styling.
+- **Why:** `:user-invalid` (Baseline Widely available) flips a CSS pseudo-class on form controls only **after** the user has interacted with them — no premature red rings on page load, no JS state mirroring, no event listeners. The shared `<Input>` already has `aria-invalid:` styling; pair it with `:user-invalid:` and the browser does the rest.
+- **Do:** `src/components/ui/input.tsx` (and `textarea.tsx`, `select.tsx`) must carry the equivalent of `[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40` so every input automatically picks up post-interaction invalid styling. Add to the primitive once — don't copy this per form.
 - **Don't:** Hand-roll `useState` + `onBlur` to mirror invalid state. Don't paint inputs red on initial render.
 - **Reference:** modern-web-guidance `validate-input-after-interaction`.
+- **Status:** Not yet implemented; tracked under PP-kqbk.2.
 
 **CORE-FORM-004:** `aria-invalid` synced for screen readers
 
 - **Severity:** Required
 - **Why:** `:user-invalid` is a CSS pseudo-class — visual only. Screen readers need `aria-invalid="true"` to announce "invalid" alongside the field label. Without it, AT users get only the form-level alert after a server round-trip.
-- **Do:** A shared `onBlur` listener (or `useActionState` error mapper) sets `aria-invalid="true"` on inputs that fail `checkValidity()` after first interaction, and `aria-invalid="false"` when the value becomes valid again.
+- **Do:** Add the `onBlur` listener to `src/components/ui/input.tsx` (and `textarea.tsx`, `select.tsx`) **once** so every form picks it up automatically — same primitive that hosts CORE-FORM-003 styling. The listener sets `aria-invalid="true"` on inputs that fail `checkValidity()` after first interaction, and `aria-invalid="false"` when the value becomes valid again. Do not copy the listener per form.
 - **Don't:** Set `aria-invalid="true"` on initial render. Don't rely solely on the form-level `<Alert>` to communicate per-field errors.
 - **Reference:** modern-web-guidance `accessible-error-announcement`, `required-field-feedback`.
+- **Status:** Not yet implemented; tracked under PP-kqbk.2 (bundled with CORE-FORM-003).
 
 **CORE-FORM-005:** Required fields are visually marked before interaction
 
@@ -537,7 +541,7 @@ trigger: always_on
 **CORE-FORM-006:** `enterkeyhint` on sequential mobile fields
 
 - **Severity:** Required
-- **Why:** On mobile, the default "return" key offers no cue about flow. `enterkeyhint="next"` → "next" → "done" walks the user through the form with the correct keyboard action label at each step. Baseline Widely available since Dec 2021. One attribute per field; high payoff.
+- **Why:** On mobile, the default "return" key offers no cue about flow. `enterkeyhint="next"` → "next" → "done" walks the user through the form with the correct keyboard action label at each step. Baseline Widely available. One attribute per field; high payoff.
 - **Do:** Multi-field forms set `enterkeyhint="next"` on every field except the last, which gets `enterkeyhint="done"` (or `"send"`/`"search"` per intent).
 - **Don't:** Ship a multi-field form with no `enterkeyhint`.
 

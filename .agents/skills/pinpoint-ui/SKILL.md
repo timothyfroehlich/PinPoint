@@ -83,24 +83,24 @@ npx -y modern-web-guidance@latest list
 
 ### Curated guide map (PinPoint use cases)
 
-| When you're building...                  | Search / retrieve                                                 |
-| :--------------------------------------- | :---------------------------------------------------------------- |
-| A sign-in / sign-up form                 | `autofill-sign-in-form`, `autofill-sign-up-form`, `forms`         |
-| An address or anonymous-reporter form    | `autofill-address-form`, `forms`                                  |
-| Post-interaction validation feedback     | `validate-input-after-interaction`, `required-field-feedback`     |
-| Accessible error announcement            | `accessible-error-announcement`                                   |
-| A modal / dialog / confirmation          | `html` §4, `light-dismiss-a-dialog`, `platform-controls-dismiss-` |
-| A mobile drawer / slide-in panel         | `navigation-drawer`                                               |
-| A tooltip on touch                       | `interest-triggered-tooltips` (most are Newly available — read)   |
-| Image priority / LCP                     | `optimize-image-priority`, `optimize-preload-priority`            |
-| Skeletons, content-visibility            | `defer-rendering-heavy-content`                                   |
-| Long-task scheduling / INP               | `break-up-long-tasks`, `identify-inp-causes`                      |
-| Container-internal layout                | `css-layout`, `size-aware-styling`                                |
-| Conditional styles via DOM state         | `style-parent-with-has`                                           |
-| Hidden-but-findable content (accordions) | `search-hidden-content`                                           |
-| Reduced-motion / animation               | `accessibility` § Motion                                          |
-| Table a11y                               | `accessibility` § Tables                                          |
-| Skip-link / landmarks                    | `accessibility` § Landmarks, `html` §3                            |
+| When you're building...                  | Search / retrieve                                                       |
+| :--------------------------------------- | :---------------------------------------------------------------------- |
+| A sign-in / sign-up form                 | `autofill-sign-in-form`, `autofill-sign-up-form`, `forms`               |
+| An address or anonymous-reporter form    | `autofill-address-form`, `forms`                                        |
+| Post-interaction validation feedback     | `validate-input-after-interaction`, `required-field-feedback`           |
+| Accessible error announcement            | `accessible-error-announcement`                                         |
+| A modal / dialog / confirmation          | `html` §4, `light-dismiss-a-dialog`, `platform-controls-dismiss-dialog` |
+| A mobile drawer / slide-in panel         | `navigation-drawer`                                                     |
+| A tooltip on touch                       | `interest-triggered-tooltips` (most are Newly available — read)         |
+| Image priority / LCP                     | `optimize-image-priority`, `optimize-preload-priority`                  |
+| Skeletons, content-visibility            | `defer-rendering-heavy-content`                                         |
+| Long-task scheduling / INP               | `break-up-long-tasks`, `identify-inp-causes`                            |
+| Container-internal layout                | `css-layout`, `size-aware-styling`                                      |
+| Conditional styles via DOM state         | `style-parent-with-has`                                                 |
+| Hidden-but-findable content (accordions) | `search-hidden-content`                                                 |
+| Reduced-motion / animation               | `accessibility` § Motion                                                |
+| Table a11y                               | `accessibility` § Tables                                                |
+| Skip-link / landmarks                    | `accessibility` § Landmarks, `html` §3                                  |
 
 **Don't memorize**: re-search per task. The catalog is updated more often than this skill is.
 
@@ -488,10 +488,12 @@ Use `"send"` on the last field of a message/search form, `"search"` on a search 
 
 ### Post-interaction validation styling (`:user-invalid`)
 
-`:user-invalid` flips a CSS pseudo-class only **after** the user interacts with the control — no premature red rings on page load, no JS state to manage. The shared `<Input>` primitive already styles `aria-invalid:`; pair it with `:user-invalid:` and the browser handles the rest.
+> **Not yet implemented** — tracked under PP-kqbk.2. The shared `<Input>` currently only styles `aria-invalid:`. Add the `:user-invalid:` selectors in `src/components/ui/input.tsx` once; do not copy them per form site.
+
+`:user-invalid` flips a CSS pseudo-class only **after** the user interacts with the control — no premature red rings on page load, no JS state to manage. Adding the two CSS variants below to the shared `<Input>` (and `<Textarea>`, `<Select>`) primitive gives the entire app post-interaction validation feedback for free.
 
 ```tsx
-// In src/components/ui/input.tsx (and textarea.tsx, select.tsx)
+// Add to src/components/ui/input.tsx (and textarea.tsx, select.tsx)
 <input
   className={cn(
     "border-input focus-visible:ring-ring",
@@ -504,12 +506,12 @@ Use `"send"` on the last field of a message/search form, `"search"` on a search 
 
 ### Screen-reader error announcement (`aria-invalid`)
 
-`:user-invalid` is visual only — AT users need `aria-invalid="true"` to hear "invalid" next to the field label.
+> **Not yet implemented** — tracked under PP-kqbk.2 (bundled with `:user-invalid` styling above).
+
+`:user-invalid` is visual only — AT users need `aria-invalid="true"` to hear "invalid" next to the field label. Add the listener to `src/components/ui/input.tsx` once so every field across the app gets it automatically — don't copy it per form.
 
 ```tsx
-"use client";
-import { useState } from "react";
-
+// Add to src/components/ui/input.tsx (and textarea.tsx, select.tsx)
 function syncInvalid(e: React.FocusEvent<HTMLInputElement>) {
   e.currentTarget.setAttribute(
     "aria-invalid",
@@ -517,10 +519,9 @@ function syncInvalid(e: React.FocusEvent<HTMLInputElement>) {
   );
 }
 
-<Input onBlur={syncInvalid} />;
+// In the primitive's render: pass syncInvalid as the default onBlur,
+// merging with any caller-supplied onBlur via composeEventHandlers.
 ```
-
-Or implement it once in the shared `<Input>` primitive so every field gets it automatically.
 
 ### Required-field indicators
 
@@ -554,7 +555,7 @@ The shadcn primitives stay — `inert` is one attribute added to the background 
 
 ### Native `<dialog>` only when a shadcn variant would be overkill
 
-`<dialog>.showModal()` is Baseline Widely available since Mar 2025 and ships focus trap + top-layer + `::backdrop` for free. Use it for one-off, self-contained, single-purpose dialogs that don't earn a place in the shadcn variant system — for example, a debug-only inspector panel, an `<a href="#fragment">`-driven help blurb, or a tightly-scoped picker that doesn't need theming.
+`<dialog>.showModal()` is Baseline Widely available (Baseline since Mar 2023; see Browser Support table) and ships focus trap + top-layer + `::backdrop` for free. Use it for one-off, self-contained, single-purpose dialogs that don't earn a place in the shadcn variant system — for example, a debug-only inspector panel, an `<a href="#fragment">`-driven help blurb, or a tightly-scoped picker that doesn't need theming.
 
 **Default to shadcn `<Dialog>` / `<AlertDialog>` / `<Sheet>` / `<Drawer>` for product UI.** Native `<dialog>` is an option in your toolbox, not the new default. If a Radix modal is doing its job, leave it.
 
@@ -590,7 +591,9 @@ The shadcn primitives (and the Radix layer underneath) already handle a lot of a
 
 ### Skip-to-main link (CORE-A11Y-001)
 
-`src/app/layout.tsx` puts a skip link as the first child of `<body>`, and the `<main>` element in `MainLayout.tsx` carries `id="main-content" tabIndex={-1}`. Without this, every page load forces a keyboard user through 6+ header tab stops before reaching content.
+> **Not yet implemented** — tracked under PP-kqbk.3. This rule applies to the implementation when it lands, and to any new layout introduced before then.
+
+Add a skip link as the first child of `<body>` in `src/app/layout.tsx`, and add `id="main-content" tabIndex={-1}` to the `<main>` element in `MainLayout.tsx`. Without this, every page load forces a keyboard user through 6+ header tab stops before reaching content.
 
 ```tsx
 <body>

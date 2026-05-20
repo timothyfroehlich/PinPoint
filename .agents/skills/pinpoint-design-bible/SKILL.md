@@ -537,7 +537,7 @@ Do not reorder the buttons to try to "fix" the mobile stack — the reversal is 
 - Never wrap a Server Action in an inline async function: `action={async () => await serverAction()}` breaks progressive enhancement. Pass the Server Action directly: `action={serverAction}`.
 - For destructive confirmations, use `AlertDialog` — it has semantics (`role="alertdialog"`) that screen readers announce more urgently.
 - When opening any modal, set `inert` on the page-root container (CORE-A11Y-006). Radix uses `aria-hidden` + pointer-events on the background; `inert` is the platform primitive that also removes the background from tab order.
-- Native `<dialog>.showModal()` (Baseline Widely available since Mar 2025) is **not** the default for product UI — shadcn `<Dialog>` / `<AlertDialog>` / `<Sheet>` are. Reach for `<dialog>` only for one-off, self-contained, single-purpose surfaces that don't earn a place in the shadcn variant system (e.g., a debug-only inspector, a tightly-scoped help blurb). See `pinpoint-ui` skill § "Native HTML primitives alongside shadcn/Radix".
+- Native `<dialog>.showModal()` (Baseline Widely available; Baseline since Mar 2023 per §19) is **not** the default for product UI — shadcn `<Dialog>` / `<AlertDialog>` / `<Sheet>` are. Reach for `<dialog>` only for one-off, self-contained, single-purpose surfaces that don't earn a place in the shadcn variant system (e.g., a debug-only inspector, a tightly-scoped help blurb). See `pinpoint-ui` skill § "Native HTML primitives alongside shadcn/Radix".
 
 ## 18. Token Canonical Form
 
