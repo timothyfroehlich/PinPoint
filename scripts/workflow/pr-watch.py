@@ -130,7 +130,9 @@ def _finalize_via_ci_gate(pr: int, timeout_sec: int = 1200, poll_sec: int = 10) 
     while time.monotonic() < deadline:
         status, conclusion = _ci_gate_state(pr)
         if status == "COMPLETED":
-            if conclusion in ("SUCCESS", "NEUTRAL"):
+            # Match run_audit's pass criteria (SUCCESS / NEUTRAL / SKIPPED) so
+            # the watcher and the audit can't disagree on the same CI Gate state.
+            if conclusion in ("SUCCESS", "NEUTRAL", "SKIPPED"):
                 emit(f"CI Gate passed (conclusion={conclusion}) ✓")
                 return 0
             emit(f"CI Gate failed (conclusion={conclusion or 'unknown'})")

@@ -142,7 +142,7 @@ else
   printf '  Antigravity-AgentsMdCleanup  cleaning up AGENTS.md in Antigravity\n'
   printf '  Codex-TestAudit              auditing test coverage in Codex\n'
   printf '  Claude-DesignBible           working on the design bible in Claude Code\n\n'
-  printf 'Format: <Harness>-<Topic>, CamelCase, ASCII letters/digits/hyphens, under ~30 chars.\n'
+  printf 'Format: <Harness>-<Topic>, CamelCase, ASCII letters/digits/hyphens/underscores, under ~30 chars.\n'
   printf 'The harness prefix lets Tim see "two Claudes and one Antigravity are running."\n\n'
   printf 'Register with:\n'
   printf '    bash scripts/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
