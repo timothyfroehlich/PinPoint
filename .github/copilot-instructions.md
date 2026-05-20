@@ -4,9 +4,8 @@
 >
 > **Canonical rule sources** (read these for full rule text):
 >
-> - `docs/NON_NEGOTIABLES.md` — the CORE-\* rule catalog (TS, SSR, SEC, PERF, TEST, ARCH, RESP, UI families) with severities and rationale.
-> - `AGENTS.md` §2.1 — 14 numbered implementation rules + casework.
-> - `NON_NEGOTIABLES.md` (repo root) — three production-critical rules: email privacy, permissions matrix accuracy, localhost domain standard.
+> - `docs/NON_NEGOTIABLES.md` — the CORE-\* rule catalog (TS, SSR, SEC, PERF, TEST, ARCH, RESP, UI families) with severities and rationale. Includes the production-critical rules (email privacy CORE-SEC-007, permissions matrix CORE-ARCH-008, localhost domain CORE-SEC-008).
+> - `AGENTS.md` §2.1 — 14-rule index of the CORE-\* catalog.
 > - Path-scoped review guidance lives in `.github/instructions/*.instructions.md` (auto-applied via `applyTo` globs).
 >
 > Cite rules by ID (e.g. CORE-SEC-007) in review comments so authors can look up the full text.
@@ -68,7 +67,7 @@ Conventional commit messages required.
    - Descriptions of features, workflows, and form fields should match the actual implementation
    - No references to removed features (e.g., roadmap)
    - **Permissions matrix ↔ enforcement sync (CORE-ARCH-008)**: If a PR changes authorization logic in server actions (`actions.ts`), verify that `src/lib/permissions/matrix.ts` values and descriptions match. If a PR changes `matrix.ts`, verify the server actions enforce it. `true` means unconditional access, `"own"` means only resources the user created — mismatches here cause the help page to show incorrect permission information.
-10. **Email privacy (CORE-SEC-007 / NON_NEGOTIABLES.md)**: Email addresses MUST NEVER appear outside `/admin/*` views and the user's own settings page. Flag any UI, timeline event, seed fixture, notification body, or client-serialized payload that falls back to `reporterEmail`. Use the name hierarchy: `reportedByUser.name` → `invitedReporter.name` → `reporterName` → `"Anonymous"`. This rule has shipped a bug before.
+10. **Email privacy (CORE-SEC-007)**: Email addresses MUST NEVER appear outside `/admin/*` views and the user's own settings page. Flag any UI, timeline event, seed fixture, notification body, or client-serialized payload that falls back to `reporterEmail`. Use the name hierarchy: `reportedByUser.name` → `invitedReporter.name` → `reporterName` → `"Anonymous"`. This rule has shipped a bug before.
 11. **Matrix-only permissions (AGENTS.md §2.1 #12)**: All permission checks MUST go through `checkPermission()` from `~/lib/permissions/helpers`. Flag any standalone permission function defined outside `src/lib/permissions/`. The help page auto-generates from the matrix — divergent enforcement paths cause users to see wrong information.
 12. **Test What We Own — class-J (AGENTS.md §2.1 #14)**: E2E specs MUST NOT drive live external services. Owned local stack only: Mailpit, PGlite, local Supabase (including local Storage). Flag any spec that hits `discord.com`, `googleapis.com`, real OAuth providers, vendor email templates, or captcha-verification endpoints. Two-layer self-check: (a) `rg 'https?://' <spec>` must show only localhost/owned-domain URLs; (b) any production third-party URL touched indirectly via server actions must live in an SDK client module that has a `*.test.ts` mocking `fetch` at the boundary. Diagnostic: "If this ran against production with real credentials, would the same code pass?" If no, the test is wrong — replace with an SDK-boundary mock.
 13. **Two-layer responsive framework (CORE-RESP-001..004 / AGENTS.md §2.1 #13)**: Viewport breakpoints (`md:`, `lg:`) for **page structure**; container queries (`@lg:`, `@xl:`) for **component internals**. Never mix the two for the same layout decision. `sm:` is padding/spacing only — never `sm:flex-row`, `sm:grid-cols-2`, `hidden sm:block`. No JS viewport detection (`window.innerWidth`, `useMediaQuery`, `matchMedia`). New pages MUST be added to `e2e/smoke/responsive-overflow.spec.ts`.
@@ -76,7 +75,7 @@ Conventional commit messages required.
 15. **Minimal RSC payload (CORE-SEC-006)**: Flag `"use client"` components receiving full ORM/domain objects (`UnifiedUser`, full profile rows, full issue rows) as props. The RSC payload is visible in page source — map to the minimal shape the component actually uses at the server→client boundary.
 16. **Migrations only, no `drizzle-kit push`**: All schema changes flow through `pnpm run db:generate` + `pnpm run db:migrate`. Production has real user data — `push` bypasses migration history and corrupts state.
 17. **No `auth.users` queries (CORE-SSR-007)**: Application code reads user data from `user_profiles`, never from Supabase's internal `auth.users` table. Exceptions: `supabase/seed.sql` triggers and `pglite.ts` test setup.
-18. **localhost domain standard (NON_NEGOTIABLES.md)**: Local URLs use `localhost`, not `127.0.0.1`. Browser cookie isolation breaks Supabase SSR auth across the two — flag any `127.0.0.1:NNNN` in `supabase/config.toml`, `.env*`, Playwright config, or health-check scripts.
+18. **localhost domain standard (CORE-SEC-008)**: Local URLs use `localhost`, not `127.0.0.1`. Browser cookie isolation breaks Supabase SSR auth across the two — flag any `127.0.0.1:NNNN` in `supabase/config.toml`, `.env*`, Playwright config, or health-check scripts.
 
 ## Do Not Generate
 

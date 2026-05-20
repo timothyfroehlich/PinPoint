@@ -2,383 +2,192 @@
 
 ## 1. User & Mission
 
-**User**: Tim (GitHub: timothyfroehlich)
-**Goal**: Vibecoding PinPoint (Pinball Issue Tracker) for Austin Pinball Collective.
-**Phase**: Soft-launched (Beta). Active users. Working on MVP+ Polish.
-**Style**: Explain pros/cons. Teach, don't just fix.
-**Constraint**: PR reviews are AI-generated; apply critical thinking.
+**User**: Tim (timothyfroehlich). **Project**: PinPoint, a pinball issue tracker for Austin Pinball Collective. **Phase**: Beta with active users; MVP+ polish.
+**Style**: Explain pros/cons, teach. PR reviews are AI-generated — apply critical thinking.
 
 ## 2. Critical Non-Negotiables
 
-### §2.1 Implementation Rules
+### 2.1 Implementation
+
+> These are one-line summaries indexed to `docs/NON_NEGOTIABLES.md`. Each rule cites its canonical `CORE-*` ID(s) — read the catalog for full severity, rationale, and do/don't. **Keep this list in sync** with `docs/NON_NEGOTIABLES.md` whenever a rule is added, removed, or rewritten.
 
-1. **Drizzle Migrations**: We use Drizzle ORM, NOT Supabase migrations. Never use `drizzle-kit push`. Use `db:generate` + `db:migrate`. Supabase migration config is disabled (`db.migrations.enabled = false`).
-2. **Worker-Scoped PGlite**: No per-test DB instances (causes lockups). Use shared worker.
-3. **Server Components Default**: "use client" only for interaction leaves.
-4. **Progressive Enhancement**: `<form action={serverAction}>`. No inline handlers.
-5. **Supabase SSR**: `createClient()` -> `auth.getUser()` immediately. No logic in between.
-6. **Type Safety**: No `any`, no `!`, no unsafe `as`. This project uses ts-strictest.
-7. **Path Aliases**: Always use `~/` (e.g., `~/lib/utils`).
-8. **Code Cleanliness**: Follow Rule of Three. DRY up code only after 3rd duplication.
-9. **Interaction Coverage at the Cheapest Layer**: Every clickable user-facing element must be exercised by at least one test at the cheapest layer that catches its bug class. Multi-step user journeys (login → mutate → verify across pages) require E2E. Server Action wiring, permission checks, and DB query correctness require integration tests (PGlite + direct action call). Pure form-state and UI logic require RTL unit tests. Smoke E2E covers "page renders without 500" and layout regression only. Adding an E2E test for a clickable that catches a class-B/E/I bug is misallocation, not coverage. Bug-class table and decision tree: `pinpoint-testing` skill § "Bug Classes & Cheapest Catching Layer".
-10. **Email Privacy**: User email addresses must NEVER be displayed outside of admin views and the user's own settings page. Use names, "Anonymous", or role labels instead. This applies to UI, seed data, timeline events, and any client-facing serialization.
-11. **Permissions Matrix Accuracy**: The permissions matrix (`matrix.ts`) must match actual server action enforcement. The help page auto-generates from the matrix — if it drifts, users see wrong information. Update both when changing auth logic.
-12. **Matrix-Only Permissions**: All permission checks MUST use `checkPermission()` from the matrix system (`~/lib/permissions/helpers`). No standalone permission functions outside `src/lib/permissions/`. The help page auto-generates from the matrix — if enforcement diverges, users see wrong information.
-13. **Two-Layer Responsive Framework**: Viewport breakpoints (`md:`, `lg:`) for page structure (show/hide sections, grid columns). Container queries (`@lg:`, `@xl:`) for component internals (flex direction, padding, column count). Never mix both for the same layout decision. No `window.innerWidth`, `useMediaQuery`, or `matchMedia` — use CSS. `sm:` is padding/spacing only. The sole documented exception is `use-table-responsive-columns` for IssueList (PP-rs9).
-14. **Test What We Own**: Tests must verify PinPoint's code at the boundary of services we don't control, not simulate the service's internals. Building scaffolding that synthesizes a third party's internal state (raw DB writes into `auth.identities`, captcha-verification mocks, OAuth handshake fakes, email-template regex extraction) is a signal you're testing the wrong thing. Cover PinPoint's contribution with unit tests; cover "the page renders without 500" with a smoke test; reserve integration/E2E for when the test exercises the contracted public API of a real running service. External services other than our owned local stack (Mailpit, PGlite, local Supabase including local Storage) MUST be mocked at the SDK boundary — driving live Discord webhooks, real OAuth provider redirects, vendor email templates, or any production third-party endpoint from an E2E spec is a class-J violation. **Class-J self-check before merging an E2E spec** — two layers, both must pass: (1) `rg 'https?://' e2e/path/to/spec.ts` for direct URLs in the spec source — must return only `localhost`/`127.0.0.1`/owned-domain hits. (2) `rg 'https?://' src/lib/ src/server/actions/` for the SDK clients and server actions the spec triggers — any non-localhost production URL there must live inside an SDK client module that has a corresponding `*.test.ts` mocking `fetch` at the boundary. The dangerous case is layer 2: a spec with a clean source that triggers a server action which fires live `fetch("https://discord.com/...")`. Any production third-party hostname (`discord.com`, `googleapis.com`, OAuth providers, etc.) reachable from an E2E run is a class-J signal — delete the spec and add the SDK-boundary mock. Diagnostic: "If this ran against production with real credentials, would the same code pass?" If no, the test is wrong. Casework: PP-e20 (OAuth identity disconnect), PP-uc8 (Turnstile captcha), PP-q9r (Supabase password-reset email format). Skill deep-dive: `pinpoint-testing` § "Test What We Own".
+1. **Drizzle migrations only** (CORE-ARCH-009): `db:generate` + `db:migrate`. Never `drizzle-kit push`. Supabase migration config is disabled.
+2. **Worker-scoped PGlite** (CORE-TEST-001): no per-test DB instances (causes lockups).
+3. **Server Components default** (CORE-ARCH-001): `"use client"` only for interaction leaves.
+4. **Progressive enhancement** (CORE-ARCH-002): `<form action={serverAction}>`. No inline handlers.
+5. **Supabase SSR** (CORE-SSR-001, CORE-SSR-002): `createClient()` → `auth.getUser()` immediately. No logic between.
+6. **Type safety** (CORE-TS-007): ts-strictest. No `any`, no `!`, no unsafe `as`.
+7. **Path aliases** (CORE-TS-008): always `~/` (e.g. `~/lib/utils`).
+8. **Rule of Three** (CORE-ARCH-010): DRY up after the third duplication, not before.
+9. **Test at the cheapest layer** (CORE-TEST-005): E2E for multi-step journeys; integration (PGlite + direct action) for server-action wiring, permissions, query correctness; RTL unit for form-state and UI logic. Smoke E2E is for "renders without 500" only. Bug-class table: `pinpoint-testing` skill.
+10. **Email privacy** (CORE-SEC-007): user emails only in admin views and the user's own settings page. Everywhere else: names, "Anonymous", or roles.
+11. **Permissions go through the matrix** (CORE-ARCH-008): all checks via `checkPermission()` from `~/lib/permissions/helpers`. The help page auto-generates from the matrix — keep enforcement and matrix in sync.
+12. **Two-layer responsive** (CORE-RESP-001..004): viewport breakpoints (`md:`, `lg:`) for page structure; container queries (`@lg:`, `@xl:`) for component internals. No `useMediaQuery` / `window.innerWidth` — use CSS. Sole exception: `use-table-responsive-columns` (PP-rs9).
+13. **Test what we own** (CORE-TEST-006): mock third-party SDKs at their boundary; don't synthesize their internal state. Any production third-party hostname reachable from an E2E run is a class-J violation — delete the spec and add an SDK-boundary mock.
+14. **`localhost`, never `127.0.0.1`** (CORE-SEC-008): cookie host isolation breaks Supabase SSR auth across the two. Use `localhost` in config, `.env*`, Playwright `baseURL`, and any local URL.
 
-### §2.2 Workflow Rules
+### 2.2 Workflow
 
-1. **Escape parentheses** in paths (e.g., `src/app/\(app\)/page.tsx`).
-2. **Preflight**: Must run `pnpm run preflight` before commit.
-3. **Process Safety**: NEVER kill processes system-wide. Do NOT run `pkill`, `killall`, use `kill` with PIDs obtained from broad selectors like `pgrep`, run `supabase stop --all`, or use any command that terminates services beyond your current worktree. Only stop services you explicitly started in your current session. Violating this destroys other agents' environments and the user's running work.
-4. **Merge for main sync, NEVER rebase**: Update a feature branch from `main` with `git fetch origin && git merge origin/main`. **NEVER `git rebase origin/main`**. Rebase rewrites SHAs → requires force-push → teammate guardrails block force-push and Tim does not authorize. Even a 1-commit branch costs a 30-minute push-permission detour after a rebase. Section 4 Branch Management has the rule + the ⚠️ REBASE TRAP callout with casework. If you find yourself typing `rebase` against `origin/main`, STOP and use `merge`.
-5. **Root Checkout Is Read-Only — All Work Happens In Worktrees**: The root checkout (main worktree — the original clone where `.git/` is a directory) is ALWAYS on `main`. No work is ever performed there: no code edits, no branch creation, no `git checkout`, no committing. **This includes planning artifacts** — design specs in `docs/superpowers/specs/`, implementation plans in `docs/superpowers/plans/`, and any other write that would land as a commit. Plans need worktrees too. Its only roles are pulling `main` fast-forward, dispatching subagents, and running cross-cutting tools (briefing, dashboard, beads). For any work — even a one-line fix or a planning doc — use a worktree: dispatch via `Agent(isolation:"worktree")` for substantive work, or use `EnterWorktree` to jump into an existing worktree for quick inline work. (PP-46z, PP-bg45; cross-session HEAD corruption reproduced 2026-05-16 with plain `git checkout -b` + push from the root checkout — no agent dispatch involved.)
+1. **Escape parentheses in paths**: `src/app/\(app\)/page.tsx`.
+2. **Run `pnpm run preflight` before committing.** Trivial doc/comment changes: `pnpm run check` is enough.
+3. **Don't kill processes you didn't start** — see §4 Process safety.
+4. **Sync with merge, never rebase** — see §5 Branches.
+5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md` and `.agents/rules/AGY.md`. (PP-46z, PP-bg45.)
+6. **Never `--no-verify`**, never `gh pr merge`, never wildcard tool permissions — without explicit user approval each time.
 
-## 3. Agent Skills (Progressive Disclosure)
+## 3. Agent Skills
 
-**YOU MUST LOAD RELEVANT SKILLS FOR EVERY TASK.**
-If your tool does not support skills, read the file path directly.
+Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
-| Category       | Skill Name                       | Path                                                    | When to Use                                                                                                |
-| :------------- | :------------------------------- | :------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------- |
-| **UI**         | `pinpoint-ui`                    | `.agent/skills/pinpoint-ui/SKILL.md`                    | Components, shadcn/ui, forms, responsive design.                                                           |
-| **UI**         | `pinpoint-design-bible`          | `.agent/skills/pinpoint-design-bible/SKILL.md`          | Design system rules, page archetypes, spacing, surfaces. Use for any new UI work.                          |
-| **TypeScript** | `pinpoint-typescript`            | `.agent/skills/pinpoint-typescript/SKILL.md`            | Type errors, generics, strict mode, Drizzle types.                                                         |
-| **Testing**    | `pinpoint-testing`               | `.agent/skills/pinpoint-testing/SKILL.md`               | Writing tests, PGlite setup, Playwright.                                                                   |
-| **Testing**    | `pinpoint-e2e`                   | `.agent/skills/pinpoint-e2e/SKILL.md`                   | E2E tests, worker isolation, stability patterns.                                                           |
-| **Security**   | `pinpoint-security`              | `.agent/skills/pinpoint-security/SKILL.md`              | Auth flows, CSP, Zod validation, Supabase SSR.                                                             |
-| **Patterns**   | `pinpoint-patterns`              | `.agent/skills/pinpoint-patterns/SKILL.md`              | Server Actions, architecture, data fetching.                                                               |
-| **Workflow**   | `pinpoint-briefing`              | `.agent/skills/pinpoint-briefing/SKILL.md`              | Session start health review: Sentry, PRs, main CI, new issues, audit, beads triage.                        |
-| **Workflow**   | `pinpoint-pr-workflow`           | `.agent/skills/pinpoint-pr-workflow/SKILL.md`           | Full PR lifecycle: commit, push, CI watch, Copilot review (via MCP), readiness label, gate-enforced merge. |
-| **Workflow**   | `pinpoint-orchestrator`          | `.agent/skills/pinpoint-orchestrator/SKILL.md`          | Parallel subagent work in worktrees (background agents or Claude Teams).                                   |
-| **Workflow**   | `pinpoint-dispatch-e2e-teammate` | `.agent/skills/pinpoint-dispatch-e2e-teammate/SKILL.md` | Dispatching a teammate end-to-end (worktree + contract + prompt).                                          |
+| Category   | Skill                            | When to use                                         |
+| :--------- | :------------------------------- | :-------------------------------------------------- |
+| UI         | `pinpoint-ui`                    | Components, shadcn/ui, forms, responsive design     |
+| UI         | `pinpoint-design-bible`          | Design system, page archetypes, spacing, surfaces   |
+| TypeScript | `pinpoint-typescript`            | Type errors, generics, Drizzle types                |
+| Testing    | `pinpoint-testing`               | Writing tests, PGlite, test-layer decisions         |
+| Testing    | `pinpoint-e2e`                   | E2E tests, worker isolation, Playwright stability   |
+| Security   | `pinpoint-security`              | Auth, CSP, Zod, Supabase SSR                        |
+| Patterns   | `pinpoint-patterns`              | Server Actions, data fetching, architecture         |
+| Workflow   | `pinpoint-briefing`              | Session-start health review                         |
+| Workflow   | `pinpoint-pr-workflow`           | Full PR lifecycle: commit, push, CI, Copilot, merge |
+| Workflow   | `pinpoint-orchestrator`          | Parallel subagent work in worktrees                 |
+| Workflow   | `pinpoint-dispatch-e2e-teammate` | Dispatching a teammate end-to-end                   |
 
-## 4. Environment & Workflow
+## 4. Environment
 
-### ⛔ SYSTEM PROCESS SAFETY — READ BEFORE TOUCHING ANY SERVICE
+### Worktrees & ports
 
-> **NEVER terminate processes system-wide. This is an absolute rule. No exceptions unless Tim gives explicit written permission in the current session.**
->
-> **FORBIDDEN without explicit permission:**
->
-> - `supabase stop --all` — kills ALL Supabase instances across every worktree
-> - `pkill node`, `killall node`, `pkill next`, `pkill -f next` — kills ALL Next.js servers system-wide
-> - `pkill postgres`, `killall postgres` — kills ALL database connections system-wide
-> - Any `kill`/`pkill`/`killall` targeting a process name or category rather than a specific PID you started
-> - Any `docker stop`/`docker rm` on containers you did not start in this session
->
-> **WHY**: This system runs multiple simultaneous environments (main + secondary + review + AntiGravity + ephemeral worktrees). Killing "all Supabase" or "all node" destroys every other running environment and the user's active work.
->
-> **ALLOWED**: Stop only the specific service you started, identified by its specific PID or by running the worktree-local stop command (e.g., run `supabase stop` from within the current worktree directory to stop only that environment's Supabase instance). When in doubt — DO NOT stop it. Ask first.
+Each git worktree gets isolated Supabase ports automatically. The Husky `post-checkout` hook runs `scripts/worktree_setup.py`, which allocates a slot from `~/.config/pinpoint/worktree-slots.json` and generates read-only `supabase/config.toml`, `.env.local`, `.claude/launch.json`.
 
-### Worktrees & Ports
+- **Create**: `git worktree add /path -b branch origin/main` — the hook handles the rest.
+- **Cleanup**: `scripts/worktree_cleanup.py` (stops Supabase, removes volumes, deallocates slot). Plain `git worktree remove` may leak Docker volumes (`docker volume prune` to clean).
+- **Ports**: main worktree uses defaults (3000 / 54321 / 54322). Slot N: `3000+N*10`, `54321+N*100`, `54322+N*100`.
+- **Config**: edit `supabase/config.toml.template`, not the generated file (which is chmod 444).
 
-We use git worktrees for parallel environments. Each worktree gets unique Supabase ports automatically.
+### Starting the local stack (self-service)
 
-**How it works**: The Husky `post-checkout` hook calls `scripts/worktree_setup.py` after every `git worktree add`. It allocates a slot (1-96) from a manifest (`~/.config/pinpoint/worktree-slots.json`), then generates `config.toml`, `.env.local`, and `.claude/launch.json` with the correct ports. No special CLI tools needed — just use `git worktree add`.
+Start what you need yourself rather than pausing the user.
 
-**Main worktree** uses default ports (Next.js 3000, API 54321, DB 54322). All other worktrees get dynamically allocated ports:
+- **OrbStack down?** `open -a OrbStack`, then `docker info` to confirm.
+- **Supabase down?** From the current worktree: `supabase start`. Ports are isolated, so this won't affect anyone else.
 
-```
-slot N → Next.js 3000+(N*10), API 54321+(N*100), DB 54322+(N*100)
-```
-
-**Creating a worktree**: `git worktree add /path -b branch origin/main` — post-checkout handles everything.
-
-**Claude Code**: `isolation: "worktree"` works out of the box — Claude Code creates the worktree, post-checkout configures it.
-
-**Cleanup**: Claude Code's `WorktreeRemove` hook runs `scripts/worktree_cleanup.py` (stops Supabase, removes Docker volumes, deallocates slot). For manual removal, `git worktree remove /path` works but Docker volumes may leak (clean with `docker volume prune`).
+Leave the stack running afterward — the user can stop it. Hand off what's running. If you can't start it (port collisions, stuck containers), ask the user — don't fall back to "let CI tell us."
 
-**Config Management**:
-
-- `supabase/config.toml` and `.env.local` are auto-generated, **read-only** (chmod 444)
-- To modify: Edit `supabase/config.toml.template`, then switch branches to regenerate
-- _Supabase Failures_: Run `supabase stop` (current worktree only — never `--all`) then restart
-
-### Starting the Local Stack (Self-Service)
-
-If you need to run integration tests, E2E tests, `pnpm run preflight`, or `pnpm db:migrate` and either Docker (OrbStack) or this worktree's Supabase instance is not running, **start them yourself** — don't pause to ask the user.
-
-- **OrbStack stopped?** Run `open -a OrbStack` and wait a few seconds for the daemon, then `docker info` to confirm it's up.
-- **Supabase stopped?** From the current worktree: `supabase start`. The worktree's allocated ports (in `supabase/config.toml`) are isolated from other worktrees — starting yours does not interfere with anyone else's.
-
-What you must NOT do is unchanged: never `supabase stop --all`, never `pkill`/`killall`, never stop services you didn't start. Self-service applies only to **starting** services for the current worktree, not stopping shared resources.
-
-When you stand up the stack just so you can run a test or a dev server, you can leave it running — the user can `supabase stop` (worktree-local) when they're done. Tell them in your handoff what's running and how to stop it.
-
-### Reproducing CI Failures Locally (Always Try)
-
-When CI surfaces a test failure, **always attempt to reproduce it locally before iterating fixes blind in CI**. Local repro is faster (seconds, not minutes), gives you full network/console/devtools access, and lets you pause with `--headed` to inspect DOM. Pushing speculative fixes and waiting on CI is the slow, expensive path.
-
-- Start with `pnpm exec playwright test <path/to/spec.ts:LINE> --project=chromium` (add `--headed` to watch). Match the project name CI used.
-- E2E tests sometimes share state via `beforeAll` across the same file's describe blocks. If a single-test run fails with "undefined" or missing fixtures, run the whole file (`pnpm exec playwright test <path/to/spec.ts>`) so prerequisite tests build the state.
-- For unit/integration: `pnpm test:unit -- <pattern>` or `pnpm test:integration -- <pattern>`.
-
-**If you're blocked starting the local stack** — orphan Docker containers squatting on ports, stale Supabase volumes, an unfamiliar hang, anything that the self-service section above doesn't cover — **ask the user for help instead of giving up on local repro**. They'd rather take 30 seconds to clear a port collision than wait for another CI cycle. Don't silently fall back to "let CI tell us."
-
-### Branch Management
-
-**Creating branches** — Branch work happens in a worktree, not the root checkout (see §2.2 "Root Checkout Is Read-Only"). Claude Code handles this automatically via `Agent(isolation:"worktree")`. When creating a branch manually inside a worktree, ensure proper remote tracking:
-
-- Inside the worktree: `git checkout -b feature/name` then `git push -u origin feature/name`
-- **NOT**: `git checkout -b feature/name origin/main` (tracks main, not your branch)
-- Verify: `git branch -vv` shows `[origin/feature/name]`, not `[origin/main]`
-
-**Why**: Proper tracking enables `git pull`/`git push` without arguments and prevents accidentally
-pushing to main.
-
-**Syncing with main** - Always merge, never rebase:
-
-> ⚠️ **REBASE TRAP — STOP IF YOU'RE TYPING `git rebase origin/main`** ⚠️
->
-> Rebasing a feature branch against `main` rewrites every commit's SHA, which forces a
-> force-push to update the PR. **Teammate guardrails block force-push and Tim does not
-> authorize it.** Even on a 1-commit branch, you'll lose 20+ minutes negotiating push
-> permission for a sync that should have been a normal push.
->
-> **Use `git merge origin/main` instead.** Merge commit preserves SHAs, normal push works,
-> CI re-runs against the merge commit. This is §2.2 "Merge for main sync, NEVER rebase" and it is the rule.
-
-- `git fetch origin && git merge origin/main` (preferred)
-- **NOT**: `git rebase origin/main` (rewrites history, causes issues with worktrees and PRs)
-
-**Why**: Merge commits preserve history and work cleanly with git worktrees. Rebasing
-causes conflicts across worktrees and force-push requirements on open PRs.
-
-**Casework (2026-05-15, audit-cleanup wave)**: Lead instructed 3 Wave 0 teammates to
-`git rebase origin/main` to absorb a freshly-merged audit-fix PR. All 3 teammates'
-permission layers blocked the resulting force-push (correctly — they had no transcript
-authorization). Tim granted a one-time exception. With `git merge origin/main`, each
-teammate would have done a normal `git push` and shipped without intervention.
-
-### Commit Safety
-
-- **NEVER use `--no-verify`** without explicit user permission
-- This flag bypasses pre-commit hooks (lint, format, type checks)
-- Only use when user explicitly requests it
-- Never add `gh pr merge` or broad wildcard tool patterns without explicit user approval.
-
-### CI Workflow
-
-- When investigating CI failures, check for merge conflicts FIRST:
-  `gh pr view <PR> --json mergeable,mergeStateStatus`. A `DIRTY`/`CONFLICTING`
-  state means GitHub silently skips `pull_request:synchronize` workflow runs
-  (it can't create the merge commit needed for testing). **If you push fixes
-  while in this state, CI will not run them.** Resolve the conflicts first
-  via `git fetch origin && git merge origin/main` (per our merge-don't-rebase
-  policy), then push. `pnpm run check` includes a `check:behind-main` step
-  that warns about this proactively.
-- Never push directly to protected branches (main). Always use a feature branch.
-- After code changes, run `pnpm run preflight` before considering work complete.
-  For trivial changes (comments, docs), `pnpm run check` is sufficient.
-- **Required checks for merge**: Only `CI Gate` is required by the GitHub ruleset (ruleset `6326455`). Vercel is NOT a required check. `mergeStateStatus: BLOCKED` while E2E tests are still running is normal — it unblocks automatically once `CI Gate` passes.
-- **Vercel preview migrations**: Preview deployments skip `migrate:production` entirely (exit 0). The Supabase integration triggers a redeployment with branch DB credentials, but that DB user lacks `CREATE SCHEMA` privileges. Migrations are handled by the GHA "Supabase Branch Setup" workflow instead. Production deployments still run migrations normally.
-
-### Key Commands
-
-- `pnpm run check` (**RUN OFTEN**): Fast check (types, lint, format, unit tests, yamllint, actionlint, ruff, shellcheck). ~12s.
-- `pnpm run preflight`: Full suite (check + build + integration). **Run before commit.**
-- `pnpm run smoke`: Smoke tests — Chromium + Mobile Chrome (all files), Firefox + Mobile Safari (cross-browser subset). ~60s.
-- `pnpm run db:migrate`: Apply schema changes locally.
-- `pnpm run db:backup`: Manual production data dump to `~/.pinpoint/db-backups` (verifies Supabase CLI link matches expected production project).
-- `pnpm run db:seed:from-prod`: Reset local DB and seed from the latest production backup.
-- `pnpm run e2e:full`: Full E2E suite (includes Mobile Safari by default).
-- `ruff check <file> && ruff format <file>`: Lint and format Python files (in `scripts/`). Ruff is installed globally — no venv needed.
-- `./scripts/workflow/pr-watch.py <PR>`: Watch GitHub Actions CI for a PR (Monitor-tool compatible, streams one line per event). **Always use this — never write a manual polling loop.**
-
-### Which Tests to Run (Decision Tree)
-
-1. **Changed pure logic/utils?** → `pnpm run check` (unit tests, ~12s)
-2. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (~15-30s, replace with your spec path)
-3. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
-4. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs
-5. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
-6. **NEVER** run `e2e:full` directly during iteration — that's what CI is for
-7. **Doing a final pre-review pass and want everything locally?** → `pnpm run e2e:all` (~10-15 min, runs `full` + `smoke` + root specs in **separate** Playwright invocations with a fresh `global-setup` between them so DB seed state cannot cross-contaminate)
-8. **NEVER** invoke `pnpm exec playwright test` with no arguments (no spec path, no `--config=`) — the bare command picks up every spec under `e2e/` in a single Playwright process and cross-contaminates seeded state. Targeted invocations like `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (item 2) are fine. Use `pnpm run e2e:all` if you actually want everything.
+### Process safety
 
-**Key rules for agents:**
+Only stop services you started in this session, by specific PID or via worktree-local commands (e.g. `supabase stop` inside the worktree). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
 
-- Always use `--project=chromium` for targeted runs (skip Mobile Chrome unless testing responsive)
-- Use `--headed` for debugging visual issues
-- `pnpm run check` catches 90% of issues — E2E is for integration verification, not iteration
-- If a test is flaky locally, report it — don't retry in a loop
+## 5. Workflow
 
-### Testing After Refactors
+### Key commands
 
-- After any refactor, verify that test mocks reflect the new code structure
-  (transaction wrappers, changed defaults, new parameters).
-- Update test fixtures and seed data proactively rather than waiting for CI to fail.
+| Command                               | What                                                                           |
+| :------------------------------------ | :----------------------------------------------------------------------------- |
+| `pnpm run check`                      | Fast: types, lint, format, unit, yamllint, actionlint, ruff, shellcheck (~12s) |
+| `pnpm run preflight`                  | Full: check + build + integration. **Before commit.**                          |
+| `pnpm run smoke`                      | Smoke E2E (~60s)                                                               |
+| `pnpm run e2e:full`                   | Full E2E suite                                                                 |
+| `pnpm run e2e:all`                    | Full + smoke + roots in separate Playwright invocations (~10–15 min)           |
+| `pnpm run db:migrate`                 | Apply schema changes locally                                                   |
+| `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups`                                    |
+| `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                     |
+| `ruff check && ruff format`           | Python lint/format (no venv needed)                                            |
+| `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.        |
 
-### Safe Command Patterns
+### Which tests to run
 
-- **Search**: `rg --files | rg "pattern"`, `rg -l "content" --type js`
-- **Discovery**: `fd "*.js"`, `fd --type f --changed-within 1day`
-- **Repository**: `git ls-files | grep "\.js$"`
+1. Docs, hooks, config, or other non-source changes → `pnpm run check` is enough (~12s)
+2. Pure logic / utils → `pnpm run check` (~12s)
+3. Single E2E spec → `pnpm exec playwright test e2e/path/file.spec.ts --project=chromium` (~15–30s)
+4. UI components / forms → `pnpm run smoke`
+5. Auth / permissions / middleware → `pnpm run smoke` + targeted specs
+6. DB schema / migrations → `pnpm run preflight`
+7. Final pre-review sweep → `pnpm run e2e:all`
 
-### Deployment Infrastructure
+**Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state. **Never** run `e2e:full` during iteration (that's what CI is for). Always use `--project=chromium` for targeted runs; `--headed` to debug visually. Report flaky tests; don't retry in a loop.
 
-- **Vercel Migrations**: Automatically runs `pnpm run migrate:production` on build.
-  - _Fix Stuck Migration_: `POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <migration_number>`
-- **Supabase Projects**:
-  - `pinpoint-prod` (Live, Pro plan) - **Real user data. STRICT SAFETY.** Daily backups with 7-day retention.
-  - Preview branches are auto-created per PR via Supabase GitHub integration.
-- **Preview Deployments (Supabase Branching)**:
-  - **Default**: PRs do NOT get a usable Supabase branch DB (saves ~$0.32/day per branch).
-  - **To enable**: Add the `preview` label to the PR. Within ~5 min, the `Supabase Branch Setup`
-    GHA workflow runs Drizzle migrations + seed; the Vercel preview becomes functional.
-  - **Cleanup**: The `Supabase Branch Cleanup` cron (every 6h, also manually triggerable) deletes
-    branch DBs for PRs that no longer have `preview` or whose PR is closed.
-  - The Supabase Vercel Marketplace integration still auto-creates the branch DB on PR open, but
-    no migrations/seed run unless `preview` is labeled — making it non-functional by default.
-  - Env var fallbacks in `server.ts`/`middleware.ts` handle both PinPoint and integration naming conventions.
-  - Cost model: ~$4.50/day (14 open PRs, all branches) → ~$1/day (3 labeled PRs) typical.
-- **Database Safety**:
-  - Local: `db:reset` allowed.
-  - Prod: **NEVER** `db:reset`. ONLY `db:migrate`.
-- **Connection Requirements**:
-  - **Session Pooler (IPv4)**: Use `POSTGRES_URL` (port `:6543`) for external connections. The `POSTGRES_URL_NON_POOLING` (port `:5432`) uses IPv6 which may be unreachable from some environments.
-  - Format: `postgresql://postgres.[project-ref]:password@aws-0-us-east-2.pooler.supabase.com:6543/postgres`
+### Reproducing CI failures locally
 
-### Migration Conflict Resolution
+Always try local first — seconds vs minutes, full devtools. If a single-test run fails with missing fixtures, run the whole file (E2E specs share state across describe blocks via `beforeAll`).
 
-**CRITICAL RULE: NEVER MANUALLY RESOLVE `drizzle/meta` CONFLICTS.**
-The `drizzle/meta` folder contains binary-like snapshots of the schema. Manual resolution (e.g., accepting "both" or editing JSON files) leads to corruption and snapshot collisions.
+### Branches
 
-**Protocol: If `drizzle/meta` conflicts on merge/pull:**
+- **Create inside a worktree**: `git checkout -b feature/name && git push -u origin feature/name`. Verify with `git branch -vv` shows `[origin/feature/name]`, not `[origin/main]`. Never push to `main`.
+- **Sync with merge, never rebase**: `git fetch origin && git merge origin/main`. Rebase rewrites SHAs → force-push → teammate guardrails block → ~30 min lost negotiating push permission. Always merge. (Casework: PP audit-cleanup wave 2026-05-15.)
 
-1.  **Accept Incoming**: Take the upstream version of `drizzle/meta` (theirs).
-2.  **Delete Local**: Delete your local migration files (`.sql` and `snapshot.json`).
-3.  **Regenerate**: Run `pnpm db:generate`. Drizzle will create a fresh migration on top of the new upstream state.
+### CI
 
-**Why this works**: Drizzle regenerates consistent meta files (prevId chain, journal idx).
-Eliminates manual JSON surgery and uncertainty.
+- **Check for conflicts first**: `gh pr view <PR> --json mergeable,mergeStateStatus`. `DIRTY`/`CONFLICTING` means GitHub silently skips workflow runs until you resolve. `pnpm run check` includes a `check:behind-main` warning.
+- **Required check**: only `CI Gate` (ruleset `6326455`). Vercel is not required. `BLOCKED` while E2E is still running is normal.
+- **Vercel preview migrations**: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The `Supabase Branch Setup` GHA workflow handles migrations on labeled previews. Production deploys still migrate.
 
-**Snapshot Verification**:
-Before merging any PR involving migrations, ensure that:
+### Migration conflicts
 
-1.  Every new `.sql` file has a corresponding `_snapshot.json` in `drizzle/meta`.
-2.  `pnpm db:generate` runs locally without error (outputs "No schema changes").
+Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the prevId chain.
 
-When merging branches with competing migrations (both created same number):
+**Protocol when meta conflicts on merge:**
 
-**Regeneration Protocol** (Standard):
+1. Take upstream's `drizzle/meta` (theirs).
+2. Delete your migration files (`.sql` + `_snapshot.json`).
+3. Resolve `schema.ts` manually.
+4. `pnpm db:generate` — Drizzle regenerates a fresh migration.
+5. Compare the new SQL to what you deleted; confirm intent preserved.
+6. `pnpm db:reset` to verify.
 
-1. **Accept incoming** (main's migrations) - Keep main's SQL and meta files
-2. **Delete your migration files** - Remove conflicted `000N_*.sql` and `drizzle/meta/000N_snapshot.json`
-3. **Resolve schema.ts** - Manually merge both sets of changes
-4. **Regenerate**: `pnpm db:generate` creates fresh migration with correct number
-5. **Verify SQL** - Compare new SQL to deleted SQL, confirm intent preserved
-6. **Test**: `pnpm db:reset` to rebuild from scratch
+Before merging any migration PR: every new `.sql` has a matching `_snapshot.json`; `pnpm db:generate` reports "No schema changes".
 
-### GitHub Copilot Reviews
+### Copilot reviews
 
-Full protocol lives in the `pinpoint-pr-workflow` skill (Phase 3). Summary:
+Full protocol: `pinpoint-pr-workflow` skill (Phase 3). Summary:
 
-1. Read unresolved comments via MCP:
-   `mcp__github__pull_request_read(method: "get_review_comments", owner, repo, pullNumber, perPage: 100)`
-   Filter to threads where first comment's `author.login` is `copilot-pull-request-reviewer` or `copilot-pull-request-reviewer[bot]`.
-2. Fix the code, or decide to decline with justification.
-3. **Applied suggestions**: Copilot auto-resolves the thread when it detects your fix commit — no action needed.
-4. **Declined suggestions**: reply via `mcp__github__add_reply_to_pull_request_comment`, then resolve via `mcp__github__pull_request_review_write(method: "resolve_thread", threadId)`.
+1. Read unresolved comments via `mcp__github__pull_request_read(method: "get_review_comments", …)`. Filter `author.login` = `copilot-pull-request-reviewer[bot]`.
+2. Fix the code, OR decline with a one-sentence reply (`add_reply_to_pull_request_comment`) and resolve the thread (`pull_request_review_write(method: "resolve_thread")`).
+3. Applied suggestions auto-resolve when Copilot detects the fix commit.
+4. Sign replies with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). Declined comments must get a reply — no silent ignores.
 
-Sign replies with your agent name (`—Gemini`, `—Antigravity`, `—Claude`, `—Codex`, etc.).
+### Parallel subagent work
 
-**Rules:**
+Use worktree-isolated subagents for independent tasks. Tool-specific dispatch, hooks, and known bugs live in your tool's instructions file. Full multi-tool workflow: `pinpoint-orchestrator` skill.
 
-- Declined comments must get a reply explaining why — no silent ignores
-- Keep replies to one sentence
-- If Copilot is wrong, say why (helps future reviews)
+### Safe command patterns
 
-### Parallel Subagent Workflow
+- Search: `rg --files | rg "pattern"`, `rg -l "content" --type js`
+- Discovery: `fd "*.js"`, `fd --type f --changed-within 1day`
 
-For multiple independent tasks, use worktree-isolated subagents.
+## 6. Deployment
 
-**Primary**: Standalone subagents with `isolation: "worktree"` + `run_in_background: true`. Use `resume` for follow-up (Copilot comments, CI fixes). The `post-checkout` hook automatically allocates ports and generates configs.
+### Supabase
 
-**Fallback**: Agent Teams for bidirectional real-time communication. Note: `isolation: "worktree"` is broken when `team_name` is set — teammates land in the lead's repo. Create worktrees manually with `git worktree add`.
+- **`pinpoint-prod`** (Live, Pro plan): **real user data — strict safety.** Daily backups, 7-day retention.
+- **Local**: `db:reset` OK. **Prod: NEVER `db:reset`. Only `db:migrate`.**
+- **Connection**: use `POSTGRES_URL` (port `:6543`, session pooler, IPv4). `POSTGRES_URL_NON_POOLING` (`:5432`) is IPv6 and often unreachable.
+  Format: `postgresql://postgres.[ref]:password@aws-0-us-east-2.pooler.supabase.com:6543/postgres`
 
-**Quality Enforcement**:
+### Vercel
 
-- **Standalone subagents**: Self-enforced via prompt instructions (`pnpm run check` before returning). Hooks don't fire.
-- **Agent Teams**: `TaskCompleted` hook runs `pnpm run check`; `TeammateIdle` hook blocks unpushed commits. Requires `isolation: "worktree"` for correct CWD (broken — see above).
+- Vercel runs `pnpm run migrate:production` on build (production only).
+- Stuck migration fix: `POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`.
 
-**Anti-patterns**:
+### Preview deployments (Supabase branching)
 
-- DON'T use Agent Teams as default — standalone subagents have working worktree isolation
-- DON'T forget to check Copilot comments before merging
-- DON'T dispatch `Agent(isolation: "worktree")` from a linked (non-primary) worktree — see "Worktree Dispatch Safety" in CLAUDE.md (bug #47548, WorktreeCreate hook cannot fix this)
-- DON'T fire N+ `Agent(isolation: "worktree")` calls without the WorktreeCreate hook active — with the hook any N is safe from the main worktree (flock serializes); without it, serialize to N=1-per-message
+- Default: PRs do **not** get a usable branch DB (saves ~$0.32/day/branch).
+- Enable: add the `preview` label. Within ~5 min, `Supabase Branch Setup` GHA runs Drizzle migrations + seed.
+- Cleanup: `Supabase Branch Cleanup` cron runs every 6h.
+- Env var fallbacks in `server.ts`/`middleware.ts` cover both PinPoint and integration naming.
 
-See `pinpoint-orchestrator` skill for the full workflow and known-bug details.
+## 7. Documentation
 
-### Claude in Web Candidates
+Actionable, "what" and "how" only. Skills carry the deep dives.
 
-Some work is well-suited for Claude in Web — the cloud session that runs in a browser-based environment without local Supabase, dev server, or interactive debugging. Tag those issues with the `web-ready` label so they're easy to discover and dispatch.
+**Canonical specs are authoritative** — particularly `pinpoint-design-bible` (§5 page archetypes, §17 modal archetypes). When implementation changes UI behavior covered there, **edit the spec in place**. Don't append divergence notes or "TODO: spec out of date" disclaimers. If you find one, fold it into canonical text and delete it. Dated artifacts in `docs/superpowers/specs/` are records — leave them alone.
 
-> Commands below use `bd` (the [beads](https://github.com/timothyfroehlich/beads) issue tracker that PinPoint uses for task management — the full command reference is loaded at session start via the `bd prime` hook). `<id>` refers to a beads issue ID like `PP-3or`.
+## 8. Landing the plane
 
-**Triage gates — all must pass before tagging `web-ready`:**
+Work is not complete until `git push` succeeds.
 
-1. **Decision-closed.** No open architecture questions, no "discuss with user", no TBDs in design notes.
-2. **Scope-pinned.** Specific files or unambiguous instructions (e.g., "rename X to Y wherever it appears"). Acceptance criteria writable as test cases.
-3. **UI gate.** No UI, or only mechanical UI (rename, prop rewire, copy change, icon swap, delete dead element). Excludes work where "does this look right?" matters.
-4. **Test gate.** Pure unit (`pnpm run check`) **or** integration/E2E that runs in CI against the auto-provisioned Supabase branch DB. The verification plan must say "CI passing is sufficient" — no local stack iteration required.
-5. **Self-contained.** No cross-PR coordination, no dependency on an open PR.
+1. File issues for follow-ups.
+2. Update issue status.
+3. `git pull --rebase && git push`. `git status` must show "up to date with origin".
+4. Hand off context for the next session.
 
-**Workflow:**
-
-- Tag during grooming: `bd label add web-ready <id>` and append a one-line note explaining the fit (e.g., "Web-ready: unit tests, single-file scope").
-- If a fixable gate fails (missing acceptance criteria, undecided UI, etc.), leave a note describing the gap instead of tagging — surface for refinement.
-- Discover candidates: `bd query "label=web-ready AND status=open"` (combine with `--priority-max` to prioritize).
-- After Claude in Web ships a PR, treat it like any other agent PR: Copilot review, CI, ready-for-review label, then user merges.
-
-**On Supabase branching:** every PR auto-provisions a branch DB with migrations + seed via the `Supabase Branch Setup` workflow. Claude in Web never touches local Supabase — CI exercises the integration path.
-
-## 5. Documentation Philosophy
-
-- Actionable information only - focus on "what" and "how", not "why"
-- Designed for efficient LLM consumption
-- Skills provide deep dives on-demand
-
-### Keeping specs aligned
-
-When you change UI behavior covered by a living canonical spec — specifically
-`.agent/skills/pinpoint-design-bible/SKILL.md` (page/modal archetypes live inside as §5 and §17) — **edit those documents in place**.
-Do not append a "divergence note", "TODO: spec out of date", or end-of-file disclaimer
-describing how the implementation now differs.
-
-Historical dated artifacts (e.g., `docs/superpowers/specs/<date>-*.md`) are NOT subject to
-this rule — they are design records that should be left as-is.
-
-If you find an existing divergence note in a canonical spec while making changes, fold its
-content back into the canonical text and delete the note. Canonical spec docs are the single
-source of truth; if implementation has drifted, the fix is to update the spec, not annotate
-the drift.
-
-## Landing the Plane (Session Completion)
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-> **Note**: The `TeammateIdle` hook now enforces push-before-idle automatically for teammates.
-> The manual checklist below applies to the lead agent and solo sessions.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Update issue status** - Close finished work, update in-progress items
-3. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-4. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+Never say "ready to push when you are" — you push.

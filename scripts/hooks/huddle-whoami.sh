@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
-# huddle-whoami.sh — look up or register the current Claude session's huddle name
+# shellcheck disable=SC2250  # unbraced $vars are consistent throughout this codebase
+# shellcheck disable=SC2310  # discover_session_id is best-effort; `|| …` fallbacks are intentional
+# huddle-whoami.sh — look up or register the current session's huddle name
 #
-# Identity is keyed by Claude Code's session_id (a UUID). Names live in a single
-# JSON map at <main-worktree>/.claude/huddle/session-names.json so every session
-# can be inspected/edited from one place and the mapping persists across
-# restarts. See huddle-lib.sh for the state-dir resolver.
+# Harness-agnostic. Identity is keyed by the agent's session_id (a UUID
+# supplied by the harness — Claude Code's session_id, Antigravity's
+# conversationId, etc.). Names live in a single JSON map at
+# <main-worktree>/.agents/huddle/session-names.json so every session can be
+# inspected/edited from one place and the mapping persists across restarts.
+# See huddle-lib.sh for the state-dir resolver.
+#
+# Names should embed the harness as a prefix (e.g. `Claude-DesignBible`,
+# `Antigravity-AgentsMdCleanup`, `Codex-TestAudit`) so Tim can recognize
+# which agent stack each parallel session belongs to. The huddle self-filter
+# uses the full registered name when matching `—<name>` sign-offs.
 #
 # Subcommands:
 #   whoami [SESSION_ID]      Print the registered name for SESSION_ID (or the
@@ -14,15 +23,17 @@
 #                            If SESSION_ID is omitted, uses the discovered one.
 #   list                     Dump all session_id → name pairs (sorted by name).
 #   discover                 Print the best-guess session_id of the calling
-#                            shell (heuristic; see WARNING below).
+#                            shell (Claude Code only; see WARNING below).
 #
-# WARNING — session_id discovery is best-effort. Claude Code stores transcripts
-# at ~/.claude/projects/<mangled-root>/<session_id>.jsonl, shared across all
-# worktrees of the same project. When multiple sessions are active simultaneously,
-# `ls -t` to pick "newest" is racy. Agents should learn their session_id
-# explicitly (e.g. via a one-time diagnostic dump of UserPromptSubmit stdin)
-# and pass it as an argument. The discover heuristic is provided as a
-# convenience fallback only.
+# WARNING — session_id discovery is a Claude-Code-specific best-effort
+# heuristic. It reads ~/.claude/projects/<mangled-root>/<session_id>.jsonl,
+# the transcript location Claude Code uses. Other harnesses (Antigravity,
+# Codex, etc.) do not write transcripts there and MUST pass session_id
+# explicitly — their bootstrap shims already do (see
+# .agents/hooks/agy-beads-bootstrap.cjs). Even within Claude Code the
+# heuristic is racy when multiple sessions are active; agents should learn
+# their session_id from the SessionStart hook payload and pass it explicitly.
+# The discover heuristic is a convenience fallback only.
 
 set -euo pipefail
 

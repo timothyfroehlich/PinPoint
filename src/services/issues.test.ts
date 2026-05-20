@@ -247,6 +247,103 @@ describe("Issue Service", () => {
       // Only the issue insert should have been called — no issueWatchers insert
       expect(mockDb.insert).toHaveBeenCalledTimes(1);
     });
+
+    it("extracts mention IDs from description and dispatches a 'mentioned' notification", async () => {
+      // Locks in the wiring that the deleted rich-text E2E used to cover:
+      // createIssue must extract mention IDs from the ProseMirror description
+      // and pass them as additionalRecipientIds with includeActor: false.
+      const description: ProseMirrorDoc = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "Hey " },
+              {
+                type: "mention",
+                attrs: { id: "mention-user-1", label: "Alice" },
+              },
+              { type: "text", text: " and " },
+              {
+                type: "mention",
+                attrs: { id: "mention-user-2", label: "Bob" },
+              },
+            ],
+          },
+        ],
+      };
+      const params = {
+        title: "Issue with Mentions",
+        description,
+        machineInitials: "MM",
+        severity: "minor" as const,
+        reportedBy: "reporter-1",
+      };
+
+      const mockIssue = { id: "issue-mention", ...params, issueNumber: 5 };
+      const mockMachineUpdate = {
+        nextIssueNumber: 6,
+        name: "Test Machine",
+        ownerId: "owner-1",
+      };
+
+      mockDb.update.mockReturnValueOnce(mockUpdateReturning(mockMachineUpdate));
+      mockDb.insert.mockReturnValueOnce(mockInsertReturning(mockIssue));
+
+      await createIssue(params);
+
+      expect(createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "mentioned",
+          resourceId: "issue-mention",
+          resourceType: "issue",
+          actorId: "reporter-1",
+          includeActor: false,
+          additionalRecipientIds: ["mention-user-1", "mention-user-2"],
+          formattedIssueId: "MM-05",
+        }),
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
+    it("does not dispatch a 'mentioned' notification when description has no mentions", async () => {
+      const description: ProseMirrorDoc = {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "No mentions here" }],
+          },
+        ],
+      };
+      const params = {
+        title: "Plain Issue",
+        description,
+        machineInitials: "MM",
+        severity: "minor" as const,
+        reportedBy: "reporter-1",
+      };
+
+      const mockIssue = { id: "issue-plain", ...params, issueNumber: 7 };
+      mockDb.update.mockReturnValueOnce(
+        mockUpdateReturning({
+          nextIssueNumber: 8,
+          name: "Test Machine",
+          ownerId: "owner-1",
+        })
+      );
+      mockDb.insert.mockReturnValueOnce(mockInsertReturning(mockIssue));
+
+      await createIssue(params);
+
+      const mentionCalls = (
+        createNotification as unknown as ReturnType<typeof vi.fn>
+      ).mock.calls.filter(
+        ([payload]) => (payload as { type?: string }).type === "mentioned"
+      );
+      expect(mentionCalls).toHaveLength(0);
+    });
   });
 
   describe("addIssueComment", () => {

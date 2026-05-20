@@ -5,8 +5,10 @@ trigger: always_on
 
 # PinPoint Non‑Negotiables
 
-**Last Updated**: November 25, 2025
-**Version**: 2.0 (Greenfield)
+**Last Updated**: 2026-05-19
+**Version**: 2.1 (Catalog gaps filled; root NON_NEGOTIABLES.md removed and folded in)
+
+> **Sync contract**: `AGENTS.md` §2.1 is a one-line index of these rules. Every §2.1 entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
 
 ## Overview
 
@@ -18,22 +20,24 @@ trigger: always_on
 
 ## Quick Start Checklist
 
-1. Import reusable types from `~/lib/types`; do not duplicate types
-2. Keep DB types (snake_case) in schema; convert to camelCase at boundaries
-3. Use Supabase SSR wrapper `~/lib/supabase/server`, call `auth.getUser()` immediately
-4. Ensure Next.js middleware for Supabase SSR token refresh is present
-5. Use database trigger for auto-profile creation (OAuth-proof, atomic)
-6. Wrap server data access with React 19 `cache()` to prevent duplicate queries
-7. Use `~/` path aliases, avoid deep relative imports
-8. Never use `any`, non‑null `!`, or unsafe `as`; write proper type guards
-9. Default to Server Components, minimal Client Components
+1. Import reusable types from `~/lib/types`; do not duplicate types (CORE-TS-001/002)
+2. Keep DB types (snake_case) in schema; convert to camelCase at boundaries (CORE-TS-003/004)
+3. Use Supabase SSR wrapper `~/lib/supabase/server`, call `auth.getUser()` immediately (CORE-SSR-001/002)
+4. Ensure Next.js middleware for Supabase SSR token refresh is present (CORE-SSR-003)
+5. Use database trigger for auto-profile creation (OAuth-proof, atomic) (CORE-SSR-006)
+6. Wrap server data access with React 19 `cache()` (CORE-PERF-001)
+7. Use `~/` path aliases, avoid deep relative imports (CORE-TS-008)
+8. Never use `any`, non-null `!`, or unsafe `as` (CORE-TS-007)
+9. Default to Server Components, minimal Client Components (CORE-ARCH-001)
 10. Map data to minimal shapes before passing to Client Components (CORE-SEC-006)
-11. Forms work without JavaScript (progressive enhancement)
-12. Use Drizzle migrations for schema changes (no ad-hoc `push` to production/preview)
-13. Keep auth host consistent: use `localhost` everywhere (Supabase site_url, Next dev, Playwright baseURL) to prevent cookie host mismatches
-14. E2E interaction coverage: if you add a clickable element, click it in a test
-15. Email addresses never displayed outside admin views and user's own settings page
-16. Permissions matrix (`matrix.ts`) must match actual server action enforcement (CORE-ARCH-008)
+11. Forms work without JavaScript (CORE-ARCH-002)
+12. Drizzle migrations only — no `drizzle-kit push` (CORE-ARCH-009)
+13. Use `localhost`, never `127.0.0.1`, for local URLs (CORE-SEC-008)
+14. Pick the cheapest test layer that catches the bug class (CORE-TEST-005)
+15. Email addresses never displayed outside admin / settings (CORE-SEC-007)
+16. Permissions go through `checkPermission()`; matrix must match enforcement (CORE-ARCH-008)
+17. Mock third-party SDKs at their boundary; no live external services in E2E (CORE-TEST-006)
+18. Rule of Three before abstracting (CORE-ARCH-010)
 
 ---
 
@@ -80,6 +84,20 @@ trigger: always_on
 - **Why:** Prevents inference errors, clarifies APIs
 - **Do:** Add return types to public functions and exported utilities
 - **Don't:** Rely on inference for complex signatures
+
+**CORE-TS-007:** No TypeScript safety escapes
+
+- **Severity:** Critical
+- **Why:** `any`, non-null `!`, and unsafe `as` defeat ts-strictest and hide real bugs
+- **Do:** Use proper type guards, narrowing, and Zod-validated shapes. Reach for `unknown` + a guard instead of `any`.
+- **Don't:** Use `any`, non-null assertions (`x!`), or unsafe casts (`as Foo`) to silence the type checker
+
+**CORE-TS-008:** Always use `~/` path aliases
+
+- **Severity:** Required
+- **Why:** Deep relative imports (`../../../lib/foo`) break under file moves and obscure module boundaries
+- **Do:** Import from `~/` (e.g. `import { foo } from "~/lib/foo"`)
+- **Don't:** Use `../../..` or longer relative paths for cross-feature imports
 
 ---
 
@@ -190,6 +208,13 @@ trigger: always_on
 - **Do:** Use name hierarchy: `reportedByUser.name` → `invitedReporter.name` → `reporterName` → `"Anonymous"`
 - **Don't:** Fall back to `reporterEmail` in any UI, timeline event, seed data, or client-serialized response
 
+**CORE-SEC-008:** Use `localhost`, never `127.0.0.1`, for local dev URLs
+
+- **Severity:** Critical
+- **Why:** Browser cookies set on `localhost` are not sent to `127.0.0.1`. Mixing the two across Supabase site URL, Next.js dev server, and Playwright `baseURL` breaks SSR auth — Server Actions see anonymous users after a successful login.
+- **Do:** Use `localhost` in `supabase/config.toml`, `.env*`, Playwright `baseURL`, health-check scripts, and any local HTTP endpoint.
+- **Don't:** Use `127.0.0.1:NNNN` for any local URL agents or the dev stack will read. CSP rules and validation checks that intentionally cover both forms are the only exception.
+
 ---
 
 ## Performance & Caching
@@ -247,6 +272,13 @@ trigger: always_on
 - **Do:** Every clickable user-facing element must be exercised by at least one test that actually invokes its handler. Pick the layer by bug class: multi-step journeys → E2E; Server Action wiring / permissions / DB queries → integration (PGlite + direct action call); pure form-state / UI logic → RTL unit.
 - **Don't:** Only assert `toBeVisible()` without testing the interaction. Also don't reflexively write E2E for every clickable — integration or RTL is usually faster and more thorough for class-B / E / I bugs.
 
+**CORE-TEST-006:** Test what we own (class-J)
+
+- **Severity:** Critical
+- **Why:** Synthesizing a third party's internal state (raw writes to `auth.identities`, OAuth handshake fakes, captcha-verification mocks, email-template regex extraction) means you're testing the third party, not PinPoint. Any production third-party hostname reachable from an E2E run can also exfiltrate test data or hit real rate limits.
+- **Do:** Mock third-party SDKs at their boundary (`fetch` inside `src/lib/<sdk>/*.ts`, with a matching `*.test.ts`). Cover PinPoint's contribution with unit tests; cover "renders without 500" with smoke. Reserve integration/E2E for the contracted public API of owned services (Mailpit, PGlite, local Supabase including local Storage).
+- **Don't:** Drive live Discord webhooks, real OAuth provider redirects, vendor email templates, or any production third-party endpoint from an E2E spec. Two-layer self-check before merging: (1) `rg 'https?://' e2e/path/spec.ts` returns only `localhost`/`127.0.0.1`/owned-domain hits; (2) any production URL reached indirectly via server actions lives inside an SDK client module with a `*.test.ts` mocking `fetch`. Casework: PP-e20, PP-uc8, PP-q9r.
+
 ---
 
 ## Architecture
@@ -299,9 +331,23 @@ trigger: always_on
 **CORE-ARCH-008:** Permissions matrix must match server action enforcement
 
 - **Severity:** Critical
-- **Why:** The help page (`/help/permissions`) is auto-generated from `src/lib/permissions/matrix.ts`. If the matrix drifts from what server actions actually enforce, users see incorrect capability information.
+- **Why:** The help page (`/help/permissions`) is auto-generated from `src/lib/permissions/matrix.ts`. If the matrix drifts from what server actions actually enforce, users see incorrect capability information. All permission checks MUST go through `checkPermission()` from `~/lib/permissions/helpers`; no standalone permission functions outside `src/lib/permissions/`.
 - **Do:** When changing permission logic in server actions, update `matrix.ts` values and descriptions to match. Review both directions during PR review.
-- **Don't:** Change server action authorization checks without updating the matrix (or vice versa)
+- **Don't:** Change server action authorization checks without updating the matrix (or vice versa). Don't add permission helpers outside `src/lib/permissions/`.
+
+**CORE-ARCH-009:** Drizzle migrations only — no `drizzle-kit push`
+
+- **Severity:** Critical
+- **Why:** Production has real user data. `push` bypasses migration history, can drop columns silently, and corrupts the schema's relationship to `drizzle/meta` snapshots. Supabase migrations are disabled (`db.migrations.enabled = false`) — Drizzle is the single source of truth.
+- **Do:** Use `pnpm run db:generate` to author migrations, then `pnpm run db:migrate` to apply. Treat `drizzle/meta` snapshots as authoritative; never edit them by hand (see also `AGENTS.md` §5 Migration conflicts).
+- **Don't:** Run `drizzle-kit push` against any database (local, preview, prod). Don't use Supabase CLI migrations. Don't hand-edit `drizzle/meta/*.json`.
+
+**CORE-ARCH-010:** Rule of Three before abstracting
+
+- **Severity:** Required
+- **Why:** Premature abstractions invented for the first or second use case usually fit one of those shapes badly and force the third to bend. Pre-beta code with no scale data can't predict the right shape.
+- **Do:** Wait until you have three concrete instances before extracting a helper, hook, or service abstraction. Inline duplication is cheaper than the wrong abstraction.
+- **Don't:** Build a DAL, service layer, error hierarchy, or shared hook because you "might need it later." Don't refactor on the second duplication.
 
 ---
 
@@ -428,13 +474,14 @@ If all Yes → ship it. Perfect is the enemy of done.
 
 **Rule IDs:**
 
-- CORE‑TS‑001..006: Type system
-- CORE‑SSR‑001..006: Supabase SSR and auth
-- CORE‑SEC‑001..007: Security
+- CORE‑TS‑001..008: Type system
+- CORE‑SSR‑001..007: Supabase SSR and auth
+- CORE‑SEC‑001..008: Security
 - CORE‑PERF‑001..002: Performance
-- CORE‑TEST‑001..005: Testing
-- CORE‑ARCH‑001..008: Architecture
+- CORE‑TEST‑001..006: Testing
+- CORE‑ARCH‑001..010: Architecture (003 retired)
 - CORE‑RESP‑001..004: Responsive framework
+- CORE‑UI‑001..004: UI & styling
 
 **Cross-References:**
 
