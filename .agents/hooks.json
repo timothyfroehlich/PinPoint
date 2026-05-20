@@ -1,0 +1,12 @@
+{
+  "beads": {
+    "enabled": true,
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node hooks/agy-beads-bootstrap.cjs",
+        "timeout": 15
+      }
+    ]
+  }
+}

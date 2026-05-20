@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2250  # unbraced $vars are consistent throughout this codebase
 # huddle-poll.sh — poll PP-cvh for new coordination comments and inject them
 #
-# Fires from two registered hook events (see .claude/settings.json):
-#   - UserPromptSubmit  → always polls (no throttle env var set)
-#   - PostToolUse       → polls at most once per HUDDLE_THROTTLE_SECONDS
+# Harness-agnostic. Fires from per-harness hook configurations:
+#   - Claude Code:  UserPromptSubmit (no throttle) + PostToolUse (throttled),
+#                   registered in .claude/settings.json
+#   - Antigravity:  mid-trajectory invocation via .agents/hooks/agy-beads-bootstrap.cjs
+#   - Other harnesses: route through their own bootstrap shim
 # Outputs new comments as a system-reminder block on stdout, or nothing if
 # nothing is new (zero stdout = no injection).
 #
-# Stdin payload schema (per https://code.claude.com/docs/en/hooks):
+# Stdin payload schema (Claude Code shape; other harnesses adapt to this via
+# their bootstrap shim):
 #   UserPromptSubmit:
 #     { session_id, transcript_path, cwd, hook_event_name,
 #       permission_mode, prompt }
@@ -17,37 +21,43 @@
 # We only read session_id and transcript_path (the latter for subagent
 # detection); other fields are ignored.
 #
-# Throttle (PostToolUse only): set HUDDLE_THROTTLE_SECONDS=N in the hook
-# command line to gate the slow path to once per N seconds per worktree.
+# Throttle (slow-path harnesses only): set HUDDLE_THROTTLE_SECONDS=N in the
+# hook command line to gate the slow path to once per N seconds per worktree.
 # When unset/zero, the throttle block is skipped entirely → identical to
 # pre-throttle behavior. The fast-path skip is the dominant cost path during
 # active tool-call bursts; target wall clock <30ms (one date +%s spawn).
 #
-# Throttle marker: $CLAUDE_PROJECT_DIR/.claude/.huddle-last-poll, one line
-# of epoch seconds. Written on every slow-path entry (whether or not new
-# comments were found) — "I polled and there was nothing" is still a poll.
-# Written BEFORE the bd fetch so that bd-broken states still get backoff
-# instead of triggering one hammer per tool call.
+# Throttle marker: <project>/.agents/.huddle-last-poll, one line of epoch
+# seconds. Written on every slow-path entry (whether or not new comments
+# were found) — "I polled and there was nothing" is still a poll. Written
+# BEFORE the bd fetch so that bd-broken states still get backoff instead
+# of triggering one hammer per tool call.
 #
-# State file: <main-worktree>/.claude/huddle/last-seen-<sha256-of-worktree-root>
+# State file: <main-worktree>/.agents/huddle/last-seen-<sha256-of-worktree-root>
 #   Per-checkout cursor advancing only when new comments are injected.
-#   Shared across all linked worktrees via huddle-lib.sh's git-common-dir
-#   resolver.
+#   Shared across all linked worktrees AND all harnesses via huddle-lib.sh's
+#   git-common-dir resolver.
 #
 # Self-filter (auto, no env config required): the stdin payload carries a
 # `session_id` field. The hook looks up the agent's name from
-# <main-worktree>/.claude/huddle/session-names.json (a JSON
-# `{session_id: name}` map). Comments ending with `—Claude-<name>` or
-# `—<name>` are excluded from injection so an agent never re-sees its own
-# coordination posts. To register a session→name mapping:
+# <main-worktree>/.agents/huddle/session-names.json (a JSON
+# `{session_id: name}` map). Comments ending with `—<name>` are excluded
+# from injection so an agent never re-sees its own coordination posts.
+# Registered names should embed the harness (e.g. `Claude-DesignBible`,
+# `Antigravity-AgentsMdCleanup`); the sign-off is `—<full-name>`. For
+# backward compat the filter also accepts `—Claude-<name>` for older
+# unprefixed registrations.
+#
+# To register a session→name mapping:
 #   bash scripts/hooks/huddle-whoami.sh register <Name> <session_id>
 #
 # Backward compat: also accepts the $CLAUDE_AGENT_NAME env var (the original
-# activation scheme).
+# activation scheme); harnesses other than Claude Code should pass session_id
+# explicitly via the stdin payload and register through huddle-whoami.sh.
 #
-# Naming guidance: pick a short descriptive name based on your current work
-# (e.g. WorktreeHookFix, TestAudit, DesignBible). Full reference:
-# `.agent/skills/pinpoint-huddle/SKILL.md`.
+# Naming guidance: pick a short descriptive name prefixed with your harness
+# (e.g. Claude-WorktreeHookFix, Antigravity-TestAudit, Codex-DesignBible).
+# Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`.
 
 set -euo pipefail
 
@@ -70,10 +80,10 @@ fi
 
 # Throttle marker path (used by fast-path check and slow-path write).
 # CLAUDE_PROJECT_DIR is set by the Claude Code harness for hook invocations;
-# the fallback to $PWD is defensive (and matches the settings.json pattern
-# `bash "${CLAUDE_PROJECT_DIR:-.}"/...`).
+# other harnesses fall through to $PWD (their bootstrap shim should cd into
+# the project root before invoking, which matches Antigravity's behavior).
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
-POLL_FILE="$PROJECT_DIR/.claude/.huddle-last-poll"
+POLL_FILE="$PROJECT_DIR/.agents/.huddle-last-poll"
 
 # === FAST PATH (PostToolUse only — gated by HUDDLE_THROTTLE_SECONDS) ===
 # UserPromptSubmit calls this script without HUDDLE_THROTTLE_SECONDS set, so
@@ -122,6 +132,7 @@ except Exception:
 fi
 case "$TRANSCRIPT_PATH" in
   */subagents/*) exit 0 ;;
+  *) ;;
 esac
 
 # Mark the throttle now — we're committed to a poll. Writing the marker before
@@ -158,7 +169,7 @@ except Exception:
 fi
 
 # --- State directory resolution ---
-# Huddle state lives in <main-worktree>/.claude/huddle/ so it's shared
+# Huddle state lives in <main-worktree>/.agents/huddle/ so it's shared
 # across all linked worktrees of the same clone. huddle-lib.sh provides
 # the resolver. If we can't find a git common-dir (e.g., hook fired outside
 # any PinPoint checkout), fail open silently — coordination is optional.
