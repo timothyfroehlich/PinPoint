@@ -72,24 +72,40 @@ fi
 do_rotation() {
   set -euo pipefail
 
-  # Re-check date inside the lock (idempotency: a peer may have rotated first)
+  # Re-check date inside the lock (idempotency: a peer may have rotated first).
+  # Reserve `exit 0` for the explicit "already up to date" case below. Anything
+  # else (bd unreachable, root bead unreadable, notes corrupted) is a hard error
+  # — silently `exit 0` here would make a caller treat a broken state as
+  # "successful no-op" and skip a required rotation.
   local root_json notes_str today_bead_date today
-  root_json=$(bd show "$ROOT_ID" --json 2>/dev/null) || exit 0
-  notes_str=$(printf '%s' "$root_json" | jq -r '.[0].notes // ""' 2>/dev/null) || exit 0
+  if ! root_json=$(bd show "$ROOT_ID" --json 2>&1); then
+    printf 'huddle-rotate.sh: failed to fetch root bead %s: %s\n' "$ROOT_ID" "$root_json" >&2
+    exit 1
+  fi
+  if ! notes_str=$(printf '%s' "$root_json" | jq -r '.[0].notes // ""' 2>&1); then
+    printf 'huddle-rotate.sh: failed to parse root bead JSON: %s\n' "$notes_str" >&2
+    exit 1
+  fi
   [[ -n "$notes_str" ]] || {
     printf 'huddle-rotate.sh: root bead has no notes — was huddle-bootstrap.sh run?\n' >&2
     exit 1
   }
 
   today=$(date +%F)
-  today_bead_date=$(printf '%s' "$notes_str" | python3 -c "
+  # today_bead.date is a required field; if it's missing or parse fails, the
+  # notes JSON is corrupted and proceeding would overwrite root pointers based
+  # on an empty-string compare. Fail clearly instead.
+  if ! today_bead_date=$(printf '%s' "$notes_str" | python3 -c "
 import sys, json
-try:
-    n = json.loads(sys.stdin.read())
-    print(n.get('today_bead', {}).get('date', ''))
-except Exception:
-    print('')
-" 2>/dev/null || echo "")
+n = json.loads(sys.stdin.read())
+d = n.get('today_bead', {}).get('date', '')
+if not d:
+    raise SystemExit('today_bead.date missing or empty in root notes')
+print(d)
+" 2>&1); then
+    printf 'huddle-rotate.sh: %s\n' "$today_bead_date" >&2
+    exit 1
+  fi
 
   if [[ "$today_bead_date" == "$today" ]]; then
     # Peer already rotated — no-op, exit silently

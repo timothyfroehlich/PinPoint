@@ -173,9 +173,10 @@ Edit `.claude/settings.json` and update `HUDDLE_THROTTLE_SECONDS=180` on the Pos
 
 ## How to post coordination updates
 
-Post to today's active bead. To find today's bead ID, check what the session-start hook reported, or look up via:
+Post to today's active bead. To find today's bead ID, check what the session-start hook reported, or look up via (huddle state lives at `<main-worktree>/.agents/huddle/`, resolved via `git rev-parse --git-common-dir` — `huddle-lib.sh` itself uses the same lookup):
 
-    bd show $(jq -r '.root_bead_id' ~/.agents/huddle/config.json) --json | jq -r '.[0].notes | fromjson | .today_bead.id'
+    HUDDLE_DIR="$(dirname "$(git rev-parse --git-common-dir)")/.agents/huddle"
+    bd show "$(jq -r '.root_bead_id' "$HUDDLE_DIR/config.json")" --json | jq -r '.[0].notes | fromjson | .today_bead.id'
 
 Then post:
 

@@ -72,6 +72,18 @@ if [[ -z "$ROOT_ID" ]]; then
   printf '    bash scripts/hooks/huddle-bootstrap.sh\n'
   exit 0
 fi
+# Verify the root bead is still reachable. If it was deleted/closed/renamed
+# under us, hooks would silently stop injecting — surface a specific notice
+# so the user knows to re-bootstrap. `bd show` exits non-zero for missing IDs.
+if ! bd show "$ROOT_ID" --json >/dev/null 2>&1; then
+  printf '## ⚠️ Huddle root bead missing\n\n'
+  # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
+  printf 'config.json points at %s but `bd show %s` failed.\n' "$ROOT_ID" "$ROOT_ID"
+  printf 'The bead may have been deleted, archived, or the bd workspace moved.\n\n'
+  printf 'To rebuild:\n'
+  printf '    bash scripts/hooks/huddle-bootstrap.sh\n'
+  exit 0
+fi
 
 # Read stdin JSON (best-effort; never fail SessionStart on parse errors)
 INPUT=""
@@ -209,6 +221,15 @@ try:
 except Exception:
     print(5)
 " 2>/dev/null || echo "5")
+# Sanitize: a non-numeric value ('null', '', 'abc') from the JSON would later
+# trip `[[ "$DAILY_COUNT" -ge "$N_DAILIES" ]]` with "integer expression expected"
+# on stderr. Default to 5; clamp to [1, 20] so a bad setting can't blow up the
+# session-start output budget.
+if ! [[ "$N_DAILIES" =~ ^[0-9]+$ ]]; then
+  N_DAILIES=5
+fi
+if (( N_DAILIES < 1 )); then N_DAILIES=1; fi
+if (( N_DAILIES > 20 )); then N_DAILIES=20; fi
 
 MONTHLY_BEAD_ID=$(printf '%s' "$NOTES_STR" | python3 -c "
 import sys, json
