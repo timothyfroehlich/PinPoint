@@ -117,6 +117,34 @@ def _ci_gate_state(pr: int) -> tuple[str, str]:
     return "", ""
 
 
+def _finalize_via_ci_gate(pr: int, timeout_sec: int = 1200, poll_sec: int = 10) -> int:
+    """Anchor exit status on the CI Gate aggregate check, not the visible workflow runs.
+
+    The "any completed run with no failures" heuristic produces false greens when
+    preview-side workflows (Supabase Branch Setup) finish before the main CI
+    workflow has been queued. Wait for CI Gate to actually report a conclusion;
+    only then return 0 (success/neutral) or 1 (anything else, or timeout).
+    """
+    deadline = time.monotonic() + timeout_sec
+    last_status = ""
+    while time.monotonic() < deadline:
+        status, conclusion = _ci_gate_state(pr)
+        if status == "COMPLETED":
+            # Match run_audit's pass criteria (SUCCESS / NEUTRAL / SKIPPED) so
+            # the watcher and the audit can't disagree on the same CI Gate state.
+            if conclusion in ("SUCCESS", "NEUTRAL", "SKIPPED"):
+                emit(f"CI Gate passed (conclusion={conclusion}) ✓")
+                return 0
+            emit(f"CI Gate failed (conclusion={conclusion or 'unknown'})")
+            return 1
+        if status != last_status:
+            emit(f"CI Gate {status.lower() or 'not yet posted'} — continuing to wait")
+            last_status = status
+        time.sleep(poll_sec)
+    emit(f"CI Gate did not report within {timeout_sec}s — treat as failure")
+    return 1
+
+
 def _fetch_merge_state(pr: int) -> tuple[str, set[str]]:
     """Fetch (mergeStateStatus, labels). Retries once if state is UNKNOWN.
 
@@ -420,8 +448,10 @@ def main() -> int:
                     emit(f"Failure details: {path}")
                 emit(f"{len(failures)} failure(s) detected — check artifact for logs")
                 return 1
-            emit("All checks passed ✓")
-            return 0
+            # No active runs and no failures among completed runs — but those
+            # completed runs may just be preview-side workflows that finished
+            # before the main CI was queued. Anchor on CI Gate before exiting.
+            return _finalize_via_ci_gate(pr)
         emit(f"No runs found for current commit on PR #{pr}.")
         return 1
 
@@ -481,8 +511,11 @@ def main() -> int:
         emit(f"{len(failures)} failure(s) detected — check artifact for logs")
         return 1
 
-    emit("All checks passed ✓")
-    return 0
+    # The watched workflow runs all finished without failures. CI Gate is the
+    # aggregate that branch protection actually requires; verify it before
+    # claiming success (it may still be pending if it's posted by a separate
+    # workflow than the ones we watched).
+    return _finalize_via_ci_gate(pr)
 
 
 if __name__ == "__main__":

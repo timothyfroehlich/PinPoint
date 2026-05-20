@@ -1,27 +1,32 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2250  # unbraced $vars are consistent throughout this codebase
 # huddle-session-start.sh — SessionStart hook: announce session_id and registration state
 #
-# Fires once at session start. Reads stdin JSON for `session_id`, looks up the
-# session's registered name in <main-worktree>/.claude/huddle/session-names.json
-# (see huddle-lib.sh for the state-dir resolver), and emits a brief block via
-# stdout (which Claude Code surfaces as system context).
+# Harness-agnostic. Fires at session start from any agent harness that supports
+# SessionStart-equivalent hooks (Claude Code via .claude/settings.json,
+# Antigravity via .agents/hooks/agy-beads-bootstrap.cjs, etc.). Reads stdin JSON
+# for `session_id`, looks up the session's registered name in
+# <main-worktree>/.agents/huddle/session-names.json (see huddle-lib.sh for the
+# state-dir resolver), and emits a brief identity block on stdout which the
+# host harness surfaces as system context.
 #
 # Why this exists: agents can't reliably discover their own session_id when
-# multiple parallel sessions are active (transcripts share a directory keyed by
-# project root, and `ls -t` is racy). The SessionStart hook is the only place
-# session_id is guaranteed-correct without an external diagnostic.
+# multiple parallel sessions are active. The SessionStart hook is the only
+# place session_id is guaranteed-correct without an external diagnostic.
 #
-# Pairs with scripts/hooks/huddle-poll.sh (UserPromptSubmit) — that's the
-# new-comment injection hook; this one is just identity announcement.
+# Pairs with scripts/hooks/huddle-poll.sh — that's the new-comment injection
+# hook; this one is just identity announcement.
 #
-# Stdin payload schema (per https://code.claude.com/docs/en/hooks):
+# Stdin payload schema (Claude Code shape; other harnesses adapt to this via
+# their bootstrap shim — see .agents/hooks/agy-beads-bootstrap.cjs for the
+# Antigravity adapter):
 #   {
 #     "session_id":       "<UUID>",
 #     "transcript_path":  "<path to .jsonl>",
 #     "cwd":              "<current working dir>",
 #     "hook_event_name":  "SessionStart",
 #     "source":           "startup" | "resume" | "clear" | "compact",
-#     "model":            "<model id>",
+#     "model":            "<model id>",                       (Claude-only, optional)
 #     "agent_type":       "<name>"  (optional, when launched with --agent)
 #   }
 #
@@ -32,7 +37,7 @@
 set -euo pipefail
 
 # --- State directory resolution ---
-# See huddle-lib.sh for why state lives in <main-worktree>/.claude/huddle/.
+# See huddle-lib.sh for why state lives in <main-worktree>/.agents/huddle/.
 LIB_SCRIPT="$(dirname "$0")/huddle-lib.sh"
 if [[ ! -f "$LIB_SCRIPT" ]]; then
   exit 0
@@ -64,6 +69,7 @@ except Exception:
 fi
 case "$TRANSCRIPT_PATH" in
   */subagents/*) exit 0 ;;
+  *) ;;
 esac
 
 # --- Rotation check (stub in PR #1357; real check in follow-up rotation PR) ---
@@ -83,6 +89,8 @@ fi
 SESSION_ID=""
 SOURCE=""
 if [[ -n "$INPUT" ]]; then
+  # python3 failure is handled by the read's `|| { … }` fallback; ignore masked return.
+  # shellcheck disable=SC2312
   read -r SESSION_ID SOURCE <<<"$(
     printf '%s' "$INPUT" | python3 -c "
 import sys, json
@@ -115,30 +123,32 @@ if [[ -n "$NAME" ]]; then
   printf '## Huddle identity\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
   printf 'Your session_id: `%s`\n' "$SESSION_ID"
-  printf 'Registered as: **Claude-%s** (self-filter active for your own posts)\n\n' "$NAME"
+  printf 'Registered as: **%s** (self-filter active for your own posts)\n\n' "$NAME"
   printf 'If this scrolls out of context later, recall your name with:\n'
   printf '    bash scripts/hooks/huddle-whoami.sh whoami %s\n\n' "$SESSION_ID"
   # shellcheck disable=SC2016  # backticks are literal Markdown
-  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md`\n'
+  printf 'Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`\n'
 else
   printf '## Huddle identity — registration needed\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
   printf 'Your session_id: `%s`\n\n' "$SESSION_ID"
   printf 'You are not yet registered in the huddle self-filter map.\n\n'
   printf 'When you receive your first user prompt, derive a short descriptive name\n'
-  printf 'for yourself from what you'\''re being asked to do. The name should help Tim\n'
-  printf 'recognize at a glance what each parallel Claude is working on.\n\n'
+  printf 'for yourself from what you'\''re being asked to do, prefixed with your\n'
+  printf 'harness name so Tim can recognize at a glance which agent stack each\n'
+  printf 'parallel session belongs to.\n\n'
   printf 'Examples:\n'
-  printf '  WorktreeHookFix  fixing a worktree hook\n'
-  printf '  TestAudit        auditing test coverage\n'
-  printf '  DesignBible      working on the design bible\n'
-  printf '  DocsSync         keeping docs aligned\n\n'
-  printf 'Format: CamelCase, ASCII letters only, under ~20 chars.\n\n'
+  printf '  Claude-WorktreeHookFix       fixing a worktree hook in Claude Code\n'
+  printf '  Antigravity-AgentsMdCleanup  cleaning up AGENTS.md in Antigravity\n'
+  printf '  Codex-TestAudit              auditing test coverage in Codex\n'
+  printf '  Claude-DesignBible           working on the design bible in Claude Code\n\n'
+  printf 'Format: <Harness>-<Topic>, CamelCase, ASCII letters/digits/hyphens/underscores, under ~30 chars.\n'
+  printf 'The harness prefix lets Tim see "two Claudes and one Antigravity are running."\n\n'
   printf 'Register with:\n'
   printf '    bash scripts/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
   printf 'If the name is taken, the helper suggests variations.\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown
-  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md`\n'
+  printf 'Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`\n'
 fi
 
 exit 0
