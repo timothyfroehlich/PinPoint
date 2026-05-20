@@ -72,11 +72,12 @@ const { chain, dbMock } = vi.hoisted(() => {
     },
   };
 
-  // tx delegates to the same db.insert/update/delete so call counts are shared
+  // tx delegates to the same db.insert/update/delete/query so call counts are shared
   const txMock = {
     insert: (...args: any[]) => dbMock.insert(...args),
     update: (...args: any[]) => dbMock.update(...args),
     delete: (...args: any[]) => dbMock.delete(...args),
+    query: dbMock.query,
   };
 
   dbMock.transaction.mockImplementation((cb: (tx: any) => Promise<any>) =>
@@ -104,6 +105,7 @@ function resetChain() {
     insert: (...args: any[]) => dbMock.insert(...args),
     update: (...args: any[]) => dbMock.update(...args),
     delete: (...args: any[]) => dbMock.delete(...args),
+    query: dbMock.query,
   };
   dbMock.transaction.mockImplementation((cb: (tx: any) => Promise<any>) =>
     cb(txMock)

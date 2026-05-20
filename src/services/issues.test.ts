@@ -204,8 +204,9 @@ describe("Issue Service", () => {
 
       await createIssue(params);
 
-      // Verify two inserts were made: issue + issueWatchers (auto-watch for reporter)
-      expect(mockDb.insert).toHaveBeenCalledTimes(2);
+      // Three inserts: issue + issueWatchers (auto-watch for reporter)
+      // + timeline_events (issue_opened duplicate-write — PP-0x98 Task 10)
+      expect(mockDb.insert).toHaveBeenCalledTimes(3);
 
       expect(createNotification).toHaveBeenCalledWith(
         {
@@ -244,8 +245,9 @@ describe("Issue Service", () => {
 
       await createIssue(params);
 
-      // Only the issue insert should have been called — no issueWatchers insert
-      expect(mockDb.insert).toHaveBeenCalledTimes(1);
+      // Two inserts: issue + timeline_events (issue_opened, PP-0x98 Task 10)
+      // The watcher insert is skipped because autoWatchReporter is false.
+      expect(mockDb.insert).toHaveBeenCalledTimes(2);
     });
 
     it("extracts mention IDs from description and dispatches a 'mentioned' notification", async () => {

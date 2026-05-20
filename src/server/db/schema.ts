@@ -17,6 +17,9 @@ import { citext } from "~/server/db/citext";
 import { ISSUE_STATUS_VALUES, type IssueStatus } from "~/lib/issues/status";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { type TimelineEventData } from "~/lib/timeline/types";
+import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
+import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
+import { type TimelineTag } from "~/lib/timeline/machine-tags";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -317,6 +320,48 @@ export const issueComments = pgTable(
     systemEventDataCheck: check(
       "chk_system_event_data",
       sql`NOT ${t.isSystem} OR ${t.eventData} IS NOT NULL`
+    ),
+  })
+);
+
+/**
+ * Timeline Events Table
+ *
+ * Per-machine timeline events (notes, status changes, issue events, etc.).
+ * See `~/lib/timeline/machine-event-types` for the discriminated union of
+ * possible `event_data` payloads and `~/lib/timeline/machine-tags` for the
+ * authoritative tag list.
+ */
+export const timelineEvents = pgTable(
+  "timeline_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    machineId: uuid("machine_id").references(() => machines.id, {
+      onDelete: "cascade",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    sourceType: text("source_type").$type<TimelineEventSourceType>().notNull(),
+    tag: text("tag").$type<TimelineTag>().notNull(),
+    authorId: uuid("author_id").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+    content: jsonb("content").$type<ProseMirrorDoc>(),
+    eventData: jsonb("event_data").$type<MachineTimelineEventData>(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: uuid("deleted_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => ({
+    machineCreatedIdx: index("idx_timeline_events_machine_created").on(
+      t.machineId,
+      t.createdAt.desc()
+    ),
+    machineTagIdx: index("idx_timeline_events_machine_tag").on(
+      t.machineId,
+      t.tag
     ),
   })
 );

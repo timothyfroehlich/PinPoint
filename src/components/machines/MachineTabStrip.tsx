@@ -31,6 +31,7 @@ interface TabSpec {
 const TABS: readonly TabSpec[] = [
   { slug: "", label: "Info" },
   { slug: "maintenance", label: "Service" },
+  { slug: "timeline", label: "Timeline" },
 ] as const;
 
 export function MachineTabStrip({

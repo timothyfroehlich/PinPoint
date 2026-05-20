@@ -43,6 +43,8 @@ async function fastReset() {
       "pnpm run db:_seed",
       "pnpm run db:_seed-users",
       "pnpm run db:_seed-discord",
+      "pnpm run db:_seed-timeline-backfill",
+      "pnpm run db:_seed-timeline-demo",
     ];
     for (const cmd of seedCommands) {
       execSync(cmd, { stdio: "inherit" });

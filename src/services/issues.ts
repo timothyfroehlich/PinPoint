@@ -12,6 +12,15 @@ import {
   createTimelineEvent,
   type TimelineEventData,
 } from "~/lib/timeline/events";
+import {
+  emitIssueOpened,
+  emitIssueClosed,
+  emitIssueStatusChanged,
+  emitIssueAssigned,
+  emitIssueUnassigned,
+  emitIssueReassignedOut,
+  emitIssueReassignedIn,
+} from "~/lib/timeline/issue-timeline-helpers";
 import { createNotification, getChannels } from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
@@ -149,6 +158,7 @@ export async function createIssue({
       .set({ nextIssueNumber: sql`${machines.nextIssueNumber} + 1` })
       .where(eq(machines.initials, machineInitials))
       .returning({
+        id: machines.id,
         nextIssueNumber: machines.nextIssueNumber,
         name: machines.name,
         ownerId: machines.ownerId,
@@ -225,7 +235,36 @@ export async function createIssue({
         .onConflictDoNothing();
     }
 
-    // 5. Notifications
+    // 5. Duplicate-write `issue_opened` to machine timeline (PP-0x98)
+    //
+    // Email privacy (AGENTS.md rule 10): never persist reporter email here.
+    // Prefer the resolved user_profiles.name when `reportedBy` is set; fall
+    // back to the freeform `reporterName` (public report); finally "Anonymous".
+    let openedByName = "Anonymous";
+    if (reportedBy) {
+      const reporter = await tx.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, reportedBy),
+        columns: { name: true },
+      });
+      if (reporter) {
+        openedByName = reporter.name;
+      } else if (reporterName) {
+        openedByName = reporterName;
+      }
+    } else if (reporterName) {
+      openedByName = reporterName;
+    }
+
+    await emitIssueOpened(tx, {
+      machineId: updatedMachine.id,
+      issueId: issue.id,
+      issueNumber: issue.issueNumber,
+      openedByName,
+      title,
+      ...(reportedBy ? { actorId: reportedBy } : {}),
+    });
+
+    // 6. Notifications
     try {
       const formattedId = formatIssueId(machineInitials, issueNumber);
       const plainDescription = description
@@ -362,6 +401,36 @@ export async function updateIssueStatus({
       tx,
       userId
     );
+
+    // 2b. Duplicate-write to machine timeline (atomic with status update, PP-0x98)
+    //
+    // Email privacy (AGENTS.md rule 10): closedByName resolves from
+    // user_profiles.name, never from email. Falls back to "Unknown User" if
+    // the profile row is missing (shouldn't happen given FK from authUsers).
+    if (isClosed) {
+      const actor = await tx.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, userId),
+        columns: { name: true },
+      });
+      const closedByName = actor?.name ?? "Unknown User";
+      await emitIssueClosed(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        closedByName,
+        title: currentIssue.title,
+        ...(userId ? { actorId: userId } : {}),
+      });
+    } else {
+      await emitIssueStatusChanged(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        from: oldStatus,
+        to: status,
+        ...(userId ? { actorId: userId } : {}),
+      });
+    }
 
     log.info(
       { issueId, oldStatus, newStatus: status, action: "updateIssueStatus" },
@@ -645,6 +714,27 @@ export async function assignIssue({
       ? { type: "assigned", assigneeName }
       : { type: "unassigned" };
     await createTimelineEvent(issueId, event, tx, actorId);
+
+    // Duplicate-write to machine timeline (atomic with assignment update, PP-0x98)
+    //
+    // `assigneeName` was already resolved above (lines 639-646) from
+    // `user_profiles.name` — never from email (AGENTS.md rule 10).
+    if (assignedTo) {
+      await emitIssueAssigned(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        assigneeName,
+        ...(actorId ? { actorId } : {}),
+      });
+    } else {
+      await emitIssueUnassigned(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        ...(actorId ? { actorId } : {}),
+      });
+    }
 
     log.info(
       { issueId, assignedTo, assigneeName, action: "assignIssue" },
@@ -940,7 +1030,7 @@ export async function reassignIssueMachine({
         issueNumber: true,
       },
       with: {
-        machine: { columns: { name: true } },
+        machine: { columns: { id: true, name: true } },
       },
     });
 
@@ -960,6 +1050,7 @@ export async function reassignIssueMachine({
       .set({ nextIssueNumber: sql`${machines.nextIssueNumber} + 1` })
       .where(eq(machines.initials, newMachineInitials))
       .returning({
+        id: machines.id,
         nextIssueNumber: machines.nextIssueNumber,
         name: machines.name,
       });
@@ -996,6 +1087,27 @@ export async function reassignIssueMachine({
       tx,
       userId
     );
+
+    // Dual-write: source machine timeline gets "reassigned_out", destination
+    // gets "reassigned_in". Both rows are atomic with the issue update (same
+    // transaction → same created_at via Postgres now()).
+    await emitIssueReassignedOut(tx, {
+      machineId: currentIssue.machine.id,
+      issueId,
+      issueNumber: fromIssueNumber, // OLD number, as it existed on source
+      toMachineId: destinationMachine.id,
+      toMachineName: destinationMachine.name,
+      ...(userId ? { actorId: userId } : {}),
+    });
+
+    await emitIssueReassignedIn(tx, {
+      machineId: destinationMachine.id,
+      issueId,
+      issueNumber: newIssueNumber, // NEW number, as it now exists on destination
+      fromMachineId: currentIssue.machine.id,
+      fromMachineName: currentIssue.machine.name,
+      ...(userId ? { actorId: userId } : {}),
+    });
 
     log.info(
       {
