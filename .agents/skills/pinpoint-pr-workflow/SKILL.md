@@ -274,6 +274,29 @@ gh pr merge <PR> --squash
 
 The sentinel is single-use — deleted on the next merge attempt. Document in commit message WHY you bypassed.
 
+### 4.5 Dependabot PRs: rebase before merging back-to-back
+
+When two or more Dependabot PRs that both touch `pnpm-lock.yaml` (or any lockfile) are open simultaneously, merging them in succession without rebasing the second-and-later PRs can silently break the lockfile.
+
+**The trap:** each Dependabot PR's lockfile diff adds entries in slightly different alphabetical zones based on its own snapshot of main. After the first PR merges, git's textual three-way merge of the second PR doesn't see a conflict because the additions live in non-overlapping line ranges — but both PRs may add the _same_ transitive dep (e.g., `brace-expansion@5.0.6`). The squash-merge produces a lockfile with a duplicated mapping key, which `pnpm install --frozen-lockfile` rejects with `ERR_PNPM_BROKEN_LOCKFILE`. Every new PR's `Setup Dependencies` then fails until main is fixed.
+
+**Why `rebase-strategy: auto` in `.github/dependabot.yml` doesn't save you:** "auto" means Dependabot rebases when _the dependency version_ is out of date, not when _the lockfile region_ has shifted under it. Two independent Dependabot PRs against the same main can both stay "current" by Dependabot's definition while their lockfile diffs collide on merge.
+
+**Rule:** when merging the first of two or more Dependabot PRs that both touch a lockfile, comment `@dependabot rebase` on each remaining Dependabot PR before merging it. Dependabot regenerates the lockfile against post-first-merge main and the duplicate is deduped automatically. Wait for the rebased CI to pass before invoking `merge-pr.sh` on the second PR.
+
+**Casework:** 2026-05-19 — PRs #1379 and #1381 each added `brace-expansion@5.0.6:` to `packages:` independently. Both merged within ~1 minute. Main's `Setup Dependencies` broke until a manual dedup of `pnpm-lock.yaml` was bundled into PR #1383 alongside that PR's primary E2E locator fix.
+
+**Quick triage check before merging the second of two open Dependabot PRs:**
+
+```bash
+# How many commits is the PR's branch behind origin/main?
+# behind_by > 0 means the PR's lockfile snapshot predates current main.
+pr_branch=$(gh pr view <second_pr> --json headRefName --jq .headRefName)
+gh api "repos/{owner}/{repo}/compare/main...$pr_branch" --jq '.behind_by'
+```
+
+If `behind_by > 0`, comment `@dependabot rebase` on the PR and wait for the rebased CI to pass before invoking `merge-pr.sh`. Do not use `gh pr view --json baseRefOid` for this — `baseRefOid` is the base branch's current SHA at query time, so it always equals `origin/main` and cannot detect a stale PR head.
+
 ---
 
 ## MCP gotchas reference
