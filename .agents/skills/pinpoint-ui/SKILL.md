@@ -28,6 +28,81 @@ Use this skill when:
 5. **Dropdown Server Actions**: Use `onSelect`, not forms
 6. **Tailwind CSS v4 + semantic tokens**: Use `bg-primary`, `text-destructive`, etc. — no raw palette classes (`bg-cyan-500`, `text-red-500`) and no hardcoded hex
 7. **TooltipProvider is hoisted**: `<TooltipProvider>` is mounted once in `ClientProviders` — don't add nested providers. See `pinpoint-design-bible` §12.
+8. **Baseline Widely available is the floor** (CORE-UI-005): use `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, native form validation directly — no polyfills. Newly-available features (Popover API, View Transitions, anchor positioning) require a per-feature opt-in in `pinpoint-design-bible` §19. See **Browser Support** section below.
+9. **Form correctness** (CORE-FORM-001..006): right `type`, correct `autocomplete` token, `:user-invalid` styling, `aria-invalid` blur sync, visible required-field indicator, `enterkeyhint` on sequential mobile fields. See **Form Correctness** below.
+10. **Accessibility floor** (CORE-A11Y-001..006): skip link, `motion-reduce:` paired with animations, semantic `<table>` markup, real `<button>` (no `<div role="button">`), `title` is not a tooltip, `inert` background on modals. See **Accessibility** below.
+
+## Browser Support
+
+PinPoint targets **Baseline Widely available** — features cross-browser for ~2.5 years and safe without fallbacks. This is the canonical floor (CORE-UI-005); see `pinpoint-design-bible` §19 for the policy.
+
+### In-scope today (reach for these directly)
+
+| Feature                              | Baseline since |
+| :----------------------------------- | :------------- |
+| `<dialog>` + `.showModal()`          | Mar 2023       |
+| Container queries (`@container`)     | Feb 2023       |
+| `:has()`                             | Dec 2023       |
+| `:user-valid` / `:user-invalid`      | Nov 2023       |
+| `inert` attribute                    | Mar 2022       |
+| `aspect-ratio`                       | Mar 2021       |
+| `accent-color`                       | May 2022       |
+| `fetchpriority` (img/script/link)    | Sep 2023       |
+| CSS subgrid                          | Sep 2023       |
+| `gap` on flexbox                     | Apr 2021       |
+| `prefers-reduced-motion` (CSS query) | Jul 2020       |
+| `focus-visible`                      | Mar 2022       |
+| Native form validation + `required`  | (pre-Baseline) |
+| `enterkeyhint` attribute             | Dec 2021       |
+| Logical properties (`inline-start`)  | Mar 2023       |
+
+### Newly available — defer unless opted in
+
+Popover API (`popover="auto"`), View Transitions, anchor positioning, scroll-driven animations, `text-wrap: balance` mid-adoption, `interestfor`, the `closedby` attribute on `<dialog>`. These ship behind a per-feature opt-in documented in the design bible.
+
+### How to check a feature's status
+
+The Google Chrome `modern-web-guidance` catalog tags each guide with its Baseline status. Search the catalog first (see next section); if a guide recommends a non-Widely feature, use the guide's documented fallback or skip the recommendation.
+
+## Modern Web Guidance Catalog
+
+The `modern-web-guidance` plugin (Google Chrome marketplace; installed at `~/.claude/plugins/marketplaces/googlechrome/skills/modern-web-guidance/`) ships ~90 prescriptive guides — one per use case — and is PinPoint's canonical "is there a Widely-available primitive for this?" lookup tool.
+
+### Use the catalog before implementing
+
+```bash
+# Search by intent
+npx -y modern-web-guidance@latest search "<query>"
+
+# Retrieve one or more guide bodies
+npx -y modern-web-guidance@latest retrieve "<id>,<id2>"
+
+# Browse the full catalog
+npx -y modern-web-guidance@latest list
+```
+
+### Curated guide map (PinPoint use cases)
+
+| When you're building...                  | Search / retrieve                                                 |
+| :--------------------------------------- | :---------------------------------------------------------------- |
+| A sign-in / sign-up form                 | `autofill-sign-in-form`, `autofill-sign-up-form`, `forms`         |
+| An address or anonymous-reporter form    | `autofill-address-form`, `forms`                                  |
+| Post-interaction validation feedback     | `validate-input-after-interaction`, `required-field-feedback`     |
+| Accessible error announcement            | `accessible-error-announcement`                                   |
+| A modal / dialog / confirmation          | `html` §4, `light-dismiss-a-dialog`, `platform-controls-dismiss-` |
+| A mobile drawer / slide-in panel         | `navigation-drawer`                                               |
+| A tooltip on touch                       | `interest-triggered-tooltips` (most are Newly available — read)   |
+| Image priority / LCP                     | `optimize-image-priority`, `optimize-preload-priority`            |
+| Skeletons, content-visibility            | `defer-rendering-heavy-content`                                   |
+| Long-task scheduling / INP               | `break-up-long-tasks`, `identify-inp-causes`                      |
+| Container-internal layout                | `css-layout`, `size-aware-styling`                                |
+| Conditional styles via DOM state         | `style-parent-with-has`                                           |
+| Hidden-but-findable content (accordions) | `search-hidden-content`                                           |
+| Reduced-motion / animation               | `accessibility` § Motion                                          |
+| Table a11y                               | `accessibility` § Tables                                          |
+| Skip-link / landmarks                    | `accessibility` § Landmarks, `html` §3                            |
+
+**Don't memorize**: re-search per task. The catalog is updated more often than this skill is.
 
 ### Adding Components
 
@@ -341,12 +416,12 @@ export function IssueForm() {
   return (
     <form action={createIssue} className="space-y-4">
       <div>
-        <Label htmlFor="title">Title</Label>
-        <Input id="title" name="title" required />
+        <Label htmlFor="title">Title <span aria-hidden="true">*</span></Label>
+        <Input id="title" name="title" required enterKeyHint="next" />
       </div>
       <div>
         <Label htmlFor="description">Description</Label>
-        <Textarea id="description" name="description" />
+        <Textarea id="description" name="description" enterKeyHint="done" />
       </div>
       <Button type="submit">Create Issue</Button>
     </form>
@@ -354,11 +429,150 @@ export function IssueForm() {
 }
 ```
 
+## Form Correctness
+
+Forms are the highest-leverage place to follow the Widely-available web platform — the browser already does post-interaction validation, autofill, mobile-keyboard hints, and password-manager integration. Opt in correctly and most "form polish" tickets disappear.
+
+### Input type
+
+| Field                             | Type                                |
+| :-------------------------------- | :---------------------------------- |
+| Email (login, signup, reporter)   | `type="email"`                      |
+| Phone                             | `type="tel"`                        |
+| URL                               | `type="url"`                        |
+| Password / new password / confirm | `type="password"`                   |
+| Numeric ID (postal, etc.)         | `type="text" inputMode="numeric"`   |
+| Number you do math on             | `type="number"`                     |
+| Date / time                       | `type="date"` / `type="time"`       |
+| Plain text                        | `type="text"` (the actual fallback) |
+
+Wrong types lose the mobile keyboard hint and native format validation. `type="text"` for an email field is a CORE-FORM-001 violation.
+
+### Autocomplete tokens
+
+Password managers and browser autofill key on `autocomplete`. Wrong/missing tokens silently break credential flows.
+
+```tsx
+// Sign-in form
+<Input id="email"            name="email"    type="email"    autoComplete="username" required />
+<Input id="current-password" name="password" type="password" autoComplete="current-password" required />
+
+// Sign-up form
+<Input id="email"            name="email"            type="email"    autoComplete="username" required />
+<Input id="new-password"     name="password"         type="password" autoComplete="new-password" required />
+<Input id="confirm-password" name="confirm-password" type="password" autoComplete="off" required />
+//                                                                                ^^^^^ off on confirm
+
+// Anonymous-reporter form
+<Input name="firstName" autoComplete="given-name" required />
+<Input name="lastName"  autoComplete="family-name" required />
+<Input name="email"     type="email" autoComplete="email" required />
+
+// Domain-specific picker that should NOT autofill
+<select id="machineId" name="machineId" autoComplete="off">…</select>
+```
+
+The full token list is in MDN; the auth-form-specific subset is in MWG `autofill-sign-in-form` and `autofill-sign-up-form`.
+
+### `enterkeyhint` for mobile flow
+
+Multi-field forms read better with the correct return-key label at each step. Baseline since Dec 2021.
+
+```tsx
+<Input enterKeyHint="next" /> // every field except the last
+<Input enterKeyHint="next" />
+<Input enterKeyHint="done" /> // last field
+```
+
+Use `"send"` on the last field of a message/search form, `"search"` on a search input, `"done"` on a generic last input.
+
+### Post-interaction validation styling (`:user-invalid`)
+
+`:user-invalid` flips a CSS pseudo-class only **after** the user interacts with the control — no premature red rings on page load, no JS state to manage. The shared `<Input>` primitive already styles `aria-invalid:`; pair it with `:user-invalid:` and the browser handles the rest.
+
+```tsx
+// In src/components/ui/input.tsx (and textarea.tsx, select.tsx)
+<input
+  className={cn(
+    "border-input focus-visible:ring-ring",
+    "aria-invalid:border-destructive aria-invalid:ring-destructive/40",
+    "[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40",
+    className
+  )}
+/>
+```
+
+### Screen-reader error announcement (`aria-invalid`)
+
+`:user-invalid` is visual only — AT users need `aria-invalid="true"` to hear "invalid" next to the field label.
+
+```tsx
+"use client";
+import { useState } from "react";
+
+function syncInvalid(e: React.FocusEvent<HTMLInputElement>) {
+  e.currentTarget.setAttribute(
+    "aria-invalid",
+    e.currentTarget.checkValidity() ? "false" : "true"
+  );
+}
+
+<Input onBlur={syncInvalid} />;
+```
+
+Or implement it once in the shared `<Input>` primitive so every field gets it automatically.
+
+### Required-field indicators
+
+Mark required fields visually before submission, not via a post-submit error.
+
+```tsx
+<Label htmlFor="email">
+  Email <span aria-hidden="true">*</span>
+</Label>
+<Input id="email" name="email" type="email" autoComplete="username" required />
+```
+
+For a form with many required fields, include a legend (`<p className="text-sm text-muted-foreground">* required</p>`) once near the top instead of explaining at every label.
+
+## Native HTML primitives alongside shadcn/Radix
+
+> **shadcn/Radix is the design system.** It owns Dialog, AlertDialog, Sheet, Drawer, Popover, Tooltip, DropdownMenu, Accordion, Form, etc. Don't migrate components off Radix to chase native primitives — Radix delivers consistent variants, theming, focus trapping, animation, and a single tested behavior across the app.
+>
+> The web platform has Widely-available primitives that **complement** the shadcn stack. Reach for them in two situations: (1) one-off uses that don't deserve a new shadcn variant, and (2) attributes/behaviors that drop straight onto shadcn components and strengthen them.
+
+### Use `inert` to harden Radix modals (CORE-A11Y-006)
+
+`inert` (Baseline since Mar 2022) removes a subtree from tab order, click handling, and the AT tree in one declarative step — stronger than `aria-hidden` (AT-only). Radix uses `aria-hidden` + pointer-events on the rest of the DOM when a modal opens; layering `inert` on top closes a small but real focus-leak gap.
+
+```tsx
+// Wrap the page content so it goes inert while any modal is open.
+<div inert={anyModalOpen || undefined}>{/* main page content */}</div>
+```
+
+The shadcn primitives stay — `inert` is one attribute added to the background container, not a replacement.
+
+### Native `<dialog>` only when a shadcn variant would be overkill
+
+`<dialog>.showModal()` is Baseline Widely available since Mar 2025 and ships focus trap + top-layer + `::backdrop` for free. Use it for one-off, self-contained, single-purpose dialogs that don't earn a place in the shadcn variant system — for example, a debug-only inspector panel, an `<a href="#fragment">`-driven help blurb, or a tightly-scoped picker that doesn't need theming.
+
+**Default to shadcn `<Dialog>` / `<AlertDialog>` / `<Sheet>` / `<Drawer>` for product UI.** Native `<dialog>` is an option in your toolbox, not the new default. If a Radix modal is doing its job, leave it.
+
+### `<details>` + `<summary>` for trivial disclosure
+
+For collapsible content that doesn't animate and doesn't need the visual treatment of `<Accordion>` — collapsible debug panels, `<summary>` for an inline "show more" — the native pair is keyboard- and SR-accessible with zero JS. Use shadcn `<Accordion>` whenever the disclosure is part of the product UI (FAQs, settings panels, content sections).
+
+### Native form validation works with shadcn `<Input>`
+
+`<Input>` already forwards `required`, `pattern`, `minLength`, `maxLength`. The browser does the validation; `:user-invalid` styles the result. `useActionState` handles cross-field validation (e.g., "passwords match") and server-side checks. You don't choose between shadcn and native — they layer.
+
 ## Accessibility Patterns
+
+The shadcn primitives (and the Radix layer underneath) already handle a lot of a11y — focus trap, `aria-modal`, focus return, descendant labeling. These rules cover what PinPoint must add on top.
 
 ### Semantic HTML
 
-```typescript
+```tsx
 // Semantic HTML
 <nav aria-label="Main navigation">
   <ul>
@@ -374,18 +588,120 @@ export function IssueForm() {
 </div>
 ```
 
-### ARIA Labels
+### Skip-to-main link (CORE-A11Y-001)
 
-```typescript
-// ARIA labels for screen readers
+`src/app/layout.tsx` puts a skip link as the first child of `<body>`, and the `<main>` element in `MainLayout.tsx` carries `id="main-content" tabIndex={-1}`. Without this, every page load forces a keyboard user through 6+ header tab stops before reaching content.
+
+```tsx
+<body>
+  <a
+    href="#main-content"
+    className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:px-4 focus:py-2 focus:text-foreground focus:ring-2 focus:ring-primary"
+  >
+    Skip to main content
+  </a>
+  {/* … providers + children … */}
+</body>
+```
+
+### Real `<button>` — never `<div role="button">` (CORE-A11Y-004)
+
+`<button>` is fully restylable. A `<div role="button" tabIndex={0} onKeyDown onClick>` is a reimplementation that almost always misses Space key, focus return, or an accessible name. If the existing pattern is a styled `<div>`, replace it with `<button type="button">`.
+
+```tsx
+// GOOD
+<button type="button" onClick={enterEditMode} className="block w-full text-left rounded-md p-2 hover:bg-muted">
+  <RichTextDisplay value={value} />
+</button>
+
+// BAD
+<div role="button" tabIndex={0} onClick={enterEditMode} onKeyDown={…}>
+  <RichTextDisplay value={value} />
+</div>
+```
+
+### Tooltip ≠ `title` attribute (CORE-A11Y-005)
+
+`title` doesn't fire on touch and is inconsistently surfaced by screen readers. For supplemental hover/focus info, use shadcn `<Tooltip>` (it wires `aria-describedby`) and add an `aria-label` on the trigger when the visible label is missing.
+
+For **disabled controls** that need a "why disabled" explanation, the tooltip-on-touch problem is a class-A blocker (mobile users see nothing). Either surface the reason as visible text near the control, bake it into the button's accessible name, or enable the control and validate on click.
+
+### Data tables (CORE-A11Y-003)
+
+```tsx
+<table aria-label="Issues">
+  <thead>
+    <tr>
+      <th scope="col" aria-sort={sortBy === "title" ? sortDir : "none"}>
+        <button type="button" onClick={() => setSort("title")}>
+          Title
+        </button>
+      </th>
+      <th scope="col" aria-sort={sortBy === "status" ? sortDir : "none"}>
+        <button type="button" onClick={() => setSort("status")}>
+          Status
+        </button>
+      </th>
+      {/* … */}
+    </tr>
+  </thead>
+  {/* … */}
+</table>
+```
+
+Reference: `src/components/issues/IssueList.tsx`. Apply the same semantics to every new sortable table.
+
+### ARIA labels on icon-only triggers
+
+```tsx
+// Icon-only button
 <Button aria-label="Delete issue">
-  <TrashIcon className="h-4 w-4" />
+  <Trash2 aria-hidden="true" />
 </Button>
 
-// Label association
-<Label htmlFor="email">Email</Label>
-<Input id="email" name="email" type="email" />
+// Editable cell — name the field, not just the value
+<DropdownMenuTrigger asChild>
+  <Button aria-label={`Status: ${current.label} — change status`}>
+    <StatusIcon aria-hidden="true" />
+    {current.label}
+  </Button>
+</DropdownMenuTrigger>
 ```
+
+### Label-to-control association (especially Radix `<Select>`)
+
+`<Label htmlFor="x">` must target the actual interactive element. Radix `<SelectTrigger>` is a `<button>` underneath; pass `id` through to that trigger, not to the wrapping `<Select>` component.
+
+```tsx
+<Label htmlFor="severity">Severity</Label>
+<Select name="severity" defaultValue="medium">
+  <SelectTrigger id="severity"> {/* id goes here, on the trigger */}
+    <SelectValue />
+  </SelectTrigger>
+  {/* … */}
+</Select>
+```
+
+### Live regions for async feedback
+
+shadcn `<Alert>` already carries `role="alert"`. Sonner toasts fire in `role="status"`. For async failures inside a row (optimistic update reverted), surface an inline `role="alert"` near the affected element — toast alone is fine for success, but failure needs a more durable announcement.
+
+## Animation & Motion (CORE-A11Y-002)
+
+`prefers-reduced-motion` is Baseline Widely available since Jul 2020. Tailwind exposes it as the `motion-reduce:` variant. Every `animate-*` and non-essential `transition-*` utility pairs with a `motion-reduce:` counterpart.
+
+```tsx
+// Loading spinner — static icon still communicates "loading" without motion
+<Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+
+// Skeleton pulse
+<div className="h-4 w-32 animate-pulse motion-reduce:animate-none bg-muted rounded" />
+
+// Layout transitions — keep the structural change, drop the motion
+<div className="transition-[height] duration-300 motion-reduce:transition-none">
+```
+
+Essential motion (e.g., a sheet sliding into view — the slide is what tells the user what just happened) can opt out by omitting the `motion-reduce:` variant; document the choice in a one-line comment.
 
 ## Progressive Enhancement
 
@@ -472,6 +788,93 @@ Per the **Two-Layer Responsive Framework** (AGENTS.md §2.1 "Two-Layer Responsiv
 
 ### Don't Do These
 
+**`type="text"` for an email field** (CORE-FORM-001):
+
+```tsx
+// BAD
+<Input id="email" name="email" type="text" autoComplete="username" />
+
+// GOOD
+<Input id="email" name="email" type="email" autoComplete="username" />
+```
+
+**Shared `autocomplete="new-password"` on new + confirm fields** (CORE-FORM-002):
+
+```tsx
+// BAD — password manager autofills the confirm field too
+<Input id="new-password"     type="password" autoComplete="new-password" />
+<Input id="confirm-password" type="password" autoComplete="new-password" />
+
+// GOOD
+<Input id="new-password"     type="password" autoComplete="new-password" />
+<Input id="confirm-password" type="password" autoComplete="off" />
+```
+
+**Bare animations without `motion-reduce:`** (CORE-A11Y-002):
+
+```tsx
+// BAD
+<Loader2 className="animate-spin" />
+
+// GOOD
+<Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+```
+
+**`<div role="button">`** (CORE-A11Y-004):
+
+```tsx
+// BAD
+<div role="button" tabIndex={0} onClick={…} onKeyDown={…}>Edit</div>
+
+// GOOD
+<button type="button" onClick={…}>Edit</button>
+```
+
+**`title` as a tooltip** (CORE-A11Y-005):
+
+```tsx
+// BAD — invisible on touch, unreliable in AT
+<span title="3 open issues, status needs_service">Service [3]</span>
+
+// GOOD — visible badge + Tooltip for hover/focus enrichment
+<Tooltip>
+  <TooltipTrigger asChild>
+    <span aria-label="Service tab, 3 open issues">Service [3]</span>
+  </TooltipTrigger>
+  <TooltipContent>3 open issues, status: needs service</TooltipContent>
+</Tooltip>
+```
+
+**`priority` on non-LCP images** (CORE-PERF-003):
+
+```tsx
+// BAD — 32px header logo, never the LCP candidate
+<Image src="/logo.png" priority width={32} height={32} />
+
+// GOOD
+<Image src="/logo.png" width={32} height={32} />
+```
+
+**`<Label htmlFor>` targeting the Radix wrapper instead of the trigger**:
+
+```tsx
+// BAD — htmlFor points at the Select wrapper, not the underlying <button>
+<Label htmlFor="severity">Severity</Label>
+<Select name="severity">
+  <SelectTrigger>…</SelectTrigger>
+</Select>
+
+// GOOD
+<Label htmlFor="severity">Severity</Label>
+<Select name="severity">
+  <SelectTrigger id="severity">…</SelectTrigger>
+</Select>
+```
+
+**`window.innerWidth` / `useMediaQuery`** (CORE-RESP-002): use container queries or viewport-breakpoint Tailwind utilities. JS viewport detection causes hydration mismatches.
+
+**`sm:` for structural layout** (CORE-RESP-003): `sm:` is padding/spacing only. `sm:flex-row`, `sm:grid-cols-*`, `sm:hidden`, `sm:block` are forbidden.
+
 **Global CSS Resets**:
 
 ```css
@@ -532,8 +935,19 @@ Before committing UI code:
 - [ ] ARIA labels for icon-only buttons
 - [ ] Responsive design (mobile-first)
 - [ ] shadcn/ui components only (no MUI)
+- [ ] Input fields carry the correct `type` and `autocomplete` token (CORE-FORM-001, 002)
+- [ ] Multi-field forms set `enterkeyhint` per field (CORE-FORM-006)
+- [ ] Required fields have a visible `*` indicator (CORE-FORM-005)
+- [ ] Every `animate-*` or non-essential `transition-*` pairs with `motion-reduce:` (CORE-A11Y-002)
+- [ ] No `<div role="button">` introduced (CORE-A11Y-004)
+- [ ] No `title="..."` as a tooltip (CORE-A11Y-005)
+- [ ] If you added a sortable table: `<th scope="col">`, `aria-sort`, accessible name (CORE-A11Y-003)
+- [ ] If you added an image with `priority`: it is the LCP candidate for the page's dominant viewport, and `sizes` is set (CORE-PERF-003)
+- [ ] If you added an animation, dialog, or layout pattern: searched `modern-web-guidance` for the Widely-available primitive first (CORE-UI-006)
 
 ## External References
 
-- shadcn/ui docs: Use Context7 MCP for latest components
-- Tailwind CSS v4 docs: Use Context7 MCP for latest utilities
+- **modern-web-guidance** (Google Chrome): `npx -y modern-web-guidance@latest search "<query>"`. The canonical lookup for Widely-available web platform patterns. Each guide tags its Baseline status. CORE-UI-005/006.
+- **shadcn/ui docs**: Context7 MCP for the latest component APIs (`mcp__plugin_context7_context7__resolve-library-id` → `query-docs`).
+- **Tailwind CSS v4 docs**: Context7 MCP for the latest utilities.
+- **MDN**: authoritative reference for any HTML/CSS/JS feature. Cross-check Baseline status.

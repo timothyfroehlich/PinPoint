@@ -6,7 +6,7 @@ trigger: always_on
 # PinPoint Non‑Negotiables
 
 **Last Updated**: 2026-05-19
-**Version**: 2.1 (Catalog gaps filled; root NON_NEGOTIABLES.md removed and folded in)
+**Version**: 2.2 (Browser support floor + accessibility + forms catalogs added)
 
 > **Sync contract**: `AGENTS.md` §2.1 is a one-line index of these rules. Every §2.1 entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
 
@@ -38,6 +38,10 @@ trigger: always_on
 16. Permissions go through `checkPermission()`; matrix must match enforcement (CORE-ARCH-008)
 17. Mock third-party SDKs at their boundary; no live external services in E2E (CORE-TEST-006)
 18. Rule of Three before abstracting (CORE-ARCH-010)
+19. Baseline Widely available is the browser-support floor; look up patterns via the modern-web-guidance catalog (CORE-UI-005/006)
+20. Forms ship with the correct input `type`, `autocomplete` token, `:user-invalid` styling, and visible required indicators (CORE-FORM-001..006)
+21. Accessibility floor: skip link, semantic table markup, `motion-reduce:` paired with animations, no `<div role="button">`, `title` is not a tooltip (CORE-A11Y-001..006)
+22. Image priority and preconnect discipline: `priority` is for the LCP candidate only; preconnect to known image origins (CORE-PERF-003)
 
 ---
 
@@ -233,6 +237,14 @@ trigger: always_on
 - **Do:** Add `cache: "force-cache"` or appropriate options to fetch()
 - **Don't:** Rely on implicit caching defaults
 
+**CORE-PERF-003:** Image priority and preconnect discipline
+
+- **Severity:** Required
+- **Why:** `priority` (which emits `fetchpriority="high"`, Baseline Widely available since Sep 2025) is a zero-sum signal — every prioritized image deprioritizes every other resource. Marking non-LCP images as `priority` (e.g., the 32px header logo, a sidebar logo, an image inside a closed dialog) burns budget the browser can't reclaim. Likewise, the first request to a known image origin pays full DNS + TLS handshake cost unless preconnected.
+- **Do:** Set `priority` on exactly one image per page — the LCP candidate — and only when you've confirmed it is above the fold for the dominant viewport. Always provide `sizes` for images that render at non-`100vw`. Add `<link rel="preconnect">` in the root layout for known image origins (e.g., Vercel Blob bucket).
+- **Don't:** Sprinkle `priority` on logos, hero variants, or pre-mounted dialog images "just in case." Don't omit `sizes` on `priority` images.
+- **Reference:** modern-web-guidance `optimize-image-priority`, `optimize-preload-priority`.
+
 ---
 
 ## Testing
@@ -415,6 +427,122 @@ trigger: always_on
 
 ---
 
+## Browser Support
+
+**CORE-UI-005:** Baseline Widely available is the browser-support floor
+
+- **Severity:** Critical
+- **Why:** Pinning a clear floor is what makes a "modern web" basis useful — every UI decision is anchored to the set of HTML / CSS / JS features the browser platform considers cross-browser stable. **Baseline Widely available** means a feature has been available in all major engines for ~2.5 years and is safe without fallbacks. Aim higher and Safari users break; aim lower and the bundle bloats with polyfills for features already shipping natively.
+- **Do:** Reach for Baseline Widely available primitives directly: `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, native form validation, `fetchpriority`, CSS Grid `auto-fit/minmax`, `text-balance`/`text-pretty`. No feature detection or polyfill needed.
+- **Don't:** Adopt Baseline Newly available features (Popover API, View Transitions, anchor positioning, scroll-driven animations, `interestfor`, the `closedby` attribute) without a per-feature opt-in documented in `pinpoint-design-bible` §19. Don't add a polyfill for any Widely-available feature.
+- **Reference:** `pinpoint-design-bible` §19 Browser Support Policy. To check a feature's status, search the modern-web-guidance catalog (CORE-UI-006) — every guide notes its Baseline status.
+
+**CORE-UI-006:** Use the modern-web-guidance catalog for pattern lookup
+
+- **Severity:** Required
+- **Why:** Web platform features evolve faster than LLM training data refreshes. Memorizing patterns produces stale code. The Google Chrome `modern-web-guidance` plugin ships ~90 prescriptive guides — searchable by use case, each with Baseline status — and is the canonical reference for "what's the right way to do X today."
+- **Do:** At the start of any non-trivial UI work, search the catalog: `npx -y modern-web-guidance@latest search "<query>"`. Retrieve specific guides by id with `retrieve "<id>,<id2>"`. Check the guide's Browser Support section against CORE-UI-005 before adopting any recommendation.
+- **Don't:** Implement ad-hoc patterns when a Widely-available primitive exists for the same job. Don't pre-emptively pull every guide into context; search per task.
+- **Reference:** Plugin is installed at `~/.claude/plugins/marketplaces/googlechrome/skills/modern-web-guidance/`.
+
+---
+
+## Accessibility
+
+**CORE-A11Y-001:** Skip-to-main-content link
+
+- **Severity:** Required
+- **Why:** WCAG 2.4.1 Level A. Without it, keyboard users tab through the AppHeader navigation on every single page load before reaching content. PinPoint's header has 6+ tab stops; that's a hard daily-driver cost for any keyboard-first user.
+- **Do:** First child of `<body>` (in `src/app/layout.tsx`) is `<a href="#main-content" className="sr-only focus:not-sr-only ...">Skip to main content</a>`. The `<main>` element in `MainLayout.tsx` carries `id="main-content"` and `tabIndex={-1}`.
+- **Don't:** Ship a layout that puts content behind the header in tab order with no skip affordance.
+
+**CORE-A11Y-002:** `motion-reduce:` pairs with every animation utility
+
+- **Severity:** Required
+- **Why:** Users with vestibular disorders need to suppress motion. The `prefers-reduced-motion` media query is Baseline Widely available, and Tailwind exposes the `motion-reduce:` variant out of the box. Adding `motion-reduce:animate-none` costs one utility and removes the motion entirely for users who request it.
+- **Do:** Every `animate-*` or `transition-*` utility that drives non-essential motion is paired with `motion-reduce:animate-none` (or `motion-reduce:transition-none` where appropriate). Loading spinners use `animate-spin motion-reduce:animate-none` — the static icon remains and is still recognizable as "loading."
+- **Don't:** Ship bare `animate-spin`, `animate-pulse`, or `animate-bounce`. Don't write JS feature-detection for `prefers-reduced-motion` — use the CSS variant.
+- **Reference:** modern-web-guidance `accessibility` § Motion.
+
+**CORE-A11Y-003:** Data tables ship with semantic structure
+
+- **Severity:** Required
+- **Why:** WCAG 1.3.1 Level A. Without `scope="col"` on header cells, screen readers can't announce the column header for each data cell. Without `aria-sort`, sort state is invisible to AT. Without `<caption>` or `aria-label`, the table has no accessible name in the page outline.
+- **Do:** Every `<th>` carries `scope="col"`. Sortable columns expose `aria-sort="ascending" | "descending" | "none"` synced to the active sort. The `<table>` has either a visible `<caption>` or an `aria-label` describing its contents. The table at `src/components/issues/IssueList.tsx` is the reference implementation — match its semantics for new tables.
+- **Don't:** Render a `<th>` without `scope`. Don't ship a sortable table with no `aria-sort`. Don't rely on column header text alone — that's not what AT uses.
+
+**CORE-A11Y-004:** No `<div role="button">` — use real `<button>`
+
+- **Severity:** Critical
+- **Why:** WCAG 4.1.2 Level A. `<button>` is the platform primitive: implicit keyboard semantics (Enter + Space), focus ring, role, name, and default form-submission behavior. `<div role="button" tabIndex={0} onKeyDown={...} onClick={...}>` reimplements these and almost always misses one (typically Space key, the accessible name, or focus return). When in doubt, the answer is `<button type="button">`.
+- **Do:** Use `<button type="button">` for any clickable that isn't a form-submit or a navigation. Style it to look like whatever it needs to (a card, a row, a chip) — `<button>` is fully restylable. For navigation, use `<Link>`/`<a>`.
+- **Don't:** Reach for `<div onClick>` or `<div role="button" tabIndex={0}>`. If you find one, replace it.
+
+**CORE-A11Y-005:** `title` attribute is not a tooltip
+
+- **Severity:** Required
+- **Why:** The `title` attribute is unreliable on touch (never fires) and not consistently surfaced by screen readers on non-interactive elements. Using `title="explanation of what this does"` as a tooltip leaves both screen-reader users and touch users with no affordance.
+- **Do:** For supplemental hover/focus information, use the shadcn `<Tooltip>` (which wires `aria-describedby`) plus an `aria-label` on the trigger if the visible label is missing. For interactive elements that are disabled, surface the "why disabled" as visible text or as the button's accessible name — never tooltip-only.
+- **Don't:** Ship `title="..."` as the only place a piece of information lives. Don't put `title` on disabled controls expecting touch users to see it.
+
+**CORE-A11Y-006:** `inert` for non-interactive background regions
+
+- **Severity:** Required
+- **Why:** The `inert` global attribute (Baseline Widely available since Mar 2022) removes an element and all its descendants from the tab order, click handling, and the accessibility tree in one declarative step. `aria-hidden` alone is weaker — it removes from the AT tree but not from the tab order, so keyboard focus can still tab into background content. When a modal opens, the background should be `inert`.
+- **Do:** When opening a modal that doesn't use native `<dialog>.showModal()` (Radix Dialog, Sheet, AlertDialog, Drawer), set `inert` on the page root or the sibling containing background content. Native `<dialog>` handles this automatically via top-layer.
+- **Don't:** Rely on `aria-hidden="true"` + pointer-events tricks alone. Don't manually manage focus trapping when `inert` does it for you.
+
+---
+
+## Forms
+
+**CORE-FORM-001:** Use the specific input `type`
+
+- **Severity:** Required
+- **Why:** `type="email"` triggers the email keyboard on mobile and enables free native format validation; `type="tel"` triggers the numeric keypad; `type="url"` adds URL hints. `type="text"` is the wrong default for typed identity inputs — it loses the keyboard hint and the validation.
+- **Do:** `type="email"` for any email field (login, signup, anonymous-reporter contact, password reset). `type="tel"` for phone. `type="url"` for URLs. `type="password"` for any secret. `type="number"` only when the value is a number you'll do math on — for postal codes, IDs, and similar, use `type="text" inputMode="numeric"`.
+- **Don't:** Ship `<input type="text">` for an email field. Don't suppress the type to bypass a mobile keyboard quirk — fix the quirk.
+
+**CORE-FORM-002:** Autocomplete tokens on every credential/identity input
+
+- **Severity:** Critical
+- **Why:** Password managers and browser autofill key on the `autocomplete` attribute. Wrong or missing tokens mean credentials don't autofill, generated passwords aren't offered, and the confirm-password field gets autofilled with the user's existing password — silently breaking the flow.
+- **Do:** Sign-in form: `autocomplete="username"` on email + `id="current-password"` on the password field with `autocomplete="current-password"`. Sign-up form: `autocomplete="username"` on email, `autocomplete="new-password"` on the new password field, `autocomplete="off"` on the confirm-password field. Anonymous-reporter forms get `autocomplete="given-name"`, `family-name"`, `email"`. Domain-specific pickers that should NOT be autofilled (e.g., machine selector) set `autocomplete="off"` explicitly.
+- **Don't:** Put `autocomplete="new-password"` on the confirm field. Don't share an `id` between login and signup password fields. Don't omit the attribute on anonymous-reporter forms.
+- **Reference:** modern-web-guidance `autofill-sign-in-form`, `autofill-sign-up-form`, `autofill-address-form`.
+
+**CORE-FORM-003:** `:user-invalid` styling on the shared Input primitive
+
+- **Severity:** Required
+- **Why:** `:user-invalid` (Baseline Widely available since Nov 2023) flips a CSS pseudo-class on form controls only **after** the user has interacted with them — no premature red rings on page load, no JS state mirroring, no event listeners. The shared `<Input>` already has `aria-invalid:` styling; pair it with `:user-invalid:` and the browser does the rest.
+- **Do:** `src/components/ui/input.tsx` (and `textarea.tsx`, `select.tsx`) carry the equivalent of `[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40` so every input automatically picks up post-interaction invalid styling.
+- **Don't:** Hand-roll `useState` + `onBlur` to mirror invalid state. Don't paint inputs red on initial render.
+- **Reference:** modern-web-guidance `validate-input-after-interaction`.
+
+**CORE-FORM-004:** `aria-invalid` synced for screen readers
+
+- **Severity:** Required
+- **Why:** `:user-invalid` is a CSS pseudo-class — visual only. Screen readers need `aria-invalid="true"` to announce "invalid" alongside the field label. Without it, AT users get only the form-level alert after a server round-trip.
+- **Do:** A shared `onBlur` listener (or `useActionState` error mapper) sets `aria-invalid="true"` on inputs that fail `checkValidity()` after first interaction, and `aria-invalid="false"` when the value becomes valid again.
+- **Don't:** Set `aria-invalid="true"` on initial render. Don't rely solely on the form-level `<Alert>` to communicate per-field errors.
+- **Reference:** modern-web-guidance `accessible-error-announcement`, `required-field-feedback`.
+
+**CORE-FORM-005:** Required fields are visually marked before interaction
+
+- **Severity:** Required
+- **Why:** Without a visual cue, users only learn a field is required by failing to submit. That's a low-grade frustration that compounds across multi-field forms. Required-field indicators are standard form hygiene and a WCAG-recommended practice.
+- **Do:** Append a `*` (or `<span aria-hidden="true">*</span>` with a form-level legend explaining "\* required") to the `<Label>` of every `required` field. Or use the project's `<RequiredLabel>` helper if/when one exists.
+- **Don't:** Rely on the post-submit error message to teach the user which fields are required.
+
+**CORE-FORM-006:** `enterkeyhint` on sequential mobile fields
+
+- **Severity:** Required
+- **Why:** On mobile, the default "return" key offers no cue about flow. `enterkeyhint="next"` → "next" → "done" walks the user through the form with the correct keyboard action label at each step. Baseline Widely available since Dec 2021. One attribute per field; high payoff.
+- **Do:** Multi-field forms set `enterkeyhint="next"` on every field except the last, which gets `enterkeyhint="done"` (or `"send"`/`"search"` per intent).
+- **Don't:** Ship a multi-field form with no `enterkeyhint`.
+
+---
+
 ## Forbidden Patterns
 
 **Never Do These:**
@@ -477,11 +605,13 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑TS‑001..008: Type system
 - CORE‑SSR‑001..007: Supabase SSR and auth
 - CORE‑SEC‑001..008: Security
-- CORE‑PERF‑001..002: Performance
+- CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
 - CORE‑ARCH‑001..010: Architecture (003 retired)
 - CORE‑RESP‑001..004: Responsive framework
-- CORE‑UI‑001..004: UI & styling
+- CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
+- CORE‑A11Y‑001..006: Accessibility floor
+- CORE‑FORM‑001..006: Form correctness
 
 **Cross-References:**
 
