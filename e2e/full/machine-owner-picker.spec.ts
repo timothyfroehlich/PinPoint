@@ -41,6 +41,12 @@ async function openOwnerPicker(page: Page) {
  * (per OwnerSelect: when query is non-empty, all matching users are shown).
  * This is more robust on mobile viewports where the checkbox+list scroll
  * interaction can miss clicks on CommandItem elements.
+ *
+ * Uses keyboard Enter rather than pointer click to confirm the selection.
+ * cmdk's keyboard handler fires the "cmdk-item-select" event on the currently
+ * aria-selected item, which is more reliable on mobile touch emulation where
+ * Playwright's synthesized pointer events can fail to trigger cmdk's onClick
+ * even when the element is correctly targeted (PP-pvbq regression).
  */
 async function selectGuestUserBySearch(page: Page, name: string) {
   const searchInput = page.getByPlaceholder("Search users...");
@@ -50,7 +56,13 @@ async function selectGuestUserBySearch(page: Page, name: string) {
     .locator("[data-slot=command-item]")
     .filter({ hasText: name });
   await expect(item).toBeVisible({ timeout: 5000 });
-  await item.click();
+  // Wait for cmdk to mark the item as keyboard-selected (aria-selected="true").
+  // cmdk auto-selects the first visible item when the search query changes;
+  // pressing Enter on the focused search input then fires onSelect on that item.
+  await expect(item).toHaveAttribute("aria-selected", "true", {
+    timeout: 3000,
+  });
+  await searchInput.press("Enter");
 }
 
 test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () => {
