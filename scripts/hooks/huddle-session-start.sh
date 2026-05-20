@@ -6,7 +6,7 @@
 # SessionStart-equivalent hooks (Claude Code via .claude/settings.json,
 # Antigravity via .agents/hooks/agy-beads-bootstrap.cjs, etc.). Reads stdin JSON
 # for `session_id`, looks up the session's registered name in
-# <main-worktree>/.claude/huddle/session-names.json (see huddle-lib.sh for the
+# <main-worktree>/.agents/huddle/session-names.json (see huddle-lib.sh for the
 # state-dir resolver), and emits a brief identity block on stdout which the
 # host harness surfaces as system context.
 #
@@ -37,7 +37,7 @@
 set -euo pipefail
 
 # --- State directory resolution ---
-# See huddle-lib.sh for why state lives in <main-worktree>/.claude/huddle/.
+# See huddle-lib.sh for why state lives in <main-worktree>/.agents/huddle/.
 LIB_SCRIPT="$(dirname "$0")/huddle-lib.sh"
 if [[ ! -f "$LIB_SCRIPT" ]]; then
   exit 0

@@ -169,7 +169,7 @@ except Exception:
 fi
 
 # --- State directory resolution ---
-# Huddle state lives in <main-worktree>/.claude/huddle/ so it's shared
+# Huddle state lives in <main-worktree>/.agents/huddle/ so it's shared
 # across all linked worktrees of the same clone. huddle-lib.sh provides
 # the resolver. If we can't find a git common-dir (e.g., hook fired outside
 # any PinPoint checkout), fail open silently — coordination is optional.

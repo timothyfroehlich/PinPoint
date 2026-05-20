@@ -18,7 +18,7 @@
 // All output is wrapped in Antigravity's `{ injectSteps: [...] }` response
 // shape and written to stdout.
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const path = require('path');
 
 async function main() {
@@ -70,9 +70,9 @@ async function main() {
 
     // 1. Run bd prime to get task list and guidelines
     try {
-      const beadsOutput = execSync('bd prime', { 
+      const beadsOutput = execFileSync('bd', ['prime'], {
         cwd: workspacePath,
-        encoding: 'utf8' 
+        encoding: 'utf8'
       }).trim();
       if (beadsOutput) {
         combinedOutput += beadsOutput + '\n\n';
@@ -84,7 +84,7 @@ async function main() {
     // 2. Run huddle-session-start.sh to announce session identity
     try {
       const huddleStartScript = path.join(workspacePath, 'scripts/hooks/huddle-session-start.sh');
-      const huddleOutput = execSync(`bash "${huddleStartScript}"`, {
+      const huddleOutput = execFileSync('bash', [huddleStartScript], {
         input: payloadString,
         cwd: workspacePath,
         encoding: 'utf8'
@@ -113,7 +113,7 @@ async function main() {
     // Mid-trajectory: run huddle-poll.sh to fetch updates
     try {
       const huddlePollScript = path.join(workspacePath, 'scripts/hooks/huddle-poll.sh');
-      const huddleOutput = execSync(`bash "${huddlePollScript}"`, {
+      const huddleOutput = execFileSync('bash', [huddlePollScript], {
         input: payloadString,
         cwd: workspacePath,
         encoding: 'utf8'
