@@ -134,6 +134,8 @@ export async function createIssue(
 }
 ```
 
+> **Client-side form correctness lives in `pinpoint-ui` § Form Correctness** — input `type`, `autocomplete` tokens, `enterkeyhint`, `:user-invalid` styling, `aria-invalid` blur sync, required-field indicators. The Server Action structure above is the server half; pair it with the client half from `pinpoint-ui` for full coverage (CORE-FORM-001..006).
+
 ## Data Fetching Patterns
 
 ### Direct Drizzle Queries

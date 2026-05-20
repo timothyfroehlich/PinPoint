@@ -307,6 +307,8 @@ Two canonical durations standardize all animated feedback:
 
 **Rule:** Never introduce a duration other than 150 or 300 unless the canonical two genuinely don't fit. If you find an edge case, add a new row to this table first, document the use case, then use it consistently across similar elements.
 
+**Motion sensitivity:** Every `animate-*` and non-essential `transition-*` utility pairs with `motion-reduce:animate-none` / `motion-reduce:transition-none` (CORE-A11Y-002). Loading spinners use `animate-spin motion-reduce:animate-none` — the static icon still communicates "loading." Essential motion (e.g., a Sheet sliding into view — the slide is what conveys "this came from the side") can omit the variant; document the choice in a one-line comment so reviewers know it was deliberate.
+
 ## 12. Component Inventory
 
 Before building something new, check if one of these already exists:
@@ -534,6 +536,8 @@ Do not reorder the buttons to try to "fix" the mobile stack — the reversal is 
 - Never put a `<form>` inside a `DropdownMenuItem` — Radix closes the dropdown before the form submits. Use `onSelect={() => serverAction()}` instead.
 - Never wrap a Server Action in an inline async function: `action={async () => await serverAction()}` breaks progressive enhancement. Pass the Server Action directly: `action={serverAction}`.
 - For destructive confirmations, use `AlertDialog` — it has semantics (`role="alertdialog"`) that screen readers announce more urgently.
+- When opening any modal, set `inert` on the page-root container (CORE-A11Y-006). Radix uses `aria-hidden` + pointer-events on the background; `inert` is the platform primitive that also removes the background from tab order.
+- Native `<dialog>.showModal()` (Baseline Widely available; Baseline since Mar 2023 per §19) is **not** the default for product UI — shadcn `<Dialog>` / `<AlertDialog>` / `<Sheet>` are. Reach for `<dialog>` only for one-off, self-contained, single-purpose surfaces that don't earn a place in the shadcn variant system (e.g., a debug-only inspector, a tightly-scoped help blurb). See `pinpoint-ui` skill § "Native HTML primitives alongside shadcn/Radix".
 
 ## 18. Token Canonical Form
 
@@ -567,3 +571,193 @@ Do not reorder the buttons to try to "fix" the mobile stack — the reversal is 
 | Destructive container bg    | `bg-destructive/10`     |
 | Card background             | `bg-card`               |
 | Dimmed/closed item          | `bg-surface-variant/30` |
+
+## 19. Browser Support Policy
+
+PinPoint's UI is built on **Baseline Widely available** (CORE-UI-005) — features that have been cross-browser stable for ~2.5 years. This is the support floor for every new component, layout, animation, and form pattern.
+
+**shadcn/ui and Radix remain the design system.** The Baseline floor is the _platform layer underneath_ — what we trust to "just work" in our users' browsers. We don't migrate components off Radix to chase native primitives; we layer Widely-available web platform features (`:user-invalid`, `inert`, container queries, `:has()`, `fetchpriority`, `motion-reduce:`, `aspect-ratio`, `enterkeyhint`, autocomplete tokens, semantic `<table>` markup, native `required`/`pattern` validation, etc.) onto our shadcn-based components so they get the full benefit of the platform.
+
+### What is in-scope today
+
+| Capability                                  | Where it shows up in PinPoint                              | Baseline since |
+| :------------------------------------------ | :--------------------------------------------------------- | :------------- |
+| Container queries (`@container`)            | IssueMetadata, IssueTimeline, AddCommentForm, ImageGallery | Feb 2023       |
+| `:has()`                                    | DOM-state-driven styling, removes JS mirroring             | Dec 2023       |
+| `:user-valid` / `:user-invalid`             | Shared Input/Textarea primitives (CORE-FORM-003)           | Nov 2023       |
+| `inert` attribute                           | Background regions when modals open (CORE-A11Y-006)        | Mar 2022       |
+| `aspect-ratio`                              | ImageGallery, calendar day cells                           | Mar 2021       |
+| `accent-color`                              | Checkbox/radio/range accent matching                       | May 2022       |
+| `fetchpriority` (img/script/link)           | LCP candidate images (Next/Image `priority`)               | Sep 2023       |
+| CSS subgrid                                 | Multi-column form alignment                                | Sep 2023       |
+| `gap` on flexbox                            | Standard spacing everywhere                                | Apr 2021       |
+| `prefers-reduced-motion` (`motion-reduce:`) | Every animation utility (CORE-A11Y-002)                    | Jul 2020       |
+| `focus-visible`                             | All interactive primitives in `src/components/ui/`         | Mar 2022       |
+| Native form validation (`required` …)       | Every form                                                 | (pre-Baseline) |
+| `enterkeyhint`                              | Multi-field forms (CORE-FORM-006)                          | Dec 2021       |
+| Logical properties (`inline-start`)         | RTL-ready text alignment                                   | Mar 2023       |
+| Native `<dialog>`                           | Narrow one-off cases — see §17                             | Mar 2023       |
+| Native `<details>` / `<summary>`            | Trivial disclosure where Accordion would be overkill       | (pre-Baseline) |
+
+### What is deferred (Baseline Newly available)
+
+These are not in PinPoint today. They require a per-feature opt-in here in §19 before adoption.
+
+- **Popover API** (`popover="auto"` / `popover="hint"`) — Radix Popover/DropdownMenu/Tooltip already cover the use cases.
+- **View Transitions** (same-document and cross-document) — interesting for navigation polish; defer.
+- **CSS anchor positioning** — would simplify some popover/tooltip placement; Radix's JS-driven positioning already works.
+- **Scroll-driven animations** — `animation-timeline: scroll()` and friends. Defer.
+- **`text-wrap: balance`** — partially adopted (we use `text-balance` selectively per §9), but treat as Newly available and check support per use.
+- **`interestfor` attribute** for tooltips — Chrome-only as of late 2025; defer.
+- **`closedby` attribute** on `<dialog>` — Limited availability (no Safari).
+
+### How to verify a feature's Baseline status
+
+The Google Chrome `modern-web-guidance` catalog tags each guide with its Baseline status. Search it before adopting any pattern:
+
+```bash
+npx -y modern-web-guidance@latest search "<query>"
+npx -y modern-web-guidance@latest retrieve "<id>"
+```
+
+If the guide says "Baseline Widely available" — use directly. If "Baseline Newly available" — follow the guide's documented fallback, or skip the recommendation and add it to the deferred list above.
+
+### Opting in to a Newly-available feature
+
+If a Newly-available feature becomes load-bearing for a planned design:
+
+1. Open a PR that adds a row to the "in-scope" table above (or moves one from "deferred").
+2. Document the fallback strategy in the row (e.g., "Use `@supports` to feature-detect; fall back to existing pattern X").
+3. Link the spec/explainer + the MWG guide id.
+4. Add the feature to `pinpoint-ui` skill's relevant section.
+
+Don't sneak a Newly-available feature in without updating this section — it's the single source of truth for what the project considers safe.
+
+## 20. Form Correctness Conventions
+
+Forms are the highest-leverage place to lean on the Widely-available web platform. The browser does post-interaction validation, autofill, mobile-keyboard hints, password-manager integration, and screen-reader announcement — opt in correctly and most "form polish" tickets disappear. Concrete rules and code in `pinpoint-ui` skill § "Form Correctness"; canonical rules in CORE-FORM-001..006.
+
+### Required attributes on every form input
+
+| Attribute               | When                                                                 |
+| :---------------------- | :------------------------------------------------------------------- |
+| `type`                  | Always — `email`, `tel`, `url`, `password`, `text` per CORE-FORM-001 |
+| `autocomplete`          | Every credential/identity input — per the token table below          |
+| `required`              | Every field the form will refuse to submit without                   |
+| `enterkeyhint`          | Every field in a multi-field form (CORE-FORM-006)                    |
+| `inputmode`             | Numeric/decimal/tel where type alone isn't enough                    |
+| `pattern` / `minlength` | When the validation can be expressed declaratively                   |
+
+### Autocomplete token quick reference
+
+| Form / field             | Token                                                     |
+| :----------------------- | :-------------------------------------------------------- |
+| Sign-in email            | `username`                                                |
+| Sign-in password         | `current-password` (`id="current-password"` too)          |
+| Sign-up email            | `username`                                                |
+| Sign-up new password     | `new-password`                                            |
+| Sign-up confirm password | `off` ← critical; do not autofill the confirm             |
+| Reset password (new)     | `new-password`                                            |
+| Reset password (confirm) | `off`                                                     |
+| First name               | `given-name`                                              |
+| Last name                | `family-name`                                             |
+| Email (general identity) | `email`                                                   |
+| Phone                    | `tel`                                                     |
+| Domain-specific picker   | `off` (explicit — prevents browser from guessing/filling) |
+
+### Required-field indicators
+
+Append `<span aria-hidden="true">*</span>` to the `<Label>` of every required field. For forms with many required fields, include a `<p className="text-sm text-muted-foreground">* required</p>` legend once near the top. Don't rely on the post-submit error to teach the user which fields are required.
+
+### Validation feedback timing
+
+- **Visual:** `:user-invalid` styling on the shared `<Input>` primitive — fires only after the user has interacted (CORE-FORM-003).
+- **AT:** `aria-invalid="true"` synced on blur when `checkValidity()` fails (CORE-FORM-004). Implement once in the shared primitive, not per form.
+- **Form-level errors:** `<Alert variant="destructive">` at the top of the form (per §13 Error State).
+- **Field-level errors:** `<FormMessage>` (react-hook-form) under the field, or inline `<p className="text-sm text-destructive">`.
+
+### Submit-button enabled state
+
+Disable a submit button **after** the user has attempted submission (to prevent double-posts), not preemptively while a CAPTCHA hasn't resolved or a field isn't yet filled. Preemptive disabling gives users no feedback about _why_ the button is greyed out. The exception is the shadcn `<Button loading>` state during an in-flight submission.
+
+## 21. Image Loading Discipline
+
+Image loading sits at the intersection of LCP, layout stability, and bandwidth. Next.js `<Image>` handles the heavy lifting (srcset, WebP/AVIF negotiation, lazy loading); PinPoint must opt in correctly on a per-image basis.
+
+### `priority` is for the LCP candidate only (CORE-PERF-003)
+
+`priority` emits `fetchpriority="high"` (Baseline Widely available since Sep 2025) plus eager loading. The browser interprets this as "this image is critical to first paint." Every prioritized image deprioritizes every other resource — so adding `priority` to a non-LCP image actively hurts LCP.
+
+| Place                              | Should `priority`?                           |
+| :--------------------------------- | :------------------------------------------- |
+| The largest above-the-fold image   | Yes — that's the LCP candidate               |
+| 32px header logo                   | No — too small to be the LCP, downloads fast |
+| Sidebar logo on a wide-only column | No — never the LCP, often below the fold     |
+| Image inside a closed dialog/modal | No — not in the viewport at first paint      |
+| Avatars in a list                  | No — many, all small, none the LCP           |
+| Thumbnail in a gallery             | No — lazy is correct                         |
+
+### `sizes` accompanies every responsive image
+
+Without `sizes`, the browser assumes `100vw` and downloads the desktop-width variant on mobile. Always provide `sizes` for images that don't render at full viewport width:
+
+```tsx
+<Image
+  src="/apc-logo.png"
+  alt="APC logo"
+  width={200}
+  height={149}
+  priority
+  sizes="(max-width: 768px) 80vw, 200px"
+/>
+```
+
+### Preconnect known image origins
+
+Add `<link rel="preconnect">` in the root layout for any third-party image origin used during initial render (e.g., the Vercel Blob bucket subdomain). This eliminates DNS + TLS handshake on the first user-uploaded image.
+
+```tsx
+// src/app/layout.tsx <head>
+<link
+  rel="preconnect"
+  href="https://<project>.public.blob.vercel-storage.com"
+/>
+```
+
+### Don't `priority` images that render inside closed surfaces
+
+A Client-Component `<Dialog>` is mounted before it opens; an `<Image priority>` inside that mount is fetched eagerly even though the dialog hasn't been opened yet. Use `priority` on the **gallery thumbnail's LCP candidate** if there is one, not on the modal's full-size image.
+
+## 22. Modern Web Guidance Reference
+
+The Google Chrome `modern-web-guidance` plugin is PinPoint's canonical lookup tool for "is there a Widely-available primitive for this?" Each guide is a prescriptive document with DOs/DON'Ts and a Baseline-status note. Use it at the start of any non-trivial UI work (CORE-UI-006).
+
+### Three commands
+
+```bash
+npx -y modern-web-guidance@latest search "<query>"       # find guides by intent
+npx -y modern-web-guidance@latest retrieve "<id>,<id2>"  # fetch full guide(s)
+npx -y modern-web-guidance@latest list                   # browse the catalog
+```
+
+### Guide map by PinPoint use case
+
+| Building...                        | MWG search/retrieve                                                     |
+| :--------------------------------- | :---------------------------------------------------------------------- |
+| Sign-in / sign-up form             | `forms`, `autofill-sign-in-form`, `autofill-sign-up-form`               |
+| Address or anonymous reporter form | `autofill-address-form`, `forms`                                        |
+| Post-interaction validation        | `validate-input-after-interaction`, `required-field-feedback`           |
+| Accessible error announcement      | `accessible-error-announcement`                                         |
+| Modal / dialog / confirmation      | `html` §4, `light-dismiss-a-dialog`, `platform-controls-dismiss-dialog` |
+| Mobile drawer / slide-in           | `navigation-drawer`                                                     |
+| Tooltips on touch                  | `interest-triggered-tooltips` (most variants are Newly available)       |
+| Image priority / LCP               | `optimize-image-priority`, `optimize-preload-priority`                  |
+| Long-task / INP                    | `break-up-long-tasks`, `identify-inp-causes`                            |
+| Container-internal layout          | `css-layout`, `size-aware-styling`                                      |
+| Conditional styling via DOM state  | `style-parent-with-has`                                                 |
+| Hidden-but-findable content        | `search-hidden-content`                                                 |
+| Reduced-motion / animation         | `accessibility` § Motion                                                |
+| Skip-link / landmarks / focus      | `accessibility`, `html` §3                                              |
+| Tables                             | `accessibility` § Tables                                                |
+
+Don't memorize the map — re-search per task. Plugin catalog updates more often than this document does.

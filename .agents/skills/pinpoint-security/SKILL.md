@@ -80,6 +80,8 @@ export async function createIssue(formData: FormData) {
 }
 ```
 
+> **Client-side form correctness lives in `pinpoint-ui` § Form Correctness.** Zod validation above is the server defense; the client opt-ins (`type`, `autocomplete`, `:user-invalid`, `aria-invalid`, `enterkeyhint`) are CORE-FORM-001..006. Both halves are required — Zod handles security/data integrity, the client correctness rules handle UX and accessibility.
+
 ## Detailed Documentation
 
 For comprehensive security guidance, read the following documentation files:
