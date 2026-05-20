@@ -50,7 +50,7 @@ export function LoginForm({
       )}
 
       {/* Login form */}
-      <form action={formAction} className="space-y-6">
+      <form action={formAction} noValidate className="space-y-6">
         {/* Hidden field for redirect destination */}
         {next && <input type="hidden" name="next" value={next} />}
 
@@ -60,7 +60,7 @@ export function LoginForm({
           <Input
             id="email"
             name="email"
-            type="text"
+            type="email"
             placeholder="you@example.com"
             autoComplete="username"
             required
@@ -76,13 +76,13 @@ export function LoginForm({
         {/* Password */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="current-password">Password</Label>
             <Link href="/forgot-password" className="text-sm text-link">
               Forgot password?
             </Link>
           </div>
           <PasswordInput
-            id="password"
+            id="current-password"
             name="password"
             autoComplete="current-password"
             required
