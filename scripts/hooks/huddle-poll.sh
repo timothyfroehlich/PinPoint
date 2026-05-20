@@ -141,20 +141,6 @@ esac
 mkdir -p "$(dirname "$POLL_FILE")" 2>/dev/null || true
 date +%s > "$POLL_FILE" 2>/dev/null || true
 
-# --- Rotation check (stub in PR #1357; real check in follow-up rotation PR) ---
-ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
-if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
-  # shellcheck source=huddle-rotation-check.sh disable=SC1091
-  source "$ROTATION_CHECK_SCRIPT"
-  if huddle_rotation_needed; then
-    # Real "rotation needed" output lands in the follow-up PR. For now this
-    # branch is unreachable (stub returns 1).
-    printf '## ⚠️ Huddle rotation needed\n\n'
-    printf 'See docs/superpowers/specs/2026-05-17-huddle-system-design.md §7.2\n'
-    exit 0
-  fi
-fi
-
 SESSION_ID=""
 if [[ -n "$INPUT" ]]; then
   SESSION_ID=$(
@@ -182,6 +168,45 @@ source "$LIB_SCRIPT"
 STATE_DIR=$(huddle_state_dir) || exit 0
 mkdir -p "$STATE_DIR"
 
+# --- Bootstrap check ---
+# If config.json is missing, the system hasn't been bootstrapped yet.
+# Exit silently — huddle-session-start.sh emits the user-visible bootstrap notice.
+CONFIG_FILE="$STATE_DIR/config.json"
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  exit 0
+fi
+ROOT_ID=$(jq -r '.root_bead_id // ""' "$CONFIG_FILE" 2>/dev/null)
+if [[ -z "$ROOT_ID" ]]; then
+  exit 0
+fi
+
+# --- Rotation check ---
+ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
+if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
+  # shellcheck source=huddle-rotation-check.sh disable=SC1091
+  source "$ROTATION_CHECK_SCRIPT"
+  if huddle_rotation_needed; then
+    STORED_DATE=""
+    NOTES_STR_ROT=$(bd show "$ROOT_ID" --json 2>/dev/null | jq -r '.[0].notes // ""' 2>/dev/null || echo "")
+    if [[ -n "$NOTES_STR_ROT" ]]; then
+      STORED_DATE=$(printf '%s' "$NOTES_STR_ROT" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('today_bead', {}).get('date', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+    fi
+    NOW_DATE=$(date +%F)
+    printf '## ⚠️ Huddle rotation needed\n\n'
+    printf 'The active coordination bead points to date %s, but today is %s.\n' "$STORED_DATE" "$NOW_DATE"
+    printf 'Before continuing, dispatch the rotation subagent.\n\n'
+    printf 'See .agents/skills/pinpoint-huddle/SKILL.md for the dispatch template.\n'
+    exit 0
+  fi
+fi
+
 # Derive a per-checkout key from the worktree root (not the hook's CWD).
 # Earlier versions hashed `pwd -P`, but that varied if the hook fired from a
 # subdirectory of the checkout (e.g. `cd src/` then triggering a UserPromptSubmit
@@ -200,8 +225,21 @@ else
   LAST_SEEN="0"
 fi
 
-# Fetch all PP-cvh comments as JSON
-COMMENTS_JSON="$(bd comments PP-cvh --json 2>/dev/null)" || { exit 0; }
+# Resolve today_bead.id from root notes, then fetch its comments
+ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || { exit 0; }
+NOTES_STR=$(printf '%s' "$ROOT_JSON" | jq -r '.[0].notes // ""' 2>/dev/null) || { exit 0; }
+[[ -n "$NOTES_STR" ]] || { exit 0; }
+TODAY_BEAD_ID=$(printf '%s' "$NOTES_STR" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('today_bead', {}).get('id', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+[[ -n "$TODAY_BEAD_ID" ]] || { exit 0; }
+
+COMMENTS_JSON="$(bd comments "$TODAY_BEAD_ID" --json 2>/dev/null)" || { exit 0; }
 
 # Resolve self agent name. Priority order:
 #   1. <STATE_DIR>/session-names.json[session_id] (canonical)
@@ -253,7 +291,7 @@ NEWEST="$(printf '%s' "$NEW_COMMENTS" | jq -r '.[-1].created_at')"
 printf '%s' "$NEWEST" > "$STATE_FILE"
 
 # Emit formatted block — becomes <system-reminder> content
-printf '## New PP-cvh coordination comments (%d)\n\n' "$COUNT"
+printf '## New huddle coordination comments (%d)\n\n' "$COUNT"
 printf '%s' "$NEW_COMMENTS" | jq -r '.[] | "**\(.author)** (\(.created_at)):\n\(.text)\n"'
 
 exit 0
