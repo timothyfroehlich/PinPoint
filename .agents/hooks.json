@@ -1,15 +1,11 @@
 {
-  "beads-integration": {
+  "beads": {
     "enabled": true,
     "PreInvocation": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node scripts/hooks/agy-beads-bootstrap.cjs",
-            "timeout": 15
-          }
-        ]
+        "type": "command",
+        "command": "node hooks/agy-beads-bootstrap.cjs",
+        "timeout": 15
       }
     ]
   }
