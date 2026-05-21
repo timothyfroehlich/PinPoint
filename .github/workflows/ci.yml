@@ -59,6 +59,8 @@ jobs:
               - '!.agent/**'
               - '!.agents/**'
               - '!.claude/**'
+              - '!scripts/hooks/**'
+              - '!scripts/workflow/**'
               - '!LICENSE'
               - '!.gitignore'
       # Separate filter for dependency changes using default "some" quantifier
@@ -502,7 +504,7 @@ jobs:
   test-integration-supabase:
     name: Supabase Integration Tests
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Harden Runner
@@ -556,7 +558,7 @@ jobs:
     # ==============================================================================
     name: E2E Smoke Tests (Chromium)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     timeout-minutes: 15
     steps:
@@ -637,7 +639,7 @@ jobs:
     # ==============================================================================
     name: E2E Smoke Tests (Mobile Chrome)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     timeout-minutes: 15
     steps:
@@ -718,7 +720,7 @@ jobs:
     # ==============================================================================
     name: E2E Full Tests (Chromium)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && (needs.changes.outputs.code == 'true' || needs.changes.outputs.deps == 'true') }}
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     timeout-minutes: 15
     steps:

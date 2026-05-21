@@ -163,6 +163,41 @@ def _fetch_merge_state(pr: int) -> tuple[str, set[str]]:
     return "UNKNOWN", set()
 
 
+def _pre_check_blocking(pr: int) -> tuple[bool, str]:
+    """Return (True, "") if no blocking conditions are present, else (False, reason).
+
+    Used by the default watch mode as a fail-fast pre-check BEFORE entering the
+    watch loop. Distinguishes conditions that won't resolve by waiting (bad merge
+    state, already-failed CI Gate, unresolved Copilot threads) from conditions
+    that the watch loop is designed to wait through (CI Gate not yet posted, CI
+    Gate in progress). The latter MUST pass this pre-check so the watch loop can
+    fire and `_finalize_via_ci_gate` can poll for completion.
+
+    Audit-only mode (run_audit, --audit) keeps its stricter semantics — there,
+    CI-Gate-absent IS correctly a "no, not ready right now".
+    """
+    merge_state, _labels = _fetch_merge_state(pr)
+    if merge_state in ("DIRTY", "CONFLICTING", "BEHIND"):
+        return False, f"merge state {merge_state} — resolve before watching"
+
+    ci_status, ci_conclusion = _ci_gate_state(pr)
+    if ci_status == "COMPLETED" and ci_conclusion not in (
+        "SUCCESS",
+        "NEUTRAL",
+        "SKIPPED",
+    ):
+        return (
+            False,
+            f"CI Gate already failed (conclusion={ci_conclusion or 'unknown'})",
+        )
+
+    unresolved = _unresolved_copilot(get_review_threads(pr))
+    if unresolved > 0:
+        return False, f"{unresolved} unresolved Copilot thread(s)"
+
+    return True, ""
+
+
 def run_audit(pr: int) -> bool:
     """Print a pass/fail report for review-readiness. Return True if all pass."""
     merge_state, labels = _fetch_merge_state(pr)
@@ -378,8 +413,11 @@ def main() -> int:
     if audit_only:
         return 0 if run_audit(pr) else 1
 
-    if not force and not run_audit(pr):
-        return 1
+    if not force:
+        blocking_ok, reason = _pre_check_blocking(pr)
+        if not blocking_ok:
+            emit(f"Pre-check failed: {reason}")
+            return 1
 
     try:
         pr_data = json.loads(
