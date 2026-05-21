@@ -18,9 +18,13 @@
 
 set -euo pipefail
 
-if ! command -v sem >/dev/null 2>&1; then
+if ! command -v sem >/dev/null 2>&1 \
+   || ! sem --version 2>/dev/null | grep -q '^GNU parallel'; then
+  # moreutils also ships a `sem` binary that doesn't speak --jobs/--id/--fg,
+  # so we additionally probe `sem --version` for the GNU parallel banner.
   cat >&2 <<'EOF'
-Error: `sem` not found.
+Error: GNU parallel's `sem` not found (or `sem` on PATH is from another
+package, e.g. moreutils — that variant doesn't speak --jobs/--id/--fg).
 
 `pnpm run preflight` uses GNU parallel's `sem` to cap host-wide preflight
 concurrency at 2. Install it:
