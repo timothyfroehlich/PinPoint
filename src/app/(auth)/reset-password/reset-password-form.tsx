@@ -40,12 +40,18 @@ export function ResetPasswordForm(): React.JSX.Element {
 
       {/* New Password */}
       <div className="space-y-2">
-        <Label htmlFor="password">New Password</Label>
+        <Label htmlFor="password">
+          New Password{" "}
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
+        </Label>
         <PasswordInput
           id="password"
           name="password"
           autoComplete="new-password"
           required
+          enterKeyHint="next"
           minLength={8}
           maxLength={128}
           className="bg-surface-variant"
@@ -60,12 +66,18 @@ export function ResetPasswordForm(): React.JSX.Element {
 
       {/* Confirm Password */}
       <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm Password</Label>
+        <Label htmlFor="confirmPassword">
+          Confirm Password{" "}
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
+        </Label>
         <PasswordInput
           id="confirmPassword"
           name="confirmPassword"
           autoComplete="off"
           required
+          enterKeyHint="done"
           minLength={8}
           maxLength={128}
           className="bg-surface-variant"

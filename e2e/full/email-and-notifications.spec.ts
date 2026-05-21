@@ -64,9 +64,7 @@ test.describe("Notifications", () => {
 
     await ownerPage.goto("/login");
     await ownerPage.getByLabel("Email").fill(ownerEmail);
-    await ownerPage
-      .getByLabel("Password", { exact: true })
-      .fill("TestPassword123");
+    await ownerPage.getByLabel(/^Password\s*\*?$/).fill("TestPassword123");
     await ownerPage.getByRole("button", { name: "Sign In" }).click();
     await expect(ownerPage).toHaveURL("/dashboard");
 
@@ -250,9 +248,7 @@ test.describe("Notifications", () => {
 
     await adminPage.goto("/login");
     await adminPage.getByLabel("Email").fill(adminEmail);
-    await adminPage
-      .getByLabel("Password", { exact: true })
-      .fill("TestPassword123");
+    await adminPage.getByLabel(/^Password\s*\*?$/).fill("TestPassword123");
     await adminPage.getByRole("button", { name: "Sign In" }).click();
     await expect(adminPage).toHaveURL("/dashboard");
 
@@ -289,9 +285,7 @@ test.describe("Notifications", () => {
 
     await watcherPage.goto("/login");
     await watcherPage.getByLabel("Email").fill(globalWatcherEmail);
-    await watcherPage
-      .getByLabel("Password", { exact: true })
-      .fill("TestPassword123");
+    await watcherPage.getByLabel(/^Password\s*\*?$/).fill("TestPassword123");
     await watcherPage.getByRole("button", { name: "Sign In" }).click();
     await expect(watcherPage).toHaveURL("/dashboard");
 
@@ -365,7 +359,7 @@ test.describe("Notifications", () => {
     // Login as owner
     await page.goto("/login");
     await page.getByLabel("Email").fill(ownerEmail);
-    await page.getByLabel("Password", { exact: true }).fill("TestPassword123");
+    await page.getByLabel(/^Password\s*\*?$/).fill("TestPassword123");
     await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/dashboard");
 
@@ -422,7 +416,7 @@ test.describe("Notifications", () => {
 
     await page.goto("/login");
     await page.getByLabel("Email").fill(ownerEmail);
-    await page.getByLabel("Password", { exact: true }).fill("TestPassword123");
+    await page.getByLabel(/^Password\s*\*?$/).fill("TestPassword123");
     await page.getByRole("button", { name: "Sign In" }).click();
 
     // Ensure In-App is enabled (it is by default for owned machines)
