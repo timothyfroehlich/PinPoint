@@ -15,6 +15,7 @@ interface PrioritySelectProps {
   value: IssuePriority | "";
   onValueChange: (value: IssuePriority) => void;
   disabled?: boolean;
+  id?: string;
   name?: string;
   placeholder?: string;
   testId?: string;
@@ -26,6 +27,7 @@ export function PrioritySelect({
   value,
   onValueChange,
   disabled = false,
+  id,
   name = "priority",
   placeholder = "Select priority...",
   testId = "issue-priority-select",
@@ -38,6 +40,7 @@ export function PrioritySelect({
       name={name}
     >
       <SelectTrigger
+        id={id}
         className="w-full border-outline-variant bg-surface text-foreground"
         aria-label={
           value

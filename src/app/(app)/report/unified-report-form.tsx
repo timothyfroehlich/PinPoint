@@ -478,7 +478,11 @@ export function UnifiedReportForm({
                   Severity *
                 </Label>
                 <input type="hidden" name="severity" value={severity} />
-                <SeveritySelect value={severity} onValueChange={setSeverity} />
+                <SeveritySelect
+                  id="severity"
+                  value={severity}
+                  onValueChange={setSeverity}
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -487,6 +491,7 @@ export function UnifiedReportForm({
                 </Label>
                 <input type="hidden" name="frequency" value={frequency} />
                 <FrequencySelect
+                  id="frequency"
                   value={frequency}
                   onValueChange={setFrequency}
                   testId="issue-frequency-select"
@@ -503,6 +508,7 @@ export function UnifiedReportForm({
                   </Label>
                   <input type="hidden" name="priority" value={priority} />
                   <PrioritySelect
+                    id="priority"
                     value={priority}
                     onValueChange={setPriority}
                   />
@@ -512,7 +518,11 @@ export function UnifiedReportForm({
                     Status *
                   </Label>
                   <input type="hidden" name="status" value={status} />
-                  <StatusSelect value={status} onValueChange={setStatus} />
+                  <StatusSelect
+                    id="status"
+                    value={status}
+                    onValueChange={setStatus}
+                  />
                 </div>
               </div>
             )}

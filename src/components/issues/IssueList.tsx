@@ -106,6 +106,8 @@ export function IssueList({
   const [_isPending, startTransition] = React.useTransition();
   // format: issueId-field
   const [updatingCell, setUpdatingCell] = React.useState<string | null>(null);
+  // format: issueId-field → error message
+  const [cellError, setCellError] = React.useState<string | null>(null);
 
   // Stable order tracking: only update display order when sort/page changes
   const [stableIds, setStableIds] = React.useState<string[]>([]);
@@ -156,6 +158,13 @@ export function IssueList({
     );
   };
 
+  const getSortAriaSort = (
+    column: string
+  ): "ascending" | "descending" | "none" => {
+    if (currentColumn !== column) return "none";
+    return currentDirection === "asc" ? "ascending" : "descending";
+  };
+
   const TableHeader = ({
     label,
     column,
@@ -168,6 +177,8 @@ export function IssueList({
     className?: string;
   }): React.JSX.Element => (
     <th
+      scope="col"
+      aria-sort={getSortAriaSort(column)}
       className={cn(
         "px-4 py-3 text-sm font-semibold text-muted-foreground group cursor-pointer hover:text-foreground transition-colors duration-150 sticky top-0 bg-muted/30 z-10",
         align === "right" && "text-right",
@@ -326,7 +337,10 @@ export function IssueList({
         className="w-full bg-card border rounded-lg overflow-hidden shadow-sm overflow-x-auto"
       >
         <div>
-          <table className="w-full text-left border-collapse">
+          <table
+            className="w-full text-left border-collapse"
+            aria-label="Issues"
+          >
             <thead>
               <tr className="border-b bg-muted/30">
                 <TableHeader
@@ -444,7 +458,9 @@ export function IssueList({
                           const formData = new FormData();
                           formData.append("issueId", issue.id);
                           formData.append("status", val);
-                          setUpdatingCell(`${issue.id}-status`);
+                          const cellKey = `${issue.id}-status`;
+                          setUpdatingCell(cellKey);
+                          setCellError(null);
                           startTransition(async () => {
                             try {
                               const result = await updateIssueStatusAction(
@@ -455,15 +471,18 @@ export function IssueList({
                                 toast.success("Status updated");
                               } else {
                                 toast.error(result.message);
+                                setCellError(cellKey);
                               }
                             } catch {
                               toast.error("Failed to update status");
+                              setCellError(cellKey);
                             } finally {
                               setUpdatingCell(null);
                             }
                           });
                         }}
                         isUpdating={updatingCell === `${issue.id}-status`}
+                        isError={cellError === `${issue.id}-status`}
                       />
                     )}
                     {visibleColumns.priority && (
@@ -483,7 +502,9 @@ export function IssueList({
                           const formData = new FormData();
                           formData.append("issueId", issue.id);
                           formData.append("priority", val);
-                          setUpdatingCell(`${issue.id}-priority`);
+                          const cellKey = `${issue.id}-priority`;
+                          setUpdatingCell(cellKey);
+                          setCellError(null);
                           startTransition(async () => {
                             try {
                               const result = await updateIssuePriorityAction(
@@ -494,15 +515,18 @@ export function IssueList({
                                 toast.success("Priority updated");
                               } else {
                                 toast.error(result.message);
+                                setCellError(cellKey);
                               }
                             } catch {
                               toast.error("Failed to update priority");
+                              setCellError(cellKey);
                             } finally {
                               setUpdatingCell(null);
                             }
                           });
                         }}
                         isUpdating={updatingCell === `${issue.id}-priority`}
+                        isError={cellError === `${issue.id}-priority`}
                       />
                     )}
                     {visibleColumns.severity && (
@@ -522,7 +546,9 @@ export function IssueList({
                           const formData = new FormData();
                           formData.append("issueId", issue.id);
                           formData.append("severity", val);
-                          setUpdatingCell(`${issue.id}-severity`);
+                          const cellKey = `${issue.id}-severity`;
+                          setUpdatingCell(cellKey);
+                          setCellError(null);
                           startTransition(async () => {
                             try {
                               const result = await updateIssueSeverityAction(
@@ -533,15 +559,18 @@ export function IssueList({
                                 toast.success("Severity updated");
                               } else {
                                 toast.error(result.message);
+                                setCellError(cellKey);
                               }
                             } catch {
                               toast.error("Failed to update severity");
+                              setCellError(cellKey);
                             } finally {
                               setUpdatingCell(null);
                             }
                           });
                         }}
                         isUpdating={updatingCell === `${issue.id}-severity`}
+                        isError={cellError === `${issue.id}-severity`}
                       />
                     )}
                     {visibleColumns.assignee && (

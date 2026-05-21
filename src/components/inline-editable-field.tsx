@@ -5,7 +5,6 @@ import type React from "react";
 import { useState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
 import { Pencil } from "lucide-react";
-import { cn } from "~/lib/utils";
 import { type ProseMirrorDoc, docToPlainText } from "~/lib/tiptap/types";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
@@ -143,33 +142,16 @@ export function InlineEditableField({
             </Button>
           </div>
         </div>
-      ) : (
-        <div
-          className={cn(
-            "group relative min-h-[1.5rem]",
-            canEdit && "cursor-pointer rounded-md hover:bg-surface-variant/50"
-          )}
-          onClick={
-            canEdit
-              ? (e) => {
-                  // Don't enter edit mode when clicking a link (e.g. mention profiles)
-                  if ((e.target as HTMLElement).closest("a")) return;
-                  handleEdit();
-                }
-              : undefined
-          }
-          onKeyDown={
-            canEdit
-              ? (e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleEdit();
-                  }
-                }
-              : undefined
-          }
-          role={canEdit ? "button" : undefined}
-          tabIndex={canEdit ? 0 : undefined}
+      ) : canEdit ? (
+        <button
+          type="button"
+          aria-label={`Edit ${label}`}
+          className="group relative min-h-[1.5rem] w-full cursor-pointer rounded-md text-left hover:bg-surface-variant/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onClick={(e) => {
+            // Don't enter edit mode when clicking a link (e.g. mention profiles)
+            if ((e.target as HTMLElement).closest("a")) return;
+            handleEdit();
+          }}
           data-testid={testId ? `${testId}-display` : undefined}
         >
           {isEmpty ? (
@@ -179,11 +161,18 @@ export function InlineEditableField({
           ) : (
             <RichTextDisplay content={displayValue} className="py-1" />
           )}
-          {canEdit && (
-            <Pencil
-              className="absolute right-2 top-1 size-3.5 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100"
-              aria-hidden="true"
-            />
+          <Pencil
+            className="absolute right-2 top-1 size-3.5 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+            aria-hidden="true"
+          />
+        </button>
+      ) : (
+        <div
+          className="relative min-h-[1.5rem]"
+          data-testid={testId ? `${testId}-display` : undefined}
+        >
+          {isEmpty ? null : (
+            <RichTextDisplay content={displayValue} className="py-1" />
           )}
         </div>
       )}
