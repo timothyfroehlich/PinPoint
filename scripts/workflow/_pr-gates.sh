@@ -174,3 +174,5 @@ check_no_merge_conflict() {
       ;;
   esac
 }
+
+# verify-skip-PP-iq16 — test PR for has_code exclusion (scripts/workflow/)

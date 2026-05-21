@@ -39,3 +39,5 @@ huddle_state_dir() {
   main_root=$(dirname "$abs_common")
   printf '%s/.agents/huddle' "$main_root"
 }
+
+# verify-skip-PP-iq16 — test PR for has_code exclusion (scripts/hooks/)
