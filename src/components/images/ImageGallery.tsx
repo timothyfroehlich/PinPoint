@@ -70,7 +70,6 @@ export function ImageGallery({
                   unoptimized={isLocalhost}
                   className="object-contain"
                   sizes="100vw"
-                  priority
                 />
               </div>
             </DialogContent>
