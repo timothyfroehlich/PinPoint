@@ -4,15 +4,23 @@ import { cn } from "~/lib/utils";
 
 function Textarea({
   className,
+  onBlur,
   ...props
 }: React.ComponentProps<"textarea">): React.JSX.Element {
   return (
     <textarea
       data-slot="textarea"
       className={cn(
-        "border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-input/30 flex field-sizing-content min-h-16 w-full rounded-md border px-3 py-2 text-base shadow-xs transition-[color,box-shadow] duration-150 outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+        "border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/40 aria-invalid:border-destructive [&:user-invalid]:ring-destructive/40 [&:user-invalid]:border-destructive bg-input/30 flex field-sizing-content min-h-16 w-full rounded-md border px-3 py-2 text-base shadow-xs transition-[color,box-shadow] duration-150 outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
         className
       )}
+      onBlur={(e) => {
+        e.currentTarget.setAttribute(
+          "aria-invalid",
+          e.currentTarget.checkValidity() ? "false" : "true"
+        );
+        onBlur?.(e);
+      }}
       {...props}
     />
   );
