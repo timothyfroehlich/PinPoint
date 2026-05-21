@@ -64,7 +64,7 @@ export function ResetPasswordForm(): React.JSX.Element {
         <PasswordInput
           id="confirmPassword"
           name="confirmPassword"
-          autoComplete="new-password"
+          autoComplete="off"
           required
           minLength={8}
           maxLength={128}

@@ -56,12 +56,13 @@ export function LoginForm({
 
         {/* Email */}
         <div className="space-y-3">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">Email or Username</Label>
           <Input
             id="email"
             name="email"
             type="text"
-            placeholder="you@example.com"
+            inputMode="email"
+            placeholder="you@example.com or username"
             autoComplete="username"
             required
             defaultValue={
@@ -76,13 +77,13 @@ export function LoginForm({
         {/* Password */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="current-password">Password</Label>
             <Link href="/forgot-password" className="text-sm text-link">
               Forgot password?
             </Link>
           </div>
           <PasswordInput
-            id="password"
+            id="current-password"
             name="password"
             autoComplete="current-password"
             required
