@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2250  # unbraced $vars are consistent throughout this codebase
 # huddle-poll.sh — poll PP-cvh for new coordination comments and inject them
 #
-# Fires from two registered hook events (see .claude/settings.json):
-#   - UserPromptSubmit  → always polls (no throttle env var set)
-#   - PostToolUse       → polls at most once per HUDDLE_THROTTLE_SECONDS
+# Harness-agnostic. Fires from per-harness hook configurations:
+#   - Claude Code:  UserPromptSubmit (no throttle) + PostToolUse (throttled),
+#                   registered in .claude/settings.json
+#   - Antigravity:  mid-trajectory invocation via .agents/hooks/agy-beads-bootstrap.cjs
+#   - Other harnesses: route through their own bootstrap shim
 # Outputs new comments as a system-reminder block on stdout, or nothing if
 # nothing is new (zero stdout = no injection).
 #
-# Stdin payload schema (per https://code.claude.com/docs/en/hooks):
+# Stdin payload schema (Claude Code shape; other harnesses adapt to this via
+# their bootstrap shim):
 #   UserPromptSubmit:
 #     { session_id, transcript_path, cwd, hook_event_name,
 #       permission_mode, prompt }
@@ -17,37 +21,43 @@
 # We only read session_id and transcript_path (the latter for subagent
 # detection); other fields are ignored.
 #
-# Throttle (PostToolUse only): set HUDDLE_THROTTLE_SECONDS=N in the hook
-# command line to gate the slow path to once per N seconds per worktree.
+# Throttle (slow-path harnesses only): set HUDDLE_THROTTLE_SECONDS=N in the
+# hook command line to gate the slow path to once per N seconds per worktree.
 # When unset/zero, the throttle block is skipped entirely → identical to
 # pre-throttle behavior. The fast-path skip is the dominant cost path during
 # active tool-call bursts; target wall clock <30ms (one date +%s spawn).
 #
-# Throttle marker: $CLAUDE_PROJECT_DIR/.claude/.huddle-last-poll, one line
-# of epoch seconds. Written on every slow-path entry (whether or not new
-# comments were found) — "I polled and there was nothing" is still a poll.
-# Written BEFORE the bd fetch so that bd-broken states still get backoff
-# instead of triggering one hammer per tool call.
+# Throttle marker: <project>/.agents/.huddle-last-poll, one line of epoch
+# seconds. Written on every slow-path entry (whether or not new comments
+# were found) — "I polled and there was nothing" is still a poll. Written
+# BEFORE the bd fetch so that bd-broken states still get backoff instead
+# of triggering one hammer per tool call.
 #
-# State file: <main-worktree>/.claude/huddle/last-seen-<sha256-of-worktree-root>
+# State file: <main-worktree>/.agents/huddle/last-seen-<sha256-of-worktree-root>
 #   Per-checkout cursor advancing only when new comments are injected.
-#   Shared across all linked worktrees via huddle-lib.sh's git-common-dir
-#   resolver.
+#   Shared across all linked worktrees AND all harnesses via huddle-lib.sh's
+#   git-common-dir resolver.
 #
 # Self-filter (auto, no env config required): the stdin payload carries a
 # `session_id` field. The hook looks up the agent's name from
-# <main-worktree>/.claude/huddle/session-names.json (a JSON
-# `{session_id: name}` map). Comments ending with `—Claude-<name>` or
-# `—<name>` are excluded from injection so an agent never re-sees its own
-# coordination posts. To register a session→name mapping:
+# <main-worktree>/.agents/huddle/session-names.json (a JSON
+# `{session_id: name}` map). Comments ending with `—<name>` are excluded
+# from injection so an agent never re-sees its own coordination posts.
+# Registered names should embed the harness (e.g. `Claude-DesignBible`,
+# `Antigravity-AgentsMdCleanup`); the sign-off is `—<full-name>`. For
+# backward compat the filter also accepts `—Claude-<name>` for older
+# unprefixed registrations.
+#
+# To register a session→name mapping:
 #   bash scripts/hooks/huddle-whoami.sh register <Name> <session_id>
 #
 # Backward compat: also accepts the $CLAUDE_AGENT_NAME env var (the original
-# activation scheme).
+# activation scheme); harnesses other than Claude Code should pass session_id
+# explicitly via the stdin payload and register through huddle-whoami.sh.
 #
-# Naming guidance: pick a short descriptive name based on your current work
-# (e.g. WorktreeHookFix, TestAudit, DesignBible). Full reference:
-# `.agent/skills/pinpoint-huddle/SKILL.md`.
+# Naming guidance: pick a short descriptive name prefixed with your harness
+# (e.g. Claude-WorktreeHookFix, Antigravity-TestAudit, Codex-DesignBible).
+# Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`.
 
 set -euo pipefail
 
@@ -70,10 +80,10 @@ fi
 
 # Throttle marker path (used by fast-path check and slow-path write).
 # CLAUDE_PROJECT_DIR is set by the Claude Code harness for hook invocations;
-# the fallback to $PWD is defensive (and matches the settings.json pattern
-# `bash "${CLAUDE_PROJECT_DIR:-.}"/...`).
+# other harnesses fall through to $PWD (their bootstrap shim should cd into
+# the project root before invoking, which matches Antigravity's behavior).
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
-POLL_FILE="$PROJECT_DIR/.claude/.huddle-last-poll"
+POLL_FILE="$PROJECT_DIR/.agents/.huddle-last-poll"
 
 # === FAST PATH (PostToolUse only — gated by HUDDLE_THROTTLE_SECONDS) ===
 # UserPromptSubmit calls this script without HUDDLE_THROTTLE_SECONDS set, so
@@ -122,6 +132,7 @@ except Exception:
 fi
 case "$TRANSCRIPT_PATH" in
   */subagents/*) exit 0 ;;
+  *) ;;
 esac
 
 # Mark the throttle now — we're committed to a poll. Writing the marker before
@@ -129,20 +140,6 @@ esac
 # still respect the throttle window instead of hammering a sick bd.
 mkdir -p "$(dirname "$POLL_FILE")" 2>/dev/null || true
 date +%s > "$POLL_FILE" 2>/dev/null || true
-
-# --- Rotation check (stub in PR #1357; real check in follow-up rotation PR) ---
-ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
-if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
-  # shellcheck source=huddle-rotation-check.sh disable=SC1091
-  source "$ROTATION_CHECK_SCRIPT"
-  if huddle_rotation_needed; then
-    # Real "rotation needed" output lands in the follow-up PR. For now this
-    # branch is unreachable (stub returns 1).
-    printf '## ⚠️ Huddle rotation needed\n\n'
-    printf 'See docs/superpowers/specs/2026-05-17-huddle-system-design.md §7.2\n'
-    exit 0
-  fi
-fi
 
 SESSION_ID=""
 if [[ -n "$INPUT" ]]; then
@@ -158,7 +155,7 @@ except Exception:
 fi
 
 # --- State directory resolution ---
-# Huddle state lives in <main-worktree>/.claude/huddle/ so it's shared
+# Huddle state lives in <main-worktree>/.agents/huddle/ so it's shared
 # across all linked worktrees of the same clone. huddle-lib.sh provides
 # the resolver. If we can't find a git common-dir (e.g., hook fired outside
 # any PinPoint checkout), fail open silently — coordination is optional.
@@ -170,6 +167,79 @@ fi
 source "$LIB_SCRIPT"
 STATE_DIR=$(huddle_state_dir) || exit 0
 mkdir -p "$STATE_DIR"
+
+# --- Bootstrap check ---
+# If config.json is missing, the system hasn't been bootstrapped yet.
+# Exit silently — huddle-session-start.sh emits the user-visible bootstrap notice.
+CONFIG_FILE="$STATE_DIR/config.json"
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  exit 0
+fi
+ROOT_ID=$(jq -r '.root_bead_id // ""' "$CONFIG_FILE" 2>/dev/null)
+if [[ -z "$ROOT_ID" ]]; then
+  exit 0
+fi
+
+# --- Fetch root bead JSON (shared by integrity check, rotation check, and slow path) ---
+# Fetch once here and reuse below. If bd is unavailable or the bead is
+# inaccessible, fail open silently — we do NOT want to emit a false "notes
+# malformed" warning when the real issue is a bd outage.
+ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || exit 0
+[[ -n "$ROOT_JSON" ]] || exit 0
+
+# --- Root notes integrity check ---
+# config.json exists but root notes may be null/malformed (e.g. 2026-05-20
+# incident on PP-lt12 where notes were wiped between 00:41 and 01:08 UTC).
+# Emit a visible stderr diagnostic so the user knows polling is degraded;
+# still exit 0 so the user prompt is not blocked.
+NOTES_STR=$(printf '%s' "$ROOT_JSON" | jq -r '.[0].notes // ""' 2>/dev/null || echo "")
+NOTES_OK=true
+if [[ -z "$NOTES_STR" ]]; then
+  NOTES_OK=false
+else
+  TODAY_CHECK=$(printf '%s' "$NOTES_STR" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('today_bead', {}).get('id', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+  if [[ -z "$TODAY_CHECK" ]]; then
+    NOTES_OK=false
+  fi
+fi
+if [[ "$NOTES_OK" == false ]]; then
+  printf 'huddle-poll: root notes JSON is null or malformed on %s. Run bash scripts/hooks/huddle-bootstrap.sh to recover. Polling skipped this turn.\n' "$ROOT_ID" >&2
+  exit 0
+fi
+
+# --- Rotation check ---
+ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
+if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
+  # shellcheck source=huddle-rotation-check.sh disable=SC1091
+  source "$ROTATION_CHECK_SCRIPT"
+  if huddle_rotation_needed; then
+    STORED_DATE=""
+    # Reuse ROOT_JSON + NOTES_STR already fetched above (avoids a second bd call).
+    if [[ -n "$NOTES_STR" ]]; then
+      STORED_DATE=$(printf '%s' "$NOTES_STR" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('today_bead', {}).get('date', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+    fi
+    NOW_DATE=$(date +%F)
+    printf '## ⚠️ Huddle rotation needed\n\n'
+    printf 'The active coordination bead points to date %s, but today is %s.\n' "$STORED_DATE" "$NOW_DATE"
+    printf 'Before continuing, dispatch the rotation subagent.\n\n'
+    printf 'See .agents/skills/pinpoint-huddle/SKILL.md for the dispatch template.\n'
+    exit 0
+  fi
+fi
 
 # Derive a per-checkout key from the worktree root (not the hook's CWD).
 # Earlier versions hashed `pwd -P`, but that varied if the hook fired from a
@@ -189,8 +259,20 @@ else
   LAST_SEEN="0"
 fi
 
-# Fetch all PP-cvh comments as JSON
-COMMENTS_JSON="$(bd comments PP-cvh --json 2>/dev/null)" || { exit 0; }
+# Resolve today_bead.id from root notes, then fetch its comments.
+# ROOT_JSON and NOTES_STR are already populated from the integrity check above;
+# the notes-integrity gate above guarantees NOTES_STR is non-empty here.
+TODAY_BEAD_ID=$(printf '%s' "$NOTES_STR" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('today_bead', {}).get('id', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+[[ -n "$TODAY_BEAD_ID" ]] || { exit 0; }
+
+COMMENTS_JSON="$(bd comments "$TODAY_BEAD_ID" --json 2>/dev/null)" || { exit 0; }
 
 # Resolve self agent name. Priority order:
 #   1. <STATE_DIR>/session-names.json[session_id] (canonical)
@@ -242,7 +324,7 @@ NEWEST="$(printf '%s' "$NEW_COMMENTS" | jq -r '.[-1].created_at')"
 printf '%s' "$NEWEST" > "$STATE_FILE"
 
 # Emit formatted block — becomes <system-reminder> content
-printf '## New PP-cvh coordination comments (%d)\n\n' "$COUNT"
+printf '## New huddle coordination comments (%d)\n\n' "$COUNT"
 printf '%s' "$NEW_COMMENTS" | jq -r '.[] | "**\(.author)** (\(.created_at)):\n\(.text)\n"'
 
 exit 0

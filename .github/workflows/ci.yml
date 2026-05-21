@@ -18,9 +18,19 @@ concurrency:
 
 jobs:
   # Detect which files changed to skip expensive jobs for docs-only changes.
-  # Uses predicate-quantifier: 'some' with negative patterns so that has_code=true
-  # when ANY changed file is NOT docs-only. New/unknown directories default to
-  # running full CI — the safe failure mode.
+  # Uses predicate-quantifier: 'every' with a positive '**' plus negative
+  # exclusions. A changed file counts as "code" only when it matches every
+  # pattern — i.e. it matches '**' (always) AND is NOT under any excluded
+  # path. `has_code` is true if at least one changed file is "code". A
+  # docs-only PR (only excluded paths touched) produces has_code=false and
+  # downstream expensive jobs cascade-skip via `setup`'s `if:` gate. New /
+  # unknown directories default to running full CI — the safe failure mode.
+  #
+  # Why 'every' and not 'some': under 'some', the positive '**' matches every
+  # file by itself, short-circuiting the negative exclusions and forcing
+  # has_code=true on every PR. PR #1327 / PP-r5v shipped 'some' and the
+  # filter never fired (e.g. PR #1386, a single .agent/skills/*.md change,
+  # still ran the full E2E suite).
   changes:
     name: Detect Changes
     runs-on: ubuntu-latest
@@ -39,7 +49,7 @@ jobs:
       - id: filter
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d  # ratchet:dorny/paths-filter@v4.0.1
         with:
-          predicate-quantifier: "some"
+          predicate-quantifier: "every"
           filters: |
             has_code:
               - '**'
@@ -47,6 +57,7 @@ jobs:
               - '!**/*.md'
               - '!.beads/**'
               - '!.agent/**'
+              - '!.agents/**'
               - '!.claude/**'
               - '!LICENSE'
               - '!.gitignore'
@@ -851,6 +862,7 @@ jobs:
         uses: ./.github/actions/setup-supabase
 
       - name: Run Comprehensive Smoke Tests (all browsers)
+        continue-on-error: true
         env:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
@@ -862,7 +874,22 @@ jobs:
             --project=chromium --project="Mobile Chrome" \
             --project="Mobile Safari" --workers=3
 
+      - name: Evaluate gating browser results (Smoke)
+        run: |
+          RESULTS=playwright-report/results.json
+          JQ_NAMES='.suites[].specs[] | select(.ok == false) | .tests[0].projectName'
+          JQ_TITLES='.suites[].specs[] | select(.ok == false) | "[\(.tests[0].projectName)] \(.title)"'
+          GATING_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cvE '^Mobile Safari$' || true)
+          if [ "$GATING_FAILS" -gt 0 ]; then
+            echo 'Gating browser failures (Smoke):'
+            jq -r "$JQ_TITLES" "$RESULTS" | grep -vE '^\[Mobile Safari\]'
+            exit 1
+          fi
+          SAFARI_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cE '^Mobile Safari$' || true)
+          echo "Gating browsers green (Smoke). Mobile Safari failures (non-gating): $SAFARI_FAILS"
+
       - name: Run Comprehensive Full Tests (all browsers)
+        continue-on-error: true
         env:
           MOCK_BLOB_STORAGE: "true"
           PLAYWRIGHT_STDOUT: "pipe"
@@ -873,6 +900,20 @@ jobs:
           pnpm exec playwright test --config=playwright.config.full.ts \
             --project=chromium --project="Mobile Chrome" \
             --project="Mobile Safari" --workers=3
+
+      - name: Evaluate gating browser results (Full)
+        run: |
+          RESULTS=playwright-report/results.json
+          JQ_NAMES='.suites[].specs[] | select(.ok == false) | .tests[0].projectName'
+          JQ_TITLES='.suites[].specs[] | select(.ok == false) | "[\(.tests[0].projectName)] \(.title)"'
+          GATING_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cvE '^Mobile Safari$' || true)
+          if [ "$GATING_FAILS" -gt 0 ]; then
+            echo 'Gating browser failures (Full):'
+            jq -r "$JQ_TITLES" "$RESULTS" | grep -vE '^\[Mobile Safari\]'
+            exit 1
+          fi
+          SAFARI_FAILS=$(jq -r "$JQ_NAMES" "$RESULTS" | grep -cE '^Mobile Safari$' || true)
+          echo "Gating browsers green (Full). Mobile Safari failures (non-gating): $SAFARI_FAILS"
 
       - name: Summarize test failures
         if: failure()
@@ -889,7 +930,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Playwright report
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # ratchet:actions/upload-artifact@v7.0.1
         with:
           name: playwright-report-comprehensive

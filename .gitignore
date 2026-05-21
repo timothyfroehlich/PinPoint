@@ -7,8 +7,8 @@
 .claude/scheduled_tasks.lock
 
 # Huddle coordination state (runtime, machine-local)
-.claude/huddle/
-.claude/.huddle-last-poll
+.agents/huddle/
+.agents/.huddle-last-poll
 
 # dependencies
 /node_modules
@@ -151,6 +151,10 @@ planning_task.md
 artifacts/superpowers/
 .agent/logs/
 .agent/tmp/
+.agents/logs/
+.agents/tmp/
+.agents/recycle_bin/
+.antigravitycli/
 .pytest_cache/
 __pycache__/
 *.pyc
