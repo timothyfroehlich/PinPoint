@@ -180,6 +180,33 @@ if [[ -z "$ROOT_ID" ]]; then
   exit 0
 fi
 
+# --- Root notes integrity check ---
+# config.json exists but root notes may be null/malformed (e.g. 2026-05-20
+# incident on PP-lt12 where notes were wiped between 00:41 and 01:08 UTC).
+# Emit a visible stderr diagnostic so the user knows polling is degraded;
+# still exit 0 so the user prompt is not blocked.
+ROOT_NOTES_CHECK=$(bd show "$ROOT_ID" --json 2>/dev/null | jq -r '.[0].notes // ""' 2>/dev/null || echo "")
+NOTES_OK=true
+if [[ -z "$ROOT_NOTES_CHECK" ]]; then
+  NOTES_OK=false
+else
+  TODAY_CHECK=$(printf '%s' "$ROOT_NOTES_CHECK" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('today_bead', {}).get('id', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+  if [[ -z "$TODAY_CHECK" ]]; then
+    NOTES_OK=false
+  fi
+fi
+if [[ "$NOTES_OK" == false ]]; then
+  printf 'huddle-poll: root notes JSON is null or malformed on %s. Run bash scripts/hooks/huddle-bootstrap.sh to recover. Polling skipped this turn.\n' "$ROOT_ID" >&2
+  exit 0
+fi
+
 # --- Rotation check ---
 ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
 if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
