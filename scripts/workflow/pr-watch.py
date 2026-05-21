@@ -210,8 +210,8 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
     Gate in progress). The latter MUST pass this pre-check so the watch loop can
     fire and `_finalize_via_ci_gate` can poll for completion.
 
-    Audit-only mode (run_audit, --audit) keeps its stricter semantics — there,
-    CI-Gate-absent IS correctly a "no, not ready right now".
+    Readiness-check mode (run_audit, --check-ready) keeps its stricter
+    semantics — there, CI-Gate-absent IS correctly a "no, not ready right now".
     """
     merge_state, _labels = _fetch_merge_state(pr)
     if merge_state in ("DIRTY", "CONFLICTING", "BEHIND"):
