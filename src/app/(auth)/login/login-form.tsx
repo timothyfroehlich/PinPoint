@@ -50,18 +50,19 @@ export function LoginForm({
       )}
 
       {/* Login form */}
-      <form action={formAction} noValidate className="space-y-6">
+      <form action={formAction} className="space-y-6">
         {/* Hidden field for redirect destination */}
         {next && <input type="hidden" name="next" value={next} />}
 
         {/* Email */}
         <div className="space-y-3">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">Email or Username</Label>
           <Input
             id="email"
             name="email"
-            type="email"
-            placeholder="you@example.com"
+            type="text"
+            inputMode="email"
+            placeholder="you@example.com or username"
             autoComplete="username"
             required
             defaultValue={
