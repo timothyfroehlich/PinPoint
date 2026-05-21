@@ -19,8 +19,11 @@ concurrency:
 jobs:
   # Detect which files changed to skip expensive jobs for non-app-code PRs.
   # "Non-app-code" covers: docs (docs/**, **/*.md), beads (.beads/**), agent
-  # configs (.agent[s]/**, .claude/**), local-only dev scripts that never run
-  # in CI (scripts/hooks/**, scripts/workflow/**), LICENSE, .gitignore.
+  # configs (.agent[s]/**, .claude/**), local dev / developer-utility scripts
+  # (scripts/hooks/**, scripts/workflow/**), LICENSE, .gitignore. A few
+  # scripts/workflow/** scripts DO run in CI (e.g. prune-supabase-branches.sh
+  # via the scheduled supabase-branch-cleanup workflow), but none of them are
+  # gated by PR CI, so skipping E2E when only those change is correct.
   # .github/** is intentionally NOT excluded — any change there directly
   # affects what CI runs, so we keep triggering E2E to validate it.
   #
