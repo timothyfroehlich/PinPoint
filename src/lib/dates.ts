@@ -48,3 +48,5 @@ export function formatDateTime(date: Date | string | number): string {
   const d = toDate(date);
   return MEDIUM_DATE_TIME_FORMATTER.format(d);
 }
+
+// verify-trigger-PP-iq16 — test PR confirms E2E still runs on src/ changes
