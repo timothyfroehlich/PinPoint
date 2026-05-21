@@ -180,17 +180,24 @@ if [[ -z "$ROOT_ID" ]]; then
   exit 0
 fi
 
+# --- Fetch root bead JSON (shared by integrity check, rotation check, and slow path) ---
+# Fetch once here and reuse below. If bd is unavailable or the bead is
+# inaccessible, fail open silently — we do NOT want to emit a false "notes
+# malformed" warning when the real issue is a bd outage.
+ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || exit 0
+[[ -n "$ROOT_JSON" ]] || exit 0
+
 # --- Root notes integrity check ---
 # config.json exists but root notes may be null/malformed (e.g. 2026-05-20
 # incident on PP-lt12 where notes were wiped between 00:41 and 01:08 UTC).
 # Emit a visible stderr diagnostic so the user knows polling is degraded;
 # still exit 0 so the user prompt is not blocked.
-ROOT_NOTES_CHECK=$(bd show "$ROOT_ID" --json 2>/dev/null | jq -r '.[0].notes // ""' 2>/dev/null || echo "")
+NOTES_STR=$(printf '%s' "$ROOT_JSON" | jq -r '.[0].notes // ""' 2>/dev/null || echo "")
 NOTES_OK=true
-if [[ -z "$ROOT_NOTES_CHECK" ]]; then
+if [[ -z "$NOTES_STR" ]]; then
   NOTES_OK=false
 else
-  TODAY_CHECK=$(printf '%s' "$ROOT_NOTES_CHECK" | python3 -c "
+  TODAY_CHECK=$(printf '%s' "$NOTES_STR" | python3 -c "
 import sys, json
 try:
     n = json.loads(sys.stdin.read())
@@ -214,9 +221,9 @@ if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
   source "$ROTATION_CHECK_SCRIPT"
   if huddle_rotation_needed; then
     STORED_DATE=""
-    NOTES_STR_ROT=$(bd show "$ROOT_ID" --json 2>/dev/null | jq -r '.[0].notes // ""' 2>/dev/null || echo "")
-    if [[ -n "$NOTES_STR_ROT" ]]; then
-      STORED_DATE=$(printf '%s' "$NOTES_STR_ROT" | python3 -c "
+    # Reuse ROOT_JSON + NOTES_STR already fetched above (avoids a second bd call).
+    if [[ -n "$NOTES_STR" ]]; then
+      STORED_DATE=$(printf '%s' "$NOTES_STR" | python3 -c "
 import sys, json
 try:
     n = json.loads(sys.stdin.read())
@@ -252,10 +259,9 @@ else
   LAST_SEEN="0"
 fi
 
-# Resolve today_bead.id from root notes, then fetch its comments
-ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || { exit 0; }
-NOTES_STR=$(printf '%s' "$ROOT_JSON" | jq -r '.[0].notes // ""' 2>/dev/null) || { exit 0; }
-[[ -n "$NOTES_STR" ]] || { exit 0; }
+# Resolve today_bead.id from root notes, then fetch its comments.
+# ROOT_JSON and NOTES_STR are already populated from the integrity check above;
+# the notes-integrity gate above guarantees NOTES_STR is non-empty here.
 TODAY_BEAD_ID=$(printf '%s' "$NOTES_STR" | python3 -c "
 import sys, json
 try:
