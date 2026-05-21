@@ -4,10 +4,14 @@
 Streams timestamped events to stdout as GitHub Actions runs complete
 and polls for new Copilot reviews. One Monitor call handles both.
 
-Usage: ./scripts/workflow/pr-watch.py [--audit | --force] <PR_NUMBER>
+Usage: ./scripts/workflow/pr-watch.py [--audit | --force] [--quiet] <PR_NUMBER>
   (no flag) Run the readiness audit, then watch CI + reviews.
   --audit   Run only the readiness audit and exit (no watch loop).
   --force   Skip the audit and watch unconditionally.
+  --quiet   Suppress per-job progressive updates. Only emit terminal
+            verdicts (CI Gate decided, audit PASS/FAIL) and action items
+            (failure details, new Copilot review). Use under Monitor to
+            avoid waking the agent on every job transition.
 
 Exit 0: all checks passed, or stopped for new Copilot review,
         or (with --audit) the PR is ready for human review.
@@ -41,6 +45,11 @@ LOG_DIR = "tmp/gh-monitor"
 
 _lock = threading.Lock()
 
+# Set by main() from --quiet flag. When True, emit_event() is a no-op so the
+# script only emits terminal verdicts and action items. Used to keep the script
+# quiet under Monitor (each emit line becomes a notification cycle).
+QUIET_MODE = False
+
 
 def ts() -> str:
     return datetime.now().strftime("%H:%M:%S")
@@ -49,6 +58,19 @@ def ts() -> str:
 def emit(msg: str) -> None:
     with _lock:
         print(f"[{ts()}] {msg}", flush=True)
+
+
+def emit_event(msg: str) -> None:
+    """Emit a non-terminal progressive event. Suppressed in --quiet mode.
+
+    Use this for per-job transitions, startup announcements, and other
+    informational lines that are useful interactively but noisy when the
+    script is invoked under Monitor (each stdout line is a notification).
+    Reserve emit() for terminal verdicts (CI Gate decided, audit PASS/FAIL)
+    and action items (failure details, new Copilot review).
+    """
+    if not QUIET_MODE:
+        emit(msg)
 
 
 def gh(*args: str) -> str:
@@ -138,7 +160,9 @@ def _finalize_via_ci_gate(pr: int, timeout_sec: int = 1200, poll_sec: int = 10) 
             emit(f"CI Gate failed (conclusion={conclusion or 'unknown'})")
             return 1
         if status != last_status:
-            emit(f"CI Gate {status.lower() or 'not yet posted'} — continuing to wait")
+            emit_event(
+                f"CI Gate {status.lower() or 'not yet posted'} — continuing to wait"
+            )
             last_status = status
         time.sleep(poll_sec)
     emit(f"CI Gate did not report within {timeout_sec}s — treat as failure")
@@ -292,7 +316,7 @@ def watch_run(
 
         if proc.returncode == 0 and status not in ("queued", "in_progress"):
             if conclusion in _PASSING_CONCLUSIONS:
-                emit(f"✓  {name} — passed")
+                emit_event(f"✓  {name} — passed")
                 return
             # Exited 0 but API says non-passing — fall through to failure handling.
 
@@ -301,11 +325,11 @@ def watch_run(
 
         if status in ("queued", "in_progress"):
             # Watcher crashed prematurely — restart it.
-            emit(f"↻  {name} — watcher restarted (run still in progress)")
+            emit_event(f"↻  {name} — watcher restarted (run still in progress)")
             continue
 
         if conclusion in _PASSING_CONCLUSIONS:
-            emit(f"✓  {name} — passed")
+            emit_event(f"✓  {name} — passed")
             return
 
         # Confirmed failure (or unrecognised conclusion — fail safe).
@@ -387,28 +411,32 @@ def write_failure_artifact(run_id: int) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _parse_args(argv: list[str]) -> tuple[int, bool, bool] | None:
-    """Return (pr, audit_only, force) or None on usage error."""
+def _parse_args(argv: list[str]) -> tuple[int, bool, bool, bool] | None:
+    """Return (pr, audit_only, force, quiet) or None on usage error."""
     audit_only = "--audit" in argv
     force = "--force" in argv
-    rest = [a for a in argv[1:] if a not in ("--audit", "--force")]
+    quiet = "--quiet" in argv
+    rest = [a for a in argv[1:] if a not in ("--audit", "--force", "--quiet")]
     if audit_only and force:
         print("Error: --audit and --force are mutually exclusive.", file=sys.stderr)
         return None
     if len(rest) != 1 or not rest[0].isdigit():
         print(
-            f"Usage: {argv[0]} [--audit | --force] <PR_NUMBER>",
+            f"Usage: {argv[0]} [--audit | --force] [--quiet] <PR_NUMBER>",
             file=sys.stderr,
         )
         return None
-    return int(rest[0]), audit_only, force
+    return int(rest[0]), audit_only, force, quiet
 
 
 def main() -> int:
     parsed = _parse_args(sys.argv)
     if parsed is None:
         return 1
-    pr, audit_only, force = parsed
+    pr, audit_only, force, quiet = parsed
+
+    global QUIET_MODE
+    QUIET_MODE = quiet
 
     if audit_only:
         return 0 if run_audit(pr) else 1
@@ -464,7 +492,7 @@ def main() -> int:
         if active:
             break
         if attempt < STARTUP_RETRIES - 1:
-            emit(f"Waiting for CI to start... ({attempt + 1}/{STARTUP_RETRIES})")
+            emit_event(f"Waiting for CI to start... ({attempt + 1}/{STARTUP_RETRIES})")
             time.sleep(STARTUP_WAIT)
 
     if not active:
@@ -493,10 +521,10 @@ def main() -> int:
         emit(f"No runs found for current commit on PR #{pr}.")
         return 1
 
-    emit(f"Watching PR #{pr} — branch: {branch} — {len(active)} run(s)")
+    emit_event(f"Watching PR #{pr} — branch: {branch} — {len(active)} run(s)")
     for run in active:
         icon = "▶ " if run["status"] == "in_progress" else "⏳"
-        emit(f"{icon} {run['name']}")
+        emit_event(f"{icon} {run['name']}")
 
     baseline: int | None
     try:
