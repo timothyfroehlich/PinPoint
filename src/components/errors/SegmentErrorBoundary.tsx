@@ -85,6 +85,7 @@ export function SegmentErrorBoundary({
           An unexpected error occurred. You can try again or navigate away to
           recover.
         </p>
+        {/* sm-structural-allow: standalone full-width error boundary, viewport breakpoint is correct */}
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
           <Button onClick={reset}>Try Again</Button>
           <Button variant="outline" asChild>

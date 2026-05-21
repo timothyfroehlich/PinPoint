@@ -239,8 +239,8 @@ export function NotificationPreferencesForm({
         )}
         <div
           className={cn(
-            "grid gap-4",
-            showDiscord ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"
+            "@container grid gap-4",
+            showDiscord ? "@sm:grid-cols-2 @lg:grid-cols-3" : "@sm:grid-cols-2"
           )}
         >
           <MainSwitchItem

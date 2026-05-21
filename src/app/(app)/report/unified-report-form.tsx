@@ -685,6 +685,7 @@ export function UnifiedReportForm({
               </>
             )}
 
+            {/* sm-structural-allow: TODO PP-kqbk follow-up — convert to @container */}
             <div className="flex flex-col-reverse gap-2 mt-1 sm:flex-row sm:items-center">
               <Button
                 type="button"

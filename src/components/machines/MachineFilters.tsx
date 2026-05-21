@@ -286,7 +286,7 @@ export function MachineFilters({
 
       {/* Filter Selectors - Moved to second line */}
       <div className="flex flex-wrap gap-2">
-        <div className="w-full sm:w-48">
+        <div className="min-w-48 flex-1">
           <MultiSelect
             options={STATUS_OPTIONS}
             value={filters.status ?? []}
@@ -294,7 +294,7 @@ export function MachineFilters({
             placeholder="Status"
           />
         </div>
-        <div className="w-full sm:w-48">
+        <div className="min-w-48 flex-1">
           <MultiSelect
             options={userOptions}
             value={filters.owner ?? []}
@@ -302,7 +302,7 @@ export function MachineFilters({
             placeholder="Owner"
           />
         </div>
-        <div className="w-full sm:w-48">
+        <div className="min-w-48 flex-1">
           <MultiSelect
             options={PRESENCE_OPTIONS}
             value={filters.presence ?? ["on_the_floor"]}

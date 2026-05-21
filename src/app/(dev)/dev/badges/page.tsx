@@ -1,3 +1,4 @@
+// sm-structural-allow-file: dev-only badge showcase, viewport breakpoints intentional for preview grids
 import type React from "react";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";

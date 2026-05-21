@@ -23,7 +23,7 @@ export function IssueBadgeGrid({
   const gridClass = cn(
     variant === "strip"
       ? "flex flex-wrap gap-2"
-      : "grid grid-cols-1 sm:grid-cols-2 gap-2",
+      : "@container grid grid-cols-1 @sm:grid-cols-2 gap-2",
     className
   );
 
