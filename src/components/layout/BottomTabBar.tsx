@@ -16,11 +16,11 @@ import {
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-  SheetDescription,
-} from "~/components/ui/sheet";
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerDescription,
+} from "~/components/ui/drawer";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { isNavItemActive } from "~/components/layout/nav-utils";
 import { NAV_ITEMS } from "~/components/layout/nav-config";
@@ -104,14 +104,14 @@ export function BottomTabBar({
         </button>
       </nav>
 
-      {/* "More" bottom sheet */}
-      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl pb-0">
+      {/* "More" bottom drawer — vaul provides swipe-to-close and momentum */}
+      <Drawer open={moreOpen} onOpenChange={setMoreOpen} direction="bottom">
+        <DrawerContent className="rounded-t-2xl pb-0">
           <div className="sr-only">
-            <SheetTitle>More Options</SheetTitle>
-            <SheetDescription>
+            <DrawerTitle>More Options</DrawerTitle>
+            <DrawerDescription>
               Additional navigation options and settings.
-            </SheetDescription>
+            </DrawerDescription>
           </div>
 
           <nav
@@ -184,8 +184,8 @@ export function BottomTabBar({
               </>
             )}
           </nav>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
     </>
   );
 }

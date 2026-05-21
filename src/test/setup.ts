@@ -57,4 +57,10 @@ if (typeof window !== "undefined") {
   // Mock scrollIntoView
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking scrollIntoView
   window.HTMLElement.prototype.scrollIntoView = function () {};
+
+  // Mock Pointer Capture API (required for vaul drag-to-dismiss — jsdom does not implement it)
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking setPointerCapture
+  window.Element.prototype.setPointerCapture = function () {};
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking releasePointerCapture
+  window.Element.prototype.releasePointerCapture = function () {};
 }
