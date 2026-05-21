@@ -381,6 +381,7 @@ export function UnifiedReportForm({
               <select
                 id="machineId"
                 name="machineId"
+                autoComplete="off"
                 data-testid="machine-select"
                 aria-label="Select Machine"
                 required
@@ -595,6 +596,7 @@ export function UnifiedReportForm({
                       <Input
                         id="firstName"
                         name="firstName"
+                        autoComplete="given-name"
                         className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
@@ -608,6 +610,7 @@ export function UnifiedReportForm({
                       <Input
                         id="lastName"
                         name="lastName"
+                        autoComplete="family-name"
                         className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
@@ -620,6 +623,7 @@ export function UnifiedReportForm({
                       id="email"
                       name="email"
                       type="email"
+                      autoComplete="email"
                       className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                     />
                     <p className="text-[10px] text-muted-foreground leading-none">

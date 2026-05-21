@@ -21,7 +21,7 @@ describe("SignupForm", () => {
     expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/last name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password\b/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/terms of service/i)).toBeInTheDocument();
     expect(
@@ -44,7 +44,7 @@ describe("SignupForm", () => {
     await user.type(screen.getByLabelText(/first name/i), "Test");
     await user.type(screen.getByLabelText(/last name/i), "User");
     await user.type(screen.getByLabelText(/email/i), "test@example.com");
-    await user.type(screen.getByLabelText(/^password$/i), "Password123!");
+    await user.type(screen.getByLabelText(/^password\b/i), "Password123!");
     await user.type(screen.getByLabelText(/confirm password/i), "Password123!");
     await user.click(screen.getByLabelText(/terms of service/i));
 
@@ -69,7 +69,7 @@ describe("SignupForm", () => {
     await user.type(screen.getByLabelText(/first name/i), "Test");
     await user.type(screen.getByLabelText(/last name/i), "User");
     await user.type(screen.getByLabelText(/email/i), "test@example.com");
-    await user.type(screen.getByLabelText(/^password$/i), "Password123!");
+    await user.type(screen.getByLabelText(/^password\b/i), "Password123!");
     await user.type(screen.getByLabelText(/confirm password/i), "Password123!");
     await user.click(screen.getByLabelText(/terms of service/i));
 
@@ -85,7 +85,7 @@ describe("SignupForm", () => {
     const user = userEvent.setup();
     render(<SignupForm />);
 
-    await user.type(screen.getByLabelText(/^password$/i), "Password123!");
+    await user.type(screen.getByLabelText(/^password\b/i), "Password123!");
     await user.type(screen.getByLabelText(/confirm password/i), "Different!");
 
     expect(screen.getByText(/passwords do not match/i)).toBeInTheDocument();
@@ -95,7 +95,7 @@ describe("SignupForm", () => {
     const user = userEvent.setup();
     render(<SignupForm />);
 
-    await user.type(screen.getByLabelText(/^password$/i), "Password123!");
+    await user.type(screen.getByLabelText(/^password\b/i), "Password123!");
     await user.type(screen.getByLabelText(/confirm password/i), "Password123!");
 
     expect(screen.getByText(/passwords match/i)).toBeInTheDocument();
