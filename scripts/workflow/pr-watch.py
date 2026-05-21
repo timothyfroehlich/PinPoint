@@ -4,24 +4,29 @@
 Streams timestamped events to stdout as GitHub Actions runs complete
 and polls for new Copilot reviews. One Monitor call handles both.
 
-Usage: ./scripts/workflow/pr-watch.py [--audit | --force] [--quiet] <PR_NUMBER>
-  (no flag) Run blocking pre-checks (mergeable, no failed CI Gate, no
-            unresolved Copilot threads), then watch CI + reviews. CI Gate
-            absent or in-progress is NOT a blocking condition — the watch
-            loop handles those by waiting.
-  --audit   Run the full readiness audit (mergeable + CI Gate present +
-            Copilot resolved + ready label) and exit. CI Gate absent IS
-            a fail here — the audit answers "is this ready right now?".
-  --force   Skip the pre-check entirely and watch unconditionally.
-  --quiet   Suppress per-job progressive updates. Only emit terminal
-            verdicts (CI Gate decided, audit PASS/FAIL) and action items
-            (failure details, new Copilot review). Use under Monitor to
-            avoid waking the agent on every job transition.
+Usage: ./scripts/workflow/pr-watch.py [--check-ready | --force] [--verbose] <PR_NUMBER>
+  (no flag)      Run blocking pre-checks (mergeable, no failed CI Gate, no
+                 unresolved Copilot threads), then watch CI + reviews. CI
+                 Gate absent or in-progress is NOT a blocking condition —
+                 the watch loop handles those by waiting.
+  --check-ready  Run the full readiness check (mergeable + CI Gate present
+                 + Copilot resolved + ready label) and exit. CI Gate
+                 absent IS a fail here — this mode answers "is this PR
+                 ready for human review right now?".
+  --force        Skip the pre-check entirely and watch unconditionally.
+  --verbose      Emit per-job progressive updates ("X passed", "CI Gate
+                 in_progress — continuing to wait", "Watching PR #N — N
+                 run(s)", per-run icon listing, startup retries). Default
+                 behavior is quiet — only terminal verdicts (CI Gate
+                 decided, check PASS/FAIL) and action items (failure
+                 details, new Copilot review) are emitted, so that
+                 running under Claude Code's Monitor doesn't wake the
+                 agent on every job transition.
 
 Exit 0: all checks passed, or stopped for new Copilot review,
-        or (with --audit) the PR is ready for human review.
+        or (with --check-ready) the PR is ready for human review.
 Exit 1: one or more checks failed, no matching runs found,
-        or (with --audit) the PR is not ready.
+        or (with --check-ready) the PR is not ready.
 """
 
 from __future__ import annotations
@@ -50,10 +55,13 @@ LOG_DIR = "tmp/gh-monitor"
 
 _lock = threading.Lock()
 
-# Set by main() from --quiet flag. When True, emit_event() is a no-op so the
-# script only emits terminal verdicts and action items. Used to keep the script
-# quiet under Monitor (each emit line becomes a notification cycle).
-QUIET_MODE = False
+# Set by main() from --verbose flag. When False (the default), emit_event() is
+# a no-op so the script only emits terminal verdicts and action items. This
+# keeps pr-watch quiet under Claude Code's Monitor — each emit line becomes a
+# notification cycle, so progressive per-job updates wake the agent for events
+# that don't change what the user would do next. Pass --verbose for full output
+# when running interactively.
+VERBOSE_MODE = False
 
 
 def ts() -> str:
@@ -66,7 +74,7 @@ def emit(msg: str) -> None:
 
 
 def emit_event(msg: str) -> None:
-    """Emit a non-terminal progressive event. Suppressed in --quiet mode.
+    """Emit a non-terminal progressive event. Suppressed unless --verbose.
 
     Use this for per-job transitions, startup announcements, and other
     informational lines that are useful interactively but noisy when the
@@ -74,7 +82,7 @@ def emit_event(msg: str) -> None:
     Reserve emit() for terminal verdicts (CI Gate decided, audit PASS/FAIL)
     and action items (failure details, new Copilot review).
     """
-    if not QUIET_MODE:
+    if VERBOSE_MODE:
         emit(msg)
 
 
@@ -417,33 +425,35 @@ def write_failure_artifact(run_id: int) -> str:
 
 
 def _parse_args(argv: list[str]) -> tuple[int, bool, bool, bool] | None:
-    """Return (pr, audit_only, force, quiet) or None on usage error."""
-    audit_only = "--audit" in argv
+    """Return (pr, check_ready, force, verbose) or None on usage error."""
+    check_ready = "--check-ready" in argv
     force = "--force" in argv
-    quiet = "--quiet" in argv
-    rest = [a for a in argv[1:] if a not in ("--audit", "--force", "--quiet")]
-    if audit_only and force:
-        print("Error: --audit and --force are mutually exclusive.", file=sys.stderr)
+    verbose = "--verbose" in argv
+    rest = [a for a in argv[1:] if a not in ("--check-ready", "--force", "--verbose")]
+    if check_ready and force:
+        print(
+            "Error: --check-ready and --force are mutually exclusive.", file=sys.stderr
+        )
         return None
     if len(rest) != 1 or not rest[0].isdigit():
         print(
-            f"Usage: {argv[0]} [--audit | --force] [--quiet] <PR_NUMBER>",
+            f"Usage: {argv[0]} [--check-ready | --force] [--verbose] <PR_NUMBER>",
             file=sys.stderr,
         )
         return None
-    return int(rest[0]), audit_only, force, quiet
+    return int(rest[0]), check_ready, force, verbose
 
 
 def main() -> int:
     parsed = _parse_args(sys.argv)
     if parsed is None:
         return 1
-    pr, audit_only, force, quiet = parsed
+    pr, check_ready, force, verbose = parsed
 
-    global QUIET_MODE
-    QUIET_MODE = quiet
+    global VERBOSE_MODE
+    VERBOSE_MODE = verbose
 
-    if audit_only:
+    if check_ready:
         return 0 if run_audit(pr) else 1
 
     if not force:
