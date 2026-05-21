@@ -5,9 +5,14 @@ Streams timestamped events to stdout as GitHub Actions runs complete
 and polls for new Copilot reviews. One Monitor call handles both.
 
 Usage: ./scripts/workflow/pr-watch.py [--audit | --force] [--quiet] <PR_NUMBER>
-  (no flag) Run the readiness audit, then watch CI + reviews.
-  --audit   Run only the readiness audit and exit (no watch loop).
-  --force   Skip the audit and watch unconditionally.
+  (no flag) Run blocking pre-checks (mergeable, no failed CI Gate, no
+            unresolved Copilot threads), then watch CI + reviews. CI Gate
+            absent or in-progress is NOT a blocking condition — the watch
+            loop handles those by waiting.
+  --audit   Run the full readiness audit (mergeable + CI Gate present +
+            Copilot resolved + ready label) and exit. CI Gate absent IS
+            a fail here — the audit answers "is this ready right now?".
+  --force   Skip the pre-check entirely and watch unconditionally.
   --quiet   Suppress per-job progressive updates. Only emit terminal
             verdicts (CI Gate decided, audit PASS/FAIL) and action items
             (failure details, new Copilot review). Use under Monitor to

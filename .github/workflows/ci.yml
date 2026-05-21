@@ -17,14 +17,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Detect which files changed to skip expensive jobs for docs-only changes.
+  # Detect which files changed to skip expensive jobs for non-app-code PRs.
+  # "Non-app-code" covers: docs (docs/**, **/*.md), beads (.beads/**), agent
+  # configs (.agent[s]/**, .claude/**), local-only dev scripts that never run
+  # in CI (scripts/hooks/**, scripts/workflow/**), LICENSE, .gitignore.
+  # .github/** is intentionally NOT excluded — any change there directly
+  # affects what CI runs, so we keep triggering E2E to validate it.
+  #
   # Uses predicate-quantifier: 'every' with a positive '**' plus negative
   # exclusions. A changed file counts as "code" only when it matches every
   # pattern — i.e. it matches '**' (always) AND is NOT under any excluded
   # path. `has_code` is true if at least one changed file is "code". A
-  # docs-only PR (only excluded paths touched) produces has_code=false and
-  # downstream expensive jobs cascade-skip via `setup`'s `if:` gate. New /
-  # unknown directories default to running full CI — the safe failure mode.
+  # PR touching only excluded paths produces has_code=false and downstream
+  # expensive jobs cascade-skip via `setup`'s `if:` gate. New / unknown
+  # directories default to running full CI — the safe failure mode.
   #
   # Why 'every' and not 'some': under 'some', the positive '**' matches every
   # file by itself, short-circuiting the negative exclusions and forcing
