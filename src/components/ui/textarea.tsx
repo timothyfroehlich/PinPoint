@@ -8,10 +8,15 @@ function Textarea({
   ...props
 }: React.ComponentProps<"textarea">): React.JSX.Element {
   function handleBlur(e: React.FocusEvent<HTMLTextAreaElement>): void {
-    e.currentTarget.setAttribute(
-      "aria-invalid",
-      e.currentTarget.checkValidity() ? "false" : "true"
-    );
+    // Skip native-validity sync when the caller controls aria-invalid
+    // (e.g. react-hook-form, Radix FormControl) — otherwise blur would
+    // clobber schema/library-driven invalid state with checkValidity().
+    if (!("aria-invalid" in props)) {
+      e.currentTarget.setAttribute(
+        "aria-invalid",
+        e.currentTarget.checkValidity() ? "false" : "true"
+      );
+    }
     onBlur?.(e);
   }
 

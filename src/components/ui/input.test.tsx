@@ -64,4 +64,32 @@ describe("Input", () => {
       expect(onBlur).toHaveBeenCalledOnce();
     });
   });
+
+  describe("caller-controlled aria-invalid", () => {
+    it("preserves caller-provided aria-invalid=true on blur even when checkValidity() passes", async () => {
+      // Form libraries (react-hook-form, Radix FormControl) set aria-invalid
+      // from schema validation, not native constraints. The blur handler
+      // must not clobber that with checkValidity().
+      const user = userEvent.setup();
+      render(<Input data-testid="inp" aria-invalid="true" />);
+      const input = screen.getByTestId("inp");
+
+      await user.click(input);
+      await user.type(input, "anything");
+      await user.tab();
+
+      expect(input).toHaveAttribute("aria-invalid", "true");
+    });
+
+    it("preserves caller-provided aria-invalid=false on blur even when checkValidity() fails", async () => {
+      const user = userEvent.setup();
+      render(<Input data-testid="inp" aria-invalid="false" required />);
+      const input = screen.getByTestId("inp");
+
+      await user.click(input);
+      await user.tab();
+
+      expect(input).toHaveAttribute("aria-invalid", "false");
+    });
+  });
 });

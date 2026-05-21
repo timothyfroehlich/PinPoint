@@ -40,4 +40,32 @@ describe("Textarea", () => {
       expect(onBlur).toHaveBeenCalledOnce();
     });
   });
+
+  describe("caller-controlled aria-invalid", () => {
+    it("preserves caller-provided aria-invalid=true on blur even when checkValidity() passes", async () => {
+      // Form libraries (react-hook-form, Radix FormControl) set aria-invalid
+      // from schema validation, not native constraints. The blur handler
+      // must not clobber that with checkValidity().
+      const user = userEvent.setup();
+      render(<Textarea data-testid="ta" aria-invalid="true" />);
+      const textarea = screen.getByTestId("ta");
+
+      await user.click(textarea);
+      await user.type(textarea, "anything");
+      await user.tab();
+
+      expect(textarea).toHaveAttribute("aria-invalid", "true");
+    });
+
+    it("preserves caller-provided aria-invalid=false on blur even when checkValidity() fails", async () => {
+      const user = userEvent.setup();
+      render(<Textarea data-testid="ta" aria-invalid="false" required />);
+      const textarea = screen.getByTestId("ta");
+
+      await user.click(textarea);
+      await user.tab();
+
+      expect(textarea).toHaveAttribute("aria-invalid", "false");
+    });
+  });
 });
