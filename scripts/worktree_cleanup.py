@@ -67,34 +67,55 @@ def main() -> None:
             file=sys.stderr,
         )
         sys.exit(2)
-    if not git_marker.is_file():
+
+    # PP-qlzu: when .git is missing (partial removal, rm -rf without the hook,
+    # Claude in Web sandbox sessions), we can't derive the branch and therefore
+    # can't safely target the Supabase project_id. Skip the Docker/Supabase
+    # phase but still deallocate the slot — otherwise the manifest entry leaks
+    # forever. worktree_orphan_sweep.py picks up any leaked Docker resources.
+    git_marker_present = git_marker.is_file()
+    if not git_marker_present:
         print(
-            f"Warning: {worktree_path} has no .git marker — not a worktree. Skipping.",
+            f"Warning: {worktree_path} has no .git marker — skipping Supabase/Docker "
+            "cleanup (no branch to derive project_id from); deallocating slot only.",
             file=sys.stderr,
         )
-        return
 
-    # Get branch name for Docker volume cleanup
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(worktree_path), "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        branch = result.stdout.strip()
-    except subprocess.CalledProcessError:
-        branch = ""
+    branch = ""
+    if git_marker_present:
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(worktree_path), "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            branch = result.stdout.strip()
+        except subprocess.CalledProcessError:
+            branch = ""
 
     if branch:
         project_id = branch_to_project_id(branch)
 
-        # Stop Supabase
+        # Stop Supabase. Failures here are non-fatal: a missing project_ref or
+        # a stack that was never started both look like errors but don't block
+        # slot deallocation.
         print(f"Stopping Supabase for {branch}...", file=sys.stderr)
-        subprocess.run(["supabase", "stop"], cwd=worktree_path, capture_output=True)
+        stop_result = subprocess.run(
+            ["supabase", "stop"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+        )
+        if stop_result.returncode != 0:
+            print(
+                f"Warning: `supabase stop` exited {stop_result.returncode}: "
+                f"{stop_result.stderr.strip() or stop_result.stdout.strip()}",
+                file=sys.stderr,
+            )
 
         # Remove Docker volumes
-        result = subprocess.run(
+        ls_result = subprocess.run(
             [
                 "docker",
                 "volume",
@@ -106,33 +127,54 @@ def main() -> None:
             capture_output=True,
             text=True,
         )
-        volumes = [v for v in result.stdout.strip().split("\n") if v]
+        if ls_result.returncode != 0:
+            print(
+                f"Warning: `docker volume ls` exited {ls_result.returncode}: "
+                f"{ls_result.stderr.strip()}",
+                file=sys.stderr,
+            )
+            volumes: list[str] = []
+        else:
+            volumes = [v for v in ls_result.stdout.strip().split("\n") if v]
         if volumes:
-            subprocess.run(["docker", "volume", "rm"] + volumes, capture_output=True)
-            print(f"Removed {len(volumes)} Docker volume(s)", file=sys.stderr)
+            rm_result = subprocess.run(
+                ["docker", "volume", "rm"] + volumes,
+                capture_output=True,
+                text=True,
+            )
+            if rm_result.returncode != 0:
+                print(
+                    f"Warning: `docker volume rm` exited {rm_result.returncode}: "
+                    f"{rm_result.stderr.strip()}",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"Removed {len(volumes)} Docker volume(s)", file=sys.stderr)
 
     # Unlock first. Claude Code agent runtimes lock worktrees while in use,
     # and the lock persists after the agent finishes; `git worktree remove
     # --force` does NOT bypass these locks. Unlock errors (e.g., "not locked")
     # are harmless and intentionally ignored.
-    subprocess.run(
-        ["git", "worktree", "unlock", str(worktree_path)],
-        capture_output=True,
-    )
-
-    result = subprocess.run(
-        ["git", "worktree", "remove", "--force", str(worktree_path)],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        print(
-            f"Failed to remove worktree {worktree_path}: {result.stderr.strip()}",
-            file=sys.stderr,
+    if git_marker_present:
+        subprocess.run(
+            ["git", "worktree", "unlock", str(worktree_path)],
+            capture_output=True,
         )
-        sys.exit(1)
 
-    subprocess.run(["git", "worktree", "prune"], capture_output=True)
+        result = subprocess.run(
+            ["git", "worktree", "remove", "--force", str(worktree_path)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print(
+                f"Warning: failed to remove worktree {worktree_path}: "
+                f"{result.stderr.strip()} — continuing to deallocate slot.",
+                file=sys.stderr,
+            )
+
+        subprocess.run(["git", "worktree", "prune"], capture_output=True)
+
     deallocate_slot(str(worktree_path))
 
     print(f"Cleaned up worktree: {worktree_path}", file=sys.stderr)
