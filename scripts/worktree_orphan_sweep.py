@@ -27,6 +27,7 @@ import argparse
 import fcntl
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -35,6 +36,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from worktree_cleanup import MANIFEST_PATH, deallocate_slot  # noqa: E402
 from worktree_setup import branch_to_project_id  # noqa: E402
+
+_PROJECT_ID_LINE_RE = re.compile(r'^project_id\s*=\s*"([^"]+)"')
 
 
 def get_active_worktree_branches(repo_dir: Path) -> dict[str, str]:
@@ -69,17 +72,60 @@ def get_active_worktree_branches(repo_dir: Path) -> dict[str, str]:
     return worktrees
 
 
+def get_active_project_ids(worktrees: dict[str, str]) -> set[str]:
+    """Derive the Supabase project_id for each active worktree.
+
+    Reads `<worktree>/supabase/config.toml` directly when present — that file
+    is the authoritative source for the project_id that Supabase containers
+    actually use, and it works for detached worktrees and for worktrees whose
+    branch was renamed after setup. Falls back to `branch_to_project_id(branch)`
+    only when the config.toml is missing and the worktree is on a named branch.
+
+    Worktrees we can't resolve (detached + missing config.toml) are intentionally
+    skipped so the caller never deletes a Docker project we don't recognize.
+    """
+    project_ids: set[str] = set()
+    for path_str, branch in worktrees.items():
+        config_path = Path(path_str) / "supabase" / "config.toml"
+        if config_path.is_file():
+            try:
+                for line in config_path.read_text().splitlines():
+                    match = _PROJECT_ID_LINE_RE.match(line)
+                    if match:
+                        project_ids.add(match.group(1))
+                        break
+            except OSError:
+                pass
+        elif branch:
+            project_ids.add(branch_to_project_id(branch))
+    return project_ids
+
+
 def get_orphan_slot_paths() -> list[str]:
-    """Read the slot manifest and return paths missing on disk or w/o .git marker."""
+    """Read the slot manifest and return paths missing on disk or w/o .git marker.
+
+    Tolerates a corrupted/partial manifest the same way deallocate_slot does —
+    a bad JSON shape shouldn't crash the sweep (and make `--apply` unusable).
+    """
     if not MANIFEST_PATH.exists():
         return []
     with open(MANIFEST_PATH) as f:
         fcntl.flock(f.fileno(), fcntl.LOCK_SH)
         try:
-            data = json.loads(f.read())
+            raw = f.read()
         finally:
             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-    slots = data.get("slots", {})
+    try:
+        data = json.loads(raw)
+        slots = data.get("slots", {})
+        if not isinstance(slots, dict):
+            slots = {}
+    except (json.JSONDecodeError, AttributeError):
+        print(
+            f"Warning: {MANIFEST_PATH} is not valid JSON; treating as empty.",
+            file=sys.stderr,
+        )
+        slots = {}
     orphans: list[str] = []
     for path_str in slots:
         path = Path(path_str)
@@ -192,9 +238,7 @@ def main() -> int:
     not_quiet = not args.quiet
 
     active = get_active_worktree_branches(repo_dir)
-    active_project_ids = {
-        branch_to_project_id(branch) for branch in active.values() if branch
-    }
+    active_project_ids = get_active_project_ids(active)
 
     if not_quiet:
         print(

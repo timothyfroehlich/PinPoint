@@ -167,11 +167,17 @@ def main() -> None:
             text=True,
         )
         if result.returncode != 0:
+            # Do NOT deallocate the slot — the worktree directory likely still
+            # exists with its `.env.local` and config pointing at this slot's
+            # ports. Freeing the slot would let the next worktree allocate the
+            # same ports and collide. Surface the failure and bail.
             print(
-                f"Warning: failed to remove worktree {worktree_path}: "
-                f"{result.stderr.strip()} — continuing to deallocate slot.",
+                f"Failed to remove worktree {worktree_path}: "
+                f"{result.stderr.strip()} — keeping slot manifest entry to "
+                "avoid port collision; investigate manually.",
                 file=sys.stderr,
             )
+            sys.exit(1)
 
         subprocess.run(["git", "worktree", "prune"], capture_output=True)
 
