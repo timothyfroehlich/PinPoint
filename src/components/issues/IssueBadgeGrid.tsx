@@ -20,41 +20,77 @@ export function IssueBadgeGrid({
   className,
   showPriority = true,
 }: IssueBadgeGridProps): React.JSX.Element {
-  const gridClass = cn(
-    variant === "strip"
-      ? "flex flex-wrap gap-2"
-      : "grid grid-cols-1 sm:grid-cols-2 gap-2",
-    className
-  );
-
-  return (
-    <div className={gridClass} role="group" aria-label="Issue metadata">
-      <IssueBadge
-        type="status"
-        value={issue.status}
-        variant={variant}
-        size={size}
-      />
-      {showPriority && (
+  if (variant === "strip") {
+    return (
+      <div
+        className={cn("flex flex-wrap gap-2", className)}
+        role="group"
+        aria-label="Issue metadata"
+      >
         <IssueBadge
-          type="priority"
-          value={issue.priority}
+          type="status"
+          value={issue.status}
           variant={variant}
           size={size}
         />
-      )}
-      <IssueBadge
-        type="severity"
-        value={issue.severity}
-        variant={variant}
-        size={size}
-      />
-      <IssueBadge
-        type="frequency"
-        value={issue.frequency}
-        variant={variant}
-        size={size}
-      />
+        {showPriority && (
+          <IssueBadge
+            type="priority"
+            value={issue.priority}
+            variant={variant}
+            size={size}
+          />
+        )}
+        <IssueBadge
+          type="severity"
+          value={issue.severity}
+          variant={variant}
+          size={size}
+        />
+        <IssueBadge
+          type="frequency"
+          value={issue.frequency}
+          variant={variant}
+          size={size}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("@container", className)}>
+      <div
+        className="grid grid-cols-1 @sm:grid-cols-2 gap-2"
+        role="group"
+        aria-label="Issue metadata"
+      >
+        <IssueBadge
+          type="status"
+          value={issue.status}
+          variant={variant}
+          size={size}
+        />
+        {showPriority && (
+          <IssueBadge
+            type="priority"
+            value={issue.priority}
+            variant={variant}
+            size={size}
+          />
+        )}
+        <IssueBadge
+          type="severity"
+          value={issue.severity}
+          variant={variant}
+          size={size}
+        />
+        <IssueBadge
+          type="frequency"
+          value={issue.frequency}
+          variant={variant}
+          size={size}
+        />
+      </div>
     </div>
   );
 }

@@ -237,58 +237,62 @@ export function NotificationPreferencesForm({
             Email notifications are not available for username accounts.
           </p>
         )}
-        <div
-          className={cn(
-            "grid gap-4",
-            showDiscord ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"
-          )}
-        >
-          <MainSwitchItem
-            id="inAppEnabled"
-            label="In-App Notifications"
-            description="Main switch for all in-app notifications"
-            checked={inAppMainEnabled}
-            onCheckedChange={setInAppMainEnabled}
-          />
-          {!isInternalAccount && (
+        <div className="@container">
+          <div
+            className={cn(
+              "grid gap-4",
+              showDiscord
+                ? "@sm:grid-cols-2 @lg:grid-cols-3"
+                : "@sm:grid-cols-2"
+            )}
+          >
             <MainSwitchItem
-              id="emailEnabled"
-              label="Email Notifications"
-              description="Main switch for all email notifications"
-              checked={emailMainEnabled}
-              onCheckedChange={setEmailMainEnabled}
+              id="inAppEnabled"
+              label="In-App Notifications"
+              description="Main switch for all in-app notifications"
+              checked={inAppMainEnabled}
+              onCheckedChange={setInAppMainEnabled}
             />
-          )}
-          {showDiscord && (
-            <MainSwitchItem
-              id="discordEnabled"
-              label="Discord Notifications"
-              description={
-                userHasDiscord
-                  ? "Main switch for all Discord DM notifications"
-                  : "Link Discord in Connected Accounts to enable"
-              }
-              // Bind to the actual preference, not (preference && userHasDiscord).
-              // The switch is already disabled when the user isn't linked, so the
-              // visual stays correct. Mixing userHasDiscord into `checked` makes
-              // the underlying hidden input submit "off" on save, silently
-              // overwriting the user's saved preference whenever they save
-              // unrelated changes while unlinked.
-              checked={discordMainEnabled}
-              onCheckedChange={setDiscordMainEnabled}
-              disabled={!userHasDiscord}
-              cta={
-                userHasDiscord ? null : (
-                  <a
-                    href="#connected-accounts"
-                    className="text-xs text-primary underline"
-                  >
-                    Link Discord
-                  </a>
-                )
-              }
-            />
-          )}
+            {!isInternalAccount && (
+              <MainSwitchItem
+                id="emailEnabled"
+                label="Email Notifications"
+                description="Main switch for all email notifications"
+                checked={emailMainEnabled}
+                onCheckedChange={setEmailMainEnabled}
+              />
+            )}
+            {showDiscord && (
+              <MainSwitchItem
+                id="discordEnabled"
+                label="Discord Notifications"
+                description={
+                  userHasDiscord
+                    ? "Main switch for all Discord DM notifications"
+                    : "Link Discord in Connected Accounts to enable"
+                }
+                // Bind to the actual preference, not (preference && userHasDiscord).
+                // The switch is already disabled when the user isn't linked, so the
+                // visual stays correct. Mixing userHasDiscord into `checked` makes
+                // the underlying hidden input submit "off" on save, silently
+                // overwriting the user's saved preference whenever they save
+                // unrelated changes while unlinked.
+                checked={discordMainEnabled}
+                onCheckedChange={setDiscordMainEnabled}
+                disabled={!userHasDiscord}
+                cta={
+                  userHasDiscord ? null : (
+                    <a
+                      href="#connected-accounts"
+                      className="text-xs text-primary underline"
+                    >
+                      Link Discord
+                    </a>
+                  )
+                }
+              />
+            )}
+          </div>
         </div>
       </div>
 

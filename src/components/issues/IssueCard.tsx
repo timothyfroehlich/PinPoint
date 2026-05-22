@@ -75,7 +75,7 @@ export function IssueCard({
             variant === "compact" ? "p-3" : "p-4"
           )}
         >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+          <div className="flex flex-col @lg/card-header:flex-row @lg/card-header:items-center justify-between gap-4 w-full">
             <div className="flex-1 min-w-0">
               <CardTitle
                 className={cn(

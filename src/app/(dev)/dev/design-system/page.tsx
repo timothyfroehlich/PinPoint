@@ -1,3 +1,4 @@
+// sm-structural-allow-file: dev-only design system showcase, viewport breakpoints intentional for preview grids
 import type React from "react";
 import { redirect } from "next/navigation";
 import { IssueBadge } from "~/components/issues/IssueBadge";

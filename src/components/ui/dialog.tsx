@@ -101,6 +101,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
+        // sm-structural-allow: dialog overlay is always full-viewport-width, container queries not applicable
         "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
         className
       )}

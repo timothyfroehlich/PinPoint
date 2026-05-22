@@ -18,6 +18,7 @@ export default function NotFound(): React.JSX.Element {
         <p className="mt-2 text-muted-foreground">
           The page you're looking for doesn't exist or has been moved.
         </p>
+        {/* sm-structural-allow: standalone full-width error page, viewport breakpoint is correct */}
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center">
           <Button asChild>
             <Link href="/">Go to Home</Link>

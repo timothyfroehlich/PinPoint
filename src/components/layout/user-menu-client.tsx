@@ -52,6 +52,7 @@ export function UserMenu({
         data-testid={testId}
       >
         <div className="flex items-center gap-1.5">
+          {/* sm-structural-allow: top navigation bar is always full-viewport-width, viewport breakpoint is correct */}
           <div className="hidden sm:block text-right">
             <p
               className="text-sm font-medium text-on-primary-container leading-tight"
