@@ -58,9 +58,16 @@ if (typeof window !== "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking scrollIntoView
   window.HTMLElement.prototype.scrollIntoView = function () {};
 
-  // Mock Pointer Capture API (required for vaul drag-to-dismiss — jsdom does not implement it)
-  // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking setPointerCapture
-  window.Element.prototype.setPointerCapture = function () {};
-  // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking releasePointerCapture
-  window.Element.prototype.releasePointerCapture = function () {};
+  // Mock Pointer Capture API (required for vaul drag-to-dismiss — jsdom does not implement it).
+  // Only polyfill when missing so a real implementation (future jsdom or alt environment) is preserved.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill setPointerCapture if missing
+  if (!window.Element.prototype.setPointerCapture) {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking setPointerCapture
+    window.Element.prototype.setPointerCapture = function () {};
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill releasePointerCapture if missing
+  if (!window.Element.prototype.releasePointerCapture) {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking releasePointerCapture
+    window.Element.prototype.releasePointerCapture = function () {};
+  }
 }

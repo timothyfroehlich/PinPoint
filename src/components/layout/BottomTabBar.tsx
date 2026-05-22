@@ -20,7 +20,9 @@ import {
   DrawerContent,
   DrawerTitle,
   DrawerDescription,
+  DrawerClose,
 } from "~/components/ui/drawer";
+import { X } from "lucide-react";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { isNavItemActive } from "~/components/layout/nav-utils";
 import { NAV_ITEMS } from "~/components/layout/nav-config";
@@ -113,6 +115,13 @@ export function BottomTabBar({
               Additional navigation options and settings.
             </DrawerDescription>
           </div>
+
+          <DrawerClose
+            className="absolute right-3 top-3 rounded-md p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            aria-label="Close menu"
+          >
+            <X className="size-5" aria-hidden="true" />
+          </DrawerClose>
 
           <nav
             aria-label="additional navigation"
