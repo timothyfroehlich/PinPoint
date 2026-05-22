@@ -110,15 +110,17 @@ function groupPermissions(
 
 export function RoleTiers(): React.JSX.Element {
   return (
-    <div className="@container grid gap-4 @sm:grid-cols-2">
-      {ACCESS_LEVELS.map((level) => (
-        <div key={level} className="rounded-lg border p-4">
-          <p className="font-medium">{ACCESS_LEVEL_LABELS[level]}</p>
-          <p className="text-sm text-muted-foreground">
-            {ACCESS_LEVEL_DESCRIPTIONS[level]}
-          </p>
-        </div>
-      ))}
+    <div className="@container">
+      <div className="grid gap-4 @sm:grid-cols-2">
+        {ACCESS_LEVELS.map((level) => (
+          <div key={level} className="rounded-lg border p-4">
+            <p className="font-medium">{ACCESS_LEVEL_LABELS[level]}</p>
+            <p className="text-sm text-muted-foreground">
+              {ACCESS_LEVEL_DESCRIPTIONS[level]}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

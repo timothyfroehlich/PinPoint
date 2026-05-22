@@ -27,20 +27,35 @@ fi
 # Use -P (PCRE) for the negative lookbehind (?<!@) to exclude @sm:
 PATTERN='(?<!@)sm:(grid-cols-[0-9a-z]+|flex-row|flex-col|block|hidden|inline[-a-z]*|items-[a-z]+)'
 
+# rg exit codes: 0=matches, 1=no matches, 2+=real error (e.g. missing PCRE2).
+# Treat exit 1 as success (clean tree) but propagate any other failure.
+set +e
 raw=$(rg -n -P -B1 -A1 "$PATTERN" src \
   --glob '*.tsx' \
   --glob '*.ts' \
   --glob '!**/*.test.*' \
-  --glob '!src/test/**' \
-  || true)
+  --glob '!src/test/**')
+rg_exit=$?
+set -e
+if [[ $rg_exit -ne 0 && $rg_exit -ne 1 ]]; then
+  echo "ERROR: ripgrep failed unexpectedly (exit $rg_exit) when scanning for sm: structural breakpoints" >&2
+  exit 2
+fi
 
 # Build a temp file listing paths that have a file-level allow comment.
 allowed_files_tmp=$(mktemp)
 trap 'rm -f "$allowed_files_tmp"' EXIT
+set +e
 rg -l 'sm-structural-allow-file:' src \
   --glob '*.tsx' \
   --glob '*.ts' \
-  2>/dev/null > "$allowed_files_tmp" || true
+  > "$allowed_files_tmp" 2>/dev/null
+rg_exit=$?
+set -e
+if [[ $rg_exit -ne 0 && $rg_exit -ne 1 ]]; then
+  echo "ERROR: ripgrep failed unexpectedly (exit $rg_exit) when listing allow-file paths" >&2
+  exit 2
+fi
 
 matches=$(echo "$raw" | awk -v allowed_file="$allowed_files_tmp" '
   BEGIN {
