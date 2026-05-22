@@ -2,7 +2,6 @@ import { sendDm } from "~/lib/discord/client";
 import type { DiscordConfig } from "~/lib/discord/config";
 import { formatDiscordMessage } from "~/lib/discord/messages";
 import { getSiteUrl } from "~/lib/url";
-import { log } from "~/lib/logger";
 import type {
   NotificationChannel,
   NotificationPreferencesRow,
@@ -28,7 +27,6 @@ export function createDiscordChannel(
       type: NotificationType
     ): boolean {
       if (!prefs.discordEnabled) return false;
-      if (prefs.discordDmBlockedAt) return false;
       switch (type) {
         case "issue_assigned":
           return prefs.discordNotifyOnAssigned;
@@ -70,14 +68,6 @@ export function createDiscordChannel(
       });
 
       if (result.ok) return { ok: true };
-      if (result.reason === "blocked") {
-        // PR 5 will react to this and emit system_discord_dm_blocked.
-        log.warn(
-          { userId: ctx.userId, action: "discord.deliver" },
-          "Discord DM blocked"
-        );
-        return { ok: false, reason: "permanent" };
-      }
       if (result.reason === "not_configured") {
         return { ok: false, reason: "skipped" };
       }

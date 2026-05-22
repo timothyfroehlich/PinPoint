@@ -108,15 +108,6 @@ describe("discordChannel.shouldDeliver", () => {
     ).toBe(true);
   });
 
-  it("returns false when discordDmBlockedAt is set", () => {
-    expect(
-      channel.shouldDeliver(
-        prefs({ discordDmBlockedAt: new Date() }),
-        "issue_assigned"
-      )
-    ).toBe(false);
-  });
-
   it("falls back to global watch flag for new_issue", () => {
     expect(
       channel.shouldDeliver(
@@ -146,15 +137,6 @@ describe("discordChannel.deliver", () => {
       discordUserId: "discord-1",
       content: expect.stringContaining("AFM-01"),
     });
-  });
-
-  it("maps blocked → permanent failure", async () => {
-    vi.mocked(sendDm).mockResolvedValueOnce({
-      ok: false,
-      reason: "blocked",
-    });
-    const result = await channel.deliver(ctx());
-    expect(result).toEqual({ ok: false, reason: "permanent" });
   });
 
   it("maps transient → transient", async () => {

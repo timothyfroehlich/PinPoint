@@ -122,7 +122,6 @@ export function NotificationPreferencesForm({
   ]);
 
   const showDiscord = discordIntegrationEnabled;
-  const discordRowDisabled = !discordMainEnabled || !userHasDiscord;
 
   return (
     <form
@@ -336,13 +335,10 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnNewIssue"
               emailDefault={preferences.emailNotifyOnNewIssue}
               inAppDefault={preferences.inAppNotifyOnNewIssue}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
               discordId="discordNotifyOnNewIssue"
               discordDefault={preferences.discordNotifyOnNewIssue}
-              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="All Machines"
@@ -351,13 +347,10 @@ export function NotificationPreferencesForm({
               inAppId="inAppWatchNewIssuesGlobal"
               emailDefault={preferences.emailWatchNewIssuesGlobal}
               inAppDefault={preferences.inAppWatchNewIssuesGlobal}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
               discordId="discordWatchNewIssuesGlobal"
               discordDefault={preferences.discordWatchNewIssuesGlobal}
-              discordDisabled={discordRowDisabled}
             />
           </div>
         </div>
@@ -384,13 +377,10 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnAssigned"
               emailDefault={preferences.emailNotifyOnAssigned}
               inAppDefault={preferences.inAppNotifyOnAssigned}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
               discordId="discordNotifyOnAssigned"
               discordDefault={preferences.discordNotifyOnAssigned}
-              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="Status Changes"
@@ -399,13 +389,10 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnStatusChange"
               emailDefault={preferences.emailNotifyOnStatusChange}
               inAppDefault={preferences.inAppNotifyOnStatusChange}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
               discordId="discordNotifyOnStatusChange"
               discordDefault={preferences.discordNotifyOnStatusChange}
-              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="New Comments"
@@ -414,13 +401,10 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnNewComment"
               emailDefault={preferences.emailNotifyOnNewComment}
               inAppDefault={preferences.inAppNotifyOnNewComment}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
               discordId="discordNotifyOnNewComment"
               discordDefault={preferences.discordNotifyOnNewComment}
-              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="Mentions"
@@ -429,13 +413,10 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnMentioned"
               emailDefault={preferences.emailNotifyOnMentioned}
               inAppDefault={preferences.inAppNotifyOnMentioned}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
               discordId="discordNotifyOnMentioned"
               discordDefault={preferences.discordNotifyOnMentioned}
-              discordDisabled={discordRowDisabled}
             />
           </div>
         </div>
@@ -532,15 +513,17 @@ interface PreferenceRowProps {
   inAppId: string;
   emailDefault: boolean;
   inAppDefault: boolean;
-  emailDisabled: boolean;
-  inAppDisabled: boolean;
   hideEmail?: boolean | undefined;
   hideDiscord?: boolean | undefined;
   discordId?: string | undefined;
   discordDefault?: boolean | undefined;
-  discordDisabled?: boolean | undefined;
 }
 
+// Per-row switches stay fully interactive regardless of master-channel state.
+// Delivery is gated by the master switches in shouldDeliver (discord-channel.ts,
+// email-channel.ts, in-app-channel.ts); the per-row toggle is a preference, not
+// a delivery gate. Disabling them at the UI level produced a 50%-opacity
+// disabled-but-checked state that read as broken (see PP-tk45).
 function PreferenceRow({
   label,
   description,
@@ -548,15 +531,11 @@ function PreferenceRow({
   inAppId,
   emailDefault,
   inAppDefault,
-  emailDisabled,
-  inAppDisabled,
   hideEmail,
   hideDiscord,
   discordId,
   discordDefault,
-  discordDisabled,
 }: PreferenceRowProps): React.JSX.Element {
-  // Build grid template based on which columns are present.
   const visibleSwitchCount = 1 + (hideEmail ? 0 : 1) + (hideDiscord ? 0 : 1);
   const gridCols = `1fr${" auto".repeat(visibleSwitchCount)}`;
 
@@ -570,21 +549,11 @@ function PreferenceRow({
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
       <div className="flex justify-center w-16">
-        <Switch
-          id={inAppId}
-          name={inAppId}
-          defaultChecked={inAppDefault}
-          disabled={inAppDisabled}
-        />
+        <Switch id={inAppId} name={inAppId} defaultChecked={inAppDefault} />
       </div>
       {!hideEmail && (
         <div className="flex justify-center w-16">
-          <Switch
-            id={emailId}
-            name={emailId}
-            defaultChecked={emailDefault}
-            disabled={emailDisabled}
-          />
+          <Switch id={emailId} name={emailId} defaultChecked={emailDefault} />
         </div>
       )}
       {!hideDiscord && discordId && (
@@ -593,7 +562,6 @@ function PreferenceRow({
             id={discordId}
             name={discordId}
             defaultChecked={discordDefault ?? false}
-            disabled={discordDisabled ?? false}
           />
         </div>
       )}
