@@ -18,7 +18,7 @@ test.describe("Username Account Login", () => {
 
     // Type just the username, not the email
     await page.getByLabel("Email").fill("testuser");
-    await page.getByLabel("Password", { exact: true }).fill("TestPassword123");
+    await page.getByLabel(/^Password\s*\*?$/).fill("TestPassword123");
     await page.getByRole("button", { name: "Sign In" }).click();
 
     // Should redirect to dashboard
@@ -43,9 +43,7 @@ test.describe("Authentication Smoke", () => {
 
     // Fill out login form
     await page.getByLabel("Email").fill(TEST_USERS.member.email);
-    await page
-      .getByLabel("Password", { exact: true })
-      .fill(TEST_USERS.member.password);
+    await page.getByLabel(/^Password\s*\*?$/).fill(TEST_USERS.member.password);
 
     // Verify "Remember Me" checkbox is checked by default
     const rememberMeCheckbox = page.getByLabel(/Remember me/i);
@@ -74,9 +72,7 @@ test.describe("Authentication Smoke", () => {
 
     // Log in using the seeded member account
     await page.getByLabel("Email").fill(TEST_USERS.member.email);
-    await page
-      .getByLabel("Password", { exact: true })
-      .fill(TEST_USERS.member.password);
+    await page.getByLabel(/^Password\s*\*?$/).fill(TEST_USERS.member.password);
     await page.getByRole("button", { name: "Sign In" }).click();
 
     // Should land on the originally requested page, not /dashboard

@@ -44,7 +44,12 @@ export function ForgotPasswordForm(): React.JSX.Element {
 
       {/* Email */}
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">
+          Email{" "}
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
+        </Label>
         <Input
           id="email"
           name="email"
