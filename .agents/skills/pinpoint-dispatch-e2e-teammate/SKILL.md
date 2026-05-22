@@ -89,7 +89,7 @@ Report back with:
 
 ```bash
 ./scripts/workflow/pr-dashboard.sh          # overview of open PRs
-./scripts/workflow/pr-watch.py --audit <PR> # audit gate state (one-shot, structured tokens)
+./scripts/workflow/pr-watch.py --check-ready <PR> # one-shot readiness check (structured tokens)
 gh pr checks <PR>                              # CI status
 ```
 

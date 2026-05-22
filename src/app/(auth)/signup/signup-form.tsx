@@ -87,13 +87,19 @@ export function SignupForm({
       <div className="grid grid-cols-2 gap-4">
         {/* First Name */}
         <div className="space-y-2">
-          <Label htmlFor="firstName">First Name</Label>
+          <Label htmlFor="firstName">
+            First Name{" "}
+            <span aria-hidden="true" className="text-destructive">
+              *
+            </span>
+          </Label>
           <Input
             id="firstName"
             name="firstName"
             type="text"
             autoComplete="given-name"
             required
+            enterKeyHint="next"
             maxLength={50}
             className="bg-surface-variant"
             defaultValue={initialData?.firstName}
@@ -102,13 +108,19 @@ export function SignupForm({
 
         {/* Last Name */}
         <div className="space-y-2">
-          <Label htmlFor="lastName">Last Name</Label>
+          <Label htmlFor="lastName">
+            Last Name{" "}
+            <span aria-hidden="true" className="text-destructive">
+              *
+            </span>
+          </Label>
           <Input
             id="lastName"
             name="lastName"
             type="text"
             autoComplete="family-name"
             required
+            enterKeyHint="next"
             maxLength={50}
             className="bg-surface-variant"
             defaultValue={initialData?.lastName}
@@ -118,13 +130,19 @@ export function SignupForm({
 
       {/* Email */}
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">
+          Email{" "}
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
+        </Label>
         <Input
           id="email"
           name="email"
           type="email"
           autoComplete="email"
           required
+          enterKeyHint="next"
           className="bg-surface-variant"
           defaultValue={initialData?.email}
           readOnly={!!initialData?.email}
@@ -133,12 +151,18 @@ export function SignupForm({
 
       {/* Password */}
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">
+          Password{" "}
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
+        </Label>
         <PasswordInput
           id="password"
           name="password"
           autoComplete="new-password"
           required
+          enterKeyHint="next"
           minLength={8}
           maxLength={128}
           className="bg-surface-variant"
@@ -153,12 +177,18 @@ export function SignupForm({
 
       {/* Confirm Password */}
       <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm Password</Label>
+        <Label htmlFor="confirmPassword">
+          Confirm Password{" "}
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
+        </Label>
         <PasswordInput
           id="confirmPassword"
           name="confirmPassword"
-          autoComplete="new-password"
+          autoComplete="off"
           required
+          enterKeyHint="done"
           className="bg-surface-variant"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
@@ -189,7 +219,10 @@ export function SignupForm({
             className="text-link"
           >
             Terms of Service
-          </Link>
+          </Link>{" "}
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
         </Label>
       </div>
 

@@ -16,11 +16,11 @@
 # uses the full registered name when matching `—<name>` sign-offs.
 #
 # Subcommands:
-#   whoami [SESSION_ID]      Print the registered name for SESSION_ID (or the
-#                            discovered session, see below). Empty if unknown.
-#   register NAME [SESSION_ID]
+#   whoami SESSION_ID        Print the registered name for SESSION_ID. Exits 1
+#                            with usage if SESSION_ID is omitted.
+#   register NAME SESSION_ID
 #                            Add or update SESSION_ID → NAME in the JSON map.
-#                            If SESSION_ID is omitted, uses the discovered one.
+#                            Exits 1 with usage if SESSION_ID is omitted.
 #   list                     Dump all session_id → name pairs (sorted by name).
 #   discover                 Print the best-guess session_id of the calling
 #                            shell (Claude Code only; see WARNING below).
@@ -31,9 +31,11 @@
 # Codex, etc.) do not write transcripts there and MUST pass session_id
 # explicitly — their bootstrap shims already do (see
 # .agents/hooks/agy-beads-bootstrap.cjs). Even within Claude Code the
-# heuristic is racy when multiple sessions are active; agents should learn
-# their session_id from the SessionStart hook payload and pass it explicitly.
-# The discover heuristic is a convenience fallback only.
+# heuristic is racy when multiple sessions are active: it returns the newest
+# transcript, which is wrong for any non-newest session (2026-05-20 incident
+# on PP-lt12 — root cause of PP-sjkz). SESSION_ID is therefore REQUIRED for
+# whoami and register; the discover subcommand invokes the heuristic only
+# when the caller explicitly requests it.
 
 set -euo pipefail
 
@@ -98,7 +100,10 @@ case "$cmd" in
   whoami)
     sid="${2:-}"
     if [[ -z "$sid" ]]; then
-      sid=$(discover_session_id) || { echo ""; exit 0; }
+      printf 'Usage: huddle-whoami.sh whoami SESSION_ID\n' >&2
+      printf 'SESSION_ID is required — the heuristic is unreliable when multiple sessions are active.\n' >&2
+      printf 'Use the discover subcommand if you want the heuristic result explicitly.\n' >&2
+      exit 1
     fi
     jq -r --arg sid "$sid" '.[$sid] // ""' "$NAMES_JSON"
     ;;
@@ -118,10 +123,10 @@ case "$cmd" in
     fi
     sid="${3:-}"
     if [[ -z "$sid" ]]; then
-      sid=$(discover_session_id) || {
-        echo "huddle-whoami.sh: could not discover session_id; pass it explicitly" >&2
-        exit 1
-      }
+      printf 'Usage: huddle-whoami.sh register NAME SESSION_ID\n' >&2
+      printf 'SESSION_ID is required — the heuristic is unreliable when multiple sessions are active.\n' >&2
+      printf 'Use: bash scripts/hooks/huddle-whoami.sh discover  to get the discovered session_id.\n' >&2
+      exit 1
     fi
     # Reject duplicate names: if any OTHER session_id already owns this name,
     # registering it again would make the self-filter suppress both sessions'
