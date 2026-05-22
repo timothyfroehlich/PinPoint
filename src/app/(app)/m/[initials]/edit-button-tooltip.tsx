@@ -20,9 +20,9 @@ export function EditButtonWithTooltip({
       <Button
         variant="outline"
         size="sm"
-        disabled
+        aria-disabled="true"
         aria-describedby="edit-machine-disabled-reason"
-        className="w-full border-outline text-muted-foreground"
+        className="w-full border-outline text-muted-foreground opacity-50 cursor-not-allowed pointer-events-none"
         data-testid="edit-machine-button-disabled"
       >
         <Pencil className="mr-2 size-4" />
