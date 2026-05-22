@@ -61,7 +61,7 @@ export async function loginAs(
 
   // Fill and submit login form
   await emailInput.fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByLabel(/^Password\s*\*?$/).fill(password);
 
   // Submit form
   await page.getByRole("button", { name: "Sign In" }).click();

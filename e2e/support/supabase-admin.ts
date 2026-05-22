@@ -382,7 +382,10 @@ export async function setMachineOwner(
 ) {
   const { error } = await supabaseAdmin
     .from("machines")
-    .update({ owner_id: ownerIdOrNull })
+    .update({
+      owner_id: ownerIdOrNull,
+      ...(ownerIdOrNull !== null ? { invited_owner_id: null } : {}),
+    })
     .eq("initials", machineInitials);
   if (error) throw error;
 }

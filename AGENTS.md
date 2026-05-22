@@ -58,12 +58,21 @@ Load relevant skills for every task. If your tool doesn't support skills, read t
 
 ## 4. Environment
 
+### Host prerequisites
+
+One-time install for tools the workflow scripts depend on:
+
+- **GNU parallel** (provides `sem`, used by `pnpm run preflight` to cap host-wide concurrency at 2):
+  - macOS: `brew install parallel`
+  - Linux: `apt install parallel`
+  - Without it, `pnpm run preflight` fails with a clear install hint; use `pnpm run preflight:unlocked` to bypass the cap.
+
 ### Worktrees & ports
 
 Each git worktree gets isolated Supabase ports automatically. The Husky `post-checkout` hook runs `scripts/worktree_setup.py`, which allocates a slot from `~/.config/pinpoint/worktree-slots.json` and generates read-only `supabase/config.toml`, `.env.local`, `.claude/launch.json`.
 
 - **Create**: `git worktree add /path -b branch origin/main` — the hook handles the rest.
-- **Cleanup**: `scripts/worktree_cleanup.py` (stops Supabase, removes volumes, deallocates slot). Plain `git worktree remove` may leak Docker volumes (`docker volume prune` to clean).
+- **Cleanup**: `scripts/worktree_cleanup.py` (stops Supabase, removes volumes, deallocates slot). Plain `git worktree remove` or `rm -rf` leaks slot entries and Docker volumes — `scripts/worktree_orphan_sweep.py` reconciles them; pass `--apply` to reclaim. A SessionStart hook runs the sweep in dry-run mode every 6h and prints a one-line nudge if orphans are found.
 - **Ports**: main worktree uses defaults (3000 / 54321 / 54322). Slot N: `3000+N*10`, `54321+N*100`, `54322+N*100`.
 - **Config**: edit `supabase/config.toml.template`, not the generated file (which is chmod 444).
 
@@ -84,18 +93,18 @@ Only stop services you started in this session, by specific PID or via worktree-
 
 ### Key commands
 
-| Command                               | What                                                                           |
-| :------------------------------------ | :----------------------------------------------------------------------------- |
-| `pnpm run check`                      | Fast: types, lint, format, unit, yamllint, actionlint, ruff, shellcheck (~12s) |
-| `pnpm run preflight`                  | Full: check + build + integration. **Before commit.**                          |
-| `pnpm run smoke`                      | Smoke E2E (~60s)                                                               |
-| `pnpm run e2e:full`                   | Full E2E suite                                                                 |
-| `pnpm run e2e:all`                    | Full + smoke + roots in separate Playwright invocations (~10–15 min)           |
-| `pnpm run db:migrate`                 | Apply schema changes locally                                                   |
-| `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups`                                    |
-| `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                     |
-| `ruff check && ruff format`           | Python lint/format (no venv needed)                                            |
-| `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.        |
+| Command                               | What                                                                                                                                      |
+| :------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm run check`                      | Fast: types, lint, format, unit, yamllint, actionlint, ruff, shellcheck (~12s)                                                            |
+| `pnpm run preflight`                  | Full: check + build + integration. **Before commit.** Host-wide cap of 2 concurrent runs (via `sem`); use `preflight:unlocked` to bypass. |
+| `pnpm run smoke`                      | Smoke E2E (~60s)                                                                                                                          |
+| `pnpm run e2e:full`                   | Full E2E suite                                                                                                                            |
+| `pnpm run e2e:all`                    | Full + smoke + roots in separate Playwright invocations (~10–15 min)                                                                      |
+| `pnpm run db:migrate`                 | Apply schema changes locally                                                                                                              |
+| `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups`                                                                                               |
+| `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                                                                                |
+| `ruff check && ruff format`           | Python lint/format (no venv needed)                                                                                                       |
+| `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                   |
 
 ### Which tests to run
 
