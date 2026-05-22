@@ -64,6 +64,12 @@ export default async function RootLayout({
       </head>
       <body className="flex flex-col h-screen overflow-hidden">
         <ClientProviders>
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-md focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            Skip to main content
+          </a>
           <SentryInitializer />
           {isDevelopment && <ClientLogger />}
           <div className="flex-1 overflow-hidden">{children}</div>

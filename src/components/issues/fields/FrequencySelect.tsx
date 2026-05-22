@@ -15,6 +15,7 @@ interface FrequencySelectProps {
   value: IssueFrequency | "";
   onValueChange: (value: IssueFrequency) => void;
   disabled?: boolean;
+  id?: string;
   name?: string;
   placeholder?: string;
   testId?: string;
@@ -30,6 +31,7 @@ export function FrequencySelect({
   value,
   onValueChange,
   disabled = false,
+  id,
   name = "frequency",
   placeholder = "Select frequency...",
   testId = "issue-frequency-select",
@@ -42,6 +44,7 @@ export function FrequencySelect({
       name={name}
     >
       <SelectTrigger
+        id={id}
         className="w-full border-outline-variant bg-surface text-foreground"
         aria-label={
           value

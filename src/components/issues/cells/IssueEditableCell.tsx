@@ -32,6 +32,7 @@ interface EditableCellProps {
   }[];
   onUpdate: (value: string) => void;
   isUpdating: boolean;
+  isError?: boolean;
 }
 
 /**
@@ -47,15 +48,22 @@ export function IssueEditableCell({
   options,
   onUpdate,
   isUpdating,
+  isError = false,
 }: EditableCellProps): React.JSX.Element {
   return (
     <td
       className="p-1 min-w-[150px] max-w-[150px]"
       data-testid={`issue-cell-${field}`}
     >
+      {isError && (
+        <span role="alert" className="sr-only">
+          Failed to update {field}. Please try again.
+        </span>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild disabled={isUpdating}>
           <button
+            aria-label={`${config.label} - change ${field}`}
             className={cn(
               "flex items-center gap-1.5 text-xs font-medium text-foreground leading-tight hover:bg-muted/80 px-3 py-3 rounded-md transition-colors duration-150 w-full text-left",
               isUpdating && "opacity-50 cursor-not-allowed"
