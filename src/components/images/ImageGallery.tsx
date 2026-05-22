@@ -69,7 +69,7 @@ export function ImageGallery({
                   fill
                   unoptimized={isLocalhost}
                   className="object-contain"
-                  sizes="100vw"
+                  sizes="(max-width: 768px) 100vw, 768px"
                 />
               </div>
             </DialogContent>

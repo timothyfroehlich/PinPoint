@@ -24,16 +24,15 @@ export const metadata: Metadata = {
  * Derives the Vercel Blob public hostname from the BLOB_READ_WRITE_TOKEN.
  * Token format: vercel_blob_rw_<storeRef>_<base64secret>
  * Hostname format: <storeRef>.public.blob.vercel-storage.com
- * Returns null when the token is absent (local dev without blob credentials).
+ * Returns null when the token is absent or doesn't match the expected shape.
  */
 function getBlobStoreHostname(): string | null {
   const token = process.env["BLOB_READ_WRITE_TOKEN"];
   if (!token) return null;
-  // Strip the "vercel_blob_rw_" prefix, then take the next segment before "_"
-  const withoutPrefix = token.replace(/^vercel_blob_rw_/, "");
-  const storeRef = withoutPrefix.split("_")[0];
-  if (!storeRef) return null;
-  return `${storeRef}.public.blob.vercel-storage.com`;
+  const tokenPattern = /^vercel_blob_rw_([a-zA-Z0-9]+)_[a-zA-Z0-9]+$/;
+  const match = tokenPattern.exec(token);
+  if (!match) return null;
+  return `${match[1]}.public.blob.vercel-storage.com`;
 }
 
 export default async function RootLayout({

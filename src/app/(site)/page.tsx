@@ -30,7 +30,7 @@ export default function LandingPage(): React.JSX.Element {
               height={149}
               className="drop-shadow-[0_0_15px_color-mix(in_srgb,var(--color-primary)_50%,transparent)] hover:drop-shadow-[0_0_20px_color-mix(in_srgb,var(--color-primary)_70%,transparent)] transition-all duration-300"
               style={{ width: "auto", height: "auto" }}
-              sizes="(max-width: 768px) 80vw, 200px"
+              sizes="200px"
               data-testid="hero-apc-logo"
               priority
             />
