@@ -6,7 +6,8 @@ set -euo pipefail
 # block/hidden, alignment) must use container queries (@sm:, @md:, …).
 #
 # Structural utilities flagged when used after bare `sm:` (not `@sm:`):
-#   grid-cols-*   flex-row   flex-col   block   hidden   inline*   items-*
+#   grid-cols-*   flex-row   flex-col   flex-row-reverse   flex-col-reverse
+#   block   hidden   inline*   items-*
 #
 # Opt-out options:
 #   Line-level: add `// sm-structural-allow: <reason>` on the same line,
@@ -25,7 +26,7 @@ if ! command -v rg >/dev/null 2>&1; then
 fi
 
 # Use -P (PCRE) for the negative lookbehind (?<!@) to exclude @sm:
-PATTERN='(?<!@)sm:(grid-cols-[0-9a-z]+|flex-row|flex-col|block|hidden|inline[-a-z]*|items-[a-z]+)'
+PATTERN='(?<!@)sm:(grid-cols-[0-9a-z]+|flex-(?:row|col)(?:-reverse)?|block|hidden|inline[-a-z]*|items-[a-z]+)'
 
 # rg exit codes: 0=matches, 1=no matches, 2+=real error (e.g. missing PCRE2).
 # Treat exit 1 as success (clean tree) but propagate any other failure.
