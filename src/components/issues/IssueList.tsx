@@ -106,8 +106,8 @@ export function IssueList({
   const [_isPending, startTransition] = React.useTransition();
   // format: issueId-field
   const [updatingCell, setUpdatingCell] = React.useState<string | null>(null);
-  // format: issueId-field → error message
-  const [cellError, setCellError] = React.useState<string | null>(null);
+  // Key (issueId-field) of the cell currently displaying an error indicator; null when none.
+  const [errorCellKey, setErrorCellKey] = React.useState<string | null>(null);
 
   // Stable order tracking: only update display order when sort/page changes
   const [stableIds, setStableIds] = React.useState<string[]>([]);
@@ -460,7 +460,7 @@ export function IssueList({
                           formData.append("status", val);
                           const cellKey = `${issue.id}-status`;
                           setUpdatingCell(cellKey);
-                          setCellError(null);
+                          setErrorCellKey(null);
                           startTransition(async () => {
                             try {
                               const result = await updateIssueStatusAction(
@@ -471,18 +471,18 @@ export function IssueList({
                                 toast.success("Status updated");
                               } else {
                                 toast.error(result.message);
-                                setCellError(cellKey);
+                                setErrorCellKey(cellKey);
                               }
                             } catch {
                               toast.error("Failed to update status");
-                              setCellError(cellKey);
+                              setErrorCellKey(cellKey);
                             } finally {
                               setUpdatingCell(null);
                             }
                           });
                         }}
                         isUpdating={updatingCell === `${issue.id}-status`}
-                        isError={cellError === `${issue.id}-status`}
+                        isError={errorCellKey === `${issue.id}-status`}
                       />
                     )}
                     {visibleColumns.priority && (
@@ -504,7 +504,7 @@ export function IssueList({
                           formData.append("priority", val);
                           const cellKey = `${issue.id}-priority`;
                           setUpdatingCell(cellKey);
-                          setCellError(null);
+                          setErrorCellKey(null);
                           startTransition(async () => {
                             try {
                               const result = await updateIssuePriorityAction(
@@ -515,18 +515,18 @@ export function IssueList({
                                 toast.success("Priority updated");
                               } else {
                                 toast.error(result.message);
-                                setCellError(cellKey);
+                                setErrorCellKey(cellKey);
                               }
                             } catch {
                               toast.error("Failed to update priority");
-                              setCellError(cellKey);
+                              setErrorCellKey(cellKey);
                             } finally {
                               setUpdatingCell(null);
                             }
                           });
                         }}
                         isUpdating={updatingCell === `${issue.id}-priority`}
-                        isError={cellError === `${issue.id}-priority`}
+                        isError={errorCellKey === `${issue.id}-priority`}
                       />
                     )}
                     {visibleColumns.severity && (
@@ -548,7 +548,7 @@ export function IssueList({
                           formData.append("severity", val);
                           const cellKey = `${issue.id}-severity`;
                           setUpdatingCell(cellKey);
-                          setCellError(null);
+                          setErrorCellKey(null);
                           startTransition(async () => {
                             try {
                               const result = await updateIssueSeverityAction(
@@ -559,18 +559,18 @@ export function IssueList({
                                 toast.success("Severity updated");
                               } else {
                                 toast.error(result.message);
-                                setCellError(cellKey);
+                                setErrorCellKey(cellKey);
                               }
                             } catch {
                               toast.error("Failed to update severity");
-                              setCellError(cellKey);
+                              setErrorCellKey(cellKey);
                             } finally {
                               setUpdatingCell(null);
                             }
                           });
                         }}
                         isUpdating={updatingCell === `${issue.id}-severity`}
-                        isError={cellError === `${issue.id}-severity`}
+                        isError={errorCellKey === `${issue.id}-severity`}
                       />
                     )}
                     {visibleColumns.assignee && (

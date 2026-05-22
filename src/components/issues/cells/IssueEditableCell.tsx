@@ -57,7 +57,7 @@ export function IssueEditableCell({
     >
       {isError && (
         <span role="alert" className="sr-only">
-          Failed to update {config.label.toLowerCase()}. Please try again.
+          Failed to update {field}. Please try again.
         </span>
       )}
       <DropdownMenu>

@@ -143,15 +143,13 @@ export function InlineEditableField({
           </div>
         </div>
       ) : canEdit ? (
-        <button
-          type="button"
-          aria-label={`Edit ${label}`}
-          className="group relative min-h-[1.5rem] w-full cursor-pointer rounded-md text-left hover:bg-surface-variant/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={(e) => {
-            // Don't enter edit mode when clicking a link (e.g. mention profiles)
-            if ((e.target as HTMLElement).closest("a")) return;
-            handleEdit();
-          }}
+        // RichTextDisplay can render <a> tags (mentions/urls). Nesting links
+        // inside a <button> is invalid HTML, so the content sits as a sibling
+        // of the Edit button rather than inside it. The Edit button is the
+        // only interactive control here — clicking the content itself does
+        // not enter edit mode.
+        <div
+          className="group relative min-h-[1.5rem] w-full rounded-md"
           data-testid={testId ? `${testId}-display` : undefined}
         >
           {isEmpty ? (
@@ -159,13 +157,18 @@ export function InlineEditableField({
               {placeholder ?? `Add ${label.toLowerCase()}...`}
             </p>
           ) : (
-            <RichTextDisplay content={displayValue} className="py-1" />
+            <RichTextDisplay content={displayValue} className="py-1 pr-8" />
           )}
-          <Pencil
-            className="absolute right-2 top-1 size-3.5 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100"
-            aria-hidden="true"
-          />
-        </button>
+          <button
+            type="button"
+            aria-label={`Edit ${label}`}
+            onClick={handleEdit}
+            className="absolute right-1 top-1 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity duration-150 hover:bg-surface-variant/50 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
+            data-testid={testId ? `${testId}-edit` : undefined}
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+          </button>
+        </div>
       ) : (
         <div
           className="relative min-h-[1.5rem]"

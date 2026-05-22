@@ -136,7 +136,7 @@ export async function MainLayout({
       <main
         id="main-content"
         tabIndex={-1}
-        className="flex-1 overflow-y-auto scroll-pt-14 outline-none"
+        className="flex-1 overflow-y-auto scroll-pt-14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
         {/* Extra bottom padding on mobile so content isn't hidden behind the fixed tab bar */}
         <div className="@container px-4 sm:px-8 lg:px-10 pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
