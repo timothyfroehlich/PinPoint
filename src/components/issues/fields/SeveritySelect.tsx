@@ -15,6 +15,7 @@ interface SeveritySelectProps {
   value: IssueSeverity | "";
   onValueChange: (value: IssueSeverity) => void;
   disabled?: boolean;
+  id?: string;
   name?: string;
   placeholder?: string;
   testId?: string;
@@ -31,6 +32,7 @@ export function SeveritySelect({
   value,
   onValueChange,
   disabled = false,
+  id,
   name = "severity",
   placeholder = "Select severity...",
   testId = "issue-severity-select",
@@ -43,6 +45,7 @@ export function SeveritySelect({
       name={name}
     >
       <SelectTrigger
+        id={id}
         className="w-full border-outline-variant bg-surface text-foreground"
         aria-label={
           value

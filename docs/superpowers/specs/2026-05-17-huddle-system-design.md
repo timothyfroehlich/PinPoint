@@ -34,13 +34,13 @@ All scripts use the `huddle-` prefix:
 - `huddle-rotation-check.sh` — shared helper sourced by both hooks
 - `huddle-whoami.sh` — agent identity helper
 
-All state lives in `<main-worktree>/.claude/huddle/` (project-scoped,
+All state lives in `<main-worktree>/.agents/huddle/` (project-scoped,
 git-ignored, shared across linked worktrees via `git rev-parse --git-common-dir`):
 
-- `<main-worktree>/.claude/huddle/config.json` — local config, holds root bead ID
-- `<main-worktree>/.claude/huddle/session-names.json` — session_id → name mapping
-- `<main-worktree>/.claude/huddle/last-seen-<path-hash>` — per-checkout poll cursor
-- `<main-worktree>/.claude/huddle/rotation.lock` — flock target for rotation
+- `<main-worktree>/.agents/huddle/config.json` — local config, holds root bead ID
+- `<main-worktree>/.agents/huddle/session-names.json` — session_id → name mapping
+- `<main-worktree>/.agents/huddle/last-seen-<path-hash>` — per-checkout poll cursor
+- `<main-worktree>/.agents/huddle/rotation.lock` — flock target for rotation
 
 ## 3. Plugin Packaging
 
@@ -56,11 +56,11 @@ Agents see plugin docs as a skill they can invoke; humans manage it via
 `enabledPlugins` in `~/.claude/settings.json`. The plugin is installed at
 project level via `scripts/hooks/` (already part of the PinPoint repo) and
 referenced from project `.claude/settings.json`. State lives in
-`<main-worktree>/.claude/huddle/` so it's project-scoped, not user-scoped — a
+`<main-worktree>/.agents/huddle/` so it's project-scoped, not user-scoped — a
 clone of PinPoint boots the system without writing to the user's home dir.
 
 The PinPoint-specific bd issue identifiers (the rolling daily/monthly beads)
-are stored in `<main-worktree>/.claude/huddle/config.json`, so the same plugin
+are stored in `<main-worktree>/.agents/huddle/config.json`, so the same plugin
 code works for any project that bootstraps its own huddle root.
 
 ## 4. System Architecture
@@ -110,7 +110,7 @@ Parent-child links via `bd dep add <child> <root> --type parent-child`.
   ~20 entries to bound size). Hooks read this directly without bd queries.
 - `last_rotation`: timestamp of the last successful rotation, for diagnostics.
 
-### 4.3 Local config file (`<main-worktree>/.claude/huddle/config.json`)
+### 4.3 Local config file (`<main-worktree>/.agents/huddle/config.json`)
 
 ```json
 {
@@ -179,7 +179,7 @@ Single source of truth for the detection logic.
 
 Invoked by the rotation subagent (dispatched by the lead agent when the
 rotation notice fires). Acquires the flock at
-`<main-worktree>/.claude/huddle/rotation.lock` (same `lockf(1)` / `flock(1)`
+`<main-worktree>/.agents/huddle/rotation.lock` (same `lockf(1)` / `flock(1)`
 platform-detection pattern as PP-bg45's worktree-create.sh), then performs
 the rotation. See §6 for the rotation flow.
 
@@ -188,7 +188,7 @@ the rotation. See §6 for the rotation flow.
 One-time initialization. Idempotent — re-running on an already-bootstrapped
 project is a no-op that prints status. Creates the root epic, today's first
 daily bead, this month's monthly bead, writes
-`<main-worktree>/.claude/huddle/config.json`, and initializes the root's notes
+`<main-worktree>/.agents/huddle/config.json`, and initializes the root's notes
 JSON.
 
 ### 5.6 `huddle-whoami.sh`
@@ -209,7 +209,7 @@ lead agent dispatches a single rotation subagent. The subagent runs
 `huddle-rotate.sh`, which:
 
 1. **Acquire lock** via `lockf -t 60` (macOS) or `flock -x -w 60` (Linux) on
-   `<main-worktree>/.claude/huddle/rotation.lock`. 60s allows the slowest case
+   `<main-worktree>/.agents/huddle/rotation.lock`. 60s allows the slowest case
    (LLM-driven summarization of a long day's chatter) to complete without
    spurious timeouts from a peer's concurrent rotation attempt.
 2. **Re-check date** inside the lock. If rotation is no longer needed (a
@@ -255,7 +255,7 @@ To bootstrap, run:
     bash scripts/hooks/huddle-bootstrap.sh
 
 That creates the root bead, today's daily, this month's monthly, and writes
-<main-worktree>/.claude/huddle/config.json with the IDs. Re-running the script
+<main-worktree>/.agents/huddle/config.json with the IDs. Re-running the script
 is safe — it's a no-op if already bootstrapped.
 ```
 
@@ -328,7 +328,7 @@ of those help Tim track who's doing what. The name describes the WORK.
 
 ### 8.1 Mapping storage
 
-`<main-worktree>/.claude/huddle/session-names.json` — JSON map of `{session_id:
+`<main-worktree>/.agents/huddle/session-names.json` — JSON map of `{session_id:
 name}`. Persists across restarts and compactions because it's a regular file.
 The canonical lookup for both the SessionStart hook (announcement) and the
 poll hook (self-filter).

@@ -1,27 +1,32 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2250  # unbraced $vars are consistent throughout this codebase
 # huddle-session-start.sh — SessionStart hook: announce session_id and registration state
 #
-# Fires once at session start. Reads stdin JSON for `session_id`, looks up the
-# session's registered name in <main-worktree>/.claude/huddle/session-names.json
-# (see huddle-lib.sh for the state-dir resolver), and emits a brief block via
-# stdout (which Claude Code surfaces as system context).
+# Harness-agnostic. Fires at session start from any agent harness that supports
+# SessionStart-equivalent hooks (Claude Code via .claude/settings.json,
+# Antigravity via .agents/hooks/agy-beads-bootstrap.cjs, etc.). Reads stdin JSON
+# for `session_id`, looks up the session's registered name in
+# <main-worktree>/.agents/huddle/session-names.json (see huddle-lib.sh for the
+# state-dir resolver), and emits a brief identity block on stdout which the
+# host harness surfaces as system context.
 #
 # Why this exists: agents can't reliably discover their own session_id when
-# multiple parallel sessions are active (transcripts share a directory keyed by
-# project root, and `ls -t` is racy). The SessionStart hook is the only place
-# session_id is guaranteed-correct without an external diagnostic.
+# multiple parallel sessions are active. The SessionStart hook is the only
+# place session_id is guaranteed-correct without an external diagnostic.
 #
-# Pairs with scripts/hooks/huddle-poll.sh (UserPromptSubmit) — that's the
-# new-comment injection hook; this one is just identity announcement.
+# Pairs with scripts/hooks/huddle-poll.sh — that's the new-comment injection
+# hook; this one is just identity announcement.
 #
-# Stdin payload schema (per https://code.claude.com/docs/en/hooks):
+# Stdin payload schema (Claude Code shape; other harnesses adapt to this via
+# their bootstrap shim — see .agents/hooks/agy-beads-bootstrap.cjs for the
+# Antigravity adapter):
 #   {
 #     "session_id":       "<UUID>",
 #     "transcript_path":  "<path to .jsonl>",
 #     "cwd":              "<current working dir>",
 #     "hook_event_name":  "SessionStart",
 #     "source":           "startup" | "resume" | "clear" | "compact",
-#     "model":            "<model id>",
+#     "model":            "<model id>",                       (Claude-only, optional)
 #     "agent_type":       "<name>"  (optional, when launched with --agent)
 #   }
 #
@@ -32,7 +37,7 @@
 set -euo pipefail
 
 # --- State directory resolution ---
-# See huddle-lib.sh for why state lives in <main-worktree>/.claude/huddle/.
+# See huddle-lib.sh for why state lives in <main-worktree>/.agents/huddle/.
 LIB_SCRIPT="$(dirname "$0")/huddle-lib.sh"
 if [[ ! -f "$LIB_SCRIPT" ]]; then
   exit 0
@@ -42,6 +47,43 @@ source "$LIB_SCRIPT"
 STATE_DIR=$(huddle_state_dir) || exit 0
 NAMES_JSON="$STATE_DIR/session-names.json"
 mkdir -p "$STATE_DIR"
+
+# --- Bootstrap check ---
+# If config.json is missing, emit the user-visible bootstrap notice and exit.
+# This is the only hook that emits the notice; huddle-poll.sh exits silently.
+CONFIG_FILE="$STATE_DIR/config.json"
+ROOT_ID=""
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  MAIN_ROOT=$(dirname "$(git rev-parse --git-common-dir 2>/dev/null || echo ".")" 2>/dev/null || echo "<main-worktree>")
+  printf '## ⚠️ Huddle not bootstrapped\n\n'
+  printf 'The huddle coordination system is not set up yet. It maintains a daily bead\n'
+  printf 'for agents to coordinate on, summarizes each day'\''s chatter into ~50-token\n'
+  printf 'digests so it stays cheap to read, and rotates at local midnight.\n\n'
+  printf 'To bootstrap, run:\n'
+  printf '    bash scripts/hooks/huddle-bootstrap.sh\n\n'
+  printf 'That creates the root bead, today'\''s daily, this month'\''s monthly, and writes\n'
+  printf '%s/.agents/huddle/config.json with the IDs. Re-running is safe.\n' "$MAIN_ROOT"
+  exit 0
+fi
+ROOT_ID=$(jq -r '.root_bead_id // ""' "$CONFIG_FILE" 2>/dev/null)
+if [[ -z "$ROOT_ID" ]]; then
+  printf '## ⚠️ Huddle not bootstrapped\n\n'
+  printf 'config.json exists but has no root_bead_id. Re-run:\n'
+  printf '    bash scripts/hooks/huddle-bootstrap.sh\n'
+  exit 0
+fi
+# Verify the root bead is still reachable. If it was deleted/closed/renamed
+# under us, hooks would silently stop injecting — surface a specific notice
+# so the user knows to re-bootstrap. `bd show` exits non-zero for missing IDs.
+if ! bd show "$ROOT_ID" --json >/dev/null 2>&1; then
+  printf '## ⚠️ Huddle root bead missing\n\n'
+  # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
+  printf 'config.json points at %s but `bd show %s` failed.\n' "$ROOT_ID" "$ROOT_ID"
+  printf 'The bead may have been deleted, archived, or the bd workspace moved.\n\n'
+  printf 'To rebuild:\n'
+  printf '    bash scripts/hooks/huddle-bootstrap.sh\n'
+  exit 0
+fi
 
 # Read stdin JSON (best-effort; never fail SessionStart on parse errors)
 INPUT=""
@@ -64,18 +106,34 @@ except Exception:
 fi
 case "$TRANSCRIPT_PATH" in
   */subagents/*) exit 0 ;;
+  *) ;;
 esac
 
-# --- Rotation check (stub in PR #1357; real check in follow-up rotation PR) ---
+# --- Rotation check ---
 ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
 if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
   # shellcheck source=huddle-rotation-check.sh disable=SC1091
   source "$ROTATION_CHECK_SCRIPT"
   if huddle_rotation_needed; then
-    # Real "rotation needed" output lands in the follow-up PR. For now this
-    # branch is unreachable (stub returns 1).
+    STORED_DATE=""
+    NOTES_STR_ROT=$(bd show "$ROOT_ID" --json 2>/dev/null | jq -r '.[0].notes // ""' 2>/dev/null || echo "")
+    if [[ -n "$NOTES_STR_ROT" ]]; then
+      STORED_DATE=$(printf '%s' "$NOTES_STR_ROT" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('today_bead', {}).get('date', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+    fi
+    NOW_DATE=$(date +%F)
     printf '## ⚠️ Huddle rotation needed\n\n'
-    printf 'See docs/superpowers/specs/2026-05-17-huddle-system-design.md §7.2\n'
+    printf 'The active coordination bead points to date %s, but today is %s.\n' "$STORED_DATE" "$NOW_DATE"
+    printf 'Before continuing, dispatch the rotation subagent — it will summarize\n'
+    printf 'the previous day, create today'\''s bead, update pointers, and post\n'
+    printf '"continued in" markers on closed beads.\n\n'
+    printf 'Dispatch template in .agents/skills/pinpoint-huddle/SKILL.md.\n'
     exit 0
   fi
 fi
@@ -83,6 +141,8 @@ fi
 SESSION_ID=""
 SOURCE=""
 if [[ -n "$INPUT" ]]; then
+  # python3 failure is handled by the read's `|| { … }` fallback; ignore masked return.
+  # shellcheck disable=SC2312
   read -r SESSION_ID SOURCE <<<"$(
     printf '%s' "$INPUT" | python3 -c "
 import sys, json
@@ -95,7 +155,7 @@ except Exception:
   )" || { SESSION_ID=""; SOURCE=""; }
 fi
 
-# If we have no session_id, silently exit — the user's PP-cvh participation is optional.
+# If we have no session_id, silently exit — huddle participation is optional.
 if [[ -z "$SESSION_ID" ]]; then
   exit 0
 fi
@@ -115,30 +175,110 @@ if [[ -n "$NAME" ]]; then
   printf '## Huddle identity\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
   printf 'Your session_id: `%s`\n' "$SESSION_ID"
-  printf 'Registered as: **Claude-%s** (self-filter active for your own posts)\n\n' "$NAME"
+  printf 'Registered as: **%s** (self-filter active for your own posts)\n\n' "$NAME"
   printf 'If this scrolls out of context later, recall your name with:\n'
   printf '    bash scripts/hooks/huddle-whoami.sh whoami %s\n\n' "$SESSION_ID"
   # shellcheck disable=SC2016  # backticks are literal Markdown
-  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md`\n'
+  printf 'Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`\n'
 else
   printf '## Huddle identity — registration needed\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
   printf 'Your session_id: `%s`\n\n' "$SESSION_ID"
   printf 'You are not yet registered in the huddle self-filter map.\n\n'
   printf 'When you receive your first user prompt, derive a short descriptive name\n'
-  printf 'for yourself from what you'\''re being asked to do. The name should help Tim\n'
-  printf 'recognize at a glance what each parallel Claude is working on.\n\n'
+  printf 'for yourself from what you'\''re being asked to do, prefixed with your\n'
+  printf 'harness name so Tim can recognize at a glance which agent stack each\n'
+  printf 'parallel session belongs to.\n\n'
   printf 'Examples:\n'
-  printf '  WorktreeHookFix  fixing a worktree hook\n'
-  printf '  TestAudit        auditing test coverage\n'
-  printf '  DesignBible      working on the design bible\n'
-  printf '  DocsSync         keeping docs aligned\n\n'
-  printf 'Format: CamelCase, ASCII letters only, under ~20 chars.\n\n'
+  printf '  Claude-WorktreeHookFix       fixing a worktree hook in Claude Code\n'
+  printf '  Antigravity-AgentsMdCleanup  cleaning up AGENTS.md in Antigravity\n'
+  printf '  Codex-TestAudit              auditing test coverage in Codex\n'
+  printf '  Claude-DesignBible           working on the design bible in Claude Code\n\n'
+  printf 'Format: <Harness>-<Topic>, CamelCase, ASCII letters/digits/hyphens/underscores, under ~30 chars.\n'
+  printf 'The harness prefix lets Tim see "two Claudes and one Antigravity are running."\n\n'
   printf 'Register with:\n'
   printf '    bash scripts/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
   printf 'If the name is taken, the helper suggests variations.\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown
-  printf 'Full reference: `.agent/skills/pinpoint-huddle/SKILL.md`\n'
+  printf 'Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`\n'
+fi
+
+# --- Summary injection (§5.1 step 5) ---
+# Inject monthly summary description + N most-recent daily bead descriptions.
+# Suppressed on compact (already returned early above via SOURCE check).
+# Fails open: any bd error exits silently without noise.
+ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || { exit 0; }
+NOTES_STR=$(printf '%s' "$ROOT_JSON" | jq -r '.[0].notes // ""' 2>/dev/null) || { exit 0; }
+if [[ -z "$NOTES_STR" ]]; then
+  exit 0
+fi
+
+N_DAILIES=$(printf '%s' "$NOTES_STR" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('settings', {}).get('n_dailies_to_inject', 5))
+except Exception:
+    print(5)
+" 2>/dev/null || echo "5")
+# Sanitize: a non-numeric value ('null', '', 'abc') from the JSON would later
+# trip `[[ "$DAILY_COUNT" -ge "$N_DAILIES" ]]` with "integer expression expected"
+# on stderr. Default to 5; clamp to [1, 20] so a bad setting can't blow up the
+# session-start output budget.
+if ! [[ "$N_DAILIES" =~ ^[0-9]+$ ]]; then
+  N_DAILIES=5
+fi
+if (( N_DAILIES < 1 )); then N_DAILIES=1; fi
+if (( N_DAILIES > 20 )); then N_DAILIES=20; fi
+
+MONTHLY_BEAD_ID=$(printf '%s' "$NOTES_STR" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    print(n.get('monthly_bead', {}).get('id', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+
+RECENT_DAILIES=$(printf '%s' "$NOTES_STR" | python3 -c "
+import sys, json
+try:
+    n = json.loads(sys.stdin.read())
+    items = n.get('recent_dailies', [])
+    for item in items:
+        print(item.get('id', '') + '\t' + item.get('date', ''))
+except Exception:
+    pass
+" 2>/dev/null || echo "")
+
+# Gather content — only emit the section header if there's something to show
+MONTHLY_DESC=""
+if [[ -n "$MONTHLY_BEAD_ID" ]]; then
+  MONTHLY_DESC=$(bd show "$MONTHLY_BEAD_ID" --json 2>/dev/null | jq -r '.[0].description // ""' 2>/dev/null || echo "")
+fi
+
+if [[ -z "$MONTHLY_DESC" && -z "$RECENT_DAILIES" ]]; then
+  exit 0
+fi
+
+printf '\n## Huddle recent activity\n\n'
+
+if [[ -n "$MONTHLY_BEAD_ID" && -n "$MONTHLY_DESC" && "$MONTHLY_DESC" != "null" ]]; then
+  MONTHLY_TITLE=$(bd show "$MONTHLY_BEAD_ID" --json 2>/dev/null | jq -r '.[0].title // "Monthly summary"' 2>/dev/null || echo "Monthly summary")
+  printf '### %s\n\n%s\n\n' "$MONTHLY_TITLE" "$MONTHLY_DESC"
+fi
+
+if [[ -n "$RECENT_DAILIES" ]]; then
+  DAILY_COUNT=0
+  while IFS=$'\t' read -r daily_id daily_date; do
+    [[ -z "$daily_id" ]] && continue
+    [[ "$DAILY_COUNT" -ge "$N_DAILIES" ]] && break
+    DAILY_DESC=$(bd show "$daily_id" --json 2>/dev/null | jq -r '.[0].description // ""' 2>/dev/null || echo "")
+    if [[ -n "$DAILY_DESC" && "$DAILY_DESC" != "null" ]]; then
+      printf '### Daily %s (%s)\n\n%s\n\n' "$daily_date" "$daily_id" "$DAILY_DESC"
+    fi
+    DAILY_COUNT=$(( DAILY_COUNT + 1 ))
+  done <<< "$RECENT_DAILIES"
 fi
 
 exit 0

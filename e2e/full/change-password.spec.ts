@@ -37,9 +37,9 @@ test.describe("Change Password", () => {
     await expect(page.getByRole("heading", { name: "Security" })).toBeVisible();
 
     const form = page.getByTestId("change-password-form");
-    await form.getByLabel("Current Password").fill(originalPassword);
-    await form.getByLabel("New Password", { exact: true }).fill(newPassword);
-    await form.getByLabel("Confirm New Password").fill(newPassword);
+    await form.getByLabel(/^Current Password\s*\*?$/).fill(originalPassword);
+    await form.getByLabel(/^New Password\s*\*?$/).fill(newPassword);
+    await form.getByLabel(/^Confirm New Password\s*\*?$/).fill(newPassword);
     await form.getByRole("button", { name: "Change Password" }).click();
 
     await expect(form.getByRole("button", { name: "Saved!" })).toBeVisible();
@@ -56,7 +56,7 @@ test.describe("Change Password", () => {
 
     await page.goto("/login");
     await page.getByLabel("Email").fill(changePasswordEmail);
-    await page.getByLabel("Password", { exact: true }).fill(newPassword);
+    await page.getByLabel(/^Password\s*\*?$/).fill(newPassword);
     await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
   });

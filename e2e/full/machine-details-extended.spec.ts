@@ -48,9 +48,11 @@ test.describe("Machine Details - Extended", () => {
     // Navigate to admin-owned machine
     await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
 
-    // Click to edit owner requirements
-    const reqDisplay = page.getByTestId("machine-owner-requirements-display");
-    await reqDisplay.click();
+    // Click the Edit pencil to enter edit mode. RichTextDisplay can render
+    // links (mentions/urls) and nesting <a> inside <button> is invalid HTML,
+    // so the display wrapper is not itself a button — clicks on the field
+    // don't enter edit mode; only the dedicated Edit button does.
+    await page.getByTestId("machine-owner-requirements-edit").click();
 
     // Fill in requirements
     const textarea = page

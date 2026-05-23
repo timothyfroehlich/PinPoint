@@ -72,7 +72,6 @@ export function AppHeader({
           width={32}
           height={32}
           className="size-8 object-contain"
-          priority
         />
         <span className="text-base font-bold tracking-tight text-foreground">
           PinPoint

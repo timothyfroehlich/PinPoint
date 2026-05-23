@@ -54,17 +54,28 @@ export function ChangePasswordSection(): React.JSX.Element {
 
       <div className="space-y-4 max-w-[320px]">
         <div className="space-y-2">
-          <Label htmlFor="currentPassword">Current Password</Label>
+          <Label htmlFor="currentPassword">
+            Current Password{" "}
+            <span aria-hidden="true" className="text-destructive">
+              *
+            </span>
+          </Label>
           <Input
             id="currentPassword"
             name="currentPassword"
             type="password"
             autoComplete="current-password"
             required
+            enterKeyHint="next"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="newPassword">New Password</Label>
+          <Label htmlFor="newPassword">
+            New Password{" "}
+            <span aria-hidden="true" className="text-destructive">
+              *
+            </span>
+          </Label>
           <Input
             id="newPassword"
             name="newPassword"
@@ -73,18 +84,25 @@ export function ChangePasswordSection(): React.JSX.Element {
             required
             minLength={8}
             maxLength={128}
+            enterKeyHint="next"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+          <Label htmlFor="confirmNewPassword">
+            Confirm New Password{" "}
+            <span aria-hidden="true" className="text-destructive">
+              *
+            </span>
+          </Label>
           <Input
             id="confirmNewPassword"
             name="confirmNewPassword"
             type="password"
-            autoComplete="new-password"
+            autoComplete="off"
             required
             minLength={8}
             maxLength={128}
+            enterKeyHint="done"
           />
         </div>
       </div>

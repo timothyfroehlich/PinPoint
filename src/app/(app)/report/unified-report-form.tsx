@@ -381,6 +381,7 @@ export function UnifiedReportForm({
               <select
                 id="machineId"
                 name="machineId"
+                autoComplete="off"
                 data-testid="machine-select"
                 aria-label="Select Machine"
                 required
@@ -478,7 +479,11 @@ export function UnifiedReportForm({
                   Severity *
                 </Label>
                 <input type="hidden" name="severity" value={severity} />
-                <SeveritySelect value={severity} onValueChange={setSeverity} />
+                <SeveritySelect
+                  id="severity"
+                  value={severity}
+                  onValueChange={setSeverity}
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -487,6 +492,7 @@ export function UnifiedReportForm({
                 </Label>
                 <input type="hidden" name="frequency" value={frequency} />
                 <FrequencySelect
+                  id="frequency"
                   value={frequency}
                   onValueChange={setFrequency}
                   testId="issue-frequency-select"
@@ -503,6 +509,7 @@ export function UnifiedReportForm({
                   </Label>
                   <input type="hidden" name="priority" value={priority} />
                   <PrioritySelect
+                    id="priority"
                     value={priority}
                     onValueChange={setPriority}
                   />
@@ -512,7 +519,11 @@ export function UnifiedReportForm({
                     Status *
                   </Label>
                   <input type="hidden" name="status" value={status} />
-                  <StatusSelect value={status} onValueChange={setStatus} />
+                  <StatusSelect
+                    id="status"
+                    value={status}
+                    onValueChange={setStatus}
+                  />
                 </div>
               </div>
             )}
@@ -595,6 +606,7 @@ export function UnifiedReportForm({
                       <Input
                         id="firstName"
                         name="firstName"
+                        autoComplete="given-name"
                         className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
@@ -608,6 +620,7 @@ export function UnifiedReportForm({
                       <Input
                         id="lastName"
                         name="lastName"
+                        autoComplete="family-name"
                         className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
@@ -620,6 +633,7 @@ export function UnifiedReportForm({
                       id="email"
                       name="email"
                       type="email"
+                      autoComplete="email"
                       className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                     />
                     <p className="text-[10px] text-muted-foreground leading-none">
@@ -685,6 +699,7 @@ export function UnifiedReportForm({
               </>
             )}
 
+            {/* sm-structural-allow: TODO PP-kqbk follow-up — convert to @container */}
             <div className="flex flex-col-reverse gap-2 mt-1 sm:flex-row sm:items-center">
               <Button
                 type="button"

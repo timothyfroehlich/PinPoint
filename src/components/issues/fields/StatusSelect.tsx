@@ -48,6 +48,7 @@ interface StatusSelectProps {
   value: IssueStatus;
   onValueChange: (value: IssueStatus) => void;
   disabled?: boolean;
+  id?: string;
   name?: string;
 }
 
@@ -55,6 +56,7 @@ export function StatusSelect({
   value,
   onValueChange,
   disabled = false,
+  id,
   name = "status",
 }: StatusSelectProps): React.JSX.Element {
   return (
@@ -65,6 +67,7 @@ export function StatusSelect({
       name={name}
     >
       <SelectTrigger
+        id={id}
         className="w-full border-outline-variant bg-surface text-foreground"
         aria-label={`Status: ${STATUS_CONFIG[value].label}`}
         data-testid="issue-status-select"

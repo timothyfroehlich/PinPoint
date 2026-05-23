@@ -111,7 +111,7 @@ test.describe("User Invitation & Signup Flow", () => {
     await expect(page.getByLabel(/Last Name/i)).toHaveValue("Flow");
 
     // 5. Complete signup
-    await page.getByLabel("Password", { exact: true }).fill("TestPassword123!");
+    await page.getByLabel(/^Password\s*\*?$/).fill("TestPassword123!");
     await page.getByLabel(/Confirm Password/i).fill("TestPassword123!");
     await page.getByLabel(/terms of service/i).check();
     await page.getByRole("button", { name: /Create Account/i }).click();
@@ -188,7 +188,7 @@ test.describe("User Invitation & Signup Flow", () => {
     const signupLink = await getSignupLink(userEmail);
     await page.goto(signupLink);
 
-    await page.getByLabel("Password", { exact: true }).fill("TestPassword123!");
+    await page.getByLabel(/^Password\s*\*?$/).fill("TestPassword123!");
     await page.getByLabel(/Confirm Password/i).fill("TestPassword123!");
     await page.getByLabel(/terms of service/i).check();
     await page.getByRole("button", { name: /Create Account/i }).click();

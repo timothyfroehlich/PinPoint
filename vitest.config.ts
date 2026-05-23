@@ -65,9 +65,12 @@ export default defineConfig(({ mode }) => {
               "src/test/integration/supabase/**/*.test.ts",
               "src/test/integration/supabase/**/*.test.tsx",
             ],
-            // PGlite WASM init in beforeAll exceeds the default 10s under
-            // preflight contention — this project runs in parallel with
-            // `test:integration`, and both spin up PGlite workers (PP-2on.3).
+            // PGlite WASM init in beforeAll can exceed the default 10s
+            // under host pressure (concurrent CI jobs, cold OrbStack, other
+            // local test runs). PP-pblt removed the same-preflight contention
+            // by serializing `test:integration` and `test:integration:supabase`,
+            // but the defensive 30s ceiling stays so init has slack under
+            // unrelated load.
             hookTimeout: 30000,
           },
         },

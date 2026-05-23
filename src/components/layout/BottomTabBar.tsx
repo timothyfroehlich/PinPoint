@@ -16,11 +16,13 @@ import {
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-  SheetDescription,
-} from "~/components/ui/sheet";
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerClose,
+} from "~/components/ui/drawer";
+import { X } from "lucide-react";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { isNavItemActive } from "~/components/layout/nav-utils";
 import { NAV_ITEMS } from "~/components/layout/nav-config";
@@ -104,15 +106,22 @@ export function BottomTabBar({
         </button>
       </nav>
 
-      {/* "More" bottom sheet */}
-      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl pb-0">
+      {/* "More" bottom drawer — vaul provides swipe-to-close and momentum */}
+      <Drawer open={moreOpen} onOpenChange={setMoreOpen} direction="bottom">
+        <DrawerContent className="rounded-t-2xl pb-0">
           <div className="sr-only">
-            <SheetTitle>More Options</SheetTitle>
-            <SheetDescription>
+            <DrawerTitle>More Options</DrawerTitle>
+            <DrawerDescription>
               Additional navigation options and settings.
-            </SheetDescription>
+            </DrawerDescription>
           </div>
+
+          <DrawerClose
+            className="absolute right-3 top-3 rounded-md p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            aria-label="Close menu"
+          >
+            <X className="size-5" aria-hidden="true" />
+          </DrawerClose>
 
           <nav
             aria-label="additional navigation"
@@ -184,8 +193,8 @@ export function BottomTabBar({
               </>
             )}
           </nav>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
     </>
   );
 }

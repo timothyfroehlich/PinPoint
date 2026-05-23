@@ -103,6 +103,7 @@ interface HelpCard {
 
 function HelpCardGrid({ cards }: { cards: HelpCard[] }): React.JSX.Element {
   return (
+    // sm-structural-allow: public full-width help page, TODO PP-kqbk follow-up — convert to @container
     <div className="grid gap-4 sm:grid-cols-2">
       {cards.map((card) => (
         <Link key={card.href} href={card.href} className="group">
