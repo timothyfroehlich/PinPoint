@@ -9,13 +9,49 @@ import {
   machines,
   issues,
 } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { sendInviteEmail } from "~/lib/email/invite";
 import { requireSiteUrl } from "~/lib/url";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 import { log } from "~/lib/logger";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+
+function getAdminClient(): ReturnType<typeof createAdminClient> {
+  if (process.env.NODE_ENV === "test") {
+    return {
+      auth: {
+        admin: {
+          listUsers: async () => {
+            try {
+              const result = await db.execute<{
+                id: string;
+                email: string | null;
+              }>(sql`SELECT id, email FROM auth.users`);
+              return {
+                data: {
+                  users: result.map(
+                    (row: { id: string; email: string | null }) => ({
+                      id: row.id,
+                      email: row.email ?? undefined,
+                    })
+                  ),
+                },
+                error: null,
+              };
+            } catch (err) {
+              return {
+                data: { users: [] },
+                error: err instanceof Error ? err : new Error(String(err)),
+              };
+            }
+          },
+        },
+      },
+    } as unknown as ReturnType<typeof createAdminClient>;
+  }
+  return createAdminClient();
+}
 
 async function verifyAdmin(userId: string): Promise<void> {
   const currentUserProfile = await db.query.userProfiles.findFirst({
@@ -140,7 +176,7 @@ export async function inviteUser(
 
     // Check both auth.users and user_profiles — a user could exist in
     // auth.users without a profile row if the handle_new_user trigger failed.
-    const adminClient = createAdminClient();
+    const adminClient = getAdminClient();
     const { data: authUsersData, error: listError } =
       await adminClient.auth.admin.listUsers();
 
