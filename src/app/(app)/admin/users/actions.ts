@@ -185,7 +185,10 @@ export async function inviteUser(
         { action: "inviteUser", err: listError.message },
         "Failed to list auth users during validation"
       );
-      throw new Error("An unexpected error occurred while inviting the user");
+      throw new Error(
+        "An unexpected error occurred while inviting the user: " +
+          listError.message
+      );
     }
 
     const existingAuthUser = authUsersData.users.find(
