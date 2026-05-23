@@ -36,7 +36,7 @@ Use this skill when:
 
 ### Server Client Creation (CORE-SSR-001)
 
-Always import and use the custom client creator from `~/lib/supabase/server`. Only a small allowlist of modules touches `@supabase/ssr` directly: `src/lib/supabase/server.ts` (the SSR wrapper itself), `src/lib/supabase/middleware.ts` (token refresh in `updateSession`), and `src/app/(auth)/auth/callback/route.ts` (custom cookie handling so OAuth tokens are written to the response). App code outside this allowlist must go through `~/lib/supabase/server`.
+Always import and use the custom client creator from `~/lib/supabase/server`. Only a small allowlist of **non-test** modules touches `@supabase/ssr` directly: `src/lib/supabase/server.ts` (the SSR wrapper itself), `src/lib/supabase/middleware.ts` (token refresh in `updateSession`), and `src/app/(auth)/auth/callback/route.ts` (custom cookie handling so OAuth tokens are written to the response). App code outside this allowlist must go through `~/lib/supabase/server`. (Tests may mock `@supabase/ssr` — e.g. `src/lib/supabase/middleware.test.ts` — which is fine.)
 
 ### Immediate `getUser` Check (CORE-SSR-002)
 
@@ -62,9 +62,9 @@ Return the response object from `updateSession` as-is (CORE-SSR-005). Don't muta
 
 The root `middleware.ts` also sets the Content-Security-Policy. Things to know before modifying it:
 
-- **`script-src` posture**: production uses `'strict-dynamic'` (nonce-only, blocks host allowlists); preview adds an explicit allowlist (`vercel.live`) for the Vercel toolbar. Never add `'unsafe-inline'` or `'unsafe-eval'`.
-- **Per-request nonce**: `middleware.ts` calls `crypto.randomUUID()` and sets the nonce on `Content-Security-Policy` (`'nonce-<uuid>'`) plus an `x-nonce` response header. Server Components read `x-nonce` for inline scripts.
-- **Already allowlisted**: `challenges.cloudflare.com` (Turnstile CAPTCHA) in `script-src`, `connect-src`, and `frame-src`. Supabase URL + WS URL in `connect-src`. Both `localhost:*` and `127.0.0.1:*` allowed in `connect-src` for dev — this is the only intentional CORE-SEC-008 exception.
+- **`script-src` posture**: production is nonce-only — `'self' 'nonce-<uuid>' 'strict-dynamic'`, no host allowlist. Preview adds `https://vercel.live` and `https://challenges.cloudflare.com` for the Vercel toolbar and Turnstile widget. Never add `'unsafe-inline'` or `'unsafe-eval'`.
+- **Per-request nonce**: `middleware.ts` calls `crypto.randomUUID()` and sets the nonce on `Content-Security-Policy` (`'nonce-<uuid>'`) plus an `x-nonce` response header. The `x-nonce` header is set for any inline-script use case; there is no consumer in `src/` today, so if you add an inline `<script>` you must read `x-nonce` yourself and set the `nonce` attribute.
+- **Already allowlisted**: `challenges.cloudflare.com` (Turnstile CAPTCHA) — in `connect-src` and `frame-src` in both branches, and additionally in `script-src` only on preview. Supabase URL + WS URL in `connect-src`. Note `connect-src` allows both `localhost:*` and `127.0.0.1:*` in **both** branches (production included), so don't describe that as dev-only.
 - **Adding a new external host**: add to the appropriate directive in the production branch first, mirror to the preview branch only if needed. Default to deny.
 
 ### Auth Callback Route (CORE-SSR-004)
@@ -108,7 +108,7 @@ Always use the following functions for permission gating and auditing:
   - `checkPermissions(permissionIds, accessLevel, context)`: Returns true if all permissions are granted.
   - `checkAnyPermission(permissionIds, accessLevel, context)`: Returns true if any of the permissions are granted.
   - `getGrantedPermissions(accessLevel, context)`: Retrieves list of granted permission IDs.
-  - `getPermissionState(permissionId, accessLevel, context)`: Returns detailed state (`allowed: boolean`, `reason: "unauthenticated" | "role" | "ownership"`).
+  - `getPermissionState(permissionId, accessLevel, context)`: Returns a discriminated union — `{ allowed: true }` or `{ allowed: false; reason: "unauthenticated" | "role" | "ownership" }`. Narrow on `allowed` before reading `reason`; it only exists on the denied branch. (The `usePermissionState` client hook flattens this to `{ allowed: boolean; reason: string | null }` for convenience.)
   - `getPermissionDeniedReason(permissionId, accessLevel, context)`: Returns a human-readable tooltip string for disabled actions.
   - `isConditionalPermission(permissionId, accessLevel)`: Checks if a permission's matrix value is conditional (`'own'`/`'owner'`) and therefore requires `OwnershipContext` to evaluate.
   - `getRawPermissionValue(permissionId, accessLevel)`: Returns the raw matrix value (`true`, `false`, `'own'`, or `'owner'`) before ownership resolution. Use this only when you need to introspect the matrix entry itself (e.g., to choose between two UI states); for actual access decisions, always go through `checkPermission` / `getPermissionState`.
@@ -300,7 +300,7 @@ Don't roll a new `sanitize-html` allowlist. The codebase has a shared config —
 
 For the common cases:
 
-- **Markdown-from-user-input → safe HTML**: call `markdownToHtml(...)` from `~/lib/markdown` (double-sanitizes after the markdown renderer runs).
+- **Markdown-from-user-input → safe HTML**: call `renderMarkdownToHtml(...)` from `~/lib/markdown` (double-sanitizes after the markdown renderer runs).
 - **TipTap ProseMirror JSON → safe HTML for display**: use the renderer in `~/lib/tiptap/render` (this is what `RichTextDisplay` uses; the comment there reads "Output is double-sanitized — the renderer escapes all text").
 - **Raw HTML that genuinely needs sanitization in a new place**: import `sanitizeHtml` from `sanitize-html` AND `NON_TEXT_TAGS` from `~/lib/sanitize-html-config`, and pass `nonTextTags: NON_TEXT_TAGS` alongside whatever `allowedTags`/`allowedAttributes` you need. The shared `NON_TEXT_TAGS` constant is what keeps `<script>`, `<style>`, `<textarea>`, etc. from leaking through; replicating an inline allowlist that omits it is a footgun.
 
@@ -316,7 +316,7 @@ Before deploying or merging security-sensitive changes, verify:
 - [ ] **Server→Client minimization**: Client Component props are minimal shapes, not raw ORM rows (CORE-SEC-006).
 - [ ] **Email Privacy**: User email addresses are never displayed outside of admin views or settings (CORE-SEC-007).
 - [ ] **Input Validation**: All form inputs are validated using Zod (CORE-SEC-002).
-- [ ] **Sanitization**: Any new sanitize-html call uses `NON_TEXT_TAGS` from `~/lib/sanitize-html-config`; prefer the existing `markdownToHtml` / tiptap renderer over rolling a new allowlist.
+- [ ] **Sanitization**: Any new sanitize-html call uses `NON_TEXT_TAGS` from `~/lib/sanitize-html-config`; prefer the existing `renderMarkdownToHtml` / tiptap renderer over rolling a new allowlist.
 - [ ] **Hostnames**: No hardcoded hostnames/ports used; local dev runs strictly on `localhost` (CORE-SEC-008).
 - [ ] **CSP Config**: Dynamic CSP nonce generated via root `middleware.ts` (CORE-SEC-004); no `'unsafe-inline'` for script-src; new external hosts added to the production branch by default.
 - [ ] **Middleware response**: `updateSession`'s response is returned as-is (CORE-SSR-005) — no rewrap, no header copy.
