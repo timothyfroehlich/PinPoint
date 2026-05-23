@@ -123,6 +123,12 @@ export function NotificationPreferencesForm({
 
   const showDiscord = discordIntegrationEnabled;
 
+  // When a master switch is off, dim only the per-row toggles that are ON.
+  const dimWhenChecked = "data-[state=checked]:opacity-50";
+  const emailDimClass = !emailMainEnabled ? dimWhenChecked : undefined;
+  const inAppDimClass = !inAppMainEnabled ? dimWhenChecked : undefined;
+  const discordDimClass = !discordMainEnabled ? dimWhenChecked : undefined;
+
   return (
     <form
       key={resetKey}
@@ -337,6 +343,10 @@ export function NotificationPreferencesForm({
               inAppDefault={preferences.inAppNotifyOnNewIssue}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordNotifyOnNewIssue"
               discordDefault={preferences.discordNotifyOnNewIssue}
             />
@@ -349,6 +359,10 @@ export function NotificationPreferencesForm({
               inAppDefault={preferences.inAppWatchNewIssuesGlobal}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordWatchNewIssuesGlobal"
               discordDefault={preferences.discordWatchNewIssuesGlobal}
             />
@@ -379,6 +393,10 @@ export function NotificationPreferencesForm({
               inAppDefault={preferences.inAppNotifyOnAssigned}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordNotifyOnAssigned"
               discordDefault={preferences.discordNotifyOnAssigned}
             />
@@ -391,6 +409,10 @@ export function NotificationPreferencesForm({
               inAppDefault={preferences.inAppNotifyOnStatusChange}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordNotifyOnStatusChange"
               discordDefault={preferences.discordNotifyOnStatusChange}
             />
@@ -403,6 +425,10 @@ export function NotificationPreferencesForm({
               inAppDefault={preferences.inAppNotifyOnNewComment}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordNotifyOnNewComment"
               discordDefault={preferences.discordNotifyOnNewComment}
             />
@@ -415,6 +441,10 @@ export function NotificationPreferencesForm({
               inAppDefault={preferences.inAppNotifyOnMentioned}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordNotifyOnMentioned"
               discordDefault={preferences.discordNotifyOnMentioned}
             />
@@ -513,17 +543,16 @@ interface PreferenceRowProps {
   inAppId: string;
   emailDefault: boolean;
   inAppDefault: boolean;
+  emailClassName?: string | undefined;
+  inAppClassName?: string | undefined;
   hideEmail?: boolean | undefined;
   hideDiscord?: boolean | undefined;
   discordId?: string | undefined;
   discordDefault?: boolean | undefined;
+  discordClassName?: string | undefined;
+  discordDisabled?: boolean | undefined;
 }
 
-// Per-row switches stay fully interactive regardless of master-channel state.
-// Delivery is gated by the master switches in shouldDeliver (discord-channel.ts,
-// email-channel.ts, in-app-channel.ts); the per-row toggle is a preference, not
-// a delivery gate. Disabling them at the UI level produced a 50%-opacity
-// disabled-but-checked state that read as broken (see PP-tk45).
 function PreferenceRow({
   label,
   description,
@@ -531,10 +560,14 @@ function PreferenceRow({
   inAppId,
   emailDefault,
   inAppDefault,
+  emailClassName,
+  inAppClassName,
   hideEmail,
   hideDiscord,
   discordId,
   discordDefault,
+  discordClassName,
+  discordDisabled,
 }: PreferenceRowProps): React.JSX.Element {
   const visibleSwitchCount = 1 + (hideEmail ? 0 : 1) + (hideDiscord ? 0 : 1);
   const gridCols = `1fr${" auto".repeat(visibleSwitchCount)}`;
@@ -549,11 +582,21 @@ function PreferenceRow({
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
       <div className="flex justify-center w-16">
-        <Switch id={inAppId} name={inAppId} defaultChecked={inAppDefault} />
+        <Switch
+          id={inAppId}
+          name={inAppId}
+          defaultChecked={inAppDefault}
+          className={inAppClassName}
+        />
       </div>
       {!hideEmail && (
         <div className="flex justify-center w-16">
-          <Switch id={emailId} name={emailId} defaultChecked={emailDefault} />
+          <Switch
+            id={emailId}
+            name={emailId}
+            defaultChecked={emailDefault}
+            className={emailClassName}
+          />
         </div>
       )}
       {!hideDiscord && discordId && (
@@ -562,6 +605,8 @@ function PreferenceRow({
             id={discordId}
             name={discordId}
             defaultChecked={discordDefault ?? false}
+            disabled={discordDisabled ?? false}
+            className={discordClassName}
           />
         </div>
       )}
