@@ -184,7 +184,7 @@ Use worktree-isolated subagents for independent tasks. Tool-specific dispatch, h
 
 - Default: PRs do **not** get a usable branch DB (saves ~$0.32/day/branch).
 - Enable: add the `preview` label. Within ~5 min, `Supabase Branch Setup` GHA runs Drizzle migrations + seed.
-- Cleanup: `Supabase Branch Cleanup` cron runs every 6h.
+- Cleanup: `Supabase Branch Cleanup` cron runs every 3h.
 - Env var fallbacks in `server.ts`/`middleware.ts` cover both PinPoint and integration naming.
 
 ## 7. Documentation
