@@ -34,6 +34,7 @@ import {
   ensureLoggedIn,
   loginAs,
   logout,
+  assertNoA11yViolations,
 } from "../support/actions";
 import { seededMachines, TEST_USERS } from "../support/constants";
 import { clearMachineField } from "../support/supabase-admin";
@@ -65,6 +66,7 @@ test.describe("Machine Details Redesign", () => {
     await expect(page.getByTestId("detail-open-issues-count")).toBeVisible();
 
     await assertNoHorizontalOverflow(page);
+    await assertNoA11yViolations(page);
   });
 
   test("Service tab renders the issues section with cards visible", async ({
@@ -78,6 +80,8 @@ test.describe("Machine Details Redesign", () => {
 
     // Cards render flat (no expando) — section is always open in this design.
     await expect(page.getByTestId("issue-card").first()).toBeVisible();
+
+    await assertNoA11yViolations(page);
   });
 
   // Absorbed from e2e/smoke/machines-crud.spec.ts (Row 26 MERGE):
@@ -95,6 +99,7 @@ test.describe("Machine Details Redesign", () => {
     await page.goto("/m?availability=all");
     await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
     await assertNoHorizontalOverflow(page);
+    await assertNoA11yViolations(page);
 
     // Restore default user
     await logout(page, testInfo);

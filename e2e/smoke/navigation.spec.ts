@@ -5,7 +5,11 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { assertNoHorizontalOverflow, loginAs } from "../support/actions.js";
+import {
+  assertNoHorizontalOverflow,
+  loginAs,
+  assertNoA11yViolations,
+} from "../support/actions.js";
 import { TEST_USERS } from "../support/constants.js";
 
 test.describe("Navigation", () => {
@@ -26,6 +30,8 @@ test.describe("Navigation", () => {
 
     // Verify Report Issue CTA is available on landing page
     await expect(page.getByTestId("cta-report-issue")).toBeVisible();
+
+    await assertNoA11yViolations(page);
   });
 
   test("authenticated navigation - show user menu", async ({
@@ -33,6 +39,8 @@ test.describe("Navigation", () => {
   }, testInfo) => {
     // Login first
     await loginAs(page, testInfo);
+
+    await assertNoA11yViolations(page);
 
     // Use project name to determine mobile vs desktop layout
     const isMobile = testInfo.project.name.includes("Mobile");

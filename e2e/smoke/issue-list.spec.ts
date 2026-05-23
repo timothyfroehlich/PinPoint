@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { assertNoHorizontalOverflow } from "../support/actions";
+import {
+  assertNoHorizontalOverflow,
+  assertNoA11yViolations,
+} from "../support/actions";
 import { seededIssues } from "../support/constants";
 import { STORAGE_STATE } from "../support/auth-state";
 
@@ -27,6 +30,8 @@ test.describe("Issue List Features", () => {
     await page
       .waitForLoadState("networkidle", { timeout: 5000 })
       .catch(() => undefined);
+
+    await assertNoA11yViolations(page);
 
     // 2. Test Searching
     // Search for Issue 1

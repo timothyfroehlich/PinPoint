@@ -5,7 +5,10 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { assertNoHorizontalOverflow } from "../support/actions";
+import {
+  assertNoHorizontalOverflow,
+  assertNoA11yViolations,
+} from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { TEST_USERS } from "../support/constants";
 import { fillReportForm } from "../support/page-helpers";
@@ -37,6 +40,7 @@ test.describe("Public Issue Reporting", () => {
 
     // Verify no horizontal overflow on report page
     await assertNoHorizontalOverflow(page);
+    await assertNoA11yViolations(page);
 
     const issueTitle = `${PUBLIC_PREFIX} ${Date.now()}`;
     await fillReportForm(page, {
@@ -52,6 +56,8 @@ test.describe("Public Issue Reporting", () => {
         name: "Issue Sent!",
       })
     ).toBeVisible();
+
+    await assertNoA11yViolations(page);
     await expect(
       page.getByRole("link", { name: "Report Another Issue" })
     ).toBeVisible();
