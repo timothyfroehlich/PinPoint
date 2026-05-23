@@ -20,50 +20,41 @@ export interface SoftwareSetting {
   value: string;
 }
 
-interface BaselineValue {
-  group: string;
-  value: string;
-}
-
 interface SoftwareSettingsSectionProps {
-  baseline: BaselineValue;
+  baseline: string;
   rows: SoftwareSetting[];
   canEdit: boolean;
+  onBaselineChange?: (newValue: string) => void;
 }
 
-function encodeBaseline(b: BaselineValue): string {
-  return `${b.group}__${b.value}`;
+function formatBaselineDisplay(raw: string): string {
+  if (raw.startsWith("custom__")) return raw.slice(8);
+  if (raw.includes("__")) return raw.replace("__", " · ");
+  return raw;
 }
 
 export function SoftwareSettingsSection({
   baseline,
   rows,
   canEdit,
+  onBaselineChange,
 }: SoftwareSettingsSectionProps): React.JSX.Element {
-  const [baselineValue, setBaselineValue] = useState(encodeBaseline(baseline));
   const [isEditingBaseline, setIsEditingBaseline] = useState(false);
 
   return (
     <div className="py-2.5">
-      <div className="mb-1.5 flex items-baseline justify-between gap-2">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Software Settings
-        </p>
-        <span className="text-[11px] text-muted-foreground">
-          {rows.length === 0
-            ? "No settings"
-            : `${String(rows.length)} setting${rows.length !== 1 ? "s" : ""}`}
-        </span>
-      </div>
+      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        Software Settings
+      </p>
 
       {/* Baseline strip */}
       <div className="mb-3 flex items-center gap-2 text-sm">
         <span className="font-medium text-foreground">Starting from:</span>
         {isEditingBaseline && canEdit ? (
           <BaselineSelect
-            value={baselineValue}
+            value={baseline}
             onChange={(val) => {
-              setBaselineValue(val);
+              onBaselineChange?.(val);
               setIsEditingBaseline(false);
             }}
           />
@@ -80,11 +71,7 @@ export function SoftwareSettingsSection({
             }
             aria-label="Edit baseline"
           >
-            <span>
-              {baselineValue.includes("__")
-                ? baselineValue.replace("__", " · ")
-                : baselineValue}
-            </span>
+            <span>{formatBaselineDisplay(baseline)}</span>
             {canEdit && (
               <span className="text-[11px] text-muted-foreground/60">✎</span>
             )}
@@ -129,7 +116,7 @@ export function SoftwareSettingsSection({
           size="sm"
           className="mt-1 text-muted-foreground"
           onClick={() => {
-            /* no-op scaffold */
+            /* Layer 2 — row editing */
           }}
         >
           <Plus aria-hidden="true" />

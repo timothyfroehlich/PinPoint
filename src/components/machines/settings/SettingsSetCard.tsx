@@ -12,6 +12,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
+import { InlineEditableText } from "~/components/machines/settings/InlineEditableText";
 import { MarkdownSection } from "~/components/machines/settings/MarkdownSection";
 import {
   SoftwareSettingsSection,
@@ -19,8 +20,16 @@ import {
 } from "~/components/machines/settings/SoftwareSettingsSection";
 import {
   DipSwitchSection,
-  type DipSwitch,
+  type DipSwitchBank,
 } from "~/components/machines/settings/DipSwitchSection";
+import { InlineEditableField } from "~/components/inline-editable-field";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+
+export type MarkdownField =
+  | "description"
+  | "rubbers"
+  | "postPositions"
+  | "notes";
 
 export interface SettingsSetData {
   id: string;
@@ -28,13 +37,13 @@ export interface SettingsSetData {
   isPreferred: boolean;
   updatedBy: string;
   updatedAt: string;
-  description: string;
-  baseline: { group: string; value: string };
+  description: ProseMirrorDoc | null;
+  baseline: string;
   softwareSettings: SoftwareSetting[];
-  dipSwitches: DipSwitch[];
-  rubbers: string;
-  postPositions: string;
-  notes: string;
+  dipSwitchBanks: DipSwitchBank[];
+  rubbers: ProseMirrorDoc | null;
+  postPositions: ProseMirrorDoc | null;
+  notes: ProseMirrorDoc | null;
 }
 
 interface SettingsSetCardProps {
@@ -43,20 +52,20 @@ interface SettingsSetCardProps {
   canEdit: boolean;
   onToggleExpand: () => void;
   onTogglePreferred: () => void;
+  onRename: (newName: string) => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onUpdateField: (field: MarkdownField, value: ProseMirrorDoc | null) => void;
+  onUpdateBaseline: (newValue: string) => void;
 }
 
-function formatMetaWhenCollapsed(set: SettingsSetData): string {
-  const sw = set.softwareSettings.length;
-  const dip = set.dipSwitches.length;
-  const swLabel =
-    sw === 0
-      ? "no software settings"
-      : `${String(sw)} software setting${sw !== 1 ? "s" : ""}`;
-  const dipLabel =
-    dip === 0
-      ? "no dip switches"
-      : `${String(dip)} dip switch${dip !== 1 ? "es" : ""}`;
-  return `updated ${set.updatedAt} by ${set.updatedBy} · ${swLabel} · ${dipLabel}`;
+function formatShortDate(iso: string): string {
+  // "2026-05-12" → "5/12"
+  const parts = iso.split("-");
+  const m = parts[1];
+  const d = parts[2];
+  if (!m || !d) return iso;
+  return `${String(parseInt(m, 10))}/${String(parseInt(d, 10))}`;
 }
 
 export function SettingsSetCard({
@@ -65,8 +74,18 @@ export function SettingsSetCard({
   canEdit,
   onToggleExpand,
   onTogglePreferred,
+  onRename,
+  onDuplicate,
+  onDelete,
+  onUpdateField,
+  onUpdateBaseline,
 }: SettingsSetCardProps): React.JSX.Element {
   const ChevronIcon = isExpanded ? ChevronDown : ChevronRight;
+
+  function handleDelete(): void {
+    const ok = window.confirm(`Delete "${set.name}"? This can't be undone.`);
+    if (ok) onDelete();
+  }
 
   return (
     <Card
@@ -77,13 +96,14 @@ export function SettingsSetCard({
           : "border-outline-variant"
       )}
     >
-      {/* Header row — always visible */}
+      {/* Header block — always visible */}
       <div
         role="button"
         tabIndex={0}
-        className="@container flex cursor-pointer items-center gap-2.5 px-4 py-3 hover:bg-muted/30"
+        className="@container flex cursor-pointer flex-col gap-1 px-4 py-3 hover:bg-muted/30"
         onClick={onToggleExpand}
         onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             onToggleExpand();
@@ -92,156 +112,163 @@ export function SettingsSetCard({
         aria-expanded={isExpanded}
         aria-label={`${set.name} settings set`}
       >
-        {/* Chevron */}
-        <ChevronIcon
-          className="size-4 shrink-0 text-muted-foreground transition-transform duration-150"
-          aria-hidden="true"
-        />
-
-        {/* Star toggle */}
-        <button
-          type="button"
-          aria-label={
-            set.isPreferred
-              ? "Preferred set (click to unset)"
-              : "Make this the preferred set"
-          }
-          className="shrink-0 rounded p-0.5 transition-colors duration-150 hover:bg-muted/50"
-          onClick={(e) => {
-            e.stopPropagation();
-            onTogglePreferred();
-          }}
-        >
-          <Star
-            className={cn(
-              "size-4 transition-colors duration-150",
-              set.isPreferred
-                ? "fill-warning text-warning"
-                : "text-muted-foreground"
-            )}
+        {/* Top row: caret, star, name + updated-by, preferred badge, kebab */}
+        <div className="flex items-center gap-2.5">
+          <ChevronIcon
+            className="size-4 shrink-0 text-muted-foreground transition-transform duration-150"
             aria-hidden="true"
           />
-        </button>
 
-        {/* Set name */}
-        <span className="flex-1 text-sm font-semibold text-foreground">
-          {set.name}
-        </span>
-
-        {/* Preferred pill — only when preferred */}
-        {set.isPreferred && (
-          <Badge
-            className="shrink-0 border-warning/30 bg-warning/10 text-warning"
-            variant="outline"
+          {/* Star toggle */}
+          <button
+            type="button"
+            aria-label={
+              set.isPreferred
+                ? "Preferred set (click to unset)"
+                : "Make this the preferred set"
+            }
+            className="shrink-0 rounded p-0.5 transition-colors duration-150 hover:bg-muted/50"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePreferred();
+            }}
           >
-            ★ Preferred
-          </Badge>
-        )}
+            <Star
+              className={cn(
+                "size-4 transition-colors duration-150",
+                set.isPreferred
+                  ? "fill-warning text-warning"
+                  : "text-muted-foreground"
+              )}
+              aria-hidden="true"
+            />
+          </button>
 
-        {/* Collapsed meta string */}
-        {!isExpanded && (
-          <span className="hidden shrink-0 text-xs text-muted-foreground @md:block">
-            {formatMetaWhenCollapsed(set)}
-          </span>
-        )}
+          {/* Name (click-to-edit) + updated-by */}
+          <div className="flex flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+            <div className="text-sm font-semibold text-foreground">
+              <InlineEditableText
+                value={set.name}
+                onValueChange={onRename}
+                canEdit={canEdit}
+                placeholder="Untitled set"
+                ariaLabel="set name"
+                inputClassName="h-7 text-sm font-semibold"
+              />
+            </div>
+            <span className="text-xs text-muted-foreground">
+              updated by {set.updatedBy} {formatShortDate(set.updatedAt)}
+            </span>
+          </div>
 
-        {/* Kebab menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 shrink-0 text-muted-foreground"
-              aria-label="More options"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
+          {set.isPreferred && (
+            <Badge
+              className="shrink-0 border-warning/30 bg-warning/10 text-warning"
+              variant="outline"
             >
-              <MoreVertical className="size-4" aria-hidden="true" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onSelect={() => {
-                /* no-op scaffold */
-              }}
-            >
-              Duplicate
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onSelect={() => {
-                /* no-op scaffold */
-              }}
-            >
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              ★ Preferred
+            </Badge>
+          )}
+
+          {/* Kebab */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 shrink-0 text-muted-foreground"
+                aria-label="More options"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <MoreVertical className="size-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onDuplicate}>
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={handleDelete}
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Description preview — always visible, click-to-edit */}
+        <div
+          className="pl-7"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+          }}
+        >
+          <InlineEditableField
+            label="Description"
+            value={set.description}
+            machineId="scaffold-noop"
+            canEdit={canEdit}
+            placeholder="Add a short description…"
+            onSave={(_machineId, newValue) => {
+              onUpdateField("description", newValue);
+              return Promise.resolve({ ok: true });
+            }}
+          />
+        </div>
       </div>
 
       {/* Expanded body */}
       {isExpanded && (
-        <CardContent className="border-t border-outline-variant px-4 pb-4 pt-0">
-          {/* Meta strip */}
-          <p className="border-b border-dashed border-outline-variant/50 py-2.5 text-xs text-muted-foreground">
-            Updated by{" "}
-            <strong className="font-medium text-foreground">
-              {set.updatedBy}
-            </strong>{" "}
-            on {set.updatedAt}
-            <span className="mx-1.5 text-outline-variant">·</span>
-            {String(set.softwareSettings.length)} software setting
-            {set.softwareSettings.length !== 1 ? "s" : ""}
-            <span className="mx-1.5 text-outline-variant">·</span>
-            {set.dipSwitches.length === 0
-              ? "no dip switches"
-              : `${String(set.dipSwitches.length)} dip switch${set.dipSwitches.length !== 1 ? "es" : ""}`}
-          </p>
-
-          {/* Description */}
-          <div className="border-b border-outline-variant/50">
-            <MarkdownSection
-              title="Description"
-              value={set.description}
-              canEdit={canEdit}
-            />
-          </div>
-
-          {/* Software settings */}
+        <CardContent className="border-t border-outline-variant px-4 pb-4 pt-2">
           <div className="border-b border-outline-variant/50">
             <SoftwareSettingsSection
               baseline={set.baseline}
               rows={set.softwareSettings}
               canEdit={canEdit}
+              onBaselineChange={onUpdateBaseline}
             />
           </div>
 
-          {/* Dip switches */}
           <div className="border-b border-outline-variant/50">
-            <DipSwitchSection rows={set.dipSwitches} canEdit={canEdit} />
+            <DipSwitchSection banks={set.dipSwitchBanks} canEdit={canEdit} />
           </div>
 
-          {/* Rubbers */}
           <div className="border-b border-outline-variant/50">
             <MarkdownSection
               title="Rubbers"
               value={set.rubbers}
               canEdit={canEdit}
+              onValueChange={(v) => {
+                onUpdateField("rubbers", v);
+              }}
             />
           </div>
 
-          {/* Post positions */}
           <div className="border-b border-outline-variant/50">
             <MarkdownSection
               title="Post positions"
               value={set.postPositions}
               canEdit={canEdit}
+              onValueChange={(v) => {
+                onUpdateField("postPositions", v);
+              }}
             />
           </div>
 
-          {/* Notes */}
-          <MarkdownSection title="Notes" value={set.notes} canEdit={canEdit} />
+          <MarkdownSection
+            title="Notes"
+            value={set.notes}
+            canEdit={canEdit}
+            onValueChange={(v) => {
+              onUpdateField("notes", v);
+            }}
+          />
         </CardContent>
       )}
     </Card>

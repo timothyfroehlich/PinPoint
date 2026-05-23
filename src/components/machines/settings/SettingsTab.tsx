@@ -7,75 +7,108 @@ import { Button } from "~/components/ui/button";
 import {
   SettingsSetCard,
   type SettingsSetData,
+  type MarkdownField,
 } from "~/components/machines/settings/SettingsSetCard";
+import { plainTextToDoc, type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 // ---------------------------------------------------------------------------
 // Hardcoded scaffold data — replaced by DB query once schema lands (PP-43q3)
 // ---------------------------------------------------------------------------
-const SAMPLE_SETS: SettingsSetData[] = [
-  {
-    id: "set-1",
-    name: "Standard House",
-    isPreferred: true,
-    updatedBy: "Bob",
-    updatedAt: "2026-05-12",
-    description:
-      "Our **day-to-day** setup — slightly harder than factory but accessible. See [2026 league rules](#).",
-    baseline: { group: "Stern", value: "Competition Install" },
-    softwareSettings: [
-      { id: "S-001", name: "Replay score", value: "700,000,000" },
-      { id: "S-014", name: "Tilt warnings", value: "2" },
-      { id: "S-021", name: "Balls per game", value: "3" },
-      { id: "S-040", name: "Free play", value: "On" },
-    ],
-    dipSwitches: [
-      { bank: "MPU", switch: "DS1", position: "ON", note: "Free play" },
-      {
-        bank: "MPU",
-        switch: "DS3",
-        position: "ON",
-        note: "3-ball game (off = 5-ball)",
-      },
-      { bank: "MPU", switch: "DS7", position: "OFF", note: "Match disabled" },
-    ],
-    rubbers:
-      '**Install:** 3/8" silicone on outlane posts. Leave everything else stock.',
-    postPositions: "Outlane posts — **middle hole**. Center post installed.",
-    notes:
-      "Right scoop has a slight kickout issue — we've been logging it as [issue #142](#). No impact on gameplay; just flag if it gets worse.",
-  },
-  {
-    id: "set-2",
-    name: "Friday Tournament",
-    isPreferred: false,
-    updatedBy: "Alice",
-    updatedAt: "2026-05-12",
-    description: "Tightened for league night — tilt sensitive, no extra balls.",
-    baseline: { group: "Stern", value: "Competition Install" },
-    softwareSettings: [
-      { id: "S-001", name: "Replay score", value: "800,000,000" },
-      { id: "S-014", name: "Tilt warnings", value: "1" },
-      { id: "S-021", name: "Balls per game", value: "3" },
-      { id: "S-030", name: "Extra ball award", value: "Off" },
-      { id: "S-041", name: "Match feature", value: "Off" },
-    ],
-    dipSwitches: [],
-    rubbers: "Same as Standard House.",
-    postPositions: "Outlane posts — **top hole** (tighter lane).",
-    notes: "Review ball times after each league session.",
-  },
-];
+function makeSampleSets(): SettingsSetData[] {
+  return [
+    {
+      id: "set-1",
+      name: "Standard House",
+      isPreferred: true,
+      updatedBy: "Bob",
+      updatedAt: "2026-05-12",
+      description: plainTextToDoc(
+        "Our day-to-day setup — slightly harder than factory but accessible."
+      ),
+      baseline: "Stern__Competition Install",
+      softwareSettings: [
+        { id: "S-001", name: "Replay score", value: "700,000,000" },
+        { id: "S-014", name: "Tilt warnings", value: "2" },
+        { id: "S-021", name: "Balls per game", value: "3" },
+        { id: "S-040", name: "Free play", value: "On" },
+      ],
+      dipSwitchBanks: [
+        {
+          id: "bank-1-mpu",
+          name: "MPU",
+          switches: [
+            { switch: "DS1", position: "ON", note: "Free play" },
+            {
+              switch: "DS3",
+              position: "ON",
+              note: "3-ball game (off = 5-ball)",
+            },
+            { switch: "DS7", position: "OFF", note: "Match disabled" },
+          ],
+        },
+        {
+          id: "bank-1-sound",
+          name: "Sound",
+          switches: [
+            {
+              switch: "DS1",
+              position: "OFF",
+              note: "Background music attract",
+            },
+          ],
+        },
+      ],
+      rubbers: plainTextToDoc(
+        '3/8" silicone on outlane posts. Leave everything else stock.'
+      ),
+      postPositions: plainTextToDoc(
+        "Outlane posts — middle hole. Center post installed."
+      ),
+      notes: plainTextToDoc(
+        "Right scoop has a slight kickout issue. No impact on gameplay; just flag if it gets worse."
+      ),
+    },
+    {
+      id: "set-2",
+      name: "Friday Tournament",
+      isPreferred: false,
+      updatedBy: "Alice",
+      updatedAt: "2026-05-12",
+      description: plainTextToDoc(
+        "Tightened for league night — tilt sensitive, no extra balls."
+      ),
+      baseline: "Stern__Competition Install",
+      softwareSettings: [
+        { id: "S-001", name: "Replay score", value: "800,000,000" },
+        { id: "S-014", name: "Tilt warnings", value: "1" },
+        { id: "S-021", name: "Balls per game", value: "3" },
+        { id: "S-030", name: "Extra ball award", value: "Off" },
+        { id: "S-041", name: "Match feature", value: "Off" },
+      ],
+      dipSwitchBanks: [],
+      rubbers: plainTextToDoc("Same as Standard House."),
+      postPositions: plainTextToDoc("Outlane posts — top hole (tighter lane)."),
+      notes: plainTextToDoc("Review ball times after each league session."),
+    },
+  ];
+}
+
+function makeId(): string {
+  return `set-${Date.now().toString()}-${String(
+    Math.floor(Math.random() * 1000)
+  )}`;
+}
 
 interface SettingsTabProps {
   canEdit: boolean;
 }
 
 export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
-  // Set 1 expanded by default; set 2 collapsed
+  const initial = makeSampleSets();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    new Set([SAMPLE_SETS[0]!.id])
+    new Set([initial[0]!.id])
   );
-  const [sets, setSets] = useState<SettingsSetData[]>(SAMPLE_SETS);
+  const [sets, setSets] = useState<SettingsSetData[]>(initial);
 
   function toggleExpand(id: string): void {
     setExpandedIds((prev) => {
@@ -90,7 +123,6 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
   }
 
   function togglePreferred(id: string): void {
-    // Exclusive — selecting a set as preferred unsets all others
     setSets((prev) =>
       prev.map((s) => ({
         ...s,
@@ -99,9 +131,72 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     );
   }
 
+  function renameSet(id: string, name: string): void {
+    setSets((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
+  }
+
+  function duplicateSet(id: string): void {
+    setSets((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx < 0) return prev;
+      const original = prev[idx]!;
+      const copy: SettingsSetData = {
+        ...original,
+        id: makeId(),
+        name: `${original.name} (copy)`,
+        isPreferred: false,
+      };
+      const next = [...prev];
+      next.splice(idx + 1, 0, copy);
+      return next;
+    });
+  }
+
+  function deleteSet(id: string): void {
+    setSets((prev) => prev.filter((s) => s.id !== id));
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  function addNewSet(): void {
+    const id = makeId();
+    const newSet: SettingsSetData = {
+      id,
+      name: "New settings set",
+      isPreferred: false,
+      updatedBy: "You",
+      updatedAt: "2026-05-19",
+      description: null,
+      baseline: "Stern__Factory Install",
+      softwareSettings: [],
+      dipSwitchBanks: [],
+      rubbers: null,
+      postPositions: null,
+      notes: null,
+    };
+    setSets((prev) => [...prev, newSet]);
+    setExpandedIds((prev) => new Set([...prev, id]));
+  }
+
+  function updateMarkdownField(
+    id: string,
+    field: MarkdownField,
+    value: ProseMirrorDoc | null
+  ): void {
+    setSets((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, [field]: value } : s))
+    );
+  }
+
+  function updateBaseline(id: string, baseline: string): void {
+    setSets((prev) => prev.map((s) => (s.id === id ? { ...s, baseline } : s)));
+  }
+
   return (
     <div className="space-y-4">
-      {/* Toolbar row */}
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-foreground">
           Game settings{" "}
@@ -110,35 +205,51 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
           </span>
         </p>
         {canEdit && (
-          <Button
-            size="sm"
-            onClick={() => {
-              /* no-op scaffold */
-            }}
-          >
+          <Button size="sm" onClick={addNewSet}>
             <Plus aria-hidden="true" />
             New set
           </Button>
         )}
       </div>
 
-      {/* Set cards */}
-      <div className="space-y-3">
-        {sets.map((set) => (
-          <SettingsSetCard
-            key={set.id}
-            set={set}
-            isExpanded={expandedIds.has(set.id)}
-            canEdit={canEdit}
-            onToggleExpand={() => {
-              toggleExpand(set.id);
-            }}
-            onTogglePreferred={() => {
-              togglePreferred(set.id);
-            }}
-          />
-        ))}
-      </div>
+      {sets.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-outline-variant py-8 text-center text-sm text-muted-foreground">
+          No settings sets yet. Click <strong>New set</strong> above to create
+          one.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {sets.map((set) => (
+            <SettingsSetCard
+              key={set.id}
+              set={set}
+              isExpanded={expandedIds.has(set.id)}
+              canEdit={canEdit}
+              onToggleExpand={() => {
+                toggleExpand(set.id);
+              }}
+              onTogglePreferred={() => {
+                togglePreferred(set.id);
+              }}
+              onRename={(name) => {
+                renameSet(set.id, name);
+              }}
+              onDuplicate={() => {
+                duplicateSet(set.id);
+              }}
+              onDelete={() => {
+                deleteSet(set.id);
+              }}
+              onUpdateField={(field, value) => {
+                updateMarkdownField(set.id, field, value);
+              }}
+              onUpdateBaseline={(baseline) => {
+                updateBaseline(set.id, baseline);
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
