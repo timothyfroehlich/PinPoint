@@ -153,7 +153,7 @@ export async function inviteUser(
     }
 
     const existingAuthUser = authUsersData.users.find(
-      (u) => u.email === validated.email
+      (u) => u.email?.toLowerCase() === validated.email
     );
 
     if (existingAuthUser) {
