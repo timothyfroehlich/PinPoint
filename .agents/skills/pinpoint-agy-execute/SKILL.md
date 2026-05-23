@@ -94,7 +94,7 @@ Fix any failures. If a failure is unrelated to your change and was pre-existing,
 
 1. Start Supabase: `supabase start`
 2. Start the dev server: `pnpm dev`
-   - The assigned port is in `.env.local` (key `NEXT_PUBLIC_APP_URL`) and `.claude/launch.json`.
+   - The assigned port is in `.env.local` (key `PORT`; the full URL is `NEXT_PUBLIC_SITE_URL`) and `.claude/launch.json`.
 3. Use `/browser` to open the app at the worktree's port.
 4. Confirm the acceptance criteria render/behave correctly as stated in the bead.
 

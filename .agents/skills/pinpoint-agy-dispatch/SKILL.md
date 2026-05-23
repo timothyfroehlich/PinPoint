@@ -67,7 +67,7 @@ Bead: <id> — <full bead title>
 
 Goal: <1–3 sentences in plain language describing what needs to change and why, derived from the bead description. No jargon. Write as if explaining to someone who hasn't read the bead.>
 
-Follow the `pinpoint-agy-execute` skill end-to-end. The bead is already selected — start at Step 2 (claim).
+Follow the `pinpoint-agy-execute` skill starting at Step 1 — the bead ID is already specified, so skip the discovery query, but still run the Step 1 label-verification (`agy-ready`) and `agy-ui` detection. Then continue end-to-end (Step 2 claim onward).
 
 Verification command: <exact command from the bead, e.g. `pnpm run check` or `pnpm exec playwright test e2e/foo.spec.ts --project=chromium`>
 ```
@@ -85,7 +85,7 @@ Bead: <id> — <full bead title>
 
 Goal: <1–3 sentences in plain language describing what needs to change and why, derived from the bead description.>
 
-Follow the `pinpoint-agy-execute` skill end-to-end. The bead is already selected — start at Step 2 (claim).
+Follow the `pinpoint-agy-execute` skill starting at Step 1 — the bead ID is already specified, so skip the discovery query, but still run the Step 1 label-verification (`agy-ready`) and `agy-ui` detection. Then continue end-to-end (Step 2 claim onward).
 
 Verification command: <exact command from the bead>
 
