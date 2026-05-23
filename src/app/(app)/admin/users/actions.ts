@@ -24,18 +24,26 @@ function getAdminClient(): ReturnType<typeof createAdminClient> {
         admin: {
           listUsers: async () => {
             try {
-              const result = await db.execute<{
-                id: string;
-                email: string | null;
-              }>(sql`SELECT id, email FROM auth.users`);
+              const result = (await db.execute(
+                sql`SELECT id, email FROM auth.users`
+              )) as unknown;
+              const rows = (
+                Array.isArray(result)
+                  ? result
+                  : typeof result === "object" &&
+                      result !== null &&
+                      "rows" in result &&
+                      Array.isArray(result.rows)
+                    ? result.rows
+                    : []
+              ) as { id: string; email: string | null }[];
+
               return {
                 data: {
-                  users: result.map(
-                    (row: { id: string; email: string | null }) => ({
-                      id: row.id,
-                      email: row.email ?? undefined,
-                    })
-                  ),
+                  users: rows.map((row) => ({
+                    id: row.id,
+                    email: row.email ?? undefined,
+                  })),
                 },
                 error: null,
               };
