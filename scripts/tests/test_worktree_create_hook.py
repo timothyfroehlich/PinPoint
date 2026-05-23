@@ -31,8 +31,17 @@ echo "$@" >> {calls_log}
     }
 
 
-def run_hook(stdin_data: dict, env_modifications: dict = None) -> tuple[int, str, str]:
+def run_hook(
+    stdin_data: dict, tmp_path: Path, env_modifications: dict = None
+) -> tuple[int, str, str]:
     env = os.environ.copy()
+    # Isolate HOME and XDG_CONFIG_HOME to prevent test flakiness and interference
+    # with developer's config lock file in ~/.config/pinpoint
+    fake_home = tmp_path / "fake_home"
+    fake_home.mkdir(parents=True, exist_ok=True)
+    env["HOME"] = str(fake_home)
+    env["XDG_CONFIG_HOME"] = str(fake_home / ".config")
+
     if env_modifications:
         env.update(env_modifications)
 
@@ -59,7 +68,7 @@ def test_hook_empirical_shape(mock_git: dict, tmp_path: Path) -> None:
 
     env_mods = {"PATH": f"{mock_git['bin_dir']}:{os.environ['PATH']}"}
 
-    return_code, stdout, stderr = run_hook(stdin_data, env_mods)
+    return_code, stdout, stderr = run_hook(stdin_data, tmp_path, env_mods)
 
     assert return_code == 0, f"Hook failed with stderr: {stderr}"
 
@@ -86,7 +95,7 @@ def test_hook_documented_shape(mock_git: dict, tmp_path: Path) -> None:
 
     env_mods = {"PATH": f"{mock_git['bin_dir']}:{os.environ['PATH']}"}
 
-    return_code, stdout, stderr = run_hook(stdin_data, env_mods)
+    return_code, stdout, stderr = run_hook(stdin_data, tmp_path, env_mods)
 
     assert return_code == 0, f"Hook failed with stderr: {stderr}"
 
@@ -111,7 +120,7 @@ def test_hook_missing_required_fields(mock_git: dict, tmp_path: Path) -> None:
 
     env_mods = {"PATH": f"{mock_git['bin_dir']}:{os.environ['PATH']}"}
 
-    return_code, stdout, stderr = run_hook(stdin_data, env_mods)
+    return_code, stdout, stderr = run_hook(stdin_data, tmp_path, env_mods)
 
     assert return_code != 0
     assert "missing cwd, worktree_id, or name" in stderr

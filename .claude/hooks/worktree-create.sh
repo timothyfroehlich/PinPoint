@@ -22,16 +22,26 @@
 #     "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/worktree-create.sh"
 #   No positional args are passed; all input comes from the JSON payload on stdin.
 #
-# Stdin payload fields (verified empirically via diagnostic dump, PP-pno7, 2026-05-16):
+# Stdin payload fields (supports both empirical and documented shapes):
+#   Documented:
 #   {
 #     "session_id":        "<uuid>",
 #     "transcript_path":   "<path to .jsonl>",
 #     "cwd":               "<repo root absolute path>",   ← used as BASE_PATH
 #     "hook_event_name":   "WorktreeCreate",
-#     "name":              "agent-<hex>"                   ← used as worktree dir name + branch
+#     "worktree_id":       "<id>",                         ← used as NAME if present
+#     "worktree_path":     "<path>"                        ← used as WORKTREE_PATH if present
 #   }
-#   The hook derives `BRANCH = worktree-${name}` to match Claude Code's native
-#   pre-hook naming convention (e.g., `worktree-agent-a20a236fe97a6d41c`).
+#   Empirical (current Claude Code version fallback):
+#   {
+#     "session_id":        "<uuid>",
+#     "transcript_path":   "<path to .jsonl>",
+#     "cwd":               "<repo root absolute path>",
+#     "hook_event_name":   "WorktreeCreate",
+#     "name":              "agent-<hex>"                   ← fallback for NAME
+#   }
+#   The hook derives `BRANCH = worktree-${NAME}` to match Claude Code's native
+#   pre-hook naming convention.
 #
 # Platform: macOS uses /usr/bin/lockf (ships with macOS, backed by flock(2)).
 #   Linux uses flock(1) from util-linux. Detected at runtime.
