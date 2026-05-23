@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { BaselineSelect } from "~/components/machines/settings/BaselineSelect";
+import { BaselineCombobox } from "~/components/machines/settings/BaselineCombobox";
 import { EditableCell } from "~/components/machines/settings/EditableCell";
 
 export interface SoftwareSetting {
@@ -36,12 +36,6 @@ interface SoftwareSettingsSectionProps {
   onDeleteRow?: (rowKey: string) => void;
 }
 
-function formatBaselineDisplay(raw: string): string {
-  if (raw.startsWith("custom__")) return raw.slice(8);
-  if (raw.includes("__")) return raw.replace("__", " · ");
-  return raw;
-}
-
 export function SoftwareSettingsSection({
   baseline,
   rows,
@@ -51,7 +45,6 @@ export function SoftwareSettingsSection({
   onUpdateRow,
   onDeleteRow,
 }: SoftwareSettingsSectionProps): React.JSX.Element {
-  const [isEditingBaseline, setIsEditingBaseline] = useState(false);
   const [autoFocusKey, setAutoFocusKey] = useState<string | null>(null);
 
   function handleAddRow(): void {
@@ -68,32 +61,17 @@ export function SoftwareSettingsSection({
       {/* Baseline strip */}
       <div className="mb-3 flex items-center gap-2 text-sm">
         <span className="font-medium text-foreground">Initial Install:</span>
-        {isEditingBaseline && canEdit ? (
-          <BaselineSelect
+        {canEdit ? (
+          <BaselineCombobox
             value={baseline}
             onChange={(val) => {
               onBaselineChange?.(val);
-              setIsEditingBaseline(false);
             }}
           />
         ) : (
-          <button
-            type="button"
-            className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-sm text-muted-foreground hover:bg-muted/50"
-            onClick={
-              canEdit
-                ? () => {
-                    setIsEditingBaseline(true);
-                  }
-                : undefined
-            }
-            aria-label="Edit baseline"
-          >
-            <span>{formatBaselineDisplay(baseline)}</span>
-            {canEdit && (
-              <span className="text-[11px] text-muted-foreground/60">✎</span>
-            )}
-          </button>
+          <span className="text-muted-foreground">
+            {baseline || "Not specified"}
+          </span>
         )}
       </div>
 

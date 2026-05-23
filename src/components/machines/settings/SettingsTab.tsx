@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useState } from "react";
-import { Plus, Pencil, Check } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   SettingsSetCard,
@@ -29,7 +29,7 @@ function makeSampleSets(): SettingsSetData[] {
       description: plainTextToDoc(
         "Our day-to-day setup — slightly harder than factory but accessible."
       ),
-      baseline: "Stern__Competition Install",
+      baseline: "Competition Install",
       softwareSettings: [
         {
           _key: makeKey(),
@@ -61,7 +61,7 @@ function makeSampleSets(): SettingsSetData[] {
       description: plainTextToDoc(
         "Tightened for league night — tilt sensitive, no extra balls."
       ),
-      baseline: "Stern__Competition Install",
+      baseline: "Competition Install",
       softwareSettings: [
         {
           _key: makeKey(),
@@ -93,7 +93,7 @@ function makeSampleSets(): SettingsSetData[] {
       description: plainTextToDoc(
         "Sample early-solid-state set so you can see how DIP-switch banks render alongside no software."
       ),
-      baseline: "Other...",
+      baseline: "",
       softwareSettings: [],
       dipSwitchBanks: [
         {
@@ -151,21 +151,24 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     new Set([initial[0]!.id])
   );
   const [sets, setSets] = useState<SettingsSetData[]>(initial);
-  // Edit mode gates ALL mutation affordances. Default off (view mode).
-  // Whether the Edit button itself shows is governed by `canEdit` (the
-  // owner/tech+ permission, hardcoded at the page for the scaffold).
-  const [isEditMode, setIsEditMode] = useState(false);
-  const editsActive = canEdit && isEditMode;
+  // Edit mode is PER SET — content editing (name, description, cells,
+  // baseline, add/delete rows) unlocks only for the sets in this set.
+  // Set-level operations (Duplicate, Delete, Preferred, New set) stay
+  // available whenever `canEdit` (the owner/tech+ permission) is true,
+  // regardless of edit mode.
+  const [editingIds, setEditingIds] = useState<Set<string>>(new Set());
 
-  function toggleEditMode(): void {
-    setIsEditMode((prev) => {
-      const entering = !prev;
-      // Entering edit mode expands every set so all editable surfaces are
-      // visible and stay open while editing.
-      if (entering) {
-        setExpandedIds(new Set(sets.map((s) => s.id)));
+  function toggleSetEdit(id: string): void {
+    setEditingIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        // Entering edit mode expands the set so editable surfaces show.
+        setExpandedIds((ex) => new Set(ex).add(id));
       }
-      return entering;
+      return next;
     });
   }
 
@@ -239,7 +242,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
       updatedBy: "You",
       updatedAt: "2026-05-19",
       description: null,
-      baseline: "Stern__Factory Install",
+      baseline: "Factory Install",
       softwareSettings: [],
       dipSwitchBanks: [],
       rubbers: null,
@@ -464,48 +467,22 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
           </span>
         </p>
         {canEdit && (
-          <div className="flex items-center gap-2">
-            {isEditMode && (
-              <Button size="sm" variant="outline" onClick={addNewSet}>
-                <Plus aria-hidden="true" />
-                New set
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant={isEditMode ? "default" : "outline"}
-              onClick={toggleEditMode}
-            >
-              {isEditMode ? (
-                <>
-                  <Check aria-hidden="true" />
-                  Done
-                </>
-              ) : (
-                <>
-                  <Pencil aria-hidden="true" />
-                  Edit
-                </>
-              )}
-            </Button>
-          </div>
+          <Button size="sm" onClick={addNewSet}>
+            <Plus aria-hidden="true" />
+            New set
+          </Button>
         )}
       </div>
 
       {sets.length === 0 ? (
         <p className="rounded-lg border border-dashed border-outline-variant py-8 text-center text-sm text-muted-foreground">
-          {!canEdit ? (
-            "No settings sets recorded."
-          ) : isEditMode ? (
+          {canEdit ? (
             <>
               No settings sets yet. Click <strong>New set</strong> above to
               create one.
             </>
           ) : (
-            <>
-              No settings sets yet. Click <strong>Edit</strong> above to add
-              one.
-            </>
+            "No settings sets recorded."
           )}
         </p>
       ) : (
@@ -515,9 +492,13 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
               key={set.id}
               set={set}
               isExpanded={expandedIds.has(set.id)}
-              canEdit={editsActive}
+              canEdit={canEdit}
+              isEditing={editingIds.has(set.id)}
               onToggleExpand={() => {
                 toggleExpand(set.id);
+              }}
+              onToggleEdit={() => {
+                toggleSetEdit(set.id);
               }}
               onTogglePreferred={() => {
                 togglePreferred(set.id);

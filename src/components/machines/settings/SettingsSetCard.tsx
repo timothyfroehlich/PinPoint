@@ -7,6 +7,8 @@ import {
   Star,
   MoreVertical,
   Plus,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { Card, CardContent } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
@@ -55,8 +57,13 @@ export interface SettingsSetData {
 interface SettingsSetCardProps {
   set: SettingsSetData;
   isExpanded: boolean;
+  /** Permission to edit at all (owner/tech+). Governs the Edit button,
+   *  the kebab, and the Preferred star. */
   canEdit: boolean;
+  /** Whether THIS set is currently in content-edit mode. */
+  isEditing: boolean;
   onToggleExpand: () => void;
+  onToggleEdit: () => void;
   onTogglePreferred: () => void;
   onRename: (newName: string) => void;
   onDuplicate: () => void;
@@ -162,7 +169,9 @@ export function SettingsSetCard({
   set,
   isExpanded,
   canEdit,
+  isEditing,
   onToggleExpand,
+  onToggleEdit,
   onTogglePreferred,
   onRename,
   onDuplicate,
@@ -182,6 +191,10 @@ export function SettingsSetCard({
   const ChevronIcon = isExpanded ? ChevronDown : ChevronRight;
   const hasSoftware = set.softwareSettings.length > 0;
   const hasDip = set.dipSwitchBanks.length > 0;
+  // Content edits (name, description, cells, baseline, add/delete) unlock
+  // only when this set is in edit mode. Set-level ops (star, kebab) use
+  // canEdit directly.
+  const contentEditable = canEdit && isEditing;
 
   function handleDelete(): void {
     const ok = window.confirm(`Delete "${set.name}"? This can't be undone.`);
@@ -260,7 +273,7 @@ export function SettingsSetCard({
               <InlineEditableText
                 value={set.name}
                 onValueChange={onRename}
-                canEdit={canEdit}
+                canEdit={contentEditable}
                 placeholder="Untitled set"
                 ariaLabel="set name"
                 inputClassName="h-7 text-sm font-semibold"
@@ -278,6 +291,30 @@ export function SettingsSetCard({
             >
               ★ Preferred
             </Badge>
+          )}
+
+          {canEdit && (
+            <Button
+              variant={isEditing ? "default" : "ghost"}
+              size="sm"
+              className="h-7 shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleEdit();
+              }}
+            >
+              {isEditing ? (
+                <>
+                  <Check aria-hidden="true" />
+                  Done
+                </>
+              ) : (
+                <>
+                  <Pencil aria-hidden="true" />
+                  Edit
+                </>
+              )}
+            </Button>
           )}
 
           {canEdit && (
@@ -314,7 +351,7 @@ export function SettingsSetCard({
         <div className="pl-7">
           <DescriptionInline
             value={set.description}
-            canEdit={canEdit}
+            canEdit={contentEditable}
             placeholder="Add a short description…"
             onValueChange={(v) => {
               onUpdateField("description", v);
@@ -331,7 +368,7 @@ export function SettingsSetCard({
               <SoftwareSettingsSection
                 baseline={set.baseline}
                 rows={set.softwareSettings}
-                canEdit={canEdit}
+                canEdit={contentEditable}
                 onBaselineChange={onUpdateBaseline}
                 onAddRow={onAddSoftwareRow}
                 onUpdateRow={onUpdateSoftwareRow}
@@ -344,7 +381,7 @@ export function SettingsSetCard({
             <div className="border-b border-outline-variant/50">
               <DipSwitchSection
                 banks={set.dipSwitchBanks}
-                canEdit={canEdit}
+                canEdit={contentEditable}
                 onAddBank={onAddDipBank}
                 onDeleteBank={onDeleteDipBank}
                 onRenameBank={onRenameDipBank}
@@ -355,7 +392,7 @@ export function SettingsSetCard({
             </div>
           )}
 
-          {canEdit && (!hasSoftware || !hasDip) && (
+          {contentEditable && (!hasSoftware || !hasDip) && (
             <div className="border-b border-outline-variant/50">
               <HardwareAdjustmentPicker
                 hasSoftware={hasSoftware}
@@ -374,7 +411,7 @@ export function SettingsSetCard({
             <MarkdownSection
               title="Rubbers"
               value={set.rubbers}
-              canEdit={canEdit}
+              canEdit={contentEditable}
               onValueChange={(v) => {
                 onUpdateField("rubbers", v);
               }}
@@ -385,7 +422,7 @@ export function SettingsSetCard({
             <MarkdownSection
               title="Post positions"
               value={set.postPositions}
-              canEdit={canEdit}
+              canEdit={contentEditable}
               onValueChange={(v) => {
                 onUpdateField("postPositions", v);
               }}
@@ -395,7 +432,7 @@ export function SettingsSetCard({
           <MarkdownSection
             title="Notes"
             value={set.notes}
-            canEdit={canEdit}
+            canEdit={contentEditable}
             onValueChange={(v) => {
               onUpdateField("notes", v);
             }}
