@@ -185,7 +185,7 @@ describe("Database queries integration", () => {
     const db = await getTestDb();
 
     // Seed test data using Drizzle
-    // id and other fields with defaults/auto-generation are omitted (e.g. uuid id defaultRandom())
+    // id auto-generated (defaultRandom()); omit it from inserts
     await db.insert(machines).values({
       name: "Test Machine",
       initials: "TM",
@@ -397,4 +397,4 @@ Before committing tests:
 - E2E best practices: [E2E_BEST_PRACTICES.md](../../../docs/E2E_BEST_PRACTICES.md)
 - 2026-05 E2E suite audit: [e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md)
 - Non-negotiables: [NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) (CORE-TEST-\* rules)
-- Playwright docs: Use Chrome DevTools or Playwright documentation for latest patterns
+- Playwright docs: Use the `context7` MCP server for current Playwright patterns and API references (resolve-library-id → get-library-docs)
