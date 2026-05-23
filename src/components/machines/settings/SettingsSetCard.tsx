@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { ChevronRight, ChevronDown, Star, MoreVertical } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronDown,
+  Star,
+  MoreVertical,
+  Plus,
+} from "lucide-react";
 import { Card, CardContent } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import {
@@ -57,15 +63,98 @@ interface SettingsSetCardProps {
   onDelete: () => void;
   onUpdateField: (field: MarkdownField, value: ProseMirrorDoc | null) => void;
   onUpdateBaseline: (newValue: string) => void;
+  // Software settings rows
+  onAddSoftwareRow: () => string | undefined;
+  onUpdateSoftwareRow: (
+    rowKey: string,
+    field: "id" | "name" | "value",
+    value: string
+  ) => void;
+  onDeleteSoftwareRow: (rowKey: string) => void;
+  // DIP switches
+  onAddDipBank: () => { bankId: string; switchKey: string } | undefined;
+  onDeleteDipBank: (bankId: string) => void;
+  onAddDipSwitch: (bankId: string) => string | undefined;
+  onUpdateDipSwitch: (
+    bankId: string,
+    switchKey: string,
+    field: "switch" | "position" | "note",
+    value: string
+  ) => void;
+  onDeleteDipSwitch: (bankId: string, switchKey: string) => void;
 }
 
 function formatShortDate(iso: string): string {
-  // "2026-05-12" → "5/12"
   const parts = iso.split("-");
   const m = parts[1];
   const d = parts[2];
   if (!m || !d) return iso;
   return `${String(parseInt(m, 10))}/${String(parseInt(d, 10))}`;
+}
+
+interface PickerProps {
+  hasSoftware: boolean;
+  hasDip: boolean;
+  onAddSoftware: () => void;
+  onAddDipBank: () => void;
+}
+
+function HardwareAdjustmentPicker({
+  hasSoftware,
+  hasDip,
+  onAddSoftware,
+  onAddDipBank,
+}: PickerProps): React.JSX.Element | null {
+  if (hasSoftware && hasDip) return null;
+
+  // Both empty — show a dropdown with both options
+  if (!hasSoftware && !hasDip) {
+    return (
+      <div className="py-2.5">
+        <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          Hardware adjustments
+        </p>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-muted-foreground"
+            >
+              <Plus aria-hidden="true" />
+              Add hardware adjustment
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onSelect={onAddSoftware}>
+              Software setting
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onAddDipBank}>
+              DIP switch
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <p className="mt-1.5 text-xs italic text-muted-foreground/70">
+          Most machines have one or the other — pick the kind this game uses.
+        </p>
+      </div>
+    );
+  }
+
+  // One missing — direct button
+  return (
+    <div className="py-2.5">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-muted-foreground"
+        onClick={!hasSoftware ? onAddSoftware : onAddDipBank}
+      >
+        <Plus aria-hidden="true" />
+        {!hasSoftware ? "Add software settings" : "Add DIP switches"}
+      </Button>
+    </div>
+  );
 }
 
 export function SettingsSetCard({
@@ -79,8 +168,18 @@ export function SettingsSetCard({
   onDelete,
   onUpdateField,
   onUpdateBaseline,
+  onAddSoftwareRow,
+  onUpdateSoftwareRow,
+  onDeleteSoftwareRow,
+  onAddDipBank,
+  onDeleteDipBank,
+  onAddDipSwitch,
+  onUpdateDipSwitch,
+  onDeleteDipSwitch,
 }: SettingsSetCardProps): React.JSX.Element {
   const ChevronIcon = isExpanded ? ChevronDown : ChevronRight;
+  const hasSoftware = set.softwareSettings.length > 0;
+  const hasDip = set.dipSwitchBanks.length > 0;
 
   function handleDelete(): void {
     const ok = window.confirm(`Delete "${set.name}"? This can't be undone.`);
@@ -112,14 +211,13 @@ export function SettingsSetCard({
         aria-expanded={isExpanded}
         aria-label={`${set.name} settings set`}
       >
-        {/* Top row: caret, star, name + updated-by, preferred badge, kebab */}
+        {/* Top row */}
         <div className="flex items-center gap-2.5">
           <ChevronIcon
             className="size-4 shrink-0 text-muted-foreground transition-transform duration-150"
             aria-hidden="true"
           />
 
-          {/* Star toggle */}
           <button
             type="button"
             aria-label={
@@ -144,7 +242,6 @@ export function SettingsSetCard({
             />
           </button>
 
-          {/* Name (click-to-edit) + updated-by */}
           <div className="flex flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
             <div className="text-sm font-semibold text-foreground">
               <InlineEditableText
@@ -170,7 +267,6 @@ export function SettingsSetCard({
             </Badge>
           )}
 
-          {/* Kebab */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -215,18 +311,48 @@ export function SettingsSetCard({
       {/* Expanded body */}
       {isExpanded && (
         <CardContent className="border-t border-outline-variant px-4 pb-4 pt-2">
-          <div className="border-b border-outline-variant/50">
-            <SoftwareSettingsSection
-              baseline={set.baseline}
-              rows={set.softwareSettings}
-              canEdit={canEdit}
-              onBaselineChange={onUpdateBaseline}
-            />
-          </div>
+          {hasSoftware && (
+            <div className="border-b border-outline-variant/50">
+              <SoftwareSettingsSection
+                baseline={set.baseline}
+                rows={set.softwareSettings}
+                canEdit={canEdit}
+                onBaselineChange={onUpdateBaseline}
+                onAddRow={onAddSoftwareRow}
+                onUpdateRow={onUpdateSoftwareRow}
+                onDeleteRow={onDeleteSoftwareRow}
+              />
+            </div>
+          )}
 
-          <div className="border-b border-outline-variant/50">
-            <DipSwitchSection banks={set.dipSwitchBanks} canEdit={canEdit} />
-          </div>
+          {hasDip && (
+            <div className="border-b border-outline-variant/50">
+              <DipSwitchSection
+                banks={set.dipSwitchBanks}
+                canEdit={canEdit}
+                onAddBank={onAddDipBank}
+                onDeleteBank={onDeleteDipBank}
+                onAddSwitch={onAddDipSwitch}
+                onUpdateSwitch={onUpdateDipSwitch}
+                onDeleteSwitch={onDeleteDipSwitch}
+              />
+            </div>
+          )}
+
+          {canEdit && (!hasSoftware || !hasDip) && (
+            <div className="border-b border-outline-variant/50">
+              <HardwareAdjustmentPicker
+                hasSoftware={hasSoftware}
+                hasDip={hasDip}
+                onAddSoftware={() => {
+                  onAddSoftwareRow();
+                }}
+                onAddDipBank={() => {
+                  onAddDipBank();
+                }}
+              />
+            </div>
+          )}
 
           <div className="border-b border-outline-variant/50">
             <MarkdownSection
