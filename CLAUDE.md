@@ -75,28 +75,10 @@ See `pinpoint-orchestrator` skill for the full workflow and known-bug details.
 
 The `TeammateIdle` hook enforces push-before-idle automatically for teammates. The manual "Landing the Plane" checklist in AGENTS.md applies to the lead agent and solo sessions.
 
-### Antigravity Candidates
+### Antigravity
 
-Some work is well-suited for Antigravity — Google's CLI agent harness (currently Gemini), which has full local environment access (Supabase, dev server, browser via Playwright) but is **less inquisitive** than Claude Sonnet. Because Antigravity won't stop mid-task to ask clarifying questions, every bead it executes must be decision-closed before it starts.
+Antigravity is Google's CLI agent harness (currently Gemini) with full local environment access. Beads tagged `agy-ready` are cleared for autonomous execution; `agy-ui` additionally marks beads whose acceptance requires browser verification.
 
-Tag those issues with the `agy-ready` label so they're easy to discover and dispatch. Follow `.agents/skills/pinpoint-agy-execute/SKILL.md` to drive a tagged bead end-to-end to ready-for-review from an Antigravity session.
-
-> Commands below use `bd` (the [beads](https://github.com/timothyfroehlich/beads) issue tracker that PinPoint uses for task management — the full command reference is loaded at session start via the `bd prime` hook). `<id>` refers to a beads issue ID like `PP-3or`.
-
-**Triage gates — ALL must pass before tagging `agy-ready`:**
-
-1. **Decision-closed (iron).** No "discuss with user", no architectural forks, no TBDs. Every interpretive choice has a written answer in the bead description, acceptance criteria, or a linked decision bead. If the bead has "Option A / Option B / Option C" branches with no chosen winner, it is NOT ready. (This is the load-bearing gate — Antigravity will pick the first plausible option and ship it.)
-2. **Scope-pinned.** Specific files, or unambiguous "do X wherever pattern Y appears" instructions. Acceptance criteria must be writable as concrete test assertions.
-3. **Concrete acceptance.** End-state is testable: "X test passes", "Y string no longer in repo", "form has `type=email autocomplete=email`", "DB constraint rejects bad insert". Not "improve UX", not "make it cleaner".
-4. **Concrete verification plan.** Bead names the exact command(s) to run: `pnpm run check`, `pnpm run preflight`, `pnpm exec playwright test e2e/path/file.spec.ts --project=chromium`. If verification needs CI (e.g., Supabase branch DB), say so explicitly.
-5. **UI work is mechanical OR pre-approved.** Rename, prop rewire, copy change, icon swap, class addition (`motion-reduce:`), `aria-foo` add, delete dead element. Or: pre-approved mockup / exact dimensions / linked design bible section. NO "does this look right?" judgment.
-6. **Self-contained.** No dependency on an open PR, no cross-bead coordination, no waiting on a teammate.
-
-**Workflow:**
-
-- Tag during grooming: `bd label add agy-ready <id>` and append a one-line fit note.
-- If a fixable gate fails (missing verification plan, undecided UI, open Option A/B fork), leave a `bd comment` describing the gap instead of tagging — surface for refinement.
-- Discover candidates: `bd query "label=agy-ready AND status=open" --priority-max=2` (priority filter is a heuristic — pick P1/P2 first).
-- After Antigravity ships a PR, treat it like any other agent PR: Copilot review, CI, ready-for-review label, then Tim merges.
-
-**When in doubt, default to FAIL.** Under-tagging is safe — Antigravity just has fewer candidates to pick from. Over-tagging causes Antigravity to make judgment calls it was never meant to make, silently shipping wrong choices. If a gate is ambiguous, add a `bd comment` describing the gap and skip the tag.
+- **Triage gates and tagging workflow:** `pinpoint-agy-triage` skill.
+- **Handing a bead to Antigravity:** `pinpoint-agy-dispatch` skill (run in Claude Code; emits a copy-paste prompt for the Antigravity 2.0 agent manager).
+- **Executing a bead inside Antigravity:** `pinpoint-agy-execute` skill.

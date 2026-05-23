@@ -24,9 +24,13 @@ The Antigravity GUI creates the worktree at session launch; the `post-checkout` 
 
 ## Step 1 — Pick the bead
 
+**Dispatched via `pinpoint-agy-dispatch`:** The initial prompt names the bead explicitly (first line is a specific imperative, e.g. "Implement PP-xxx: …"). Use that bead ID. Still verify the `agy-ready` label per the rule below before proceeding.
+
 **With no bead specified:** Run `bd query "label=agy-ready AND status=open" --priority-max=2`. Pick the top result by priority, then by ID (lexicographic tiebreak). If the list is empty, tell Tim there are no tagged candidates and stop.
 
 **With a bead ID specified:** Skip the query. Verify the bead has the `agy-ready` label by running `bd show <id>` and checking the LABELS line. If the label is absent, refuse to proceed and ask Tim to confirm the bead is groomed.
+
+**Detect `agy-ui`:** Also check whether the bead carries the `agy-ui` label. If it does, browser verification is required at Steps 5 and 11 — note this now so you don't miss it later.
 
 ---
 
@@ -85,6 +89,16 @@ pnpm run preflight
 The `preflight` command is capped at 2 host-wide concurrent runs via `sem --jobs 2`. Accept the wait — do **not** use `preflight:unlocked` unless Tim explicitly says to.
 
 Fix any failures. If a failure is unrelated to your change and was pre-existing, note it in the PR description but do not abandon — fix your change so the pre-existing failure is the only one remaining, and call it out explicitly.
+
+**`agy-ui` branch:** If the bead carries the `agy-ui` label, do the following after the automated verification passes and before opening the PR (Step 8):
+
+1. Start Supabase: `supabase start`
+2. Start the dev server: `pnpm dev`
+   - The assigned port is in `.env.local` (key `NEXT_PUBLIC_APP_URL`) and `.claude/launch.json`.
+3. Use `/browser` to open the app at the worktree's port.
+4. Confirm the acceptance criteria render/behave correctly as stated in the bead.
+
+`/browser` grants Chrome access only — it does not start the stack. You must run steps 1–2 yourself before using it. If you cannot start Supabase (port collision, stuck container), stop and ask Tim.
 
 ---
 
@@ -245,6 +259,10 @@ Sign all replies with `—Antigravity` (em-dash U+2014, not a hyphen). Declined 
 ## Step 11 — Label ready-for-review
 
 Once CI is green **and** zero unresolved Copilot threads remain:
+
+**`agy-ui` branch:** Before applying the label, re-verify the UI. Copilot fixes may introduce regressions. Use `/browser` to open the app at the worktree's port and confirm the acceptance criteria still hold. If the stack is no longer running, restart it (`supabase start` + `pnpm dev`) first — `/browser` grants Chrome access only.
+
+Once UI verification passes (or the bead has no `agy-ui` label):
 
 ```
 mcp__github__update_pull_request(
