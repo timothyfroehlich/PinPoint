@@ -75,25 +75,28 @@ See `pinpoint-orchestrator` skill for the full workflow and known-bug details.
 
 The `TeammateIdle` hook enforces push-before-idle automatically for teammates. The manual "Landing the Plane" checklist in AGENTS.md applies to the lead agent and solo sessions.
 
-### Claude in Web Candidates
+### Antigravity Candidates
 
-Some work is well-suited for Claude in Web — the cloud session that runs in a browser-based environment without local Supabase, dev server, or interactive debugging. Tag those issues with the `web-ready` label so they're easy to discover and dispatch.
+Some work is well-suited for Antigravity — Google's CLI agent harness (currently Gemini), which has full local environment access (Supabase, dev server, browser via Playwright) but is **less inquisitive** than Claude Sonnet. Because Antigravity won't stop mid-task to ask clarifying questions, every bead it executes must be decision-closed before it starts.
+
+Tag those issues with the `agy-ready` label so they're easy to discover and dispatch. Follow `.agents/skills/pinpoint-agy-execute/SKILL.md` to drive a tagged bead end-to-end to ready-for-review from an Antigravity session.
 
 > Commands below use `bd` (the [beads](https://github.com/timothyfroehlich/beads) issue tracker that PinPoint uses for task management — the full command reference is loaded at session start via the `bd prime` hook). `<id>` refers to a beads issue ID like `PP-3or`.
 
-**Triage gates — all must pass before tagging `web-ready`:**
+**Triage gates — ALL must pass before tagging `agy-ready`:**
 
-1. **Decision-closed.** No open architecture questions, no "discuss with user", no TBDs in design notes.
-2. **Scope-pinned.** Specific files or unambiguous instructions (e.g., "rename X to Y wherever it appears"). Acceptance criteria writable as test cases.
-3. **UI gate.** No UI, or only mechanical UI (rename, prop rewire, copy change, icon swap, delete dead element). Excludes work where "does this look right?" matters.
-4. **Test gate.** Pure unit (`pnpm run check`) **or** integration/E2E that runs in CI against the auto-provisioned Supabase branch DB. The verification plan must say "CI passing is sufficient" — no local stack iteration required.
-5. **Self-contained.** No cross-PR coordination, no dependency on an open PR.
+1. **Decision-closed (iron).** No "discuss with user", no architectural forks, no TBDs. Every interpretive choice has a written answer in the bead description, acceptance criteria, or a linked decision bead. If the bead has "Option A / Option B / Option C" branches with no chosen winner, it is NOT ready. (This is the load-bearing gate — Antigravity will pick the first plausible option and ship it.)
+2. **Scope-pinned.** Specific files, or unambiguous "do X wherever pattern Y appears" instructions. Acceptance criteria must be writable as concrete test assertions.
+3. **Concrete acceptance.** End-state is testable: "X test passes", "Y string no longer in repo", "form has `type=email autocomplete=email`", "DB constraint rejects bad insert". Not "improve UX", not "make it cleaner".
+4. **Concrete verification plan.** Bead names the exact command(s) to run: `pnpm run check`, `pnpm run preflight`, `pnpm exec playwright test e2e/path/file.spec.ts --project=chromium`. If verification needs CI (e.g., Supabase branch DB), say so explicitly.
+5. **UI work is mechanical OR pre-approved.** Rename, prop rewire, copy change, icon swap, class addition (`motion-reduce:`), `aria-foo` add, delete dead element. Or: pre-approved mockup / exact dimensions / linked design bible section. NO "does this look right?" judgment.
+6. **Self-contained.** No dependency on an open PR, no cross-bead coordination, no waiting on a teammate.
 
 **Workflow:**
 
-- Tag during grooming: `bd label add web-ready <id>` and append a one-line note explaining the fit (e.g., "Web-ready: unit tests, single-file scope").
-- If a fixable gate fails (missing acceptance criteria, undecided UI, etc.), leave a note describing the gap instead of tagging — surface for refinement.
-- Discover candidates: `bd query "label=web-ready AND status=open"` (combine with `--priority-max` to prioritize).
-- After Claude in Web ships a PR, treat it like any other agent PR: Copilot review, CI, ready-for-review label, then user merges.
+- Tag during grooming: `bd label add agy-ready <id>` and append a one-line fit note.
+- If a fixable gate fails (missing verification plan, undecided UI, open Option A/B fork), leave a `bd comment` describing the gap instead of tagging — surface for refinement.
+- Discover candidates: `bd query "label=agy-ready AND status=open" --priority-max=2` (priority filter is a heuristic — pick P1/P2 first).
+- After Antigravity ships a PR, treat it like any other agent PR: Copilot review, CI, ready-for-review label, then Tim merges.
 
-**On Supabase branching:** every PR auto-provisions a branch DB with migrations + seed via the `Supabase Branch Setup` workflow. Claude in Web never touches local Supabase — CI exercises the integration path.
+**When in doubt, default to FAIL.** Under-tagging is safe — Antigravity just has fewer candidates to pick from. Over-tagging causes Antigravity to make judgment calls it was never meant to make, silently shipping wrong choices. If a gate is ambiguous, add a `bd comment` describing the gap and skip the tag.
