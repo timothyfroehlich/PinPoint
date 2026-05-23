@@ -575,6 +575,53 @@ describe("createNotification (Integration)", () => {
     );
   });
 
+  it("should notify machine owner on new issue even if not in machine_watchers", async () => {
+    const db = await getTestDb();
+
+    const [owner] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ email: "owner@test.com" }))
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "OWNB", ownerId: owner.id }))
+      .returning();
+
+    await db.insert(notificationPreferences).values({
+      userId: owner.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+      emailNotifyOnNewIssue: true,
+      inAppNotifyOnNewIssue: true,
+    });
+
+    const [issue] = await db
+      .insert(issues)
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+      .returning();
+
+    await createNotification(
+      {
+        type: "new_issue",
+        resourceId: issue.id,
+        resourceType: "issue",
+        issueTitle: issue.title,
+        machineName: machine.name,
+      },
+      db
+    );
+
+    const notificationsList = await db.query.notifications.findMany({
+      where: eq(notifications.userId, owner.id),
+    });
+    expect(notificationsList).toHaveLength(1);
+    expect(notificationsList[0].type).toBe("new_issue");
+
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "owner@test.com" })
+    );
+  });
+
   it("should always notify for machine_ownership_changed even with granular toggles off", async () => {
     const db = await getTestDb();
 

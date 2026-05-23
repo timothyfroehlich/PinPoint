@@ -22,16 +22,26 @@
 #     "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/worktree-create.sh"
 #   No positional args are passed; all input comes from the JSON payload on stdin.
 #
-# Stdin payload fields (verified empirically via diagnostic dump, PP-pno7, 2026-05-16):
+# Stdin payload fields (supports both empirical and documented shapes):
+#   Documented:
 #   {
 #     "session_id":        "<uuid>",
 #     "transcript_path":   "<path to .jsonl>",
 #     "cwd":               "<repo root absolute path>",   ← used as BASE_PATH
 #     "hook_event_name":   "WorktreeCreate",
-#     "name":              "agent-<hex>"                   ← used as worktree dir name + branch
+#     "worktree_id":       "<id>",                         ← used as NAME if present
+#     "worktree_path":     "<path>"                        ← used as WORKTREE_PATH if present
 #   }
-#   The hook derives `BRANCH = worktree-${name}` to match Claude Code's native
-#   pre-hook naming convention (e.g., `worktree-agent-a20a236fe97a6d41c`).
+#   Empirical (current Claude Code version fallback):
+#   {
+#     "session_id":        "<uuid>",
+#     "transcript_path":   "<path to .jsonl>",
+#     "cwd":               "<repo root absolute path>",
+#     "hook_event_name":   "WorktreeCreate",
+#     "name":              "agent-<hex>"                   ← fallback for NAME
+#   }
+#   The hook derives `BRANCH = worktree-${NAME}` to match Claude Code's native
+#   pre-hook naming convention.
 #
 # Platform: macOS uses /usr/bin/lockf (ships with macOS, backed by flock(2)).
 #   Linux uses flock(1) from util-linux. Detected at runtime.
@@ -61,17 +71,30 @@ print(payload.get('$1') or '')
 }
 
 BASE_PATH=$(parse_field cwd)
-NAME=$(parse_field name)
+WORKTREE_ID=$(parse_field worktree_id)
+NAME_FIELD=$(parse_field name)
+WORKTREE_PATH_FIELD=$(parse_field worktree_path)
 
-if [ -z "$BASE_PATH" ] || [ -z "$NAME" ]; then
-  echo "worktree-create.sh: missing cwd or name in hook input" >&2
+if [ -z "$BASE_PATH" ] || { [ -z "$WORKTREE_ID" ] && [ -z "$NAME_FIELD" ]; }; then
+  echo "worktree-create.sh: missing cwd, worktree_id, or name in hook input" >&2
   exit 1
+fi
+
+if [ -n "$WORKTREE_ID" ]; then
+  NAME="$WORKTREE_ID"
+else
+  NAME="$NAME_FIELD"
 fi
 
 # Match Claude Code's pre-hook native naming so existing tooling (cleanup hook,
 # worktree manifest, orchestrator skill) continues to recognize the worktree.
 BRANCH="worktree-${NAME}"
-WORKTREE_PATH="${BASE_PATH}/.claude/worktrees/${NAME}"
+
+if [ -n "$WORKTREE_PATH_FIELD" ]; then
+  WORKTREE_PATH="$WORKTREE_PATH_FIELD"
+else
+  WORKTREE_PATH="${BASE_PATH}/.claude/worktrees/${NAME}"
+fi
 
 # Ensure the parent directory exists before `git worktree add` tries to write.
 # (Claude Code's `name` is currently a flat `agent-<hex>` slug with no slashes,

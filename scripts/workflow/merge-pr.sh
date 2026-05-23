@@ -139,3 +139,31 @@ fi
 # no sentinel needed. (A leftover sentinel would silently bypass the next user-level merge.)
 gh pr merge "$PR" "${MERGE_ARGS[@]}"
 echo "MERGED: PR #$PR"
+
+# --- Post huddle coordination notice (fail-open) ---
+# The merge is already done — a huddle failure must NEVER propagate an error.
+# shellcheck source=../hooks/huddle-lib.sh disable=SC1091
+(
+  set +e
+  set +u
+  set +o pipefail
+  _HUDDLE_LIB="$(dirname "$0")/../hooks/huddle-lib.sh"
+  if [[ ! -f "$_HUDDLE_LIB" ]]; then
+    exit 0
+  fi
+  source "$_HUDDLE_LIB"
+  _TODAY=$(huddle_today_bead_id 2>/dev/null) || exit 0
+  [[ -n "$_TODAY" ]] || exit 0
+  # Parse PinPoint bead ID from PR title (convention: trailing "(PP-xxx)").
+  # Bead IDs may include dots (e.g. PP-yxw.9), so allow [a-z0-9.] in the capture.
+  _BEAD_ID=$(printf '%s' "$PR_TITLE" | grep -oE '\(PP-[a-z0-9.]+\)' | tail -1 | tr -d '()' || echo "")
+  # Compact changed-files hint for collision awareness (top-level dirs, first 5)
+  _FILES=$(gh pr view "$PR" --json files --jq '[.files[].path | split("/")[0]] | unique | .[:5] | join(", ")' 2>/dev/null || echo "")
+  _BEAD_PART=""
+  [[ -n "$_BEAD_ID" ]] && _BEAD_PART=" ($_BEAD_ID)"
+  _FILES_PART=""
+  [[ -n "$_FILES" ]] && _FILES_PART=" [touched: $_FILES]"
+  _SIGN="${HUDDLE_NAME:-huddle-auto}"
+  _MSG="Merged PR #$PR$_BEAD_PART: $PR_TITLE$_FILES_PART. Sync main if you have active branches. —$_SIGN"
+  bd comments add "$_TODAY" "$_MSG" >/dev/null 2>&1 || true
+) || true
