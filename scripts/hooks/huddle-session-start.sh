@@ -178,6 +178,14 @@ if [[ -n "$NAME" ]]; then
   printf 'Registered as: **%s** (self-filter active for your own posts)\n\n' "$NAME"
   printf 'If this scrolls out of context later, recall your name with:\n'
   printf '    bash scripts/hooks/huddle-whoami.sh whoami %s\n\n' "$SESSION_ID"
+  # Resolve today_bead_id for the copy-paste command (fail-open: fall back to placeholder)
+  _TODAY_ID_REG=$(huddle_today_bead_id 2>/dev/null) || _TODAY_ID_REG="<today-bead-id>"
+  [[ -n "$_TODAY_ID_REG" ]] || _TODAY_ID_REG="<today-bead-id>"
+  printf 'Post a coordination update when you:\n'
+  printf '  - File a bead for a non-obvious finding: "Filed PP-xxx: <finding>. —<YourName>"\n'
+  printf '  - Touch an area others may conflict on: "Working on <file/area> in <branch>; flag if conflict. —<YourName>"\n'
+  printf '  (Merges and PR opens are auto-posted — no manual action needed for those.)\n\n'
+  printf '    bd comments add %s "Your update. —%s"\n\n' "$_TODAY_ID_REG" "$NAME"
   # shellcheck disable=SC2016  # backticks are literal Markdown
   printf 'Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`\n'
 else

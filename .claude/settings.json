@@ -54,6 +54,16 @@
         ]
       },
       {
+        "matcher": "Bash|mcp__github__create_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/huddle-pr-announce.sh",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
         "hooks": [
           {
             "type": "command",
