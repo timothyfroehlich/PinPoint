@@ -202,16 +202,16 @@ Sign with `—<YourFullRegisteredName>` (em-dash + your registered name). The se
 
 ## Scripts
 
-| Script                                   | Trigger                                              | Purpose                                                             |
-| ---------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------- |
-| `scripts/hooks/huddle-bootstrap.sh`      | manual (one-time)                                    | Init root epic + daily + monthly + config.json                      |
-| `scripts/hooks/huddle-rotate.sh`         | rotation subagent                                    | Phase A: atomic create-and-pointer-update; outputs OLD/NEW bead IDs |
-| `scripts/hooks/huddle-poll.sh`           | UserPromptSubmit + PostToolUse (throttled)           | Inject new today_bead comments since last_seen                      |
-| `scripts/hooks/huddle-session-start.sh`  | SessionStart                                         | Bootstrap notice, rotation notice, identity, summary injection      |
-| `scripts/hooks/huddle-pr-announce.sh`    | PostToolUse (Bash\|mcp**github**create_pull_request) | Auto-post PR-open notice; dedup + fail-open                         |
-| `scripts/hooks/huddle-whoami.sh`         | manual                                               | Register/lookup/list/discover session→name mappings                 |
-| `scripts/hooks/huddle-rotation-check.sh` | sourced by both hooks                                | Date-compare: returns 0 if today_bead.date < today                  |
-| `scripts/hooks/huddle-lib.sh`            | sourced by all hooks                                 | Shared helpers (state-dir resolver, today-bead ID resolver)         |
+| Script                                   | Trigger                                                  | Purpose                                                             |
+| ---------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------- |
+| `scripts/hooks/huddle-bootstrap.sh`      | manual (one-time)                                        | Init root epic + daily + monthly + config.json                      |
+| `scripts/hooks/huddle-rotate.sh`         | rotation subagent                                        | Phase A: atomic create-and-pointer-update; outputs OLD/NEW bead IDs |
+| `scripts/hooks/huddle-poll.sh`           | UserPromptSubmit + PostToolUse (throttled)               | Inject new today_bead comments since last_seen                      |
+| `scripts/hooks/huddle-session-start.sh`  | SessionStart                                             | Bootstrap notice, rotation notice, identity, summary injection      |
+| `scripts/hooks/huddle-pr-announce.sh`    | PostToolUse (`Bash`\|`mcp__github__create_pull_request`) | Auto-post PR-open notice; dedup + fail-open                         |
+| `scripts/hooks/huddle-whoami.sh`         | manual                                                   | Register/lookup/list/discover session→name mappings                 |
+| `scripts/hooks/huddle-rotation-check.sh` | sourced by both hooks                                    | Date-compare: returns 0 if today_bead.date < today                  |
+| `scripts/hooks/huddle-lib.sh`            | sourced by all hooks                                     | Shared helpers (state-dir resolver, today-bead ID resolver)         |
 
 ## State files
 
