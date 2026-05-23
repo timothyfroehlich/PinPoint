@@ -17,7 +17,28 @@ import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 import { log } from "~/lib/logger";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
-function getAdminClient(): ReturnType<typeof createAdminClient> {
+interface AdminClientSubset {
+  auth: {
+    admin: {
+      listUsers: () => Promise<
+        | {
+            data: {
+              users: { id: string; email?: string | null | undefined }[];
+            };
+            error: null;
+          }
+        | {
+            data: {
+              users: [];
+            };
+            error: Error;
+          }
+      >;
+    };
+  };
+}
+
+function getAdminClient(): AdminClientSubset {
   if (process.env.NODE_ENV === "test") {
     return {
       auth: {
@@ -56,7 +77,7 @@ function getAdminClient(): ReturnType<typeof createAdminClient> {
           },
         },
       },
-    } as unknown as ReturnType<typeof createAdminClient>;
+    };
   }
   return createAdminClient();
 }
