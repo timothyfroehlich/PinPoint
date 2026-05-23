@@ -13,7 +13,11 @@ export default function AuthLayout({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <main className="flex min-h-screen items-center justify-center overflow-y-auto px-4 sm:px-6 py-12 bg-background">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="flex min-h-screen items-center justify-center overflow-y-auto px-4 sm:px-6 py-12 bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+    >
       <div className="w-full max-w-md">
         {/* Logo and title */}
         <Link

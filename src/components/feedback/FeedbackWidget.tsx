@@ -161,6 +161,7 @@ export function FeedbackWidget(): React.JSX.Element | null {
           title="Send Feedback"
         >
           <MessageSquare className="h-5 w-5" />
+          {/* sm-structural-allow: button label abbreviation at viewport width, not layout structure */}
           <span className="hidden sm:inline">Feedback</span>
         </Button>
       </DropdownMenuTrigger>

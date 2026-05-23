@@ -93,9 +93,7 @@ test.describe("Public Issue Reporting", () => {
     expect(next).toBe(`/report?machine=${machineInitials}`);
 
     await page.getByLabel("Email").fill(TEST_USERS.member.email);
-    await page
-      .getByLabel("Password", { exact: true })
-      .fill(TEST_USERS.member.password);
+    await page.getByLabel(/^Password\s*\*?$/).fill(TEST_USERS.member.password);
     await page.getByRole("button", { name: "Sign In" }).click();
 
     await expect(page).toHaveURL(
@@ -135,9 +133,7 @@ test.describe("Public Issue Reporting", () => {
     expect(next).toBe(`/report?machine=${machineInitials}`);
 
     await page.getByLabel("Email").fill(TEST_USERS.member.email);
-    await page
-      .getByLabel("Password", { exact: true })
-      .fill(TEST_USERS.member.password);
+    await page.getByLabel(/^Password\s*\*?$/).fill(TEST_USERS.member.password);
     await page.getByRole("button", { name: "Sign In" }).click();
 
     await expect(page).toHaveURL(

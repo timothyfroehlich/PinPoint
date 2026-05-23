@@ -10,9 +10,9 @@ const changePasswordSpy = vi.spyOn(actions, "changePasswordAction");
 describe("ChangePasswordSection", () => {
   it("renders all three password fields", () => {
     render(<ChangePasswordSection />);
-    expect(screen.getByLabelText("Current Password")).toBeVisible();
-    expect(screen.getByLabelText("New Password")).toBeVisible();
-    expect(screen.getByLabelText("Confirm New Password")).toBeVisible();
+    expect(screen.getByLabelText(/^Current Password\b/i)).toBeVisible();
+    expect(screen.getByLabelText(/^New Password\b/i)).toBeVisible();
+    expect(screen.getByLabelText(/^Confirm New Password\b/i)).toBeVisible();
   });
 
   it("renders the Change Password button", () => {
@@ -24,11 +24,11 @@ describe("ChangePasswordSection", () => {
 
   it("has correct autocomplete attributes", () => {
     render(<ChangePasswordSection />);
-    expect(screen.getByLabelText("Current Password")).toHaveAttribute(
+    expect(screen.getByLabelText(/^Current Password\b/i)).toHaveAttribute(
       "autocomplete",
       "current-password"
     );
-    expect(screen.getByLabelText("New Password")).toHaveAttribute(
+    expect(screen.getByLabelText(/^New Password\b/i)).toHaveAttribute(
       "autocomplete",
       "new-password"
     );

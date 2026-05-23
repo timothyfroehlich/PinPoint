@@ -20,6 +20,21 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Derives the Vercel Blob public hostname from the BLOB_READ_WRITE_TOKEN.
+ * Token format: vercel_blob_rw_<storeRef>_<base64secret>
+ * Hostname format: <storeRef>.public.blob.vercel-storage.com
+ * Returns null when the token is absent or doesn't match the expected shape.
+ */
+function getBlobStoreHostname(): string | null {
+  const token = process.env["BLOB_READ_WRITE_TOKEN"];
+  if (!token) return null;
+  const tokenPattern = /^vercel_blob_rw_([a-zA-Z0-9]+)_[a-zA-Z0-9]+$/;
+  const match = tokenPattern.exec(token);
+  if (!match) return null;
+  return `${match[1]}.public.blob.vercel-storage.com`;
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -38,11 +53,23 @@ export default async function RootLayout({
   }
 
   const showCookieBanner = isProduction || forceShow;
+  const blobHostname = getBlobStoreHostname();
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {blobHostname !== null && (
+          <link rel="preconnect" href={`https://${blobHostname}`} />
+        )}
+      </head>
       <body className="flex flex-col h-screen overflow-hidden">
         <ClientProviders>
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-md focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            Skip to main content
+          </a>
           <SentryInitializer />
           {isDevelopment && <ClientLogger />}
           <div className="flex-1 overflow-hidden">{children}</div>

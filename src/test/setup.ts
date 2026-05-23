@@ -58,13 +58,25 @@ if (typeof window !== "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking scrollIntoView
   window.HTMLElement.prototype.scrollIntoView = function () {};
 
-  // Radix UI Select calls element.hasPointerCapture / releasePointerCapture on
-  // pointer events. jsdom does not implement these APIs. Add no-op stubs so any
-  // test that opens a Radix Select dropdown can proceed. (Promoted from
-  // MachineTimelineComposer.test.tsx after a second consumer appeared in Task 18.)
-  window.HTMLElement.prototype.hasPointerCapture = function (): boolean {
-    return false;
-  };
-  // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking releasePointerCapture
-  window.HTMLElement.prototype.releasePointerCapture = function (): void {};
+  // Mock Pointer Capture API — required by vaul drag-to-dismiss and by Radix
+  // UI Select (which calls hasPointerCapture/releasePointerCapture on pointer
+  // events). jsdom doesn't implement these, so we polyfill no-ops only when
+  // they're missing — keeps any real implementation in a future jsdom or alt
+  // environment intact.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill setPointerCapture if missing
+  if (!window.Element.prototype.setPointerCapture) {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking setPointerCapture
+    window.Element.prototype.setPointerCapture = function () {};
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill releasePointerCapture if missing
+  if (!window.Element.prototype.releasePointerCapture) {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking releasePointerCapture
+    window.Element.prototype.releasePointerCapture = function () {};
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill hasPointerCapture if missing
+  if (!window.Element.prototype.hasPointerCapture) {
+    window.Element.prototype.hasPointerCapture = function (): boolean {
+      return false;
+    };
+  }
 }
