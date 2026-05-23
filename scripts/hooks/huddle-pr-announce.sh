@@ -15,6 +15,9 @@
 #
 # HUDDLE_DRY_RUN=1: print the would-post text to stdout instead of calling bd.
 #   Used by test_huddle_pr_announce.py.
+# HUDDLE_PR_TITLE_OVERRIDE: when set, skip the `gh pr view` network call and use
+#   this string as PR_TITLE in the Bash branch. Intended for dry-run tests so no
+#   network call is made. Example: HUDDLE_PR_TITLE_OVERRIDE="fix thing (PP-abc1)"
 
 set -euo pipefail
 
@@ -99,8 +102,14 @@ case "$TOOL_NAME" in
     esac
     # Parse PR number from the URL in the output
     PR_NUMBER=$(printf '%s' "$TOOL_RESPONSE" | grep -oE '/pull/([0-9]+)' | head -1 | grep -oE '[0-9]+' || echo "")
-    # Title is not in the gh pr create stdout; bead ID won't be parsed for this shape.
-    PR_TITLE=""
+    # Fetch PR title: use override if set (for dry-run tests), else call gh (fail-open).
+    if [[ -n "${HUDDLE_PR_TITLE_OVERRIDE:-}" ]]; then
+      PR_TITLE="$HUDDLE_PR_TITLE_OVERRIDE"
+    elif [[ "${HUDDLE_DRY_RUN:-}" != "1" ]] && [[ -n "$PR_NUMBER" ]]; then
+      PR_TITLE=$(gh pr view "$PR_NUMBER" --json title --jq .title 2>/dev/null || echo "")
+    else
+      PR_TITLE=""
+    fi
     ;;
   *)
     exit 0

@@ -114,8 +114,8 @@ class TestBashPrCreatePayload:
         )
         rc, stdout, _ = run_hook(payload)
         assert rc == 0
-        # Bead ID comes from the PR title in this hook; for Bash shape, title is
-        # not in the response — bead part may be absent. Just confirm no crash.
+        # Without HUDDLE_PR_TITLE_OVERRIDE the Bash path has no title; PR number
+        # must appear but bead/title parts are absent. Just confirm no crash.
         assert "PR #42" in stdout
 
     def test_output_contains_sign_off(self) -> None:
@@ -131,6 +131,59 @@ class TestBashPrCreatePayload:
         )
         assert rc == 0
         assert "—Claude-TestAgent" in stdout
+
+
+class TestBashPrCreateWithTitleOverride:
+    """Tests for the enriched Bash path using HUDDLE_PR_TITLE_OVERRIDE.
+
+    HUDDLE_PR_TITLE_OVERRIDE injects a PR title without making a network call,
+    so these tests are dry-run-safe while verifying the enriched announcement.
+    """
+
+    def test_enriched_output_contains_title_and_bead(self) -> None:
+        """Bash path with title override produces title + bead in announcement."""
+        payload = _bash_pr_create_payload()
+        rc, stdout, stderr = run_hook(
+            payload,
+            env_modifications={"HUDDLE_PR_TITLE_OVERRIDE": "some fix (PP-abc.1)"},
+        )
+        assert rc == 0, f"Hook exited {rc}; stderr={stderr!r}"
+        assert "PR #42" in stdout, f"Expected 'PR #42' in stdout, got: {stdout!r}"
+        assert "PP-abc.1" in stdout, f"Expected 'PP-abc.1' in stdout, got: {stdout!r}"
+        assert "some fix" in stdout, f"Expected title in stdout, got: {stdout!r}"
+
+    def test_enriched_output_format(self) -> None:
+        """Full format: 'Opened PR #N (PP-xxx): <title>. —huddle-auto'."""
+        payload = _bash_pr_create_payload()
+        rc, stdout, _ = run_hook(
+            payload,
+            env_modifications={"HUDDLE_PR_TITLE_OVERRIDE": "some fix (PP-abc.1)"},
+        )
+        assert rc == 0
+        assert (
+            stdout.strip()
+            == "Opened PR #42 (PP-abc.1): some fix (PP-abc.1). —huddle-auto"
+        )
+
+    def test_title_without_bead_id(self) -> None:
+        """Title override with no bead ID still produces title part."""
+        payload = _bash_pr_create_payload()
+        rc, stdout, _ = run_hook(
+            payload,
+            env_modifications={"HUDDLE_PR_TITLE_OVERRIDE": "plain title no bead"},
+        )
+        assert rc == 0
+        assert "PR #42" in stdout
+        assert "plain title no bead" in stdout
+        assert "PP-" not in stdout
+
+    def test_no_override_falls_back_to_bare(self) -> None:
+        """Without override and in dry-run mode, output is the bare PR number message."""
+        payload = _bash_pr_create_payload()
+        rc, stdout, _ = run_hook(payload)
+        assert rc == 0
+        # Bare format: no title colon-separator, no bead ID
+        assert stdout.strip() == "Opened PR #42. —huddle-auto"
 
 
 class TestMcpCreatePrPayload:
