@@ -15,9 +15,17 @@
 #
 # HUDDLE_DRY_RUN=1: print the would-post text to stdout instead of calling bd.
 #   Used by test_huddle_pr_announce.py.
-# HUDDLE_PR_TITLE_OVERRIDE: when set, skip the `gh pr view` network call and use
-#   this string as PR_TITLE in the Bash branch. Intended for dry-run tests so no
+# HUDDLE_PR_TITLE_OVERRIDE: when set, skip the `gh pr view` fetch and use this
+#   string as PR_TITLE in the Bash branch. Intended for dry-run tests so no
 #   network call is made. Example: HUDDLE_PR_TITLE_OVERRIDE="fix thing (PP-abc1)"
+# HUDDLE_FORCE_TITLE_FETCH=1: test-only. Lets the `gh pr view` fetch branch run
+#   even under HUDDLE_DRY_RUN=1, so a test can exercise the real fetch path with a
+#   fake `gh` on PATH (no network). Production never sets this.
+#
+# The `gh pr view` title fetch (Bash path) is bounded by a 3s timeout(1)/gtimeout(1)
+# when available so a slow/stalled call can't hold this PostToolUse hook toward the
+# harness's ~10s timeout; if no timeout binary exists it falls back to a bare gh
+# call. Any gh failure is fail-open → empty title → bare message.
 
 set -euo pipefail
 
@@ -102,11 +110,22 @@ case "$TOOL_NAME" in
     esac
     # Parse PR number from the URL in the output
     PR_NUMBER=$(printf '%s' "$TOOL_RESPONSE" | grep -oE '/pull/([0-9]+)' | head -1 | grep -oE '[0-9]+' || echo "")
-    # Fetch PR title: use override if set (for dry-run tests), else call gh (fail-open).
+    # Fetch PR title (see header comment for the timeout/fail-open contract):
+    #   1. HUDDLE_PR_TITLE_OVERRIDE wins (test seam, no network).
+    #   2. Otherwise call `gh pr view`, bounded by timeout(1)/gtimeout(1) if present.
+    # Network gate: the gh call is skipped under dry-run UNLESS the test opts in via
+    # HUDDLE_FORCE_TITLE_FETCH=1 (paired with a fake `gh` on PATH). Production never
+    # sets that, so dry-run tests stay network-free.
     if [[ -n "${HUDDLE_PR_TITLE_OVERRIDE:-}" ]]; then
       PR_TITLE="$HUDDLE_PR_TITLE_OVERRIDE"
-    elif [[ "${HUDDLE_DRY_RUN:-}" != "1" ]] && [[ -n "$PR_NUMBER" ]]; then
-      PR_TITLE=$(gh pr view "$PR_NUMBER" --json title --jq .title 2>/dev/null || echo "")
+    elif { [[ "${HUDDLE_DRY_RUN:-}" != "1" ]] || [[ "${HUDDLE_FORCE_TITLE_FETCH:-}" == "1" ]]; } && [[ -n "$PR_NUMBER" ]]; then
+      _TIMEOUT=""
+      if command -v timeout >/dev/null 2>&1; then
+        _TIMEOUT="timeout 3"
+      elif command -v gtimeout >/dev/null 2>&1; then
+        _TIMEOUT="gtimeout 3"
+      fi
+      PR_TITLE=$($_TIMEOUT gh pr view "$PR_NUMBER" --json title --jq .title 2>/dev/null || echo "")
     else
       PR_TITLE=""
     fi
