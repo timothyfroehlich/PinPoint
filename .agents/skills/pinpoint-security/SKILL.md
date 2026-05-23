@@ -52,9 +52,20 @@ const {
 if (!user) redirect("/login");
 ```
 
-### Middleware Token Refresh (CORE-SSR-003)
+### Middleware Token Refresh (CORE-SSR-003, CORE-SSR-005)
 
-Token refresh is managed automatically in `middleware.ts` via `updateSession(request)` (implemented in `src/lib/supabase/middleware.ts`). This function invokes `supabase.auth.getUser()` to refresh expired tokens and updates response cookies for the browser.
+Token refresh is managed automatically in `middleware.ts` (at the repo root — not `src/middleware.ts`) via `updateSession(request)` (implemented in `src/lib/supabase/middleware.ts`). This function invokes `supabase.auth.getUser()` to refresh expired tokens and updates response cookies for the browser.
+
+Return the response object from `updateSession` as-is (CORE-SSR-005). Don't mutate, rewrap, or copy headers into a fresh `NextResponse` — that strips the `Set-Cookie` headers that carry refreshed session tokens, and the next request will see an anonymous user.
+
+### CSP Authoring (CORE-SEC-003/004)
+
+The root `middleware.ts` also sets the Content-Security-Policy. Things to know before modifying it:
+
+- **`script-src` posture**: production uses `'strict-dynamic'` (nonce-only, blocks host allowlists); preview adds an explicit allowlist (`vercel.live`) for the Vercel toolbar. Never add `'unsafe-inline'` or `'unsafe-eval'`.
+- **Per-request nonce**: `middleware.ts` calls `crypto.randomUUID()` and sets the nonce on `Content-Security-Policy` (`'nonce-<uuid>'`) plus an `x-nonce` response header. Server Components read `x-nonce` for inline scripts.
+- **Already allowlisted**: `challenges.cloudflare.com` (Turnstile CAPTCHA) in `script-src`, `connect-src`, and `frame-src`. Supabase URL + WS URL in `connect-src`. Both `localhost:*` and `127.0.0.1:*` allowed in `connect-src` for dev — this is the only intentional CORE-SEC-008 exception.
+- **Adding a new external host**: add to the appropriate directive in the production branch first, mirror to the preview branch only if needed. Default to deny.
 
 ### Auth Callback Route (CORE-SSR-004)
 
@@ -64,15 +75,33 @@ The OAuth flow redirects through `src/app/(auth)/auth/callback/route.ts` which h
 
 Never create user profiles manually in Server Actions. Profiles are created atomically via the `handle_new_user` SQL trigger on `auth.users` insert, ensuring compatibility with all auth methods including OAuth.
 
+### Don't Query `auth.users` Directly (CORE-SSR-007)
+
+Application code reads user data from `user_profiles` (mirrored from `auth.users` via the `handle_new_user` trigger). Do not write Drizzle queries or raw SQL against `auth.users` in Server Actions, services, or route handlers — the schema is internal to Supabase and can change between releases.
+
+**Allowed exceptions:**
+
+- Database triggers and `supabase/seed.sql`.
+- Test bootstrapping (`src/test/setup/pglite.ts` and integration test fixtures).
+- The orphan-recovery path in `src/app/(app)/admin/users/actions.ts` — when inviting a user, the admin action queries the `authUsers` Drizzle wrapper to detect orphan auth records left behind by a failed `handle_new_user` trigger. This is documented inline at that callsite and is the only sanctioned application-code reference; do not generalize the pattern.
+
+### Server→Client Data Minimization (CORE-SEC-006)
+
+The React Server Components payload is visible in page source — `view-source:` on any authenticated page reveals every prop passed to `"use client"` components. Map server-fetched data to a minimal shape _before_ the boundary; never pass full ORM/domain objects (`UnifiedUser`, full `user_profiles` records, raw issue rows with `reporterEmail`, etc.) as Client Component props.
+
+Practical pattern: define a `XyzProps` interface listing only the fields the component actually uses, then build it from the full object in the Server Component. Combine with CORE-SEC-007: even authenticated users should not see other users' emails in the RSC payload outside admin views.
+
 ---
 
 ## 2. Authorization & Permissions Framework (CORE-ARCH-008)
 
 The permissions system is defined in `src/lib/permissions/matrix.ts` (single source of truth) and checked via helpers in `src/lib/permissions/helpers.ts` or React hooks in `src/lib/permissions/hooks.ts`.
 
-### Named Role Helpers
+The `permissions-audit-allow` annotation contract is **enforced**, not documentation. `scripts/audit/no-hardcoded-role-checks.sh` scans `src/` (excluding the permissions module and tests) for `role === "<role>"` comparisons and fails on any that lack `// permissions-audit-allow: <reason>` on the same line, the line directly above, or the line directly below. The audit is wired into `pnpm run check` as `audit:role-checks` — preflight will reject unannotated gates.
 
-Always use the following functions for security and role auditing:
+### Permission Helpers
+
+Always use the following functions for permission gating and auditing:
 
 - **Server Helpers (`src/lib/permissions/helpers.ts`)**:
   - `getAccessLevel(role)`: Resolves a database role string (or null) to an `AccessLevel` ("unauthenticated", "guest", "member", "technician", "admin").
@@ -82,7 +111,8 @@ Always use the following functions for security and role auditing:
   - `getGrantedPermissions(accessLevel, context)`: Retrieves list of granted permission IDs.
   - `getPermissionState(permissionId, accessLevel, context)`: Returns detailed state (`allowed: boolean`, `reason: "unauthenticated" | "role" | "ownership"`).
   - `getPermissionDeniedReason(permissionId, accessLevel, context)`: Returns a human-readable tooltip string for disabled actions.
-  - `isConditionalPermission(permissionId, accessLevel)`: Checks if permission requires ownership context.
+  - `isConditionalPermission(permissionId, accessLevel)`: Checks if a permission's matrix value is conditional (`'own'`/`'owner'`) and therefore requires `OwnershipContext` to evaluate.
+  - `getRawPermissionValue(permissionId, accessLevel)`: Returns the raw matrix value (`true`, `false`, `'own'`, or `'owner'`) before ownership resolution. Use this only when you need to introspect the matrix entry itself (e.g., to choose between two UI states); for actual access decisions, always go through `checkPermission` / `getPermissionState`.
 - **Client React Hooks (`src/lib/permissions/hooks.ts`)**:
   - `usePermission(permissionId, user, context)`
   - `usePermissionState(permissionId, user, context)`
@@ -267,35 +297,13 @@ export async function linkProviderAction(rawKey: string): Promise<void> {
 
 ### Input Sanitization
 
-```typescript
-import sanitizeHtml from "sanitize-html";
+Don't roll a new `sanitize-html` allowlist. The codebase has a shared config — `~/lib/sanitize-html-config` exports `NON_TEXT_TAGS`, the canonical set of raw-text tags that must be stripped (covered by the test in `sanitize-html-config.test.ts`). The shared config is consumed by `src/lib/markdown.ts`, `src/lib/tiptap/render.ts`, and `src/lib/notifications/channels/email-channel.ts`.
 
-export async function createComment(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+For the common cases:
 
-  const rawContent = formData.get("content");
-  if (typeof rawContent !== "string") {
-    throw new Error("Invalid content");
-  }
-
-  // Sanitize HTML to prevent XSS
-  const sanitizedContent = sanitizeHtml(rawContent, {
-    allowedTags: ["b", "i", "em", "strong", "a", "p"],
-    allowedAttributes: {
-      a: ["href"],
-    },
-  });
-
-  await db.insert(comments).values({
-    userId: user.id,
-    content: sanitizedContent,
-  });
-}
-```
+- **Markdown-from-user-input → safe HTML**: call `markdownToHtml(...)` from `~/lib/markdown` (double-sanitizes after the markdown renderer runs).
+- **TipTap ProseMirror JSON → safe HTML for display**: use the renderer in `~/lib/tiptap/render` (this is what `RichTextDisplay` uses; the comment there reads "Output is double-sanitized — the renderer escapes all text").
+- **Raw HTML that genuinely needs sanitization in a new place**: import `sanitizeHtml` from `sanitize-html` AND `NON_TEXT_TAGS` from `~/lib/sanitize-html-config`, and pass `nonTextTags: NON_TEXT_TAGS` alongside whatever `allowedTags`/`allowedAttributes` you need. The shared `NON_TEXT_TAGS` constant is what keeps `<script>`, `<style>`, `<textarea>`, etc. from leaking through; replicating an inline allowlist that omits it is a footgun.
 
 ---
 
@@ -304,11 +312,15 @@ export async function createComment(formData: FormData) {
 Before deploying or merging security-sensitive changes, verify:
 
 - [ ] **Auth Checks**: `createClient()` is immediately followed by `auth.getUser()` (CORE-SSR-002) in all Server Actions/routes.
-- [ ] **Authorization**: Every action is protected using the permissions matrix via `checkPermission()` (CORE-ARCH-008). No hardcoded checks.
+- [ ] **Authorization**: Every action is protected using the permissions matrix via `checkPermission()` (CORE-ARCH-008). No hardcoded role gates; `pnpm run check` (`audit:role-checks`) must pass.
+- [ ] **`auth.users` discipline**: No application-code queries against `auth.users` outside the sanctioned exceptions (CORE-SSR-007).
+- [ ] **Server→Client minimization**: Client Component props are minimal shapes, not raw ORM rows (CORE-SEC-006).
 - [ ] **Email Privacy**: User email addresses are never displayed outside of admin views or settings (CORE-SEC-007).
 - [ ] **Input Validation**: All form inputs are validated using Zod (CORE-SEC-002).
+- [ ] **Sanitization**: Any new sanitize-html call uses `NON_TEXT_TAGS` from `~/lib/sanitize-html-config`; prefer the existing `markdownToHtml` / tiptap renderer over rolling a new allowlist.
 - [ ] **Hostnames**: No hardcoded hostnames/ports used; local dev runs strictly on `localhost` (CORE-SEC-008).
-- [ ] **CSP Config**: Dynamic CSP nonce generated via `middleware.ts` (CORE-SEC-004), no `'unsafe-inline'` for script-src.
+- [ ] **CSP Config**: Dynamic CSP nonce generated via root `middleware.ts` (CORE-SEC-004); no `'unsafe-inline'` for script-src; new external hosts added to the production branch by default.
+- [ ] **Middleware response**: `updateSession`'s response is returned as-is (CORE-SSR-005) — no rewrap, no header copy.
 - [ ] **Identities Safeguard**: Manual unlinking verifies multiple identities remain via `canUnlinkIdentity`.
 - [ ] **Drizzle Migrations**: Schema updates are managed via generated SQL migrations only (CORE-ARCH-009).
 
