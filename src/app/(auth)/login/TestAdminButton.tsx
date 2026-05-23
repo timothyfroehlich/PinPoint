@@ -13,7 +13,7 @@ export function TestAdminButton(): React.JSX.Element {
   function handleTestAdminLogin(): void {
     // Find the form fields
     const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
+    const passwordInput = document.getElementById("current-password");
 
     if (
       !emailInput ||
