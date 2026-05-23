@@ -95,9 +95,9 @@ Always use the following functions for security and role auditing:
 
 ---
 
-## 3. Multi-Provider OAuth & Discord Integration
+## 3. Discord OAuth Integration (extensible to other providers)
 
-OAuth is built on an extensible multi-provider framework.
+Discord is the only provider currently registered. The OAuth machinery (provider registry, unlink guard, callback redirect handling) is structured so additional providers can be added by appending entries to the registry, but `ProviderKey` resolves to `"discord"` today.
 
 ### Multi-Provider Registry (`src/lib/auth/providers.ts`)
 
@@ -122,7 +122,7 @@ export function canUnlinkIdentity(
 
 ### Discord Identity Mirroring
 
-During OAuth login or linking, the callback route `src/app/(auth)/auth/callback/route.ts` invokes `syncDiscordIdentity(supabase)` to extract the Discord user ID from `getUserIdentities()` and mirror it into `user_profiles.discordUserId` in the database.
+During OAuth login or linking, the callback route `src/app/(auth)/auth/callback/route.ts` invokes `syncDiscordIdentity(supabase)` to extract the Discord user ID from `getUserIdentities()` and mirror it into `user_profiles.discordUserId` in the database. `syncDiscordIdentity` is defined as an internal helper inside the callback route — it is not exported and is not callable from elsewhere.
 
 ### Dynamic Redirects
 
@@ -187,6 +187,12 @@ export async function updateIssueAction(formData: FormData) {
   }
 
   // 5. Check permissions through the matrix helper (CORE-ARCH-008)
+  //    checkPermission returns boolean — it resolves "own"/"owner" conditional
+  //    permissions internally against the OwnershipContext. Always pass
+  //    { userId, reporterId } (issues) or { userId, machineOwnerId } (machines)
+  //    when the permission may be conditional; otherwise the call denies by
+  //    default. For UI gating with denial-reason tooltips, prefer
+  //    getPermissionState(...).allowed, which returns { allowed, reason }.
   const isAllowed = checkPermission("issues.update.reporting", accessLevel, {
     userId: user.id,
     reporterId: issue.reportedBy,
@@ -214,8 +220,7 @@ export async function updateIssueAction(formData: FormData) {
 ```typescript
 "use client";
 
-import { usePermissionState } from "~/lib/permissions/hooks";
-import { type PermissionUser, type IssueContext } from "~/lib/permissions/hooks";
+import { usePermissionState, type PermissionUser, type IssueContext } from "~/lib/permissions/hooks";
 
 interface IssueEditorProps {
   user: PermissionUser;
@@ -304,7 +309,7 @@ Before deploying or merging security-sensitive changes, verify:
 - [ ] **Input Validation**: All form inputs are validated using Zod (CORE-SEC-002).
 - [ ] **Hostnames**: No hardcoded hostnames/ports used; local dev runs strictly on `localhost` (CORE-SEC-008).
 - [ ] **CSP Config**: Dynamic CSP nonce generated via `middleware.ts` (CORE-SEC-004), no `'unsafe-inline'` for script-src.
-- [ ] **Identities Safeguard**: Manual unlinking verifies multiple identities remain via `canUnlinkIdentity` (PR #1213).
+- [ ] **Identities Safeguard**: Manual unlinking verifies multiple identities remain via `canUnlinkIdentity`.
 - [ ] **Drizzle Migrations**: Schema updates are managed via generated SQL migrations only (CORE-ARCH-009).
 
 ---
