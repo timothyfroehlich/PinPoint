@@ -81,7 +81,7 @@ export function SettingsSetCard({
       <div
         role="button"
         tabIndex={0}
-        className="flex cursor-pointer items-center gap-2.5 px-4 py-3 hover:bg-muted/30"
+        className="@container flex cursor-pointer items-center gap-2.5 px-4 py-3 hover:bg-muted/30"
         onClick={onToggleExpand}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -140,7 +140,7 @@ export function SettingsSetCard({
 
         {/* Collapsed meta string */}
         {!isExpanded && (
-          <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
+          <span className="hidden shrink-0 text-xs text-muted-foreground @md:block">
             {formatMetaWhenCollapsed(set)}
           </span>
         )}
