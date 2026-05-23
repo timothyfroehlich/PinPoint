@@ -1,7 +1,7 @@
 # Supabase Branch Cleanup
 #
 # Deletes Supabase preview branch DBs for PRs that no longer have the
-# 'preview' label (or whose PR is closed). Runs every 6 hours and can be
+# 'preview' label (or whose PR is closed). Runs every 3 hours and can be
 # triggered manually.
 #
 # Required GitHub Secrets (same as supabase-branch-setup.yaml):
@@ -12,7 +12,7 @@ name: Supabase Branch Cleanup
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # every 6 hours
+    - cron: '0 */3 * * *'  # every 3 hours
   workflow_dispatch:        # manual trigger
 
 permissions:

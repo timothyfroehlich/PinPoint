@@ -9,32 +9,38 @@ import { serverActionError } from "~/lib/observability/report-error";
 import { z } from "zod";
 
 const updatePreferencesSchema = z.object({
-  emailEnabled: z.boolean(),
-  inAppEnabled: z.boolean(),
-  discordEnabled: z.boolean(),
-  suppressOwnActions: z.boolean(),
+  emailEnabled: z.boolean().optional(),
+  inAppEnabled: z.boolean().optional(),
+  discordEnabled: z.boolean().optional(),
+  suppressOwnActions: z.boolean().optional(),
 
   // Granular Preferences
-  emailNotifyOnAssigned: z.boolean(),
-  inAppNotifyOnAssigned: z.boolean(),
-  discordNotifyOnAssigned: z.boolean(),
-  emailNotifyOnStatusChange: z.boolean(),
-  inAppNotifyOnStatusChange: z.boolean(),
-  discordNotifyOnStatusChange: z.boolean(),
-  emailNotifyOnNewComment: z.boolean(),
-  inAppNotifyOnNewComment: z.boolean(),
-  discordNotifyOnNewComment: z.boolean(),
-  emailNotifyOnMentioned: z.boolean(),
-  inAppNotifyOnMentioned: z.boolean(),
-  discordNotifyOnMentioned: z.boolean(),
-  emailNotifyOnNewIssue: z.boolean(),
-  inAppNotifyOnNewIssue: z.boolean(),
-  discordNotifyOnNewIssue: z.boolean(),
+  emailNotifyOnAssigned: z.boolean().optional(),
+  inAppNotifyOnAssigned: z.boolean().optional(),
+  discordNotifyOnAssigned: z.boolean().optional(),
+  emailNotifyOnStatusChange: z.boolean().optional(),
+  inAppNotifyOnStatusChange: z.boolean().optional(),
+  discordNotifyOnStatusChange: z.boolean().optional(),
+  emailNotifyOnNewComment: z.boolean().optional(),
+  inAppNotifyOnNewComment: z.boolean().optional(),
+  discordNotifyOnNewComment: z.boolean().optional(),
+  emailNotifyOnMentioned: z.boolean().optional(),
+  inAppNotifyOnMentioned: z.boolean().optional(),
+  discordNotifyOnMentioned: z.boolean().optional(),
+  emailNotifyOnNewIssue: z.boolean().optional(),
+  inAppNotifyOnNewIssue: z.boolean().optional(),
+  discordNotifyOnNewIssue: z.boolean().optional(),
 
-  emailWatchNewIssuesGlobal: z.boolean(),
-  inAppWatchNewIssuesGlobal: z.boolean(),
-  discordWatchNewIssuesGlobal: z.boolean(),
+  emailWatchNewIssuesGlobal: z.boolean().optional(),
+  inAppWatchNewIssuesGlobal: z.boolean().optional(),
+  discordWatchNewIssuesGlobal: z.boolean().optional(),
 });
+
+type PrefField = keyof z.infer<typeof updatePreferencesSchema>;
+
+const PREF_FIELDS = Object.keys(
+  updatePreferencesSchema.shape
+) as readonly PrefField[];
 
 export type UpdatePreferencesResult = Result<
   { success: boolean },
@@ -54,44 +60,25 @@ export async function updateNotificationPreferencesAction(
     return err("UNAUTHORIZED", "Unauthorized");
   }
 
-  const rawData = {
-    emailEnabled: formData.get("emailEnabled") === "on",
-    inAppEnabled: formData.get("inAppEnabled") === "on",
-    discordEnabled: formData.get("discordEnabled") === "on",
-    suppressOwnActions: formData.get("suppressOwnActions") === "on",
-
-    // Granular Preferences
-    emailNotifyOnAssigned: formData.get("emailNotifyOnAssigned") === "on",
-    inAppNotifyOnAssigned: formData.get("inAppNotifyOnAssigned") === "on",
-    discordNotifyOnAssigned: formData.get("discordNotifyOnAssigned") === "on",
-    emailNotifyOnStatusChange:
-      formData.get("emailNotifyOnStatusChange") === "on",
-    inAppNotifyOnStatusChange:
-      formData.get("inAppNotifyOnStatusChange") === "on",
-    discordNotifyOnStatusChange:
-      formData.get("discordNotifyOnStatusChange") === "on",
-    emailNotifyOnNewComment: formData.get("emailNotifyOnNewComment") === "on",
-    inAppNotifyOnNewComment: formData.get("inAppNotifyOnNewComment") === "on",
-    discordNotifyOnNewComment:
-      formData.get("discordNotifyOnNewComment") === "on",
-    emailNotifyOnMentioned: formData.get("emailNotifyOnMentioned") === "on",
-    inAppNotifyOnMentioned: formData.get("inAppNotifyOnMentioned") === "on",
-    discordNotifyOnMentioned: formData.get("discordNotifyOnMentioned") === "on",
-    emailNotifyOnNewIssue: formData.get("emailNotifyOnNewIssue") === "on",
-    inAppNotifyOnNewIssue: formData.get("inAppNotifyOnNewIssue") === "on",
-    discordNotifyOnNewIssue: formData.get("discordNotifyOnNewIssue") === "on",
-
-    emailWatchNewIssuesGlobal:
-      formData.get("emailWatchNewIssuesGlobal") === "on",
-    inAppWatchNewIssuesGlobal:
-      formData.get("inAppWatchNewIssuesGlobal") === "on",
-    discordWatchNewIssuesGlobal:
-      formData.get("discordWatchNewIssuesGlobal") === "on",
-  };
+  // Absent fields are preserved (not coerced to false). The SwitchWithFormSupport
+  // hidden input always submits "on" or "off" from the resolved switch state, so
+  // a JS-enabled save sends every rendered field. Anything missing — direct API
+  // call, future per-toggle save, no-JS submit — leaves that column untouched.
+  const rawData: Partial<Record<PrefField, boolean>> = {};
+  for (const name of PREF_FIELDS) {
+    const value = formData.get(name);
+    if (value === "on") rawData[name] = true;
+    else if (value === "off") rawData[name] = false;
+  }
 
   const validation = updatePreferencesSchema.safeParse(rawData);
   if (!validation.success) {
     return err("VALIDATION", "Invalid input");
+  }
+
+  if (Object.keys(validation.data).length === 0) {
+    revalidatePath("/settings");
+    return ok({ success: true });
   }
 
   try {
