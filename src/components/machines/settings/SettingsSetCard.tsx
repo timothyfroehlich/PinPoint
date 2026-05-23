@@ -22,7 +22,7 @@ import {
   DipSwitchSection,
   type DipSwitchBank,
 } from "~/components/machines/settings/DipSwitchSection";
-import { InlineEditableField } from "~/components/inline-editable-field";
+import { DescriptionInline } from "~/components/machines/settings/DescriptionInline";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 export type MarkdownField =
@@ -199,25 +199,14 @@ export function SettingsSetCard({
           </DropdownMenu>
         </div>
 
-        {/* Description preview — always visible, click-to-edit */}
-        <div
-          className="pl-7"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-          onKeyDown={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          <InlineEditableField
-            label="Description"
+        {/* Description preview — always visible, click anywhere to edit */}
+        <div className="pl-7">
+          <DescriptionInline
             value={set.description}
-            machineId="scaffold-noop"
             canEdit={canEdit}
             placeholder="Add a short description…"
-            onSave={(_machineId, newValue) => {
-              onUpdateField("description", newValue);
-              return Promise.resolve({ ok: true });
+            onValueChange={(v) => {
+              onUpdateField("description", v);
             }}
           />
         </div>
