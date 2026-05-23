@@ -89,28 +89,38 @@ export function InlineEditableText({
     );
   }
 
+  // View mode without permission: plain text, not interactive.
+  if (!canEdit) {
+    return (
+      <span className={className}>
+        {value || (
+          <span className="italic text-muted-foreground">{placeholder}</span>
+        )}
+      </span>
+    );
+  }
+
+  // Editable: the whole field is the click target (click-anywhere),
+  // with a pencil that appears on hover as a hint.
   return (
-    <span
+    <button
+      type="button"
+      aria-label={ariaLabel ? `Edit ${ariaLabel}` : "Edit"}
       className={cn(
-        "group/iet relative inline-flex items-center gap-1.5",
+        "group/iet -mx-1 inline-flex items-center gap-1.5 rounded px-1 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         className
       )}
+      onClick={startEdit}
     >
       <span>
         {value || (
           <span className="italic text-muted-foreground">{placeholder}</span>
         )}
       </span>
-      {canEdit && (
-        <button
-          type="button"
-          aria-label={ariaLabel ? `Edit ${ariaLabel}` : "Edit"}
-          className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/iet:opacity-100"
-          onClick={startEdit}
-        >
-          <Pencil className="size-3" aria-hidden="true" />
-        </button>
-      )}
-    </span>
+      <Pencil
+        className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/iet:opacity-100"
+        aria-hidden="true"
+      />
+    </button>
   );
 }

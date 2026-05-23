@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { InlineEditableField } from "~/components/inline-editable-field";
+import { InlineMarkdownField } from "~/components/machines/settings/InlineMarkdownField";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface MarkdownSectionProps {
@@ -12,9 +12,9 @@ interface MarkdownSectionProps {
 }
 
 /**
- * Renders a labelled markdown/rich-text field using InlineEditableField.
- * In the scaffold, save is a no-op at the server boundary — the new value is
- * forwarded to onValueChange so the parent's local state stays in sync.
+ * A labelled markdown section (Rubbers / Post positions / Notes) built on the
+ * shared InlineMarkdownField: click-anywhere to edit, commit-on-blur-out, no
+ * per-field Save/Cancel.
  */
 export function MarkdownSection({
   title,
@@ -24,15 +24,13 @@ export function MarkdownSection({
 }: MarkdownSectionProps): React.JSX.Element {
   return (
     <div className="py-2.5">
-      <InlineEditableField
+      <InlineMarkdownField
         label={title}
         value={value}
-        machineId="scaffold-noop"
         canEdit={canEdit}
         placeholder={`Add ${title.toLowerCase()}…`}
-        onSave={(_machineId, newValue) => {
-          onValueChange?.(newValue);
-          return Promise.resolve({ ok: true });
+        onValueChange={(v) => {
+          onValueChange?.(v);
         }}
       />
     </div>

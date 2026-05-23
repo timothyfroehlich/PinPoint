@@ -30,7 +30,7 @@ import {
   DipSwitchSection,
   type DipSwitchBank,
 } from "~/components/machines/settings/DipSwitchSection";
-import { DescriptionInline } from "~/components/machines/settings/DescriptionInline";
+import { InlineMarkdownField } from "~/components/machines/settings/InlineMarkdownField";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 export type MarkdownField =
@@ -349,10 +349,11 @@ export function SettingsSetCard({
 
         {/* Description preview — always visible, click anywhere to edit */}
         <div className="pl-7">
-          <DescriptionInline
+          <InlineMarkdownField
             value={set.description}
             canEdit={contentEditable}
             placeholder="Add a short description…"
+            compact
             onValueChange={(v) => {
               onUpdateField("description", v);
             }}
