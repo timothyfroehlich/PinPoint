@@ -40,19 +40,19 @@ E2E earns its slot when the test is genuinely class F. Most other classes have a
 
 Before writing a new test, check the canonical location for that bug class. Most new tests should _extend an existing file_, not create a new one — the audit found agents creating duplicate coverage because they couldn't see what already existed.
 
-| Testing…                                                           | Look first at…                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Permission enforcement (role-gated UI / actions)                   | [issue-detail-permissions.test.ts](../../../src/test/integration/issue-detail-permissions.test.ts), [issue-detail-permissions.test.tsx](../../../src/test/unit/components/issues/issue-detail-permissions.test.tsx)                                                                                                   |
-| Server Action wiring (action → DB write → response)                | [images.test.ts](../../../src/server/actions/images.test.ts), [issue-actions.test.ts](../../../src/test/unit/issue-actions.test.ts), [machine-actions.test.ts](../../../src/test/unit/machine-actions.test.ts), [issue-services.test.ts](../../../src/test/integration/supabase/issue-services.test.ts)               |
-| DB query correctness (filters / joins / order)                     | [src/test/integration/supabase/](../../../src/test/integration/supabase/), [src/test/integration/](../../../src/test/integration/) (e.g., [database-queries.test.ts](../../../src/test/integration/database-queries.test.ts)), [filters-queries.test.ts](../../../src/test/unit/lib/machines/filters-queries.test.ts) |
-| Middleware / route protection                                      | [middleware.test.ts](../../../src/lib/supabase/middleware.test.ts) — the `publicRoutes` / `protectedRoutes` `it.each` arrays are the canonical place to add new routes (one line, not an E2E spec)                                                                                                                    |
-| Component UI state (open / close, focus, RTL)                      | [src/components/](../../../src/components/) or [src/test/unit/components/](../../../src/test/unit/components/)                                                                                                                                                                                                        |
-| Form-state lifecycle (clear / reset / optimistic)                  | [src/app/(app)/](<../../../src/app/(app)/>) or [src/components/](../../../src/components/) (e.g., [update-issue-forms-rollback.test.tsx](<../../../src/app/(app)/m/%5Binitials%5D/i/%5BissueNumber%5D/update-issue-forms-rollback.test.tsx>))                                                                         |
-| Comment audit trail (delete / edit)                                | [delete-comment-audit.test.ts](../../../src/test/unit/delete-comment-audit.test.ts)                                                                                                                                                                                                                                   |
-| Auth actions (signup / login / logout)                             | [auth-actions.test.ts](../../../src/test/integration/supabase/auth-actions.test.ts)                                                                                                                                                                                                                                   |
-| Notifications / Mailpit dispatch                                   | [notifications.test.ts](../../../src/test/integration/notifications.test.ts), [notification-formatting.test.ts](../../../src/test/unit/notification-formatting.test.ts)                                                                                                                                               |
-| External services (Discord, Vercel Blob, OAuth providers, captcha) | [client.test.ts](../../../src/lib/discord/client.test.ts) with the SDK mocked at the boundary — NEVER live in E2E (CORE-TEST-006)                                                                                                                                                                                     |
-| TipTap render / markdown serialization                             | [render.test.ts](../../../src/lib/tiptap/render.test.ts), [markdown.test.ts](../../../src/lib/markdown.test.ts)                                                                                                                                                                                                       |
+| Testing…                                                           | Look first at…                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Permission enforcement (role-gated UI / actions)                   | [issue-detail-permissions.test.ts](../../../src/test/integration/issue-detail-permissions.test.ts), [issue-detail-permissions.test.tsx](../../../src/test/unit/components/issues/issue-detail-permissions.test.tsx)                                                                                                                                                        |
+| Server Action wiring (action → DB write → response)                | [machine-owner-promotion.test.ts](../../../src/test/integration/machine-owner-promotion.test.ts), [user-management.test.ts](../../../src/test/integration/admin/user-management.test.ts), [issue-detail-permissions.test.ts](../../../src/test/integration/issue-detail-permissions.test.ts) — prefer integration tests over mocked unit tests for class B (CORE-TEST-004) |
+| DB query correctness (filters / joins / order)                     | [src/test/integration/supabase/](../../../src/test/integration/supabase/), [src/test/integration/](../../../src/test/integration/) (e.g., [database-queries.test.ts](../../../src/test/integration/database-queries.test.ts)), [filters-queries.test.ts](../../../src/test/unit/lib/machines/filters-queries.test.ts)                                                      |
+| Middleware / route protection                                      | [middleware.test.ts](../../../src/lib/supabase/middleware.test.ts) — the `publicRoutes` / `protectedRoutes` `it.each` arrays are the canonical place to add new routes (one line, not an E2E spec)                                                                                                                                                                         |
+| Component UI state (open / close, focus, RTL)                      | [src/components/](../../../src/components/) or [src/test/unit/components/](../../../src/test/unit/components/)                                                                                                                                                                                                                                                             |
+| Form-state lifecycle (clear / reset / optimistic)                  | [src/app/(app)/](<../../../src/app/(app)/>) or [src/components/](../../../src/components/) (e.g., [update-issue-forms-rollback.test.tsx](<../../../src/app/(app)/m/%5Binitials%5D/i/%5BissueNumber%5D/update-issue-forms-rollback.test.tsx>))                                                                                                                              |
+| Comment audit trail (delete / edit)                                | [delete-comment-audit.test.ts](../../../src/test/unit/delete-comment-audit.test.ts)                                                                                                                                                                                                                                                                                        |
+| Auth actions (signup / login / logout)                             | [auth-actions.test.ts](../../../src/test/integration/supabase/auth-actions.test.ts)                                                                                                                                                                                                                                                                                        |
+| Notifications / Mailpit dispatch                                   | [notifications.test.ts](../../../src/test/integration/notifications.test.ts), [notification-formatting.test.ts](../../../src/test/unit/notification-formatting.test.ts)                                                                                                                                                                                                    |
+| External services (Discord, Vercel Blob, OAuth providers, captcha) | [client.test.ts](../../../src/lib/discord/client.test.ts) with the SDK mocked at the boundary — NEVER live in E2E (CORE-TEST-006)                                                                                                                                                                                                                                          |
+| TipTap render / markdown serialization                             | [render.test.ts](../../../src/lib/tiptap/render.test.ts), [markdown.test.ts](../../../src/lib/markdown.test.ts)                                                                                                                                                                                                                                                            |
 
 If the canonical location doesn't exist yet, that's a signal you may need to create a new test file at that layer — but check the table first.
 
@@ -160,8 +160,8 @@ describe("calculateSeverityScore", () => {
     expect(calculateSeverityScore("unplayable")).toBe(10);
   });
 
-  it("returns 5 for playable", () => {
-    expect(calculateSeverityScore("playable")).toBe(5);
+  it("returns 5 for major", () => {
+    expect(calculateSeverityScore("major")).toBe(5);
   });
 
   it("returns 1 for minor", () => {
@@ -176,7 +176,7 @@ describe("calculateSeverityScore", () => {
 import { describe, it, expect } from "vitest";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { machines, issues } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 
 describe("Database queries integration", () => {
   setupTestDb(); // Shared worker instance auto-setup and cleanup - CRITICAL (CORE-TEST-001)
@@ -208,6 +208,7 @@ describe("Database queries integration", () => {
 
     const result = await db.query.issues.findMany({
       where: eq(issues.machineInitials, "TM"),
+      orderBy: asc(issues.issueNumber), // explicit ordering for deterministic assertions
     });
 
     expect(result).toHaveLength(2);
@@ -232,7 +233,7 @@ test.describe("Issue Creation Flow", () => {
     // Fill out form
     await page.getByLabel("Title").fill("Broken left flipper");
     await page.getByLabel("Description").fill("Not responding to button press");
-    await page.getByLabel("Severity").selectOption("playable");
+    await page.getByLabel("Severity").selectOption("minor");
 
     // Submit form
     await page.getByRole("button", { name: "Create Issue" }).click();
