@@ -21,18 +21,10 @@ There is no numeric target for test counts. Total-test-count is a vanity metric.
 
 > _What class of bug does this test catch, and is the chosen layer the cheapest one that catches that class?_
 
-| Class | What it catches                                                | Cheapest catching layer                                                                                                                                                                                  |
-| ----- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A** | Auth redirect / route protection                               | Integration (middleware) or thin E2E set                                                                                                                                                                 |
-| **B** | Server Action wiring (form → action → DB → response)           | **Integration** (PGlite + direct action call)                                                                                                                                                            |
-| **C** | Form-state lifecycle (reset / optimistic / rollback)           | **RTL unit**                                                                                                                                                                                             |
-| **D** | Layout / overflow / hydration regression                       | **Smoke E2E** (`responsive-overflow.spec.ts` is canonical)                                                                                                                                               |
-| **E** | Permission enforcement (role X can / cannot mutate)            | **Integration**                                                                                                                                                                                          |
-| **F** | Multi-step user journey (login → mutate → verify across pages) | **E2E** (the only class E2E genuinely owns)                                                                                                                                                              |
-| **G** | Pure logic (validators, formatters, dates)                     | Unit                                                                                                                                                                                                     |
-| **H** | Pure UI state (open / close, focus, keyboard nav)              | RTL unit                                                                                                                                                                                                 |
-| **I** | DB query correctness (filters, joins, ordering)                | Integration (PGlite)                                                                                                                                                                                     |
-| **J** | Third-party integration                                        | **Boundary-mocked** unit/integration. NEVER live external services in E2E except our owned local stack (Mailpit, PGlite, local Supabase including local Storage). See AGENTS.md §2.1 "Test What We Own". |
+| **G** | Pure logic (validators, formatters, dates) | Unit |
+| **H** | Pure UI state (open / close, focus, keyboard nav) | RTL unit |
+| **I** | DB query correctness (filters, joins, ordering) | Integration (PGlite) |
+| **J** | Third-party integration | **Boundary-mocked** unit/integration. NEVER live external services in E2E except our owned local stack (Mailpit, PGlite, local Supabase including local Storage). See AGENTS.md §2.1 "Test What We Own". |
 
 E2E earns its slot when the test is genuinely class F. Most other classes have a cheaper home. The 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`) found that 36 of 48 specs were partially or fully misallocated — write the cheapest layer that catches the bug class, not the most thorough one.
 
@@ -40,31 +32,33 @@ E2E earns its slot when the test is genuinely class F. Most other classes have a
 
 Before writing a new test, check the canonical location for that bug class. Most new tests should _extend an existing file_, not create a new one — the audit found agents creating duplicate coverage because they couldn't see what already existed.
 
-| Testing…                                                           | Look first at…                                                                                                                                                        |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Permission enforcement (role-gated UI / actions)                   | `src/test/integration/issue-detail-permissions.test.ts`, `src/test/unit/components/issues/issue-detail-permissions.test.tsx`                                          |
-| Server Action wiring (action → DB write → response)                | `src/server/actions/**/*.test.ts`, `src/test/integration/supabase/issue-services.test.ts`                                                                             |
-| DB query correctness (filters / joins / order)                     | `src/test/integration/supabase/*.test.ts`, `src/test/unit/lib/<feature>/filters-queries.test.ts`                                                                      |
-| Middleware / route protection                                      | `src/lib/supabase/middleware.test.ts` — the `publicRoutes` / `protectedRoutes` `it.each` arrays are the canonical place to add new routes (one line, not an E2E spec) |
-| Component UI state (open / close, focus, RTL)                      | `src/components/**/*.test.tsx`, `src/test/unit/components/**/*.test.tsx`                                                                                              |
-| Form-state lifecycle (clear / reset / optimistic)                  | `src/app/(app)/**/<form>.test.tsx`, `src/components/**/<form>.test.tsx`                                                                                               |
-| Comment audit trail (delete / edit)                                | `src/test/unit/delete-comment-audit.test.ts`                                                                                                                          |
-| Auth actions (signup / login / logout)                             | `src/test/integration/supabase/auth-actions.test.ts`                                                                                                                  |
-| Notifications / Mailpit dispatch                                   | `src/test/integration/notifications.test.ts`, `src/test/unit/notification-formatting.test.ts`                                                                         |
-| External services (Discord, Vercel Blob, OAuth providers, captcha) | `src/lib/<service>/client.test.ts` with the SDK mocked at the boundary — NEVER live in E2E (§2.1 "Test What We Own")                                                  |
-| TipTap render / markdown serialization                             | `src/lib/tiptap/render.test.ts`, `src/lib/markdown.test.ts`                                                                                                           |
+| Testing…                                                           | Look first at…                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Permission enforcement (role-gated UI / actions)                   | [issue-detail-permissions.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/test/integration/issue-detail-permissions.test.ts), [issue-detail-permissions.test.tsx](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/test/unit/components/issues/issue-detail-permissions.test.tsx)                                                                                                         |
+| Server Action wiring (action → DB write → response)                | [images.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/server/actions/images.test.ts), [issue-actions.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/test/unit/issue-actions.test.ts), [issue-services.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/test/integration/supabase/issue-services.test.ts)                  |
+| DB query correctness (filters / joins / order)                     | [src/test/integration/supabase/](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/test/integration/supabase/), [filters-queries.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/test/unit/lib/machines/filters-queries.test.ts)                                                                                                                                                           |
+| Middleware / route protection                                      | [middleware.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/lib/supabase/middleware.test.ts) — the `publicRoutes` / `protectedRoutes` `it.each` arrays are the canonical place to add new routes (one line, not an E2E spec)                                                                                                                                                                                                        |
+| Component UI state (open / close, focus, RTL)                      | [src/components/](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/components/) or [src/test/unit/components/](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/test/unit/components/)                                                                                                                                                                                                              |
+| Form-state lifecycle (clear / reset / optimistic)                  | [src/app/(app)/](<file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/app/(app)/>) or [src/components/](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/components/) (e.g., [update-issue-forms-rollback.test.tsx](<file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/app/(app)/m/%5Binitials%5D/i/%5BissueNumber%5D/update-issue-forms-rollback.test.tsx>)) |
+| Comment audit trail (delete / edit)                                | [delete-comment-audit.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/test/unit/delete-comment-audit.test.ts)                                                                                                                                                                                                                                                                                                                       |
+| Auth actions (signup / login / logout)                             | [auth-actions.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/test/integration/supabase/auth-actions.test.ts)                                                                                                                                                                                                                                                                                                                       |
+| Notifications / Mailpit dispatch                                   | [notifications.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/test/integration/notifications.test.ts), [notification-formatting.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/test/unit/notification-formatting.test.ts)                                                                                                                                                     |
+| External services (Discord, Vercel Blob, OAuth providers, captcha) | [client.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/lib/discord/client.test.ts) with the SDK mocked at the boundary — NEVER live in E2E (CORE-TEST-006)                                                                                                                                                                                                                                                                         |
+| TipTap render / markdown serialization                             | [render.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/lib/tiptap/render.test.ts), [markdown.test.ts](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/src/lib/markdown.test.ts)                                                                                                                                                                                                             |
 
 If the canonical location doesn't exist yet, that's a signal you may need to create a new test file at that layer — but check the table first.
 
 ### Commands
 
 ```bash
-pnpm run check          # Quick: types + lint + unit (~5s)
-pnpm test               # Unit tests only
-pnpm test -- path/to/file.test.ts  # Targeted unit test
-pnpm run test:integration          # DB integration tests (requires supabase start)
-pnpm run smoke                     # E2E smoke tests (Playwright)
-pnpm run preflight                 # Full suite (~60s) - run before commit
+pnpm run check                     # Quick check: types, lint, formatting, and unit tests
+pnpm test                          # Run unit tests only
+pnpm test -- path/to/file.test.ts  # Run targeted unit test
+pnpm run test:integration          # Run PGlite integration tests (fast, no Supabase required)
+pnpm run test:integration:supabase # Run Supabase integration tests (requires supabase start)
+pnpm run smoke                     # Run E2E smoke tests (Playwright)
+pnpm run preflight                 # Full pre-commit check (locked, caps concurrency)
+pnpm run preflight:unlocked        # Full pre-commit check (unlocked, bypasses concurrency cap)
 ```
 
 ### Which Tests to Run (Decision Tree)
@@ -85,14 +79,16 @@ pnpm run preflight                 # Full suite (~60s) - run before commit
 
 ### Critical Rules
 
-1. **Worker-scoped PGlite only**: Per-test instances cause lockups
-2. **No testing Server Components directly**: Use E2E instead
-3. **Test behavior, not implementation**: Focus on outcomes
-4. **Integration tests location**: `src/test/integration/supabase/*.test.ts`
+1. **Worker-scoped PGlite only** (CORE-TEST-001): Per-test instances cause lockups. Shared worker instance via `getTestDb()` and `setupTestDb()` is required.
+2. **No testing Server Components directly** (CORE-TEST-002): Use E2E instead.
+3. **Test behavior, not implementation** (CORE-TEST-005): Focus on outcomes, exercise element handlers at the cheapest layer.
+4. **Prefer Integration Tests for DB Logic** (CORE-TEST-004): Do not write unit tests with extensive mocking of Drizzle; use integration tests with PGlite instead.
+5. **Test what we own** (CORE-TEST-006): Mock third-party SDKs at their boundary; no live external services in E2E (class-J).
+6. **Integration tests location**: General integration tests live in `src/test/integration/` (PGlite-based). Tests requiring real Supabase live in `src/test/integration/supabase/`.
 
 ## Test What We Own
 
-> See AGENTS.md §2.1 "Test What We Own" for the binding form.
+> See [AGENTS.md](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/AGENTS.md) §2.1 and [docs/NON_NEGOTIABLES.md](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/docs/NON_NEGOTIABLES.md#L287) (CORE-TEST-006) for the binding form.
 
 Tests must verify PinPoint's code at the boundary of services we don't control, not simulate the service's internals. If your test setup is building scaffolding that synthesizes a third party's internal state — raw DB writes into `auth.identities`, captcha-bypass mocks, OAuth handshake fakes, regex extraction from a vendor's email template — step back. You're testing their code, not yours. Cover PinPoint's contribution with unit tests; cover "the page renders without 500" with a smoke test; reserve integration/E2E for when the test exercises the contracted public API of a real running service.
 
@@ -138,16 +134,9 @@ The line you're walking is "synthesizing state inside a third party's domain." R
 
 Read these files for comprehensive testing guidance:
 
-```bash
-# E2E-specific patterns with Playwright
-cat docs/E2E_BEST_PRACTICES.md
-
-# Testing-related non-negotiables
-cat docs/NON_NEGOTIABLES.md | grep -A 10 "## Testing"
-
-# 2026-05 E2E suite audit (per-spec verdicts and bug-class framework history)
-cat docs/testing/e2e-audit-2026-05.md
-```
+- [E2E_BEST_PRACTICES.md](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/docs/E2E_BEST_PRACTICES.md) — E2E-specific patterns with Playwright
+- [NON_NEGOTIABLES.md](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/docs/NON_NEGOTIABLES.md#L250) — Testing-related non-negotiables
+- [e2e-audit-2026-05.md](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/docs/testing/e2e-audit-2026-05.md) — 2026-05 E2E suite audit (per-spec verdicts and bug-class framework history)
 
 ## Code Examples
 
@@ -176,35 +165,47 @@ describe("calculateSeverityScore", () => {
 ### Integration Test with PGlite (Worker-Scoped)
 
 ```typescript
-import { describe, it, expect, beforeAll } from "vitest";
-import { getPGlite } from "~/test/setup/pglite";
-import { getIssuesForMachine } from "~/server/data-access/issues";
+import { describe, it, expect } from "vitest";
+import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { machines, issues } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
 
-describe("getIssuesForMachine", () => {
-  let db: PGlite;
+describe("Database queries integration", () => {
+  setupTestDb(); // Shared worker instance auto-setup and cleanup - CRITICAL (CORE-TEST-001)
 
-  beforeAll(async () => {
-    db = getPGlite(); // Shared worker instance - CRITICAL!
+  it("should query issues for the specified machine", async () => {
+    const db = await getTestDb();
 
-    // Seed test data
-    await db.exec(`
-      INSERT INTO machines (id, name) VALUES ('machine-1', 'Test Machine');
-      INSERT INTO issues (id, machine_id, title, severity)
-      VALUES
-        ('issue-1', 'machine-1', 'Broken flipper', 'playable'),
-        ('issue-2', 'machine-1', 'Dead display', 'unplayable');
-    `);
-  });
+    // Seed test data using Drizzle
+    await db.insert(machines).values({
+      id: "machine-1",
+      name: "Test Machine",
+      initials: "TM",
+    });
 
-  it("returns issues for the specified machine", async () => {
-    const issues = await getIssuesForMachine("machine-1");
-    expect(issues).toHaveLength(2);
-    expect(issues[0].title).toBe("Broken flipper");
-  });
+    await db.insert(issues).values([
+      {
+        id: "issue-1",
+        machineInitials: "TM",
+        issueNumber: 1,
+        title: "Broken flipper",
+        severity: "playable",
+      },
+      {
+        id: "issue-2",
+        machineInitials: "TM",
+        issueNumber: 2,
+        title: "Dead display",
+        severity: "unplayable",
+      },
+    ]);
 
-  it("returns empty array for machine with no issues", async () => {
-    const issues = await getIssuesForMachine("machine-2");
-    expect(issues).toHaveLength(0);
+    const result = await db.query.issues.findMany({
+      where: eq(issues.machineInitials, "TM"),
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result[0].title).toBe("Broken flipper");
   });
 });
 ```
@@ -264,17 +265,15 @@ e2e/
 ### ✅ Correct: Worker-Scoped Instance
 
 ```typescript
-import { getPGlite } from "~/test/setup/pglite";
+import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 
 describe("Database operations", () => {
-  beforeAll(async () => {
-    const db = getPGlite(); // Shared worker instance
-    await db.exec("INSERT INTO ...");
-  });
+  setupTestDb(); // Auto-setup and cleanup the shared instance
 
   it("query works", async () => {
-    const result = await db.query("SELECT * FROM ...");
-    expect(result.rows).toHaveLength(1);
+    const db = await getTestDb();
+    const result = await db.query.issues.findMany();
+    expect(result).toHaveLength(0);
   });
 });
 ```
@@ -284,7 +283,7 @@ describe("Database operations", () => {
 ```typescript
 // DON'T DO THIS - causes system lockups!
 beforeEach(async () => {
-  const db = new PGlite(); // Creates new instance every test
+  const db = new PGlite(); // Creates new instance every test (violates CORE-TEST-001)
 });
 ```
 
@@ -379,17 +378,17 @@ test("page displays issues", async ({ page }) => {
 Before committing tests:
 
 - [ ] Test files in correct location (unit vs integration vs E2E)
-- [ ] Integration tests use worker-scoped PGlite (`getPGlite()`)
-- [ ] No per-test PGlite instances
-- [ ] E2E tests use roles/labels for selectors
-- [ ] No arbitrary `waitForTimeout()` in E2E tests
+- [ ] Integration tests use worker-scoped PGlite (`getTestDb()` and `setupTestDb()`)
+- [ ] No per-test PGlite instances (violates CORE-TEST-001)
+- [ ] E2E tests use roles/labels for selectors (CORE-TEST-005)
+- [ ] No arbitrary `waitForTimeout()` in E2E tests (violates CORE-TEST-005)
 - [ ] Tests are independent (no shared state)
-- [ ] Testing behavior, not implementation
+- [ ] Testing behavior, not implementation (CORE-TEST-005)
 - [ ] `pnpm run preflight` passes (includes all test suites)
 
 ## Additional Resources
 
-- E2E best practices: `docs/E2E_BEST_PRACTICES.md`
-- 2026-05 E2E suite audit: `docs/testing/e2e-audit-2026-05.md`
-- Non-negotiables: `docs/NON_NEGOTIABLES.md` (CORE-TEST-\* rules)
-- Playwright docs: Use Context7 MCP for latest patterns
+- E2E best practices: [E2E_BEST_PRACTICES.md](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/docs/E2E_BEST_PRACTICES.md)
+- 2026-05 E2E suite audit: [e2e-audit-2026-05.md](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/docs/testing/e2e-audit-2026-05.md)
+- Non-negotiables: [NON_NEGOTIABLES.md](file:///Users/froeht/.gemini/antigravity/worktrees/PinPoint/execute-agy-pinpoint-logic/docs/NON_NEGOTIABLES.md#L250) (CORE-TEST-\* rules)
+- Playwright docs: Use Chrome DevTools or Playwright documentation for latest patterns
