@@ -173,7 +173,17 @@ Edit `.claude/settings.json` and update `HUDDLE_THROTTLE_SECONDS=180` on the Pos
 
 ## How to post coordination updates
 
-Post to today's active bead. To find today's bead ID, check what the session-start hook reported, or look up via (huddle state lives at `<main-worktree>/.agents/huddle/`, resolved via `git rev-parse --git-common-dir` — `huddle-lib.sh` itself uses the same lookup):
+**Two events are auto-posted — you don't need to post these manually:**
+
+- **Merge** (`scripts/workflow/merge-pr.sh`): after a squash-merge succeeds, the script posts "Merged PR #N (PP-xxx): title. Sync main if you have active branches." to today's bead.
+- **PR opened** (`scripts/hooks/huddle-pr-announce.sh` PostToolUse hook): when you call `gh pr create` (Bash) or `mcp__github__create_pull_request`, the hook auto-posts "Opened PR #N (PP-xxx): title." Dedup-safe — re-fires are ignored.
+
+**What still requires a manual post** (the judgment calls automation can't make):
+
+- A bead you filed for a non-obvious finding: "Filed PP-xxx: <finding>."
+- A coordination need — file/area conflict risk: "Working on <file/area> in <branch>; flag if conflict."
+
+To post, find today's bead ID (the session-start hook reported it, or look it up):
 
     HUDDLE_DIR="$(dirname "$(git rev-parse --git-common-dir)")/.agents/huddle"
     bd show "$(jq -r '.root_bead_id' "$HUDDLE_DIR/config.json")" --json | jq -r '.[0].notes | fromjson | .today_bead.id'
@@ -182,32 +192,26 @@ Then post:
 
     bd comments add <TODAY_BEAD_ID> "Your update here. —<YourName>"
 
-Things worth posting:
-
-- A PR you merged ("Merged PR #N (PP-xxx). Sync main if you have active branches.")
-- A PR you opened ("Opened PR #N (PP-xxx): brief title.")
-- A bead you filed for a non-obvious finding ("Filed PP-xxx: <finding>.")
-- A coordination need ("Working on file Y in branch Z; flag if conflict.")
-
 Things NOT worth posting:
 
 - Every single commit
 - Internal debugging chatter
-- "I started working on X" (only post merge/discovery)
+- "I started working on X" (merges and PR-opens are already auto-posted)
 
 Sign with `—<YourFullRegisteredName>` (em-dash + your registered name). The self-filter matches this suffix to suppress your own echoes.
 
 ## Scripts
 
-| Script                                   | Trigger                                    | Purpose                                                             |
-| ---------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------- |
-| `scripts/hooks/huddle-bootstrap.sh`      | manual (one-time)                          | Init root epic + daily + monthly + config.json                      |
-| `scripts/hooks/huddle-rotate.sh`         | rotation subagent                          | Phase A: atomic create-and-pointer-update; outputs OLD/NEW bead IDs |
-| `scripts/hooks/huddle-poll.sh`           | UserPromptSubmit + PostToolUse (throttled) | Inject new today_bead comments since last_seen                      |
-| `scripts/hooks/huddle-session-start.sh`  | SessionStart                               | Bootstrap notice, rotation notice, identity, summary injection      |
-| `scripts/hooks/huddle-whoami.sh`         | manual                                     | Register/lookup/list/discover session→name mappings                 |
-| `scripts/hooks/huddle-rotation-check.sh` | sourced by both hooks                      | Date-compare: returns 0 if today_bead.date < today                  |
-| `scripts/hooks/huddle-lib.sh`            | sourced by all hooks                       | Shared helpers (state-dir resolver)                                 |
+| Script                                   | Trigger                                              | Purpose                                                             |
+| ---------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------- |
+| `scripts/hooks/huddle-bootstrap.sh`      | manual (one-time)                                    | Init root epic + daily + monthly + config.json                      |
+| `scripts/hooks/huddle-rotate.sh`         | rotation subagent                                    | Phase A: atomic create-and-pointer-update; outputs OLD/NEW bead IDs |
+| `scripts/hooks/huddle-poll.sh`           | UserPromptSubmit + PostToolUse (throttled)           | Inject new today_bead comments since last_seen                      |
+| `scripts/hooks/huddle-session-start.sh`  | SessionStart                                         | Bootstrap notice, rotation notice, identity, summary injection      |
+| `scripts/hooks/huddle-pr-announce.sh`    | PostToolUse (Bash\|mcp**github**create_pull_request) | Auto-post PR-open notice; dedup + fail-open                         |
+| `scripts/hooks/huddle-whoami.sh`         | manual                                               | Register/lookup/list/discover session→name mappings                 |
+| `scripts/hooks/huddle-rotation-check.sh` | sourced by both hooks                                | Date-compare: returns 0 if today_bead.date < today                  |
+| `scripts/hooks/huddle-lib.sh`            | sourced by all hooks                                 | Shared helpers (state-dir resolver, today-bead ID resolver)         |
 
 ## State files
 
