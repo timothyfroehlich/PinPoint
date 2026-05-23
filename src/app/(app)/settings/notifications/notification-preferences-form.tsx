@@ -122,7 +122,12 @@ export function NotificationPreferencesForm({
   ]);
 
   const showDiscord = discordIntegrationEnabled;
-  const discordRowDisabled = !discordMainEnabled || !userHasDiscord;
+
+  // When a master switch is off, dim only the per-row toggles that are ON.
+  const dimWhenChecked = "data-[state=checked]:opacity-50";
+  const emailDimClass = !emailMainEnabled ? dimWhenChecked : undefined;
+  const inAppDimClass = !inAppMainEnabled ? dimWhenChecked : undefined;
+  const discordDimClass = !discordMainEnabled ? dimWhenChecked : undefined;
 
   return (
     <form
@@ -340,13 +345,14 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnNewIssue"
               emailDefault={preferences.emailNotifyOnNewIssue}
               inAppDefault={preferences.inAppNotifyOnNewIssue}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordNotifyOnNewIssue"
               discordDefault={preferences.discordNotifyOnNewIssue}
-              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="All Machines"
@@ -355,13 +361,14 @@ export function NotificationPreferencesForm({
               inAppId="inAppWatchNewIssuesGlobal"
               emailDefault={preferences.emailWatchNewIssuesGlobal}
               inAppDefault={preferences.inAppWatchNewIssuesGlobal}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordWatchNewIssuesGlobal"
               discordDefault={preferences.discordWatchNewIssuesGlobal}
-              discordDisabled={discordRowDisabled}
             />
           </div>
         </div>
@@ -388,13 +395,14 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnAssigned"
               emailDefault={preferences.emailNotifyOnAssigned}
               inAppDefault={preferences.inAppNotifyOnAssigned}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordNotifyOnAssigned"
               discordDefault={preferences.discordNotifyOnAssigned}
-              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="Status Changes"
@@ -403,13 +411,14 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnStatusChange"
               emailDefault={preferences.emailNotifyOnStatusChange}
               inAppDefault={preferences.inAppNotifyOnStatusChange}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordNotifyOnStatusChange"
               discordDefault={preferences.discordNotifyOnStatusChange}
-              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="New Comments"
@@ -418,13 +427,14 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnNewComment"
               emailDefault={preferences.emailNotifyOnNewComment}
               inAppDefault={preferences.inAppNotifyOnNewComment}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordNotifyOnNewComment"
               discordDefault={preferences.discordNotifyOnNewComment}
-              discordDisabled={discordRowDisabled}
             />
             <PreferenceRow
               label="Mentions"
@@ -433,13 +443,14 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnMentioned"
               emailDefault={preferences.emailNotifyOnMentioned}
               inAppDefault={preferences.inAppNotifyOnMentioned}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
               hideEmail={isInternalAccount}
               hideDiscord={!showDiscord}
+              emailClassName={emailDimClass}
+              inAppClassName={inAppDimClass}
+              discordClassName={discordDimClass}
+              discordDisabled={!userHasDiscord}
               discordId="discordNotifyOnMentioned"
               discordDefault={preferences.discordNotifyOnMentioned}
-              discordDisabled={discordRowDisabled}
             />
           </div>
         </div>
@@ -536,12 +547,13 @@ interface PreferenceRowProps {
   inAppId: string;
   emailDefault: boolean;
   inAppDefault: boolean;
-  emailDisabled: boolean;
-  inAppDisabled: boolean;
+  emailClassName?: string | undefined;
+  inAppClassName?: string | undefined;
   hideEmail?: boolean | undefined;
   hideDiscord?: boolean | undefined;
   discordId?: string | undefined;
   discordDefault?: boolean | undefined;
+  discordClassName?: string | undefined;
   discordDisabled?: boolean | undefined;
 }
 
@@ -552,15 +564,15 @@ function PreferenceRow({
   inAppId,
   emailDefault,
   inAppDefault,
-  emailDisabled,
-  inAppDisabled,
+  emailClassName,
+  inAppClassName,
   hideEmail,
   hideDiscord,
   discordId,
   discordDefault,
+  discordClassName,
   discordDisabled,
 }: PreferenceRowProps): React.JSX.Element {
-  // Build grid template based on which columns are present.
   const visibleSwitchCount = 1 + (hideEmail ? 0 : 1) + (hideDiscord ? 0 : 1);
   const gridCols = `1fr${" auto".repeat(visibleSwitchCount)}`;
 
@@ -578,7 +590,7 @@ function PreferenceRow({
           id={inAppId}
           name={inAppId}
           defaultChecked={inAppDefault}
-          disabled={inAppDisabled}
+          className={inAppClassName}
         />
       </div>
       {!hideEmail && (
@@ -587,7 +599,7 @@ function PreferenceRow({
             id={emailId}
             name={emailId}
             defaultChecked={emailDefault}
-            disabled={emailDisabled}
+            className={emailClassName}
           />
         </div>
       )}
@@ -598,6 +610,7 @@ function PreferenceRow({
             name={discordId}
             defaultChecked={discordDefault ?? false}
             disabled={discordDisabled ?? false}
+            className={discordClassName}
           />
         </div>
       )}

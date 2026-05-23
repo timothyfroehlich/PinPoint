@@ -509,7 +509,7 @@ export const notificationPreferences = pgTable(
       .notNull()
       .default(false),
 
-    // PR 5 sets this when Discord rejects DMs to this user (used by failure detection).
+    // Deprecated 2026-05-21: column retained to avoid drop migration; never read.
     discordDmBlockedAt: timestamp("discord_dm_blocked_at", {
       withTimezone: true,
     }),

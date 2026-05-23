@@ -101,6 +101,7 @@ export async function createNotification(
 
   if (type === "new_issue") {
     let machineId: string | null;
+    let machineOwnerId: string | null;
 
     if (resourceType === "issue") {
       const issue = await tx.query.issues.findFirst({
@@ -108,14 +109,16 @@ export async function createNotification(
         with: { machine: true },
       });
       machineId = issue?.machine.id ?? null;
+      machineOwnerId = issue?.machine.ownerId ?? null;
       resolvedIssueTitle = resolvedIssueTitle ?? issue?.title;
       resolvedMachineName = resolvedMachineName ?? issue?.machine.name;
     } else {
       const machine = await tx.query.machines.findFirst({
         where: eq(machines.id, resourceId),
-        columns: { id: true, name: true },
+        columns: { id: true, name: true, ownerId: true },
       });
       machineId = machine?.id ?? null;
+      machineOwnerId = machine?.ownerId ?? null;
       resolvedMachineName = resolvedMachineName ?? machine?.name;
     }
 
@@ -139,6 +142,10 @@ export async function createNotification(
     });
 
     addRecipients(...globalSubscribers.map((p) => p.userId));
+
+    // Owners always get new_issue (per-user prefs still gate delivery);
+    // toggleMachineWatcher can remove them from machine_watchers.
+    addRecipients(machineOwnerId);
 
     if (machineId) {
       const watchersList = await tx.query.machineWatchers.findMany({
