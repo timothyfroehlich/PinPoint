@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { notificationPreferences, userProfiles } from "~/server/db/schema";
+import {
+  authUsers,
+  notificationPreferences,
+  userProfiles,
+} from "~/server/db/schema";
 import { createTestUser } from "~/test/helpers/factories";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 
@@ -37,9 +41,7 @@ async function seedUser(): Promise<string> {
   const id = randomUUID();
   const email = `prefs-${id}@test.com`;
   const db = await getTestDb();
-  await db.execute(
-    `INSERT INTO auth.users (id, email) VALUES ('${id}', '${email}')`
-  );
+  await db.insert(authUsers).values({ id, email });
   await db.insert(userProfiles).values(
     createTestUser({
       id,
