@@ -77,13 +77,12 @@ Never create user profiles manually in Server Actions. Profiles are created atom
 
 ### Don't Query `auth.users` Directly (CORE-SSR-007)
 
-Application code reads user data from `user_profiles` (mirrored from `auth.users` via the `handle_new_user` trigger). Do not write Drizzle queries or raw SQL against `auth.users` in Server Actions, services, or route handlers — the schema is internal to Supabase and can change between releases.
+Application code reads user data from `user_profiles` (mirrored from `auth.users` via the `handle_new_user` trigger). Do not write Drizzle queries or raw SQL against `auth.users` in Server Actions, services, or route handlers — the schema is internal to Supabase and can change between releases. If you need to look up an auth record by email (e.g., detecting an orphaned `auth.users` row after a trigger failure), use the Supabase Admin API: `createAdminClient().auth.admin.listUsers(...)` and filter in JS.
 
 **Allowed exceptions:**
 
 - Database triggers and `supabase/seed.sql`.
-- Test bootstrapping (`src/test/setup/pglite.ts` and integration test fixtures).
-- The orphan-recovery path in `src/app/(app)/admin/users/actions.ts` — when inviting a user, the admin action queries the `authUsers` Drizzle wrapper to detect orphan auth records left behind by a failed `handle_new_user` trigger. This is documented inline at that callsite and is the only sanctioned application-code reference; do not generalize the pattern.
+- Test bootstrapping (`src/test/setup/pglite.ts` and integration test fixtures, which use the `authUsers` Drizzle wrapper to seed paired `auth.users` + `user_profiles` rows).
 
 ### Server→Client Data Minimization (CORE-SEC-006)
 
