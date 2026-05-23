@@ -156,4 +156,10 @@ describe("discordChannel.deliver", () => {
     const result = await channel.deliver(ctx());
     expect(result).toEqual({ ok: false, reason: "skipped" });
   });
+
+  it("maps blocked → permanent (don't retry futile sends)", async () => {
+    vi.mocked(sendDm).mockResolvedValueOnce({ ok: false, reason: "blocked" });
+    const result = await channel.deliver(ctx());
+    expect(result).toEqual({ ok: false, reason: "permanent" });
+  });
 });

@@ -2,6 +2,7 @@ import { sendDm } from "~/lib/discord/client";
 import type { DiscordConfig } from "~/lib/discord/config";
 import { formatDiscordMessage } from "~/lib/discord/messages";
 import { getSiteUrl } from "~/lib/url";
+import { log } from "~/lib/logger";
 import type {
   NotificationChannel,
   NotificationPreferencesRow,
@@ -70,6 +71,13 @@ export function createDiscordChannel(
       if (result.ok) return { ok: true };
       if (result.reason === "not_configured") {
         return { ok: false, reason: "skipped" };
+      }
+      if (result.reason === "blocked") {
+        log.warn(
+          { userId: ctx.userId, action: "discord.deliver" },
+          "Discord DM blocked"
+        );
+        return { ok: false, reason: "permanent" };
       }
       return { ok: false, reason: "transient" };
     },
