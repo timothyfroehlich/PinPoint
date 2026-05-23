@@ -52,6 +52,10 @@ PinPoint E2E tests run in parallel against a **shared database**.
 3.  **Unique Machines**: Create a fresh machine for your test.
 4.  **Unique Titles**: Use `getTestIssueTitle("My Title")` to prefix issues with `[w0_xyz]`.
 
+## Common Helpers
+
+- **Select Reset Assertions**: Use `assertSelectAtPlaceholder(trigger, placeholderText)` to assert a custom Radix/shadcn Select trigger returned to its placeholder state after a reset (e.g. `await assertSelectAtPlaceholder(page.getByTestId("select-id"), "Select option...")`).
+
 ## References
 
 - **Best Practices**: See [references/e2e-best-practices.md](references/e2e-best-practices.md) for structure and anti-patterns.
