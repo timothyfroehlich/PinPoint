@@ -427,21 +427,12 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
   // Use the member-who-is-also-owner pattern: passes both `machines.edit`
   // (owner condition) and `machines.edit.ownerNotes` (owner-only) so all four
   // prose-field actions are authorized by the same test user.
-  const cases = [
-    {
-      label: "description",
-      kind: "description_updated" as const,
-      load: () =>
-        import("~/app/(app)/m/actions").then((m) => m.updateMachineDescription),
-    },
-    {
-      label: "tournamentNotes",
-      kind: "tournament_notes_updated" as const,
-      load: () =>
-        import("~/app/(app)/m/actions").then(
-          (m) => m.updateMachineTournamentNotes
-        ),
-    },
+  //
+  // Only the owner-facing prose fields emit a marker timeline event. The
+  // public `description` and `tournamentNotes` fields are intentionally
+  // SILENT on edit (PP-0x98 V2 design pass) — high edit cadence floods the
+  // timeline with low-signal "description updated" rows.
+  const emittingCases = [
     {
       label: "ownerRequirements",
       kind: "owner_requirements_updated" as const,
@@ -458,7 +449,22 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
     },
   ];
 
-  for (const c of cases) {
+  const silentCases = [
+    {
+      label: "description",
+      load: () =>
+        import("~/app/(app)/m/actions").then((m) => m.updateMachineDescription),
+    },
+    {
+      label: "tournamentNotes",
+      load: () =>
+        import("~/app/(app)/m/actions").then(
+          (m) => m.updateMachineTournamentNotes
+        ),
+    },
+  ];
+
+  for (const c of emittingCases) {
     it(`${c.kind} emits a marker event`, async () => {
       const db = await getTestDb();
       const owner = await makeUser("member");
@@ -490,12 +496,41 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
     });
   }
 
-  it("no-op edit emits NO marker event", async () => {
+  for (const c of silentCases) {
+    it(`${c.label} edit emits NO timeline event`, async () => {
+      const db = await getTestDb();
+      const owner = await makeUser("member");
+      await mockAuth(owner.id);
+      const machine = await makeMachine(owner.id);
+      const action = await c.load();
+
+      const doc = {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "x" }] },
+        ],
+      } as const;
+
+      const result = await action(machine.id, doc);
+      expect(result.ok).toBe(true);
+
+      const rows = await db
+        .select()
+        .from(timelineEvents)
+        .where(eq(timelineEvents.machineId, machine.id));
+      // Should be empty — these fields no longer post to the timeline.
+      // Both lifecycle markers (the dropped kinds) and any other rows are
+      // unexpected here.
+      expect(rows).toHaveLength(0);
+    });
+  }
+
+  it("no-op edit on a marker-emitting field doesn't double-emit", async () => {
     const db = await getTestDb();
     const owner = await makeUser("member");
     await mockAuth(owner.id);
     const machine = await makeMachine(owner.id);
-    const { updateMachineDescription } = await import("~/app/(app)/m/actions");
+    const { updateMachineOwnerNotes } = await import("~/app/(app)/m/actions");
 
     const doc = {
       type: "doc",
@@ -503,21 +538,21 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
     } as const;
 
     // First edit: sets initial value, emits one event.
-    const first = await updateMachineDescription(machine.id, doc);
+    const first = await updateMachineOwnerNotes(machine.id, doc);
     expect(first.ok).toBe(true);
 
-    // Second edit: same content, should emit NOTHING.
-    const second = await updateMachineDescription(machine.id, doc);
+    // Second edit: same content, should emit NOTHING extra.
+    const second = await updateMachineOwnerNotes(machine.id, doc);
     expect(second.ok).toBe(true);
 
     const rows = await db
       .select()
       .from(timelineEvents)
       .where(eq(timelineEvents.machineId, machine.id));
-    const descriptionMarkers = rows.filter(
+    const markers = rows.filter(
       (r) =>
-        (r.eventData as { kind: string } | null)?.kind === "description_updated"
+        (r.eventData as { kind: string } | null)?.kind === "owner_notes_updated"
     );
-    expect(descriptionMarkers).toHaveLength(1);
+    expect(markers).toHaveLength(1);
   });
 });

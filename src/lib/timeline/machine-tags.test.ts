@@ -8,13 +8,18 @@ import {
 } from "~/lib/timeline/machine-tags";
 
 describe("machine-tags", () => {
-  it("exposes the V1 tag list", () => {
+  it("exposes the V2 tag list", () => {
     expect([...TIMELINE_TAGS]).toEqual([
       "lifecycle",
       "issue",
       "maintenance",
-      "event",
+      "adjustment",
+      "parts",
+      "upgrade",
       "cleaning",
+      "inspection",
+      "note",
+      "highlight",
     ]);
   });
 
@@ -38,8 +43,17 @@ describe("machine-tags", () => {
     expect(() => userTagSchema.parse("lifecycle")).toThrow();
     expect(() => userTagSchema.parse("issue")).toThrow();
     expect(userTagSchema.parse("maintenance")).toBe("maintenance");
-    expect(userTagSchema.parse("event")).toBe("event");
+    expect(userTagSchema.parse("adjustment")).toBe("adjustment");
+    expect(userTagSchema.parse("parts")).toBe("parts");
+    expect(userTagSchema.parse("upgrade")).toBe("upgrade");
     expect(userTagSchema.parse("cleaning")).toBe("cleaning");
+    expect(userTagSchema.parse("inspection")).toBe("inspection");
+    expect(userTagSchema.parse("note")).toBe("note");
+    expect(userTagSchema.parse("highlight")).toBe("highlight");
+  });
+
+  it("userTagSchema rejects retired `event` tag", () => {
+    expect(() => userTagSchema.parse("event")).toThrow();
   });
 
   it("TimelineTag type narrows correctly", () => {

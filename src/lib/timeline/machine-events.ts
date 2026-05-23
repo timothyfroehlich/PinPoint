@@ -157,6 +157,13 @@ export interface GetMachineTimelineArgs {
    * client; see `MachineTimelineFilter`).
    */
   tags?: TimelineTag[];
+  /**
+   * Pagination. Caller is responsible for `offset = (page-1) * limit`.
+   * Pass `limit + 1` if you want to detect a next page without a count query
+   * (trim the last row before rendering).
+   */
+  limit?: number;
+  offset?: number;
 }
 
 export interface MachineTimelineRow {
@@ -191,7 +198,7 @@ export async function getMachineTimeline(
   const author = alias(userProfiles, "author");
   const deleter = alias(userProfiles, "deleter");
 
-  const rows = await tx
+  let query = tx
     .select({
       id: timelineEvents.id,
       machineId: timelineEvents.machineId,
@@ -220,7 +227,11 @@ export async function getMachineTimeline(
     // `createdAt` is `now()`, constant within a transaction, so multiple
     // events emitted from a single tx share a timestamp. Tie-break on `id`
     // so the feed order is deterministic across page loads (PP-0x98 review).
-    .orderBy(desc(timelineEvents.createdAt), desc(timelineEvents.id));
+    .orderBy(desc(timelineEvents.createdAt), desc(timelineEvents.id))
+    .$dynamic();
 
-  return rows;
+  if (args.limit !== undefined) query = query.limit(args.limit);
+  if (args.offset !== undefined) query = query.offset(args.offset);
+
+  return await query;
 }

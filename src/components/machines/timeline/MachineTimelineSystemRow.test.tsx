@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { MachineTimelineSystemRow } from "./MachineTimelineSystemRow";
 
 describe("MachineTimelineSystemRow", () => {
-  it("renders formatted event text and tag", () => {
-    render(
+  it("renders formatted event text with a per-kind icon and no tag pill", () => {
+    const { container } = render(
       <MachineTimelineSystemRow
         row={{
           id: "s1",
@@ -16,7 +16,15 @@ describe("MachineTimelineSystemRow", () => {
       />
     );
     expect(screen.getByText("Machine added")).toBeInTheDocument();
-    expect(screen.getByText("lifecycle")).toBeInTheDocument();
+    // No tag pill: the icon + verb carry the kind redundantly.
+    expect(screen.queryByText("lifecycle")).not.toBeInTheDocument();
+    // Icon is rendered as an aria-hidden lucide SVG; the row wrapper exposes
+    // the kind via data-event-kind so tests can target the row deterministically.
+    const wrapper = container.querySelector(
+      '[data-event-kind="machine_added"]'
+    );
+    expect(wrapper).not.toBeNull();
+    expect(wrapper?.querySelector("svg")).not.toBeNull();
   });
 
   it("renders an issue link when machineInitials is provided and event has issueNumber", () => {

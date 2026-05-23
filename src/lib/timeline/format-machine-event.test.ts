@@ -83,7 +83,7 @@ describe("formatMachineEvent", () => {
     );
   });
 
-  it("formats issue_opened", () => {
+  it("formats issue_opened with title", () => {
     expect(
       formatMachineEvent({
         kind: "issue_opened",
@@ -92,10 +92,10 @@ describe("formatMachineEvent", () => {
         openedByName: "Maria",
         title: "Flipper broken",
       })
-    ).toBe("Issue #42 opened by Maria");
+    ).toBe('Issue #42 "Flipper broken" opened by Maria');
   });
 
-  it("formats issue_closed", () => {
+  it("formats issue_closed with title", () => {
     expect(
       formatMachineEvent({
         kind: "issue_closed",
@@ -104,10 +104,23 @@ describe("formatMachineEvent", () => {
         closedByName: "Tim",
         title: "Flipper broken",
       })
-    ).toBe("Issue #42 closed by Tim");
+    ).toBe('Issue #42 "Flipper broken" closed by Tim');
   });
 
-  it("formats issue_status_changed", () => {
+  it("formats issue_status_changed with title", () => {
+    expect(
+      formatMachineEvent({
+        kind: "issue_status_changed",
+        issueId: "i1",
+        issueNumber: 42,
+        from: "new",
+        to: "in_progress",
+        title: "Flipper broken",
+      })
+    ).toBe('Issue #42 "Flipper broken" status changed from New to In Progress');
+  });
+
+  it("formats issue_status_changed without title (legacy data)", () => {
     expect(
       formatMachineEvent({
         kind: "issue_status_changed",
@@ -119,28 +132,30 @@ describe("formatMachineEvent", () => {
     ).toBe("Issue #42 status changed from New to In Progress");
   });
 
-  it("formats issue_assigned", () => {
+  it("formats issue_assigned with title", () => {
     expect(
       formatMachineEvent({
         kind: "issue_assigned",
         issueId: "i1",
         issueNumber: 42,
         assigneeName: "Tim",
+        title: "Flipper broken",
       })
-    ).toBe("Issue #42 assigned to Tim");
+    ).toBe('Issue #42 "Flipper broken" assigned to Tim');
   });
 
-  it("formats issue_unassigned", () => {
+  it("formats issue_unassigned with title", () => {
     expect(
       formatMachineEvent({
         kind: "issue_unassigned",
         issueId: "i1",
         issueNumber: 42,
+        title: "Flipper broken",
       })
-    ).toBe("Issue #42 unassigned");
+    ).toBe('Issue #42 "Flipper broken" unassigned');
   });
 
-  it("formats issue_reassigned_out", () => {
+  it("formats issue_reassigned_out with title", () => {
     expect(
       formatMachineEvent({
         kind: "issue_reassigned_out",
@@ -148,11 +163,12 @@ describe("formatMachineEvent", () => {
         issueNumber: 42,
         toMachineId: "m2",
         toMachineName: "Iron Maiden",
+        title: "Flipper broken",
       })
-    ).toBe("Issue #42 moved to Iron Maiden");
+    ).toBe('Issue #42 "Flipper broken" moved to Iron Maiden');
   });
 
-  it("formats issue_reassigned_in", () => {
+  it("formats issue_reassigned_in with title", () => {
     expect(
       formatMachineEvent({
         kind: "issue_reassigned_in",
@@ -160,7 +176,8 @@ describe("formatMachineEvent", () => {
         issueNumber: 42,
         fromMachineId: "m1",
         fromMachineName: "Stranger Things",
+        title: "Flipper broken",
       })
-    ).toBe("Issue #42 received from Stranger Things");
+    ).toBe('Issue #42 "Flipper broken" received from Stranger Things');
   });
 });

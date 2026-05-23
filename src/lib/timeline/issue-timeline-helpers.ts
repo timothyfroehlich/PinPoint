@@ -26,6 +26,7 @@
 
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
+import type { IssueFrequency, IssueSeverity, IssueStatus } from "~/lib/types";
 import type { DbTransaction } from "~/server/db";
 
 export interface IssueEventCommon {
@@ -37,7 +38,12 @@ export interface IssueEventCommon {
 
 export async function emitIssueOpened(
   tx: DbTransaction,
-  args: IssueEventCommon & { openedByName: string; title: string }
+  args: IssueEventCommon & {
+    openedByName: string;
+    title: string;
+    severity: IssueSeverity;
+    frequency: IssueFrequency;
+  }
 ): Promise<void> {
   await emit(tx, args, {
     kind: "issue_opened",
@@ -45,12 +51,18 @@ export async function emitIssueOpened(
     issueNumber: args.issueNumber,
     openedByName: args.openedByName,
     title: args.title,
+    severity: args.severity,
+    frequency: args.frequency,
   });
 }
 
 export async function emitIssueClosed(
   tx: DbTransaction,
-  args: IssueEventCommon & { closedByName: string; title: string }
+  args: IssueEventCommon & {
+    closedByName: string;
+    title: string;
+    closedAsStatus: IssueStatus;
+  }
 ): Promise<void> {
   await emit(tx, args, {
     kind: "issue_closed",
@@ -58,12 +70,13 @@ export async function emitIssueClosed(
     issueNumber: args.issueNumber,
     closedByName: args.closedByName,
     title: args.title,
+    closedAsStatus: args.closedAsStatus,
   });
 }
 
 export async function emitIssueStatusChanged(
   tx: DbTransaction,
-  args: IssueEventCommon & { from: string; to: string }
+  args: IssueEventCommon & { from: string; to: string; title: string }
 ): Promise<void> {
   await emit(tx, args, {
     kind: "issue_status_changed",
@@ -71,35 +84,42 @@ export async function emitIssueStatusChanged(
     issueNumber: args.issueNumber,
     from: args.from,
     to: args.to,
+    title: args.title,
   });
 }
 
 export async function emitIssueAssigned(
   tx: DbTransaction,
-  args: IssueEventCommon & { assigneeName: string }
+  args: IssueEventCommon & { assigneeName: string; title: string }
 ): Promise<void> {
   await emit(tx, args, {
     kind: "issue_assigned",
     issueId: args.issueId,
     issueNumber: args.issueNumber,
     assigneeName: args.assigneeName,
+    title: args.title,
   });
 }
 
 export async function emitIssueUnassigned(
   tx: DbTransaction,
-  args: IssueEventCommon
+  args: IssueEventCommon & { title: string }
 ): Promise<void> {
   await emit(tx, args, {
     kind: "issue_unassigned",
     issueId: args.issueId,
     issueNumber: args.issueNumber,
+    title: args.title,
   });
 }
 
 export async function emitIssueReassignedOut(
   tx: DbTransaction,
-  args: IssueEventCommon & { toMachineId: string; toMachineName: string }
+  args: IssueEventCommon & {
+    toMachineId: string;
+    toMachineName: string;
+    title: string;
+  }
 ): Promise<void> {
   await emit(tx, args, {
     kind: "issue_reassigned_out",
@@ -107,12 +127,17 @@ export async function emitIssueReassignedOut(
     issueNumber: args.issueNumber,
     toMachineId: args.toMachineId,
     toMachineName: args.toMachineName,
+    title: args.title,
   });
 }
 
 export async function emitIssueReassignedIn(
   tx: DbTransaction,
-  args: IssueEventCommon & { fromMachineId: string; fromMachineName: string }
+  args: IssueEventCommon & {
+    fromMachineId: string;
+    fromMachineName: string;
+    title: string;
+  }
 ): Promise<void> {
   await emit(tx, args, {
     kind: "issue_reassigned_in",
@@ -120,6 +145,7 @@ export async function emitIssueReassignedIn(
     issueNumber: args.issueNumber,
     fromMachineId: args.fromMachineId,
     fromMachineName: args.fromMachineName,
+    title: args.title,
   });
 }
 

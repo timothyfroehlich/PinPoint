@@ -17,6 +17,11 @@ import {
   getTagLabel,
   type TimelineTag,
 } from "~/lib/timeline/machine-tags";
+import {
+  TAG_DECORATION,
+  tagTextColor,
+} from "~/lib/timeline/user-tag-decoration";
+import { cn } from "~/lib/utils";
 
 interface Props {
   currentTags: TimelineTag[];
@@ -98,18 +103,25 @@ export function MachineTimelineFilter({
           All
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
-        {TIMELINE_TAGS.map((t) => (
-          <DropdownMenuCheckboxItem
-            key={t}
-            checked={currentTags.includes(t)}
-            onSelect={(e) => {
-              e.preventDefault();
-              toggleTag(t);
-            }}
-          >
-            {getTagLabel(t)}
-          </DropdownMenuCheckboxItem>
-        ))}
+        {TIMELINE_TAGS.map((t) => {
+          const { Icon, badgeClass } = TAG_DECORATION[t];
+          return (
+            <DropdownMenuCheckboxItem
+              key={t}
+              checked={currentTags.includes(t)}
+              onSelect={(e) => {
+                e.preventDefault();
+                toggleTag(t);
+              }}
+            >
+              <Icon
+                aria-hidden="true"
+                className={cn("size-4", tagTextColor(badgeClass))}
+              />
+              {getTagLabel(t)}
+            </DropdownMenuCheckboxItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

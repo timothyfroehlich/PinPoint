@@ -50,7 +50,7 @@ describe("MachineTimelineActionsRow", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("expands to the composer form on click; collapses on Cancel", async () => {
+  it("expands to the composer form on click and hides the New entry trigger", async () => {
     const user = userEvent.setup();
     render(
       <MachineTimelineActionsRow
@@ -65,12 +65,10 @@ describe("MachineTimelineActionsRow", () => {
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /new entry/i }));
     expect(screen.getByRole("button", { name: /post/i })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    // The New entry trigger is hidden once composing — there is no Cancel,
+    // so the only escape is to Post.
     expect(
-      screen.queryByRole("button", { name: /post/i })
+      screen.queryByRole("button", { name: /new entry/i })
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /new entry/i })
-    ).toBeInTheDocument();
   });
 });

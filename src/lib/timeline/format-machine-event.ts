@@ -18,6 +18,18 @@ function issueStatusLabel(value: string): string {
   return value;
 }
 
+/**
+ * Renders the "Issue #N" anchor plus the title clause when present:
+ *   - with title:    `Issue #42 "Flipper sticking"`
+ *   - without title: `Issue #42`
+ * The leading `Issue #N` token stays first so the system-row renderer can
+ * regex-replace it with a `<Link>` to the issue.
+ */
+function issueAnchor(issueNumber: number, title: string | undefined): string {
+  const base = `Issue #${String(issueNumber)}`;
+  return title ? `${base} "${title}"` : base;
+}
+
 export function formatMachineEvent(event: MachineTimelineEventData): string {
   switch (event.kind) {
     case "machine_added":
@@ -45,18 +57,18 @@ export function formatMachineEvent(event: MachineTimelineEventData): string {
     case "owner_notes_updated":
       return "Owner notes updated";
     case "issue_opened":
-      return `Issue #${String(event.issueNumber)} opened by ${event.openedByName}`;
+      return `${issueAnchor(event.issueNumber, event.title)} opened by ${event.openedByName}`;
     case "issue_closed":
-      return `Issue #${String(event.issueNumber)} closed by ${event.closedByName}`;
+      return `${issueAnchor(event.issueNumber, event.title)} closed by ${event.closedByName}`;
     case "issue_status_changed":
-      return `Issue #${String(event.issueNumber)} status changed from ${issueStatusLabel(event.from)} to ${issueStatusLabel(event.to)}`;
+      return `${issueAnchor(event.issueNumber, event.title)} status changed from ${issueStatusLabel(event.from)} to ${issueStatusLabel(event.to)}`;
     case "issue_assigned":
-      return `Issue #${String(event.issueNumber)} assigned to ${event.assigneeName}`;
+      return `${issueAnchor(event.issueNumber, event.title)} assigned to ${event.assigneeName}`;
     case "issue_unassigned":
-      return `Issue #${String(event.issueNumber)} unassigned`;
+      return `${issueAnchor(event.issueNumber, event.title)} unassigned`;
     case "issue_reassigned_out":
-      return `Issue #${String(event.issueNumber)} moved to ${event.toMachineName}`;
+      return `${issueAnchor(event.issueNumber, event.title)} moved to ${event.toMachineName}`;
     case "issue_reassigned_in":
-      return `Issue #${String(event.issueNumber)} received from ${event.fromMachineName}`;
+      return `${issueAnchor(event.issueNumber, event.title)} received from ${event.fromMachineName}`;
   }
 }

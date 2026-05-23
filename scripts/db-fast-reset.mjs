@@ -29,6 +29,7 @@ async function fastReset() {
         "issue_comments",
         "issue_watchers",
         "issues",
+        "timeline_events",
         "machines",
         "notifications",
         "notification_preferences",

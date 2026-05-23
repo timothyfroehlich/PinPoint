@@ -41,18 +41,31 @@ import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import { type MachineTimelineEventKind } from "~/lib/timeline/machine-event-types";
 
 /**
- * Maps a prose-field column name to its marker lifecycle event kind. Used by
- * `updateMachineTextField` to emit one timeline event per successful edit.
+ * Maps a prose-field column name to its marker lifecycle event kind.
+ *
+ * Only owner-facing edits emit a timeline event — `description` and
+ * `tournamentNotes` are intentionally absent because their edit cadence is
+ * high enough that emitting on every save floods the timeline with low-
+ * signal "description updated" rows (PP-0x98 V2 design pass). The fields
+ * themselves are still editable; the change just doesn't get duplicated
+ * into the activity feed.
  */
-const PROSE_FIELD_TO_EVENT_KIND = {
-  description: "description_updated",
-  tournamentNotes: "tournament_notes_updated",
+/** Subset of {@link MachineTimelineEventKind} that this map ever produces.
+ *  Pinning the value type to the literal-string union keeps the
+ *  `{ kind: ... }` event-data construction below assignable to the full
+ *  discriminated `MachineTimelineEventData` union (TS otherwise widens
+ *  to the whole 16-variant kind and demands the issue-event fields). */
+type ProseFieldEventKind = "owner_requirements_updated" | "owner_notes_updated";
+
+const PROSE_FIELD_TO_EVENT_KIND: Partial<
+  Record<
+    "description" | "tournamentNotes" | "ownerRequirements" | "ownerNotes",
+    ProseFieldEventKind
+  >
+> = {
   ownerRequirements: "owner_requirements_updated",
   ownerNotes: "owner_notes_updated",
-} as const satisfies Record<
-  "description" | "tournamentNotes" | "ownerRequirements" | "ownerNotes",
-  MachineTimelineEventKind
->;
+};
 
 /**
  * Canonical-JSON serializer with deterministic key ordering. Used to compare
@@ -1139,13 +1152,17 @@ async function updateMachineTextField(
         .set({ [field]: normalizedValue })
         .where(eq(machines.id, machine.id));
 
-      if (changed) {
+      // Only emit when (a) the field actually changed and (b) the field
+      // has an event-kind mapping. `description` and `tournamentNotes` are
+      // intentionally omitted from the map (see PROSE_FIELD_TO_EVENT_KIND).
+      const eventKind = PROSE_FIELD_TO_EVENT_KIND[field];
+      if (changed && eventKind) {
         await createMachineTimelineEvent(
           machine.id,
           {
             sourceType: "lifecycle",
             tag: "lifecycle",
-            eventData: { kind: PROSE_FIELD_TO_EVENT_KIND[field] },
+            eventData: { kind: eventKind },
             actorId: user.id,
           },
           tx

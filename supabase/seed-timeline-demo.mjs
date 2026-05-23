@@ -54,11 +54,15 @@ async function run() {
       return;
     }
 
+    // Idempotency sentinel: `owner_notes_updated` is unique to the demo seed
+    // on AFM (the backfill script doesn't emit it). Previously this used
+    // `description_updated`, but that event was dropped from the demo as
+    // part of the V2 design pass.
     const existing = await sql`
       SELECT count(*)::int AS cnt
       FROM timeline_events
       WHERE machine_id = ${afm.id}
-        AND event_data->>'kind' = 'description_updated'
+        AND event_data->>'kind' = 'owner_notes_updated'
     `;
     if ((existing[0]?.cnt ?? 0) > 0) {
       console.log("ℹ️  AFM demo already seeded; skipping.");
@@ -91,139 +95,302 @@ async function run() {
     const issueA = issueRows[0];
     const issueB = issueRows[1];
 
-    // Walk timestamps backwards from now in 1-hour increments so events
-    // sort cleanly newest-first.
+    // Walk timestamps backwards in 1-hour increments. Each push to `events`
+    // calls nextStamp() immediately, so the array order IS the desired
+    // chronological order. `skipToDaysAgo(N)` jumps the cursor back to that
+    // many days before "now" so subsequent events land in the day-group
+    // we want — gives the timeline visible "Today", "Yesterday", and
+    // absolute-date headings rather than everything landing in one bucket.
     let stamp = Date.now();
     const nextStamp = () => {
       stamp -= 60 * 60 * 1000;
       return new Date(stamp);
     };
+    const skipToDaysAgo = (n) => {
+      const anchor = new Date();
+      anchor.setHours(20, 0, 0, 0); // 8pm local on the target day
+      anchor.setDate(anchor.getDate() - n);
+      stamp = anchor.getTime();
+    };
 
-    const lifecycleRows = [
-      {
-        createdAt: nextStamp(),
-        tag: "lifecycle",
-        sourceType: "lifecycle",
-        eventData: {
-          kind: "presence_changed",
-          from: "on_the_floor",
-          to: "off_the_floor",
-        },
+    const lifecycle = (eventData) => ({
+      source: "lifecycle",
+      createdAt: nextStamp(),
+      tag: "lifecycle",
+      eventData,
+    });
+    const issue = (eventData) => ({
+      source: "issue",
+      createdAt: nextStamp(),
+      tag: "issue",
+      eventData,
+    });
+    const comment = (authorId, tag, text) => ({
+      source: "comment",
+      createdAt: nextStamp(),
+      tag,
+      authorId,
+      doc: {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text }] },
+        ],
       },
-      {
-        createdAt: nextStamp(),
-        tag: "lifecycle",
-        sourceType: "lifecycle",
-        eventData: {
-          kind: "name_changed",
-          from: afm.name,
-          to: `${afm.name} (renamed)`,
-        },
-      },
-      {
-        createdAt: nextStamp(),
-        tag: "lifecycle",
-        sourceType: "lifecycle",
-        eventData: { kind: "description_updated" },
-      },
-      {
-        createdAt: nextStamp(),
-        tag: "lifecycle",
-        sourceType: "lifecycle",
-        eventData: { kind: "tournament_notes_updated" },
-      },
-      {
-        createdAt: nextStamp(),
-        tag: "lifecycle",
-        sourceType: "lifecycle",
-        eventData: { kind: "owner_requirements_updated" },
-      },
-      {
-        createdAt: nextStamp(),
-        tag: "lifecycle",
-        sourceType: "lifecycle",
-        eventData: { kind: "owner_notes_updated" },
-      },
-    ];
+    });
 
-    if (memberUser) {
-      lifecycleRows.push({
-        createdAt: nextStamp(),
-        tag: "lifecycle",
-        sourceType: "lifecycle",
-        eventData: {
-          kind: "owner_set",
-          toOwnerId: memberUser.id,
-          toOwnerName: memberUser.name ?? "Member",
-        },
-      });
-      if (adminUser) {
-        lifecycleRows.push({
-          createdAt: nextStamp(),
-          tag: "lifecycle",
-          sourceType: "lifecycle",
-          eventData: {
-            kind: "owner_changed",
-            fromOwnerId: memberUser.id,
-            fromOwnerName: memberUser.name ?? "Member",
-            toOwnerId: adminUser.id,
-            toOwnerName: adminUser.name ?? "Admin",
-          },
-        });
-      }
+    // Interleaved demo timeline — newest first. Comments are sprinkled
+    // between lifecycle/issue events so the rendered timeline has visual
+    // variety. Each entry is only pushed if its prerequisite users / issues
+    // exist in the seed.
+    //
+    // skipToDaysAgo() calls between groups span four day-buckets so the
+    // rendered timeline shows "Today", "Yesterday", and two absolute-date
+    // headings — useful for design review and screenshots.
+    const events = [];
+
+    // -- Today --
+    if (adminUser) {
+      events.push(
+        comment(
+          adminUser.id,
+          "highlight",
+          "Featured machine at the Friday tournament — held up great."
+        )
+      );
     }
+    if (techUser) {
+      events.push(
+        comment(
+          techUser.id,
+          "inspection",
+          "Pre-tournament walk-through. All switches firing, no scorched coils."
+        )
+      );
+    }
+    events.push(
+      lifecycle({
+        kind: "presence_changed",
+        from: "on_the_floor",
+        to: "off_the_floor",
+      })
+    );
 
+    // -- Yesterday --
+    skipToDaysAgo(1);
+    events.push(
+      lifecycle({
+        kind: "name_changed",
+        from: afm.name,
+        to: `${afm.name} (renamed)`,
+      })
+    );
+    if (techUser) {
+      events.push(
+        comment(
+          techUser.id,
+          "maintenance",
+          "Rebuilt the left flipper. Coil tested at 6.2Ω."
+        )
+      );
+    }
     if (issueA) {
-      lifecycleRows.push({
-        createdAt: nextStamp(),
-        tag: "issue",
-        sourceType: "issue",
-        eventData: {
+      events.push(
+        issue({
           kind: "issue_status_changed",
           issueId: issueA.id,
           issueNumber: issueA.number,
           from: "new",
           to: "investigating",
-        },
-      });
-      if (techUser) {
-        lifecycleRows.push({
-          createdAt: nextStamp(),
-          tag: "issue",
-          sourceType: "issue",
-          eventData: {
-            kind: "issue_assigned",
-            issueId: issueA.id,
-            issueNumber: issueA.number,
-            assigneeName: techUser.name ?? "Technician",
-          },
-        });
-      }
-      lifecycleRows.push({
-        createdAt: nextStamp(),
-        tag: "issue",
-        sourceType: "issue",
-        eventData: {
+          title: issueA.title,
+        })
+      );
+    }
+
+    // -- Three days ago --
+    skipToDaysAgo(3);
+    if (memberUser) {
+      events.push(
+        comment(
+          memberUser.id,
+          "cleaning",
+          "Wax + clean playfield. Replaced two worn rubbers."
+        )
+      );
+    }
+    if (issueA && techUser) {
+      events.push(
+        issue({
+          kind: "issue_assigned",
+          issueId: issueA.id,
+          issueNumber: issueA.number,
+          assigneeName: techUser.name ?? "Technician",
+          title: issueA.title,
+        })
+      );
+    }
+    if (issueA) {
+      events.push(
+        issue({
           kind: "issue_unassigned",
           issueId: issueA.id,
           issueNumber: issueA.number,
-        },
-      });
+          title: issueA.title,
+        })
+      );
+    }
+    events.push(lifecycle({ kind: "owner_requirements_updated" }));
+    events.push(lifecycle({ kind: "owner_notes_updated" }));
+
+    // -- A week ago --
+    skipToDaysAgo(7);
+    if (memberUser) {
+      events.push(
+        lifecycle({
+          kind: "owner_set",
+          toOwnerId: memberUser.id,
+          toOwnerName: memberUser.name ?? "Member",
+        })
+      );
+    }
+    if (memberUser && adminUser) {
+      events.push(
+        lifecycle({
+          kind: "owner_changed",
+          fromOwnerId: memberUser.id,
+          fromOwnerName: memberUser.name ?? "Member",
+          toOwnerId: adminUser.id,
+          toOwnerName: adminUser.name ?? "Admin",
+        })
+      );
     }
     if (issueB) {
-      lifecycleRows.push({
-        createdAt: nextStamp(),
-        tag: "issue",
-        sourceType: "issue",
-        eventData: {
+      events.push(
+        issue({
           kind: "issue_reassigned_out",
           issueId: issueB.id,
           issueNumber: issueB.number,
           toMachineId: other.id,
           toMachineName: other.name,
-        },
-      });
-      // The matching reassigned_in lives on the OTHER machine's timeline.
+          title: issueB.title,
+        })
+      );
+    }
+
+    // -- Last month — exercises the Tier-2 (month) rollup banner --
+    skipToDaysAgo(35);
+    if (techUser) {
+      events.push(
+        comment(
+          techUser.id,
+          "maintenance",
+          "Quarterly service: shopped out, leveled, new rubbers."
+        )
+      );
+    }
+    if (issueA) {
+      events.push(
+        issue({
+          kind: "issue_status_changed",
+          issueId: issueA.id,
+          issueNumber: issueA.number,
+          from: "in_progress",
+          to: "need_parts",
+          title: issueA.title,
+        })
+      );
+    }
+
+    // -- Two months back — second month-tier bucket --
+    skipToDaysAgo(70);
+    events.push(
+      lifecycle({
+        kind: "presence_changed",
+        from: "off_the_floor",
+        to: "on_the_floor",
+      })
+    );
+    if (adminUser) {
+      events.push(
+        comment(
+          adminUser.id,
+          "highlight",
+          "Hosted the spring tournament — held up across 40 games."
+        )
+      );
+    }
+    if (memberUser) {
+      events.push(
+        comment(
+          memberUser.id,
+          "upgrade",
+          "Installed Comet GI kit + warm-white inserts. Big visual lift."
+        )
+      );
+    }
+    if (techUser) {
+      events.push(
+        comment(
+          techUser.id,
+          "adjustment",
+          "Bumped tilt sensitivity down two notches; leveled to 6.5° pitch."
+        )
+      );
+    }
+    if (techUser) {
+      events.push(
+        comment(
+          techUser.id,
+          "parts",
+          "Ordered 2× new flipper coils (FL11629). ETA Friday."
+        )
+      );
+    }
+    if (memberUser) {
+      events.push(
+        comment(
+          memberUser.id,
+          "note",
+          "Plunger feels a bit weak today; not broken, just noting it."
+        )
+      );
+    }
+
+    let commentCount = 0;
+    let systemCount = 0;
+    for (const ev of events) {
+      if (ev.source === "comment") {
+        await sql`
+          INSERT INTO timeline_events (
+            machine_id, created_at, source_type, tag, author_id, content
+          ) VALUES (
+            ${afm.id},
+            ${ev.createdAt},
+            'comment',
+            ${ev.tag},
+            ${ev.authorId},
+            ${sql.json(ev.doc)}
+          )
+        `;
+        commentCount++;
+      } else {
+        await sql`
+          INSERT INTO timeline_events (
+            machine_id, created_at, source_type, tag, event_data
+          ) VALUES (
+            ${afm.id},
+            ${ev.createdAt},
+            ${ev.source},
+            ${ev.tag},
+            ${sql.json(ev.eventData)}
+          )
+        `;
+        systemCount++;
+      }
+    }
+
+    // The matching reassigned_in lives on the OTHER machine's timeline.
+    // Goes in last so its timestamp lands between the AFM events naturally.
+    if (issueB) {
       await sql`
         INSERT INTO timeline_events (
           machine_id, created_at, source_type, tag, event_data
@@ -238,74 +405,14 @@ async function run() {
             issueNumber: issueB.number,
             fromMachineId: afm.id,
             fromMachineName: afm.name,
+            title: issueB.title,
           })}
         )
       `;
     }
 
-    for (const row of lifecycleRows) {
-      await sql`
-        INSERT INTO timeline_events (
-          machine_id, created_at, source_type, tag, event_data
-        ) VALUES (
-          ${afm.id},
-          ${row.createdAt},
-          ${row.sourceType},
-          ${row.tag},
-          ${sql.json(row.eventData)}
-        )
-      `;
-    }
-
-    const commentRows = [];
-    if (techUser) {
-      commentRows.push({
-        createdAt: nextStamp(),
-        authorId: techUser.id,
-        tag: "maintenance",
-        text: "Rebuilt the left flipper. Coil tested at 6.2Ω.",
-      });
-    }
-    if (memberUser) {
-      commentRows.push({
-        createdAt: nextStamp(),
-        authorId: memberUser.id,
-        tag: "cleaning",
-        text: "Wax + clean playfield. Replaced two worn rubbers.",
-      });
-    }
-    if (adminUser) {
-      commentRows.push({
-        createdAt: nextStamp(),
-        authorId: adminUser.id,
-        tag: "event",
-        text: "Featured machine at the Friday tournament — held up great.",
-      });
-    }
-
-    for (const c of commentRows) {
-      const doc = {
-        type: "doc",
-        content: [
-          { type: "paragraph", content: [{ type: "text", text: c.text }] },
-        ],
-      };
-      await sql`
-        INSERT INTO timeline_events (
-          machine_id, created_at, source_type, tag, author_id, content
-        ) VALUES (
-          ${afm.id},
-          ${c.createdAt},
-          'comment',
-          ${c.tag},
-          ${c.authorId},
-          ${sql.json(doc)}
-        )
-      `;
-    }
-
     console.log(
-      `✅ AFM demo seeded: lifecycle/issue=${lifecycleRows.length} comments=${commentRows.length} (+1 reassigned_in on ${other.name})`
+      `✅ AFM demo seeded: system=${systemCount} comments=${commentCount} (interleaved) (+1 reassigned_in on ${other.name})`
     );
   } finally {
     await sql.end();

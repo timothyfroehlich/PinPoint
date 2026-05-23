@@ -261,6 +261,12 @@ export async function createIssue({
       issueNumber: issue.issueNumber,
       openedByName,
       title,
+      // Snapshot at-open severity + frequency for the timeline row. Use the
+      // post-insert values from the returning() row so they reflect the
+      // applied defaults (frequency falls back to "intermittent" when the
+      // caller omits it).
+      severity: issue.severity,
+      frequency: issue.frequency,
       ...(reportedBy ? { actorId: reportedBy } : {}),
     });
 
@@ -419,6 +425,9 @@ export async function updateIssueStatus({
         issueNumber: currentIssue.issueNumber,
         closedByName,
         title: currentIssue.title,
+        // The "close reason" — which closed-group status the issue was
+        // resolved to (fixed / wont_fix / wai / no_repro / duplicate).
+        closedAsStatus: status,
         ...(userId ? { actorId: userId } : {}),
       });
     } else {
@@ -428,6 +437,7 @@ export async function updateIssueStatus({
         issueNumber: currentIssue.issueNumber,
         from: oldStatus,
         to: status,
+        title: currentIssue.title,
         ...(userId ? { actorId: userId } : {}),
       });
     }
@@ -725,6 +735,7 @@ export async function assignIssue({
         issueId,
         issueNumber: currentIssue.issueNumber,
         assigneeName,
+        title: currentIssue.title,
         ...(actorId ? { actorId } : {}),
       });
     } else {
@@ -732,6 +743,7 @@ export async function assignIssue({
         machineId: currentIssue.machine.id,
         issueId,
         issueNumber: currentIssue.issueNumber,
+        title: currentIssue.title,
         ...(actorId ? { actorId } : {}),
       });
     }
@@ -1028,6 +1040,7 @@ export async function reassignIssueMachine({
       columns: {
         machineInitials: true,
         issueNumber: true,
+        title: true,
       },
       with: {
         machine: { columns: { id: true, name: true } },
@@ -1097,6 +1110,7 @@ export async function reassignIssueMachine({
       issueNumber: fromIssueNumber, // OLD number, as it existed on source
       toMachineId: destinationMachine.id,
       toMachineName: destinationMachine.name,
+      title: currentIssue.title,
       ...(userId ? { actorId: userId } : {}),
     });
 
@@ -1106,6 +1120,7 @@ export async function reassignIssueMachine({
       issueNumber: newIssueNumber, // NEW number, as it now exists on destination
       fromMachineId: currentIssue.machine.id,
       fromMachineName: currentIssue.machine.name,
+      title: currentIssue.title,
       ...(userId ? { actorId: userId } : {}),
     });
 

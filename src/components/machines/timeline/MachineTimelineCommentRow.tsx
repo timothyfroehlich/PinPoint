@@ -44,7 +44,12 @@ import {
   getTagLabel,
   userTagSchema,
 } from "~/lib/timeline/machine-tags";
+import {
+  USER_TAG_DECORATION,
+  isUserTag,
+} from "~/lib/timeline/user-tag-decoration";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import { cn } from "~/lib/utils";
 
 export interface MachineCommentRowData {
   id: string;
@@ -59,6 +64,15 @@ interface Props {
   row: MachineCommentRowData;
   canEdit: boolean;
   canDelete: boolean;
+  /** See `MachineTimelineSystemRow` for the rationale. */
+  showRelativeTime?: boolean;
+  /**
+   * Absolute date ("May 14") for rows inside a Tier-2 (month) bucket. Shares
+   * the inline timestamp slot with the relative time — month rows show the
+   * date there (`· May 14`) instead of "N ago". Tier-1 (day) buckets leave
+   * this undefined since the bucket banner names the day.
+   */
+  rowDateLabel?: string;
 }
 
 const USER_TAGS = TIMELINE_TAGS.filter(
@@ -83,10 +97,18 @@ export function MachineTimelineCommentRow({
   row,
   canEdit,
   canDelete,
+  showRelativeTime = true,
+  rowDateLabel,
 }: Props): React.JSX.Element {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const canShowActions = canEdit || canDelete;
+
+  // Inline timestamp slot (after the author name): relative time for "today"
+  // rows, the absolute date for month-rollup rows. One slot, never both.
+  const inlineMeta = showRelativeTime
+    ? formatRelative(row.createdAt)
+    : rowDateLabel;
 
   return (
     <div className="flex gap-3 border-b py-3">
@@ -96,15 +118,23 @@ export function MachineTimelineCommentRow({
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <div>
-            <span className="font-semibold">{row.authorName ?? "Unknown"}</span>{" "}
-            <span className="text-muted-foreground">
-              · {formatRelative(row.createdAt)}
-            </span>
+        <div className="flex items-center gap-2 text-xs">
+          {/*
+           * Left cluster: author, timestamp (relative time or month-rollup
+           * date), tag. The tag pill sits *inline* with these (PP-0x98 V2
+           * design pass) so the comment row's left cluster matches the issue
+           * row's pattern of `[id] [verb] [badges]`.
+           */}
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="font-semibold">{row.authorName ?? "Unknown"}</span>
+            {inlineMeta ? (
+              <span className="tabular-nums text-muted-foreground">
+                · {inlineMeta}
+              </span>
+            ) : null}
+            <CommentTagBadge tag={row.tag} />
           </div>
-          <div className="flex items-center gap-1">
-            <Badge variant="secondary">{row.tag}</Badge>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             {canShowActions && !isEditing ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -167,6 +197,25 @@ export function MachineTimelineCommentRow({
         />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Tag pill on a comment row. Per-tag icon + semantic-token color from
+ * `USER_TAG_DECORATION`. Reserved tags (lifecycle/issue, which shouldn't
+ * appear on a comment but might in legacy data) fall back to the neutral
+ * `secondary` Badge variant so the row still renders.
+ */
+function CommentTagBadge({ tag }: { tag: TimelineTag }): React.JSX.Element {
+  if (!isUserTag(tag)) {
+    return <Badge variant="secondary">{tag}</Badge>;
+  }
+  const { Icon, badgeClass } = USER_TAG_DECORATION[tag];
+  return (
+    <Badge variant="secondary" className={cn("gap-1 border", badgeClass)}>
+      <Icon aria-hidden="true" className="size-3" />
+      {tag}
+    </Badge>
   );
 }
 

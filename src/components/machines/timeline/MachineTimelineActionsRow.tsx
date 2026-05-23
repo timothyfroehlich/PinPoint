@@ -46,9 +46,6 @@ export function MachineTimelineActionsRow({
       {canCompose && composing ? (
         <MachineTimelineComposer
           machineId={machineId}
-          onCancel={() => {
-            setComposing(false);
-          }}
           onPosted={() => {
             setComposing(false);
           }}

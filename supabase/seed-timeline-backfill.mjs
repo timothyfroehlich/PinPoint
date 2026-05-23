@@ -92,7 +92,9 @@ async function backfill() {
             i.reporter_name,
             'Anonymous'
           ),
-          'title', i.title
+          'title', i.title,
+          'severity', i.severity,
+          'frequency', i.frequency
         )
       FROM issues i
       JOIN machines m ON m.initials = i.machine_initials
@@ -121,7 +123,9 @@ async function backfill() {
           'kind', 'issue_closed',
           'issueId', i.id::text,
           'issueNumber', i.issue_number,
-          'closedByName', 'Unknown'
+          'closedByName', 'Unknown',
+          'title', i.title,
+          'closedAsStatus', i.status
         )
       FROM issues i
       JOIN machines m ON m.initials = i.machine_initials
