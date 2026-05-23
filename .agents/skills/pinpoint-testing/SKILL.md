@@ -89,7 +89,7 @@ pnpm run preflight:unlocked        # Full pre-commit check (unlocked, bypasses c
 
 1. **Use correct test types** (CORE-TEST-001): Pure functions → unit tests; DB queries → integration with PGlite; Full flows → E2E. Do not spin per-test PGlite instances (which cause system lockups); use the shared worker instance via `getTestDb()` and `setupTestDb()`.
 2. **No testing Server Components directly** (CORE-TEST-002): Use E2E instead.
-3. **Test behavior, not implementation** (CORE-TEST-005): Focus on outcomes, exercise element handlers at the cheapest layer.
+3. **Interaction Coverage at the Cheapest Catching Layer** (CORE-TEST-005): Pick the test layer by bug class — multi-step journeys → E2E; Server Action wiring / permissions / DB queries → integration; pure form-state / UI logic → RTL unit. (Separately: test behavior/outcomes, not internal state — this is good practice regardless of layer.)
 4. **Prefer Integration Tests for DB Logic** (CORE-TEST-004): Do not write unit tests with extensive mocking of Drizzle; use integration tests with PGlite instead.
 5. **Test what we own** (CORE-TEST-006): Mock third-party SDKs at their boundary; no live external services in E2E (class-J).
 6. **Integration tests location**: General integration tests live in `src/test/integration/` (PGlite-based). Tests requiring real Supabase live in `src/test/integration/supabase/`.
@@ -223,12 +223,9 @@ describe("Database queries integration", () => {
 import { test, expect } from "@playwright/test";
 
 test.describe("Issue Creation Flow", () => {
-  test("user can create a new issue", async ({ page }) => {
-    // Navigate to machine page
-    await page.goto("/machines/test-machine-id");
-
-    // Click "New Issue" button
-    await page.getByRole("button", { name: "New Issue" }).click();
+  test("user can create a new issue via the report form", async ({ page }) => {
+    // Navigate to report page pre-scoped to a machine (real route: /report?machine=<initials>)
+    await page.goto("/report?machine=TAF");
 
     // Fill out form
     await page.getByLabel("Title").fill("Broken left flipper");
@@ -236,11 +233,15 @@ test.describe("Issue Creation Flow", () => {
     await page.getByLabel("Severity").selectOption("minor");
 
     // Submit form
-    await page.getByRole("button", { name: "Create Issue" }).click();
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
-    // Verify success
-    await expect(page.getByText("Issue created successfully")).toBeVisible();
-    await expect(page).toHaveURL(/\/issues\/[\w-]+/);
+    // Verify redirect to issue detail: /m/<initials>/i/<issueNumber>
+    await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+
+    // Verify issue title is visible on the detail page
+    await expect(
+      page.getByRole("heading", { name: "Broken left flipper" })
+    ).toBeVisible();
   });
 });
 ```
@@ -387,10 +388,10 @@ Before committing tests:
 - [ ] Test files in correct location (unit vs integration vs E2E)
 - [ ] Integration tests use worker-scoped PGlite (`getTestDb()` and `setupTestDb()`)
 - [ ] No per-test PGlite instances (violates CORE-TEST-001)
-- [ ] E2E tests use roles/labels for selectors (CORE-TEST-005)
-- [ ] No arbitrary `waitForTimeout()` in E2E tests (violates CORE-TEST-005)
+- [ ] E2E tests use roles/labels for selectors (see [Selector Strategy](../../../docs/E2E_BEST_PRACTICES.md#selector-strategy) in E2E_BEST_PRACTICES.md)
+- [ ] No arbitrary `waitForTimeout()` in E2E tests (violates [Forbidden Patterns](../../../docs/NON_NEGOTIABLES.md#forbidden-patterns) in NON_NEGOTIABLES.md)
 - [ ] Tests are independent (no shared state)
-- [ ] Testing behavior, not implementation (CORE-TEST-005)
+- [ ] Testing behavior, not implementation
 - [ ] `pnpm run preflight` passes (includes all test suites)
 
 ## Additional Resources
