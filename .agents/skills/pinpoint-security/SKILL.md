@@ -23,8 +23,8 @@ Use this skill when:
 
 ### Critical Security Rules
 
-1. **Permissions Go Through the Matrix (CORE-ARCH-008)**: All permission checks MUST go through `checkPermission()` (server-side) or `usePermission()` (client-side) from `~/lib/permissions/helpers` and `hooks`. Hardcoded role checks (e.g., `role === 'admin'`) are strictly forbidden. The matrix at `src/lib/permissions/matrix.ts` is the single source of truth and must remain perfectly synced with actual enforcement.
-2. **Supabase SSR Contract (CORE-SSR-001/002)**: Use `~/lib/supabase/server`'s `createClient()`. Always call `await supabase.auth.getUser()` immediately after client creation, with **no logic in between**. Never import from `@supabase/supabase-js` directly on the server.
+1. **Permissions Go Through the Matrix (CORE-ARCH-008)**: All permission checks that gate a request or enforce authorization MUST go through `checkPermission()` (server-side) or `usePermission()` (client-side) from `~/lib/permissions/helpers` and `hooks`. Hardcoded role checks (e.g., `role === 'admin'`) as auth gates are strictly forbidden. Limited role comparisons are allowed for non-gating logic — SQL/query row filtering (e.g., an `isAdmin` flag driving a `where` clause), UI display flags/badges, business-logic preconditions — but each such usage must be annotated with `// permissions-audit-allow: <reason>` so the matrix audit recognizes the exception. The matrix at `src/lib/permissions/matrix.ts` is the single source of truth and must remain perfectly synced with actual enforcement.
+2. **Supabase SSR Contract (CORE-SSR-001/002)**: Use `~/lib/supabase/server`'s `createClient()` for user-scoped server work. Always call `await supabase.auth.getUser()` immediately after client creation, with **no logic in between**. Do not hand-build a user-scoped SSR client from `@supabase/supabase-js` — go through `~/lib/supabase/server`. Importing types or specific utilities from `@supabase/supabase-js` is fine, and `src/lib/supabase/admin.ts` legitimately uses `createClient` from `@supabase/supabase-js` to build the server-only, service-role admin client.
 3. **Validate ALL Inputs (CORE-SEC-002)**: Use Zod for all form data and user inputs. Never trust `FormData` or query parameters without validation.
 4. **CSP with Nonces (CORE-SEC-003/004)**: Dynamic nonces are generated via `middleware.ts` for script execution. Do not use `'unsafe-inline'` or `'unsafe-eval'` for scripts. Static security headers are set in `next.config.ts`.
 5. **PII and Email Privacy (CORE-SEC-007)**: Email addresses are PII. Display user emails only in admin views and the user's own settings page. Everywhere else: names, "Anonymous", or roles.
@@ -36,7 +36,7 @@ Use this skill when:
 
 ### Server Client Creation (CORE-SSR-001)
 
-Always import and use the custom client creator from `~/lib/supabase/server` (never from `@supabase/ssr` directly in app code, except in the callback route where custom cookies are written to responses).
+Always import and use the custom client creator from `~/lib/supabase/server`. Only a small allowlist of modules touches `@supabase/ssr` directly: `src/lib/supabase/server.ts` (the SSR wrapper itself), `src/lib/supabase/middleware.ts` (token refresh in `updateSession`), and `src/app/(auth)/auth/callback/route.ts` (custom cookie handling so OAuth tokens are written to the response). App code outside this allowlist must go through `~/lib/supabase/server`.
 
 ### Immediate `getUser` Check (CORE-SSR-002)
 
@@ -115,7 +115,7 @@ To prevent users from locking themselves out, `canUnlinkIdentity` enforces that 
 
 ```typescript
 export function canUnlinkIdentity(
-  identities: UserIdentity[],
+  identities: readonly UserIdentity[],
   providerKey: ProviderKey
 ): UnlinkCheck;
 ```
@@ -148,7 +148,7 @@ import { eq } from "drizzle-orm";
 const updateIssueSchema = z.object({
   id: z.string().uuid(),
   title: z.string().min(1, "Title is required"),
-  severity: z.enum(["minor", "playable", "unplayable"]),
+  severity: z.enum(["cosmetic", "minor", "major", "unplayable"]),
 });
 
 export async function updateIssueAction(formData: FormData) {
