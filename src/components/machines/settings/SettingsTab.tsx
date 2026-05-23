@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Pencil, Check } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   SettingsSetCard,
@@ -151,6 +151,23 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     new Set([initial[0]!.id])
   );
   const [sets, setSets] = useState<SettingsSetData[]>(initial);
+  // Edit mode gates ALL mutation affordances. Default off (view mode).
+  // Whether the Edit button itself shows is governed by `canEdit` (the
+  // owner/tech+ permission, hardcoded at the page for the scaffold).
+  const [isEditMode, setIsEditMode] = useState(false);
+  const editsActive = canEdit && isEditMode;
+
+  function toggleEditMode(): void {
+    setIsEditMode((prev) => {
+      const entering = !prev;
+      // Entering edit mode expands every set so all editable surfaces are
+      // visible and stay open while editing.
+      if (entering) {
+        setExpandedIds(new Set(sets.map((s) => s.id)));
+      }
+      return entering;
+    });
+  }
 
   function toggleExpand(id: string): void {
     setExpandedIds((prev) => {
@@ -343,6 +360,21 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     );
   }
 
+  function renameDipBank(setId: string, bankId: string, name: string): void {
+    setSets((prev) =>
+      prev.map((s) =>
+        s.id === setId
+          ? {
+              ...s,
+              dipSwitchBanks: s.dipSwitchBanks.map((b) =>
+                b.id === bankId ? { ...b, name } : b
+              ),
+            }
+          : s
+      )
+    );
+  }
+
   function addDipSwitch(setId: string, bankId: string): string {
     const newKey = makeKey();
     setSets((prev) =>
@@ -432,17 +464,49 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
           </span>
         </p>
         {canEdit && (
-          <Button size="sm" onClick={addNewSet}>
-            <Plus aria-hidden="true" />
-            New set
-          </Button>
+          <div className="flex items-center gap-2">
+            {isEditMode && (
+              <Button size="sm" variant="outline" onClick={addNewSet}>
+                <Plus aria-hidden="true" />
+                New set
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant={isEditMode ? "default" : "outline"}
+              onClick={toggleEditMode}
+            >
+              {isEditMode ? (
+                <>
+                  <Check aria-hidden="true" />
+                  Done
+                </>
+              ) : (
+                <>
+                  <Pencil aria-hidden="true" />
+                  Edit
+                </>
+              )}
+            </Button>
+          </div>
         )}
       </div>
 
       {sets.length === 0 ? (
         <p className="rounded-lg border border-dashed border-outline-variant py-8 text-center text-sm text-muted-foreground">
-          No settings sets yet. Click <strong>New set</strong> above to create
-          one.
+          {!canEdit ? (
+            "No settings sets recorded."
+          ) : isEditMode ? (
+            <>
+              No settings sets yet. Click <strong>New set</strong> above to
+              create one.
+            </>
+          ) : (
+            <>
+              No settings sets yet. Click <strong>Edit</strong> above to add
+              one.
+            </>
+          )}
         </p>
       ) : (
         <div className="space-y-3">
@@ -451,7 +515,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
               key={set.id}
               set={set}
               isExpanded={expandedIds.has(set.id)}
-              canEdit={canEdit}
+              canEdit={editsActive}
               onToggleExpand={() => {
                 toggleExpand(set.id);
               }}
@@ -483,6 +547,9 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
               onAddDipBank={() => addDipBank(set.id)}
               onDeleteDipBank={(bankId) => {
                 deleteDipBank(set.id, bankId);
+              }}
+              onRenameDipBank={(bankId, name) => {
+                renameDipBank(set.id, bankId, name);
               }}
               onAddDipSwitch={(bankId) => addDipSwitch(set.id, bankId)}
               onUpdateDipSwitch={(bankId, switchKey, field, value) => {

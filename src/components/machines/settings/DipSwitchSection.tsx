@@ -2,14 +2,8 @@
 
 import type React from "react";
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "~/components/ui/accordion";
 import {
   Table,
   TableBody,
@@ -20,6 +14,7 @@ import {
 } from "~/components/ui/table";
 import { cn } from "~/lib/utils";
 import { EditableCell } from "~/components/machines/settings/EditableCell";
+import { InlineEditableText } from "~/components/machines/settings/InlineEditableText";
 
 export interface DipSwitchEntry {
   _key: string;
@@ -39,6 +34,7 @@ interface DipSwitchSectionProps {
   canEdit: boolean;
   onAddBank?: () => { bankId: string; switchKey: string } | undefined;
   onDeleteBank?: (bankId: string) => void;
+  onRenameBank?: (bankId: string, name: string) => void;
   onAddSwitch?: (bankId: string) => string | undefined;
   onUpdateSwitch?: (
     bankId: string,
@@ -59,15 +55,29 @@ export function DipSwitchSection({
   canEdit,
   onAddBank,
   onDeleteBank,
+  onRenameBank,
   onAddSwitch,
   onUpdateSwitch,
   onDeleteSwitch,
 }: DipSwitchSectionProps): React.JSX.Element {
-  // Tracks which freshly-added switch should mount in edit-mode with focus.
-  // We don't bother clearing it: EditableCell only acts on the marker on
-  // its initial mount, and re-setting the marker on the next add replaces
-  // the value (so the previously-mounted cell ignores it).
+  // Manual accordion state — every bank starts open. Tracked by the set of
+  // collapsed bank ids so newly added banks default to open without extra work.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Which freshly-added switch should mount focused. Not cleared: EditableCell
+  // only reads it on its initial mount, and the next add replaces the value.
   const [autoFocus, setAutoFocus] = useState<AutoFocusTarget | null>(null);
+
+  function toggleBank(bankId: string): void {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(bankId)) {
+        next.delete(bankId);
+      } else {
+        next.add(bankId);
+      }
+      return next;
+    });
+  }
 
   function handleAddBank(): void {
     const result = onAddBank?.();
@@ -94,148 +104,175 @@ export function DipSwitchSection({
         Dip Switches
       </p>
 
-      <Accordion>
-        {banks.map((bank) => (
-          <AccordionItem key={bank.id} open>
-            <AccordionTrigger className="py-2">
-              <span className="flex items-baseline gap-2">
-                <span className="font-semibold text-foreground">
-                  {bank.name}
+      <div className="divide-y divide-outline-variant/50">
+        {banks.map((bank) => {
+          const isOpen = !collapsed.has(bank.id);
+          const ChevronIcon = isOpen ? ChevronDown : ChevronRight;
+          return (
+            <div key={bank.id}>
+              {/* Bank header row — chevron toggles, name is click-to-edit */}
+              <div className="flex items-center gap-1.5 py-2">
+                <button
+                  type="button"
+                  className="rounded p-0.5 text-muted-foreground hover:bg-muted/50"
+                  onClick={() => {
+                    toggleBank(bank.id);
+                  }}
+                  aria-expanded={isOpen}
+                  aria-label={`${isOpen ? "Collapse" : "Expand"} ${bank.name} bank`}
+                >
+                  <ChevronIcon className="size-4" aria-hidden="true" />
+                </button>
+                <span className="text-sm font-semibold text-foreground">
+                  <InlineEditableText
+                    value={bank.name}
+                    canEdit={canEdit}
+                    onValueChange={(name) => {
+                      onRenameBank?.(bank.id, name);
+                    }}
+                    placeholder="Bank name"
+                    ariaLabel="bank name"
+                    inputClassName="h-7 text-sm font-semibold"
+                  />
                 </span>
-                <span className="text-xs font-normal text-muted-foreground">
-                  bank
-                </span>
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="pb-3 pl-1">
-                {bank.switches.length === 0 ? (
-                  <p className="py-1 text-xs italic text-muted-foreground">
-                    No switches in this bank yet
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-24">Switch</TableHead>
-                        <TableHead className="w-24">Position</TableHead>
-                        <TableHead>Note</TableHead>
-                        {canEdit && (
-                          <TableHead className="w-8" aria-label="Actions" />
-                        )}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {bank.switches.map((sw) => (
-                        <TableRow key={sw._key} className="group">
-                          <TableCell className="font-mono text-sm text-muted-foreground">
-                            <EditableCell
-                              value={sw.switch}
-                              canEdit={canEdit}
-                              onCommit={(v) => {
-                                onUpdateSwitch?.(bank.id, sw._key, "switch", v);
-                              }}
-                              autoFocusOnMount={
-                                autoFocus?.bankId === bank.id &&
-                                autoFocus.switchKey === sw._key
-                              }
-                              placeholder="DS-…"
-                              ariaLabel="Switch number"
-                              inputClassName="font-mono"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <button
-                              type="button"
-                              disabled={!canEdit}
-                              onClick={() => {
-                                onUpdateSwitch?.(
-                                  bank.id,
-                                  sw._key,
-                                  "position",
-                                  sw.position === "ON" ? "OFF" : "ON"
-                                );
-                              }}
-                              className={cn(
-                                "inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold transition-opacity",
-                                sw.position === "ON"
-                                  ? "bg-success/15 text-success"
-                                  : "bg-muted text-muted-foreground",
-                                canEdit && "cursor-pointer hover:opacity-80"
-                              )}
-                              aria-label={`Position ${sw.position}${
-                                canEdit ? " (click to toggle)" : ""
-                              }`}
-                            >
-                              {sw.position}
-                            </button>
-                          </TableCell>
-                          <TableCell className="text-sm text-foreground">
-                            <EditableCell
-                              value={sw.note}
-                              canEdit={canEdit}
-                              onCommit={(v) => {
-                                onUpdateSwitch?.(bank.id, sw._key, "note", v);
-                              }}
-                              placeholder="Note"
-                              ariaLabel="Switch note"
-                            />
-                          </TableCell>
+                <span className="text-xs text-muted-foreground">bank</span>
+              </div>
+
+              {isOpen && (
+                <div className="pb-3 pl-7">
+                  {bank.switches.length === 0 ? (
+                    <p className="py-1 text-xs italic text-muted-foreground">
+                      No switches in this bank yet
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-24">Switch</TableHead>
+                          <TableHead className="w-24">Position</TableHead>
+                          <TableHead>Note</TableHead>
                           {canEdit && (
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="size-6 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
-                                onClick={() => {
-                                  onDeleteSwitch?.(bank.id, sw._key);
-                                }}
-                                aria-label={`Delete switch ${sw.switch || "row"}`}
-                              >
-                                <Trash2
-                                  className="size-3.5"
-                                  aria-hidden="true"
-                                />
-                              </Button>
-                            </TableCell>
+                            <TableHead className="w-8" aria-label="Actions" />
                           )}
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                      </TableHeader>
+                      <TableBody>
+                        {bank.switches.map((sw) => (
+                          <TableRow key={sw._key} className="group">
+                            <TableCell className="font-mono text-sm text-muted-foreground">
+                              <EditableCell
+                                value={sw.switch}
+                                canEdit={canEdit}
+                                onCommit={(v) => {
+                                  onUpdateSwitch?.(
+                                    bank.id,
+                                    sw._key,
+                                    "switch",
+                                    v
+                                  );
+                                }}
+                                autoFocusOnMount={
+                                  autoFocus?.bankId === bank.id &&
+                                  autoFocus.switchKey === sw._key
+                                }
+                                placeholder="DS-…"
+                                ariaLabel="Switch number"
+                                inputClassName="font-mono"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <button
+                                type="button"
+                                disabled={!canEdit}
+                                onClick={() => {
+                                  onUpdateSwitch?.(
+                                    bank.id,
+                                    sw._key,
+                                    "position",
+                                    sw.position === "ON" ? "OFF" : "ON"
+                                  );
+                                }}
+                                className={cn(
+                                  "inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold transition-opacity",
+                                  sw.position === "ON"
+                                    ? "bg-success/15 text-success"
+                                    : "bg-muted text-muted-foreground",
+                                  canEdit && "cursor-pointer hover:opacity-80"
+                                )}
+                                aria-label={`Position ${sw.position}${
+                                  canEdit ? " (click to toggle)" : ""
+                                }`}
+                              >
+                                {sw.position}
+                              </button>
+                            </TableCell>
+                            <TableCell className="text-sm text-foreground">
+                              <EditableCell
+                                value={sw.note}
+                                canEdit={canEdit}
+                                onCommit={(v) => {
+                                  onUpdateSwitch?.(bank.id, sw._key, "note", v);
+                                }}
+                                placeholder="Note"
+                                ariaLabel="Switch note"
+                              />
+                            </TableCell>
+                            {canEdit && (
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-6 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
+                                  onClick={() => {
+                                    onDeleteSwitch?.(bank.id, sw._key);
+                                  }}
+                                  aria-label={`Delete switch ${sw.switch || "row"}`}
+                                >
+                                  <Trash2
+                                    className="size-3.5"
+                                    aria-hidden="true"
+                                  />
+                                </Button>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
 
-                {canEdit && (
-                  <div className="mt-1 flex items-center justify-between">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground"
-                      onClick={() => {
-                        handleAddSwitch(bank.id);
-                      }}
-                    >
-                      <Plus aria-hidden="true" />
-                      Add switch
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => {
-                        handleDeleteBank(bank);
-                      }}
-                    >
-                      <Trash2 aria-hidden="true" />
-                      Delete bank
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+                  {canEdit && (
+                    <div className="mt-1 flex items-center justify-between">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground"
+                        onClick={() => {
+                          handleAddSwitch(bank.id);
+                        }}
+                      >
+                        <Plus aria-hidden="true" />
+                        Add switch
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          handleDeleteBank(bank);
+                        }}
+                      >
+                        <Trash2 aria-hidden="true" />
+                        Delete bank
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {canEdit && (
         <Button

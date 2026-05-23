@@ -67,7 +67,7 @@ export function SoftwareSettingsSection({
 
       {/* Baseline strip */}
       <div className="mb-3 flex items-center gap-2 text-sm">
-        <span className="font-medium text-foreground">Starting from:</span>
+        <span className="font-medium text-foreground">Initial Install:</span>
         {isEditingBaseline && canEdit ? (
           <BaselineSelect
             value={baseline}

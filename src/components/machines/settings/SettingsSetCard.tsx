@@ -74,6 +74,7 @@ interface SettingsSetCardProps {
   // DIP switches
   onAddDipBank: () => { bankId: string; switchKey: string } | undefined;
   onDeleteDipBank: (bankId: string) => void;
+  onRenameDipBank: (bankId: string, name: string) => void;
   onAddDipSwitch: (bankId: string) => string | undefined;
   onUpdateDipSwitch: (
     bankId: string,
@@ -173,6 +174,7 @@ export function SettingsSetCard({
   onDeleteSoftwareRow,
   onAddDipBank,
   onDeleteDipBank,
+  onRenameDipBank,
   onAddDipSwitch,
   onUpdateDipSwitch,
   onDeleteDipSwitch,
@@ -218,29 +220,40 @@ export function SettingsSetCard({
             aria-hidden="true"
           />
 
-          <button
-            type="button"
-            aria-label={
-              set.isPreferred
-                ? "Preferred set (click to unset)"
-                : "Make this the preferred set"
-            }
-            className="shrink-0 rounded p-0.5 transition-colors duration-150 hover:bg-muted/50"
-            onClick={(e) => {
-              e.stopPropagation();
-              onTogglePreferred();
-            }}
-          >
-            <Star
-              className={cn(
-                "size-4 transition-colors duration-150",
+          {canEdit ? (
+            <button
+              type="button"
+              aria-label={
                 set.isPreferred
-                  ? "fill-warning text-warning"
-                  : "text-muted-foreground"
-              )}
-              aria-hidden="true"
-            />
-          </button>
+                  ? "Preferred set (click to unset)"
+                  : "Make this the preferred set"
+              }
+              className="shrink-0 rounded p-0.5 transition-colors duration-150 hover:bg-muted/50"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePreferred();
+              }}
+            >
+              <Star
+                className={cn(
+                  "size-4 transition-colors duration-150",
+                  set.isPreferred
+                    ? "fill-warning text-warning"
+                    : "text-muted-foreground"
+                )}
+                aria-hidden="true"
+              />
+            </button>
+          ) : (
+            // View mode: static indicator. Only render for the preferred set
+            // so non-preferred cards aren't cluttered with empty stars.
+            set.isPreferred && (
+              <Star
+                className="size-4 shrink-0 fill-warning text-warning"
+                aria-label="Preferred set"
+              />
+            )
+          )}
 
           <div className="flex flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
             <div className="text-sm font-semibold text-foreground">
@@ -267,32 +280,34 @@ export function SettingsSetCard({
             </Badge>
           )}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 shrink-0 text-muted-foreground"
-                aria-label="More options"
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                <MoreVertical className="size-4" aria-hidden="true" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onDuplicate}>
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onSelect={handleDelete}
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {canEdit && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0 text-muted-foreground"
+                  aria-label="More options"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                >
+                  <MoreVertical className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={onDuplicate}>
+                  Duplicate
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={handleDelete}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Description preview — always visible, click anywhere to edit */}
@@ -332,6 +347,7 @@ export function SettingsSetCard({
                 canEdit={canEdit}
                 onAddBank={onAddDipBank}
                 onDeleteBank={onDeleteDipBank}
+                onRenameBank={onRenameDipBank}
                 onAddSwitch={onAddDipSwitch}
                 onUpdateSwitch={onUpdateDipSwitch}
                 onDeleteSwitch={onDeleteDipSwitch}
