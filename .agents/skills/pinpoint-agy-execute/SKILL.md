@@ -170,7 +170,7 @@ Result: all passing.
 <any pre-existing failures, deliberate omissions from the bead's "out of scope", or noteworthy decisions>
 ```
 
-Open as **ready-for-review** (not draft).
+Open as **non-draft** (i.e., `draft: false`) — the `ready-for-review` label is applied later in Step 11 after CI is green and Copilot threads are clean.
 
 ---
 

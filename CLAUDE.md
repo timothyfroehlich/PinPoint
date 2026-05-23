@@ -87,7 +87,7 @@ Tag those issues with the `agy-ready` label so they're easy to discover and disp
 
 1. **Decision-closed (iron).** No "discuss with user", no architectural forks, no TBDs. Every interpretive choice has a written answer in the bead description, acceptance criteria, or a linked decision bead. If the bead has "Option A / Option B / Option C" branches with no chosen winner, it is NOT ready. (This is the load-bearing gate — Antigravity will pick the first plausible option and ship it.)
 2. **Scope-pinned.** Specific files, or unambiguous "do X wherever pattern Y appears" instructions. Acceptance criteria must be writable as concrete test assertions.
-3. **Concrete acceptance.** End-state is testable: "X test passes", "Y string no longer in repo", "form has `type=email autocomplete=current-password`", "DB constraint rejects bad insert". Not "improve UX", not "make it cleaner".
+3. **Concrete acceptance.** End-state is testable: "X test passes", "Y string no longer in repo", "form has `type=email autocomplete=email`", "DB constraint rejects bad insert". Not "improve UX", not "make it cleaner".
 4. **Concrete verification plan.** Bead names the exact command(s) to run: `pnpm run check`, `pnpm run preflight`, `pnpm exec playwright test e2e/path/file.spec.ts --project=chromium`. If verification needs CI (e.g., Supabase branch DB), say so explicitly.
 5. **UI work is mechanical OR pre-approved.** Rename, prop rewire, copy change, icon swap, class addition (`motion-reduce:`), `aria-foo` add, delete dead element. Or: pre-approved mockup / exact dimensions / linked design bible section. NO "does this look right?" judgment.
 6. **Self-contained.** No dependency on an open PR, no cross-bead coordination, no waiting on a teammate.
