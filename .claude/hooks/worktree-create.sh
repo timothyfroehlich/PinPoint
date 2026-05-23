@@ -61,17 +61,30 @@ print(payload.get('$1') or '')
 }
 
 BASE_PATH=$(parse_field cwd)
-NAME=$(parse_field name)
+WORKTREE_ID=$(parse_field worktree_id)
+NAME_FIELD=$(parse_field name)
+WORKTREE_PATH_FIELD=$(parse_field worktree_path)
 
-if [ -z "$BASE_PATH" ] || [ -z "$NAME" ]; then
-  echo "worktree-create.sh: missing cwd or name in hook input" >&2
+if [ -z "$BASE_PATH" ] || { [ -z "$WORKTREE_ID" ] && [ -z "$NAME_FIELD" ]; }; then
+  echo "worktree-create.sh: missing cwd, worktree_id, or name in hook input" >&2
   exit 1
+fi
+
+if [ -n "$WORKTREE_ID" ]; then
+  NAME="$WORKTREE_ID"
+else
+  NAME="$NAME_FIELD"
 fi
 
 # Match Claude Code's pre-hook native naming so existing tooling (cleanup hook,
 # worktree manifest, orchestrator skill) continues to recognize the worktree.
 BRANCH="worktree-${NAME}"
-WORKTREE_PATH="${BASE_PATH}/.claude/worktrees/${NAME}"
+
+if [ -n "$WORKTREE_PATH_FIELD" ]; then
+  WORKTREE_PATH="$WORKTREE_PATH_FIELD"
+else
+  WORKTREE_PATH="${BASE_PATH}/.claude/worktrees/${NAME}"
+fi
 
 # Ensure the parent directory exists before `git worktree add` tries to write.
 # (Claude Code's `name` is currently a flat `agent-<hex>` slug with no slashes,
