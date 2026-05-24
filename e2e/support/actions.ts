@@ -1,4 +1,5 @@
 import {
+  test,
   expect,
   type Locator,
   type Page,
@@ -331,8 +332,8 @@ export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
 }
 
 /**
- * Asserts that the page has no accessibility (a11y) violations.
- * Fails on 'serious' and 'critical' impacts, and logs 'minor' and 'moderate' impacts.
+ * Asserts that the page has no serious or critical accessibility (a11y) violations.
+ * Fails only on 'serious' and 'critical' impacts, and logs 'minor' and 'moderate' impacts.
  */
 export async function assertNoA11yViolations(
   page: Page,
@@ -361,6 +362,17 @@ export async function assertNoA11yViolations(
 
   const results = await builder.analyze();
 
+  // Attach full results to Playwright report if running inside a test context
+  try {
+    const testInfo = test.info();
+    await testInfo.attach("a11y-scan-results.json", {
+      body: JSON.stringify(results, null, 2),
+      contentType: "application/json",
+    });
+  } catch {
+    // Silent catch if called outside of active test runner execution context
+  }
+
   const seriousOrCritical = results.violations.filter(
     (v) => v.impact === "serious" || v.impact === "critical"
   );
@@ -370,16 +382,32 @@ export async function assertNoA11yViolations(
 
   if (minorOrModerate.length > 0) {
     console.log(
-      `[A11y Warning] Found ${minorOrModerate.length} moderate/minor violations:`
+      `[A11y Warning] Found ${minorOrModerate.length} moderate/minor violations.`
     );
-    for (const v of minorOrModerate) {
+    const maxViolationsToLog = 5;
+    const violationsToLog = minorOrModerate.slice(0, maxViolationsToLog);
+    for (const v of violationsToLog) {
       console.log(`- [${v.impact ?? "unknown"}] ${v.id}: ${v.help}`);
       console.log(`  Help: ${v.helpUrl}`);
-      console.log(`  Elements (${v.nodes.length}):`);
-      for (const node of v.nodes) {
+      const maxNodesToLog = 3;
+      const nodesToLog = v.nodes.slice(0, maxNodesToLog);
+      console.log(
+        `  Elements (showing ${nodesToLog.length} of ${v.nodes.length}):`
+      );
+      for (const node of nodesToLog) {
         console.log(`    - Selector: ${node.target.join(", ")}`);
         console.log(`      HTML: ${node.html}`);
       }
+      if (v.nodes.length > maxNodesToLog) {
+        console.log(
+          `    ... and ${v.nodes.length - maxNodesToLog} more element(s)`
+        );
+      }
+    }
+    if (minorOrModerate.length > maxViolationsToLog) {
+      console.log(
+        `... and ${minorOrModerate.length - maxViolationsToLog} more moderate/minor violation(s)`
+      );
     }
   }
 
