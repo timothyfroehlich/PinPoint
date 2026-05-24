@@ -18,7 +18,7 @@ import {
   loginAs,
   logout,
   selectOption,
-  assertSelectAtPlaceholder,
+  assertSelectValue,
 } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { seededMachines, TEST_USERS } from "../support/constants";
@@ -100,10 +100,7 @@ test.describe("CREATE form resets", () => {
     );
 
     // Severity select returned to default "Minor".
-    await assertSelectAtPlaceholder(
-      page.getByTestId("issue-severity-select"),
-      "Minor"
-    );
+    await assertSelectValue(page.getByTestId("issue-severity-select"), "Minor");
 
     // Confirm machineInitials wasn't hydrated from a leaked localStorage entry.
     expect(page.url()).not.toContain(`machine=${machineInitials}`);
@@ -149,10 +146,7 @@ test.describe("CREATE form resets", () => {
     await expect(page.getByTestId("machine-select")).toHaveValue("");
 
     // Severity select returned to default "Minor".
-    await assertSelectAtPlaceholder(
-      page.getByTestId("issue-severity-select"),
-      "Minor"
-    );
+    await assertSelectValue(page.getByTestId("issue-severity-select"), "Minor");
 
     // ?machine= must be stripped on Clear when the machine was user-picked
     // (no URL-derived default). Otherwise a reload silently re-selects.

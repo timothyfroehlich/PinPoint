@@ -336,6 +336,7 @@ export async function assertSelectAtPlaceholder(
   trigger: Locator,
   placeholderText: string | RegExp
 ): Promise<void> {
+  await expect(trigger).toHaveAttribute("data-placeholder");
   await expect(trigger).toHaveText(placeholderText);
 }
 
@@ -346,5 +347,6 @@ export async function assertSelectValue(
   trigger: Locator,
   expectedLabel: string | RegExp
 ): Promise<void> {
+  await expect(trigger).not.toHaveAttribute("data-placeholder");
   await expect(trigger).toHaveText(expectedLabel);
 }

@@ -54,7 +54,7 @@ PinPoint E2E tests run in parallel against a **shared database**.
 
 ## Common Helpers
 
-- **Select Reset Assertions**: Use `assertSelectAtPlaceholder(trigger, placeholderText)` to assert a custom Radix/shadcn Select trigger returned to its placeholder state after a reset (e.g. `await assertSelectAtPlaceholder(page.getByTestId("select-id"), "Select option...")`).
+- **Select Reset Assertions**: Use `assertSelectAtPlaceholder(trigger, placeholderText)` for placeholder state, or `assertSelectValue(trigger, expectedLabel)` for default value state (e.g. `await assertSelectValue(page.getByTestId("select-id"), "Minor")`).
 
 ## References
 
