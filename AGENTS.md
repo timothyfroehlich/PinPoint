@@ -51,6 +51,7 @@ Load relevant skills for every task. If your tool doesn't support skills, read t
 | Testing     | `pinpoint-e2e`                   | E2E tests, worker isolation, Playwright stability               |
 | Security    | `pinpoint-security`              | Auth, CSP, Zod, Supabase SSR                                    |
 | Patterns    | `pinpoint-patterns`              | Server Actions, data fetching, architecture                     |
+| Workflow    | `pinpoint-prototype-mode`        | Opt-in rapid iteration: relax test/lint/type rigor, track debt  |
 | Workflow    | `pinpoint-briefing`              | Session-start health review                                     |
 | Workflow    | `pinpoint-pr-workflow`           | Full PR lifecycle: commit, push, CI, Copilot, merge             |
 | Workflow    | `pinpoint-orchestrator`          | Parallel subagent work in worktrees                             |
@@ -108,6 +109,10 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                                                                                |
 | `ruff check && ruff format`           | Python lint/format (no venv needed)                                                                                                       |
 | `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                   |
+
+### Prototype mode (rapid iteration)
+
+When the user explicitly asks for "prototype mode" / "rapid iteration" / "just explore", load the `pinpoint-prototype-mode` skill and enter it. It relaxes the §2 rigor (skip preflight/tests before showing work, defer lint/type fixes, defer coverage and DRY) while logging every skipped item to a `.prototype-mode` debt ledger. It changes **agent behavior only** — pre-commit and `preflight` hooks still run on any real commit, which is fine because prototype work stays local and uncommitted. Never self-elect into it; full rigor is the default. A `UserPromptSubmit`/`SessionStart` hook reminds the agent while the marker exists, so the mode survives compaction. Exit on "exit prototype mode" / "make this real" — then repay the ledger.
 
 ### Which tests to run
 
