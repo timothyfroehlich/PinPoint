@@ -60,8 +60,9 @@ These are cheap and keep "fast" from becoming "unusable" or "dangerous":
   expected; the point of this mode is you're _not_ committing yet.)
 - **Never touch production** (no prod DB, no prod deploy, no prod secrets).
 - **Never delete or weaken existing tests** to make something pass.
-- **Auth / secrets / RLS safety** (AGENTS.md §2.1 #5, #10) still applies — a
-  prototype that leaks data isn't a prototype, it's a bug.
+- **Auth, permissions, and data-privacy rules still apply** (AGENTS.md §2.1 #5
+  Supabase SSR, #10 email privacy, #11 permissions matrix) — a prototype that
+  leaks data or bypasses a permission check isn't a prototype, it's a bug.
 - **`localhost` not `127.0.0.1`** (#14) — breaking this wastes iteration time
   on auth failures, so keep it.
 
