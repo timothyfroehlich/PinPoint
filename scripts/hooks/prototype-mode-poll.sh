@@ -21,6 +21,9 @@ goal=$(grep -m1 '^Goal:' "$marker" 2>/dev/null || true)
 # stdout as a reminder. Match the convention in huddle-poll.sh (no literal
 # wrapper tags).
 printf '## ⚡ Prototype mode is ACTIVE\n\n'
+printf 'Scope is UI/UX only (layout, components, styling, flow). Keep full '
+printf 'rigor on backend/internal logic (data, server actions, auth, '
+printf 'permissions, migrations) — stub data rather than building it.\n'
 printf 'Rigor is relaxed per the pinpoint-prototype-mode skill: do not run '
 printf 'preflight/tests before showing work, do not fix every lint/type '
 printf 'error, defer coverage and DRY — but log each skip to the debt ledger '

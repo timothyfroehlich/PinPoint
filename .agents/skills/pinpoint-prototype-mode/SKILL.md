@@ -1,21 +1,40 @@
 ---
 name: pinpoint-prototype-mode
-description: Opt-in rapid-iteration mode for design/idea exploration. Relaxes test/lint/type rigor in favor of speed while tracking the resulting debt. Use when the user says "prototype mode", "rapid iteration", "vibe", or asks to explore an idea quickly without worrying about tests passing. Also read this to EXIT the mode.
+description: Opt-in rapid-iteration mode for UI/UX prototyping — layout, components, styling, page structure, interaction/flow. Relaxes test/lint/type rigor on presentational code in favor of speed while tracking the resulting debt. NOT for backend/internal work (data layer, server-action logic, auth, permissions, migrations). Use when the user says "prototype mode", "rapid iteration", "vibe", or asks to explore a UI/design idea quickly without worrying about tests passing. Also read this to EXIT the mode.
 ---
 
 # PinPoint Prototype Mode
 
-A deliberately-entered, deliberately-exited mode for iterating on designs and
-ideas fast — without stopping to make tests, lint, and types green at every
-step. The work is **not** done when prototype mode ends; the mode tracks
-exactly what rigor was skipped so it can be repaid.
+A deliberately-entered, deliberately-exited mode for iterating on **UI/UX**
+fast — layout, components, styling, page structure, interaction and flow —
+without stopping to make tests, lint, and types green at every step. The work
+is **not** done when prototype mode ends; the mode tracks exactly what rigor
+was skipped so it can be repaid.
+
+## Scope: UI/UX only
+
+This mode is for **visual and interaction design** — the stuff you want to see
+rendered, tweak, and see again. It is **not** a license to vibe-code internals.
+
+- **In scope:** components, layouts, Tailwind/styling, page composition,
+  responsive behavior, copy, empty/loading/error states, navigation and
+  interaction flow.
+- **Out of scope (keep full rigor):** the data layer, server-action business
+  logic, queries, migrations, auth, permissions, anything in `~/lib` that isn't
+  presentational. If a UI idea needs data, **stub or hard-code it** to see the
+  screen — don't build the real backend under relaxed rigor. When the design is
+  settled, exit the mode and build the backend properly.
+
+If the exploration starts requiring real backend/internal changes, that's the
+signal to exit prototype mode (or keep that slice rigorous) — say so rather
+than quietly relaxing rigor on logic that matters.
 
 ## When to use
 
 Enter **only** when the user explicitly asks: "prototype mode", "rapid
-iteration", "let's just explore", "vibe on this", "don't worry about tests for
-now", or similar. **Never self-elect into this mode.** Full rigor (AGENTS.md
-§2) is always the default.
+iteration", "let's just explore", "vibe on this UI", "don't worry about tests
+for now", or similar — and the work is **UI/UX**. **Never self-elect into this
+mode.** Full rigor (AGENTS.md §2) is always the default.
 
 ## Entering the mode
 
