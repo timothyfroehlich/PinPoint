@@ -594,8 +594,8 @@ describe("Issue Service Functions (Integration)", () => {
         })
         .returning();
 
-      // Fetch the issue the same way page.tsx does: with reportedByUser and
-      // invitedReporter relations but without any root columns restriction.
+      // Fetch the issue matching the root columns selection behavior of the issue detail page
+      // (no columns restriction under issues, but with related tables restricted).
       const fetched = await db.query.issues.findFirst({
         where: eq(issues.id, emailOnlyIssue.id),
         with: {
@@ -605,6 +605,9 @@ describe("Issue Service Functions (Integration)", () => {
       });
 
       if (!fetched) throw new Error("Expected issue to exist");
+
+      // Verify that reporterEmail is actually retrieved by the query.
+      expect(fetched.reporterEmail).toBe("display@bug.com");
 
       // Pass the fetched issue directly to resolveIssueReporter to mirror how the page
       // invokes it. This ensures that any accidental access to reporterEmail (which is
