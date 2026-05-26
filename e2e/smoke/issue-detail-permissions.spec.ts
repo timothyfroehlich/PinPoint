@@ -10,6 +10,7 @@
  *   src/test/unit/components/issues/issue-detail-permissions.test.tsx
  */
 import { test, expect } from "@playwright/test";
+import { assertNoA11yViolations } from "../support/actions.js";
 import { seededIssues } from "../support/constants.js";
 
 test.describe("Issue detail smoke — unauthenticated render", () => {
@@ -35,5 +36,7 @@ test.describe("Issue detail smoke — unauthenticated render", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: issue.title })
     ).toBeVisible();
+
+    await assertNoA11yViolations(page);
   });
 });

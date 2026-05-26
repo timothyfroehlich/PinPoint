@@ -10,6 +10,7 @@ import {
   assertNoHorizontalOverflow,
   updateIssueField,
   visibleIssueFieldControl,
+  assertNoA11yViolations,
 } from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
@@ -54,6 +55,8 @@ test.describe("Issues System", () => {
 
       // Navigate to report page for The Addams Family
       await page.goto(`/report?machine=${machineInitials}`);
+
+      await assertNoA11yViolations(page);
 
       // Fill out form
       await fillReportForm(page, {
@@ -202,6 +205,8 @@ test.describe("Issues System", () => {
           .getByRole("main")
           .getByRole("heading", { level: 1, name: issueTitle })
       ).toBeVisible();
+
+      await assertNoA11yViolations(page);
 
       // Check ID is displayed (in layout above title, not in H1)
       const idText = `${machineInitials}-${String(issueNumber).padStart(2, "0")}`;
