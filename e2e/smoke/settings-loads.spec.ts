@@ -8,6 +8,7 @@
 
 import { test, expect } from "@playwright/test";
 import { STORAGE_STATE } from "../support/auth-state";
+import { assertNoA11yViolations } from "../support/actions.js";
 
 test.describe("Settings page (smoke)", () => {
   test.use({ storageState: STORAGE_STATE.member });
@@ -18,5 +19,7 @@ test.describe("Settings page (smoke)", () => {
     await expect(
       page.getByRole("heading", { name: /connected accounts/i })
     ).toBeVisible();
+
+    await assertNoA11yViolations(page);
   });
 });

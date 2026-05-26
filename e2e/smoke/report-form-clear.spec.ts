@@ -12,7 +12,8 @@ import { cleanupTestEntities } from "../support/cleanup";
 import {
   fillReportForm,
   submitFormAndWaitForRedirect,
-} from "../support/page-helpers";
+} from "../support/page-helpers.js";
+import { assertNoA11yViolations } from "../support/actions.js";
 
 const TITLE_PREFIX = "E2E Form Clear";
 
@@ -33,6 +34,8 @@ test.describe("Report Form Clears After Submission", () => {
     await expect(
       page.getByRole("heading", { name: "Report an Issue" })
     ).toBeVisible();
+
+    await assertNoA11yViolations(page);
 
     const select = page.getByTestId("machine-select");
     await expect(select).toBeVisible();

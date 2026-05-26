@@ -7,7 +7,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { loginAs, logout } from "../support/actions.js";
+import { loginAs, logout, assertNoA11yViolations } from "../support/actions.js";
 import { TEST_USERS } from "../support/constants";
 
 test.describe("Username Account Login", () => {
@@ -26,6 +26,8 @@ test.describe("Username Account Login", () => {
 
     // Verify we're logged in — AppHeader is always visible
     await expect(page.getByTestId("app-header")).toBeVisible();
+
+    await assertNoA11yViolations(page);
   });
 });
 
@@ -40,6 +42,8 @@ test.describe("Authentication Smoke", () => {
     // Verify we're on the login page (may include ?next= from HeaderSignInButton)
     await expect(page).toHaveURL(/\/login/);
     await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
+
+    await assertNoA11yViolations(page);
 
     // Fill out login form
     await page.getByLabel("Email").fill(TEST_USERS.member.email);
@@ -60,6 +64,8 @@ test.describe("Authentication Smoke", () => {
 
     await expect(page.getByTestId("quick-stats")).toBeVisible();
     await expect(page.getByTestId("stat-open-issues-value")).toBeVisible();
+
+    await assertNoA11yViolations(page);
   });
 
   test("protected route redirect - login with ?next= and land on original destination", async ({
