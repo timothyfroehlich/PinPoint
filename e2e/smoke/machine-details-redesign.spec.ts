@@ -13,8 +13,8 @@
  *     - "should show Report Issue button in header" (class-H)
  *   Row 26 — Absorbed from e2e/smoke/machines-crud.spec.ts (now deleted):
  *     - machines list page overflow check (class-D)
- *   Row 26 — Downgraded to integration/unit (machine-actions.test.ts):
- *     - "non-admin cannot access /m/new page" (class-E)
+ *   Row 26 — Downgraded to integration/unit (machine-actions.test.ts) except /m/new page-level 403 (E2E):
+ *     - "non-admin cannot access /m/new page" (class-E page guard in E2E; mutation action in unit)
  *     - "should display seeded test machines with correct statuses" (class-B/D)
  *     - "should display machine issues on detail page via expando" (class-H — RTL)
  *     - "should display machine owner to all logged-in users" (class-D/H — RTL)

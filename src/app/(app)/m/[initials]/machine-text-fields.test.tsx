@@ -4,9 +4,14 @@ import { describe, it, expect, vi } from "vitest";
 import { MachineTextFields } from "./machine-text-fields";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
+interface MockInlineEditableFieldProps {
+  label: string;
+  testId?: string;
+}
+
 // Mock InlineEditableField to avoid rendering complex rich text editor
 vi.mock("~/components/inline-editable-field", () => ({
-  InlineEditableField: ({ label, testId }: any) => (
+  InlineEditableField: ({ label, testId }: MockInlineEditableFieldProps) => (
     <div data-testid={testId}>
       <span>{label}</span>
     </div>
