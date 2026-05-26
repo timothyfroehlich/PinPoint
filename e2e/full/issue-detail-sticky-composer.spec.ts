@@ -57,10 +57,16 @@ test.describe("StickyCommentComposer — mobile signed-out", () => {
     await page.goto(ISSUE_URL);
     await page.waitForLoadState("domcontentloaded");
 
+    // Assert that we are on the issue detail page and it loaded successfully (not redirected).
+    await expect(page).toHaveURL(ISSUE_URL);
+    await expect(
+      page.getByRole("heading", { level: 1, name: ISSUE.title })
+    ).toBeVisible();
+
     // The server-side check (accessLevel !== "unauthenticated") should prevent the
-    // StickyCommentComposer from rendering entirely, meaning it is not visible.
+    // StickyCommentComposer from rendering entirely, meaning it is not attached to the DOM.
     const stickyTrigger = page.getByRole("button", { name: "Add a comment" });
-    await expect(stickyTrigger).not.toBeVisible();
+    await expect(stickyTrigger).not.toBeAttached();
   });
 });
 
