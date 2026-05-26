@@ -23,9 +23,17 @@ Use the `agy-ready` label to mark candidates. Use the `agy-ui` label additionall
 
 ### Gate 1 — Decision-closed (load-bearing)
 
-No "discuss with user", no architectural forks, no TBDs. Every interpretive choice has a written answer in the bead description, acceptance criteria, or a linked decision bead.
+No unresolved fork that (a) Tim holds a preference on AND (b) carries repo-wide blast radius or would be hard to catch in review. Every such choice must have a written answer in the bead description, acceptance criteria, or a linked decision bead.
 
-If the bead has "Option A / Option B / Option C" branches with no chosen winner, it is NOT ready. Antigravity will pick the first plausible option and ship it.
+If the bead has "Option A / Option B / Option C" branches with no chosen winner on a high-blast-radius question, it is NOT ready. Antigravity will pick the first plausible option and ship it.
+
+A capable executor applying a documented rule (e.g. CORE-TEST-005 to pick the cheapest test layer) is NOT an open fork. Micro-decisions that the executor can resolve by following existing project rules pass Gate 1 — especially when the bead's blast radius is low (tests, docs). The `pinpoint-agy-execute` runbook instructs the executor to stop and post a `bd comment` when genuinely torn, so it is not forced to guess silently.
+
+#### Blast radius calibration
+
+**Low blast radius** (tests, docs, isolated UI components): the executor may make reasonable micro-decisions and should post a `bd comment` when torn. Prefer tagging `agy-ready` with a delegated-decision note rather than blocking on every minor choice.
+
+**High blast radius** (new dependencies, lint/architecture rules, schema changes, permission logic, prod behavior): these forks require a pre-made decision in the bead. Antigravity must not invent answers here.
 
 ### Gate 2 — Scope-pinned
 
@@ -117,10 +125,8 @@ After Antigravity ships a PR, treat it like any other agent PR: Copilot review, 
 
 ---
 
-## When in doubt, default to FAIL
+## When in doubt
 
-Under-tagging is safe — Antigravity just has fewer candidates to pick from.
+**High blast radius (schema, permissions, prod behavior, new dependencies, lint architecture):** default to FAIL. Over-tagging causes Antigravity to make judgment calls it was never meant to make, silently shipping wrong choices. Leave a `bd comment` describing the gap and skip the tag.
 
-Over-tagging causes Antigravity to make judgment calls it was never meant to make, silently shipping wrong choices.
-
-If a gate is ambiguous, leave a `bd comment` describing the gap and skip the tag.
+**Low blast radius (tests, docs):** prefer tagging `agy-ready` with a delegated-decision note. Add a `bd comment` naming the micro-decisions the executor may resolve independently (e.g. "executor may choose cheapest test layer per CORE-TEST-005; post bd comment if torn"). Under-tagging safe work just starves Antigravity of good candidates.
