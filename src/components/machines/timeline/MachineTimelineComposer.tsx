@@ -59,6 +59,8 @@ export function MachineTimelineComposer({
     if (!isDirty) return undefined;
     const handler = (e: BeforeUnloadEvent): void => {
       e.preventDefault();
+      // Legacy browsers require returnValue to be set.
+      e.returnValue = "";
     };
     window.addEventListener("beforeunload", handler);
     return () => {
@@ -71,18 +73,22 @@ export function MachineTimelineComposer({
     setError(null);
     const chosenTag = tag;
     startTransition(async () => {
-      const result = await addMachineCommentAction({
-        machineId,
-        tag: chosenTag,
-        contentJson: JSON.stringify(doc),
-      });
-      if (result.success) {
-        setDoc({ type: "doc", content: [] });
-        setTag("note");
-        setFullMode(false);
-        onPosted();
-      } else {
-        setError(result.error);
+      try {
+        const result = await addMachineCommentAction({
+          machineId,
+          tag: chosenTag,
+          contentJson: JSON.stringify(doc),
+        });
+        if (result.success) {
+          setDoc({ type: "doc", content: [] });
+          setTag("note");
+          setFullMode(false);
+          onPosted();
+        } else {
+          setError(result.error);
+        }
+      } catch {
+        setError("Something went wrong. Please try again.");
       }
     });
   };

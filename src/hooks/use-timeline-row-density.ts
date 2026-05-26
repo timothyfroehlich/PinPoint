@@ -37,12 +37,12 @@ export const TIMELINE_ROW_BREAKPOINT_FULL = 560;
  * back-to-back resize events. Returns a density tier plus the ref the
  * caller attaches to the line-1 element.
  *
- * SSR-safe: starts in `"compact"` so the server-rendered HTML matches the
- * narrowest visible state (no actor, badges-as-icons). When the JS bundle
- * hydrates and runs the observer, room is detected and the row expands
- * upward to the densest tier the width allows. Hydration mismatch is
- * impossible because the server-rendered DOM is exactly what the client
- * renders before the first effect runs.
+ * SSR-safe: starts in `"no-actor"` so the server-rendered HTML matches the
+ * narrowest visible state (actor hidden). When the JS bundle hydrates and
+ * runs the observer, room is detected and the row expands to `"full"` if
+ * the width allows. Hydration mismatch is impossible because the
+ * server-rendered DOM is exactly what the client renders before the first
+ * effect runs.
  */
 export function useTimelineRowDensity(): {
   density: TimelineRowDensity;

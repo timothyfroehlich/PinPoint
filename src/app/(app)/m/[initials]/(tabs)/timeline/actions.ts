@@ -28,7 +28,11 @@ import {
   updateMachineComment,
 } from "~/lib/timeline/machine-events";
 import { userTagSchema } from "~/lib/timeline/machine-tags";
-import { type ProseMirrorDoc, proseMirrorDocSchema } from "~/lib/tiptap/types";
+import {
+  docToPlainText,
+  type ProseMirrorDoc,
+  proseMirrorDocSchema,
+} from "~/lib/tiptap/types";
 import { db } from "~/server/db";
 import { machines, timelineEvents, userProfiles } from "~/server/db/schema";
 
@@ -86,14 +90,14 @@ export async function addMachineCommentAction(
     if (!validated.success) {
       return { success: false, error: "Invalid content" };
     }
-    if (!validated.data.content || validated.data.content.length === 0) {
+    // Cast through `unknown` — the schema validates the top-level shape;
+    // deeper node validation is handled by Tiptap on render.
+    content = raw as ProseMirrorDoc;
+    // Reject semantically-empty docs (whitespace-only paragraphs, etc.)
+    // consistent with the issue-comment action pattern.
+    if (!docToPlainText(content).trim()) {
       return { success: false, error: "Invalid content" };
     }
-    // The schema validates the top-level shape; deeper node validation is
-    // handled by Tiptap on render. Cast through `unknown` to align with the
-    // `ProseMirrorDoc` interface (matches the established m/actions.ts
-    // pattern for the existing prose-field actions).
-    content = raw as ProseMirrorDoc;
   } catch {
     return { success: false, error: "Invalid content JSON" };
   }
@@ -174,10 +178,10 @@ export async function editMachineCommentAction(
     if (!validated.success) {
       return { success: false, error: "Invalid content" };
     }
-    if (!validated.data.content || validated.data.content.length === 0) {
+    content = raw as ProseMirrorDoc;
+    if (!docToPlainText(content).trim()) {
       return { success: false, error: "Invalid content" };
     }
-    content = raw as ProseMirrorDoc;
   } catch {
     return { success: false, error: "Invalid content JSON" };
   }

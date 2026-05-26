@@ -14,13 +14,13 @@ describe("MachineTimelineTombstoneRow", () => {
     expect(screen.getByText(/Comment deleted by Sam/)).toBeInTheDocument();
   });
 
-  it("falls back to 'an admin' when deletedByName is null", () => {
+  it("falls back to 'a user' when deletedByName is null", () => {
     render(
       <MachineTimelineTombstoneRow
         deletedByName={null}
         deletedAt={new Date()}
       />
     );
-    expect(screen.getByText(/Comment deleted by an admin/)).toBeInTheDocument();
+    expect(screen.getByText(/Comment deleted by a user/)).toBeInTheDocument();
   });
 });

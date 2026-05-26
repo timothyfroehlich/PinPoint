@@ -48,7 +48,7 @@ export function MachineNoteComposerSheet({
       </SheetTrigger>
       <SheetContent
         side="bottom"
-        className="sm:left-1/2 sm:right-auto sm:w-full sm:max-w-2xl sm:-translate-x-1/2 sm:rounded-t-xl"
+        className="md:left-1/2 md:right-auto md:w-full md:max-w-2xl md:-translate-x-1/2 md:rounded-t-xl"
       >
         <SheetHeader className="pb-0">
           <SheetTitle>New note</SheetTitle>

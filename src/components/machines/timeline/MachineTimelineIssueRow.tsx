@@ -55,17 +55,17 @@ interface Props {
  * Line 1 layout: `[ID verb] [badges] [— Actor] [time]`. The em-dash and
  * actor name are visually part of the left cluster — time alone is
  * right-pinned via `margin-left: auto`. The {@link useTimelineRowDensity}
- * hook observes the row body width and drops the actor (then collapses
- * badge labels to icons) as space runs out.
+ * hook observes the row body width and drops the actor when space runs
+ * out (two tiers: `full` with actor, `no-actor` without).
  *
  * Line 2: `<AFM-03 Title>` issue anchor. Wraps to multiple lines if the
  * title is long.
  *
  * Client component because the ResizeObserver-driven density logic needs
- * to measure the actual DOM. SSR-safe: initial render uses the densest
- * fallback (no actor, badge icons only) so the first paint matches the
- * tightest layout; JS expands upward when room is available. This avoids
- * hydration mismatch and the "actor flashes in then disappears" flicker.
+ * to measure the actual DOM. SSR-safe: initial render uses `"no-actor"`
+ * (actor hidden) so the first paint matches the tightest layout; JS
+ * expands to `"full"` when room is available. This avoids hydration
+ * mismatch and the "actor flashes in then disappears" flicker.
  */
 export function MachineTimelineIssueRow({
   row,

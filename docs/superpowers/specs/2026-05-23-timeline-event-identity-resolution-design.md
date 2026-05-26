@@ -1,8 +1,8 @@
 # Timeline Event Identity Resolution — Design
 
 **Date:** 2026-05-23
-**Status:** Approved design (pre-implementation)
-**Feature:** PP-0x98 machine timeline (PR #1380)
+**Status:** Approved design — NOT YET IMPLEMENTED (follow-up bead)
+**Feature:** PP-0x98 machine timeline (PR #1380 ships the V1 snapshot approach described in §1 as the problem; this spec is the target design for the follow-up implementation bead)
 **Author:** Tim + Claude (design dialogue)
 
 ## 1. Problem

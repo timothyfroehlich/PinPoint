@@ -20,7 +20,7 @@ export function MachineTimelineTombstoneRow({
 }: Props): React.JSX.Element {
   return (
     <div className="border-b py-1.5 text-xs italic text-muted-foreground">
-      Comment deleted by {deletedByName ?? "an admin"} ·{" "}
+      Comment deleted by {deletedByName ?? "a user"} ·{" "}
       {formatRelative(deletedAt)}
     </div>
   );

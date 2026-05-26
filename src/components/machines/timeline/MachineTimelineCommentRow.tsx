@@ -277,11 +277,21 @@ function DeleteCommentDialog({
   onOpenChange,
 }: DeleteCommentDialogProps): React.JSX.Element {
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   const handleDelete = (): void => {
+    setError(null);
     startTransition(async () => {
-      await deleteMachineCommentAction({ id: commentId });
-      onOpenChange(false);
+      try {
+        const result = await deleteMachineCommentAction({ id: commentId });
+        if (result.success) {
+          onOpenChange(false);
+        } else {
+          setError(result.error);
+        }
+      } catch {
+        setError("Something went wrong. Please try again.");
+      }
     });
   };
 
@@ -295,6 +305,7 @@ function DeleteCommentDialog({
             visible to others.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={handleDelete} disabled={pending}>

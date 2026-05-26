@@ -171,8 +171,8 @@ export interface MachineTimelineRow {
   id: string;
   machineId: string | null;
   createdAt: Date;
-  sourceType: string;
-  tag: string;
+  sourceType: TimelineEventSourceType;
+  tag: TimelineTag;
   authorId: string | null;
   authorName: string | null;
   authorAvatarUrl: string | null;

@@ -43,6 +43,22 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
+// Production safety guard: refuse to run against non-local hosts unless the
+// caller has explicitly opted in. This mirrors seed-timeline-demo's guard.
+// For the intentional production one-shot run:
+//   ALLOW_NONLOCAL_BACKFILL=1 node --env-file=<prod-env> supabase/seed-timeline-backfill.mjs
+{
+  const url = new URL(databaseUrl);
+  const isLocal =
+    url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (!isLocal && !process.env.ALLOW_NONLOCAL_BACKFILL) {
+    console.error(
+      `❌ seed-timeline-backfill refuses non-local DB (${url.hostname}) without ALLOW_NONLOCAL_BACKFILL=1`
+    );
+    process.exit(1);
+  }
+}
+
 async function backfill() {
   const sql = postgres(databaseUrl);
   const counts = {
