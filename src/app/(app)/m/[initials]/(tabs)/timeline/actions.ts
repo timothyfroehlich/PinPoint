@@ -243,6 +243,9 @@ export async function editMachineCommentAction(
   });
 
   revalidatePath(`/m/${machine.initials}/timeline`);
+  // Also refresh the overview tab — the "Recent activity" section renders the
+  // same row (with the new content + "(edited)" marker) off the machine root.
+  revalidatePath(`/m/${machine.initials}`);
   return { success: true };
 }
 
@@ -330,5 +333,8 @@ export async function deleteMachineCommentAction(
   });
 
   revalidatePath(`/m/${machine.initials}/timeline`);
+  // Also refresh the overview tab — a deleted comment in "Recent activity"
+  // must flip to a tombstone there too, not just on the timeline.
+  revalidatePath(`/m/${machine.initials}`);
   return { success: true };
 }
