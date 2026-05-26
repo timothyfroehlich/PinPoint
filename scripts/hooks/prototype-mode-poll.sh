@@ -17,18 +17,14 @@ marker="${CLAUDE_PROJECT_DIR:-.}/.prototype-mode"
 
 goal=$(grep -m1 '^Goal:' "$marker" 2>/dev/null || true)
 
-# Emit plain markdown — the harness presents UserPromptSubmit/SessionStart
-# stdout as a reminder. Match the convention in huddle-poll.sh (no literal
-# wrapper tags).
-printf '## ⚡ Prototype mode is ACTIVE\n\n'
-printf 'Scope is UI/UX only (layout, components, styling, flow). Keep full '
-printf 'rigor on backend/internal logic (data, server actions, auth, '
-printf 'permissions, migrations) — stub data rather than building it.\n'
-printf 'Rigor is relaxed per the pinpoint-prototype-mode skill: do not run '
-printf 'preflight/tests before showing work, do not fix every lint/type '
-printf 'error, defer coverage and DRY — but log each skip to the debt ledger '
-printf 'in .prototype-mode. Never commit/push, never touch prod, never delete '
-printf 'tests.\n'
-[ -n "$goal" ] && printf '%s\n' "$goal"
-printf 'Exit with "exit prototype mode" / "make this real", then repay the '
-printf 'ledger. Read the pinpoint-prototype-mode skill for the full rules.\n'
+# Emit a compact plain-markdown reminder — the harness presents
+# UserPromptSubmit/SessionStart stdout as a reminder, and this fires every
+# turn while the marker exists, so keep it bounded. Match huddle-poll.sh's
+# convention (no literal wrapper tags). Full rules live in the skill.
+printf '⚡ **Prototype mode ACTIVE — UI/UX only.** Relax test/lint/type rigor '
+printf 'on presentation; keep full rigor on backend/data/auth (stub data, do '
+printf 'not build it). Log skips to the .prototype-mode ledger; never '
+printf 'commit/push, touch prod, or delete tests. '
+[ -n "$goal" ] && printf '%s ' "$goal"
+printf 'Exit: "exit prototype mode" / "make this real" → repay the ledger. '
+printf 'Full rules: pinpoint-prototype-mode skill.\n'
