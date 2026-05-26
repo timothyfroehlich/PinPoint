@@ -5,12 +5,12 @@
  *
  * The backfill script populates `machine_added`, `issue_opened`, and
  * `issue_closed` events from real seed data (those are the kinds we have
- * actual history for). This script populates AFM (Addams Family) with ONE
+ * actual history for). This script populates AFM (Attack from Mars) with ONE
  * of every OTHER kind so the timeline tab is visually exhaustive for demos
  * and design reviews. Also sprinkles in a few user comments with mixed
  * authors.
  *
- * Idempotent: bails if AFM already has a `description_updated` row (which
+ * Idempotent: bails if AFM already has an `owner_notes_updated` row (which
  * the demo is the only source of in seed data).
  *
  * NEVER run on prod. The script refuses to run unless POSTGRES_URL points
