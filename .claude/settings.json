@@ -124,6 +124,11 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/huddle-poll.sh",
             "timeout": 10000
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/prototype-mode-poll.sh",
+            "timeout": 5000
           }
         ]
       }
@@ -141,6 +146,11 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/session-start-orphan-sweep.sh",
             "timeout": 15000
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/prototype-mode-poll.sh",
+            "timeout": 5000
           }
         ]
       }
