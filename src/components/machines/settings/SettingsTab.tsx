@@ -7,7 +7,6 @@ import { Button } from "~/components/ui/button";
 import {
   SettingsSetCard,
   type SettingsSetData,
-  type MarkdownField,
 } from "~/components/machines/settings/SettingsSetCard";
 import { plainTextToDoc, type ProseMirrorDoc } from "~/lib/tiptap/types";
 
@@ -42,15 +41,32 @@ function makeSampleSets(): SettingsSetData[] {
         { _key: makeKey(), id: "S-040", name: "Free play", value: "On" },
       ],
       dipSwitchBanks: [],
-      rubbers: plainTextToDoc(
-        '3/8" silicone on outlane posts. Leave everything else stock.'
-      ),
-      postPositions: plainTextToDoc(
-        "Outlane posts — middle hole. Center post installed."
-      ),
-      notes: plainTextToDoc(
-        "Right scoop has a slight kickout issue. No impact on gameplay; just flag if it gets worse."
-      ),
+      notes: [
+        {
+          id: makeKey(),
+          title: "Rubbers",
+          customTitle: false,
+          body: plainTextToDoc(
+            '3/8" silicone on outlane posts. Leave everything else stock.'
+          ),
+        },
+        {
+          id: makeKey(),
+          title: "Post positions",
+          customTitle: false,
+          body: plainTextToDoc(
+            "Outlane posts — middle hole. Center post installed."
+          ),
+        },
+        {
+          id: makeKey(),
+          title: "Notes",
+          customTitle: true,
+          body: plainTextToDoc(
+            "Right scoop has a slight kickout issue. No impact on gameplay; just flag if it gets worse."
+          ),
+        },
+      ],
     },
     {
       id: "set-2",
@@ -80,9 +96,26 @@ function makeSampleSets(): SettingsSetData[] {
         { _key: makeKey(), id: "S-041", name: "Match feature", value: "Off" },
       ],
       dipSwitchBanks: [],
-      rubbers: plainTextToDoc("Same as Standard House."),
-      postPositions: plainTextToDoc("Outlane posts — top hole (tighter lane)."),
-      notes: plainTextToDoc("Review ball times after each league session."),
+      notes: [
+        {
+          id: makeKey(),
+          title: "Rubbers",
+          customTitle: false,
+          body: plainTextToDoc("Same as Standard House."),
+        },
+        {
+          id: makeKey(),
+          title: "Post positions",
+          customTitle: false,
+          body: plainTextToDoc("Outlane posts — top hole (tighter lane)."),
+        },
+        {
+          id: makeKey(),
+          title: "Notes",
+          customTitle: true,
+          body: plainTextToDoc("Review ball times after each league session."),
+        },
+      ],
     },
     {
       id: "set-3",
@@ -128,9 +161,20 @@ function makeSampleSets(): SettingsSetData[] {
           ],
         },
       ],
-      rubbers: plainTextToDoc("Standard outlane post rubber."),
-      postPositions: plainTextToDoc("Stock."),
-      notes: null,
+      notes: [
+        {
+          id: makeKey(),
+          title: "Rubbers",
+          customTitle: false,
+          body: plainTextToDoc("Standard outlane post rubber."),
+        },
+        {
+          id: makeKey(),
+          title: "Post positions",
+          customTitle: false,
+          body: plainTextToDoc("Stock."),
+        },
+      ],
     },
   ];
 }
@@ -217,6 +261,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
           id: makeKey(),
           switches: b.switches.map((sw) => ({ ...sw, _key: makeKey() })),
         })),
+        notes: original.notes.map((n) => ({ ...n, id: makeKey() })),
       };
       const next = [...prev];
       next.splice(idx + 1, 0, copy);
@@ -247,9 +292,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
       baseline: "Factory Install",
       softwareSettings: [],
       dipSwitchBanks: [],
-      rubbers: null,
-      postPositions: null,
-      notes: null,
+      notes: [],
     };
     // New sets go to the top, expand, and open straight into edit mode so the
     // owner can name + fill them in without a second click.
@@ -258,13 +301,68 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     setEditingIds((prev) => new Set([...prev, id]));
   }
 
-  function updateMarkdownField(
-    id: string,
-    field: MarkdownField,
-    value: ProseMirrorDoc | null
+  function updateDescription(id: string, value: ProseMirrorDoc | null): void {
+    setSets((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, description: value } : s))
+    );
+  }
+
+  // -- Free-form note section handlers --
+  function addNote(setId: string, title: string, customTitle: boolean): void {
+    setSets((prev) =>
+      prev.map((s) =>
+        s.id === setId
+          ? {
+              ...s,
+              notes: [
+                ...s.notes,
+                { id: makeKey(), title, body: null, customTitle },
+              ],
+            }
+          : s
+      )
+    );
+  }
+
+  function updateNoteTitle(setId: string, noteId: string, title: string): void {
+    setSets((prev) =>
+      prev.map((s) =>
+        s.id === setId
+          ? {
+              ...s,
+              notes: s.notes.map((n) =>
+                n.id === noteId ? { ...n, title } : n
+              ),
+            }
+          : s
+      )
+    );
+  }
+
+  function updateNoteBody(
+    setId: string,
+    noteId: string,
+    body: ProseMirrorDoc | null
   ): void {
     setSets((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, [field]: value } : s))
+      prev.map((s) =>
+        s.id === setId
+          ? {
+              ...s,
+              notes: s.notes.map((n) => (n.id === noteId ? { ...n, body } : n)),
+            }
+          : s
+      )
+    );
+  }
+
+  function deleteNote(setId: string, noteId: string): void {
+    setSets((prev) =>
+      prev.map((s) =>
+        s.id === setId
+          ? { ...s, notes: s.notes.filter((n) => n.id !== noteId) }
+          : s
+      )
     );
   }
 
@@ -517,8 +615,8 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
               onDelete={() => {
                 deleteSet(set.id);
               }}
-              onUpdateField={(field, value) => {
-                updateMarkdownField(set.id, field, value);
+              onUpdateDescription={(value) => {
+                updateDescription(set.id, value);
               }}
               onUpdateBaseline={(baseline) => {
                 updateBaseline(set.id, baseline);
@@ -543,6 +641,18 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
               }}
               onDeleteDipSwitch={(bankId, switchKey) => {
                 deleteDipSwitch(set.id, bankId, switchKey);
+              }}
+              onAddNote={(title, customTitle) => {
+                addNote(set.id, title, customTitle);
+              }}
+              onUpdateNoteTitle={(noteId, title) => {
+                updateNoteTitle(set.id, noteId, title);
+              }}
+              onUpdateNoteBody={(noteId, body) => {
+                updateNoteBody(set.id, noteId, body);
+              }}
+              onDeleteNote={(noteId) => {
+                deleteNote(set.id, noteId);
               }}
             />
           ))}

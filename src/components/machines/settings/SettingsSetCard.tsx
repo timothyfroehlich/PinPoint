@@ -21,7 +21,10 @@ import {
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
 import { InlineEditableText } from "~/components/machines/settings/InlineEditableText";
-import { MarkdownSection } from "~/components/machines/settings/MarkdownSection";
+import {
+  NoteSection,
+  type NoteSectionData,
+} from "~/components/machines/settings/NoteSection";
 import {
   SoftwareSettingsSection,
   type SoftwareSetting,
@@ -33,11 +36,8 @@ import {
 import { InlineMarkdownField } from "~/components/machines/settings/InlineMarkdownField";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
-export type MarkdownField =
-  | "description"
-  | "rubbers"
-  | "postPositions"
-  | "notes";
+// Preset note titles that may appear at most once per set.
+export const PRESET_NOTE_TITLES = ["Post positions", "Rubbers"] as const;
 
 export interface SettingsSetData {
   id: string;
@@ -49,9 +49,7 @@ export interface SettingsSetData {
   baseline: string;
   softwareSettings: SoftwareSetting[];
   dipSwitchBanks: DipSwitchBank[];
-  rubbers: ProseMirrorDoc | null;
-  postPositions: ProseMirrorDoc | null;
-  notes: ProseMirrorDoc | null;
+  notes: NoteSectionData[];
 }
 
 interface SettingsSetCardProps {
@@ -68,7 +66,7 @@ interface SettingsSetCardProps {
   onRename: (newName: string) => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  onUpdateField: (field: MarkdownField, value: ProseMirrorDoc | null) => void;
+  onUpdateDescription: (value: ProseMirrorDoc | null) => void;
   onUpdateBaseline: (newValue: string) => void;
   // Software settings rows
   onAddSoftwareRow: () => string | undefined;
@@ -90,6 +88,11 @@ interface SettingsSetCardProps {
     value: string
   ) => void;
   onDeleteDipSwitch: (bankId: string, switchKey: string) => void;
+  // Free-form note sections
+  onAddNote: (title: string, customTitle: boolean) => void;
+  onUpdateNoteTitle: (noteId: string, title: string) => void;
+  onUpdateNoteBody: (noteId: string, body: ProseMirrorDoc | null) => void;
+  onDeleteNote: (noteId: string) => void;
 }
 
 function formatShortDate(iso: string): string {
@@ -100,66 +103,77 @@ function formatShortDate(iso: string): string {
   return `${String(parseInt(m, 10))}/${String(parseInt(d, 10))}`;
 }
 
-interface PickerProps {
+interface AddSectionMenuProps {
   hasSoftware: boolean;
-  hasDip: boolean;
+  hasPostPositions: boolean;
+  hasRubbers: boolean;
   onAddSoftware: () => void;
   onAddDipBank: () => void;
+  onAddNote: (title: string, customTitle: boolean) => void;
 }
 
-function SettingsTypePicker({
+/**
+ * The single "Add…" entry point for a set. Surfaces every kind of content a
+ * set can hold — software settings, a DIP bank, the Post positions / Rubbers
+ * presets, or a custom Other/Notes section. Single-instance kinds (software,
+ * the two presets) drop off the menu once present; DIP banks and Other/Notes
+ * repeat, so the menu is never empty.
+ */
+function AddSectionMenu({
   hasSoftware,
-  hasDip,
+  hasPostPositions,
+  hasRubbers,
   onAddSoftware,
   onAddDipBank,
-}: PickerProps): React.JSX.Element | null {
-  if (hasSoftware && hasDip) return null;
-
-  // Both empty — show a dropdown with both options. Software settings and DIP
-  // switches are two eras of the same thing (game scoring/pricing config), so
-  // they share one "Game settings" umbrella — not "hardware" (software isn't).
-  if (!hasSoftware && !hasDip) {
-    return (
-      <div className="py-2.5">
-        <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Game settings
-        </p>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-muted-foreground"
-            >
-              <Plus aria-hidden="true" />
-              Add setting
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onSelect={onAddSoftware}>
-              Software setting
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onAddDipBank}>
-              DIP switch
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    );
-  }
-
-  // One missing — direct button
+  onAddNote,
+}: AddSectionMenuProps): React.JSX.Element {
   return (
     <div className="py-2.5">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-muted-foreground"
-        onClick={!hasSoftware ? onAddSoftware : onAddDipBank}
-      >
-        <Plus aria-hidden="true" />
-        {!hasSoftware ? "Add software settings" : "Add DIP switches"}
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="text-muted-foreground">
+            <Plus aria-hidden="true" />
+            Add…
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          {!hasSoftware && (
+            <DropdownMenuItem onSelect={onAddSoftware}>
+              Software settings
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onSelect={onAddDipBank}>
+            DIP switch
+          </DropdownMenuItem>
+          {!hasPostPositions && (
+            <DropdownMenuItem
+              onSelect={() => {
+                onAddNote("Post positions", false);
+              }}
+            >
+              Post positions
+            </DropdownMenuItem>
+          )}
+          {!hasRubbers && (
+            <DropdownMenuItem
+              onSelect={() => {
+                onAddNote("Rubbers", false);
+              }}
+            >
+              Rubbers
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem
+            onSelect={() => {
+              // Blank title → the new section opens with its title field
+              // focused so the user names it, rather than defaulting to "Notes".
+              onAddNote("", true);
+            }}
+          >
+            Other / Notes…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
@@ -175,7 +189,7 @@ export function SettingsSetCard({
   onRename,
   onDuplicate,
   onDelete,
-  onUpdateField,
+  onUpdateDescription,
   onUpdateBaseline,
   onAddSoftwareRow,
   onUpdateSoftwareRow,
@@ -186,11 +200,17 @@ export function SettingsSetCard({
   onAddDipSwitch,
   onUpdateDipSwitch,
   onDeleteDipSwitch,
+  onAddNote,
+  onUpdateNoteTitle,
+  onUpdateNoteBody,
+  onDeleteNote,
 }: SettingsSetCardProps): React.JSX.Element {
   const ChevronIcon = isExpanded ? ChevronDown : ChevronRight;
   const hasSoftware = set.softwareSettings.length > 0;
   const hasDip = set.dipSwitchBanks.length > 0;
   const nameMissing = set.name.trim() === "";
+  const hasPreset = (title: string): boolean =>
+    set.notes.some((n) => !n.customTitle && n.title === title);
   // Content edits (name, description, cells, baseline, add/delete) unlock
   // only when this set is in edit mode. Set-level ops (star, kebab) use
   // canEdit directly.
@@ -212,18 +232,27 @@ export function SettingsSetCard({
     >
       {/* Header block — always visible */}
       <div
-        role="button"
-        tabIndex={0}
-        className="@container flex cursor-pointer flex-col gap-1 px-4 py-3 hover:bg-muted/30"
-        onClick={onToggleExpand}
-        onKeyDown={(e) => {
-          if (e.target !== e.currentTarget) return;
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onToggleExpand();
-          }
-        }}
-        aria-expanded={isExpanded}
+        // While editing, the header is inert — no collapse-on-click, so a
+        // mis-aimed click on a field can't fold the card shut mid-edit.
+        role={isEditing ? undefined : "button"}
+        tabIndex={isEditing ? undefined : 0}
+        className={cn(
+          "@container flex flex-col gap-1 px-4 py-3",
+          !isEditing && "cursor-pointer hover:bg-muted/30"
+        )}
+        onClick={isEditing ? undefined : onToggleExpand}
+        onKeyDown={
+          isEditing
+            ? undefined
+            : (e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onToggleExpand();
+                }
+              }
+        }
+        aria-expanded={isEditing ? undefined : isExpanded}
         aria-label={`${set.name || "Unnamed"} settings set`}
       >
         {/* Top row */}
@@ -362,9 +391,7 @@ export function SettingsSetCard({
             canEdit={contentEditable}
             placeholder="Add a short description…"
             compact
-            onValueChange={(v) => {
-              onUpdateField("description", v);
-            }}
+            onValueChange={onUpdateDescription}
           />
         </div>
       </div>
@@ -391,7 +418,6 @@ export function SettingsSetCard({
               <DipSwitchSection
                 banks={set.dipSwitchBanks}
                 canEdit={contentEditable}
-                onAddBank={onAddDipBank}
                 onDeleteBank={onDeleteDipBank}
                 onRenameBank={onRenameDipBank}
                 onAddSwitch={onAddDipSwitch}
@@ -401,51 +427,38 @@ export function SettingsSetCard({
             </div>
           )}
 
-          {contentEditable && (!hasSoftware || !hasDip) && (
-            <div className="border-b border-outline-variant/50">
-              <SettingsTypePicker
-                hasSoftware={hasSoftware}
-                hasDip={hasDip}
-                onAddSoftware={() => {
-                  onAddSoftwareRow();
+          {set.notes.map((note) => (
+            <div key={note.id} className="border-b border-outline-variant/50">
+              <NoteSection
+                note={note}
+                canEdit={contentEditable}
+                onTitleChange={(title) => {
+                  onUpdateNoteTitle(note.id, title);
                 }}
-                onAddDipBank={() => {
-                  onAddDipBank();
+                onBodyChange={(body) => {
+                  onUpdateNoteBody(note.id, body);
+                }}
+                onDelete={() => {
+                  onDeleteNote(note.id);
                 }}
               />
             </div>
+          ))}
+
+          {contentEditable && (
+            <AddSectionMenu
+              hasSoftware={hasSoftware}
+              hasPostPositions={hasPreset("Post positions")}
+              hasRubbers={hasPreset("Rubbers")}
+              onAddSoftware={() => {
+                onAddSoftwareRow();
+              }}
+              onAddDipBank={() => {
+                onAddDipBank();
+              }}
+              onAddNote={onAddNote}
+            />
           )}
-
-          <div className="border-b border-outline-variant/50">
-            <MarkdownSection
-              title="Rubbers"
-              value={set.rubbers}
-              canEdit={contentEditable}
-              onValueChange={(v) => {
-                onUpdateField("rubbers", v);
-              }}
-            />
-          </div>
-
-          <div className="border-b border-outline-variant/50">
-            <MarkdownSection
-              title="Post positions"
-              value={set.postPositions}
-              canEdit={contentEditable}
-              onValueChange={(v) => {
-                onUpdateField("postPositions", v);
-              }}
-            />
-          </div>
-
-          <MarkdownSection
-            title="Notes"
-            value={set.notes}
-            canEdit={contentEditable}
-            onValueChange={(v) => {
-              onUpdateField("notes", v);
-            }}
-          />
         </CardContent>
       )}
     </Card>

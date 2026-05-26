@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { cn } from "~/lib/utils";
+import { Switch } from "~/components/ui/switch";
 import { EditableCell } from "~/components/machines/settings/EditableCell";
 import { InlineEditableText } from "~/components/machines/settings/InlineEditableText";
 
@@ -32,7 +32,6 @@ export interface DipSwitchBank {
 interface DipSwitchSectionProps {
   banks: DipSwitchBank[];
   canEdit: boolean;
-  onAddBank?: () => { bankId: string; switchKey: string } | undefined;
   onDeleteBank?: (bankId: string) => void;
   onRenameBank?: (bankId: string, name: string) => void;
   onAddSwitch?: (bankId: string) => string | undefined;
@@ -53,7 +52,6 @@ interface AutoFocusTarget {
 export function DipSwitchSection({
   banks,
   canEdit,
-  onAddBank,
   onDeleteBank,
   onRenameBank,
   onAddSwitch,
@@ -77,11 +75,6 @@ export function DipSwitchSection({
       }
       return next;
     });
-  }
-
-  function handleAddBank(): void {
-    const result = onAddBank?.();
-    if (result) setAutoFocus(result);
   }
 
   function handleAddSwitch(bankId: string): void {
@@ -181,30 +174,24 @@ export function DipSwitchSection({
                               />
                             </TableCell>
                             <TableCell>
-                              <button
-                                type="button"
-                                disabled={!canEdit}
-                                onClick={() => {
-                                  onUpdateSwitch?.(
-                                    bank.id,
-                                    sw._key,
-                                    "position",
-                                    sw.position === "ON" ? "OFF" : "ON"
-                                  );
-                                }}
-                                className={cn(
-                                  "inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold transition-opacity",
-                                  sw.position === "ON"
-                                    ? "bg-success/15 text-success"
-                                    : "bg-muted text-muted-foreground",
-                                  canEdit && "cursor-pointer hover:opacity-80"
-                                )}
-                                aria-label={`Position ${sw.position}${
-                                  canEdit ? " (click to toggle)" : ""
-                                }`}
-                              >
-                                {sw.position}
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={sw.position === "ON"}
+                                  disabled={!canEdit}
+                                  onCheckedChange={(checked) => {
+                                    onUpdateSwitch?.(
+                                      bank.id,
+                                      sw._key,
+                                      "position",
+                                      checked ? "ON" : "OFF"
+                                    );
+                                  }}
+                                  aria-label={`Position: ${sw.position}`}
+                                />
+                                <span className="text-[11px] font-semibold text-muted-foreground">
+                                  {sw.position}
+                                </span>
+                              </div>
                             </TableCell>
                             <TableCell className="text-sm text-foreground">
                               <EditableCell
@@ -273,18 +260,6 @@ export function DipSwitchSection({
           );
         })}
       </div>
-
-      {canEdit && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mt-2 text-muted-foreground"
-          onClick={handleAddBank}
-        >
-          <Plus aria-hidden="true" />
-          Add bank
-        </Button>
-      )}
     </div>
   );
 }

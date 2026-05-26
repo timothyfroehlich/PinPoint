@@ -102,49 +102,56 @@ export function InlineMarkdownField({
             className={textSize}
           />
         </div>
-      ) : (
-        <div
-          role={canEdit ? "button" : undefined}
-          tabIndex={canEdit ? 0 : undefined}
-          aria-label={canEdit ? `Edit ${label ?? "text"}` : undefined}
+      ) : isEmpty ? (
+        // Empty + editable: a real <button> (not a div[role=button]) so the
+        // click fires reliably across browsers — Safari in particular drops
+        // clicks on nested div[role=button], which made "add a description"
+        // appear dead (CORE-A11Y-004). Full-width so the whole row is a target.
+        <button
+          type="button"
+          aria-label={`Edit ${label ?? "text"}`}
           className={cn(
-            "group/imf relative rounded",
+            "group/imf block w-full rounded text-left",
             textSize,
-            canEdit &&
-              "cursor-text transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            "cursor-text transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           )}
-          onClick={
-            canEdit
-              ? (e) => {
-                  e.stopPropagation();
-                  open(e.target as HTMLElement);
-                }
-              : undefined
-          }
-          onKeyDown={
-            canEdit
-              ? (e) => {
-                  if (e.target !== e.currentTarget) return;
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    open(e.target as HTMLElement);
-                  }
-                }
-              : undefined
-          }
+          onClick={(e) => {
+            e.stopPropagation();
+            open(e.currentTarget);
+          }}
         >
-          {isEmpty ? (
-            <span className="italic text-muted-foreground">{placeholder}</span>
-          ) : (
-            <RichTextDisplay
-              content={value}
-              className={cn(textSize, compact && "text-muted-foreground")}
+          <span className="italic text-muted-foreground">{placeholder}</span>
+        </button>
+      ) : (
+        // Non-empty: a plain wrapper holds the rendered markdown (which can
+        // contain block elements + links, so it can't live inside a <button>).
+        // A transparent overlay <button> captures the click-to-edit so the
+        // open still fires reliably in Safari. Links sit above the overlay so
+        // they remain clickable.
+        <div className={cn("group/imf relative rounded", textSize)}>
+          {canEdit && (
+            <button
+              type="button"
+              aria-label={`Edit ${label ?? "text"}`}
+              className="absolute inset-0 z-0 cursor-text rounded transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              onClick={(e) => {
+                e.stopPropagation();
+                open(e.currentTarget);
+              }}
             />
           )}
-          {canEdit && !isEmpty && (
+          <RichTextDisplay
+            content={value}
+            className={cn(
+              "relative z-[1] [&_a]:pointer-events-auto",
+              textSize,
+              compact && "text-muted-foreground",
+              canEdit && "pointer-events-none"
+            )}
+          />
+          {canEdit && (
             <Pencil
-              className="pointer-events-none absolute right-1 top-1 size-3 text-muted-foreground opacity-0 transition-opacity group-hover/imf:opacity-100"
+              className="pointer-events-none absolute right-1 top-1 z-[2] size-3 text-muted-foreground opacity-0 transition-opacity group-hover/imf:opacity-100"
               aria-hidden="true"
             />
           )}
