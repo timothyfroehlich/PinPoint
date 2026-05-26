@@ -595,31 +595,21 @@ describe("Issue Service Functions (Integration)", () => {
         .returning();
 
       // Fetch the issue the same way page.tsx does: with reportedByUser and
-      // invitedReporter relations but WITHOUT selecting reporterEmail in the
-      // column set (the query omits it by design for privacy).
+      // invitedReporter relations but without any root columns restriction.
       const fetched = await db.query.issues.findFirst({
         where: eq(issues.id, emailOnlyIssue.id),
         with: {
           reportedByUser: { columns: { id: true, name: true } },
           invitedReporter: { columns: { id: true, name: true } },
         },
-        columns: {
-          id: true,
-          reportedBy: true,
-          reporterName: true,
-          // reporterEmail intentionally excluded — privacy contract
-        },
       });
 
       if (!fetched) throw new Error("Expected issue to exist");
 
-      // resolveIssueReporter only sees reportedByUser, invitedReporter, and
-      // reporterName.  All are null here.  The email must NOT appear.
-      const reporter = resolveIssueReporter({
-        reportedByUser: fetched.reportedByUser ?? null,
-        invitedReporter: fetched.invitedReporter ?? null,
-        reporterName: fetched.reporterName ?? null,
-      });
+      // Pass the fetched issue directly to resolveIssueReporter to mirror how the page
+      // invokes it. This ensures that any accidental access to reporterEmail (which is
+      // now retrieved by the query) will be caught.
+      const reporter = resolveIssueReporter(fetched);
 
       expect(reporter.name).toBe("Anonymous");
       expect(reporter.name).not.toContain("display@bug.com");
