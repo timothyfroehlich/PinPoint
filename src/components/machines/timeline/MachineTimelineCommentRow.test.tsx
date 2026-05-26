@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { deleteMachineCommentAction } from "~/app/(app)/m/[initials]/(tabs)/timeline/actions";
+
 import { MachineTimelineCommentRow } from "./MachineTimelineCommentRow";
 
 // The kebab menu wires up edit + delete server actions. In a jsdom unit test
@@ -111,6 +113,31 @@ describe("MachineTimelineCommentRow", () => {
     expect(
       screen.getByRole("menuitem", { name: /delete/i })
     ).toBeInTheDocument();
+  });
+
+  it("keeps the delete dialog open and shows the error when delete fails", async () => {
+    // Regression: AlertDialogAction auto-closes on click (Radix); the handler
+    // preventDefaults so a failed delete keeps the dialog open to render the
+    // error instead of vanishing silently.
+    const user = userEvent.setup();
+    vi.mocked(deleteMachineCommentAction).mockResolvedValueOnce({
+      success: false,
+      error: "Forbidden",
+    });
+    render(
+      <MachineTimelineCommentRow
+        row={baseRow}
+        canEdit={false}
+        canDelete={true}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: /comment actions/i }));
+    await user.click(screen.getByRole("menuitem", { name: /delete/i }));
+    await user.click(screen.getByRole("button", { name: /^delete$/i }));
+
+    expect(await screen.findByText("Forbidden")).toBeInTheDocument();
+    // Dialog is still open — the close was prevented on failure.
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
   });
 
   it("does NOT display the author's email anywhere (rule 10)", () => {

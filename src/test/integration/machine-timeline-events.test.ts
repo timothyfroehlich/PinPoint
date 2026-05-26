@@ -213,6 +213,33 @@ describe("machine-events helpers (PGlite)", () => {
       expect(row.deletedBy).toBe(user.id);
       expect(row.content).toEqual(doc);
     });
+
+    it("refuses to tombstone a non-comment (system) row", async () => {
+      const { db, user, machine } = await seed();
+      // A lifecycle (system) row — never a comment. The helper's
+      // sourceType='comment' guard must leave it untouched even if a stray
+      // caller passes its id.
+      await createMachineTimelineEvent(
+        machine.id,
+        {
+          sourceType: "lifecycle",
+          tag: "lifecycle",
+          eventData: { kind: "machine_added" },
+          actorId: user.id,
+        },
+        db
+      );
+      const [system] = await db.select().from(timelineEvents);
+
+      await softDeleteMachineComment(system.id, { deletedBy: user.id }, db);
+
+      const [row] = await db
+        .select()
+        .from(timelineEvents)
+        .where(eq(timelineEvents.id, system.id));
+      expect(row.deletedAt).toBeNull();
+      expect(row.deletedBy).toBeNull();
+    });
   });
 
   describe("getMachineTimeline", () => {

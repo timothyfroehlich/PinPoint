@@ -141,13 +141,23 @@ export async function softDeleteMachineComment(
   // Idempotent + race-safe: only the first concurrent delete writes the
   // tombstone columns; subsequent attempts no-op rather than overwriting
   // `deletedBy`/`deletedAt`. (PP-0x98 review)
+  //
+  // `sourceType = 'comment'` enforces the comment-only invariant at the
+  // helper boundary (matching `updateMachineComment`) so a stray caller can
+  // never tombstone a system row even if the action-layer guard is bypassed.
   await tx
     .update(timelineEvents)
     .set({
       deletedAt: new Date(),
       deletedBy: args.deletedBy,
     })
-    .where(and(eq(timelineEvents.id, id), isNull(timelineEvents.deletedAt)));
+    .where(
+      and(
+        eq(timelineEvents.id, id),
+        eq(timelineEvents.sourceType, "comment"),
+        isNull(timelineEvents.deletedAt)
+      )
+    );
 }
 
 export interface GetMachineTimelineArgs {
