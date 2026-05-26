@@ -6,7 +6,7 @@ import {
   fillReportForm,
   submitFormAndWaitForRedirect,
 } from "../support/page-helpers.js";
-import { loginAs } from "../support/actions.js";
+import { loginAs, assertNoA11yViolations } from "../support/actions.js";
 import { TEST_USERS } from "../support/constants.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +36,8 @@ test.describe("Image Upload Reporting", () => {
     // Ensure we pick the same machine as the dashboard default or just pick the first one
     await select.selectOption({ index: 1 });
     await expect(page).toHaveURL(/machine=/);
+
+    await assertNoA11yViolations(page);
 
     // 3. Fill Form
     const issueTitle = `${IMAGE_UPLOAD_PREFIX} Auth ${Date.now()}`;

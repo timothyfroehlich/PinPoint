@@ -9,6 +9,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { assertNoA11yViolations } from "../support/actions.js";
 
 test.describe("Landing Page", () => {
   test("loads with welcome content and CTAs", async ({ page }) => {
@@ -36,6 +37,9 @@ test.describe("Landing Page", () => {
     // Verify navigation elements in header (unified AppHeader — same testids on all viewports)
     await expect(page.getByTestId("nav-signup")).toBeVisible();
     await expect(page.getByTestId("nav-signin")).toBeVisible();
+
+    // Check accessibility
+    await assertNoA11yViolations(page);
   });
 
   test("Browse Machines CTA is clickable and navigates", async ({ page }) => {
