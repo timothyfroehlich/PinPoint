@@ -107,7 +107,7 @@ interface PickerProps {
   onAddDipBank: () => void;
 }
 
-function HardwareAdjustmentPicker({
+function SettingsTypePicker({
   hasSoftware,
   hasDip,
   onAddSoftware,
@@ -115,12 +115,14 @@ function HardwareAdjustmentPicker({
 }: PickerProps): React.JSX.Element | null {
   if (hasSoftware && hasDip) return null;
 
-  // Both empty — show a dropdown with both options
+  // Both empty — show a dropdown with both options. Software settings and DIP
+  // switches are two eras of the same thing (game scoring/pricing config), so
+  // they share one "Game settings" umbrella — not "hardware" (software isn't).
   if (!hasSoftware && !hasDip) {
     return (
       <div className="py-2.5">
         <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Hardware adjustments
+          Game settings
         </p>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -130,7 +132,7 @@ function HardwareAdjustmentPicker({
               className="text-muted-foreground"
             >
               <Plus aria-hidden="true" />
-              Add hardware adjustment
+              Add setting
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
@@ -142,9 +144,6 @@ function HardwareAdjustmentPicker({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <p className="mt-1.5 text-xs italic text-muted-foreground/70">
-          Most machines have one or the other — pick the kind this game uses.
-        </p>
       </div>
     );
   }
@@ -191,6 +190,7 @@ export function SettingsSetCard({
   const ChevronIcon = isExpanded ? ChevronDown : ChevronRight;
   const hasSoftware = set.softwareSettings.length > 0;
   const hasDip = set.dipSwitchBanks.length > 0;
+  const nameMissing = set.name.trim() === "";
   // Content edits (name, description, cells, baseline, add/delete) unlock
   // only when this set is in edit mode. Set-level ops (star, kebab) use
   // canEdit directly.
@@ -224,7 +224,7 @@ export function SettingsSetCard({
           }
         }}
         aria-expanded={isExpanded}
-        aria-label={`${set.name} settings set`}
+        aria-label={`${set.name || "Unnamed"} settings set`}
       >
         {/* Top row */}
         <div className="flex items-center gap-2.5">
@@ -274,7 +274,8 @@ export function SettingsSetCard({
                 value={set.name}
                 onValueChange={onRename}
                 canEdit={contentEditable}
-                placeholder="Untitled set"
+                required
+                placeholder="Name this set"
                 ariaLabel="set name"
                 inputClassName="h-7 text-sm font-semibold"
               />
@@ -298,6 +299,13 @@ export function SettingsSetCard({
               variant={isEditing ? "default" : "ghost"}
               size="sm"
               className="h-7 shrink-0"
+              // A set must have a name before edit mode can be left.
+              disabled={isEditing && nameMissing}
+              aria-label={
+                isEditing && nameMissing
+                  ? "Name the set before finishing"
+                  : undefined
+              }
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleEdit();
@@ -395,7 +403,7 @@ export function SettingsSetCard({
 
           {contentEditable && (!hasSoftware || !hasDip) && (
             <div className="border-b border-outline-variant/50">
-              <HardwareAdjustmentPicker
+              <SettingsTypePicker
                 hasSoftware={hasSoftware}
                 hasDip={hasDip}
                 onAddSoftware={() => {

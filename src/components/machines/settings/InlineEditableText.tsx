@@ -10,6 +10,9 @@ interface InlineEditableTextProps {
   value: string;
   onValueChange: (newValue: string) => void;
   canEdit?: boolean;
+  /** Field can't be left empty: starts open when empty, shows invalid
+   *  styling while blank, and marks the placeholder with a required hint. */
+  required?: boolean;
   placeholder?: string;
   className?: string;
   inputClassName?: string;
@@ -24,14 +27,20 @@ export function InlineEditableText({
   value,
   onValueChange,
   canEdit = true,
+  required = false,
   placeholder = "Click to edit…",
   className,
   inputClassName,
   ariaLabel,
 }: InlineEditableTextProps): React.JSX.Element {
-  const [isEditing, setIsEditing] = useState(false);
+  // A required field that mounts empty (e.g. a freshly created set) opens
+  // straight into the input so the user lands on it without an extra click.
+  const [isEditing, setIsEditing] = useState(
+    canEdit && required && value.trim() === ""
+  );
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isInvalid = required && draft.trim() === "";
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -68,6 +77,7 @@ export function InlineEditableText({
         className={cn("h-7", inputClassName)}
         placeholder={placeholder}
         aria-label={ariaLabel}
+        aria-invalid={isInvalid || undefined}
         onClick={(e) => {
           e.stopPropagation();
         }}
@@ -114,7 +124,15 @@ export function InlineEditableText({
     >
       <span>
         {value || (
-          <span className="italic text-muted-foreground">{placeholder}</span>
+          <span
+            className={cn(
+              "italic",
+              required ? "text-destructive" : "text-muted-foreground"
+            )}
+          >
+            {placeholder}
+            {required && " *"}
+          </span>
         )}
       </span>
       <Pencil

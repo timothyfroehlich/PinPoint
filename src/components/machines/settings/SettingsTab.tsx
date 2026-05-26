@@ -237,10 +237,12 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     const id = makeSetId();
     const newSet: SettingsSetData = {
       id,
-      name: "New settings set",
+      // Intentionally blank — the card opens with the name field focused and
+      // required, so the owner must name it before leaving edit mode.
+      name: "",
       isPreferred: false,
       updatedBy: "You",
-      updatedAt: "2026-05-19",
+      updatedAt: "2026-05-24",
       description: null,
       baseline: "Factory Install",
       softwareSettings: [],
@@ -249,8 +251,11 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
       postPositions: null,
       notes: null,
     };
-    setSets((prev) => [...prev, newSet]);
+    // New sets go to the top, expand, and open straight into edit mode so the
+    // owner can name + fill them in without a second click.
+    setSets((prev) => [newSet, ...prev]);
     setExpandedIds((prev) => new Set([...prev, id]));
+    setEditingIds((prev) => new Set([...prev, id]));
   }
 
   function updateMarkdownField(
