@@ -391,6 +391,9 @@ export async function updateIssueStatus({
 
     // 1. Update Status
     const isClosed = (CLOSED_STATUSES as readonly string[]).includes(status);
+    const wasClosed = (CLOSED_STATUSES as readonly string[]).includes(
+      oldStatus
+    );
     await tx
       .update(issues)
       .set({
@@ -410,10 +413,16 @@ export async function updateIssueStatus({
 
     // 2b. Duplicate-write to machine timeline (atomic with status update, PP-0x98)
     //
+    // Only a *true close transition* (open → closed) emits `issue_closed`.
+    // A move between two closed statuses (e.g. fixed → duplicate) is a
+    // reclassification, not a close, so it records as a status change —
+    // otherwise the machine timeline would show a second misleading
+    // "closed by …" row for an already-closed issue.
+    //
     // Email privacy (AGENTS.md rule 10): closedByName resolves from
     // user_profiles.name, never from email. Falls back to "Unknown User" if
     // the profile row is missing (shouldn't happen given FK from authUsers).
-    if (isClosed) {
+    if (isClosed && !wasClosed) {
       const actor = await tx.query.userProfiles.findFirst({
         where: eq(userProfiles.id, userId),
         columns: { name: true },

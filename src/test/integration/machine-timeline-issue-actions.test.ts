@@ -284,6 +284,45 @@ describe("updateIssueStatus duplicate-writes to machine timeline (PP-0x98)", () 
     expect(rows[0].authorId).toBe(user.id);
   });
 
+  it("emits issue_status_changed (not a second issue_closed) when moving between two closed statuses", async () => {
+    const db = await getTestDb();
+    const user = await makeUser({ firstName: "Dana", lastName: "Lee" });
+    const machine = await makeMachine();
+    const issue = await seedIssue(user, machine);
+
+    const { updateIssueStatus } = await import("~/services/issues");
+    // First, a true close transition: new → fixed.
+    await updateIssueStatus({
+      issueId: issue.id,
+      status: "fixed",
+      userId: user.id,
+    });
+    // Clear so we assert cleanly on the reclassification that follows.
+    await clearTimelineEventsForMachine(machine.id);
+
+    // Reclassify: fixed → duplicate. Both are closed statuses, so this is a
+    // reclassification, not a close — it must record a status change, NOT a
+    // second misleading "closed by …" row.
+    await updateIssueStatus({
+      issueId: issue.id,
+      status: "duplicate",
+      userId: user.id,
+    });
+
+    const rows = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].eventData).toMatchObject({
+      kind: "issue_status_changed",
+      issueId: issue.id,
+      issueNumber: issue.issueNumber,
+      from: "fixed",
+      to: "duplicate",
+    });
+  });
+
   it("emits issue_status_changed for an intermediate status transition", async () => {
     const db = await getTestDb();
     const user = await makeUser({ firstName: "Sam", lastName: "Smith" });

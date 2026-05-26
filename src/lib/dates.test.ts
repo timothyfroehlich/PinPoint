@@ -13,20 +13,15 @@ describe("formatDayGroup", () => {
   });
 
   it("returns a weekday name for 2–6 calendar days back", () => {
-    // 3 calendar days back lands inside the 2..6 weekday window. We can't
-    // assert a specific weekday (it depends on `today`), but it must be one
-    // of the seven English weekday names that `weekday: "long"` produces.
-    const label = formatDayGroup(subDays(new Date(), 3));
-    const weekdays = [
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ];
-    expect(weekdays).toContain(label);
+    // 3 calendar days back lands inside the 2..6 weekday window. The exact
+    // weekday depends on `today` and the label is locale-formatted, so derive
+    // the expected value from the same Intl formatter rather than hard-coding
+    // English names (which would fail under a non-English runtime locale).
+    const date = subDays(new Date(), 3);
+    const expected = new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+    }).format(date);
+    expect(formatDayGroup(date)).toBe(expected);
   });
 
   it("returns the absolute medium date for timestamps a week or older", () => {
@@ -65,26 +60,26 @@ describe("formatTimelineBucket", () => {
   });
 
   it("returns a day-tier bucket with a weekday label for 3 days back", () => {
-    const bucket = formatTimelineBucket(subDays(new Date(), 3));
+    const date = subDays(new Date(), 3);
+    const bucket = formatTimelineBucket(date);
     expect(bucket.tier).toBe("day");
-    expect([
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ]).toContain(bucket.label);
+    // Locale-formatted weekday — derive the expectation from the same Intl
+    // formatter the implementation uses (see formatDayGroup test above).
+    expect(bucket.label).toBe(
+      new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(date)
+    );
   });
 
   it("returns a month-tier bucket for timestamps 2 months back", () => {
-    const bucket = formatTimelineBucket(subMonths(new Date(), 2));
+    const date = subMonths(new Date(), 2);
+    const bucket = formatTimelineBucket(date);
     expect(bucket.tier).toBe("month");
     expect(bucket.key.startsWith("month-")).toBe(true);
     expect(bucket.rowDateLabel).toBeDefined();
-    // Label has the form "Month YYYY" — verify the trailing year.
-    expect(bucket.label).toMatch(/\d{4}$/);
+    // Label is a locale-formatted "month + year". Assert it contains the
+    // 4-digit year rather than requiring the year to be the trailing token —
+    // some locales are year-first.
+    expect(bucket.label).toContain(String(date.getFullYear()));
   });
 
   it("two same-day timestamps share a bucket key", () => {
