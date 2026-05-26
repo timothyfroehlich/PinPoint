@@ -42,22 +42,23 @@
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
-| Category    | Skill                            | When to use                                                     |
-| :---------- | :------------------------------- | :-------------------------------------------------------------- |
-| UI          | `pinpoint-ui`                    | Components, shadcn/ui, forms, responsive design                 |
-| UI          | `pinpoint-design-bible`          | Design system, page archetypes, spacing, surfaces               |
-| TypeScript  | `pinpoint-typescript`            | Type errors, generics, Drizzle types                            |
-| Testing     | `pinpoint-testing`               | Writing tests, PGlite, test-layer decisions                     |
-| Testing     | `pinpoint-e2e`                   | E2E tests, worker isolation, Playwright stability               |
-| Security    | `pinpoint-security`              | Auth, CSP, Zod, Supabase SSR                                    |
-| Patterns    | `pinpoint-patterns`              | Server Actions, data fetching, architecture                     |
-| Workflow    | `pinpoint-briefing`              | Session-start health review                                     |
-| Workflow    | `pinpoint-pr-workflow`           | Full PR lifecycle: commit, push, CI, Copilot, merge             |
-| Workflow    | `pinpoint-orchestrator`          | Parallel subagent work in worktrees                             |
-| Workflow    | `pinpoint-dispatch-e2e-teammate` | Dispatching a teammate end-to-end                               |
-| Antigravity | `pinpoint-agy-triage`            | Grooming: evaluate whether a bead is agy-ready/agy-ui           |
-| Antigravity | `pinpoint-agy-dispatch`          | Emit an Antigravity copy-paste prompt for a chosen bead         |
-| Antigravity | `pinpoint-agy-execute`           | Runbook for Antigravity to execute an agy-ready bead end-to-end |
+| Category    | Skill                            | When to use                                                             |
+| :---------- | :------------------------------- | :---------------------------------------------------------------------- |
+| UI          | `pinpoint-ui`                    | Components, shadcn/ui, forms, responsive design                         |
+| UI          | `pinpoint-design-bible`          | Design system, page archetypes, spacing, surfaces                       |
+| TypeScript  | `pinpoint-typescript`            | Type errors, generics, Drizzle types                                    |
+| Testing     | `pinpoint-testing`               | Writing tests, PGlite, test-layer decisions                             |
+| Testing     | `pinpoint-e2e`                   | E2E tests, worker isolation, Playwright stability                       |
+| Security    | `pinpoint-security`              | Auth, CSP, Zod, Supabase SSR                                            |
+| Patterns    | `pinpoint-patterns`              | Server Actions, data fetching, architecture                             |
+| Workflow    | `pinpoint-prototype-mode`        | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt |
+| Workflow    | `pinpoint-briefing`              | Session-start health review                                             |
+| Workflow    | `pinpoint-pr-workflow`           | Full PR lifecycle: commit, push, CI, Copilot, merge                     |
+| Workflow    | `pinpoint-orchestrator`          | Parallel subagent work in worktrees                                     |
+| Workflow    | `pinpoint-dispatch-e2e-teammate` | Dispatching a teammate end-to-end                                       |
+| Antigravity | `pinpoint-agy-triage`            | Grooming: evaluate whether a bead is agy-ready/agy-ui                   |
+| Antigravity | `pinpoint-agy-dispatch`          | Emit an Antigravity copy-paste prompt for a chosen bead                 |
+| Antigravity | `pinpoint-agy-execute`           | Runbook for Antigravity to execute an agy-ready bead end-to-end         |
 
 ## 4. Environment
 
@@ -108,6 +109,10 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                                                                                |
 | `ruff check && ruff format`           | Python lint/format (no venv needed)                                                                                                       |
 | `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                   |
+
+### Prototype mode (rapid iteration)
+
+When the user explicitly asks for "prototype mode" / "rapid iteration" / "just explore" **for UI/UX work**, load the `pinpoint-prototype-mode` skill and enter it. It's scoped to **presentation only** — layout, components, styling, page structure, interaction/flow — and explicitly **not** for backend/internal work (data layer, server-action logic, auth, permissions, migrations), which keep full rigor; stub data rather than building it. Within that scope it relaxes the §2 rigor (skip preflight/tests before showing work, defer lint/type fixes, defer coverage and DRY) while logging every skipped item to a `.prototype-mode` debt ledger. It changes **agent behavior only** — pre-commit and `preflight` hooks still run on any real commit, which is fine because prototype work stays local and uncommitted. Never self-elect into it; full rigor is the default. A `UserPromptSubmit`/`SessionStart` hook reminds the agent while the marker exists, so the mode survives compaction. Exit on "exit prototype mode" / "make this real" — then repay the ledger.
 
 ### Which tests to run
 
