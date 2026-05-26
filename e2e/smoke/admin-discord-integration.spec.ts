@@ -13,6 +13,7 @@
 
 import { test, expect } from "@playwright/test";
 import { STORAGE_STATE } from "../support/auth-state";
+import { assertNoA11yViolations } from "../support/actions.js";
 
 test.describe("Admin Discord integration page", () => {
   test.use({ storageState: STORAGE_STATE.admin });
@@ -31,6 +32,8 @@ test.describe("Admin Discord integration page", () => {
       page.getByRole("button", { name: "Save changes" })
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Reset" })).toBeVisible();
+
+    await assertNoA11yViolations(page);
   });
 
   test("navigates here from the user menu", async ({ page }) => {

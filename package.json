@@ -131,6 +131,7 @@
     "zxcvbn": "^4.4.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@electric-sql/pglite": "^0.4.4",
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
     "@eslint/eslintrc": "^3.3.5",

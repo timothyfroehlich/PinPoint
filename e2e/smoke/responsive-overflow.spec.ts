@@ -10,6 +10,7 @@ import { test } from "@playwright/test";
 import {
   assertNoHorizontalOverflow,
   ensureLoggedIn,
+  assertNoA11yViolations,
 } from "../support/actions.js";
 import { seededMachines, seededIssues } from "../support/constants.js";
 
@@ -41,6 +42,7 @@ test.describe("Responsive: no horizontal overflow", () => {
         await page.goto(route);
         await page.waitForLoadState("load");
         await assertNoHorizontalOverflow(page);
+        await assertNoA11yViolations(page);
       });
     }
   });
@@ -51,6 +53,7 @@ test.describe("Responsive: no horizontal overflow", () => {
         await page.goto(route);
         await page.waitForLoadState("load");
         await assertNoHorizontalOverflow(page);
+        await assertNoA11yViolations(page);
       });
     }
   });

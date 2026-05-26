@@ -1,21 +1,86 @@
 "use server";
 
 import { createClient } from "~/lib/supabase/server";
+import { createAdminClient } from "~/lib/supabase/admin";
 import { db } from "~/server/db";
 import {
   userProfiles,
   invitedUsers,
-  authUsers,
   machines,
   issues,
 } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { sendInviteEmail } from "~/lib/email/invite";
 import { requireSiteUrl } from "~/lib/url";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 import { log } from "~/lib/logger";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+
+interface AdminClientSubset {
+  auth: {
+    admin: {
+      listUsers: () => Promise<
+        | {
+            data: {
+              users: { id: string; email?: string | null | undefined }[];
+            };
+            error: null;
+          }
+        | {
+            data: {
+              users: [];
+            };
+            error: Error;
+          }
+      >;
+    };
+  };
+}
+
+function getAdminClient(): AdminClientSubset {
+  if (process.env.NODE_ENV === "test") {
+    return {
+      auth: {
+        admin: {
+          listUsers: async () => {
+            try {
+              const result = (await db.execute(
+                sql`SELECT id, email FROM auth.users`
+              )) as unknown;
+              const rows = (
+                Array.isArray(result)
+                  ? result
+                  : typeof result === "object" &&
+                      result !== null &&
+                      "rows" in result &&
+                      Array.isArray(result.rows)
+                    ? result.rows
+                    : []
+              ) as { id: string; email: string | null }[];
+
+              return {
+                data: {
+                  users: rows.map((row) => ({
+                    id: row.id,
+                    email: row.email ?? undefined,
+                  })),
+                },
+                error: null,
+              };
+            } catch (err) {
+              return {
+                data: { users: [] },
+                error: err instanceof Error ? err : new Error(String(err)),
+              };
+            }
+          },
+        },
+      },
+    };
+  }
+  return createAdminClient();
+}
 
 async function verifyAdmin(userId: string): Promise<void> {
   const currentUserProfile = await db.query.userProfiles.findFirst({
@@ -140,9 +205,21 @@ export async function inviteUser(
 
     // Check both auth.users and user_profiles — a user could exist in
     // auth.users without a profile row if the handle_new_user trigger failed.
-    const existingAuthUser = await db.query.authUsers.findFirst({
-      where: eq(authUsers.email, validated.email),
-    });
+    const adminClient = getAdminClient();
+    const { data: authUsersData, error: listError } =
+      await adminClient.auth.admin.listUsers();
+
+    if (listError) {
+      log.error(
+        { action: "inviteUser", err: listError.message },
+        "Failed to list auth users during validation"
+      );
+      throw listError;
+    }
+
+    const existingAuthUser = authUsersData.users.find(
+      (u) => u.email?.toLowerCase() === validated.email
+    );
 
     if (existingAuthUser) {
       throw new Error("A user with this email already exists and is active.");

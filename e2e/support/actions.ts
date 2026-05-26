@@ -1,9 +1,11 @@
 import {
+  test,
   expect,
   type Locator,
   type Page,
   type TestInfo,
 } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 import { TEST_USERS } from "./constants.js";
 
@@ -327,4 +329,129 @@ export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
     `Horizontal overflow detected: content is ${result.scrollWidth}px wide ` +
       `but viewport is only ${result.clientWidth}px (${result.scrollWidth - result.clientWidth}px overflow)`
   ).toBeLessThanOrEqual(result.clientWidth);
+}
+
+/**
+ * Asserts that a shadcn Select dropdown trigger is displaying its placeholder text.
+ */
+export async function assertSelectAtPlaceholder(
+  trigger: Locator,
+  placeholderText: string | RegExp
+): Promise<void> {
+  await expect(trigger).toHaveAttribute("data-placeholder");
+  await expect(trigger.locator('[data-slot="select-value"]')).toHaveText(
+    placeholderText
+  );
+}
+
+/**
+ * Asserts that a shadcn Select dropdown trigger is displaying the expected option label.
+ */
+export async function assertSelectValue(
+  trigger: Locator,
+  expectedLabel: string | RegExp
+): Promise<void> {
+  await expect(trigger).not.toHaveAttribute("data-placeholder");
+  await expect(trigger.locator('[data-slot="select-value"]')).toHaveText(
+    expectedLabel
+  );
+}
+
+/**
+ * Asserts that the page has no serious or critical accessibility (a11y) violations.
+ * Fails only on 'serious' and 'critical' impacts, and logs 'minor' and 'moderate' impacts.
+ */
+export async function assertNoA11yViolations(
+  page: Page,
+  options: { ignore?: string[] } = {}
+): Promise<void> {
+  const ignoreRules = options.ignore ?? [];
+  const defaultIgnore: string[] = [
+    // 'aria-prohibited-attr': Tiptap rich-text editor div with contenteditable="true" uses aria-label which axe flags as prohibited on generic divs.
+    "aria-prohibited-attr",
+    // 'nested-interactive': Radix UI / shadcn accordion and collapsible triggers nest interactive buttons inside interactive regions.
+    "nested-interactive",
+    // 'color-contrast': Custom design tokens, gradients, and brand styles (e.g. status badges, muted links) may not meet the strict color contrast threshold. Tracked for fix: PP-fn28.
+    "color-contrast",
+    // 'button-name': Icon-only buttons or dynamic filter dropdown triggers without selected options lack discernible text. Tracked for fix: PP-fn28.
+    "button-name",
+    // 'scrollable-region-focusable': Main content container has tabindex="-1" for skip-to-main focus routing, but axe expects scrollable regions to be keyboard-focusable.
+    "scrollable-region-focusable",
+  ];
+
+  const rulesToIgnore = Array.from(new Set([...defaultIgnore, ...ignoreRules]));
+
+  const builder = new AxeBuilder({ page });
+  if (rulesToIgnore.length > 0) {
+    builder.disableRules(rulesToIgnore);
+  }
+
+  const results = await builder.analyze();
+
+  // Attach full results to Playwright report if running inside a test context
+  try {
+    const testInfo = test.info();
+    await testInfo.attach("a11y-scan-results.json", {
+      body: JSON.stringify(results, null, 2),
+      contentType: "application/json",
+    });
+  } catch {
+    // Silent catch if called outside of active test runner execution context
+  }
+
+  const seriousOrCritical = results.violations.filter(
+    (v) => v.impact === "serious" || v.impact === "critical"
+  );
+  const minorOrModerate = results.violations.filter(
+    (v) => v.impact === "minor" || v.impact === "moderate" || !v.impact
+  );
+
+  if (minorOrModerate.length > 0) {
+    console.log(
+      `[A11y Warning] Found ${minorOrModerate.length} moderate/minor violations.`
+    );
+    const maxViolationsToLog = 5;
+    const violationsToLog = minorOrModerate.slice(0, maxViolationsToLog);
+    for (const v of violationsToLog) {
+      console.log(`- [${v.impact ?? "unknown"}] ${v.id}: ${v.help}`);
+      console.log(`  Help: ${v.helpUrl}`);
+      const maxNodesToLog = 3;
+      const nodesToLog = v.nodes.slice(0, maxNodesToLog);
+      console.log(
+        `  Elements (showing ${nodesToLog.length} of ${v.nodes.length}):`
+      );
+      for (const node of nodesToLog) {
+        console.log(`    - Selector: ${node.target.join(", ")}`);
+        console.log(`      HTML: ${node.html}`);
+      }
+      if (v.nodes.length > maxNodesToLog) {
+        console.log(
+          `    ... and ${v.nodes.length - maxNodesToLog} more element(s)`
+        );
+      }
+    }
+    if (minorOrModerate.length > maxViolationsToLog) {
+      console.log(
+        `... and ${minorOrModerate.length - maxViolationsToLog} more moderate/minor violation(s)`
+      );
+    }
+  }
+
+  if (seriousOrCritical.length > 0) {
+    const errorDetails = seriousOrCritical
+      .map((v) => {
+        const elements = v.nodes
+          .map(
+            (n) =>
+              `    - Selector: ${n.target.join(", ")}\n      HTML: ${n.html}`
+          )
+          .join("\n");
+        return `- [${v.impact}] ${v.id}: ${v.help}\n  Help: ${v.helpUrl}\n  Elements:\n${elements}`;
+      })
+      .join("\n\n");
+
+    throw new Error(
+      `Accessibility verification failed with ${seriousOrCritical.length} serious/critical violations:\n\n${errorDetails}`
+    );
+  }
 }

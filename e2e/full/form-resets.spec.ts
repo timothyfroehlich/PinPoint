@@ -13,7 +13,13 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn, loginAs, logout } from "../support/actions";
+import {
+  ensureLoggedIn,
+  loginAs,
+  logout,
+  selectOption,
+  assertSelectValue,
+} from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { seededMachines, TEST_USERS } from "../support/constants";
 import {
@@ -93,6 +99,9 @@ test.describe("CREATE form resets", () => {
       "[]"
     );
 
+    // Severity select returned to default "Minor".
+    await assertSelectValue(page.getByTestId("issue-severity-select"), "Minor");
+
     // Confirm machineInitials wasn't hydrated from a leaked localStorage entry.
     expect(page.url()).not.toContain(`machine=${machineInitials}`);
   });
@@ -116,6 +125,9 @@ test.describe("CREATE form resets", () => {
       .getByLabel("Issue Title *")
       .fill(`${RESET_PREFIX} clear-button title`);
 
+    // Change severity dropdown to a non-default option to verify reset
+    await selectOption(page, "issue-severity-select", "major");
+
     // Open confirmation dialog and confirm.
     await page.getByRole("button", { name: "Clear" }).click();
     await expect(
@@ -132,6 +144,10 @@ test.describe("CREATE form resets", () => {
 
     await expect(page.getByLabel("Issue Title *")).toHaveValue("");
     await expect(page.getByTestId("machine-select")).toHaveValue("");
+
+    // Severity select returned to default "Minor".
+    await assertSelectValue(page.getByTestId("issue-severity-select"), "Minor");
+
     // ?machine= must be stripped on Clear when the machine was user-picked
     // (no URL-derived default). Otherwise a reload silently re-selects.
     await expect(page).not.toHaveURL(/\?.*machine=/);
