@@ -127,6 +127,6 @@ After Antigravity ships a PR, treat it like any other agent PR: Copilot review, 
 
 ## When in doubt
 
-**High blast radius (schema, permissions, prod behavior, new dependencies, lint architecture):** default to FAIL. Over-tagging causes Antigravity to make judgment calls it was never meant to make, silently shipping wrong choices. Leave a `bd comment` describing the gap and skip the tag.
+**High blast radius (schema, permissions, prod behavior, new dependencies, lint/architecture rules):** default to FAIL. Over-tagging causes Antigravity to make judgment calls it was never meant to make, silently shipping wrong choices. Leave a `bd comment` describing the gap and skip the tag.
 
 **Low blast radius (tests, docs):** prefer tagging `agy-ready` with a delegated-decision note. Add a `bd comment` naming the micro-decisions the executor may resolve independently (e.g. "executor may choose cheapest test layer per CORE-TEST-005; post bd comment if torn"). Under-tagging safe work just starves Antigravity of good candidates.
