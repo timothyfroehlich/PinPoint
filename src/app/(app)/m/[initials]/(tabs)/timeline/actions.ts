@@ -133,6 +133,9 @@ export async function addMachineCommentAction(
   });
 
   revalidatePath(`/m/${machine.initials}/timeline`);
+  // Also refresh the overview tab — the "Recent activity" section and a note
+  // posted from the header's New Note action both live off the machine root.
+  revalidatePath(`/m/${machine.initials}`);
   return { success: true };
 }
 

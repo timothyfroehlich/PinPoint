@@ -349,6 +349,9 @@ export const timelineEvents = pgTable(
     }),
     content: jsonb("content").$type<ProseMirrorDoc>(),
     eventData: jsonb("event_data").$type<MachineTimelineEventData>(),
+    // Set when a comment's content/tag is edited after creation; drives the
+    // "(edited)" marker. Null = never edited. Comment rows only.
+    editedAt: timestamp("edited_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deletedBy: uuid("deleted_by").references(() => userProfiles.id, {
       onDelete: "set null",

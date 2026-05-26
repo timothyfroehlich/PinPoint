@@ -7,6 +7,7 @@ CREATE TABLE "timeline_events" (
 	"author_id" uuid,
 	"content" jsonb,
 	"event_data" jsonb,
+	"edited_at" timestamp with time zone,
 	"deleted_at" timestamp with time zone,
 	"deleted_by" uuid
 );

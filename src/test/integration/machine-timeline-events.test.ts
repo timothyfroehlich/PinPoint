@@ -6,6 +6,7 @@ import { machines, timelineEvents, userProfiles } from "~/server/db/schema";
 import {
   createMachineTimelineEvent,
   createMachineComment,
+  updateMachineComment,
   softDeleteMachineComment,
   getMachineTimeline,
 } from "~/lib/timeline/machine-events";
@@ -111,6 +112,78 @@ describe("machine-events helpers (PGlite)", () => {
         content: doc,
         eventData: null,
       });
+    });
+  });
+
+  describe("updateMachineComment", () => {
+    it("stamps editedAt and rewrites content + tag (null before edit)", async () => {
+      const { db, user, machine } = await seed();
+      await createMachineComment(
+        machine.id,
+        {
+          content: {
+            type: "doc",
+            content: [
+              { type: "paragraph", content: [{ type: "text", text: "v1" }] },
+            ],
+          },
+          tag: "maintenance",
+          authorId: user.id,
+        },
+        db
+      );
+      const [inserted] = await db.select().from(timelineEvents);
+      // Fresh comments have never been edited.
+      expect(inserted.editedAt).toBeNull();
+
+      const newDoc: ProseMirrorDoc = {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "v2" }] },
+        ],
+      };
+      await updateMachineComment(
+        inserted.id,
+        { content: newDoc, tag: "cleaning" },
+        db
+      );
+
+      const [updated] = await db
+        .select()
+        .from(timelineEvents)
+        .where(eq(timelineEvents.id, inserted.id));
+      expect(updated.editedAt).toBeInstanceOf(Date);
+      expect(updated.tag).toBe("cleaning");
+      expect(updated.content).toEqual(newDoc);
+    });
+
+    it("refuses to edit a soft-deleted comment (guarded by deletedAt IS NULL)", async () => {
+      const { db, user, machine } = await seed();
+      await createMachineComment(
+        machine.id,
+        {
+          content: { type: "doc", content: [] },
+          tag: "maintenance",
+          authorId: user.id,
+        },
+        db
+      );
+      const [inserted] = await db.select().from(timelineEvents);
+      await softDeleteMachineComment(inserted.id, { deletedBy: user.id }, db);
+
+      await updateMachineComment(
+        inserted.id,
+        { content: { type: "doc", content: [] }, tag: "cleaning" },
+        db
+      );
+
+      const [row] = await db
+        .select()
+        .from(timelineEvents)
+        .where(eq(timelineEvents.id, inserted.id));
+      // The guarded UPDATE matched no rows — tag unchanged, editedAt untouched.
+      expect(row.tag).toBe("maintenance");
+      expect(row.editedAt).toBeNull();
     });
   });
 
@@ -277,6 +350,53 @@ describe("machine-events helpers (PGlite)", () => {
       const expectedName = `${user.firstName} ${user.lastName}`;
       expect(rows[0].authorName).toBe(expectedName);
       expect(rows[0].deletedByName).toBe(expectedName);
+    });
+
+    it("surfaces the author's avatarUrl via the joined profile", async () => {
+      const db = await getTestDb();
+      const user = createTestUser({
+        avatarUrl: "https://cdn.example.com/avatar.png",
+      });
+      const machine = createTestMachine();
+      await db.insert(userProfiles).values(user);
+      await db.insert(machines).values(machine);
+      await createMachineComment(
+        machine.id,
+        {
+          content: { type: "doc", content: [] },
+          tag: "maintenance",
+          authorId: user.id,
+        },
+        db
+      );
+
+      const rows = await getMachineTimeline(db, { machineId: machine.id });
+      expect(rows[0].authorAvatarUrl).toBe(
+        "https://cdn.example.com/avatar.png"
+      );
+    });
+
+    it("surfaces editedAt — null for a fresh comment, a Date once edited", async () => {
+      const { db, user, machine } = await seed();
+      await createMachineComment(
+        machine.id,
+        {
+          content: { type: "doc", content: [] },
+          tag: "maintenance",
+          authorId: user.id,
+        },
+        db
+      );
+      let rows = await getMachineTimeline(db, { machineId: machine.id });
+      expect(rows[0].editedAt).toBeNull();
+
+      await updateMachineComment(
+        rows[0].id,
+        { content: { type: "doc", content: [] }, tag: "cleaning" },
+        db
+      );
+      rows = await getMachineTimeline(db, { machineId: machine.id });
+      expect(rows[0].editedAt).toBeInstanceOf(Date);
     });
   });
 });

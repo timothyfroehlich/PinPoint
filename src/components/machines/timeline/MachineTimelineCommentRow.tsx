@@ -20,8 +20,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
-import { Avatar, AvatarFallback } from "~/components/ui/avatar";
-import { Badge } from "~/components/ui/badge";
+import {
+  TagPill,
+  TagSelect,
+  USER_TAGS,
+} from "~/components/machines/timeline/TagSelect";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -29,33 +33,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
 import { formatRelative } from "~/lib/dates";
-import {
-  RESERVED_TAGS,
-  TIMELINE_TAGS,
-  type TimelineTag,
-  getTagLabel,
-  userTagSchema,
-} from "~/lib/timeline/machine-tags";
-import {
-  USER_TAG_DECORATION,
-  isUserTag,
-} from "~/lib/timeline/user-tag-decoration";
+import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
-import { cn } from "~/lib/utils";
 
 export interface MachineCommentRowData {
   id: string;
   createdAt: Date;
   authorId: string | null;
   authorName: string | null;
+  authorAvatarUrl: string | null;
+  editedAt: Date | null;
   tag: TimelineTag;
   content: ProseMirrorDoc;
 }
@@ -68,17 +56,12 @@ interface Props {
   showRelativeTime?: boolean;
   /**
    * Absolute date ("May 14") for rows inside a Tier-2 (month) bucket. Shares
-   * the inline timestamp slot with the relative time — month rows show the
-   * date there (`· May 14`) instead of "N ago". Tier-1 (day) buckets leave
-   * this undefined since the bucket banner names the day.
+   * the right-pinned timestamp slot with the relative time — month rows show
+   * the date there instead of "N ago". Tier-1 (day) buckets leave this
+   * undefined since the bucket banner names the day.
    */
   rowDateLabel?: string;
 }
-
-const USER_TAGS = TIMELINE_TAGS.filter(
-  (t): t is Exclude<TimelineTag, (typeof RESERVED_TAGS)[number]> =>
-    !(RESERVED_TAGS as readonly string[]).includes(t)
-);
 
 /**
  * Renders a single user comment row in the machine timeline.
@@ -104,15 +87,22 @@ export function MachineTimelineCommentRow({
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const canShowActions = canEdit || canDelete;
 
-  // Inline timestamp slot (after the author name): relative time for "today"
-  // rows, the absolute date for month-rollup rows. One slot, never both.
-  const inlineMeta = showRelativeTime
+  // Right-pinned timestamp slot (matches issue/system rows): relative time
+  // for "today" rows, the absolute date for month-rollup rows. One slot,
+  // never both.
+  const rightMeta = showRelativeTime
     ? formatRelative(row.createdAt)
     : rowDateLabel;
 
   return (
     <div className="flex gap-3 border-b py-3">
       <Avatar className="size-10 shrink-0 border border-border/60 ring-4 ring-background">
+        {row.authorAvatarUrl ? (
+          <AvatarImage
+            src={row.authorAvatarUrl}
+            alt={row.authorName ?? "Author"}
+          />
+        ) : null}
         <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
           {(row.authorName ?? "??").slice(0, 2).toUpperCase()}
         </AvatarFallback>
@@ -120,21 +110,30 @@ export function MachineTimelineCommentRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-xs">
           {/*
-           * Left cluster: author, timestamp (relative time or month-rollup
-           * date), tag. The tag pill sits *inline* with these (PP-0x98 V2
-           * design pass) so the comment row's left cluster matches the issue
-           * row's pattern of `[id] [verb] [badges]`.
+           * Left cluster: author + tag. The tag pill sits *inline* with the
+           * name (PP-0x98 V2 design pass) so the comment row's left cluster
+           * matches the issue row's `[id] [verb] [badges]` pattern. The
+           * timestamp is right-pinned (below) so it lines up with the
+           * issue/system rows' time column.
            */}
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="font-semibold">{row.authorName ?? "Unknown"}</span>
-            {inlineMeta ? (
-              <span className="tabular-nums text-muted-foreground">
-                · {inlineMeta}
+            <TagPill tag={row.tag} />
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {row.editedAt ? (
+              <span
+                className="whitespace-nowrap italic text-muted-foreground/70"
+                title={`Edited ${formatRelative(row.editedAt)}`}
+              >
+                (edited)
               </span>
             ) : null}
-            <CommentTagBadge tag={row.tag} />
-          </div>
-          <div className="ml-auto flex shrink-0 items-center gap-1">
+            {rightMeta ? (
+              <span className="whitespace-nowrap tabular-nums text-muted-foreground">
+                {rightMeta}
+              </span>
+            ) : null}
             {canShowActions && !isEditing ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -200,25 +199,6 @@ export function MachineTimelineCommentRow({
   );
 }
 
-/**
- * Tag pill on a comment row. Per-tag icon + semantic-token color from
- * `USER_TAG_DECORATION`. Reserved tags (lifecycle/issue, which shouldn't
- * appear on a comment but might in legacy data) fall back to the neutral
- * `secondary` Badge variant so the row still renders.
- */
-function CommentTagBadge({ tag }: { tag: TimelineTag }): React.JSX.Element {
-  if (!isUserTag(tag)) {
-    return <Badge variant="secondary">{tag}</Badge>;
-  }
-  const { Icon, badgeClass } = USER_TAG_DECORATION[tag];
-  return (
-    <Badge variant="secondary" className={cn("gap-1 border", badgeClass)}>
-      <Icon aria-hidden="true" className="size-3" />
-      {tag}
-    </Badge>
-  );
-}
-
 interface CommentEditFormProps {
   commentId: string;
   initialContent: ProseMirrorDoc;
@@ -270,24 +250,7 @@ function CommentEditForm({
         compact
       />
       <div className="mt-2 flex items-center justify-between gap-2">
-        <Select
-          value={tag}
-          onValueChange={(v) => {
-            const parsed = userTagSchema.safeParse(v);
-            if (parsed.success) setTag(parsed.data);
-          }}
-        >
-          <SelectTrigger aria-label="Tag" className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {USER_TAGS.map((t) => (
-              <SelectItem key={t} value={t}>
-                {getTagLabel(t)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <TagSelect value={tag} onChange={setTag} disabled={pending} />
         <div className="flex gap-2">
           <Button variant="ghost" onClick={onCancel} disabled={pending}>
             Cancel

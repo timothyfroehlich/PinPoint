@@ -13,7 +13,8 @@ interface MachineDetailHeaderProps {
  * Status / open-issue signal lives on the Maintenance tab itself as a count
  * badge (see `MachineTabStrip`). Owner display, Report Issue button, and the
  * full-text status badge were removed from this header — Owner + Report
- * relocate to the Info tab cleanup.
+ * relocate to the Info tab cleanup. The "New Note" capture action lives in the
+ * Info tab's "Recent activity" section, not here.
  */
 export function MachineDetailHeader({
   machine,

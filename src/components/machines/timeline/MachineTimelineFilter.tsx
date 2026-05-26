@@ -1,48 +1,52 @@
 "use client";
 
 import type React from "react";
-import { ChevronDown } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { Button } from "~/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+import { MultiSelect, type Option } from "~/components/ui/multi-select";
 import {
   TIMELINE_TAGS,
   getTagLabel,
+  tagSchema,
   type TimelineTag,
 } from "~/lib/timeline/machine-tags";
 import {
   TAG_DECORATION,
   tagTextColor,
 } from "~/lib/timeline/user-tag-decoration";
-import { cn } from "~/lib/utils";
 
 interface Props {
   currentTags: TimelineTag[];
 }
 
 /**
- * Multi-select "sticky All" filter.
+ * Tag filter — the app's shared {@link MultiSelect} (Popover + Command +
+ * visible checkboxes + count badge + search), the same control the issue
+ * list uses. Visible checkboxes make the multi-select nature obvious.
  *
- * UI pattern: "All" is the empty-state of the selection, not a sibling. Picking
- * any specific tag clears "All"; checking "All" clears every specific tag;
- * unchecking the last specific tag puts you back at "All" automatically. URL:
- * `?tag=` missing = all, `?tag=maintenance,event` = explicit subset (CSV).
+ * "All" is the empty selection, not a row: no tags selected = no `?tag=`
+ * param = everything shown. Each option carries its tag icon + color so the
+ * dropdown matches the composer/edit pickers and the row badges.
+ *
+ * URL: `?tag=` missing = all; `?tag=maintenance,upgrade` = explicit subset.
  */
+const TAG_OPTIONS: Option[] = TIMELINE_TAGS.map((t) => {
+  const { Icon, badgeClass } = TAG_DECORATION[t];
+  const iconColor = tagTextColor(badgeClass);
+  return {
+    label: getTagLabel(t),
+    value: t,
+    icon: Icon,
+    ...(iconColor !== undefined ? { iconColor } : {}),
+  };
+});
+
 export function MachineTimelineFilter({
   currentTags,
 }: Props): React.ReactElement {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
-  const allSelected = currentTags.length === 0;
 
   const writeTags = (next: TimelineTag[]): void => {
     const params = new URLSearchParams(searchParams.toString());
@@ -55,74 +59,26 @@ export function MachineTimelineFilter({
     router.push(qs ? `${pathname}?${qs}` : pathname);
   };
 
-  const toggleAll = (): void => {
-    // "All" → empty set (deselect everything specific). Already-all is a no-op
-    // because checking it again would be the same state.
-    writeTags([]);
+  const handleChange = (next: string[]): void => {
+    // Values originate from TAG_OPTIONS (all valid), but validate at this
+    // boundary rather than blind-cast — the enum is the source of truth.
+    const tags = next.flatMap((s) => {
+      const parsed = tagSchema.safeParse(s);
+      return parsed.success ? [parsed.data] : [];
+    });
+    writeTags(tags);
   };
-
-  const toggleTag = (tag: TimelineTag): void => {
-    const set = new Set(currentTags);
-    if (set.has(tag)) {
-      set.delete(tag);
-    } else {
-      set.add(tag);
-    }
-    // If the user just unchecked the last tag, fall back to "All" (empty set).
-    writeTags([...set]);
-  };
-
-  const [onlyTag] = currentTags;
-  const triggerLabel = allSelected
-    ? "All tags"
-    : onlyTag && currentTags.length === 1
-      ? getTagLabel(onlyTag)
-      : `${String(currentTags.length)} tags`;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          aria-label="Filter by tag"
-          className="w-44 justify-between"
-        >
-          <span className="truncate">{triggerLabel}</span>
-          <ChevronDown className="ml-2 size-4 opacity-50" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-44">
-        <DropdownMenuCheckboxItem
-          checked={allSelected}
-          onSelect={(e) => {
-            // Keep menu open while toggling, matching shadcn checkbox-item idiom.
-            e.preventDefault();
-            toggleAll();
-          }}
-        >
-          All
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuSeparator />
-        {TIMELINE_TAGS.map((t) => {
-          const { Icon, badgeClass } = TAG_DECORATION[t];
-          return (
-            <DropdownMenuCheckboxItem
-              key={t}
-              checked={currentTags.includes(t)}
-              onSelect={(e) => {
-                e.preventDefault();
-                toggleTag(t);
-              }}
-            >
-              <Icon
-                aria-hidden="true"
-                className={cn("size-4", tagTextColor(badgeClass))}
-              />
-              {getTagLabel(t)}
-            </DropdownMenuCheckboxItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <MultiSelect
+      options={TAG_OPTIONS}
+      value={currentTags}
+      onChange={handleChange}
+      placeholder="Tags"
+      searchPlaceholder="Filter tags…"
+      ariaLabel="Filter by tag"
+      data-testid="timeline-tag-filter"
+      className="w-44"
+    />
   );
 }

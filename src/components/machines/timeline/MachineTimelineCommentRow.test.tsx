@@ -23,6 +23,8 @@ const baseRow = {
   createdAt: new Date("2026-05-17T12:00:00Z"),
   authorId: "u1",
   authorName: "Tim",
+  authorAvatarUrl: null,
+  editedAt: null,
   tag: "maintenance" as const,
   content: {
     type: "doc" as const,
@@ -45,7 +47,9 @@ describe("MachineTimelineCommentRow", () => {
       />
     );
     expect(screen.getByText("Tim")).toBeInTheDocument();
-    expect(screen.getByText("maintenance")).toBeInTheDocument();
+    // Tag pill renders the Title-case label (getTagLabel), consistent with
+    // the picker dropdowns and filter — not the raw lowercase tag.
+    expect(screen.getByText("Maintenance")).toBeInTheDocument();
     expect(screen.getByText("Rebuilt flippers")).toBeInTheDocument();
   });
 
@@ -129,5 +133,39 @@ describe("MachineTimelineCommentRow", () => {
       />
     );
     expect(screen.getByText("Unknown")).toBeInTheDocument();
+  });
+
+  it("shows the '(edited)' marker only when editedAt is set", () => {
+    const { rerender } = render(
+      <MachineTimelineCommentRow
+        row={baseRow}
+        canEdit={false}
+        canDelete={false}
+      />
+    );
+    // editedAt is null on baseRow — no marker.
+    expect(screen.queryByText(/\(edited\)/i)).not.toBeInTheDocument();
+
+    rerender(
+      <MachineTimelineCommentRow
+        row={{ ...baseRow, editedAt: new Date("2026-05-18T09:00:00Z") }}
+        canEdit={false}
+        canDelete={false}
+      />
+    );
+    expect(screen.getByText(/\(edited\)/i)).toBeInTheDocument();
+  });
+
+  it("renders avatar fallback initials from the author name (no image URL)", () => {
+    // jsdom never fires the image load event, so Radix Avatar keeps showing
+    // the fallback — the initials are derived from authorName.
+    render(
+      <MachineTimelineCommentRow
+        row={baseRow}
+        canEdit={false}
+        canDelete={false}
+      />
+    );
+    expect(screen.getByText("TI")).toBeInTheDocument();
   });
 });

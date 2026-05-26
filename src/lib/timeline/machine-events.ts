@@ -116,6 +116,7 @@ export async function updateMachineComment(
     .set({
       content: args.content,
       tag: args.tag,
+      editedAt: new Date(),
     })
     .where(
       and(
@@ -174,8 +175,10 @@ export interface MachineTimelineRow {
   tag: string;
   authorId: string | null;
   authorName: string | null;
+  authorAvatarUrl: string | null;
   content: ProseMirrorDoc | null;
   eventData: MachineTimelineEventData | null;
+  editedAt: Date | null;
   deletedAt: Date | null;
   deletedById: string | null;
   deletedByName: string | null;
@@ -207,8 +210,10 @@ export async function getMachineTimeline(
       tag: timelineEvents.tag,
       authorId: timelineEvents.authorId,
       authorName: author.name,
+      authorAvatarUrl: author.avatarUrl,
       content: timelineEvents.content,
       eventData: timelineEvents.eventData,
+      editedAt: timelineEvents.editedAt,
       deletedAt: timelineEvents.deletedAt,
       deletedById: timelineEvents.deletedBy,
       deletedByName: deleter.name,

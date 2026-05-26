@@ -1,5 +1,5 @@
 {
-  "id": "86899c39-4b40-4379-b5b2-ed5735360264",
+  "id": "6542004d-bb63-4e76-9497-3fad21447935",
   "prevId": "bac32b91-2b2c-4f6d-ba6a-d2b3619a509f",
   "version": "7",
   "dialect": "postgresql",
@@ -1450,6 +1450,12 @@
         "event_data": {
           "name": "event_data",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "edited_at": {
+          "name": "edited_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

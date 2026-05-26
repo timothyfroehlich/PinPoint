@@ -1,10 +1,19 @@
 /**
  * E2E Tests for Machine Timeline (PP-0x98)
  *
- * Three class-F multi-step user journeys:
- * - Member posts a comment → it appears on the timeline
+ * Class-F multi-step user journeys:
+ * - Member posts a note via the "New Note" bottom sheet → it appears on the timeline
+ * - Member edits their own note → an "(edited)" marker appears (full edit round-trip)
  * - Tag filter URL param round-trips through the dropdown
+ * - The overview "Recent activity" section renders + "View all" navigates to the timeline
  * - Reassigning an issue surfaces events on BOTH machines' timelines
+ *
+ * The composer (quick-note default + "Aa" full-format toggle) is a single
+ * bottom sheet reused by the Timeline tab and the overview "Recent activity"
+ * section (`MachineNoteComposerSheet`). Quick-note + Aa-toggle UI states are
+ * class-H, covered by MachineTimelineComposer.test.tsx; editedAt stamping is
+ * class-B/I, covered by machine-timeline-events.test.ts. The E2E here only owns
+ * the cross-page journeys.
  *
  * Permission splits (admin/author/owner vs third-party) are class-E and
  * covered by integration tests at
@@ -29,18 +38,19 @@ test.describe("Machine Timeline (PP-0x98)", () => {
   test.describe("member journeys", () => {
     test.use({ storageState: STORAGE_STATE.member });
 
-    test("can post a comment and see it appear on the timeline", async ({
+    test("can post a note via the New Note sheet and see it on the timeline", async ({
       page,
     }) => {
       const body = `${PREFIX} cleaned playfield ${Date.now().toString()}`;
 
       await page.goto(`/m/${machineA}/timeline`);
 
-      // Expand the composer (collapsed trigger is a "New entry" button).
-      await page.getByRole("button", { name: /new entry/i }).click();
+      // Open the composer in the bottom sheet (the single shared entry point).
+      await page.getByRole("button", { name: /new note/i }).click();
 
-      // Select the "maintenance" tag via the composer's "Tag" combobox.
-      // exact:true so we don't also match the filter's "Filter by tag" trigger.
+      // Tag defaults to "Note" (quick-note); switch it to "maintenance" via the
+      // composer's "Tag" combobox. exact:true so we don't also match the
+      // filter's "Filter by tag" trigger.
       await page.getByRole("combobox", { name: "Tag", exact: true }).click();
       await page.getByRole("option", { name: /maintenance/i }).click();
 
@@ -54,7 +64,55 @@ test.describe("Machine Timeline (PP-0x98)", () => {
 
       await page.getByRole("button", { name: /^post$/i }).click();
 
+      // Sheet closes, the timeline RSC revalidates, and the note appears.
       await expect(page.getByText(body)).toBeVisible({ timeout: 10_000 });
+    });
+
+    test("can edit own note and an (edited) marker appears", async ({
+      page,
+    }) => {
+      const body = `${PREFIX} editable note ${Date.now().toString()}`;
+
+      await page.goto(`/m/${machineA}/timeline`);
+      await page.getByRole("button", { name: /new note/i }).click();
+
+      const editor = page.locator(".ProseMirror").first();
+      await editor.waitFor({ state: "visible", timeout: 15_000 });
+      await editor.click();
+      await page.keyboard.type(body);
+      await page.getByRole("button", { name: /^post$/i }).click();
+      await expect(page.getByText(body)).toBeVisible({ timeout: 10_000 });
+
+      // Newest-first ordering puts our just-posted note at the top, so the
+      // first comment kebab is ours. Open it → Edit → Save (a save stamps
+      // editedAt even with no content change).
+      await page
+        .getByRole("button", { name: /comment actions/i })
+        .first()
+        .click();
+      await page.getByRole("menuitem", { name: /edit/i }).click();
+      await page.getByRole("button", { name: /^save$/i }).click();
+
+      await expect(page.getByText(/\(edited\)/i).first()).toBeVisible({
+        timeout: 10_000,
+      });
+    });
+
+    test("overview Recent activity renders and 'View all' opens the timeline", async ({
+      page,
+    }) => {
+      // The overview (Info) tab is the discoverability surface — the last few
+      // events plus a "View all" link into the full timeline (PP-0x98.3).
+      await page.goto(`/m/${machineA}`);
+
+      await expect(
+        page.getByRole("heading", { name: /recent activity/i })
+      ).toBeVisible();
+
+      await page.getByRole("link", { name: /view all/i }).click();
+      await page.waitForURL(new RegExp(`/m/${machineA}/timeline$`), {
+        timeout: 10_000,
+      });
     });
 
     test("tag filter URL param ?tag= round-trips through the dropdown", async ({
@@ -62,11 +120,16 @@ test.describe("Machine Timeline (PP-0x98)", () => {
     }) => {
       await page.goto(`/m/${machineA}/timeline?tag=maintenance`);
 
-      // MachineTimelineFilter is a multi-select dropdown; its trigger button
-      // is labelled "Filter by tag" and shows the currently selected tag (or
-      // "All tags" / "<n> tags").
-      const trigger = page.getByRole("button", { name: /filter by tag/i });
-      await expect(trigger).toContainText(/maintenance/i);
+      // MachineTimelineFilter is the shared MultiSelect: a combobox trigger
+      // labelled "Filter by tag" that shows a count badge for the selection.
+      // Opening it reveals the "Maintenance" option in its checked state,
+      // confirming the ?tag= param round-tripped into the control.
+      const trigger = page.getByRole("combobox", { name: /filter by tag/i });
+      await expect(trigger).toContainText("1");
+      await trigger.click();
+      await expect(
+        page.getByRole("option", { name: /maintenance/i })
+      ).toBeVisible();
     });
   });
 

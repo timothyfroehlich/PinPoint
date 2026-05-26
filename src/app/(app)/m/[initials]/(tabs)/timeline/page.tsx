@@ -93,7 +93,7 @@ export default async function MachineTimelinePage({
   // Load the machine (FK target for getMachineTimeline + initials for routes).
   const machine = await db.query.machines.findFirst({
     where: eq(machines.initials, initials),
-    columns: { id: true, initials: true, ownerId: true },
+    columns: { id: true, initials: true, ownerId: true, name: true },
   });
   if (!machine) notFound();
 
@@ -139,6 +139,7 @@ export default async function MachineTimelinePage({
   const machineId = machine.id;
   const machineInitials = machine.initials;
   const machineOwnerId = machine.ownerId;
+  const machineName = machine.name;
 
   // Fetch one extra row so we can detect whether a next page exists without
   // a separate COUNT(*) query. Trim it back to PAGE_SIZE before rendering.
@@ -232,6 +233,8 @@ export default async function MachineTimelinePage({
             createdAt: row.createdAt,
             authorId: row.authorId,
             authorName: row.authorName,
+            authorAvatarUrl: row.authorAvatarUrl,
+            editedAt: row.editedAt,
             tag: rowTag,
             content: row.content,
           }}
@@ -286,6 +289,7 @@ export default async function MachineTimelinePage({
     <div className="flex flex-col gap-4">
       <MachineTimelineActionsRow
         machineId={machineId}
+        machineName={machineName}
         currentTags={tags}
         canCompose={canCompose}
       />
