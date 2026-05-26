@@ -345,9 +345,9 @@ export async function assertNoA11yViolations(
     "aria-prohibited-attr",
     // 'nested-interactive': Radix UI / shadcn accordion and collapsible triggers nest interactive buttons inside interactive regions.
     "nested-interactive",
-    // 'color-contrast': Custom design tokens, gradients, and brand styles (e.g. status badges, muted links) may not meet the strict color contrast threshold.
+    // 'color-contrast': Custom design tokens, gradients, and brand styles (e.g. status badges, muted links) may not meet the strict color contrast threshold. Tracked for fix: PP-fn28.
     "color-contrast",
-    // 'button-name': Icon-only buttons or dynamic filter dropdown triggers without selected options lack discernible text.
+    // 'button-name': Icon-only buttons or dynamic filter dropdown triggers without selected options lack discernible text. Tracked for fix: PP-fn28.
     "button-name",
     // 'scrollable-region-focusable': Main content container has tabindex="-1" for skip-to-main focus routing, but axe expects scrollable regions to be keyboard-focusable.
     "scrollable-region-focusable",
