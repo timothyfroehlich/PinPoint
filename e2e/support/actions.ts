@@ -332,6 +332,32 @@ export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
 }
 
 /**
+ * Asserts that a shadcn Select dropdown trigger is displaying its placeholder text.
+ */
+export async function assertSelectAtPlaceholder(
+  trigger: Locator,
+  placeholderText: string | RegExp
+): Promise<void> {
+  await expect(trigger).toHaveAttribute("data-placeholder");
+  await expect(trigger.locator('[data-slot="select-value"]')).toHaveText(
+    placeholderText
+  );
+}
+
+/**
+ * Asserts that a shadcn Select dropdown trigger is displaying the expected option label.
+ */
+export async function assertSelectValue(
+  trigger: Locator,
+  expectedLabel: string | RegExp
+): Promise<void> {
+  await expect(trigger).not.toHaveAttribute("data-placeholder");
+  await expect(trigger.locator('[data-slot="select-value"]')).toHaveText(
+    expectedLabel
+  );
+}
+
+/**
  * Asserts that the page has no serious or critical accessibility (a11y) violations.
  * Fails only on 'serious' and 'critical' impacts, and logs 'minor' and 'moderate' impacts.
  */
