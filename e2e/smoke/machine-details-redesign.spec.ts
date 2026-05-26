@@ -124,4 +124,17 @@ test.describe("Machine Details Redesign", () => {
       /^pinpoint-TAF-issues-\d{4}-\d{2}-\d{2}\.csv$/
     );
   });
+
+  test("logged-in non-admin member is blocked from /m/new page", async ({
+    page,
+  }) => {
+    await page.goto("/m/new");
+
+    // Should show Forbidden page / Access Denied
+    await expect(page.getByText("Access Denied")).toBeVisible();
+    await expect(
+      page.locator("span").filter({ hasText: "Member" })
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Home" })).toBeVisible();
+  });
 });
