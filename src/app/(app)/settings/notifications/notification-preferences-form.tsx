@@ -589,6 +589,7 @@ function PreferenceRow({
         <Switch
           id={inAppId}
           name={inAppId}
+          aria-label={`In-app notifications: ${label}`}
           defaultChecked={inAppDefault}
           className={inAppClassName}
         />
@@ -598,6 +599,7 @@ function PreferenceRow({
           <Switch
             id={emailId}
             name={emailId}
+            aria-label={`Email notifications: ${label}`}
             defaultChecked={emailDefault}
             className={emailClassName}
           />
@@ -608,6 +610,7 @@ function PreferenceRow({
           <Switch
             id={discordId}
             name={discordId}
+            aria-label={`Discord notifications: ${label}`}
             defaultChecked={discordDefault ?? false}
             disabled={discordDisabled ?? false}
             className={discordClassName}

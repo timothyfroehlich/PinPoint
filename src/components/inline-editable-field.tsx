@@ -153,7 +153,7 @@ export function InlineEditableField({
           data-testid={testId ? `${testId}-display` : undefined}
         >
           {isEmpty ? (
-            <p className="py-1 text-sm italic text-muted-foreground/60">
+            <p className="py-1 text-sm italic text-muted-foreground">
               {placeholder ?? `Add ${label.toLowerCase()}...`}
             </p>
           ) : (

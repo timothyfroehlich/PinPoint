@@ -78,6 +78,8 @@ describe("getMachineStatusStyles", () => {
 
     const unplayableStyles = getMachineStatusStyles("unplayable");
     expect(unplayableStyles).toContain("bg-destructive/10");
-    expect(unplayableStyles).toContain("text-destructive");
+    // text-red-400 (not text-destructive #dc2626) to clear WCAG AA on the
+    // composited bg-destructive/10 surface — see PP-fn28.
+    expect(unplayableStyles).toContain("text-red-400");
   });
 });
