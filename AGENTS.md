@@ -169,6 +169,10 @@ Full protocol: `pinpoint-pr-workflow` skill (Phase 3). Summary:
 
 Use worktree-isolated subagents for independent tasks. Tool-specific dispatch, hooks, and known bugs live in your tool's instructions file. Full multi-tool workflow: `pinpoint-orchestrator` skill.
 
+### Surfacing visual or ambiguous decisions (playgrounds)
+
+When a decision is **visual or hard to convey in prose** — color/contrast, spacing, layout, component variants, or a tradeoff with several plausible answers — build a small interactive playground for the user instead of describing options in text or guessing on their behalf. A playground is a single self-contained HTML file with live controls, a real rendered preview, and a copy-out decision; the user adjusts it, sees the actual result, and hands the choice back. (Claude Code: `playground` skill. Other tools: write the HTML directly.) Prefer this over a wall of bullet-pointed options whenever the user would benefit from _seeing_ the thing — e.g. a contrast change is far easier to judge as rendered swatches with live WCAG ratios than as numbers. Keep using `AskUserQuestion`-style prompts for non-visual forks; reach for a playground when sight is the deciding factor.
+
 ### Safe command patterns
 
 - Search: `rg --files | rg "pattern"`, `rg -l "content" --type js`
