@@ -58,29 +58,78 @@ function checkBrowserBinaries(config: FullConfig): void {
 }
 
 /**
+ * Block the current thread for `ms` milliseconds without a shell or child
+ * process. Used to pace Docker readiness retries. `Atomics.wait` on a throwaway
+ * SharedArrayBuffer is the standard synchronous-sleep primitive in Node.
+ */
+function sleepSync(ms: number): void {
+  // Guard non-finite values: Atomics.wait coerces NaN to +Infinity and would
+  // block forever, defeating the bounded readiness budget.
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Read a numeric env override, falling back to `fallback` when unset or
+ * invalid (e.g. a typo'd `E2E_DOCKER_READY_DELAY_MS=abc` → NaN). Keeps the
+ * Docker readiness budget bounded regardless of bad input.
+ */
+function numEnv(name: string, fallback: number, min: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= min ? n : fallback;
+}
+
+/**
  * Verify the Docker daemon is up. Supabase's local stack runs in Docker, so
  * a missing daemon would surface as confusing Postgres connection failures.
  * Uses spawnSync (not exec) — no shell, fixed argv, safe.
+ *
+ * On CI the runner's Docker daemon can still be coming up when global-setup
+ * runs, so a single-shot check races daemon startup and fails spuriously
+ * (PP-149t). Poll `docker info` with a bounded retry budget instead, tolerating
+ * a brief startup delay. A missing binary (ENOENT) is fatal immediately —
+ * retrying won't install Docker. Budget is tunable via env for CI.
  */
 function checkDocker(): void {
-  const result = spawnSync("docker", ["info"], {
-    stdio: "ignore",
-    timeout: 5000,
-  });
-  if (result.error?.code === "ENOENT") {
-    throw new Error(
-      "Docker is not installed.\n" +
-        "  Install OrbStack, Docker Desktop, or Docker Engine (whichever your platform supports).\n" +
-        "  Mac: brew install --cask orbstack"
-    );
+  const attempts = Math.floor(numEnv("E2E_DOCKER_READY_ATTEMPTS", 15, 1));
+  const delayMs = numEnv("E2E_DOCKER_READY_DELAY_MS", 1000, 0);
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const result = spawnSync("docker", ["info"], {
+      stdio: "ignore",
+      timeout: 5000,
+    });
+
+    if (result.error?.code === "ENOENT") {
+      throw new Error(
+        "Docker is not installed.\n" +
+          "  Install OrbStack, Docker Desktop, or Docker Engine (whichever your platform supports).\n" +
+          "  Mac: brew install --cask orbstack"
+      );
+    }
+
+    if (!result.error && result.status === 0) {
+      if (attempt > 1) {
+        console.log(`✅ Docker daemon ready (attempt ${attempt}/${attempts}).`);
+      }
+      return;
+    }
+
+    if (attempt < attempts) {
+      console.log(
+        `⏳ Docker daemon not ready (attempt ${attempt}/${attempts}), retrying in ${delayMs}ms...`
+      );
+      sleepSync(delayMs);
+    }
   }
-  if (result.error || result.status !== 0) {
-    throw new Error(
-      "Docker daemon is not running. Supabase's local stack needs it.\n" +
-        "  Start your Docker daemon (e.g., OrbStack, Docker Desktop, Colima, or `systemctl start docker`).\n" +
-        "  Then wait a few seconds and re-run."
-    );
-  }
+
+  throw new Error(
+    `Docker daemon is not running after ${attempts} attempts. Supabase's local stack needs it.\n` +
+      "  Start your Docker daemon (e.g., OrbStack, Docker Desktop, Colima, or `systemctl start docker`).\n" +
+      "  Then wait a few seconds and re-run."
+  );
 }
 
 /**
