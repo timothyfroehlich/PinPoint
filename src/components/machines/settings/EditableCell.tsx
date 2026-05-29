@@ -103,14 +103,23 @@ export function EditableCell({
     );
   }
 
+  // Read-only: a plain span, not a disabled <button> (a disabled interactive
+  // element is needless noise in the AT tree for a value that can't change).
+  if (!canEdit) {
+    return (
+      <span className={cn("px-1", textClassName)}>
+        {value || (
+          <span className="italic text-muted-foreground/60">{placeholder}</span>
+        )}
+      </span>
+    );
+  }
+
   return (
     <button
       type="button"
       className={cn(
-        "-mx-1 w-[calc(100%+0.5rem)] rounded px-1 text-left",
-        canEdit
-          ? "cursor-text hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          : "cursor-default",
+        "-mx-1 w-[calc(100%+0.5rem)] cursor-text rounded px-1 text-left hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         textClassName
       )}
       onClick={startEdit}
@@ -120,7 +129,6 @@ export function EditableCell({
           startEdit();
         }
       }}
-      disabled={!canEdit}
       aria-label={ariaLabel}
     >
       {value || (

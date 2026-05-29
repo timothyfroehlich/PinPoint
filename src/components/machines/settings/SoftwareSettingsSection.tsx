@@ -14,6 +14,8 @@ import {
 } from "~/components/ui/table";
 import { BaselineCombobox } from "~/components/machines/settings/BaselineCombobox";
 import { EditableCell } from "~/components/machines/settings/EditableCell";
+import { SECTION_LABEL_CLASS } from "~/components/machines/settings/styles";
+import { cn } from "~/lib/utils";
 
 export interface SoftwareSetting {
   _key: string;
@@ -54,9 +56,7 @@ export function SoftwareSettingsSection({
 
   return (
     <div className="py-2.5">
-      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-        Software Settings
-      </p>
+      <p className={cn("mb-1.5", SECTION_LABEL_CLASS)}>Software Settings</p>
 
       {/* Baseline strip */}
       <div className="mb-3 flex items-center gap-2 text-sm">
@@ -75,13 +75,21 @@ export function SoftwareSettingsSection({
         )}
       </div>
 
-      <Table>
+      <Table aria-label="Software settings">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-24">ID</TableHead>
-            <TableHead>Setting</TableHead>
-            <TableHead className="w-44">Value</TableHead>
-            {canEdit && <TableHead className="w-8" aria-label="Actions" />}
+            <TableHead scope="col" className="w-24">
+              ID
+            </TableHead>
+            <TableHead scope="col">Setting</TableHead>
+            <TableHead scope="col" className="w-44">
+              Value
+            </TableHead>
+            {canEdit && (
+              <TableHead scope="col" className="w-8">
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -127,7 +135,7 @@ export function SoftwareSettingsSection({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-6 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
+                    className="size-6 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:opacity-100 motion-reduce:transition-none"
                     onClick={() => {
                       onDeleteRow?.(row._key);
                     }}

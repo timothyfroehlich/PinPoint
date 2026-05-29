@@ -3,9 +3,12 @@
 import type React from "react";
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import { arrayMove } from "@dnd-kit/sortable";
 import { Button } from "~/components/ui/button";
 import {
   SettingsSetCard,
+  type AddSectionSpec,
+  type Section,
   type SettingsSetData,
 } from "~/components/machines/settings/SettingsSetCard";
 import { plainTextToDoc, type ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -28,22 +31,31 @@ function makeSampleSets(): SettingsSetData[] {
       description: plainTextToDoc(
         "Our day-to-day setup — slightly harder than factory but accessible."
       ),
-      baseline: "Competition Install",
-      softwareSettings: [
-        {
-          _key: makeKey(),
-          id: "S-001",
-          name: "Replay score",
-          value: "700,000,000",
-        },
-        { _key: makeKey(), id: "S-014", name: "Tilt warnings", value: "2" },
-        { _key: makeKey(), id: "S-021", name: "Balls per game", value: "3" },
-        { _key: makeKey(), id: "S-040", name: "Free play", value: "On" },
-      ],
-      dipSwitchBanks: [],
-      notes: [
+      sections: [
         {
           id: makeKey(),
+          kind: "software",
+          baseline: "Competition Install",
+          rows: [
+            {
+              _key: makeKey(),
+              id: "S-001",
+              name: "Replay score",
+              value: "700,000,000",
+            },
+            { _key: makeKey(), id: "S-014", name: "Tilt warnings", value: "2" },
+            {
+              _key: makeKey(),
+              id: "S-021",
+              name: "Balls per game",
+              value: "3",
+            },
+            { _key: makeKey(), id: "S-040", name: "Free play", value: "On" },
+          ],
+        },
+        {
+          id: makeKey(),
+          kind: "note",
           title: "Rubbers",
           customTitle: false,
           body: plainTextToDoc(
@@ -52,6 +64,7 @@ function makeSampleSets(): SettingsSetData[] {
         },
         {
           id: makeKey(),
+          kind: "note",
           title: "Post positions",
           customTitle: false,
           body: plainTextToDoc(
@@ -60,6 +73,7 @@ function makeSampleSets(): SettingsSetData[] {
         },
         {
           id: makeKey(),
+          kind: "note",
           title: "Notes",
           customTitle: true,
           body: plainTextToDoc(
@@ -77,40 +91,56 @@ function makeSampleSets(): SettingsSetData[] {
       description: plainTextToDoc(
         "Tightened for league night — tilt sensitive, no extra balls."
       ),
-      baseline: "Competition Install",
-      softwareSettings: [
-        {
-          _key: makeKey(),
-          id: "S-001",
-          name: "Replay score",
-          value: "800,000,000",
-        },
-        { _key: makeKey(), id: "S-014", name: "Tilt warnings", value: "1" },
-        { _key: makeKey(), id: "S-021", name: "Balls per game", value: "3" },
-        {
-          _key: makeKey(),
-          id: "S-030",
-          name: "Extra ball award",
-          value: "Off",
-        },
-        { _key: makeKey(), id: "S-041", name: "Match feature", value: "Off" },
-      ],
-      dipSwitchBanks: [],
-      notes: [
+      sections: [
         {
           id: makeKey(),
+          kind: "software",
+          baseline: "Competition Install",
+          rows: [
+            {
+              _key: makeKey(),
+              id: "S-001",
+              name: "Replay score",
+              value: "800,000,000",
+            },
+            { _key: makeKey(), id: "S-014", name: "Tilt warnings", value: "1" },
+            {
+              _key: makeKey(),
+              id: "S-021",
+              name: "Balls per game",
+              value: "3",
+            },
+            {
+              _key: makeKey(),
+              id: "S-030",
+              name: "Extra ball award",
+              value: "Off",
+            },
+            {
+              _key: makeKey(),
+              id: "S-041",
+              name: "Match feature",
+              value: "Off",
+            },
+          ],
+        },
+        {
+          id: makeKey(),
+          kind: "note",
           title: "Rubbers",
           customTitle: false,
           body: plainTextToDoc("Same as Standard House."),
         },
         {
           id: makeKey(),
+          kind: "note",
           title: "Post positions",
           customTitle: false,
           body: plainTextToDoc("Outlane posts — top hole (tighter lane)."),
         },
         {
           id: makeKey(),
+          kind: "note",
           title: "Notes",
           customTitle: true,
           body: plainTextToDoc("Review ball times after each league session."),
@@ -126,11 +156,10 @@ function makeSampleSets(): SettingsSetData[] {
       description: plainTextToDoc(
         "Sample early-solid-state set so you can see how DIP-switch banks render alongside no software."
       ),
-      baseline: "",
-      softwareSettings: [],
-      dipSwitchBanks: [
+      sections: [
         {
-          id: "bank-bk-mpu",
+          id: makeKey(),
+          kind: "dip",
           name: "MPU",
           switches: [
             {
@@ -149,7 +178,8 @@ function makeSampleSets(): SettingsSetData[] {
           ],
         },
         {
-          id: "bank-bk-sound",
+          id: makeKey(),
+          kind: "dip",
           name: "Sound",
           switches: [
             {
@@ -160,16 +190,16 @@ function makeSampleSets(): SettingsSetData[] {
             },
           ],
         },
-      ],
-      notes: [
         {
           id: makeKey(),
+          kind: "note",
           title: "Rubbers",
           customTitle: false,
           body: plainTextToDoc("Standard outlane post rubber."),
         },
         {
           id: makeKey(),
+          kind: "note",
           title: "Post positions",
           customTitle: false,
           body: plainTextToDoc("Stock."),
@@ -195,12 +225,16 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     new Set([initial[0]!.id])
   );
   const [sets, setSets] = useState<SettingsSetData[]>(initial);
-  // Edit mode is PER SET — content editing (name, description, cells,
-  // baseline, add/delete rows) unlocks only for the sets in this set.
-  // Set-level operations (Duplicate, Delete, Preferred, New set) stay
-  // available whenever `canEdit` (the owner/tech+ permission) is true,
-  // regardless of edit mode.
+  // Edit mode is PER SET — content editing unlocks only for the sets in this
+  // set. Set-level operations (Duplicate, Delete, Preferred, New set) stay
+  // available whenever `canEdit` (the owner/tech+ permission) is true.
   const [editingIds, setEditingIds] = useState<Set<string>>(new Set());
+
+  // The preferred set is always pinned to the top. A stable sort preserves the
+  // insertion order of everything else (new sets, etc.).
+  const orderedSets = [...sets].sort(
+    (a, b) => Number(b.isPreferred) - Number(a.isPreferred)
+  );
 
   function toggleSetEdit(id: string): void {
     setEditingIds((prev) => {
@@ -209,7 +243,6 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
         next.delete(id);
       } else {
         next.add(id);
-        // Entering edit mode expands the set so editable surfaces show.
         setExpandedIds((ex) => new Set(ex).add(id));
       }
       return next;
@@ -246,22 +279,14 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
       const idx = prev.findIndex((s) => s.id === id);
       if (idx < 0) return prev;
       const original = prev[idx]!;
-      // Deep-clone the row arrays so edits on the copy don't mutate the original.
+      // Deep-clone every section (and its inner rows/switches) so edits on the
+      // copy don't mutate the original.
       const copy: SettingsSetData = {
         ...original,
         id: makeSetId(),
         name: `${original.name} (copy)`,
         isPreferred: false,
-        softwareSettings: original.softwareSettings.map((r) => ({
-          ...r,
-          _key: makeKey(),
-        })),
-        dipSwitchBanks: original.dipSwitchBanks.map((b) => ({
-          ...b,
-          id: makeKey(),
-          switches: b.switches.map((sw) => ({ ...sw, _key: makeKey() })),
-        })),
-        notes: original.notes.map((n) => ({ ...n, id: makeKey() })),
+        sections: original.sections.map(cloneSection),
       };
       const next = [...prev];
       next.splice(idx + 1, 0, copy);
@@ -287,15 +312,11 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
       name: "",
       isPreferred: false,
       updatedBy: "You",
-      updatedAt: "2026-05-24",
+      updatedAt: "2026-05-25",
       description: null,
-      baseline: "Factory Install",
-      softwareSettings: [],
-      dipSwitchBanks: [],
-      notes: [],
+      sections: [],
     };
-    // New sets go to the top, expand, and open straight into edit mode so the
-    // owner can name + fill them in without a second click.
+    // New sets go to the top, expand, and open straight into edit mode.
     setSets((prev) => [newSet, ...prev]);
     setExpandedIds((prev) => new Set([...prev, id]));
     setEditingIds((prev) => new Set([...prev, id]));
@@ -307,256 +328,211 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     );
   }
 
-  // -- Free-form note section handlers --
-  function addNote(setId: string, title: string, customTitle: boolean): void {
-    setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? {
-              ...s,
-              notes: [
-                ...s.notes,
-                { id: makeKey(), title, body: null, customTitle },
-              ],
-            }
-          : s
-      )
-    );
-  }
-
-  function updateNoteTitle(setId: string, noteId: string, title: string): void {
-    setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? {
-              ...s,
-              notes: s.notes.map((n) =>
-                n.id === noteId ? { ...n, title } : n
-              ),
-            }
-          : s
-      )
-    );
-  }
-
-  function updateNoteBody(
+  // -- Section-level operations --
+  function mapSections(
     setId: string,
-    noteId: string,
-    body: ProseMirrorDoc | null
+    fn: (sections: Section[]) => Section[]
   ): void {
     setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? {
-              ...s,
-              notes: s.notes.map((n) => (n.id === noteId ? { ...n, body } : n)),
-            }
-          : s
-      )
+      prev.map((s) => (s.id === setId ? { ...s, sections: fn(s.sections) } : s))
     );
   }
 
-  function deleteNote(setId: string, noteId: string): void {
+  function updateSection(
+    setId: string,
+    sectionId: string,
+    updater: (section: Section) => Section
+  ): void {
+    mapSections(setId, (sections) =>
+      sections.map((sec) => (sec.id === sectionId ? updater(sec) : sec))
+    );
+  }
+
+  function addSection(setId: string, spec: AddSectionSpec): void {
     setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? { ...s, notes: s.notes.filter((n) => n.id !== noteId) }
-          : s
-      )
+      prev.map((s) => {
+        if (s.id !== setId) return s;
+        let section: Section;
+        if (spec.kind === "software") {
+          section = {
+            id: makeKey(),
+            kind: "software",
+            baseline: "Factory Install",
+            rows: [{ _key: makeKey(), id: "", name: "", value: "" }],
+          };
+        } else if (spec.kind === "dip") {
+          const num = s.sections.filter((x) => x.kind === "dip").length + 1;
+          section = {
+            id: makeKey(),
+            kind: "dip",
+            name: `Bank ${String(num)}`,
+            switches: [
+              { _key: makeKey(), switch: "", position: "OFF", note: "" },
+            ],
+          };
+        } else {
+          section = {
+            id: makeKey(),
+            kind: "note",
+            title: spec.title,
+            body: null,
+            customTitle: spec.customTitle,
+          };
+        }
+        return { ...s, sections: [...s.sections, section] };
+      })
     );
   }
 
-  function updateBaseline(id: string, baseline: string): void {
-    setSets((prev) => prev.map((s) => (s.id === id ? { ...s, baseline } : s)));
+  function deleteSection(setId: string, sectionId: string): void {
+    mapSections(setId, (sections) =>
+      sections.filter((sec) => sec.id !== sectionId)
+    );
   }
 
-  // -- Software-settings row handlers --
-  function addSoftwareRow(setId: string): string {
+  function reorderSections(
+    setId: string,
+    activeId: string,
+    overId: string
+  ): void {
+    mapSections(setId, (sections) => {
+      const oldIndex = sections.findIndex((sec) => sec.id === activeId);
+      const newIndex = sections.findIndex((sec) => sec.id === overId);
+      if (oldIndex < 0 || newIndex < 0) return sections;
+      return arrayMove(sections, oldIndex, newIndex);
+    });
+  }
+
+  // -- Software-settings row handlers (scoped to a software section) --
+  function updateBaseline(
+    setId: string,
+    sectionId: string,
+    baseline: string
+  ): void {
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "software" ? { ...sec, baseline } : sec
+    );
+  }
+
+  function addSoftwareRow(setId: string, sectionId: string): string {
     const newKey = makeKey();
-    setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? {
-              ...s,
-              softwareSettings: [
-                ...s.softwareSettings,
-                { _key: newKey, id: "", name: "", value: "" },
-              ],
-            }
-          : s
-      )
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "software"
+        ? {
+            ...sec,
+            rows: [...sec.rows, { _key: newKey, id: "", name: "", value: "" }],
+          }
+        : sec
     );
     return newKey;
   }
 
   function updateSoftwareRow(
     setId: string,
+    sectionId: string,
     rowKey: string,
     field: "id" | "name" | "value",
     value: string
   ): void {
-    setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? {
-              ...s,
-              softwareSettings: s.softwareSettings.map((r) =>
-                r._key === rowKey ? { ...r, [field]: value } : r
-              ),
-            }
-          : s
-      )
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "software"
+        ? {
+            ...sec,
+            rows: sec.rows.map((r) =>
+              r._key === rowKey ? { ...r, [field]: value } : r
+            ),
+          }
+        : sec
     );
   }
 
-  function deleteSoftwareRow(setId: string, rowKey: string): void {
-    setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? {
-              ...s,
-              softwareSettings: s.softwareSettings.filter(
-                (r) => r._key !== rowKey
-              ),
-            }
-          : s
-      )
+  function deleteSoftwareRow(
+    setId: string,
+    sectionId: string,
+    rowKey: string
+  ): void {
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "software"
+        ? { ...sec, rows: sec.rows.filter((r) => r._key !== rowKey) }
+        : sec
     );
   }
 
-  // -- DIP switch handlers --
-  function addDipBank(setId: string): {
-    bankId: string;
-    switchKey: string;
-  } {
-    const bankId = makeKey();
-    const switchKey = makeKey();
-    setSets((prev) =>
-      prev.map((s) => {
-        if (s.id !== setId) return s;
-        const num = s.dipSwitchBanks.length + 1;
-        return {
-          ...s,
-          dipSwitchBanks: [
-            ...s.dipSwitchBanks,
-            {
-              id: bankId,
-              name: `Bank ${String(num)}`,
-              switches: [
-                { _key: switchKey, switch: "", position: "OFF", note: "" },
-              ],
-            },
-          ],
-        };
-      })
-    );
-    return { bankId, switchKey };
-  }
-
-  function deleteDipBank(setId: string, bankId: string): void {
-    setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? {
-              ...s,
-              dipSwitchBanks: s.dipSwitchBanks.filter((b) => b.id !== bankId),
-            }
-          : s
-      )
+  // -- DIP switch handlers (scoped to a dip section) --
+  function renameDipBank(setId: string, sectionId: string, name: string): void {
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "dip" ? { ...sec, name } : sec
     );
   }
 
-  function renameDipBank(setId: string, bankId: string, name: string): void {
-    setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? {
-              ...s,
-              dipSwitchBanks: s.dipSwitchBanks.map((b) =>
-                b.id === bankId ? { ...b, name } : b
-              ),
-            }
-          : s
-      )
-    );
-  }
-
-  function addDipSwitch(setId: string, bankId: string): string {
+  function addDipSwitch(setId: string, sectionId: string): string {
     const newKey = makeKey();
-    setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? {
-              ...s,
-              dipSwitchBanks: s.dipSwitchBanks.map((b) =>
-                b.id === bankId
-                  ? {
-                      ...b,
-                      switches: [
-                        ...b.switches,
-                        { _key: newKey, switch: "", position: "OFF", note: "" },
-                      ],
-                    }
-                  : b
-              ),
-            }
-          : s
-      )
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "dip"
+        ? {
+            ...sec,
+            switches: [
+              ...sec.switches,
+              { _key: newKey, switch: "", position: "OFF", note: "" },
+            ],
+          }
+        : sec
     );
     return newKey;
   }
 
   function updateDipSwitch(
     setId: string,
-    bankId: string,
+    sectionId: string,
     switchKey: string,
     field: "switch" | "position" | "note",
     value: string
   ): void {
-    setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? {
-              ...s,
-              dipSwitchBanks: s.dipSwitchBanks.map((b) =>
-                b.id === bankId
-                  ? {
-                      ...b,
-                      switches: b.switches.map((sw) =>
-                        sw._key === switchKey ? { ...sw, [field]: value } : sw
-                      ),
-                    }
-                  : b
-              ),
-            }
-          : s
-      )
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "dip"
+        ? {
+            ...sec,
+            switches: sec.switches.map((sw) =>
+              sw._key === switchKey ? { ...sw, [field]: value } : sw
+            ),
+          }
+        : sec
     );
   }
 
   function deleteDipSwitch(
     setId: string,
-    bankId: string,
+    sectionId: string,
     switchKey: string
   ): void {
-    setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? {
-              ...s,
-              dipSwitchBanks: s.dipSwitchBanks.map((b) =>
-                b.id === bankId
-                  ? {
-                      ...b,
-                      switches: b.switches.filter(
-                        (sw) => sw._key !== switchKey
-                      ),
-                    }
-                  : b
-              ),
-            }
-          : s
-      )
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "dip"
+        ? {
+            ...sec,
+            switches: sec.switches.filter((sw) => sw._key !== switchKey),
+          }
+        : sec
+    );
+  }
+
+  // -- Free-form note section handlers (scoped to a note section) --
+  function updateNoteTitle(
+    setId: string,
+    sectionId: string,
+    title: string
+  ): void {
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "note" ? { ...sec, title } : sec
+    );
+  }
+
+  function updateNoteBody(
+    setId: string,
+    sectionId: string,
+    body: ProseMirrorDoc | null
+  ): void {
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "note" ? { ...sec, body } : sec
     );
   }
 
@@ -590,7 +566,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
         </p>
       ) : (
         <div className="space-y-3">
-          {sets.map((set) => (
+          {orderedSets.map((set) => (
             <SettingsSetCard
               key={set.id}
               set={set}
@@ -618,41 +594,42 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
               onUpdateDescription={(value) => {
                 updateDescription(set.id, value);
               }}
-              onUpdateBaseline={(baseline) => {
-                updateBaseline(set.id, baseline);
+              onAddSection={(spec) => {
+                addSection(set.id, spec);
               }}
-              onAddSoftwareRow={() => addSoftwareRow(set.id)}
-              onUpdateSoftwareRow={(rowKey, field, value) => {
-                updateSoftwareRow(set.id, rowKey, field, value);
+              onDeleteSection={(sectionId) => {
+                deleteSection(set.id, sectionId);
               }}
-              onDeleteSoftwareRow={(rowKey) => {
-                deleteSoftwareRow(set.id, rowKey);
+              onReorderSections={(activeId, overId) => {
+                reorderSections(set.id, activeId, overId);
               }}
-              onAddDipBank={() => addDipBank(set.id)}
-              onDeleteDipBank={(bankId) => {
-                deleteDipBank(set.id, bankId);
+              onUpdateBaseline={(sectionId, value) => {
+                updateBaseline(set.id, sectionId, value);
               }}
-              onRenameDipBank={(bankId, name) => {
-                renameDipBank(set.id, bankId, name);
+              onAddSoftwareRow={(sectionId) =>
+                addSoftwareRow(set.id, sectionId)
+              }
+              onUpdateSoftwareRow={(sectionId, rowKey, field, value) => {
+                updateSoftwareRow(set.id, sectionId, rowKey, field, value);
               }}
-              onAddDipSwitch={(bankId) => addDipSwitch(set.id, bankId)}
-              onUpdateDipSwitch={(bankId, switchKey, field, value) => {
-                updateDipSwitch(set.id, bankId, switchKey, field, value);
+              onDeleteSoftwareRow={(sectionId, rowKey) => {
+                deleteSoftwareRow(set.id, sectionId, rowKey);
               }}
-              onDeleteDipSwitch={(bankId, switchKey) => {
-                deleteDipSwitch(set.id, bankId, switchKey);
+              onRenameDipBank={(sectionId, name) => {
+                renameDipBank(set.id, sectionId, name);
               }}
-              onAddNote={(title, customTitle) => {
-                addNote(set.id, title, customTitle);
+              onAddDipSwitch={(sectionId) => addDipSwitch(set.id, sectionId)}
+              onUpdateDipSwitch={(sectionId, switchKey, field, value) => {
+                updateDipSwitch(set.id, sectionId, switchKey, field, value);
               }}
-              onUpdateNoteTitle={(noteId, title) => {
-                updateNoteTitle(set.id, noteId, title);
+              onDeleteDipSwitch={(sectionId, switchKey) => {
+                deleteDipSwitch(set.id, sectionId, switchKey);
               }}
-              onUpdateNoteBody={(noteId, body) => {
-                updateNoteBody(set.id, noteId, body);
+              onUpdateNoteTitle={(sectionId, title) => {
+                updateNoteTitle(set.id, sectionId, title);
               }}
-              onDeleteNote={(noteId) => {
-                deleteNote(set.id, noteId);
+              onUpdateNoteBody={(sectionId, body) => {
+                updateNoteBody(set.id, sectionId, body);
               }}
             />
           ))}
@@ -660,4 +637,24 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
       )}
     </div>
   );
+}
+
+/** Deep-clone one section, regenerating every key/id so the copy is isolated. */
+function cloneSection(section: Section): Section {
+  switch (section.kind) {
+    case "software":
+      return {
+        ...section,
+        id: makeKey(),
+        rows: section.rows.map((r) => ({ ...r, _key: makeKey() })),
+      };
+    case "dip":
+      return {
+        ...section,
+        id: makeKey(),
+        switches: section.switches.map((sw) => ({ ...sw, _key: makeKey() })),
+      };
+    case "note":
+      return { ...section, id: makeKey() };
+  }
 }

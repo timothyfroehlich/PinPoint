@@ -39,8 +39,12 @@ export function InlineEditableText({
     canEdit && required && value.trim() === ""
   );
   const [draft, setDraft] = useState(value);
+  // Required-field errors stay silent until the user actually tries to leave
+  // the field empty — a freshly-opened blank field shows no red flair.
+  const [showRequiredError, setShowRequiredError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const isInvalid = required && draft.trim() === "";
+  const isEmptyRequired = required && draft.trim() === "";
+  const showInvalid = isEmptyRequired && showRequiredError;
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -58,6 +62,12 @@ export function InlineEditableText({
 
   function commit(): void {
     const trimmed = draft.trim();
+    if (required && trimmed === "") {
+      // Tried to leave a required field blank: reveal the error and keep the
+      // field open instead of silently closing it empty.
+      setShowRequiredError(true);
+      return;
+    }
     if (trimmed && trimmed !== value) {
       onValueChange(trimmed);
     }
@@ -76,8 +86,10 @@ export function InlineEditableText({
         value={draft}
         className={cn("h-7", inputClassName)}
         placeholder={placeholder}
-        aria-label={ariaLabel}
-        aria-invalid={isInvalid || undefined}
+        aria-label={
+          showInvalid && ariaLabel ? `${ariaLabel} (required)` : ariaLabel
+        }
+        aria-invalid={showInvalid || undefined}
         onClick={(e) => {
           e.stopPropagation();
         }}
@@ -117,7 +129,7 @@ export function InlineEditableText({
       type="button"
       aria-label={ariaLabel ? `Edit ${ariaLabel}` : "Edit"}
       className={cn(
-        "group/iet -mx-1 inline-flex items-center gap-1.5 rounded px-1 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        "group/iet -mx-1 inline-flex items-center gap-1.5 rounded px-1 text-left transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none",
         className
       )}
       onClick={startEdit}
@@ -127,16 +139,16 @@ export function InlineEditableText({
           <span
             className={cn(
               "italic",
-              required ? "text-destructive" : "text-muted-foreground"
+              showInvalid ? "text-destructive" : "text-muted-foreground"
             )}
           >
             {placeholder}
-            {required && " *"}
+            {showInvalid && " *"}
           </span>
         )}
       </span>
       <Pencil
-        className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/iet:opacity-100"
+        className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/iet:opacity-100 motion-reduce:transition-none"
         aria-hidden="true"
       />
     </button>

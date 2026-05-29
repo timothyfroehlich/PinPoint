@@ -113,7 +113,7 @@ export function InlineMarkdownField({
           className={cn(
             "group/imf block w-full rounded text-left",
             textSize,
-            "cursor-text transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            "cursor-text transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none"
           )}
           onClick={(e) => {
             e.stopPropagation();
@@ -133,7 +133,7 @@ export function InlineMarkdownField({
             <button
               type="button"
               aria-label={`Edit ${label ?? "text"}`}
-              className="absolute inset-0 z-0 cursor-text rounded transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="absolute inset-0 z-0 cursor-text rounded transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none"
               onClick={(e) => {
                 e.stopPropagation();
                 open(e.currentTarget);
@@ -151,7 +151,7 @@ export function InlineMarkdownField({
           />
           {canEdit && (
             <Pencil
-              className="pointer-events-none absolute right-1 top-1 z-[2] size-3 text-muted-foreground opacity-0 transition-opacity group-hover/imf:opacity-100"
+              className="pointer-events-none absolute right-1 top-1 z-[2] size-3 text-muted-foreground opacity-0 transition-opacity group-hover/imf:opacity-100 motion-reduce:transition-none"
               aria-hidden="true"
             />
           )}
