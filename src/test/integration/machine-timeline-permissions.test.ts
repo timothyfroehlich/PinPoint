@@ -267,6 +267,25 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
       expect(row).toBeDefined();
       expect(row.deletedAt).toBeNull();
     });
+
+    it("double-delete returns 'Already deleted' on the second call", async () => {
+      // First call soft-deletes. The second hits the action's pre-check
+      // (`row.deletedAt !== null`) and returns `Already deleted` rather than
+      // a false success — protects the UI from "deleted twice" no-op flashes.
+      // (See `deleteMachineCommentAction` in
+      // src/app/(app)/m/[initials]/(tabs)/timeline/actions.ts, line ~297.)
+      const { member, comment } = await seedCommentByMember();
+      await mockAuth(member.id);
+      const { deleteMachineCommentAction } =
+        await import("~/app/(app)/m/[initials]/(tabs)/timeline/actions");
+
+      const first = await deleteMachineCommentAction({ id: comment.id });
+      expect(first.success).toBe(true);
+
+      const second = await deleteMachineCommentAction({ id: comment.id });
+      expect(second.success).toBe(false);
+      if (!second.success) expect(second.error).toBe("Already deleted");
+    });
   });
 
   describe("editMachineCommentAction permission scenarios", () => {

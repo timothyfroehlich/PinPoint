@@ -423,5 +423,116 @@ describe("machine-events helpers (PGlite)", () => {
       rows = await getMachineTimeline(db, { machineId: machine.id });
       expect(rows[0].editedAt).toBeInstanceOf(Date);
     });
+
+    it("honors limit and offset for pagination (newest-first)", async () => {
+      // Five lifecycle rows on one machine, then pin createdAt so the
+      // newest-first order is unambiguous (PP-0x98 review). Pagination is
+      // applied at the DB layer in `getMachineTimeline`.
+      const { db, user, machine } = await seed();
+      const labels = ["e1", "e2", "e3", "e4", "e5"] as const;
+      for (const label of labels) {
+        await createMachineTimelineEvent(
+          machine.id,
+          {
+            sourceType: "lifecycle",
+            tag: "lifecycle",
+            // Encode the seed order in the eventData payload so we can
+            // assert which slice we got back without depending on insert
+            // order through the helper.
+            eventData: { kind: "name_changed", from: "x", to: label },
+            actorId: user.id,
+          },
+          db
+        );
+      }
+
+      // Pin a deterministic timestamp per row: e1 oldest → e5 newest, one
+      // day apart. The helper orders by createdAt DESC, sequence DESC.
+      const allRows = await db
+        .select()
+        .from(timelineEvents)
+        .where(eq(timelineEvents.machineId, machine.id));
+      for (const row of allRows) {
+        const ed = row.eventData as { kind: string; to?: string } | null;
+        const label = ed?.to;
+        if (!label) continue;
+        const idx = labels.indexOf(label as (typeof labels)[number]);
+        if (idx < 0) continue;
+        await db
+          .update(timelineEvents)
+          .set({
+            createdAt: new Date(`2026-01-0${String(idx + 1)}T00:00:00Z`),
+          })
+          .where(eq(timelineEvents.id, row.id));
+      }
+
+      // limit=3 → newest 3 (e5, e4, e3)
+      const firstPage = await getMachineTimeline(db, {
+        machineId: machine.id,
+        limit: 3,
+      });
+      expect(firstPage).toHaveLength(3);
+      expect(firstPage.map((r) => (r.eventData as { to: string }).to)).toEqual([
+        "e5",
+        "e4",
+        "e3",
+      ]);
+
+      // offset=2, limit=10 → skip the newest 2, return the remaining 3
+      // oldest in newest-first order (e3, e2, e1).
+      const secondPage = await getMachineTimeline(db, {
+        machineId: machine.id,
+        offset: 2,
+        limit: 10,
+      });
+      expect(secondPage).toHaveLength(3);
+      expect(secondPage.map((r) => (r.eventData as { to: string }).to)).toEqual(
+        ["e3", "e2", "e1"]
+      );
+
+      // limit=6 (one more than available) → all 5 rows, no error.
+      const allWithSlack = await getMachineTimeline(db, {
+        machineId: machine.id,
+        limit: 6,
+      });
+      expect(allWithSlack).toHaveLength(5);
+    });
+
+    it("populates machineRefs for reassign rows from the joined machines table", async () => {
+      // Insert an `issue_reassigned_out` on machine A pointing at machine B,
+      // then assert the read path joins `machines` and surfaces the live
+      // name + initials in `machineRefs`. (PP-tv9l live machine resolution)
+      const { db, machine: machineA } = await seed();
+      const machineB = createTestMachine({
+        initials: "MIM",
+        name: "Medieval Madness",
+      });
+      await db.insert(machines).values(machineB);
+
+      await createMachineTimelineEvent(
+        machineA.id,
+        {
+          sourceType: "issue",
+          tag: "issue",
+          eventData: {
+            kind: "issue_reassigned_out",
+            issueId: "00000000-0000-0000-0000-000000000001",
+            issueNumber: 7,
+            toMachineId: machineB.id,
+            title: "Migrated issue",
+          },
+        },
+        db
+      );
+
+      const rows = await getMachineTimeline(db, { machineId: machineA.id });
+      expect(rows).toHaveLength(1);
+      const ref = rows[0].machineRefs[machineB.id];
+      expect(ref).toBeDefined();
+      // ResolvedMachineRef exposes name + initials; both should match the
+      // current state of the referenced machine (not a snapshot).
+      expect(ref?.name).toBe("Medieval Madness");
+      expect(ref?.initials).toBe("MIM");
+    });
   });
 });

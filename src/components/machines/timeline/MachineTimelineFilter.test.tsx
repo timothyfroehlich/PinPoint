@@ -14,9 +14,13 @@ vi.stubGlobal("ResizeObserver", MockResizeObserver);
 Element.prototype.scrollIntoView = vi.fn();
 
 const pushMock = vi.fn();
+// Per-test override of the `?…` query string. Default is empty (most tests
+// don't care); the page-reset test sets a `?page=3&tag=maintenance` source
+// and asserts `page` is dropped on filter change.
+let searchParamsValue = "";
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, replace: pushMock }),
-  useSearchParams: () => new URLSearchParams(""),
+  useSearchParams: () => new URLSearchParams(searchParamsValue),
   usePathname: () => "/m/AAA/timeline",
 }));
 
@@ -80,5 +84,27 @@ describe("MachineTimelineFilter (shared MultiSelect)", () => {
     // Maintenance is shown checked (selected-first); clicking unchecks it.
     await user.click(screen.getByText("Maintenance"));
     expect(pushMock).toHaveBeenCalledWith("/m/AAA/timeline");
+  });
+
+  it("clears ?page= when tags change (avoids landing on a stale empty page)", async () => {
+    // Regression for the page-reset behaviour in writeTags: a deep paginated
+    // view (`?page=3`) under one filter must NOT carry over into a different
+    // filter view. (MachineTimelineFilter.tsx writeTags / PP-ii3u #5)
+    pushMock.mockClear();
+    searchParamsValue = "page=3&tag=maintenance";
+    const user = userEvent.setup();
+    render(<MachineTimelineFilter currentTags={["maintenance"]} />);
+    await user.click(screen.getByRole("combobox", { name: /filter by tag/i }));
+    // Uncheck Maintenance — onChange fires with the new tag list, which calls
+    // writeTags and rewrites the query string.
+    await user.click(screen.getByText("Maintenance"));
+    expect(pushMock).toHaveBeenCalled();
+    // Every push made during this interaction must omit `page=`.
+    for (const call of pushMock.mock.calls) {
+      const [url] = call as [string];
+      expect(url).not.toMatch(/[?&]page=/);
+    }
+    // Reset the shared search-params override so subsequent tests start clean.
+    searchParamsValue = "";
   });
 });
