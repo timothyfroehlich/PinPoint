@@ -66,7 +66,6 @@ describe("machine-events helpers (PGlite)", () => {
             kind: "issue_opened",
             issueId: "00000000-0000-0000-0000-000000000001",
             issueNumber: 42,
-            openedByName: "Tim",
             title: "Flipper broken",
           },
           actorId: user.id,
@@ -79,7 +78,6 @@ describe("machine-events helpers (PGlite)", () => {
         kind: "issue_opened",
         issueId: "00000000-0000-0000-0000-000000000001",
         issueNumber: 42,
-        openedByName: "Tim",
         title: "Flipper broken",
       });
     });

@@ -1,5 +1,5 @@
 {
-  "id": "6542004d-bb63-4e76-9497-3fad21447935",
+  "id": "94971a4e-3f9c-49b6-8d7e-a514eb31e4c1",
   "prevId": "bac32b91-2b2c-4f6d-ba6a-d2b3619a509f",
   "version": "7",
   "dialect": "postgresql",
@@ -1399,6 +1399,114 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.timeline_event_people": {
+      "name": "timeline_event_people",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "event_id": {
+          "name": "event_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "invited_id": {
+          "name": "invited_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_timeline_event_people_event_id": {
+          "name": "idx_timeline_event_people_event_id",
+          "columns": [
+            {
+              "expression": "event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_timeline_event_people_invited_id": {
+          "name": "idx_timeline_event_people_invited_id",
+          "columns": [
+            {
+              "expression": "invited_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "timeline_event_people_event_id_timeline_events_id_fk": {
+          "name": "timeline_event_people_event_id_timeline_events_id_fk",
+          "tableFrom": "timeline_event_people",
+          "tableTo": "timeline_events",
+          "columnsFrom": ["event_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "timeline_event_people_user_id_user_profiles_id_fk": {
+          "name": "timeline_event_people_user_id_user_profiles_id_fk",
+          "tableFrom": "timeline_event_people",
+          "tableTo": "user_profiles",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "timeline_event_people_invited_id_invited_users_id_fk": {
+          "name": "timeline_event_people_invited_id_invited_users_id_fk",
+          "tableFrom": "timeline_event_people",
+          "tableTo": "invited_users",
+          "columnsFrom": ["invited_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "timeline_event_people_person_check": {
+          "name": "timeline_event_people_person_check",
+          "value": "(\"timeline_event_people\".\"user_id\" IS NULL OR \"timeline_event_people\".\"invited_id\" IS NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.timeline_events": {
       "name": "timeline_events",
       "schema": "",
@@ -1470,6 +1578,12 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "bigserial",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {

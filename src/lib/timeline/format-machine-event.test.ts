@@ -1,183 +1,100 @@
 import { describe, it, expect } from "vitest";
+
 import { formatMachineEvent } from "~/lib/timeline/format-machine-event";
+import type { ResolvedPerson } from "~/lib/timeline/resolve-person";
+
+const real = (displayName: string): ResolvedPerson => ({
+  displayName,
+  isInvited: false,
+});
+const invited = (displayName: string): ResolvedPerson => ({
+  displayName,
+  isInvited: true,
+});
 
 describe("formatMachineEvent", () => {
+  // Identity resolution (PP-tv9l): owner names come from the resolved `people`
+  // map, never from event_data. Issue-event formatting lives in
+  // MachineTimelineIssueRow, not here, so only lifecycle events are covered.
+
   it("formats machine_added", () => {
-    expect(formatMachineEvent({ kind: "machine_added" })).toBe("Machine added");
+    expect(formatMachineEvent({ kind: "machine_added" }, {})).toBe(
+      "Machine added"
+    );
   });
 
-  it("formats owner_set", () => {
+  it("formats owner_set from the resolved to_owner", () => {
     expect(
-      formatMachineEvent({
-        kind: "owner_set",
-        toOwnerId: "u1",
-        toOwnerName: "Tim",
-      })
+      formatMachineEvent({ kind: "owner_set" }, { to_owner: real("Tim") })
     ).toBe("Owner set to Tim");
+  });
+
+  it("marks an invited owner on owner_set", () => {
+    expect(
+      formatMachineEvent({ kind: "owner_set" }, { to_owner: invited("Bo") })
+    ).toBe("Owner set to Bo (invited)");
   });
 
   it("formats owner_changed (named -> named)", () => {
     expect(
-      formatMachineEvent({
-        kind: "owner_changed",
-        fromOwnerId: "u1",
-        fromOwnerName: "Alex",
-        toOwnerId: "u2",
-        toOwnerName: "Sam",
-      })
+      formatMachineEvent(
+        { kind: "owner_changed" },
+        { from_owner: real("Alex"), to_owner: real("Sam") }
+      )
     ).toBe("Owner changed from Alex to Sam");
   });
 
-  it("formats owner_changed (named -> unassigned)", () => {
+  it("formats owner_changed (removed: from only)", () => {
     expect(
-      formatMachineEvent({
-        kind: "owner_changed",
-        fromOwnerId: "u1",
-        fromOwnerName: "Alex",
-        toOwnerId: null,
-        toOwnerName: null,
-      })
+      formatMachineEvent(
+        { kind: "owner_changed" },
+        { from_owner: real("Alex") }
+      )
     ).toBe("Owner removed (was Alex)");
   });
 
-  it("formats owner_changed (unassigned -> named)", () => {
+  it("formats owner_changed (set: to only)", () => {
     expect(
-      formatMachineEvent({
-        kind: "owner_changed",
-        fromOwnerId: null,
-        fromOwnerName: null,
-        toOwnerId: "u2",
-        toOwnerName: "Sam",
-      })
+      formatMachineEvent({ kind: "owner_changed" }, { to_owner: real("Sam") })
     ).toBe("Owner set to Sam");
+  });
+
+  it("formats a former (deleted) owner without a name leak", () => {
+    expect(
+      formatMachineEvent(
+        { kind: "owner_changed" },
+        { from_owner: real("Former user"), to_owner: real("Sam") }
+      )
+    ).toBe("Owner changed from Former user to Sam");
   });
 
   it("formats name_changed", () => {
     expect(
-      formatMachineEvent({ kind: "name_changed", from: "ST", to: "ST LE" })
+      formatMachineEvent({ kind: "name_changed", from: "ST", to: "ST LE" }, {})
     ).toBe('Name changed from "ST" to "ST LE"');
   });
 
   it("formats presence_changed", () => {
     expect(
-      formatMachineEvent({
-        kind: "presence_changed",
-        from: "on_the_floor",
-        to: "off_the_floor",
-      })
+      formatMachineEvent(
+        { kind: "presence_changed", from: "on_the_floor", to: "off_the_floor" },
+        {}
+      )
     ).toBe("Availability changed from On the floor to Off the floor");
   });
 
   it("formats prose-field markers", () => {
-    expect(formatMachineEvent({ kind: "description_updated" })).toBe(
+    expect(formatMachineEvent({ kind: "description_updated" }, {})).toBe(
       "Description updated"
     );
-    expect(formatMachineEvent({ kind: "tournament_notes_updated" })).toBe(
+    expect(formatMachineEvent({ kind: "tournament_notes_updated" }, {})).toBe(
       "Tournament notes updated"
     );
-    expect(formatMachineEvent({ kind: "owner_requirements_updated" })).toBe(
+    expect(formatMachineEvent({ kind: "owner_requirements_updated" }, {})).toBe(
       "Owner requirements updated"
     );
-    expect(formatMachineEvent({ kind: "owner_notes_updated" })).toBe(
+    expect(formatMachineEvent({ kind: "owner_notes_updated" }, {})).toBe(
       "Owner notes updated"
     );
-  });
-
-  it("formats issue_opened with title", () => {
-    expect(
-      formatMachineEvent({
-        kind: "issue_opened",
-        issueId: "i1",
-        issueNumber: 42,
-        openedByName: "Maria",
-        title: "Flipper broken",
-      })
-    ).toBe('Issue #42 "Flipper broken" opened by Maria');
-  });
-
-  it("formats issue_closed with title", () => {
-    expect(
-      formatMachineEvent({
-        kind: "issue_closed",
-        issueId: "i1",
-        issueNumber: 42,
-        closedByName: "Tim",
-        title: "Flipper broken",
-      })
-    ).toBe('Issue #42 "Flipper broken" closed by Tim');
-  });
-
-  it("formats issue_status_changed with title", () => {
-    expect(
-      formatMachineEvent({
-        kind: "issue_status_changed",
-        issueId: "i1",
-        issueNumber: 42,
-        from: "new",
-        to: "in_progress",
-        title: "Flipper broken",
-      })
-    ).toBe('Issue #42 "Flipper broken" status changed from New to In Progress');
-  });
-
-  it("formats issue_status_changed without title (legacy data)", () => {
-    expect(
-      formatMachineEvent({
-        kind: "issue_status_changed",
-        issueId: "i1",
-        issueNumber: 42,
-        from: "new",
-        to: "in_progress",
-      })
-    ).toBe("Issue #42 status changed from New to In Progress");
-  });
-
-  it("formats issue_assigned with title", () => {
-    expect(
-      formatMachineEvent({
-        kind: "issue_assigned",
-        issueId: "i1",
-        issueNumber: 42,
-        assigneeName: "Tim",
-        title: "Flipper broken",
-      })
-    ).toBe('Issue #42 "Flipper broken" assigned to Tim');
-  });
-
-  it("formats issue_unassigned with title", () => {
-    expect(
-      formatMachineEvent({
-        kind: "issue_unassigned",
-        issueId: "i1",
-        issueNumber: 42,
-        title: "Flipper broken",
-      })
-    ).toBe('Issue #42 "Flipper broken" unassigned');
-  });
-
-  it("formats issue_reassigned_out with title", () => {
-    expect(
-      formatMachineEvent({
-        kind: "issue_reassigned_out",
-        issueId: "i1",
-        issueNumber: 42,
-        toMachineId: "m2",
-        toMachineName: "Iron Maiden",
-        title: "Flipper broken",
-      })
-    ).toBe('Issue #42 "Flipper broken" moved to Iron Maiden');
-  });
-
-  it("formats issue_reassigned_in with title", () => {
-    expect(
-      formatMachineEvent({
-        kind: "issue_reassigned_in",
-        issueId: "i1",
-        issueNumber: 42,
-        fromMachineId: "m1",
-        fromMachineName: "Stranger Things",
-        title: "Flipper broken",
-      })
-    ).toBe('Issue #42 "Flipper broken" received from Stranger Things');
   });
 });

@@ -9,8 +9,10 @@
  *   - normal path  (lines 334-382 of src/app/(app)/m/actions.ts)
  *   - forcePromote path (lines 184-277, same file)
  *
- * `invitedOwnerId` ownership intentionally does NOT emit `owner_set` in V1
- * (no display name available via user_profiles).
+ * Owners are recorded as `timeline_event_people` references (PP-tv9l), not
+ * snapshotted names. An *invited* owner DOES emit `owner_set` now (the
+ * reference carries `invited_id`) — this closes review finding #15, which
+ * previously only exercised the active-user branch.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -19,7 +21,9 @@ import { randomUUID } from "node:crypto";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   authUsers,
+  invitedUsers,
   machines,
+  timelineEventPeople,
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
@@ -139,14 +143,63 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     expect(kinds).toContain("owner_set");
 
     const ownerSet = rows.find((r) => r.eventData?.kind === "owner_set");
-    expect(ownerSet?.eventData).toMatchObject({
-      kind: "owner_set",
-      toOwnerId: owner.id,
-      toOwnerName: "Sam Carter",
-    });
+    expect(ownerSet?.eventData).toEqual({ kind: "owner_set" });
     expect(ownerSet?.authorId).toBe(admin.id);
     expect(ownerSet?.sourceType).toBe("lifecycle");
     expect(ownerSet?.tag).toBe("lifecycle");
+
+    // The owner is a `to_owner` person-reference (real user), not a name.
+    const people = await db
+      .select()
+      .from(timelineEventPeople)
+      .where(eq(timelineEventPeople.eventId, ownerSet?.id ?? ""));
+    expect(people).toHaveLength(1);
+    expect(people[0]).toMatchObject({
+      role: "to_owner",
+      userId: owner.id,
+      invitedId: null,
+    });
+  });
+
+  it("emits owner_set with an invited person-reference (finding #15)", async () => {
+    const db = await getTestDb();
+    const admin = await makeUser("admin");
+    const [invitee] = await db
+      .insert(invitedUsers)
+      .values({
+        email: `${randomUUID()}@example.com`,
+        firstName: "Ivy",
+        lastName: "Invited",
+        role: "member",
+      })
+      .returning();
+    await mockAuth(admin.id);
+    const { createMachineAction } = await import("~/app/(app)/m/actions");
+
+    const formData = new FormData();
+    formData.append("name", "Cactus Canyon");
+    formData.append("initials", "CC");
+    formData.append("ownerId", invitee.id);
+
+    const result = await createMachineAction(undefined, formData);
+    expect(result.ok).toBe(true);
+
+    const rows = await db.select().from(timelineEvents);
+    const ownerSet = rows.find((r) => r.eventData?.kind === "owner_set");
+    expect(ownerSet?.eventData).toEqual({ kind: "owner_set" });
+
+    // Invited owner ⇒ a `to_owner` reference with `invited_id`, not a null
+    // active owner (the old "Owner removed"/no-event bug).
+    const people = await db
+      .select()
+      .from(timelineEventPeople)
+      .where(eq(timelineEventPeople.eventId, ownerSet?.id ?? ""));
+    expect(people).toHaveLength(1);
+    expect(people[0]).toMatchObject({
+      role: "to_owner",
+      userId: null,
+      invitedId: invitee.id,
+    });
   });
 
   it("emits machine_added + owner_set via the forcePromote path", async () => {
@@ -175,11 +228,55 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
     expect(kinds).toContain("owner_set");
 
     const ownerSet = rows.find((r) => r.eventData?.kind === "owner_set");
-    expect(ownerSet?.eventData).toMatchObject({
-      kind: "owner_set",
-      toOwnerId: guest.id,
-      toOwnerName: "Promoted Guest",
+    expect(ownerSet?.eventData).toEqual({ kind: "owner_set" });
+    // forcePromote activates the guest, so the reference is the now-real user.
+    const people = await db
+      .select()
+      .from(timelineEventPeople)
+      .where(eq(timelineEventPeople.eventId, ownerSet?.id ?? ""));
+    expect(people).toHaveLength(1);
+    expect(people[0]).toMatchObject({
+      role: "to_owner",
+      userId: guest.id,
+      invitedId: null,
     });
+  });
+
+  it("orders same-transaction events deterministically by sequence", async () => {
+    const db = await getTestDb();
+    const admin = await makeUser("admin");
+    const owner = await makeUser("member", {
+      firstName: "Ord",
+      lastName: "Er",
+    });
+    await mockAuth(admin.id);
+    const { createMachineAction } = await import("~/app/(app)/m/actions");
+
+    const formData = new FormData();
+    formData.append("name", "Sequence Test");
+    formData.append("initials", "SEQ");
+    formData.append("ownerId", owner.id);
+    const result = await createMachineAction(undefined, formData);
+    expect(result.ok).toBe(true);
+
+    const [machine] = await db
+      .select()
+      .from(machines)
+      .where(eq(machines.initials, "SEQ"));
+    const { getMachineTimeline } =
+      await import("~/lib/timeline/machine-events");
+    const timeline = await getMachineTimeline(db, { machineId: machine.id });
+
+    // Both events share created_at (one transaction); newest-first ordering is
+    // by sequence, so owner_set (emitted second, higher sequence) comes first
+    // and machine_added second — deterministic across reads (finding #6).
+    expect(timeline.map((r) => r.eventData?.kind)).toEqual([
+      "owner_set",
+      "machine_added",
+    ]);
+    const added = timeline.find((r) => r.eventData?.kind === "machine_added");
+    const set = timeline.find((r) => r.eventData?.kind === "owner_set");
+    expect((set?.sequence ?? 0) > (added?.sequence ?? 0)).toBe(true);
   });
 });
 
@@ -306,16 +403,25 @@ describe("updateMachineAction — timeline event emission (PP-0x98)", () => {
       .from(timelineEvents)
       .where(eq(timelineEvents.machineId, machine.id));
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.eventData).toEqual({
-      kind: "owner_changed",
-      fromOwnerId: oldOwner.id,
-      fromOwnerName: "Old Owner",
-      toOwnerId: newOwner.id,
-      toOwnerName: "New Owner",
-    });
+    expect(rows[0]?.eventData).toEqual({ kind: "owner_changed" });
     expect(rows[0]?.authorId).toBe(admin.id);
     expect(rows[0]?.sourceType).toBe("lifecycle");
     expect(rows[0]?.tag).toBe("lifecycle");
+
+    // from_owner + to_owner person-references (real users), not names.
+    const people = await db
+      .select()
+      .from(timelineEventPeople)
+      .where(eq(timelineEventPeople.eventId, rows[0]?.id ?? ""));
+    expect(people).toHaveLength(2);
+    expect(people.find((p) => p.role === "from_owner")).toMatchObject({
+      userId: oldOwner.id,
+      invitedId: null,
+    });
+    expect(people.find((p) => p.role === "to_owner")).toMatchObject({
+      userId: newOwner.id,
+      invitedId: null,
+    });
   });
 
   it("emits presence_changed when presence changes", async () => {

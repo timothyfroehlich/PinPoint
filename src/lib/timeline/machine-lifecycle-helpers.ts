@@ -1,43 +1,71 @@
 /**
- * Machine Lifecycle Event Helpers (PP-0x98)
+ * Machine Lifecycle Event Helpers (PP-0x98, PP-tv9l)
  *
  * Thin wrappers around `createMachineTimelineEvent` for the two server actions
  * that mutate `machines` rows:
  *
  * - `emitMachineCreated` — used by `createMachineAction` after a successful
- *   insert. Always emits `machine_added`; emits `owner_set` when the new
- *   machine has an active `ownerId`.
+ *   insert. Always emits `machine_added`; emits `owner_set` (with a `to_owner`
+ *   person-reference) when the new machine has an owner — real OR invited.
  *
  * - `emitMachineUpdated` — used by `updateMachineAction` after a successful
  *   update. Emits one event per tracked field that changed:
  *     - `name_changed` — when `before.name !== next.name`
  *     - `owner_changed` — when caller passes `ownerChanged: true` and the
- *       owner id actually changed (or owner was set/removed)
+ *       owner identity actually changed (set / removed / swapped). Records
+ *       `from_owner`/`to_owner` person-references; which rows exist tells the
+ *       renderer set-vs-changed-vs-removed.
  *     - `presence_changed` — when `next.presenceStatus !== undefined` and
  *       differs from `before.presenceStatus`
+ *
+ * Owners are stored as stable id person-references (real `user_id` xor invited
+ * `invited_id`), never as snapshotted names — names resolve live at render
+ * (PP-tv9l). This is what makes an *invited* owner emit a correct, resolvable
+ * event instead of "Owner removed" (review findings #1–4).
  *
  * Both helpers MUST be called inside the same DB transaction as the row
  * mutation so an emit failure rolls back the underlying change.
  */
 
-import { eq } from "drizzle-orm";
-
-import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
+import {
+  createMachineTimelineEvent,
+  type TimelinePersonRef,
+} from "~/lib/timeline/machine-events";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import type { DbTransaction } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+
+/**
+ * A machine owner reference — a real user xor an invited (not-yet-signed-up)
+ * user. Exactly one id is present; the discriminated union enforces it.
+ */
+export type MachineOwnerRef = { userId: string } | { invitedId: string };
+
+/** Stable key for owner-identity comparison across the two id kinds. */
+function ownerKey(owner: MachineOwnerRef | null): string | null {
+  if (owner === null) return null;
+  return "userId" in owner ? `u:${owner.userId}` : `i:${owner.invitedId}`;
+}
+
+/** Build a `timeline_event_people` reference for an owner in a given role. */
+function ownerPersonRef(
+  role: string,
+  owner: MachineOwnerRef
+): TimelinePersonRef {
+  return "userId" in owner
+    ? { role, userId: owner.userId }
+    : { role, invitedId: owner.invitedId };
+}
 
 export interface MachineCreatedSnapshot {
   id: string;
-  ownerId: string | null;
+  owner: MachineOwnerRef | null;
 }
 
 /**
  * Emit lifecycle events for a newly created machine.
  *
- * Always emits `machine_added`. Additionally emits `owner_set` when the
- * machine has an active `ownerId`; resolves the owner's display name from
- * `user_profiles.name` via the supplied transaction.
+ * Always emits `machine_added`. Additionally emits `owner_set` with a
+ * `to_owner` person-reference when the machine has an owner (real or invited).
  */
 export async function emitMachineCreated(
   tx: DbTransaction,
@@ -55,35 +83,25 @@ export async function emitMachineCreated(
     tx
   );
 
-  if (machine.ownerId) {
-    const ownerProfile = await tx.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, machine.ownerId),
-      columns: { id: true, name: true },
-    });
-    if (ownerProfile) {
-      await createMachineTimelineEvent(
-        machine.id,
-        {
-          sourceType: "lifecycle",
-          tag: "lifecycle",
-          eventData: {
-            kind: "owner_set",
-            toOwnerId: ownerProfile.id,
-            toOwnerName: ownerProfile.name,
-          },
-          actorId,
-        },
-        tx
-      );
-    }
+  if (machine.owner) {
+    await createMachineTimelineEvent(
+      machine.id,
+      {
+        sourceType: "lifecycle",
+        tag: "lifecycle",
+        eventData: { kind: "owner_set" },
+        actorId,
+        people: [ownerPersonRef("to_owner", machine.owner)],
+      },
+      tx
+    );
   }
 }
 
 export interface MachineBeforeSnapshot {
   id: string;
   name: string;
-  ownerId: string | null;
-  ownerName: string | null;
+  owner: MachineOwnerRef | null;
   presenceStatus: MachinePresenceStatus;
 }
 
@@ -91,12 +109,12 @@ export interface MachineUpdateNext {
   name: string;
   /**
    * Whether the caller is updating ownership in this action invocation. When
-   * `false`, no `owner_changed` event is considered even if `ownerId` differs
+   * `false`, no `owner_changed` event is considered even if the owner differs
    * (the caller didn't intend to change ownership in this request).
    */
   ownerChanged: boolean;
-  /** New active owner id (or null when removed). Only consulted if `ownerChanged`. */
-  ownerId: string | null;
+  /** New owner (real or invited), or null when removed. Only consulted if `ownerChanged`. */
+  owner: MachineOwnerRef | null;
   /**
    * New presence status, or `undefined` when the action did not touch
    * presence. `undefined` skips the `presence_changed` event entirely.
@@ -128,28 +146,20 @@ export async function emitMachineUpdated(
     );
   }
 
-  if (next.ownerChanged && next.ownerId !== before.ownerId) {
-    let toOwnerName: string | null = null;
-    if (next.ownerId) {
-      const newOwner = await tx.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, next.ownerId),
-        columns: { name: true },
-      });
-      toOwnerName = newOwner?.name ?? null;
-    }
+  if (next.ownerChanged && ownerKey(before.owner) !== ownerKey(next.owner)) {
+    // `from_owner`/`to_owner` person-references; presence of each tells the
+    // renderer whether this is a set (to-only), removal (from-only), or swap.
+    const people: TimelinePersonRef[] = [];
+    if (before.owner) people.push(ownerPersonRef("from_owner", before.owner));
+    if (next.owner) people.push(ownerPersonRef("to_owner", next.owner));
     await createMachineTimelineEvent(
       before.id,
       {
         sourceType: "lifecycle",
         tag: "lifecycle",
-        eventData: {
-          kind: "owner_changed",
-          fromOwnerId: before.ownerId,
-          fromOwnerName: before.ownerName,
-          toOwnerId: next.ownerId,
-          toOwnerName,
-        },
+        eventData: { kind: "owner_changed" },
         actorId,
+        people,
       },
       tx
     );

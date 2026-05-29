@@ -25,11 +25,31 @@ import { alias } from "drizzle-orm/pg-core";
 
 import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
 import type { TimelineTag } from "~/lib/timeline/machine-tags";
+import {
+  resolvePerson,
+  type ResolvedPerson,
+} from "~/lib/timeline/resolve-person";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import { db, type DbTransaction } from "~/server/db";
-import { timelineEvents, userProfiles } from "~/server/db/schema";
+import {
+  invitedUsers,
+  machines,
+  timelineEventPeople,
+  timelineEvents,
+  userProfiles,
+} from "~/server/db/schema";
 
 type SystemSourceType = "lifecycle" | "issue";
+
+/**
+ * A person attached to a timeline event (PP-tv9l). Stored as a stable id
+ * reference in `timeline_event_people` and resolved to a name/link/invited
+ * status live at render. Exactly one of `userId` (real) / `invitedId`
+ * (invited, not yet signed up) is set — the discriminated union enforces it.
+ */
+export type TimelinePersonRef =
+  | { role: string; userId: string }
+  | { role: string; invitedId: string };
 
 /**
  * All valid values for `timeline_events.source_type`. Used as the column's
@@ -42,6 +62,11 @@ export interface CreateTimelineEventArgs {
   tag: TimelineTag;
   eventData: MachineTimelineEventData;
   actorId?: string;
+  /**
+   * Person-references (actors/subjects) to attach to this event, resolved
+   * live at render. e.g. `to_owner`/`from_owner`, `assignee`, `reporter`.
+   */
+  people?: TimelinePersonRef[];
 }
 
 export interface CreateMachineCommentArgs {
@@ -69,14 +94,31 @@ export async function createMachineTimelineEvent(
   machineId: string,
   args: CreateTimelineEventArgs,
   tx: DbTransaction = db
-): Promise<void> {
-  await tx.insert(timelineEvents).values({
-    machineId,
-    sourceType: args.sourceType,
-    tag: args.tag,
-    eventData: args.eventData,
-    authorId: args.actorId ?? null,
-  });
+): Promise<string> {
+  const [row] = await tx
+    .insert(timelineEvents)
+    .values({
+      machineId,
+      sourceType: args.sourceType,
+      tag: args.tag,
+      eventData: args.eventData,
+      authorId: args.actorId ?? null,
+    })
+    .returning({ id: timelineEvents.id });
+  if (!row) throw new Error("Failed to insert timeline event");
+
+  if (args.people && args.people.length > 0) {
+    await tx.insert(timelineEventPeople).values(
+      args.people.map((p) => ({
+        eventId: row.id,
+        role: p.role,
+        userId: "userId" in p ? p.userId : null,
+        invitedId: "invitedId" in p ? p.invitedId : null,
+      }))
+    );
+  }
+
+  return row.id;
 }
 
 /**
@@ -110,8 +152,8 @@ export async function updateMachineComment(
   id: string,
   args: UpdateMachineCommentArgs,
   tx: DbTransaction = db
-): Promise<void> {
-  await tx
+): Promise<boolean> {
+  const updated = await tx
     .update(timelineEvents)
     .set({
       content: args.content,
@@ -124,7 +166,12 @@ export async function updateMachineComment(
         eq(timelineEvents.sourceType, "comment"),
         isNull(timelineEvents.deletedAt)
       )
-    );
+    )
+    .returning({ id: timelineEvents.id });
+  // false = no row matched (PP-h850): a concurrent delete won the race in the
+  // window between the action's pre-check and this write. The caller surfaces
+  // a real "already deleted" result instead of a false success.
+  return updated.length > 0;
 }
 
 /**
@@ -137,7 +184,7 @@ export async function softDeleteMachineComment(
   id: string,
   args: SoftDeleteArgs,
   tx: DbTransaction = db
-): Promise<void> {
+): Promise<boolean> {
   // Idempotent + race-safe: only the first concurrent delete writes the
   // tombstone columns; subsequent attempts no-op rather than overwriting
   // `deletedBy`/`deletedAt`. (PP-0x98 review)
@@ -145,7 +192,7 @@ export async function softDeleteMachineComment(
   // `sourceType = 'comment'` enforces the comment-only invariant at the
   // helper boundary (matching `updateMachineComment`) so a stray caller can
   // never tombstone a system row even if the action-layer guard is bypassed.
-  await tx
+  const deleted = await tx
     .update(timelineEvents)
     .set({
       deletedAt: new Date(),
@@ -157,7 +204,11 @@ export async function softDeleteMachineComment(
         eq(timelineEvents.sourceType, "comment"),
         isNull(timelineEvents.deletedAt)
       )
-    );
+    )
+    .returning({ id: timelineEvents.id });
+  // false = already deleted (or not a comment): a concurrent delete won the
+  // TOCTOU race (PP-h850). The caller surfaces it instead of a false success.
+  return deleted.length > 0;
 }
 
 export interface GetMachineTimelineArgs {
@@ -177,6 +228,12 @@ export interface GetMachineTimelineArgs {
   offset?: number;
 }
 
+/** A machine referenced by an event (e.g. reassign), resolved live (PP-tv9l). */
+export interface ResolvedMachineRef {
+  name: string;
+  initials: string;
+}
+
 export interface MachineTimelineRow {
   id: string;
   machineId: string | null;
@@ -192,6 +249,17 @@ export interface MachineTimelineRow {
   deletedAt: Date | null;
   deletedById: string | null;
   deletedByName: string | null;
+  /**
+   * Person-references for this event, resolved live (PP-tv9l), keyed by role
+   * (`to_owner`, `from_owner`, `assignee`, `reporter`). `{}` for events with
+   * no people (e.g. comments, machine_added).
+   */
+  people: Record<string, ResolvedPerson>;
+  /**
+   * Machines referenced by this event (reassign rows), resolved live and
+   * keyed by machine id. `{}` for events that reference no other machine.
+   */
+  machineRefs: Record<string, ResolvedMachineRef>;
 }
 
 /**
@@ -227,6 +295,7 @@ export async function getMachineTimeline(
       deletedAt: timelineEvents.deletedAt,
       deletedById: timelineEvents.deletedBy,
       deletedByName: deleter.name,
+      sequence: timelineEvents.sequence,
     })
     .from(timelineEvents)
     .leftJoin(author, eq(timelineEvents.authorId, author.id))
@@ -239,14 +308,93 @@ export async function getMachineTimeline(
           : undefined
       )
     )
-    // `createdAt` is `now()`, constant within a transaction, so multiple
-    // events emitted from a single tx share a timestamp. Tie-break on `id`
-    // so the feed order is deterministic across page loads (PP-0x98 review).
-    .orderBy(desc(timelineEvents.createdAt), desc(timelineEvents.id))
+    // `createdAt` is `now()`, constant within a transaction, so events from a
+    // single tx share a timestamp. Tie-break on the monotonic `sequence` so
+    // same-tx order is deterministic (e.g. machine_added before owner_set) —
+    // a random `id` tiebreak was non-deterministic (PP-tv9l, finding #6).
+    .orderBy(desc(timelineEvents.createdAt), desc(timelineEvents.sequence))
     .$dynamic();
 
   if (args.limit !== undefined) query = query.limit(args.limit);
   if (args.offset !== undefined) query = query.offset(args.offset);
 
-  return await query;
+  const rows = await query;
+
+  // Resolve person-references and referenced machines live (PP-tv9l), scoped
+  // to this page's events only (≤ limit rows) — names/links never snapshotted.
+  const eventIds = rows.map((r) => r.id);
+
+  const peopleByEvent = new Map<string, Record<string, ResolvedPerson>>();
+  if (eventIds.length > 0) {
+    const peopleRows = await tx
+      .select({
+        eventId: timelineEventPeople.eventId,
+        role: timelineEventPeople.role,
+        userId: timelineEventPeople.userId,
+        invitedId: timelineEventPeople.invitedId,
+        userName: userProfiles.name,
+        invitedName: invitedUsers.name,
+      })
+      .from(timelineEventPeople)
+      .leftJoin(userProfiles, eq(timelineEventPeople.userId, userProfiles.id))
+      .leftJoin(
+        invitedUsers,
+        eq(timelineEventPeople.invitedId, invitedUsers.id)
+      )
+      .where(inArray(timelineEventPeople.eventId, eventIds));
+
+    for (const p of peopleRows) {
+      const rec = peopleByEvent.get(p.eventId) ?? {};
+      rec[p.role] = resolvePerson({
+        userId: p.userId,
+        invitedId: p.invitedId,
+        userName: p.userName,
+        invitedName: p.invitedName,
+      });
+      peopleByEvent.set(p.eventId, rec);
+    }
+  }
+
+  // Machines referenced by reassign events, resolved to current name+initials.
+  const machineIds = new Set<string>();
+  for (const r of rows) {
+    const ed = r.eventData;
+    if (ed?.kind === "issue_reassigned_out") machineIds.add(ed.toMachineId);
+    else if (ed?.kind === "issue_reassigned_in")
+      machineIds.add(ed.fromMachineId);
+  }
+  const machineById = new Map<string, ResolvedMachineRef>();
+  if (machineIds.size > 0) {
+    const machineRows = await tx
+      .select({
+        id: machines.id,
+        name: machines.name,
+        initials: machines.initials,
+      })
+      .from(machines)
+      .where(inArray(machines.id, [...machineIds]));
+    for (const m of machineRows) {
+      machineById.set(m.id, { name: m.name, initials: m.initials });
+    }
+  }
+
+  return rows.map((r) => {
+    const machineRefs: Record<string, ResolvedMachineRef> = {};
+    const ed = r.eventData;
+    const refId =
+      ed?.kind === "issue_reassigned_out"
+        ? ed.toMachineId
+        : ed?.kind === "issue_reassigned_in"
+          ? ed.fromMachineId
+          : null;
+    if (refId !== null) {
+      const m = machineById.get(refId);
+      if (m) machineRefs[refId] = m;
+    }
+    return {
+      ...r,
+      people: peopleByEvent.get(r.id) ?? {},
+      machineRefs,
+    };
+  });
 }

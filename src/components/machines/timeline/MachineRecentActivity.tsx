@@ -167,6 +167,8 @@ function renderRecentRow(
             tag: rowTag,
             authorName: row.authorName,
             eventData: row.eventData,
+            people: row.people,
+            machineRefs: row.machineRefs,
           }}
           machineInitials={machineInitials}
         />
@@ -180,8 +182,8 @@ function renderRecentRow(
           createdAt: row.createdAt,
           tag: rowTag,
           eventData: row.eventData,
+          people: row.people,
         }}
-        machineInitials={machineInitials}
       />
     );
   }

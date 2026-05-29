@@ -1,23 +1,24 @@
 import type React from "react";
-import Link from "next/link";
 
 import { formatRelative } from "~/lib/dates";
 import { MACHINE_EVENT_ICONS } from "~/lib/timeline/machine-event-icons";
 import { formatMachineEvent } from "~/lib/timeline/format-machine-event";
-import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
+import type { MachineLifecycleEventData } from "~/lib/timeline/machine-event-types";
 import type { TimelineTag } from "~/lib/timeline/machine-tags";
+import type { ResolvedPerson } from "~/lib/timeline/resolve-person";
 import { cn } from "~/lib/utils";
 
 export interface MachineSystemRowData {
   id: string;
   createdAt: Date;
   tag: TimelineTag;
-  eventData: MachineTimelineEventData;
+  eventData: MachineLifecycleEventData;
+  /** Live-resolved owner references (`to_owner`/`from_owner`), keyed by role. */
+  people: Record<string, ResolvedPerson>;
 }
 
 interface Props {
   row: MachineSystemRowData;
-  machineInitials?: string;
   /**
    * Show the relative "N minutes/hours ago" timestamp.
    *
@@ -50,12 +51,12 @@ interface Props {
  */
 export function MachineTimelineSystemRow({
   row,
-  machineInitials,
   showRelativeTime = true,
   rowDateLabel,
 }: Props): React.JSX.Element {
-  const text = formatMachineEvent(row.eventData);
-  const issueLink = extractIssueLink(row.eventData, machineInitials);
+  // Lifecycle events never reference an issue, so there is no issue link to
+  // extract here (issue events render via MachineTimelineIssueRow).
+  const text = formatMachineEvent(row.eventData, row.people);
   const { Icon, colorClass } = MACHINE_EVENT_ICONS[row.eventData.kind];
 
   // Right-pinned timestamp slot: relative time for "today" rows, the absolute
@@ -79,41 +80,11 @@ export function MachineTimelineSystemRow({
         <Icon aria-hidden="true" className={cn("size-5", colorClass)} />
       </div>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-        <span>
-          {issueLink ? (
-            <>
-              <Link href={issueLink.href} className="underline">
-                Issue #{String(issueLink.number)}
-              </Link>
-              {text.replace(/^Issue #\d+/, "")}
-            </>
-          ) : (
-            text
-          )}
-        </span>
+        <span>{text}</span>
         {rightMeta ? (
           <span className="ml-auto text-xs tabular-nums">{rightMeta}</span>
         ) : null}
       </div>
     </div>
   );
-}
-
-function extractIssueLink(
-  data: MachineTimelineEventData,
-  machineInitials: string | undefined
-): { href: string; number: number } | null {
-  if (!machineInitials) return null;
-  // `issue_reassigned_out` events live on the SOURCE machine's timeline,
-  // but the issue itself has moved away — `/m/<source>/i/<oldNumber>` no
-  // longer resolves (the reassign action redirects it to the destination).
-  // Render plain text instead of a broken link.
-  if (data.kind === "issue_reassigned_out") return null;
-  if ("issueNumber" in data) {
-    return {
-      href: `/m/${machineInitials}/i/${String(data.issueNumber)}`,
-      number: data.issueNumber,
-    };
-  }
-  return null;
 }

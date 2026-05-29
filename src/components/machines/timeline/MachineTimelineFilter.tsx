@@ -55,6 +55,9 @@ export function MachineTimelineFilter({
     } else {
       params.set("tag", next.join(","));
     }
+    // Reset to page 1 on any filter change — keeping a deep `?page=` from the
+    // previous filter would land on an empty/stale page (PP-ii3u #5).
+    params.delete("page");
     const qs = params.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname);
   };

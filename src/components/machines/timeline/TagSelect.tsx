@@ -121,7 +121,12 @@ export function TagSelect({
   const selected = value !== null && isUserTag(value) ? value : null;
   return (
     <Select
-      {...(value !== null ? { value } : {})}
+      // Always controlled (PP-ii3u #10): an empty string represents the "Add
+      // tag" state. It matches no SelectItem, so Radix shows no selection while
+      // our trigger renders the dashed placeholder. Conditionally spreading
+      // `value` flipped the Select controlled↔uncontrolled, warning in React
+      // and dropping the selection after a post reset.
+      value={value ?? ""}
       disabled={disabled}
       onValueChange={(v) => {
         const parsed = userTagSchema.safeParse(v);

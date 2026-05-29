@@ -113,17 +113,22 @@ async function run() {
       stamp = anchor.getTime();
     };
 
-    const lifecycle = (eventData) => ({
+    // `people` (optional): timeline_event_people rows to attach after insert,
+    // each { role, userId } (demo users are all real accounts). Person display
+    // resolves live at render (PP-tv9l) — no names stored in event_data.
+    const lifecycle = (eventData, people) => ({
       source: "lifecycle",
       createdAt: nextStamp(),
       tag: "lifecycle",
       eventData,
+      ...(people ? { people } : {}),
     });
-    const issue = (eventData) => ({
+    const issue = (eventData, people) => ({
       source: "issue",
       createdAt: nextStamp(),
       tag: "issue",
       eventData,
+      ...(people ? { people } : {}),
     });
     const comment = (authorId, tag, text) => ({
       source: "comment",
@@ -219,13 +224,15 @@ async function run() {
     }
     if (issueA && techUser) {
       events.push(
-        issue({
-          kind: "issue_assigned",
-          issueId: issueA.id,
-          issueNumber: issueA.number,
-          assigneeName: techUser.name ?? "Technician",
-          title: issueA.title,
-        })
+        issue(
+          {
+            kind: "issue_assigned",
+            issueId: issueA.id,
+            issueNumber: issueA.number,
+            title: issueA.title,
+          },
+          [{ role: "assignee", userId: techUser.id }]
+        )
       );
     }
     if (issueA) {
@@ -245,22 +252,17 @@ async function run() {
     skipToDaysAgo(7);
     if (memberUser) {
       events.push(
-        lifecycle({
-          kind: "owner_set",
-          toOwnerId: memberUser.id,
-          toOwnerName: memberUser.name ?? "Member",
-        })
+        lifecycle({ kind: "owner_set" }, [
+          { role: "to_owner", userId: memberUser.id },
+        ])
       );
     }
     if (memberUser && adminUser) {
       events.push(
-        lifecycle({
-          kind: "owner_changed",
-          fromOwnerId: memberUser.id,
-          fromOwnerName: memberUser.name ?? "Member",
-          toOwnerId: adminUser.id,
-          toOwnerName: adminUser.name ?? "Admin",
-        })
+        lifecycle({ kind: "owner_changed" }, [
+          { role: "from_owner", userId: memberUser.id },
+          { role: "to_owner", userId: adminUser.id },
+        ])
       );
     }
     if (issueB) {
@@ -270,7 +272,6 @@ async function run() {
           issueId: issueB.id,
           issueNumber: issueB.number,
           toMachineId: other.id,
-          toMachineName: other.name,
           title: issueB.title,
         })
       );
@@ -373,7 +374,7 @@ async function run() {
         `;
         commentCount++;
       } else {
-        await sql`
+        const inserted = await sql`
           INSERT INTO timeline_events (
             machine_id, created_at, source_type, tag, event_data
           ) VALUES (
@@ -383,8 +384,18 @@ async function run() {
             ${ev.tag},
             ${sql.json(ev.eventData)}
           )
+          RETURNING id
         `;
         systemCount++;
+        const eventId = inserted[0]?.id;
+        if (eventId && ev.people) {
+          for (const p of ev.people) {
+            await sql`
+              INSERT INTO timeline_event_people (event_id, role, user_id, invited_id)
+              VALUES (${eventId}, ${p.role}, ${p.userId}, null)
+            `;
+          }
+        }
       }
     }
 
@@ -404,7 +415,6 @@ async function run() {
             issueId: issueB.id,
             issueNumber: issueB.number,
             fromMachineId: afm.id,
-            fromMachineName: afm.name,
             title: issueB.title,
           })}
         )

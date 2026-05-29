@@ -29,6 +29,7 @@ const tables = [
   "machine_watchers",
   "notifications",
   "notification_preferences",
+  "timeline_event_people",
   "timeline_events",
   "issues",
   "machines",

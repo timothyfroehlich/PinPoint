@@ -12,6 +12,7 @@ describe("MachineTimelineSystemRow", () => {
           createdAt: new Date("2026-05-17T12:00:00Z"),
           tag: "lifecycle",
           eventData: { kind: "machine_added" },
+          people: {},
         }}
       />
     );
@@ -27,46 +28,35 @@ describe("MachineTimelineSystemRow", () => {
     expect(wrapper?.querySelector("svg")).not.toBeNull();
   });
 
-  it("renders an issue link when machineInitials is provided and event has issueNumber", () => {
+  it("resolves the owner name live for owner_set (PP-tv9l)", () => {
     render(
       <MachineTimelineSystemRow
         row={{
-          id: "s1",
+          id: "s2",
           createdAt: new Date(),
-          tag: "issue",
-          eventData: {
-            kind: "issue_opened",
-            issueId: "i1",
-            issueNumber: 42,
-            openedByName: "Maria",
-            title: "Flipper",
-          },
+          tag: "lifecycle",
+          eventData: { kind: "owner_set" },
+          people: { to_owner: { displayName: "Sam Carter", isInvited: false } },
         }}
-        machineInitials="AAA"
       />
     );
-    const link = screen.getByRole("link", { name: /#42/ });
-    expect(link).toHaveAttribute("href", "/m/AAA/i/42");
+    expect(screen.getByText("Owner set to Sam Carter")).toBeInTheDocument();
   });
 
-  it("renders plain text (no link) when machineInitials is missing", () => {
+  it("marks an invited owner with an (invited) suffix", () => {
     render(
       <MachineTimelineSystemRow
         row={{
-          id: "s1",
+          id: "s3",
           createdAt: new Date(),
-          tag: "issue",
-          eventData: {
-            kind: "issue_opened",
-            issueId: "i1",
-            issueNumber: 42,
-            openedByName: "Maria",
-            title: "Flipper",
-          },
+          tag: "lifecycle",
+          eventData: { kind: "owner_set" },
+          people: { to_owner: { displayName: "Bo Newcomer", isInvited: true } },
         }}
       />
     );
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.getByText(/opened by Maria/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Owner set to Bo Newcomer (invited)")
+    ).toBeInTheDocument();
   });
 });

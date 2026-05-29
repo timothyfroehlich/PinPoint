@@ -55,7 +55,12 @@ const { chain, dbMock } = vi.hoisted(() => {
   chain.values.mockReturnValue(chain);
   chain.set.mockReturnValue(chain);
   chain.where.mockReturnValue(chain);
-  chain.returning.mockResolvedValue([]);
+  // Default returns a row with an id: inserts always return their row, and
+  // `createMachineTimelineEvent` reads `.returning({ id })` (PP-tv9l) for its
+  // timeline_event_people rows. Tests that need a specific row override this.
+  chain.returning.mockResolvedValue([
+    { id: "00000000-0000-4000-8000-00000000ev01" },
+  ]);
   chain.onConflictDoUpdate.mockReturnValue(chain);
   chain.onConflictDoNothing.mockReturnValue(chain);
 
@@ -97,7 +102,12 @@ function resetChain() {
   chain.values.mockReturnValue(chain);
   chain.set.mockReturnValue(chain);
   chain.where.mockReturnValue(chain);
-  chain.returning.mockResolvedValue([]);
+  // Default returns a row with an id: inserts always return their row, and
+  // `createMachineTimelineEvent` reads `.returning({ id })` (PP-tv9l) for its
+  // timeline_event_people rows. Tests that need a specific row override this.
+  chain.returning.mockResolvedValue([
+    { id: "00000000-0000-4000-8000-00000000ev01" },
+  ]);
   chain.onConflictDoUpdate.mockReturnValue(chain);
   chain.onConflictDoNothing.mockReturnValue(chain);
   // tx delegates to dbMock

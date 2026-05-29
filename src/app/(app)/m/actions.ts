@@ -297,11 +297,19 @@ export async function createMachineAction(
             });
         }
 
-        // Lifecycle: emit machine_added (and owner_set if active owner)
-        // Atomic with the machine insert — if these fail, the machine rolls back.
+        // Lifecycle: emit machine_added (and owner_set with a to_owner
+        // person-reference if owned — real OR invited). Atomic with the
+        // machine insert — if these fail, the machine rolls back.
         await emitMachineCreated(
           tx,
-          { id: newMachine.id, ownerId: newMachine.ownerId },
+          {
+            id: newMachine.id,
+            owner: newMachine.ownerId
+              ? { userId: newMachine.ownerId }
+              : newMachine.invitedOwnerId
+                ? { invitedId: newMachine.invitedOwnerId }
+                : null,
+          },
           user.id
         );
 
@@ -440,11 +448,19 @@ export async function createMachineAction(
           });
       }
 
-      // Lifecycle: emit machine_added (and owner_set if active owner)
-      // Atomic with the machine insert — if these fail, the machine rolls back.
+      // Lifecycle: emit machine_added (and owner_set with a to_owner
+      // person-reference if owned — real OR invited). Atomic with the machine
+      // insert — if these fail, the machine rolls back.
       await emitMachineCreated(
         tx,
-        { id: newMachine.id, ownerId: newMachine.ownerId },
+        {
+          id: newMachine.id,
+          owner: newMachine.ownerId
+            ? { userId: newMachine.ownerId }
+            : newMachine.invitedOwnerId
+              ? { invitedId: newMachine.invitedOwnerId }
+              : null,
+        },
         user.id
       );
 
@@ -543,12 +559,10 @@ export async function updateMachineAction(
       columns: {
         id: true,
         ownerId: true,
+        invitedOwnerId: true,
         name: true,
         initials: true,
         presenceStatus: true,
-      },
-      with: {
-        owner: { columns: { id: true, name: true } },
       },
     });
 
@@ -659,14 +673,21 @@ export async function updateMachineAction(
           {
             id: currentMachine.id,
             name: currentMachine.name,
-            ownerId: currentMachine.ownerId,
-            ownerName: currentMachine.owner?.name ?? null,
+            owner: currentMachine.ownerId
+              ? { userId: currentMachine.ownerId }
+              : currentMachine.invitedOwnerId
+                ? { invitedId: currentMachine.invitedOwnerId }
+                : null,
             presenceStatus: currentMachine.presenceStatus,
           },
           {
             name,
             ownerChanged: true,
-            ownerId: machineOwnerId ?? null,
+            owner: machineOwnerId
+              ? { userId: machineOwnerId }
+              : machineInvitedOwnerId
+                ? { invitedId: machineInvitedOwnerId }
+                : null,
             presenceStatus,
           },
           user.id
@@ -855,14 +876,21 @@ export async function updateMachineAction(
         {
           id: currentMachine.id,
           name: currentMachine.name,
-          ownerId: currentMachine.ownerId,
-          ownerName: currentMachine.owner?.name ?? null,
+          owner: currentMachine.ownerId
+            ? { userId: currentMachine.ownerId }
+            : currentMachine.invitedOwnerId
+              ? { invitedId: currentMachine.invitedOwnerId }
+              : null,
           presenceStatus: currentMachine.presenceStatus,
         },
         {
           name,
           ownerChanged: shouldUpdateOwner,
-          ownerId: finalOwnerId ?? null,
+          owner: finalOwnerId
+            ? { userId: finalOwnerId }
+            : finalInvitedOwnerId
+              ? { invitedId: finalInvitedOwnerId }
+              : null,
           presenceStatus,
         },
         user.id

@@ -103,6 +103,15 @@ BEGIN
       reporter_email = NULL
     WHERE invited_reported_by = v_invited_user_id;
 
+    -- Transfer timeline person-references owned by invited user (PP-tv9l).
+    -- Must run BEFORE the invited_users DELETE: the ON DELETE RESTRICT FK on
+    -- timeline_event_people.invited_id makes the delete fail otherwise.
+    UPDATE public.timeline_event_people
+    SET
+      user_id = NEW.id,
+      invited_id = NULL
+    WHERE invited_id = v_invited_user_id;
+
     -- Delete the invited user record (no longer needed)
     DELETE FROM public.invited_users
     WHERE id = v_invited_user_id;

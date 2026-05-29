@@ -1,6 +1,6 @@
-import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
+import type { MachineLifecycleEventData } from "~/lib/timeline/machine-event-types";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
-import { STATUS_CONFIG } from "~/lib/issues/status";
+import type { ResolvedPerson } from "~/lib/timeline/resolve-person";
 
 const PRESENCE_LABELS: Record<MachinePresenceStatus, string> = {
   on_the_floor: "On the floor",
@@ -10,40 +10,46 @@ const PRESENCE_LABELS: Record<MachinePresenceStatus, string> = {
   removed: "Removed",
 };
 
-function issueStatusLabel(value: string): string {
-  // Narrow via `in` rather than an unsafe cast (PP-0x98 review).
-  if (value in STATUS_CONFIG) {
-    return STATUS_CONFIG[value as keyof typeof STATUS_CONFIG].label;
-  }
-  return value;
+/**
+ * Display a resolved person with an `(invited)` marker when they have not yet
+ * signed up. Names resolve live (PP-tv9l) — never snapshotted, never email.
+ */
+function personLabel(person: ResolvedPerson): string {
+  return person.isInvited
+    ? `${person.displayName} (invited)`
+    : person.displayName;
 }
 
 /**
- * Renders the "Issue #N" anchor plus the title clause when present:
- *   - with title:    `Issue #42 "Flipper sticking"`
- *   - without title: `Issue #42`
- * The leading `Issue #N` token stays first so the system-row renderer can
- * regex-replace it with a `<Link>` to the issue.
+ * Format a lifecycle event (machine added, owner/name/presence changes, prose
+ * markers) for the single-line system row. Issue-side events are formatted by
+ * MachineTimelineIssueRow, not here.
+ *
+ * `people` carries the live-resolved owner references (`to_owner`/`from_owner`)
+ * for the owner events; which are present distinguishes set / changed /
+ * removed.
  */
-function issueAnchor(issueNumber: number, title: string | undefined): string {
-  const base = `Issue #${String(issueNumber)}`;
-  return title ? `${base} "${title}"` : base;
-}
-
-export function formatMachineEvent(event: MachineTimelineEventData): string {
+export function formatMachineEvent(
+  event: MachineLifecycleEventData,
+  people: Record<string, ResolvedPerson>
+): string {
   switch (event.kind) {
     case "machine_added":
       return "Machine added";
-    case "owner_set":
-      return `Owner set to ${event.toOwnerName}`;
-    case "owner_changed":
-      if (event.toOwnerName === null && event.fromOwnerName !== null) {
-        return `Owner removed (was ${event.fromOwnerName})`;
+    case "owner_set": {
+      const to = people["to_owner"];
+      return to ? `Owner set to ${personLabel(to)}` : "Owner set";
+    }
+    case "owner_changed": {
+      const from = people["from_owner"];
+      const to = people["to_owner"];
+      if (!to && from) return `Owner removed (was ${personLabel(from)})`;
+      if (to && !from) return `Owner set to ${personLabel(to)}`;
+      if (to && from) {
+        return `Owner changed from ${personLabel(from)} to ${personLabel(to)}`;
       }
-      if (event.fromOwnerName === null && event.toOwnerName !== null) {
-        return `Owner set to ${event.toOwnerName}`;
-      }
-      return `Owner changed from ${event.fromOwnerName ?? "—"} to ${event.toOwnerName ?? "—"}`;
+      return "Owner changed";
+    }
     case "name_changed":
       return `Name changed from "${event.from}" to "${event.to}"`;
     case "presence_changed":
@@ -56,19 +62,5 @@ export function formatMachineEvent(event: MachineTimelineEventData): string {
       return "Owner requirements updated";
     case "owner_notes_updated":
       return "Owner notes updated";
-    case "issue_opened":
-      return `${issueAnchor(event.issueNumber, event.title)} opened by ${event.openedByName}`;
-    case "issue_closed":
-      return `${issueAnchor(event.issueNumber, event.title)} closed by ${event.closedByName}`;
-    case "issue_status_changed":
-      return `${issueAnchor(event.issueNumber, event.title)} status changed from ${issueStatusLabel(event.from)} to ${issueStatusLabel(event.to)}`;
-    case "issue_assigned":
-      return `${issueAnchor(event.issueNumber, event.title)} assigned to ${event.assigneeName}`;
-    case "issue_unassigned":
-      return `${issueAnchor(event.issueNumber, event.title)} unassigned`;
-    case "issue_reassigned_out":
-      return `${issueAnchor(event.issueNumber, event.title)} moved to ${event.toMachineName}`;
-    case "issue_reassigned_in":
-      return `${issueAnchor(event.issueNumber, event.title)} received from ${event.fromMachineName}`;
   }
 }

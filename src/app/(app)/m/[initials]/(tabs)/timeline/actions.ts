@@ -237,14 +237,15 @@ export async function editMachineCommentAction(
     return { success: false, error: "Forbidden" };
   }
 
-  // 8. Update
-  await db.transaction(async (tx) => {
-    await updateMachineComment(
-      parsed.data.id,
-      { content, tag: parsed.data.tag },
-      tx
-    );
-  });
+  // 8. Update. The helper returns false if no row matched — a concurrent
+  // delete won the race after our pre-check (PP-h850 TOCTOU). Surface a real
+  // result instead of a false success.
+  const applied = await db.transaction(async (tx) =>
+    updateMachineComment(parsed.data.id, { content, tag: parsed.data.tag }, tx)
+  );
+  if (!applied) {
+    return { success: false, error: "This comment was already deleted." };
+  }
 
   revalidatePath(`/m/${machine.initials}/timeline`);
   // Also refresh the overview tab — the "Recent activity" section renders the
@@ -331,10 +332,15 @@ export async function deleteMachineCommentAction(
     return { success: false, error: "Forbidden" };
   }
 
-  // 7. Soft-delete
-  await db.transaction(async (tx) => {
-    await softDeleteMachineComment(parsed.data.id, { deletedBy: user.id }, tx);
-  });
+  // 7. Soft-delete. The helper returns false if no row matched — a concurrent
+  // delete won the TOCTOU race after our pre-check (PP-h850). Surface it
+  // instead of a false success.
+  const applied = await db.transaction(async (tx) =>
+    softDeleteMachineComment(parsed.data.id, { deletedBy: user.id }, tx)
+  );
+  if (!applied) {
+    return { success: false, error: "This comment was already deleted." };
+  }
 
   revalidatePath(`/m/${machine.initials}/timeline`);
   // Also refresh the overview tab — a deleted comment in "Recent activity"

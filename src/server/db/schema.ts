@@ -10,6 +10,7 @@ import {
   primaryKey,
   index,
   integer,
+  bigserial,
   check,
   unique,
 } from "drizzle-orm/pg-core";
@@ -356,6 +357,12 @@ export const timelineEvents = pgTable(
     deletedBy: uuid("deleted_by").references(() => userProfiles.id, {
       onDelete: "set null",
     }),
+    // Monotonic tiebreak for same-transaction ordering (PP-tv9l, finding #6).
+    // Events emitted in one transaction share `created_at` (Postgres now() is
+    // transaction-constant), so ordering by created_at alone is arbitrary.
+    // Order by (created_at desc, sequence desc) for deterministic insertion
+    // order — e.g. machine_added before owner_set.
+    sequence: bigserial("sequence", { mode: "number" }).notNull(),
   },
   (t) => ({
     machineCreatedIdx: index("idx_timeline_events_machine_created").on(
@@ -366,6 +373,54 @@ export const timelineEvents = pgTable(
       t.machineId,
       t.tag
     ),
+  })
+);
+
+/**
+ * Timeline Event People (PP-tv9l)
+ *
+ * Polymorphic person-references for timeline events — actors and subjects,
+ * uniform across event kinds and arities (e.g. `owner_changed` has both a
+ * `from_owner` and a `to_owner`). Stores stable IDs only; names/links/
+ * invited-status are resolved live at render. This is what makes the
+ * invited→real signup conversion a single relational UPDATE (mirroring the
+ * machines/issues rewrites) instead of fragile JSON surgery.
+ *
+ * `invited_id` uses onDelete RESTRICT deliberately: if the signup trigger's
+ * invited→real rewrite is ever missed, deleting the invited_users row fails
+ * the signup loudly (recoverable) rather than cascading to permanent silent
+ * history loss. See design spec §5.2.
+ */
+export const timelineEventPeople = pgTable(
+  "timeline_event_people",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => timelineEvents.id, { onDelete: "cascade" }),
+    // e.g. "from_owner", "to_owner", "assignee", "reporter".
+    role: text("role").notNull(),
+    userId: uuid("user_id").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+    invitedId: uuid("invited_id").references(() => invitedUsers.id, {
+      onDelete: "restrict",
+    }),
+  },
+  (t) => ({
+    // At most one of user_id / invited_id is non-null (mirrors
+    // machines.ownerCheck). We always INSERT exactly one; the both-null state
+    // only arises legitimately when onDelete:set null nulls a deleted user's
+    // user_id, which the resolver renders as "Former user". An exactly-one
+    // check would instead VIOLATE on that set-null, so "at most one" is
+    // required to coexist with the deleted-user path (spec §7).
+    personCheck: check(
+      "timeline_event_people_person_check",
+      sql`(${t.userId} IS NULL OR ${t.invitedId} IS NULL)`
+    ),
+    eventIdIdx: index("idx_timeline_event_people_event_id").on(t.eventId),
+    // The signup conversion's rewrite WHERE clause.
+    invitedIdIdx: index("idx_timeline_event_people_invited_id").on(t.invitedId),
   })
 );
 

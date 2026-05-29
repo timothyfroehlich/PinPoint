@@ -6,9 +6,10 @@
  * `issue_opened` row lives alongside (NOT instead of) the existing
  * `issueComments` system row.
  *
- * Email-privacy guarantee (AGENTS.md rule 10): `openedByName` is derived
- * from `user_profiles.name` or the freeform `reporterName`, with an
- * "Anonymous" fallback — never the reporter email.
+ * Identity resolution (PP-tv9l): reporter/assignee are stored as
+ * `timeline_event_people` references (real or invited), not snapshotted names.
+ * A freeform guest keeps a `guestReporterName`; anonymous opens carry neither.
+ * Email is never persisted (AGENTS.md rule 10).
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -19,6 +20,7 @@ import {
   authUsers,
   issueComments,
   machines,
+  timelineEventPeople,
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
@@ -122,14 +124,27 @@ describe("createIssue duplicate-writes to machine timeline (PP-0x98)", () => {
     const row = mtRows[0];
     expect(row.sourceType).toBe("issue");
     expect(row.tag).toBe("issue");
+    // No snapshotted name (PP-tv9l) — the reporter is a person-reference.
     expect(row.eventData).toMatchObject({
       kind: "issue_opened",
       issueId: issue.id,
       issueNumber: issue.issueNumber,
-      openedByName: "Maria Lopez",
       title: "Flipper broken",
     });
+    expect(row.eventData).not.toHaveProperty("openedByName");
+    expect(row.eventData).not.toHaveProperty("guestReporterName");
     expect(row.authorId).toBe(reporter.id);
+
+    const people = await db
+      .select()
+      .from(timelineEventPeople)
+      .where(eq(timelineEventPeople.eventId, row.id));
+    expect(people).toHaveLength(1);
+    expect(people[0]).toMatchObject({
+      role: "reporter",
+      userId: reporter.id,
+      invitedId: null,
+    });
 
     // The existing issueComments behavior is preserved (no "assigned" comment
     // here because the issue isn't assigned; the assigned-event path is
@@ -138,7 +153,7 @@ describe("createIssue duplicate-writes to machine timeline (PP-0x98)", () => {
     expect(ic).toHaveLength(0);
   });
 
-  it("uses reporterName fallback when reportedBy is not set (public report)", async () => {
+  it("keeps a guestReporterName for a freeform public report (no person row)", async () => {
     const db = await getTestDb();
     const machine = await makeMachine();
 
@@ -158,14 +173,21 @@ describe("createIssue duplicate-writes to machine timeline (PP-0x98)", () => {
       .select()
       .from(timelineEvents)
       .where(eq(timelineEvents.machineId, machine.id));
+    // A freeform guest has no account id → no person-reference; their typed
+    // name is kept as an immutable historical value (rendered "(guest)").
     expect(row.eventData).toMatchObject({
       kind: "issue_opened",
-      openedByName: "Joe Public",
+      guestReporterName: "Joe Public",
     });
     expect(row.authorId).toBeNull();
+    const people = await db
+      .select()
+      .from(timelineEventPeople)
+      .where(eq(timelineEventPeople.eventId, row.id));
+    expect(people).toHaveLength(0);
   });
 
-  it('falls back to "Anonymous" when neither reportedBy nor reporterName is set', async () => {
+  it("stores neither a name nor a person row for an anonymous report", async () => {
     const db = await getTestDb();
     const machine = await makeMachine();
 
@@ -184,10 +206,14 @@ describe("createIssue duplicate-writes to machine timeline (PP-0x98)", () => {
       .select()
       .from(timelineEvents)
       .where(eq(timelineEvents.machineId, machine.id));
-    expect(row.eventData).toMatchObject({
-      kind: "issue_opened",
-      openedByName: "Anonymous",
-    });
+    expect(row.eventData).toMatchObject({ kind: "issue_opened" });
+    expect(row.eventData).not.toHaveProperty("guestReporterName");
+    expect(row.eventData).not.toHaveProperty("openedByName");
+    const people = await db
+      .select()
+      .from(timelineEventPeople)
+      .where(eq(timelineEventPeople.eventId, row.id));
+    expect(people).toHaveLength(0);
   });
 });
 
@@ -274,13 +300,15 @@ describe("updateIssueStatus duplicate-writes to machine timeline (PP-0x98)", () 
     expect(rows).toHaveLength(1);
     expect(rows[0].sourceType).toBe("issue");
     expect(rows[0].tag).toBe("issue");
+    // No snapshotted name (PP-tv9l) — the closer is attributed via author_id
+    // and resolved live at render.
     expect(rows[0].eventData).toMatchObject({
       kind: "issue_closed",
       issueId: issue.id,
       issueNumber: issue.issueNumber,
-      closedByName: "Tim Test",
       title: "x",
     });
+    expect(rows[0].eventData).not.toHaveProperty("closedByName");
     expect(rows[0].authorId).toBe(user.id);
   });
 
@@ -456,13 +484,25 @@ describe("assignIssue duplicate-writes to machine timeline (PP-0x98)", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].sourceType).toBe("issue");
     expect(rows[0].tag).toBe("issue");
+    // No snapshotted name (PP-tv9l) — the assignee is a person-reference.
     expect(rows[0].eventData).toMatchObject({
       kind: "issue_assigned",
       issueId: issue.id,
       issueNumber: issue.issueNumber,
-      assigneeName: "Tim Test",
     });
+    expect(rows[0].eventData).not.toHaveProperty("assigneeName");
     expect(rows[0].authorId).toBe(reporter.id);
+
+    const people = await db
+      .select()
+      .from(timelineEventPeople)
+      .where(eq(timelineEventPeople.eventId, rows[0].id));
+    expect(people).toHaveLength(1);
+    expect(people[0]).toMatchObject({
+      role: "assignee",
+      userId: assignee.id,
+      invitedId: null,
+    });
   });
 
   it("emits issue_unassigned when the assignee is cleared", async () => {
@@ -618,13 +658,15 @@ describe("reassignIssueMachine duplicate-writes dual rows (PP-0x98)", () => {
 
     expect(sourceRows[0].sourceType).toBe("issue");
     expect(sourceRows[0].tag).toBe("issue");
+    // Machine ids are stored; the names are resolved live at render (PP-tv9l),
+    // so no *MachineName is snapshotted into event_data.
     expect(sourceRows[0].eventData).toMatchObject({
       kind: "issue_reassigned_out",
       issueId: issue.id,
       issueNumber: sourceIssueNumber,
       toMachineId: dest.id,
-      toMachineName: dest.name,
     });
+    expect(sourceRows[0].eventData).not.toHaveProperty("toMachineName");
 
     expect(destRows[0].sourceType).toBe("issue");
     expect(destRows[0].tag).toBe("issue");
@@ -633,8 +675,8 @@ describe("reassignIssueMachine duplicate-writes dual rows (PP-0x98)", () => {
       issueId: issue.id,
       // issueNumber on destination is the NEW number (1, since it's the dest's first issue)
       fromMachineId: source.id,
-      fromMachineName: source.name,
     });
+    expect(destRows[0].eventData).not.toHaveProperty("fromMachineName");
 
     // Both events share the same createdAt (same transaction → Postgres now() is constant in a tx)
     expect(sourceRows[0].createdAt.getTime()).toBe(

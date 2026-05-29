@@ -1,5 +1,5 @@
 /**
- * Issue Timeline Event Helpers (PP-0x98)
+ * Issue Timeline Event Helpers (PP-0x98, PP-tv9l)
  *
  * Thin wrappers around `createMachineTimelineEvent` for the issue-side actions
  * that duplicate-write events into the machine timeline:
@@ -14,17 +14,22 @@
  * - Run inside the caller's transaction (pass `tx`).
  * - Hardcode `sourceType: "issue"` and `tag: "issue"` so the
  *   (sourceType, tag, eventData) shape lives in ONE place.
- * - Take an already-resolved display name (the caller does the
- *   `user_profiles.name` lookup). Helpers are pure-data on purpose — this
- *   keeps test mocking trivial (PP-bamx motivation) and avoids accidental
- *   email leakage (AGENTS.md rule 10).
+ * - Take stable id person-references (PP-tv9l), NOT snapshotted names. The
+ *   reporter/assignee resolve to current names/links live at render — no
+ *   `user_profiles.name` lookup here, no email leakage (AGENTS.md rule 10).
+ *   The one exception is a freeform guest reporter (no account id to
+ *   reference): their typed name is carried as `guestReporterName` and
+ *   rendered with a "(guest)" marker.
  *
  * Issue→machine FK shape note: `issues.machineInitials` is the legacy FK; the
  * helpers take the resolved `machineId` (UUID) directly because all current
  * call sites already have it via `with: { machine: true }`.
  */
 
-import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
+import {
+  createMachineTimelineEvent,
+  type TimelinePersonRef,
+} from "~/lib/timeline/machine-events";
 import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
 import type { IssueFrequency, IssueSeverity, IssueStatus } from "~/lib/types";
 import type { DbTransaction } from "~/server/db";
@@ -36,39 +41,66 @@ export interface IssueEventCommon {
   actorId?: string;
 }
 
+/** A reporter reference — a real user xor an invited user (no role; the helper assigns it). */
+type ReporterRef = { userId: string } | { invitedId: string };
+
 export async function emitIssueOpened(
   tx: DbTransaction,
   args: IssueEventCommon & {
-    openedByName: string;
     title: string;
     severity: IssueSeverity;
     frequency: IssueFrequency;
+    /**
+     * Reporter as a stable id reference (real or invited) when one exists —
+     * resolved live at render. Omit for a freeform guest or anonymous open.
+     */
+    reporter?: ReporterRef | undefined;
+    /**
+     * Freeform guest reporter's typed name (no account id to reference). Kept
+     * as an immutable historical value, rendered with a "(guest)" marker.
+     * Omit for identity-backed reporters and for fully anonymous opens.
+     */
+    guestReporterName?: string | undefined;
   }
 ): Promise<void> {
-  await emit(tx, args, {
+  const eventData: MachineTimelineEventData = {
     kind: "issue_opened",
     issueId: args.issueId,
     issueNumber: args.issueNumber,
-    openedByName: args.openedByName,
     title: args.title,
     severity: args.severity,
     frequency: args.frequency,
-  });
+    ...(args.guestReporterName
+      ? { guestReporterName: args.guestReporterName }
+      : {}),
+  };
+
+  const people: TimelinePersonRef[] = [];
+  if (args.reporter) {
+    people.push(
+      "userId" in args.reporter
+        ? { role: "reporter", userId: args.reporter.userId }
+        : { role: "reporter", invitedId: args.reporter.invitedId }
+    );
+  }
+
+  await emit(tx, args, eventData, people);
 }
 
 export async function emitIssueClosed(
   tx: DbTransaction,
   args: IssueEventCommon & {
-    closedByName: string;
     title: string;
     closedAsStatus: IssueStatus;
   }
 ): Promise<void> {
+  // The closer is always a real logged-in user (status changes require auth),
+  // so attribution comes from the event's `author_id` (actorId) at render —
+  // no people row needed.
   await emit(tx, args, {
     kind: "issue_closed",
     issueId: args.issueId,
     issueNumber: args.issueNumber,
-    closedByName: args.closedByName,
     title: args.title,
     closedAsStatus: args.closedAsStatus,
   });
@@ -90,15 +122,21 @@ export async function emitIssueStatusChanged(
 
 export async function emitIssueAssigned(
   tx: DbTransaction,
-  args: IssueEventCommon & { assigneeName: string; title: string }
+  args: IssueEventCommon & { assigneeId: string; title: string }
 ): Promise<void> {
-  await emit(tx, args, {
-    kind: "issue_assigned",
-    issueId: args.issueId,
-    issueNumber: args.issueNumber,
-    assigneeName: args.assigneeName,
-    title: args.title,
-  });
+  // Assignees are always real users (`issues.assigned_to` FKs user_profiles
+  // only), so an `assignee` person-reference with a real `userId`.
+  await emit(
+    tx,
+    args,
+    {
+      kind: "issue_assigned",
+      issueId: args.issueId,
+      issueNumber: args.issueNumber,
+      title: args.title,
+    },
+    [{ role: "assignee", userId: args.assigneeId }]
+  );
 }
 
 export async function emitIssueUnassigned(
@@ -117,7 +155,6 @@ export async function emitIssueReassignedOut(
   tx: DbTransaction,
   args: IssueEventCommon & {
     toMachineId: string;
-    toMachineName: string;
     title: string;
   }
 ): Promise<void> {
@@ -126,7 +163,6 @@ export async function emitIssueReassignedOut(
     issueId: args.issueId,
     issueNumber: args.issueNumber,
     toMachineId: args.toMachineId,
-    toMachineName: args.toMachineName,
     title: args.title,
   });
 }
@@ -135,7 +171,6 @@ export async function emitIssueReassignedIn(
   tx: DbTransaction,
   args: IssueEventCommon & {
     fromMachineId: string;
-    fromMachineName: string;
     title: string;
   }
 ): Promise<void> {
@@ -144,7 +179,6 @@ export async function emitIssueReassignedIn(
     issueId: args.issueId,
     issueNumber: args.issueNumber,
     fromMachineId: args.fromMachineId,
-    fromMachineName: args.fromMachineName,
     title: args.title,
   });
 }
@@ -152,7 +186,8 @@ export async function emitIssueReassignedIn(
 async function emit(
   tx: DbTransaction,
   args: IssueEventCommon,
-  eventData: MachineTimelineEventData
+  eventData: MachineTimelineEventData,
+  people?: TimelinePersonRef[]
 ): Promise<void> {
   await createMachineTimelineEvent(
     args.machineId,
@@ -161,6 +196,7 @@ async function emit(
       tag: "issue",
       eventData,
       ...(args.actorId ? { actorId: args.actorId } : {}),
+      ...(people && people.length > 0 ? { people } : {}),
     },
     tx
   );

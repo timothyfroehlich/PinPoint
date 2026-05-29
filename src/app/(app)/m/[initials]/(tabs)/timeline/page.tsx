@@ -259,6 +259,8 @@ export default async function MachineTimelinePage({
               tag: rowTag,
               authorName: row.authorName,
               eventData: row.eventData,
+              people: row.people,
+              machineRefs: row.machineRefs,
             }}
             machineInitials={machineInitials}
             showRelativeTime={showRelativeTime}
@@ -274,8 +276,8 @@ export default async function MachineTimelinePage({
             createdAt: row.createdAt,
             tag: rowTag,
             eventData: row.eventData,
+            people: row.people,
           }}
-          machineInitials={machineInitials}
           showRelativeTime={showRelativeTime}
           {...(rowDateLabel !== undefined ? { rowDateLabel } : {})}
         />
@@ -348,7 +350,7 @@ export default async function MachineTimelinePage({
           currentPage={currentPage}
           hasPrevPage={hasPrevPage}
           hasNextPage={hasNextPage}
-          tagParam={tagParam}
+          tags={tags}
           initials={machineInitials}
         />
       )}
@@ -360,7 +362,7 @@ interface TimelinePaginationProps {
   currentPage: number;
   hasPrevPage: boolean;
   hasNextPage: boolean;
-  tagParam: string | undefined;
+  tags: TimelineTag[];
   initials: string;
 }
 
@@ -368,11 +370,14 @@ function TimelinePagination({
   currentPage,
   hasPrevPage,
   hasNextPage,
-  tagParam,
+  tags,
   initials,
 }: TimelinePaginationProps): React.JSX.Element {
   const baseUrl = `/m/${initials}/timeline`;
-  const tagQuery = tagParam ? `tag=${encodeURIComponent(tagParam)}` : "";
+  // Build from the validated tags, not the raw `?tag=` string, so an invalid
+  // tag in the URL doesn't propagate into the Older/Newer links (PP-ii3u #12).
+  const tagQuery =
+    tags.length > 0 ? `tag=${encodeURIComponent(tags.join(","))}` : "";
 
   const buildHref = (page: number): string => {
     const parts: string[] = [];

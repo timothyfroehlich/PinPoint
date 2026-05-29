@@ -9,23 +9,13 @@ import { formatRelative } from "~/lib/dates";
 import { formatIssueId } from "~/lib/issues/utils";
 import { STATUS_CONFIG } from "~/lib/issues/status";
 import { MACHINE_EVENT_ICONS } from "~/lib/timeline/machine-event-icons";
-import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
+import type { MachineIssueEventData } from "~/lib/timeline/machine-event-types";
+import type { ResolvedMachineRef } from "~/lib/timeline/machine-events";
 import type { TimelineTag } from "~/lib/timeline/machine-tags";
+import type { ResolvedPerson } from "~/lib/timeline/resolve-person";
 import { cn } from "~/lib/utils";
 
-type IssueEventKind =
-  | "issue_opened"
-  | "issue_closed"
-  | "issue_status_changed"
-  | "issue_assigned"
-  | "issue_unassigned"
-  | "issue_reassigned_out"
-  | "issue_reassigned_in";
-
-type IssueEventData = Extract<
-  MachineTimelineEventData,
-  { kind: IssueEventKind }
->;
+type IssueEventData = MachineIssueEventData;
 
 export interface MachineIssueRowData {
   id: string;
@@ -33,6 +23,10 @@ export interface MachineIssueRowData {
   tag: TimelineTag;
   authorName: string | null;
   eventData: IssueEventData;
+  /** Live-resolved person-references (`reporter`/`assignee`), keyed by role. */
+  people: Record<string, ResolvedPerson>;
+  /** Live-resolved referenced machines (reassign), keyed by machine id. */
+  machineRefs: Record<string, ResolvedMachineRef>;
 }
 
 interface Props {
@@ -74,8 +68,8 @@ export function MachineTimelineIssueRow({
   rowDateLabel,
 }: Props): React.JSX.Element {
   const { Icon, colorClass } = MACHINE_EVENT_ICONS[row.eventData.kind];
-  const actorName = resolveActorName(row);
-  const verbClause = formatVerbClause(row.eventData);
+  const actor = resolveActor(row);
+  const verbClause = formatVerbClause(row);
   const issueIdText = machineInitials
     ? formatIssueId(machineInitials, row.eventData.issueNumber)
     : `#${String(row.eventData.issueNumber)}`;
@@ -124,12 +118,13 @@ export function MachineTimelineIssueRow({
               </span>
             )}
             <span className="truncate text-muted-foreground">{verbClause}</span>
-            {actorName && density === "full" ? (
+            {actor && density === "full" ? (
               <span className="shrink-0 text-muted-foreground">
                 by{" "}
                 <span className="font-medium text-foreground/90">
-                  {actorName}
+                  {actor.name}
                 </span>
+                {actor.suffix}
               </span>
             ) : null}
           </span>
@@ -159,14 +154,35 @@ export function MachineTimelineIssueRow({
   );
 }
 
-function resolveActorName(row: MachineIssueRowData): string | null {
-  if (row.authorName) return row.authorName;
-  if (row.eventData.kind === "issue_opened") return row.eventData.openedByName;
-  if (row.eventData.kind === "issue_closed") return row.eventData.closedByName;
-  return null;
+/**
+ * The actor shown in the "by X" clause, with a marker suffix distinguishing
+ * an invited or guest reporter from a real user. Names resolve live (PP-tv9l).
+ */
+function resolveActor(
+  row: MachineIssueRowData
+): { name: string; suffix: string } | null {
+  const ed = row.eventData;
+  if (ed.kind === "issue_opened") {
+    const reporter = row.people["reporter"];
+    if (reporter) {
+      return {
+        name: reporter.displayName,
+        suffix: reporter.isInvited ? " (invited)" : "",
+      };
+    }
+    // Freeform guest (no account id) — typed name, marked as not a user.
+    if (ed.guestReporterName) {
+      return { name: ed.guestReporterName, suffix: " (guest)" };
+    }
+    // Fully anonymous open carries no actor.
+    return row.authorName ? { name: row.authorName, suffix: "" } : null;
+  }
+  // Every other issue event is performed by the acting (real) user.
+  return row.authorName ? { name: row.authorName, suffix: "" } : null;
 }
 
-function formatVerbClause(data: IssueEventData): string {
+function formatVerbClause(row: MachineIssueRowData): string {
+  const data = row.eventData;
   switch (data.kind) {
     case "issue_opened":
       return "opened";
@@ -174,14 +190,20 @@ function formatVerbClause(data: IssueEventData): string {
       return "closed";
     case "issue_status_changed":
       return `→ ${formatStatusLabel(data.to)}`;
-    case "issue_assigned":
-      return `assigned to ${data.assigneeName}`;
+    case "issue_assigned": {
+      const assignee = row.people["assignee"];
+      return `assigned to ${assignee ? assignee.displayName : "someone"}`;
+    }
     case "issue_unassigned":
       return "unassigned";
-    case "issue_reassigned_out":
-      return `moved to ${data.toMachineName}`;
-    case "issue_reassigned_in":
-      return `received from ${data.fromMachineName}`;
+    case "issue_reassigned_out": {
+      const m = row.machineRefs[data.toMachineId];
+      return `moved to ${m ? m.name : "another machine"}`;
+    }
+    case "issue_reassigned_in": {
+      const m = row.machineRefs[data.fromMachineId];
+      return `received from ${m ? m.name : "another machine"}`;
+    }
   }
 }
 
