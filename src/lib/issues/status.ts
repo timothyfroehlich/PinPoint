@@ -226,8 +226,8 @@ export const SEVERITY_CONFIG: Record<
   },
   unplayable: {
     label: "Unplayable",
-    styles: "bg-amber-600/20 text-amber-600 border-amber-500",
-    iconColor: "text-amber-600",
+    styles: "bg-amber-600/20 text-amber-500 border-amber-500",
+    iconColor: "text-amber-500",
     icon: AlertTriangle,
   },
 };
@@ -238,8 +238,8 @@ export const PRIORITY_CONFIG: Record<
 > = {
   low: {
     label: "Low",
-    styles: "bg-purple-950/50 text-purple-600 border-purple-500",
-    iconColor: "text-purple-600",
+    styles: "bg-purple-950/50 text-purple-400 border-purple-500",
+    iconColor: "text-purple-400",
     icon: TrendingUp,
   },
   medium: {
@@ -262,8 +262,8 @@ export const FREQUENCY_CONFIG: Record<
 > = {
   intermittent: {
     label: "Intermittent",
-    styles: "bg-cyan-950/50 text-cyan-600 border-cyan-500",
-    iconColor: "text-cyan-600",
+    styles: "bg-cyan-950/50 text-cyan-400 border-cyan-500",
+    iconColor: "text-cyan-400",
     icon: Repeat,
   },
   frequent: {
