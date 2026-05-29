@@ -31,6 +31,25 @@ export interface ResolvedPerson {
 }
 
 /**
+ * Suffix appended to a resolved person's name to mark them as an invited
+ * (not-yet-signed-up) account. Single source of truth so every renderer
+ * agrees on wording and whitespace.
+ */
+export function personSuffix(person: ResolvedPerson): string {
+  return person.isInvited ? " (invited)" : "";
+}
+
+/**
+ * Full display label: `displayName` + the invited suffix when applicable.
+ * Use this when name + suffix render as one flat string. When the name and
+ * suffix need separate styling (bold name, regular suffix), call
+ * `personSuffix` alongside `person.displayName` instead.
+ */
+export function personLabel(person: ResolvedPerson): string {
+  return `${person.displayName}${personSuffix(person)}`;
+}
+
+/**
  * Resolve a person-reference to its current display value.
  *
  * - Real user → current name.

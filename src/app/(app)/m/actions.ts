@@ -36,6 +36,7 @@ import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import {
   emitMachineCreated,
   emitMachineUpdated,
+  toMachineOwnerRef,
 } from "~/lib/timeline/machine-lifecycle-helpers";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import { type MachineTimelineEventKind } from "~/lib/timeline/machine-event-types";
@@ -304,11 +305,10 @@ export async function createMachineAction(
           tx,
           {
             id: newMachine.id,
-            owner: newMachine.ownerId
-              ? { userId: newMachine.ownerId }
-              : newMachine.invitedOwnerId
-                ? { invitedId: newMachine.invitedOwnerId }
-                : null,
+            owner: toMachineOwnerRef(
+              newMachine.ownerId,
+              newMachine.invitedOwnerId
+            ),
           },
           user.id
         );
@@ -455,11 +455,10 @@ export async function createMachineAction(
         tx,
         {
           id: newMachine.id,
-          owner: newMachine.ownerId
-            ? { userId: newMachine.ownerId }
-            : newMachine.invitedOwnerId
-              ? { invitedId: newMachine.invitedOwnerId }
-              : null,
+          owner: toMachineOwnerRef(
+            newMachine.ownerId,
+            newMachine.invitedOwnerId
+          ),
         },
         user.id
       );
@@ -673,21 +672,16 @@ export async function updateMachineAction(
           {
             id: currentMachine.id,
             name: currentMachine.name,
-            owner: currentMachine.ownerId
-              ? { userId: currentMachine.ownerId }
-              : currentMachine.invitedOwnerId
-                ? { invitedId: currentMachine.invitedOwnerId }
-                : null,
+            owner: toMachineOwnerRef(
+              currentMachine.ownerId,
+              currentMachine.invitedOwnerId
+            ),
             presenceStatus: currentMachine.presenceStatus,
           },
           {
             name,
             ownerChanged: true,
-            owner: machineOwnerId
-              ? { userId: machineOwnerId }
-              : machineInvitedOwnerId
-                ? { invitedId: machineInvitedOwnerId }
-                : null,
+            owner: toMachineOwnerRef(machineOwnerId, machineInvitedOwnerId),
             presenceStatus,
           },
           user.id
@@ -876,21 +870,16 @@ export async function updateMachineAction(
         {
           id: currentMachine.id,
           name: currentMachine.name,
-          owner: currentMachine.ownerId
-            ? { userId: currentMachine.ownerId }
-            : currentMachine.invitedOwnerId
-              ? { invitedId: currentMachine.invitedOwnerId }
-              : null,
+          owner: toMachineOwnerRef(
+            currentMachine.ownerId,
+            currentMachine.invitedOwnerId
+          ),
           presenceStatus: currentMachine.presenceStatus,
         },
         {
           name,
           ownerChanged: shouldUpdateOwner,
-          owner: finalOwnerId
-            ? { userId: finalOwnerId }
-            : finalInvitedOwnerId
-              ? { invitedId: finalInvitedOwnerId }
-              : null,
+          owner: toMachineOwnerRef(finalOwnerId, finalInvitedOwnerId),
           presenceStatus,
         },
         user.id

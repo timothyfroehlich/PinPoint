@@ -33,6 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { RelativeTime } from "~/components/issues/RelativeTime";
 import { formatRelative } from "~/lib/dates";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -89,10 +90,15 @@ export function MachineTimelineCommentRow({
 
   // Right-pinned timestamp slot (matches issue/system rows): relative time
   // for "today" rows, the absolute date for month-rollup rows. One slot,
-  // never both.
-  const rightMeta = showRelativeTime
-    ? formatRelative(row.createdAt)
-    : rowDateLabel;
+  // never both. `<RelativeTime>` ticks every 60s so the label stays accurate
+  // while the page is open; a raw formatRelative() would freeze at first
+  // render. `(edited)` keeps the static `formatRelative` for the hover-title
+  // — only paints when hovered and doesn't need to tick.
+  const rightMeta: React.ReactNode = showRelativeTime ? (
+    <RelativeTime value={row.createdAt} />
+  ) : (
+    rowDateLabel
+  );
 
   return (
     <div className="flex gap-3 border-b py-3">

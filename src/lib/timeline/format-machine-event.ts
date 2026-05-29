@@ -1,6 +1,9 @@
 import type { MachineLifecycleEventData } from "~/lib/timeline/machine-event-types";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
-import type { ResolvedPerson } from "~/lib/timeline/resolve-person";
+import {
+  personLabel,
+  type ResolvedPerson,
+} from "~/lib/timeline/resolve-person";
 
 const PRESENCE_LABELS: Record<MachinePresenceStatus, string> = {
   on_the_floor: "On the floor",
@@ -9,16 +12,6 @@ const PRESENCE_LABELS: Record<MachinePresenceStatus, string> = {
   pending_arrival: "Pending arrival",
   removed: "Removed",
 };
-
-/**
- * Display a resolved person with an `(invited)` marker when they have not yet
- * signed up. Names resolve live (PP-tv9l) — never snapshotted, never email.
- */
-function personLabel(person: ResolvedPerson): string {
-  return person.isInvited
-    ? `${person.displayName} (invited)`
-    : person.displayName;
-}
 
 /**
  * Format a lifecycle event (machine added, owner/name/presence changes, prose

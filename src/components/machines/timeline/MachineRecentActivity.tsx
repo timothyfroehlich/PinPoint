@@ -8,7 +8,7 @@ import { MachineTimelineCommentRow } from "~/components/machines/timeline/Machin
 import { MachineTimelineIssueRow } from "~/components/machines/timeline/MachineTimelineIssueRow";
 import { MachineTimelineSystemRow } from "~/components/machines/timeline/MachineTimelineSystemRow";
 import { MachineTimelineTombstoneRow } from "~/components/machines/timeline/MachineTimelineTombstoneRow";
-import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
+import { isMachineIssueEvent } from "~/lib/timeline/machine-event-types";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
 import { tagSchema } from "~/lib/timeline/machine-tags";
 import { db } from "~/server/db";
@@ -89,35 +89,6 @@ export async function MachineRecentActivity({
 
 type RecentRow = Awaited<ReturnType<typeof getMachineTimeline>>[number];
 
-type IssueEventData = Extract<
-  MachineTimelineEventData,
-  {
-    kind:
-      | "issue_opened"
-      | "issue_closed"
-      | "issue_status_changed"
-      | "issue_assigned"
-      | "issue_unassigned"
-      | "issue_reassigned_out"
-      | "issue_reassigned_in";
-  }
->;
-
-function isIssueEvent(data: MachineTimelineEventData): data is IssueEventData {
-  switch (data.kind) {
-    case "issue_opened":
-    case "issue_closed":
-    case "issue_status_changed":
-    case "issue_assigned":
-    case "issue_unassigned":
-    case "issue_reassigned_out":
-    case "issue_reassigned_in":
-      return true;
-    default:
-      return false;
-  }
-}
-
 function renderRecentRow(
   row: RecentRow,
   machineInitials: string
@@ -157,7 +128,7 @@ function renderRecentRow(
   }
 
   if (row.eventData) {
-    if (isIssueEvent(row.eventData)) {
+    if (isMachineIssueEvent(row.eventData)) {
       return (
         <MachineTimelineIssueRow
           key={row.id}

@@ -127,3 +127,29 @@ export type MachineLifecycleEventData = Exclude<
   MachineTimelineEventData,
   { kind: MachineIssueEventKind }
 >;
+
+/**
+ * Type predicate: narrow MachineTimelineEventData to the issue-side variants.
+ *
+ * Explicit case list (instead of `kind.startsWith("issue_")`) keeps the
+ * discriminated-union narrowing intact — `Extract<>` over a template literal
+ * doesn't always narrow as TS users expect. Adding a new issue kind requires
+ * updating this list AND `MachineIssueEventKind` above; both are in this file
+ * so they stay in lockstep.
+ */
+export function isMachineIssueEvent(
+  data: MachineTimelineEventData
+): data is MachineIssueEventData {
+  switch (data.kind) {
+    case "issue_opened":
+    case "issue_closed":
+    case "issue_status_changed":
+    case "issue_assigned":
+    case "issue_unassigned":
+    case "issue_reassigned_out":
+    case "issue_reassigned_in":
+      return true;
+    default:
+      return false;
+  }
+}

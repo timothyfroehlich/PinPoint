@@ -56,6 +56,23 @@ function ownerPersonRef(
     : { role, invitedId: owner.invitedId };
 }
 
+/**
+ * Build a {@link MachineOwnerRef} from the raw owner-id columns on a
+ * `machines` row. Returns null when neither id is present (unowned machine).
+ *
+ * Both call sites in `m/actions.ts` and any other code that owns the
+ * `(ownerId, invitedOwnerId)` pair share this single factory so the XOR
+ * priority and the discriminated-union shape live in one place.
+ */
+export function toMachineOwnerRef(
+  userId: string | null | undefined,
+  invitedId: string | null | undefined
+): MachineOwnerRef | null {
+  if (userId != null) return { userId };
+  if (invitedId != null) return { invitedId };
+  return null;
+}
+
 export interface MachineCreatedSnapshot {
   id: string;
   owner: MachineOwnerRef | null;

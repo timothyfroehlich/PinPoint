@@ -16,47 +16,11 @@ import {
   getAccessLevel,
 } from "~/lib/permissions/index";
 import { createClient } from "~/lib/supabase/server";
-import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
+import { isMachineIssueEvent } from "~/lib/timeline/machine-event-types";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
 import { tagSchema, type TimelineTag } from "~/lib/timeline/machine-tags";
 import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
-
-/**
- * Type-predicate narrowing for splitting the system row (lifecycle) from
- * the new two-line issue row. Listing the kinds explicitly (instead of
- * `kind.startsWith("issue_")`) keeps the discriminated-union narrowing
- * intact downstream — `Extract<>` with a template literal doesn't always
- * narrow as TS users expect.
- */
-type IssueEventData = Extract<
-  MachineTimelineEventData,
-  {
-    kind:
-      | "issue_opened"
-      | "issue_closed"
-      | "issue_status_changed"
-      | "issue_assigned"
-      | "issue_unassigned"
-      | "issue_reassigned_out"
-      | "issue_reassigned_in";
-  }
->;
-
-function isIssueEvent(data: MachineTimelineEventData): data is IssueEventData {
-  switch (data.kind) {
-    case "issue_opened":
-    case "issue_closed":
-    case "issue_status_changed":
-    case "issue_assigned":
-    case "issue_unassigned":
-    case "issue_reassigned_out":
-    case "issue_reassigned_in":
-      return true;
-    default:
-      return false;
-  }
-}
 
 interface PageProps {
   params: Promise<{ initials: string }>;
@@ -249,7 +213,7 @@ export default async function MachineTimelinePage({
     // Issue-side events get the two-line treatment (`AFM-03 Title` + badges).
     // Lifecycle events keep the single-line system row.
     if (row.eventData) {
-      if (isIssueEvent(row.eventData)) {
+      if (isMachineIssueEvent(row.eventData)) {
         return (
           <MachineTimelineIssueRow
             key={row.id}

@@ -1,6 +1,6 @@
 import type React from "react";
 
-import { formatRelative } from "~/lib/dates";
+import { RelativeTime } from "~/components/issues/RelativeTime";
 import { MACHINE_EVENT_ICONS } from "~/lib/timeline/machine-event-icons";
 import { formatMachineEvent } from "~/lib/timeline/format-machine-event";
 import type { MachineLifecycleEventData } from "~/lib/timeline/machine-event-types";
@@ -61,9 +61,13 @@ export function MachineTimelineSystemRow({
 
   // Right-pinned timestamp slot: relative time for "today" rows, the absolute
   // date for month-rollup rows. One slot, one position — never both.
-  const rightMeta = showRelativeTime
-    ? formatRelative(row.createdAt)
-    : rowDateLabel;
+  // `<RelativeTime>` ticks every 60s so the label stays accurate while the
+  // page is open; a raw formatRelative() would freeze at first render.
+  const rightMeta: React.ReactNode = showRelativeTime ? (
+    <RelativeTime value={row.createdAt} />
+  ) : (
+    rowDateLabel
+  );
 
   return (
     <div

@@ -4,15 +4,19 @@ import type React from "react";
 import Link from "next/link";
 
 import { IssueBadge } from "~/components/issues/IssueBadge";
+import { RelativeTime } from "~/components/issues/RelativeTime";
 import { useTimelineRowDensity } from "~/hooks/use-timeline-row-density";
-import { formatRelative } from "~/lib/dates";
 import { formatIssueId } from "~/lib/issues/utils";
 import { STATUS_CONFIG } from "~/lib/issues/status";
 import { MACHINE_EVENT_ICONS } from "~/lib/timeline/machine-event-icons";
 import type { MachineIssueEventData } from "~/lib/timeline/machine-event-types";
 import type { ResolvedMachineRef } from "~/lib/timeline/machine-events";
 import type { TimelineTag } from "~/lib/timeline/machine-tags";
-import type { ResolvedPerson } from "~/lib/timeline/resolve-person";
+import {
+  personLabel,
+  personSuffix,
+  type ResolvedPerson,
+} from "~/lib/timeline/resolve-person";
 import { cn } from "~/lib/utils";
 
 type IssueEventData = MachineIssueEventData;
@@ -84,9 +88,13 @@ export function MachineTimelineIssueRow({
 
   // Right-pinned timestamp slot: relative time for "today" rows, the absolute
   // date for month-rollup rows. One slot, one position — never both.
-  const rightMeta = showRelativeTime
-    ? formatRelative(row.createdAt)
-    : rowDateLabel;
+  // `<RelativeTime>` ticks every 60s so the label stays accurate while the
+  // page is open; a raw formatRelative() would freeze at first render.
+  const rightMeta: React.ReactNode = showRelativeTime ? (
+    <RelativeTime value={row.createdAt} />
+  ) : (
+    rowDateLabel
+  );
 
   return (
     <div
@@ -167,7 +175,7 @@ function resolveActor(
     if (reporter) {
       return {
         name: reporter.displayName,
-        suffix: reporter.isInvited ? " (invited)" : "",
+        suffix: personSuffix(reporter),
       };
     }
     // Freeform guest (no account id) — typed name, marked as not a user.
@@ -196,7 +204,7 @@ function formatVerbClause(row: MachineIssueRowData): string {
       return `→ ${formatStatusLabel(data.to)}`;
     case "issue_assigned": {
       const assignee = row.people["assignee"];
-      return `assigned to ${assignee ? assignee.displayName : "someone"}`;
+      return `assigned to ${assignee ? personLabel(assignee) : "someone"}`;
     }
     case "issue_unassigned":
       return "unassigned";
