@@ -63,8 +63,22 @@ function checkBrowserBinaries(config: FullConfig): void {
  * SharedArrayBuffer is the standard synchronous-sleep primitive in Node.
  */
 function sleepSync(ms: number): void {
-  if (ms <= 0) return;
+  // Guard non-finite values: Atomics.wait coerces NaN to +Infinity and would
+  // block forever, defeating the bounded readiness budget.
+  if (!Number.isFinite(ms) || ms <= 0) return;
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Read a numeric env override, falling back to `fallback` when unset or
+ * invalid (e.g. a typo'd `E2E_DOCKER_READY_DELAY_MS=abc` → NaN). Keeps the
+ * Docker readiness budget bounded regardless of bad input.
+ */
+function numEnv(name: string, fallback: number, min: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= min ? n : fallback;
 }
 
 /**
@@ -79,8 +93,8 @@ function sleepSync(ms: number): void {
  * retrying won't install Docker. Budget is tunable via env for CI.
  */
 function checkDocker(): void {
-  const attempts = Number(process.env.E2E_DOCKER_READY_ATTEMPTS ?? "15");
-  const delayMs = Number(process.env.E2E_DOCKER_READY_DELAY_MS ?? "1000");
+  const attempts = Math.floor(numEnv("E2E_DOCKER_READY_ATTEMPTS", 15, 1));
+  const delayMs = numEnv("E2E_DOCKER_READY_DELAY_MS", 1000, 0);
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const result = spawnSync("docker", ["info"], {

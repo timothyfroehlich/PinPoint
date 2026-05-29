@@ -203,6 +203,21 @@ describe("e2e/global-setup", () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
+  it("falls back to the default budget when retry env vars are invalid", async () => {
+    // A typo'd attempts value must not skip the probe (NaN loop → 0 probes)
+    // or, via an invalid delay, block forever — the budget stays bounded.
+    process.env.E2E_DOCKER_READY_ATTEMPTS = "abc";
+    process.env.E2E_DOCKER_READY_DELAY_MS = "0";
+    spawnSyncMock.mockReturnValue({ status: 1, error: null });
+    const setup = await loadSetup();
+
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "Docker daemon is not running"
+    );
+    // Invalid attempts → falls back to the default of 15, still probing.
+    expect(spawnSyncMock).toHaveBeenCalledTimes(15);
+  });
+
   it("fails fast without retrying when Docker is not installed (ENOENT)", async () => {
     const enoent = Object.assign(new Error("spawn docker ENOENT"), {
       code: "ENOENT",
