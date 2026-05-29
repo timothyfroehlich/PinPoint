@@ -13,7 +13,6 @@ import type { MachineIssueEventData } from "~/lib/timeline/machine-event-types";
 import type { ResolvedMachineRef } from "~/lib/timeline/machine-events";
 import type { TimelineTag } from "~/lib/timeline/machine-tags";
 import {
-  personLabel,
   personSuffix,
   type ResolvedPerson,
 } from "~/lib/timeline/resolve-person";
@@ -204,7 +203,7 @@ function formatVerbClause(row: MachineIssueRowData): string {
       return `→ ${formatStatusLabel(data.to)}`;
     case "issue_assigned": {
       const assignee = row.people["assignee"];
-      return `assigned to ${assignee ? personLabel(assignee) : "someone"}`;
+      return `assigned to ${assignee ? assignee.displayName : "someone"}`;
     }
     case "issue_unassigned":
       return "unassigned";

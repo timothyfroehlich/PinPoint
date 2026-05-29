@@ -10,7 +10,6 @@ import { MachineTimelineSystemRow } from "~/components/machines/timeline/Machine
 import { MachineTimelineTombstoneRow } from "~/components/machines/timeline/MachineTimelineTombstoneRow";
 import { isMachineIssueEvent } from "~/lib/timeline/machine-event-types";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
-import { tagSchema } from "~/lib/timeline/machine-tags";
 import { db } from "~/server/db";
 
 const RECENT_LIMIT = 5;
@@ -103,10 +102,6 @@ function renderRecentRow(
     );
   }
 
-  const parsedTag = tagSchema.safeParse(row.tag);
-  if (!parsedTag.success) return null;
-  const rowTag = parsedTag.data;
-
   if (row.sourceType === "comment" && row.content) {
     return (
       <MachineTimelineCommentRow
@@ -118,7 +113,7 @@ function renderRecentRow(
           authorName: row.authorName,
           authorAvatarUrl: row.authorAvatarUrl,
           editedAt: row.editedAt,
-          tag: rowTag,
+          tag: row.tag,
           content: row.content,
         }}
         canEdit={false}
@@ -135,7 +130,7 @@ function renderRecentRow(
           row={{
             id: row.id,
             createdAt: row.createdAt,
-            tag: rowTag,
+            tag: row.tag,
             authorName: row.authorName,
             eventData: row.eventData,
             people: row.people,
@@ -151,7 +146,7 @@ function renderRecentRow(
         row={{
           id: row.id,
           createdAt: row.createdAt,
-          tag: rowTag,
+          tag: row.tag,
           eventData: row.eventData,
           people: row.people,
         }}

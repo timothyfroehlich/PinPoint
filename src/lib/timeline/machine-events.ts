@@ -24,7 +24,7 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
-import type { TimelineTag } from "~/lib/timeline/machine-tags";
+import { tagSchema, type TimelineTag } from "~/lib/timeline/machine-tags";
 import {
   resolvePerson,
   type ResolvedPerson,
@@ -381,7 +381,15 @@ export async function getMachineTimeline(
     }
   }
 
-  return rows.map((r) => {
+  // Validate `tag` against the enum at this read boundary — the DB column is
+  // unconstrained `text` (`$type<TimelineTag>()` is a compile-time hint only),
+  // so a legacy/manual row could carry an out-of-enum value. Drop it rather
+  // than blind-casting; consumers can render `row.tag` directly (PP-tv9l).
+  const out: MachineTimelineRow[] = [];
+  for (const r of rows) {
+    const parsedTag = tagSchema.safeParse(r.tag);
+    if (!parsedTag.success) continue;
+
     const machineRefs: Record<string, ResolvedMachineRef> = {};
     const ed = r.eventData;
     const refId =
@@ -394,10 +402,12 @@ export async function getMachineTimeline(
       const m = machineById.get(refId);
       if (m) machineRefs[refId] = m;
     }
-    return {
+    out.push({
       ...r,
+      tag: parsedTag.data,
       people: peopleByEvent.get(r.id) ?? {},
       machineRefs,
-    };
-  });
+    });
+  }
+  return out;
 }

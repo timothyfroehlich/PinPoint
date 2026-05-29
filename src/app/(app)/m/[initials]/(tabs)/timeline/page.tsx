@@ -155,13 +155,6 @@ export default async function MachineTimelinePage({
       );
     }
 
-    // Validate `row.tag` at this read boundary — the DB column is
-    // unconstrained `text`, so a legacy/manual row could carry an
-    // out-of-enum value. Skip it rather than blind-casting (PP-0x98 review).
-    const parsedRowTag = tagSchema.safeParse(row.tag);
-    if (!parsedRowTag.success) return null;
-    const rowTag = parsedRowTag.data;
-
     // User comment.
     if (row.sourceType === "comment" && row.content) {
       // Matrix-only permission checks (AGENTS.md rule 12). Edit uses `own`
@@ -199,7 +192,7 @@ export default async function MachineTimelinePage({
             authorName: row.authorName,
             authorAvatarUrl: row.authorAvatarUrl,
             editedAt: row.editedAt,
-            tag: rowTag,
+            tag: row.tag,
             content: row.content,
           }}
           canEdit={canEdit}
@@ -220,7 +213,7 @@ export default async function MachineTimelinePage({
             row={{
               id: row.id,
               createdAt: row.createdAt,
-              tag: rowTag,
+              tag: row.tag,
               authorName: row.authorName,
               eventData: row.eventData,
               people: row.people,
@@ -238,7 +231,7 @@ export default async function MachineTimelinePage({
           row={{
             id: row.id,
             createdAt: row.createdAt,
-            tag: rowTag,
+            tag: row.tag,
             eventData: row.eventData,
             people: row.people,
           }}
