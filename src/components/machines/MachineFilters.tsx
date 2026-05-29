@@ -211,6 +211,7 @@ export function MachineFilters({
                   <Badge
                     key={badge.id}
                     variant="secondary"
+                    data-testid="filter-badge"
                     className="flex items-center gap-1 px-2 py-0.5 whitespace-nowrap text-[10px] h-6 bg-secondary-container text-on-secondary-container border-0"
                   >
                     <span className="max-w-[100px] truncate">
@@ -219,6 +220,7 @@ export function MachineFilters({
                     <button
                       type="button"
                       onClick={() => badge.clear()}
+                      aria-label={`Clear ${badge.label} filter`}
                       className="hover:bg-on-secondary-container/10 rounded-full p-0.5"
                     >
                       <X className="h-3 w-3" />
@@ -292,6 +294,7 @@ export function MachineFilters({
             value={filters.status ?? []}
             onChange={(val) => pushFilters({ status: val as MachineStatus[] })}
             placeholder="Status"
+            data-testid="filter-status"
           />
         </div>
         <div className="min-w-48 flex-1">
@@ -300,6 +303,7 @@ export function MachineFilters({
             value={filters.owner ?? []}
             onChange={(val) => pushFilters({ owner: val })}
             placeholder="Owner"
+            data-testid="filter-owner"
           />
         </div>
         <div className="min-w-48 flex-1">
@@ -310,6 +314,7 @@ export function MachineFilters({
               pushFilters({ presence: val as MachinePresenceStatus[] })
             }
             placeholder="Availability"
+            data-testid="filter-availability"
           />
         </div>
       </div>

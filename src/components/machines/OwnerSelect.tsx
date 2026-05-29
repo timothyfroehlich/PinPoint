@@ -208,7 +208,7 @@ export function OwnerSelect({
                   {selectedUser.name}
                   {selectedUser.role !== "guest" &&
                     selectedUser.status === "invited" && ( // permissions-audit-allow: UI badge display, not a permission gate
-                      <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                      <span className="ml-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                         (Invited)
                       </span>
                     )}
@@ -278,7 +278,7 @@ export function OwnerSelect({
                       <div className="flex items-center gap-2">
                         <span>{user.name}</span>
                         {user.machineCount > 0 && (
-                          <span className="text-[10px] text-muted-foreground/70">
+                          <span className="text-[10px] text-muted-foreground">
                             ({user.machineCount})
                           </span>
                         )}
@@ -305,7 +305,7 @@ export function OwnerSelect({
                         <div className="flex items-center gap-2">
                           <span>{user.name}</span>
                           {user.machineCount > 0 && (
-                            <span className="text-[10px] text-muted-foreground/70">
+                            <span className="text-[10px] text-muted-foreground">
                               ({user.machineCount})
                             </span>
                           )}
@@ -338,7 +338,7 @@ export function OwnerSelect({
                         <div className="flex items-center gap-2">
                           <span>{user.name}</span>
                           {user.machineCount > 0 && (
-                            <span className="text-[10px] text-muted-foreground/70">
+                            <span className="text-[10px] text-muted-foreground">
                               ({user.machineCount})
                             </span>
                           )}

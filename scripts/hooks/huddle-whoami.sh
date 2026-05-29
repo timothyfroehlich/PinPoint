@@ -23,10 +23,12 @@
 #                            Exits 1 with usage if SESSION_ID is omitted.
 #   list                     Dump all session_id → name pairs (sorted by name).
 #   discover                 Print the best-guess session_id of the calling
-#                            shell (Claude Code only; see WARNING below).
+#                            shell. Prefers $CLAUDE_SESSION_ID when set;
+#                            falls back to the transcript heuristic with a
+#                            warning (Claude Code only; see WARNING below).
 #
-# WARNING — session_id discovery is a Claude-Code-specific best-effort
-# heuristic. It reads ~/.claude/projects/<mangled-root>/<session_id>.jsonl,
+# WARNING — the transcript-based session_id discovery is a Claude-Code-specific
+# best-effort heuristic. It reads ~/.claude/projects/<mangled-root>/<session_id>.jsonl,
 # the transcript location Claude Code uses. Other harnesses (Antigravity,
 # Codex, etc.) do not write transcripts there and MUST pass session_id
 # explicitly — their bootstrap shims already do (see
@@ -35,7 +37,7 @@
 # transcript, which is wrong for any non-newest session (2026-05-20 incident
 # on PP-lt12 — root cause of PP-sjkz). SESSION_ID is therefore REQUIRED for
 # whoami and register; the discover subcommand invokes the heuristic only
-# when the caller explicitly requests it.
+# when the caller explicitly requests it and $CLAUDE_SESSION_ID is absent.
 
 set -euo pipefail
 
@@ -151,7 +153,18 @@ case "$cmd" in
     ;;
 
   discover)
-    discover_session_id || { echo "(could not discover)" >&2; exit 1; }
+    # Prefer the env var set by Claude Code's hook context — it is guaranteed
+    # correct for the calling session. Fall back to the transcript heuristic
+    # only when the env var is absent, and warn that the result may be wrong
+    # when multiple sessions are active concurrently (PP-bh7w).
+    if [[ -n "${CLAUDE_SESSION_ID:-}" ]]; then
+      printf '%s\n' "$CLAUDE_SESSION_ID"
+    else
+      printf 'WARNING: CLAUDE_SESSION_ID is not set; falling back to transcript heuristic.\n' >&2
+      printf 'WARNING: This result may be incorrect when multiple Claude sessions are active.\n' >&2
+      printf 'WARNING: Pass the session_id explicitly, or run from a hook context where CLAUDE_SESSION_ID is set.\n' >&2
+      discover_session_id || { printf '(could not discover)\n' >&2; exit 1; }
+    fi
     ;;
 
   *)

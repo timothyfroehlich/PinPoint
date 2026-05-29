@@ -742,7 +742,7 @@ function ButtonsSection(): React.JSX.Element {
         <Button size="sm">Small</Button>
         <Button size="default">Default</Button>
         <Button size="lg">Large</Button>
-        <Button size="icon">
+        <Button size="icon" aria-label="Add">
           <span aria-hidden="true">+</span>
         </Button>
       </div>

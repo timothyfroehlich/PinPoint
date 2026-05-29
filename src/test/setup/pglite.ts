@@ -17,6 +17,7 @@ import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { beforeAll, afterEach } from "vitest";
 import * as schema from "~/server/db/schema";
+import { cleanupTestDb as runSchemaCleanup } from "~/test/setup/cleanup";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -60,21 +61,14 @@ export async function getTestDb(): Promise<PgliteDatabase<typeof schema>> {
 /**
  * Clean up helper - deletes all rows from all tables.
  * Use in afterEach to ensure test isolation.
+ *
+ * Table order is derived automatically from the schema FK graph at module load
+ * (see src/test/setup/cleanup.ts). Adding new tables to schema.ts requires
+ * no manual edits here.
  */
-export async function cleanupTestDb() {
+export async function cleanupTestDb(): Promise<void> {
   if (!testDb) return;
-
-  // Delete in order to respect foreign key constraints
-  await testDb.delete(schema.timelineEvents);
-  await testDb.delete(schema.issueWatchers);
-  await testDb.delete(schema.issueImages);
-  await testDb.delete(schema.issueComments);
-  await testDb.delete(schema.issues);
-  await testDb.delete(schema.machineWatchers);
-  await testDb.delete(schema.machines);
-  await testDb.delete(schema.userProfiles);
-  await testDb.delete(schema.invitedUsers);
-  await testDb.delete(schema.authUsers);
+  await runSchemaCleanup(testDb);
 }
 
 /**

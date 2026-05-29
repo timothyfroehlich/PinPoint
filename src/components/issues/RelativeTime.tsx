@@ -1,8 +1,8 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useState } from "react";
 import { formatRelative } from "~/lib/dates";
+import { useRelativeNow } from "./RelativeTimeProvider";
 
 interface RelativeTimeProps {
   value: Date | string;
@@ -15,34 +15,9 @@ export function RelativeTime({
   value,
   fallback,
 }: RelativeTimeProps): React.JSX.Element {
-  const [label, setLabel] = useState<string | null>(null);
-
-  // Re-runs only when the instant changes, not the Date reference.
-  const depKey = value instanceof Date ? value.getTime() : value;
-
-  useEffect(() => {
-    const date = typeof value === "string" ? new Date(value) : value;
-    if (Number.isNaN(date.getTime())) {
-      // Reset label so a previous, now-stale value doesn't keep rendering when
-      // the prop changes to an invalid date — the resolved fallback should win.
-      setLabel(null);
-      return;
-    }
-
-    const update = (): void => {
-      try {
-        setLabel(formatRelative(date));
-      } catch (err) {
-        // formatDistanceToNow can throw RangeError on edge inputs; stay on fallback.
-        console.warn("[RelativeTime] formatRelative threw", err);
-      }
-    };
-    update();
-    const interval = window.setInterval(update, 60_000);
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [depKey]);
+  // `null` during SSR and before the provider's first tick — render fallback.
+  // After mount the shared ticker emits a number every 60s, causing a re-render.
+  const now = useRelativeNow();
 
   const resolvedFallback = (() => {
     if (fallback !== undefined) return fallback;
@@ -50,5 +25,24 @@ export function RelativeTime({
     return Number.isNaN(date.getTime()) ? "" : date.toISOString();
   })();
 
-  return <>{label ?? resolvedFallback}</>;
+  // Pre-mount / SSR path: render fallback (matches original useEffect behaviour).
+  if (now === null) {
+    return <>{resolvedFallback}</>;
+  }
+
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) {
+    return <>{resolvedFallback}</>;
+  }
+
+  let label: string;
+  try {
+    label = formatRelative(date);
+  } catch (err) {
+    // formatDistanceToNow can throw RangeError on edge inputs; stay on fallback.
+    console.warn("[RelativeTime] formatRelative threw", err);
+    return <>{resolvedFallback}</>;
+  }
+
+  return <>{label}</>;
 }
