@@ -9,6 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { getCleanupOrder } from "~/test/setup/cleanup";
+import { authUsers, userProfiles } from "~/server/db/schema";
 
 describe("getCleanupOrder", () => {
   it("includes all schema tables", () => {
@@ -53,6 +54,25 @@ describe("getCleanupOrder", () => {
         }
       }
     }
+  });
+
+  it("places userProfiles before authUsers (explicit cross-schema FK override)", () => {
+    const order = getCleanupOrder();
+    const indexMap = new Map<object, number>();
+    order.forEach((t, i) => indexMap.set(t, i));
+
+    const userProfilesIdx = indexMap.get(userProfiles);
+    const authUsersIdx = indexMap.get(authUsers);
+
+    expect(userProfilesIdx).toBeDefined();
+    expect(authUsersIdx).toBeDefined();
+
+    // userProfiles must be deleted before authUsers because the database
+    // enforces a cross-schema FK (userProfiles.id → auth.users.id) that
+    // Drizzle cannot express and getTableConfig cannot see.
+    // Use a numeric coercion (fallback -1) to avoid non-null assertion;
+    // the toBeDefined() checks above already guard against undefined.
+    expect(userProfilesIdx ?? -1).toBeLessThan(authUsersIdx ?? -2);
   });
 
   it("has no duplicate tables in the order", () => {

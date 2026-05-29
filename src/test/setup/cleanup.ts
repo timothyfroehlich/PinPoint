@@ -34,10 +34,22 @@ function buildCleanupOrder(): PgTable[] {
         const referenced = fc.table;
         // Skip self-references and tables outside our known set
         if (referenced !== t && deps.has(referenced)) {
-          deps.get(t)!.add(referenced);
+          // Use nullish check — deps always has t, but be explicit for the type system
+          const depSet = deps.get(t);
+          if (depSet !== undefined) {
+            depSet.add(referenced);
+          }
         }
       }
     }
+  }
+
+  // Cross-schema FK not visible to Drizzle: userProfiles.id → auth.users.id
+  // (enforced by a manual SQL FK in schema.sql; getTableConfig cannot see it).
+  // Add it explicitly so authUsers is always cleaned after userProfiles.
+  const userProfilesDeps = deps.get(schema.userProfiles);
+  if (userProfilesDeps !== undefined) {
+    userProfilesDeps.add(schema.authUsers);
   }
 
   // Build the reverse graph for Kahn's: edge referenced → referencer
@@ -50,9 +62,14 @@ function buildCleanupOrder(): PgTable[] {
   // in-degree[t] = number of DISTINCT tables that t depends on
   const inDegree = new Map<PgTable, number>();
   for (const t of tables) {
-    inDegree.set(t, deps.get(t)!.size);
-    for (const dep of deps.get(t)!) {
-      successors.get(dep)!.add(t);
+    const depSet = deps.get(t);
+    const depSize = depSet?.size ?? 0;
+    inDegree.set(t, depSize);
+    for (const dep of depSet ?? []) {
+      const succSet = successors.get(dep);
+      if (succSet !== undefined) {
+        succSet.add(t);
+      }
     }
   }
 
@@ -67,7 +84,9 @@ function buildCleanupOrder(): PgTable[] {
   // dependencyOrder: referenced tables come first (safe INSERT order)
   const dependencyOrder: PgTable[] = [];
   while (queue.length > 0) {
-    const node = queue.shift()!;
+    // queue.length > 0 ensures shift() returns a value, not undefined
+    const node = queue.shift();
+    if (node === undefined) break; // unreachable guard, makes the type system happy
     dependencyOrder.push(node);
     // "Unlock" every table that depended on this node
     for (const successor of successors.get(node) ?? []) {
@@ -78,9 +97,14 @@ function buildCleanupOrder(): PgTable[] {
   }
 
   if (dependencyOrder.length !== tables.length) {
-    // Circular FK (shouldn't happen in normal Postgres schemas) — fall back to
-    // unordered so we at least try to clean up.
-    return [...tables];
+    // A cycle would indicate a schema design error (Postgres does not normally
+    // allow circular FKs). Fail loudly instead of silently producing a broken
+    // cleanup order that would cause mysterious test-isolation failures.
+    throw new Error(
+      `cleanupTestDb: circular FK detected in schema — ` +
+        `${tables.length - dependencyOrder.length} table(s) could not be ordered. ` +
+        `Inspect the schema for cyclic foreign key constraints.`
+    );
   }
 
   // Reverse: from "referenced first" (INSERT order) → "referencer first" (DELETE order)
