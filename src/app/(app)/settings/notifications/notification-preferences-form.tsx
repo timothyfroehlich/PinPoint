@@ -129,6 +129,96 @@ export function NotificationPreferencesForm({
   const inAppDimClass = !inAppMainEnabled ? dimWhenChecked : undefined;
   const discordDimClass = !discordMainEnabled ? dimWhenChecked : undefined;
 
+  const NEW_ISSUE_ROWS = [
+    {
+      label: "Owned Machines",
+      description: "New issues on machines you own",
+      ids: {
+        email: "emailNotifyOnNewIssue",
+        inApp: "inAppNotifyOnNewIssue",
+        discord: "discordNotifyOnNewIssue",
+      },
+      defaults: {
+        email: preferences.emailNotifyOnNewIssue,
+        inApp: preferences.inAppNotifyOnNewIssue,
+        discord: preferences.discordNotifyOnNewIssue,
+      },
+    },
+    {
+      label: "All Machines",
+      description: "Notify for EVERY new issue on the platform",
+      ids: {
+        email: "emailWatchNewIssuesGlobal",
+        inApp: "inAppWatchNewIssuesGlobal",
+        discord: "discordWatchNewIssuesGlobal",
+      },
+      defaults: {
+        email: preferences.emailWatchNewIssuesGlobal,
+        inApp: preferences.inAppWatchNewIssuesGlobal,
+        discord: preferences.discordWatchNewIssuesGlobal,
+      },
+    },
+  ] as const;
+
+  const EVENT_ROWS = [
+    {
+      label: "Issue Assignment",
+      description: "When an issue is assigned to you",
+      ids: {
+        email: "emailNotifyOnAssigned",
+        inApp: "inAppNotifyOnAssigned",
+        discord: "discordNotifyOnAssigned",
+      },
+      defaults: {
+        email: preferences.emailNotifyOnAssigned,
+        inApp: preferences.inAppNotifyOnAssigned,
+        discord: preferences.discordNotifyOnAssigned,
+      },
+    },
+    {
+      label: "Status Changes",
+      description: "When status changes on watched issues",
+      ids: {
+        email: "emailNotifyOnStatusChange",
+        inApp: "inAppNotifyOnStatusChange",
+        discord: "discordNotifyOnStatusChange",
+      },
+      defaults: {
+        email: preferences.emailNotifyOnStatusChange,
+        inApp: preferences.inAppNotifyOnStatusChange,
+        discord: preferences.discordNotifyOnStatusChange,
+      },
+    },
+    {
+      label: "New Comments",
+      description: "When comments are added to watched issues",
+      ids: {
+        email: "emailNotifyOnNewComment",
+        inApp: "inAppNotifyOnNewComment",
+        discord: "discordNotifyOnNewComment",
+      },
+      defaults: {
+        email: preferences.emailNotifyOnNewComment,
+        inApp: preferences.inAppNotifyOnNewComment,
+        discord: preferences.discordNotifyOnNewComment,
+      },
+    },
+    {
+      label: "Mentions",
+      description: "When someone @mentions you in a comment",
+      ids: {
+        email: "emailNotifyOnMentioned",
+        inApp: "inAppNotifyOnMentioned",
+        discord: "discordNotifyOnMentioned",
+      },
+      defaults: {
+        email: preferences.emailNotifyOnMentioned,
+        inApp: preferences.inAppNotifyOnMentioned,
+        discord: preferences.discordNotifyOnMentioned,
+      },
+    },
+  ] as const;
+
   return (
     <form
       key={resetKey}
@@ -144,92 +234,6 @@ export function NotificationPreferencesForm({
         >
           <p className="text-sm font-medium">{state.message}</p>
         </div>
-      )}
-
-      {/* Preserve email preference values for internal accounts (no email UI rendered) */}
-      {isInternalAccount && (
-        <>
-          <input
-            type="hidden"
-            name="emailEnabled"
-            value={preferences.emailEnabled ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="emailNotifyOnAssigned"
-            value={preferences.emailNotifyOnAssigned ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="emailNotifyOnStatusChange"
-            value={preferences.emailNotifyOnStatusChange ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="emailNotifyOnNewComment"
-            value={preferences.emailNotifyOnNewComment ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="emailNotifyOnMentioned"
-            value={preferences.emailNotifyOnMentioned ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="emailNotifyOnNewIssue"
-            value={preferences.emailNotifyOnNewIssue ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="emailWatchNewIssuesGlobal"
-            value={preferences.emailWatchNewIssuesGlobal ? "on" : ""}
-          />
-        </>
-      )}
-
-      {/* Preserve Discord preference values when the Discord column is hidden
-          (integration disabled — `showDiscord` mirrors `discordIntegrationEnabled`,
-          not link state). Without these, missing form fields would be coerced
-          to false on save and silently wipe the user's saved Discord prefs.
-          Mirror of the internal-account email preservation block above. */}
-      {!showDiscord && (
-        <>
-          <input
-            type="hidden"
-            name="discordEnabled"
-            value={preferences.discordEnabled ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="discordNotifyOnAssigned"
-            value={preferences.discordNotifyOnAssigned ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="discordNotifyOnStatusChange"
-            value={preferences.discordNotifyOnStatusChange ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="discordNotifyOnNewComment"
-            value={preferences.discordNotifyOnNewComment ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="discordNotifyOnMentioned"
-            value={preferences.discordNotifyOnMentioned ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="discordNotifyOnNewIssue"
-            value={preferences.discordNotifyOnNewIssue ? "on" : ""}
-          />
-          <input
-            type="hidden"
-            name="discordWatchNewIssuesGlobal"
-            value={preferences.discordWatchNewIssuesGlobal ? "on" : ""}
-          />
-        </>
       )}
 
       {/* Main Switches */}
@@ -338,38 +342,25 @@ export function NotificationPreferencesForm({
             showDiscord={showDiscord}
           />
           <div className="divide-y divide-outline-variant/50">
-            <PreferenceRow
-              label="Owned Machines"
-              description="New issues on machines you own"
-              emailId="emailNotifyOnNewIssue"
-              inAppId="inAppNotifyOnNewIssue"
-              emailDefault={preferences.emailNotifyOnNewIssue}
-              inAppDefault={preferences.inAppNotifyOnNewIssue}
-              hideEmail={isInternalAccount}
-              hideDiscord={!showDiscord}
-              emailClassName={emailDimClass}
-              inAppClassName={inAppDimClass}
-              discordClassName={discordDimClass}
-              discordDisabled={!userHasDiscord}
-              discordId="discordNotifyOnNewIssue"
-              discordDefault={preferences.discordNotifyOnNewIssue}
-            />
-            <PreferenceRow
-              label="All Machines"
-              description="Notify for EVERY new issue on the platform"
-              emailId="emailWatchNewIssuesGlobal"
-              inAppId="inAppWatchNewIssuesGlobal"
-              emailDefault={preferences.emailWatchNewIssuesGlobal}
-              inAppDefault={preferences.inAppWatchNewIssuesGlobal}
-              hideEmail={isInternalAccount}
-              hideDiscord={!showDiscord}
-              emailClassName={emailDimClass}
-              inAppClassName={inAppDimClass}
-              discordClassName={discordDimClass}
-              discordDisabled={!userHasDiscord}
-              discordId="discordWatchNewIssuesGlobal"
-              discordDefault={preferences.discordWatchNewIssuesGlobal}
-            />
+            {NEW_ISSUE_ROWS.map((row) => (
+              <PreferenceRow
+                key={row.ids.inApp}
+                label={row.label}
+                description={row.description}
+                emailId={row.ids.email}
+                inAppId={row.ids.inApp}
+                emailDefault={row.defaults.email}
+                inAppDefault={row.defaults.inApp}
+                hideEmail={isInternalAccount}
+                hideDiscord={!showDiscord}
+                emailClassName={emailDimClass}
+                inAppClassName={inAppDimClass}
+                discordClassName={discordDimClass}
+                discordDisabled={!userHasDiscord}
+                discordId={row.ids.discord}
+                discordDefault={row.defaults.discord}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -388,70 +379,25 @@ export function NotificationPreferencesForm({
 
           {/* Rows */}
           <div className="divide-y divide-outline-variant/50">
-            <PreferenceRow
-              label="Issue Assignment"
-              description="When an issue is assigned to you"
-              emailId="emailNotifyOnAssigned"
-              inAppId="inAppNotifyOnAssigned"
-              emailDefault={preferences.emailNotifyOnAssigned}
-              inAppDefault={preferences.inAppNotifyOnAssigned}
-              hideEmail={isInternalAccount}
-              hideDiscord={!showDiscord}
-              emailClassName={emailDimClass}
-              inAppClassName={inAppDimClass}
-              discordClassName={discordDimClass}
-              discordDisabled={!userHasDiscord}
-              discordId="discordNotifyOnAssigned"
-              discordDefault={preferences.discordNotifyOnAssigned}
-            />
-            <PreferenceRow
-              label="Status Changes"
-              description="When status changes on watched issues"
-              emailId="emailNotifyOnStatusChange"
-              inAppId="inAppNotifyOnStatusChange"
-              emailDefault={preferences.emailNotifyOnStatusChange}
-              inAppDefault={preferences.inAppNotifyOnStatusChange}
-              hideEmail={isInternalAccount}
-              hideDiscord={!showDiscord}
-              emailClassName={emailDimClass}
-              inAppClassName={inAppDimClass}
-              discordClassName={discordDimClass}
-              discordDisabled={!userHasDiscord}
-              discordId="discordNotifyOnStatusChange"
-              discordDefault={preferences.discordNotifyOnStatusChange}
-            />
-            <PreferenceRow
-              label="New Comments"
-              description="When comments are added to watched issues"
-              emailId="emailNotifyOnNewComment"
-              inAppId="inAppNotifyOnNewComment"
-              emailDefault={preferences.emailNotifyOnNewComment}
-              inAppDefault={preferences.inAppNotifyOnNewComment}
-              hideEmail={isInternalAccount}
-              hideDiscord={!showDiscord}
-              emailClassName={emailDimClass}
-              inAppClassName={inAppDimClass}
-              discordClassName={discordDimClass}
-              discordDisabled={!userHasDiscord}
-              discordId="discordNotifyOnNewComment"
-              discordDefault={preferences.discordNotifyOnNewComment}
-            />
-            <PreferenceRow
-              label="Mentions"
-              description="When someone @mentions you in a comment"
-              emailId="emailNotifyOnMentioned"
-              inAppId="inAppNotifyOnMentioned"
-              emailDefault={preferences.emailNotifyOnMentioned}
-              inAppDefault={preferences.inAppNotifyOnMentioned}
-              hideEmail={isInternalAccount}
-              hideDiscord={!showDiscord}
-              emailClassName={emailDimClass}
-              inAppClassName={inAppDimClass}
-              discordClassName={discordDimClass}
-              discordDisabled={!userHasDiscord}
-              discordId="discordNotifyOnMentioned"
-              discordDefault={preferences.discordNotifyOnMentioned}
-            />
+            {EVENT_ROWS.map((row) => (
+              <PreferenceRow
+                key={row.ids.inApp}
+                label={row.label}
+                description={row.description}
+                emailId={row.ids.email}
+                inAppId={row.ids.inApp}
+                emailDefault={row.defaults.email}
+                inAppDefault={row.defaults.inApp}
+                hideEmail={isInternalAccount}
+                hideDiscord={!showDiscord}
+                emailClassName={emailDimClass}
+                inAppClassName={inAppDimClass}
+                discordClassName={discordDimClass}
+                discordDisabled={!userHasDiscord}
+                discordId={row.ids.discord}
+                discordDefault={row.defaults.discord}
+              />
+            ))}
           </div>
         </div>
       </div>

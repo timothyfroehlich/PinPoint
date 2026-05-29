@@ -7,8 +7,8 @@
  * - Navigation from the user menu lands on the Discord page
  * - Unauthenticated visitors don't see the page heading
  *
- * The full admin-form behaviour (validate buttons, save round-trip,
- * unsaved-changes guard) is covered by `src/test/integration/admin/discord-integration-actions.test.ts`.
+ * The admin Server Action behaviour (validate buttons, save validation and DB write paths)
+ * is covered by `src/test/integration/admin/discord-integration-actions.test.ts`.
  */
 
 import { test, expect } from "@playwright/test";

@@ -116,9 +116,9 @@ const ORIGINAL_FETCH = globalThis.fetch;
 
 /** Replace globalThis.fetch with a handler that returns canned responses. */
 function mockFetch(
-  handler: (url: string) => Response | Promise<Response>
+  handler: (url: string, init?: RequestInit) => Response | Promise<Response>
 ): void {
-  globalThis.fetch = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
+  globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     let url: string;
     if (typeof input === "string") {
       url = input;
@@ -127,7 +127,7 @@ function mockFetch(
     } else {
       url = input.url;
     }
-    return Promise.resolve(handler(url));
+    return Promise.resolve(handler(url, init));
   });
 }
 
@@ -156,6 +156,17 @@ const VALID_TOKEN =
 
 beforeEach(() => {
   vi.clearAllMocks();
+
+  // Default: Stub global fetch to throw by default to prevent silent network hits in tests.
+  globalThis.fetch = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    throw new Error(`fetch was called with unmocked URL: ${url}`);
+  });
 
   // Default: auth resolves to an admin user.
   const mockSupabase = {
@@ -282,6 +293,25 @@ describe("saveDiscordConfig", () => {
       if (result.ok) {
         expect(result.botUsername).toBe("TestBot");
       }
+
+      // Assert that fetch was called as expected (method + auth header)
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+
+      const [firstUrl, firstInit] = vi.mocked(globalThis.fetch).mock.calls[0];
+      expect(firstUrl).toBe("https://discord.com/api/v10/users/@me");
+      expect(firstInit?.method ?? "GET").toBe("GET");
+      expect(firstInit?.headers).toEqual({
+        Authorization: `Bot ${VALID_TOKEN}`,
+      });
+
+      const [secondUrl, secondInit] = vi.mocked(globalThis.fetch).mock.calls[1];
+      expect(secondUrl).toBe(
+        "https://discord.com/api/v10/guilds/123456789012345678"
+      );
+      expect(secondInit?.method ?? "GET").toBe("GET");
+      expect(secondInit?.headers).toEqual({
+        Authorization: `Bot ${VALID_TOKEN}`,
+      });
     });
 
     it("returns newToken field error when token is rejected by Discord (401)", async () => {
@@ -319,9 +349,7 @@ describe("saveDiscordConfig", () => {
 
   describe("enabled save — probeServerMembership outcomes", () => {
     it("returns guildId field error when bot is not in the server (404)", async () => {
-      let callCount = 0;
       mockFetch((url) => {
-        callCount++;
         if (url.includes("/users/@me")) {
           return new Response(JSON.stringify({ username: "TestBot" }), {
             status: 200,
@@ -400,6 +428,15 @@ describe("validateBotToken", () => {
     if (result.ok) {
       expect(result.botUsername).toBe("MyBot");
     }
+
+    // Assert that fetch was called as expected
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    expect(url).toBe("https://discord.com/api/v10/users/@me");
+    expect(init?.method ?? "GET").toBe("GET");
+    expect(init?.headers).toEqual({
+      Authorization: `Bot ${VALID_TOKEN}`,
+    });
   });
 
   it("returns not_configured when no token is available in form or DB", async () => {
@@ -451,6 +488,15 @@ describe("validateServerId", () => {
     if (result.ok) {
       expect(result.guildName).toBe("Pinball Wizards");
     }
+
+    // Assert that fetch was called as expected
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    expect(url).toBe("https://discord.com/api/v10/guilds/123456789012345678");
+    expect(init?.method ?? "GET").toBe("GET");
+    expect(init?.headers).toEqual({
+      Authorization: `Bot ${VALID_TOKEN}`,
+    });
   });
 
   it("returns invalid_input when serverId is non-numeric", async () => {
