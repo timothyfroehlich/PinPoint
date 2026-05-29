@@ -63,8 +63,13 @@ function stopTicker(): void {
   if (_refCount === 0 && _interval !== null) {
     window.clearInterval(_interval);
     _interval = null;
-    // Reset to null so a remount starts fresh with the fallback path.
+    // Reset to null so a remount starts fresh with the fallback path, and
+    // notify listeners so any still-subscribed components re-render to fallback
+    // rather than staying stuck on the last relative label.
     _snapshot = null;
+    for (const listener of _listeners) {
+      listener();
+    }
   }
 }
 
