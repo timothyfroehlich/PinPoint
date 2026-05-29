@@ -89,7 +89,7 @@ export function QrCodeDialog({
               </Button>
             </div>
 
-            <p className="text-[10px] text-center text-muted-foreground/70 pt-2">
+            <p className="text-[10px] text-center text-muted-foreground pt-2">
               Optimized for standard 2&quot;x2&quot; or larger label printers.
             </p>
           </div>

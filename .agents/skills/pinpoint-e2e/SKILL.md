@@ -52,6 +52,10 @@ PinPoint E2E tests run in parallel against a **shared database**.
 3.  **Unique Machines**: Create a fresh machine for your test.
 4.  **Unique Titles**: Use `getTestIssueTitle("My Title")` to prefix issues with `[w0_xyz]`.
 
+## Common Helpers
+
+- **Select Reset Assertions**: Use `assertSelectAtPlaceholder(trigger, placeholderText)` for placeholder state, or `assertSelectValue(trigger, expectedLabel)` for default value state (e.g. `await assertSelectValue(page.getByTestId("select-id"), "Minor")`).
+
 ## References
 
 - **Best Practices**: See [references/e2e-best-practices.md](references/e2e-best-practices.md) for structure and anti-patterns.

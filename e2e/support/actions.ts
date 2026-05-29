@@ -332,6 +332,32 @@ export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
 }
 
 /**
+ * Asserts that a shadcn Select dropdown trigger is displaying its placeholder text.
+ */
+export async function assertSelectAtPlaceholder(
+  trigger: Locator,
+  placeholderText: string | RegExp
+): Promise<void> {
+  await expect(trigger).toHaveAttribute("data-placeholder");
+  await expect(trigger.locator('[data-slot="select-value"]')).toHaveText(
+    placeholderText
+  );
+}
+
+/**
+ * Asserts that a shadcn Select dropdown trigger is displaying the expected option label.
+ */
+export async function assertSelectValue(
+  trigger: Locator,
+  expectedLabel: string | RegExp
+): Promise<void> {
+  await expect(trigger).not.toHaveAttribute("data-placeholder");
+  await expect(trigger.locator('[data-slot="select-value"]')).toHaveText(
+    expectedLabel
+  );
+}
+
+/**
  * Asserts that the page has no serious or critical accessibility (a11y) violations.
  * Fails only on 'serious' and 'critical' impacts, and logs 'minor' and 'moderate' impacts.
  */
@@ -345,10 +371,6 @@ export async function assertNoA11yViolations(
     "aria-prohibited-attr",
     // 'nested-interactive': Radix UI / shadcn accordion and collapsible triggers nest interactive buttons inside interactive regions.
     "nested-interactive",
-    // 'color-contrast': Custom design tokens, gradients, and brand styles (e.g. status badges, muted links) may not meet the strict color contrast threshold. Tracked for fix: PP-fn28.
-    "color-contrast",
-    // 'button-name': Icon-only buttons or dynamic filter dropdown triggers without selected options lack discernible text. Tracked for fix: PP-fn28.
-    "button-name",
     // 'scrollable-region-focusable': Main content container has tabindex="-1" for skip-to-main focus routing, but axe expects scrollable regions to be keyboard-focusable.
     "scrollable-region-focusable",
   ];

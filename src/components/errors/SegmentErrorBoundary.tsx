@@ -93,7 +93,7 @@ export function SegmentErrorBoundary({
           </Button>
         </div>
         {error.digest && (
-          <p className="mt-8 text-xs text-muted-foreground/60">
+          <p className="mt-8 text-xs text-muted-foreground">
             Error ID: {error.digest}
           </p>
         )}

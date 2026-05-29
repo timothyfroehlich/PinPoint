@@ -19,9 +19,23 @@ updates:
       semver-minor-days: 14
       semver-patch-days: 14
     groups:
-      # Group minor and patch updates together
+      # Group minor and patch updates together (Tiptap excluded — see the tiptap
+      # group; it must move in lockstep and skews transiently. PP-sg3m)
       minor-patch-updates:
         applies-to: version-updates
+        exclude-patterns:
+          - "@tiptap/*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Tiptap adapter packages import internal helpers from @tiptap/core that
+      # only exist in the exactly-matching core version. Isolating them so a
+      # transient skew (unpinned transitive core vs. cooldown-held direct deps)
+      # never blocks the rest of the minor-patch group. PP-sg3m
+      tiptap:
+        applies-to: version-updates
+        patterns:
+          - "@tiptap/*"
         update-types:
           - "minor"
           - "patch"

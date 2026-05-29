@@ -136,7 +136,7 @@ export default async function MachineInfoTab({
                   {machine.owner?.name ?? machine.invitedOwner?.name}
                 </p>
                 {machine.invitedOwner && !machine.owner && (
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     (Invited)
                   </span>
                 )}

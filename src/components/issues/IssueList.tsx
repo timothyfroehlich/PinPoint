@@ -425,7 +425,7 @@ export function IssueList({
                               issue.issueNumber
                             )}
                           </Link>
-                          <span className="text-muted-foreground/60 font-medium shrink-0">
+                          <span className="text-muted-foreground font-medium shrink-0">
                             —
                           </span>
                           <span className="text-muted-foreground font-semibold truncate min-w-0">

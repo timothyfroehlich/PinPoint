@@ -142,6 +142,7 @@ export function MultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-label={placeholder}
           data-testid={testId}
           className={cn(
             "w-full justify-between h-9 px-3 py-2 font-normal",
@@ -230,7 +231,7 @@ export function MultiSelect({
                           onCheckedChange={toggleGroup}
                           onClick={(e) => e.stopPropagation()}
                         />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 group-hover/header:text-foreground transition-colors duration-150">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground group-hover/header:text-foreground transition-colors duration-150">
                           {group.label}
                         </span>
                       </div>

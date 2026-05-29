@@ -67,6 +67,10 @@ describe("e2e/global-setup", () => {
       ...envBackup,
       NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
       POSTGRES_URL: "postgresql://postgres:postgres@localhost:54322/postgres",
+      // Keep the Docker readiness retry loop fast and deterministic in tests:
+      // a few attempts, no real sleep between them.
+      E2E_DOCKER_READY_ATTEMPTS: "3",
+      E2E_DOCKER_READY_DELAY_MS: "0",
     };
   });
 
@@ -170,16 +174,51 @@ describe("e2e/global-setup", () => {
     );
   });
 
-  it("throws daemon-down error when Docker exits with non-zero status", async () => {
+  it("throws daemon-down error after exhausting retries when Docker stays down", async () => {
     spawnSyncMock.mockReturnValue({ status: 1, error: null });
     const setup = await loadSetup();
 
     await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
       "Docker daemon is not running"
     );
+    // Retried up to the configured budget (E2E_DOCKER_READY_ATTEMPTS=3) before
+    // giving up, rather than failing on the first transient miss.
+    expect(spawnSyncMock).toHaveBeenCalledTimes(3);
   });
 
-  it("throws not-installed error when Docker returns ENOENT", async () => {
+  it("recovers when Docker becomes ready within the retry budget", async () => {
+    // Daemon not ready on the first two polls, then comes up — global-setup
+    // should tolerate the transient startup delay and proceed (PP-149t).
+    spawnSyncMock
+      .mockReturnValueOnce({ status: 1, error: null })
+      .mockReturnValueOnce({ status: 1, error: null })
+      .mockReturnValue({ status: 0, error: null });
+    execSyncMock.mockReturnValue(undefined);
+    const setup = await loadSetup();
+
+    await setup(EMPTY_CONFIG);
+
+    expect(spawnSyncMock).toHaveBeenCalledTimes(3);
+    // Proceeded past the Docker check to the Supabase health probe.
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("falls back to the default budget when retry env vars are invalid", async () => {
+    // A typo'd attempts value must not skip the probe (NaN loop → 0 probes)
+    // or, via an invalid delay, block forever — the budget stays bounded.
+    process.env.E2E_DOCKER_READY_ATTEMPTS = "abc";
+    process.env.E2E_DOCKER_READY_DELAY_MS = "0";
+    spawnSyncMock.mockReturnValue({ status: 1, error: null });
+    const setup = await loadSetup();
+
+    await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
+      "Docker daemon is not running"
+    );
+    // Invalid attempts → falls back to the default of 15, still probing.
+    expect(spawnSyncMock).toHaveBeenCalledTimes(15);
+  });
+
+  it("fails fast without retrying when Docker is not installed (ENOENT)", async () => {
     const enoent = Object.assign(new Error("spawn docker ENOENT"), {
       code: "ENOENT",
     });
@@ -189,6 +228,8 @@ describe("e2e/global-setup", () => {
     await expect(setup(EMPTY_CONFIG)).rejects.toThrow(
       "Docker is not installed"
     );
+    // ENOENT is fatal immediately — retrying won't install Docker.
+    expect(spawnSyncMock).toHaveBeenCalledTimes(1);
   });
 
   it("throws install hint when a required browser binary is missing", async () => {
