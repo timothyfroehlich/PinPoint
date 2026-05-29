@@ -174,8 +174,12 @@ function resolveActor(
     if (ed.guestReporterName) {
       return { name: ed.guestReporterName, suffix: " (guest)" };
     }
-    // Fully anonymous open carries no actor.
-    return row.authorName ? { name: row.authorName, suffix: "" } : null;
+    // A real actor (rare for opens) is shown by name; a fully anonymous public
+    // report shows "Anonymous" — preserving the pre-PP-tv9l attribution rather
+    // than dropping the "by" clause entirely.
+    return row.authorName
+      ? { name: row.authorName, suffix: "" }
+      : { name: "Anonymous", suffix: "" };
   }
   // Every other issue event is performed by the acting (real) user.
   return row.authorName ? { name: row.authorName, suffix: "" } : null;

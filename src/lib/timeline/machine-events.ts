@@ -249,6 +249,8 @@ export interface MachineTimelineRow {
   deletedAt: Date | null;
   deletedById: string | null;
   deletedByName: string | null;
+  /** Monotonic tiebreak for same-tx ordering (PP-tv9l) — selected + returned. */
+  sequence: number;
   /**
    * Person-references for this event, resolved live (PP-tv9l), keyed by role
    * (`to_owner`, `from_owner`, `assignee`, `reporter`). `{}` for events with
@@ -309,9 +311,10 @@ export async function getMachineTimeline(
       )
     )
     // `createdAt` is `now()`, constant within a transaction, so events from a
-    // single tx share a timestamp. Tie-break on the monotonic `sequence` so
-    // same-tx order is deterministic (e.g. machine_added before owner_set) —
-    // a random `id` tiebreak was non-deterministic (PP-tv9l, finding #6).
+    // single tx share a timestamp. Tie-break on the monotonic `sequence`
+    // (DESC, so the later-emitted event sorts first in this newest-first feed:
+    // e.g. owner_set above machine_added) — deterministic across reads, unlike
+    // the old random `id` tiebreak (PP-tv9l, finding #6).
     .orderBy(desc(timelineEvents.createdAt), desc(timelineEvents.sequence))
     .$dynamic();
 

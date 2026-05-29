@@ -390,9 +390,11 @@ async function run() {
         const eventId = inserted[0]?.id;
         if (eventId && ev.people) {
           for (const p of ev.people) {
+            // Support both {userId} and {invitedId} refs; sending undefined
+            // for both would write a both-null row that renders "Former user".
             await sql`
               INSERT INTO timeline_event_people (event_id, role, user_id, invited_id)
-              VALUES (${eventId}, ${p.role}, ${p.userId}, null)
+              VALUES (${eventId}, ${p.role}, ${p.userId ?? null}, ${p.invitedId ?? null})
             `;
           }
         }
