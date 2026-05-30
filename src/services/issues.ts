@@ -12,6 +12,15 @@ import {
   createTimelineEvent,
   type TimelineEventData,
 } from "~/lib/timeline/events";
+import {
+  emitIssueOpened,
+  emitIssueClosed,
+  emitIssueStatusChanged,
+  emitIssueAssigned,
+  emitIssueUnassigned,
+  emitIssueReassignedOut,
+  emitIssueReassignedIn,
+} from "~/lib/timeline/issue-timeline-helpers";
 import { createNotification, getChannels } from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
@@ -149,6 +158,7 @@ export async function createIssue({
       .set({ nextIssueNumber: sql`${machines.nextIssueNumber} + 1` })
       .where(eq(machines.initials, machineInitials))
       .returning({
+        id: machines.id,
         nextIssueNumber: machines.nextIssueNumber,
         name: machines.name,
         ownerId: machines.ownerId,
@@ -225,7 +235,33 @@ export async function createIssue({
         .onConflictDoNothing();
     }
 
-    // 5. Notifications
+    // 5. Duplicate-write `issue_opened` to machine timeline (PP-0x98, PP-tv9l)
+    //
+    // Reporter is stored as a stable id reference and resolved live at render:
+    // a real `reportedBy` becomes a `reporter` person-reference. A freeform
+    // guest (no account, hence no id) keeps their typed name as
+    // `guestReporterName` (rendered with a "(guest)" marker); a fully
+    // anonymous open carries neither. Email is never persisted (rule 10).
+    await emitIssueOpened(tx, {
+      machineId: updatedMachine.id,
+      issueId: issue.id,
+      issueNumber: issue.issueNumber,
+      title,
+      // Snapshot at-open severity + frequency for the timeline row. Use the
+      // post-insert values from the returning() row so they reflect the
+      // applied defaults (frequency falls back to "intermittent" when the
+      // caller omits it).
+      severity: issue.severity,
+      frequency: issue.frequency,
+      ...(reportedBy
+        ? { reporter: { userId: reportedBy } }
+        : reporterName
+          ? { guestReporterName: reporterName }
+          : {}),
+      ...(reportedBy ? { actorId: reportedBy } : {}),
+    });
+
+    // 6. Notifications
     try {
       const formattedId = formatIssueId(machineInitials, issueNumber);
       const plainDescription = description
@@ -346,6 +382,9 @@ export async function updateIssueStatus({
 
     // 1. Update Status
     const isClosed = (CLOSED_STATUSES as readonly string[]).includes(status);
+    const wasClosed = (CLOSED_STATUSES as readonly string[]).includes(
+      oldStatus
+    );
     await tx
       .update(issues)
       .set({
@@ -362,6 +401,39 @@ export async function updateIssueStatus({
       tx,
       userId
     );
+
+    // 2b. Duplicate-write to machine timeline (atomic with status update, PP-0x98)
+    //
+    // Only a *true close transition* (open → closed) emits `issue_closed`.
+    // A move between two closed statuses (e.g. fixed → duplicate) is a
+    // reclassification, not a close, so it records as a status change —
+    // otherwise the machine timeline would show a second misleading
+    // "closed by …" row for an already-closed issue.
+    //
+    // The closer is the acting user, attributed via the event's `author_id`
+    // (actorId) and resolved live at render (PP-tv9l) — no name snapshot.
+    if (isClosed && !wasClosed) {
+      await emitIssueClosed(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        title: currentIssue.title,
+        // The "close reason" — which closed-group status the issue was
+        // resolved to (fixed / wont_fix / wai / no_repro / duplicate).
+        closedAsStatus: status,
+        ...(userId ? { actorId: userId } : {}),
+      });
+    } else {
+      await emitIssueStatusChanged(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        from: oldStatus,
+        to: status,
+        title: currentIssue.title,
+        ...(userId ? { actorId: userId } : {}),
+      });
+    }
 
     log.info(
       { issueId, oldStatus, newStatus: status, action: "updateIssueStatus" },
@@ -645,6 +717,28 @@ export async function assignIssue({
       ? { type: "assigned", assigneeName }
       : { type: "unassigned" };
     await createTimelineEvent(issueId, event, tx, actorId);
+
+    // Duplicate-write to machine timeline (atomic with assignment update,
+    // PP-0x98, PP-tv9l). The assignee is stored as an `assignee` person-
+    // reference (always a real user) and resolved live at render.
+    if (assignedTo) {
+      await emitIssueAssigned(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        assigneeId: assignedTo,
+        title: currentIssue.title,
+        ...(actorId ? { actorId } : {}),
+      });
+    } else {
+      await emitIssueUnassigned(tx, {
+        machineId: currentIssue.machine.id,
+        issueId,
+        issueNumber: currentIssue.issueNumber,
+        title: currentIssue.title,
+        ...(actorId ? { actorId } : {}),
+      });
+    }
 
     log.info(
       { issueId, assignedTo, assigneeName, action: "assignIssue" },
@@ -938,9 +1032,10 @@ export async function reassignIssueMachine({
       columns: {
         machineInitials: true,
         issueNumber: true,
+        title: true,
       },
       with: {
-        machine: { columns: { name: true } },
+        machine: { columns: { id: true, name: true } },
       },
     });
 
@@ -960,6 +1055,7 @@ export async function reassignIssueMachine({
       .set({ nextIssueNumber: sql`${machines.nextIssueNumber} + 1` })
       .where(eq(machines.initials, newMachineInitials))
       .returning({
+        id: machines.id,
         nextIssueNumber: machines.nextIssueNumber,
         name: machines.name,
       });
@@ -996,6 +1092,29 @@ export async function reassignIssueMachine({
       tx,
       userId
     );
+
+    // Dual-write: source machine timeline gets "reassigned_out", destination
+    // gets "reassigned_in". Both rows are atomic with the issue update (same
+    // transaction → same created_at via Postgres now()).
+    // The other machine's name is resolved live from its id at render
+    // (PP-tv9l) so a renamed machine updates everywhere — no name snapshot.
+    await emitIssueReassignedOut(tx, {
+      machineId: currentIssue.machine.id,
+      issueId,
+      issueNumber: fromIssueNumber, // OLD number, as it existed on source
+      toMachineId: destinationMachine.id,
+      title: currentIssue.title,
+      ...(userId ? { actorId: userId } : {}),
+    });
+
+    await emitIssueReassignedIn(tx, {
+      machineId: destinationMachine.id,
+      issueId,
+      issueNumber: newIssueNumber, // NEW number, as it now exists on destination
+      fromMachineId: currentIssue.machine.id,
+      title: currentIssue.title,
+      ...(userId ? { actorId: userId } : {}),
+    });
 
     log.info(
       {

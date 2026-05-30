@@ -32,16 +32,26 @@
  *     e.g., a guest can update the severity on issues they reported themselves
  * - 'owner': Allowed only for resources the user owns / is designated as owner of
  *     e.g., a machine owner can edit details for machines where they are recorded as the owner
+ * - 'own_or_owner': Allowed when EITHER condition holds — userId matches the
+ *     resource creator (reporterId) OR userId matches the related resource's
+ *     owner (machineOwnerId). Use this when the rule is "the creator or the
+ *     owner can act"; admins can always be granted via `admin: true`. Example:
+ *     `machines.timeline.comment.delete` lets the comment author OR the
+ *     machine owner soft-delete a timeline comment.
  *
  * Use:
  * - 'own' when the relationship is "created by this user" (reporter, comment author, etc.)
  * - 'owner' when the relationship is "owns/maintains this resource" (machine owner, etc.)
+ * - 'own_or_owner' when EITHER of those grants permission (keeps the help page
+ *   showing a single rule instead of two matrix entries that would need to be
+ *   ORed at call sites — see AGENTS.md §2.1 "Matrix-Only Permissions").
  *
- * Both require ownership context to resolve. See checkPermission() in helpers.ts,
- * which resolves 'own' via userId === reporterId and 'owner' via userId === machineOwnerId.
- * The simpler hasPermission() in this file throws on these values to prevent silent bugs.
+ * All three require ownership context to resolve. See checkPermission() in helpers.ts,
+ * which resolves 'own' via userId === reporterId, 'owner' via userId === machineOwnerId,
+ * and 'own_or_owner' as the disjunction of those. The simpler hasPermission() in
+ * this file throws on these values to prevent silent bugs.
  */
-export type PermissionValue = boolean | "own" | "owner";
+export type PermissionValue = boolean | "own" | "owner" | "own_or_owner";
 
 /**
  * Access levels represent authentication + authorization state.
@@ -399,6 +409,45 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           admin: "owner",
         },
       },
+      {
+        id: "machines.timeline.comment.add",
+        label: "Add machine timeline comments",
+        description:
+          "Post freeform comments on a machine's timeline (e.g., 'rebuilt flippers', 'cleaned playfield')",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: true,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "machines.timeline.comment.edit",
+        label: "Edit machine timeline comments",
+        description:
+          "Edit a comment on a machine's timeline. Authors only — even admins and machine owners cannot put words in someone else's mouth (mirrors `comments.edit` on issue comments).",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: "own",
+          technician: "own",
+          admin: "own",
+        },
+      },
+      {
+        id: "machines.timeline.comment.delete",
+        label: "Delete machine timeline comments",
+        description:
+          "Soft-delete a comment on a machine's timeline. Comment authors can delete their own; the machine owner can delete any; admins can delete any.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: "own_or_owner",
+          technician: "own_or_owner",
+          admin: true,
+        },
+      },
     ],
   },
   {
@@ -523,11 +572,12 @@ export function getPermission(
  * Check if a permission is unconditionally granted for a given access level.
  *
  * This only handles unconditional permissions (`true`/`false`).
- * If the permission value is "own" or "owner", this function will throw
- * to prevent silent permission bugs. Callers must use `requiresOwnershipCheck`
- * first, or use `checkPermission` from helpers.ts for ownership-aware checks.
+ * If the permission value is "own", "owner", or "own_or_owner", this function
+ * will throw to prevent silent permission bugs. Callers must use
+ * `requiresOwnershipCheck` first, or use `checkPermission` from helpers.ts for
+ * ownership-aware checks.
  *
- * @throws Error if the permission value is "own" or "owner"
+ * @throws Error if the permission value is "own", "owner", or "own_or_owner"
  */
 export function hasPermission(
   permissionId: string,
@@ -535,7 +585,7 @@ export function hasPermission(
 ): boolean {
   const value = getPermission(permissionId, accessLevel);
 
-  if (value === "own" || value === "owner") {
+  if (value === "own" || value === "owner" || value === "own_or_owner") {
     throw new Error(
       `hasPermission cannot be used for ownership-based permissions ` +
         `(permissionId="${permissionId}", accessLevel="${accessLevel}", value="${value}"). ` +
@@ -548,7 +598,7 @@ export function hasPermission(
 }
 
 /**
- * Check if a permission requires ownership context ('own' or 'owner').
+ * Check if a permission requires ownership context ('own', 'owner', or 'own_or_owner').
  *
  * Use this to determine whether you need to provide an OwnershipContext
  * to checkPermission() in helpers.ts for an accurate result.
@@ -558,5 +608,5 @@ export function requiresOwnershipCheck(
   accessLevel: AccessLevel
 ): boolean {
   const value = getPermission(permissionId, accessLevel);
-  return value === "own" || value === "owner";
+  return value === "own" || value === "owner" || value === "own_or_owner";
 }

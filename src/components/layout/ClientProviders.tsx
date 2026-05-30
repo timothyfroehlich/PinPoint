@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { TooltipProvider } from "~/components/ui/tooltip";
+import { RelativeTimeProvider } from "~/components/issues/RelativeTimeProvider";
 
 /**
  * Global client-side providers wrapper.
@@ -12,11 +13,18 @@ import { TooltipProvider } from "~/components/ui/tooltip";
  *
  * Exception: CopyButton keeps its own local <TooltipProvider delayDuration={0}>
  * so that the "Copied!" tooltip appears instantly after a click.
+ *
+ * RelativeTimeProvider is mounted here so that all RelativeTime instances in the
+ * app share a single 60-second interval instead of each running their own timer.
  */
 export function ClientProviders({
   children,
 }: {
   children: React.ReactNode;
 }): React.JSX.Element {
-  return <TooltipProvider delayDuration={300}>{children}</TooltipProvider>;
+  return (
+    <TooltipProvider delayDuration={300}>
+      <RelativeTimeProvider>{children}</RelativeTimeProvider>
+    </TooltipProvider>
+  );
 }

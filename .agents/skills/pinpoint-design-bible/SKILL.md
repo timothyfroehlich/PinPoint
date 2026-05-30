@@ -539,6 +539,16 @@ Do not reorder the buttons to try to "fix" the mobile stack — the reversal is 
 - When opening any modal, set `inert` on the page-root container (CORE-A11Y-006). Radix uses `aria-hidden` + pointer-events on the background; `inert` is the platform primitive that also removes the background from tab order.
 - Native `<dialog>.showModal()` (Baseline Widely available; Baseline since Mar 2023 per §19) is **not** the default for product UI — shadcn `<Dialog>` / `<AlertDialog>` / `<Sheet>` are. Reach for `<dialog>` only for one-off, self-contained, single-purpose surfaces that don't earn a place in the shadcn variant system (e.g., a debug-only inspector, a tightly-scoped help blurb). See `pinpoint-ui` skill § "Native HTML primitives alongside shadcn/Radix".
 
+### Composer surfaces (mobile bottom sheet + quick→full editor)
+
+Any surface whose primary job is **composing free-form rich text** (timeline notes, issue comments, and future equivalents) follows two rules. Length-limited single-line fields — titles, names, search boxes — are explicitly **exempt**; these rules are about multi-line writing surfaces only.
+
+1. **Bottom sheet on mobile.** On small screens a composer SHOULD open in a bottom `<Sheet side="bottom">`, not an inline block buried in the page. The sheet owns the keyboard-adjusted viewport so the editor and its Post button stay visible while typing, and the capture affordance is reachable without scrolling past existing content. On desktop the composer may render inline (or in a side sheet / dialog when triggered from a header action). One composer component, viewport-aware presentation — do not fork into two components.
+
+2. **Quick → full editor transition.** The editor opens in **quick mode**: the formatting toolbar is hidden so it reads as a fast jot, not a document. A single toggle (a "format"/`Aa` button beside the primary controls) reveals the full toolbar; the toggle is **two-way** (content is always stored as the same rich-text document regardless of mode, so flipping back is lossless). Default to the lightest classification (e.g. the timeline composer defaults its tag to `note`) and never block submit on a classification the author has not been asked to make. Support `Cmd`/`Ctrl`+`Enter` to submit.
+
+The timeline composer (PP-0x98) establishes the basic pattern; generalizing it across every mobile editor and extracting a shared primitive is tracked separately (do it on the third use site, per rule-of-three — §17 intro).
+
 ## 18. Token Canonical Form
 
 `globals.css` defines two parallel token vocabularies. The MD-era tokens predate Tailwind v4's semantic token naming and are kept in CSS for backward compatibility, but new code must use the canonical Tailwind semantic tokens.

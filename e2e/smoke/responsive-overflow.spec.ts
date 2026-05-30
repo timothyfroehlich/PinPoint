@@ -24,6 +24,7 @@ const authenticatedRoutes = [
   "/m",
   `/m/${machineInitials}`,
   `/m/${machineInitials}/maintenance`,
+  `/m/${machineInitials}/timeline`,
   `/m/${machineInitials}/i/${issueNum}`,
   "/settings",
 ];

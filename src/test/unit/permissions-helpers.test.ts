@@ -450,6 +450,213 @@ describe("Integration: Machine text field permissions", () => {
   });
 });
 
+describe("checkPermission - own_or_owner scope (PP-0x98)", () => {
+  const authorId = "user-author";
+  const ownerId = "user-machine-owner";
+  const thirdPartyId = "user-third-party";
+
+  it("allows the comment author to delete (reporterId match)", () => {
+    expect(
+      checkPermission("machines.timeline.comment.delete", "member", {
+        userId: authorId,
+        reporterId: authorId,
+        machineOwnerId: ownerId,
+      })
+    ).toBe(true);
+  });
+
+  it("allows the machine owner to delete any comment (machineOwnerId match)", () => {
+    expect(
+      checkPermission("machines.timeline.comment.delete", "member", {
+        userId: ownerId,
+        reporterId: authorId,
+        machineOwnerId: ownerId,
+      })
+    ).toBe(true);
+  });
+
+  it("denies a third party who is neither author nor machine owner", () => {
+    expect(
+      checkPermission("machines.timeline.comment.delete", "member", {
+        userId: thirdPartyId,
+        reporterId: authorId,
+        machineOwnerId: ownerId,
+      })
+    ).toBe(false);
+  });
+
+  it("denies when context.userId is undefined", () => {
+    expect(
+      checkPermission("machines.timeline.comment.delete", "member", {
+        reporterId: authorId,
+        machineOwnerId: ownerId,
+      })
+    ).toBe(false);
+  });
+
+  it("denies when no context is provided", () => {
+    expect(checkPermission("machines.timeline.comment.delete", "member")).toBe(
+      false
+    );
+  });
+
+  it("denies when both reporterId and machineOwnerId are null", () => {
+    expect(
+      checkPermission("machines.timeline.comment.delete", "member", {
+        userId: authorId,
+        reporterId: null,
+        machineOwnerId: null,
+      })
+    ).toBe(false);
+  });
+
+  it("admin override: admins always allowed without ownership context", () => {
+    expect(
+      checkPermission("machines.timeline.comment.delete", "admin", {
+        userId: thirdPartyId,
+        reporterId: authorId,
+        machineOwnerId: ownerId,
+      })
+    ).toBe(true);
+    // Even without any context at all
+    expect(checkPermission("machines.timeline.comment.delete", "admin")).toBe(
+      true
+    );
+  });
+
+  it("denies guest and unauthenticated regardless of authorship", () => {
+    const context: OwnershipContext = {
+      userId: authorId,
+      reporterId: authorId,
+      machineOwnerId: authorId,
+    };
+    expect(
+      checkPermission("machines.timeline.comment.delete", "guest", context)
+    ).toBe(false);
+    expect(
+      checkPermission("machines.timeline.comment.delete", "unauthenticated")
+    ).toBe(false);
+  });
+
+  it("technician with own_or_owner scope: author path allowed", () => {
+    expect(
+      checkPermission("machines.timeline.comment.delete", "technician", {
+        userId: authorId,
+        reporterId: authorId,
+        machineOwnerId: ownerId,
+      })
+    ).toBe(true);
+  });
+
+  it("technician with own_or_owner scope: machine-owner path allowed", () => {
+    expect(
+      checkPermission("machines.timeline.comment.delete", "technician", {
+        userId: ownerId,
+        reporterId: authorId,
+        machineOwnerId: ownerId,
+      })
+    ).toBe(true);
+  });
+
+  it("technician with own_or_owner scope: third party denied", () => {
+    expect(
+      checkPermission("machines.timeline.comment.delete", "technician", {
+        userId: thirdPartyId,
+        reporterId: authorId,
+        machineOwnerId: ownerId,
+      })
+    ).toBe(false);
+  });
+});
+
+describe("getPermissionState - own_or_owner scope (PP-0x98)", () => {
+  const authorId = "user-author";
+  const ownerId = "user-machine-owner";
+  const thirdPartyId = "user-third-party";
+
+  it("returns allowed: true on author path", () => {
+    const state = getPermissionState(
+      "machines.timeline.comment.delete",
+      "member",
+      {
+        userId: authorId,
+        reporterId: authorId,
+        machineOwnerId: ownerId,
+      }
+    );
+    expect(state.allowed).toBe(true);
+  });
+
+  it("returns allowed: true on machine-owner path", () => {
+    const state = getPermissionState(
+      "machines.timeline.comment.delete",
+      "member",
+      {
+        userId: ownerId,
+        reporterId: authorId,
+        machineOwnerId: ownerId,
+      }
+    );
+    expect(state.allowed).toBe(true);
+  });
+
+  it("returns reason: ownership for third party", () => {
+    const state = getPermissionState(
+      "machines.timeline.comment.delete",
+      "member",
+      {
+        userId: thirdPartyId,
+        reporterId: authorId,
+        machineOwnerId: ownerId,
+      }
+    );
+    expect(state.allowed).toBe(false);
+    if (!state.allowed) {
+      expect(state.reason).toBe("ownership");
+    }
+  });
+});
+
+describe("isConditionalPermission - own_or_owner scope (PP-0x98)", () => {
+  it("returns true for own_or_owner permissions", () => {
+    expect(
+      isConditionalPermission("machines.timeline.comment.delete", "member")
+    ).toBe(true);
+    expect(
+      isConditionalPermission("machines.timeline.comment.delete", "technician")
+    ).toBe(true);
+  });
+
+  it("returns false for admin (which has true, not own_or_owner)", () => {
+    expect(
+      isConditionalPermission("machines.timeline.comment.delete", "admin")
+    ).toBe(false);
+  });
+});
+
+describe("machines.timeline.comment.add (PP-0x98)", () => {
+  it("denies unauthenticated and guest", () => {
+    expect(
+      checkPermission("machines.timeline.comment.add", "unauthenticated")
+    ).toBe(false);
+    expect(checkPermission("machines.timeline.comment.add", "guest")).toBe(
+      false
+    );
+  });
+
+  it("allows member, technician, and admin without ownership context", () => {
+    expect(checkPermission("machines.timeline.comment.add", "member")).toBe(
+      true
+    );
+    expect(checkPermission("machines.timeline.comment.add", "technician")).toBe(
+      true
+    );
+    expect(checkPermission("machines.timeline.comment.add", "admin")).toBe(
+      true
+    );
+  });
+});
+
 describe("Integration: Guest issue update flow", () => {
   const guestId = "guest-user";
   const memberId = "member-user";

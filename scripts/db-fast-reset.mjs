@@ -29,6 +29,7 @@ async function fastReset() {
         "issue_comments",
         "issue_watchers",
         "issues",
+        "timeline_events",
         "machines",
         "notifications",
         "notification_preferences",
@@ -43,6 +44,8 @@ async function fastReset() {
       "pnpm run db:_seed",
       "pnpm run db:_seed-users",
       "pnpm run db:_seed-discord",
+      "pnpm run db:_seed-timeline-backfill",
+      "pnpm run db:_seed-timeline-demo",
     ];
     for (const cmd of seedCommands) {
       execSync(cmd, { stdio: "inherit" });

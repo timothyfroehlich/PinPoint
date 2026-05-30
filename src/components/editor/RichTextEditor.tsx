@@ -38,6 +38,15 @@ interface RichTextEditorProps {
   disabled?: boolean | undefined;
   className?: string | undefined;
   ariaLabel?: string | undefined;
+  /**
+   * Show the formatting toolbar. Defaults to `true` to preserve every
+   * existing caller. The timeline composer's "quick → full" transition
+   * (design-bible §17) passes `false` for quick mode and flips it `true`
+   * when the author taps the format toggle.
+   */
+  showToolbar?: boolean | undefined;
+  /** Focus the editor on mount (e.g. when opened inside a sheet). */
+  autoFocus?: boolean | undefined;
 }
 
 export const RichTextEditor = forwardRef<
@@ -53,6 +62,8 @@ export const RichTextEditor = forwardRef<
     disabled = false,
     className,
     ariaLabel,
+    showToolbar = true,
+    autoFocus = false,
   }: RichTextEditorProps,
   ref
 ) {
@@ -148,6 +159,7 @@ export const RichTextEditor = forwardRef<
     extensions,
     content,
     editable: !disabled,
+    autofocus: autoFocus ? "end" : false,
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getJSON() as ProseMirrorDoc);
@@ -155,8 +167,11 @@ export const RichTextEditor = forwardRef<
     editorProps: {
       attributes: {
         class: cn(
-          "prose prose-sm prose-invert focus:outline-none max-w-none min-h-[100px] px-3 py-2",
-          compact ? "min-h-[40px]" : ""
+          "prose prose-sm prose-invert focus:outline-none max-w-none px-3 py-2",
+          // One line in compact mode, ~3 lines otherwise. Mutually exclusive
+          // so the arbitrary-value min-heights never both apply (which made
+          // the winner depend on stylesheet order).
+          compact ? "min-h-[40px]" : "min-h-[100px]"
         ),
         "aria-label": ariaLabel ?? placeholder,
       },
@@ -195,7 +210,9 @@ export const RichTextEditor = forwardRef<
         className
       )}
     >
-      <EditorToolbar editor={editor} mentionsEnabled={mentionsEnabled} />
+      {showToolbar ? (
+        <EditorToolbar editor={editor} mentionsEnabled={mentionsEnabled} />
+      ) : null}
       <EditorContent editor={editor} />
     </div>
   );

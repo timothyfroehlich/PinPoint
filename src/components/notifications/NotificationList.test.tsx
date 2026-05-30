@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NotificationList } from "./NotificationList";
+import { RelativeTimeProvider } from "~/components/issues/RelativeTimeProvider";
 import {
   markAsReadAction,
   markAllAsReadAction,
@@ -50,7 +51,13 @@ describe("NotificationList", () => {
 
   it("should display notifications in dropdown", async () => {
     const user = userEvent.setup();
-    render(<NotificationList notifications={mockNotifications} />);
+    // RelativeTimeProvider is required so RelativeTime renders relative labels
+    // (without it the shared ticker never starts and the fallback is shown).
+    render(
+      <RelativeTimeProvider>
+        <NotificationList notifications={mockNotifications} />
+      </RelativeTimeProvider>
+    );
 
     // Open dropdown
     const trigger = screen.getByRole("button", { name: /notifications/i });

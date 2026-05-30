@@ -51,6 +51,7 @@ vi.mock("~/lib/logger", () => ({
 // Mock notifications
 vi.mock("~/lib/notifications", () => ({
   createNotification: vi.fn(),
+  getChannels: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock services

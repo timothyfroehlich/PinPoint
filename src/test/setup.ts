@@ -58,8 +58,11 @@ if (typeof window !== "undefined") {
   // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking scrollIntoView
   window.HTMLElement.prototype.scrollIntoView = function () {};
 
-  // Mock Pointer Capture API (required for vaul drag-to-dismiss — jsdom does not implement it).
-  // Only polyfill when missing so a real implementation (future jsdom or alt environment) is preserved.
+  // Mock Pointer Capture API — required by vaul drag-to-dismiss and by Radix
+  // UI Select (which calls hasPointerCapture/releasePointerCapture on pointer
+  // events). jsdom doesn't implement these, so we polyfill no-ops only when
+  // they're missing — keeps any real implementation in a future jsdom or alt
+  // environment intact.
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill setPointerCapture if missing
   if (!window.Element.prototype.setPointerCapture) {
     // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking setPointerCapture
@@ -69,5 +72,11 @@ if (typeof window !== "undefined") {
   if (!window.Element.prototype.releasePointerCapture) {
     // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking releasePointerCapture
     window.Element.prototype.releasePointerCapture = function () {};
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill hasPointerCapture if missing
+  if (!window.Element.prototype.hasPointerCapture) {
+    window.Element.prototype.hasPointerCapture = function (): boolean {
+      return false;
+    };
   }
 }

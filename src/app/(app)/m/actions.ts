@@ -33,8 +33,73 @@ import {
 } from "~/lib/tiptap/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
+import {
+  emitMachineCreated,
+  emitMachineUpdated,
+  toMachineOwnerRef,
+} from "~/lib/timeline/machine-lifecycle-helpers";
+import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
+import { type MachineTimelineEventKind } from "~/lib/timeline/machine-event-types";
+
+/**
+ * Maps a prose-field column name to its marker lifecycle event kind.
+ *
+ * Only owner-facing edits emit a timeline event — `description` and
+ * `tournamentNotes` are intentionally absent because their edit cadence is
+ * high enough that emitting on every save floods the timeline with low-
+ * signal "description updated" rows (PP-0x98 V2 design pass). The fields
+ * themselves are still editable; the change just doesn't get duplicated
+ * into the activity feed.
+ */
+/** Subset of {@link MachineTimelineEventKind} that this map ever produces.
+ *  Pinning the value type to the literal-string union keeps the
+ *  `{ kind: ... }` event-data construction below assignable to the full
+ *  discriminated `MachineTimelineEventData` union (TS otherwise widens
+ *  to the whole 16-variant kind and demands the issue-event fields). */
+type ProseFieldEventKind = "owner_requirements_updated" | "owner_notes_updated";
+
+const PROSE_FIELD_TO_EVENT_KIND: Partial<
+  Record<
+    "description" | "tournamentNotes" | "ownerRequirements" | "ownerNotes",
+    ProseFieldEventKind
+  >
+> = {
+  ownerRequirements: "owner_requirements_updated",
+  ownerNotes: "owner_notes_updated",
+};
+
+/**
+ * Canonical-JSON serializer with deterministic key ordering. Used to compare
+ * before/after ProseMirror documents inside `updateMachineTextField` — PG
+ * stores JSONB without preserving the source key order, so a naive
+ * `JSON.stringify` round-trip would falsely report changes whenever the
+ * client-supplied key order differs from PG's normalized order.
+ */
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, val: unknown): unknown => {
+    if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+      const entries = Object.entries(val as Record<string, unknown>);
+      entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+      return Object.fromEntries(entries);
+    }
+    return val;
+  });
+}
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
+
+/**
+ * Sentinel thrown from inside `updateMachineAction`'s transaction when the
+ * UPDATE returns no rows (machine deleted between the load and the update).
+ * Caught at the top-level handler so we can return `NOT_FOUND` rather than
+ * surfacing a generic server error.
+ */
+class MachineNotFoundError extends Error {
+  constructor() {
+    super("Machine not found");
+    this.name = "MachineNotFoundError";
+  }
+}
 
 const isNextRedirectError = (error: unknown): error is { digest: string } => {
   if (typeof error !== "object" || error === null || !("digest" in error)) {
@@ -233,6 +298,21 @@ export async function createMachineAction(
             });
         }
 
+        // Lifecycle: emit machine_added (and owner_set with a to_owner
+        // person-reference if owned — real OR invited). Atomic with the
+        // machine insert — if these fail, the machine rolls back.
+        await emitMachineCreated(
+          tx,
+          {
+            id: newMachine.id,
+            owner: toMachineOwnerRef(
+              newMachine.ownerId,
+              newMachine.invitedOwnerId
+            ),
+          },
+          user.id
+        );
+
         return [newMachine];
       });
 
@@ -336,36 +416,55 @@ export async function createMachineAction(
   }
   // If no ownerId provided, leave both undefined — DB stores NULL (no defaulting to caller)
 
-  // Insert machine
+  // Insert machine + watcher + lifecycle events atomically.
   try {
-    const [machine] = await db
-      .insert(machines)
-      .values({
-        name,
-        initials,
-        ownerId: finalOwnerId,
-        invitedOwnerId: finalInvitedOwnerId,
-      })
-      .returning();
-
-    if (!machine) {
-      throw new Error("Machine creation failed");
-    }
-
-    // Auto-add owner to machine_watchers (full subscribe mode)
-    if (finalOwnerId) {
-      await db
-        .insert(machineWatchers)
+    const [machine] = await db.transaction(async (tx) => {
+      const [newMachine] = await tx
+        .insert(machines)
         .values({
-          machineId: machine.id,
-          userId: finalOwnerId,
-          watchMode: "subscribe",
+          name,
+          initials,
+          ownerId: finalOwnerId,
+          invitedOwnerId: finalInvitedOwnerId,
         })
-        .onConflictDoUpdate({
-          target: [machineWatchers.machineId, machineWatchers.userId],
-          set: { watchMode: "subscribe" },
-        });
-    }
+        .returning();
+
+      if (!newMachine) {
+        throw new Error("Machine creation failed");
+      }
+
+      // Auto-add owner to machine_watchers (full subscribe mode)
+      if (finalOwnerId) {
+        await tx
+          .insert(machineWatchers)
+          .values({
+            machineId: newMachine.id,
+            userId: finalOwnerId,
+            watchMode: "subscribe",
+          })
+          .onConflictDoUpdate({
+            target: [machineWatchers.machineId, machineWatchers.userId],
+            set: { watchMode: "subscribe" },
+          });
+      }
+
+      // Lifecycle: emit machine_added (and owner_set with a to_owner
+      // person-reference if owned — real OR invited). Atomic with the machine
+      // insert — if these fail, the machine rolls back.
+      await emitMachineCreated(
+        tx,
+        {
+          id: newMachine.id,
+          owner: toMachineOwnerRef(
+            newMachine.ownerId,
+            newMachine.invitedOwnerId
+          ),
+        },
+        user.id
+      );
+
+      return [newMachine];
+    });
 
     revalidatePath("/m");
 
@@ -451,10 +550,19 @@ export async function updateMachineAction(
     validation.data;
 
   try {
-    // Load current machine by id — permission check is authoritative
+    // Load current machine by id — permission check is authoritative.
+    // Pre-load presenceStatus and the joined active-owner display name so
+    // lifecycle emits below can compute deltas without re-fetching.
     const currentMachine = await db.query.machines.findFirst({
       where: eq(machines.id, id),
-      columns: { id: true, ownerId: true, name: true, initials: true },
+      columns: {
+        id: true,
+        ownerId: true,
+        invitedOwnerId: true,
+        name: true,
+        initials: true,
+        presenceStatus: true,
+      },
     });
 
     if (!currentMachine) {
@@ -556,6 +664,28 @@ export async function updateMachineAction(
               set: { watchMode: "subscribe" },
             });
         }
+
+        // Lifecycle: emit one event per tracked field that changed.
+        // Atomic with the update — if an emit fails, the update rolls back.
+        await emitMachineUpdated(
+          tx,
+          {
+            id: currentMachine.id,
+            name: currentMachine.name,
+            owner: toMachineOwnerRef(
+              currentMachine.ownerId,
+              currentMachine.invitedOwnerId
+            ),
+            presenceStatus: currentMachine.presenceStatus,
+          },
+          {
+            name,
+            ownerChanged: true,
+            owner: toMachineOwnerRef(machineOwnerId, machineInvitedOwnerId),
+            presenceStatus,
+          },
+          user.id
+        );
 
         return [updatedMachine];
       });
@@ -680,88 +810,128 @@ export async function updateMachineAction(
       }
     }
 
-    const [machine] = await db
-      .update(machines)
-      .set({
-        name,
-        ...(presenceStatus !== undefined && { presenceStatus }),
-        ...(shouldUpdateOwner && {
-          ownerId: finalOwnerId,
-          invitedOwnerId: finalInvitedOwnerId,
-        }),
-      })
-      .where(eq(machines.id, id))
-      .returning();
+    const oldOwnerId = currentMachine.ownerId;
 
-    if (!machine) {
-      return err("NOT_FOUND", "Machine not found.");
-    }
+    // Atomic: update machine + reconcile watcher rows + emit lifecycle events.
+    // Notifications stay outside the tx as best-effort side effects.
+    const [machine] = await db.transaction(async (tx) => {
+      const [updatedMachine] = await tx
+        .update(machines)
+        .set({
+          name,
+          ...(presenceStatus !== undefined && { presenceStatus }),
+          ...(shouldUpdateOwner && {
+            ownerId: finalOwnerId,
+            invitedOwnerId: finalInvitedOwnerId,
+          }),
+        })
+        .where(eq(machines.id, id))
+        .returning();
 
-    // Handle owner changes in machine_watchers
-    if (shouldUpdateOwner) {
-      const oldOwnerId = currentMachine.ownerId;
-      // Resolve channels once for all notifications in this block (PP-rfc).
-      const channels = await getChannels();
-
-      // 1. Handle Old Owner
-      if (oldOwnerId && oldOwnerId !== finalOwnerId) {
-        // Remove old owner from watchers
-        await db
-          .delete(machineWatchers)
-          .where(
-            and(
-              eq(machineWatchers.machineId, id),
-              eq(machineWatchers.userId, oldOwnerId)
-            )
-          );
-
-        // Notify old owner
-        await createNotification(
-          {
-            type: "machine_ownership_changed",
-            resourceId: machine.id,
-            resourceType: "machine",
-            actorId: user.id,
-            includeActor: false,
-            machineName: machine.name,
-            newStatus: "removed",
-            additionalRecipientIds: [oldOwnerId],
-          },
-          undefined,
-          channels
-        );
+      if (!updatedMachine) {
+        throw new MachineNotFoundError();
       }
 
-      // 2. Handle New Owner
-      if (finalOwnerId && finalOwnerId !== oldOwnerId) {
-        // Add new owner as subscriber
-        await db
-          .insert(machineWatchers)
-          .values({
-            machineId: id,
-            userId: finalOwnerId,
-            watchMode: "subscribe",
-          })
-          .onConflictDoUpdate({
-            target: [machineWatchers.machineId, machineWatchers.userId],
-            set: { watchMode: "subscribe" },
-          });
+      // Handle owner changes in machine_watchers (inside tx so they roll back
+      // with the update if anything below fails).
+      if (shouldUpdateOwner) {
+        // 1. Remove old owner from watchers (notification sent post-commit)
+        if (oldOwnerId && oldOwnerId !== finalOwnerId) {
+          await tx
+            .delete(machineWatchers)
+            .where(
+              and(
+                eq(machineWatchers.machineId, id),
+                eq(machineWatchers.userId, oldOwnerId)
+              )
+            );
+        }
 
-        // Notify new owner
-        await createNotification(
-          {
-            type: "machine_ownership_changed",
-            resourceId: machine.id,
-            resourceType: "machine",
-            actorId: user.id,
-            includeActor: false,
-            machineName: machine.name,
-            newStatus: "added",
-            additionalRecipientIds: [finalOwnerId],
-          },
-          undefined,
-          channels
-        );
+        // 2. Add new owner as subscriber (notification sent post-commit)
+        if (finalOwnerId && finalOwnerId !== oldOwnerId) {
+          await tx
+            .insert(machineWatchers)
+            .values({
+              machineId: id,
+              userId: finalOwnerId,
+              watchMode: "subscribe",
+            })
+            .onConflictDoUpdate({
+              target: [machineWatchers.machineId, machineWatchers.userId],
+              set: { watchMode: "subscribe" },
+            });
+        }
+      }
+
+      // Lifecycle: emit one event per tracked field that changed.
+      // Atomic with the update — if an emit fails, the update rolls back.
+      await emitMachineUpdated(
+        tx,
+        {
+          id: currentMachine.id,
+          name: currentMachine.name,
+          owner: toMachineOwnerRef(
+            currentMachine.ownerId,
+            currentMachine.invitedOwnerId
+          ),
+          presenceStatus: currentMachine.presenceStatus,
+        },
+        {
+          name,
+          ownerChanged: shouldUpdateOwner,
+          owner: toMachineOwnerRef(finalOwnerId, finalInvitedOwnerId),
+          presenceStatus,
+        },
+        user.id
+      );
+
+      return [updatedMachine];
+    });
+
+    // Post-commit side effects — best-effort: do not fail the action on notification errors
+    if (shouldUpdateOwner) {
+      try {
+        // Resolve channels once for all notifications in this block (PP-rfc).
+        const channels = await getChannels();
+
+        if (oldOwnerId && oldOwnerId !== finalOwnerId) {
+          await createNotification(
+            {
+              type: "machine_ownership_changed",
+              resourceId: machine.id,
+              resourceType: "machine",
+              actorId: user.id,
+              includeActor: false,
+              machineName: machine.name,
+              newStatus: "removed",
+              additionalRecipientIds: [oldOwnerId],
+            },
+            undefined,
+            channels
+          );
+        }
+        if (finalOwnerId && finalOwnerId !== oldOwnerId) {
+          await createNotification(
+            {
+              type: "machine_ownership_changed",
+              resourceId: machine.id,
+              resourceType: "machine",
+              actorId: user.id,
+              includeActor: false,
+              machineName: machine.name,
+              newStatus: "added",
+              additionalRecipientIds: [finalOwnerId],
+            },
+            undefined,
+            channels
+          );
+        }
+      } catch (sideEffectError: unknown) {
+        reportError(sideEffectError, {
+          action: "updateMachineNotify",
+          bestEffort: true,
+          machineId: machine.id,
+        });
       }
     }
 
@@ -772,6 +942,9 @@ export async function updateMachineAction(
   } catch (error: unknown) {
     if (isNextRedirectError(error)) {
       throw error;
+    }
+    if (error instanceof MachineNotFoundError) {
+      return err("NOT_FOUND", "Machine not found.");
     }
     return serverActionError(
       error,
@@ -939,9 +1112,13 @@ async function updateMachineTextField(
         where: eq(userProfiles.id, user.id),
         columns: { role: true },
       }),
+      // Load the full machine row (rather than `columns: {...}`) so the
+      // current value of the prose field being edited is available for the
+      // before/after diff in the marker-event emit below. Using a dynamic
+      // `[field]: true` column projection would erase Drizzle's static type
+      // inference and force unsafe casts on every property access.
       db.query.machines.findFirst({
         where: eq(machines.id, machineId),
-        columns: { id: true, ownerId: true, initials: true },
       }),
     ]);
 
@@ -972,11 +1149,43 @@ async function updateMachineTextField(
       );
     }
 
-    // Update the field
-    await db
-      .update(machines)
-      .set({ [field]: normalizedValue })
-      .where(eq(machines.id, machine.id));
+    // Compute change diff for the marker event. Compare the *normalized* value
+    // (post empty-doc → null normalization) against the stored value so that
+    // pure-whitespace edits collapse to no-ops and don't spam the timeline.
+    //
+    // Use a canonical (sorted-keys) JSON serializer because PostgreSQL JSONB
+    // doesn't preserve source key order — a round-tripped doc returns with
+    // PG's normalized key order which won't match the client's submission
+    // order under plain `JSON.stringify`.
+    const beforeValue: ProseMirrorDoc | null = machine[field];
+    const changed =
+      canonicalJson(beforeValue) !== canonicalJson(normalizedValue);
+
+    // Atomic: update + (optional) marker event emit. If the emit fails, the
+    // field update rolls back along with it.
+    await db.transaction(async (tx) => {
+      await tx
+        .update(machines)
+        .set({ [field]: normalizedValue })
+        .where(eq(machines.id, machine.id));
+
+      // Only emit when (a) the field actually changed and (b) the field
+      // has an event-kind mapping. `description` and `tournamentNotes` are
+      // intentionally omitted from the map (see PROSE_FIELD_TO_EVENT_KIND).
+      const eventKind = PROSE_FIELD_TO_EVENT_KIND[field];
+      if (changed && eventKind) {
+        await createMachineTimelineEvent(
+          machine.id,
+          {
+            sourceType: "lifecycle",
+            tag: "lifecycle",
+            eventData: { kind: eventKind },
+            actorId: user.id,
+          },
+          tx
+        );
+      }
+    });
 
     revalidatePath(`/m/${machine.initials}`);
 
