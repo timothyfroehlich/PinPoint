@@ -142,14 +142,18 @@ describe("hasPermission", () => {
   });
 
   it("should throw for ownership-based permissions to prevent silent bugs", () => {
-    // hasPermission throws for 'own'/'owner' values to force callers to use
-    // requiresOwnershipCheck() or checkPermission() from helpers.ts
+    // hasPermission throws for 'own'/'owner'/'own_or_owner' values to force
+    // callers to use requiresOwnershipCheck() or checkPermission() from helpers.ts
     expect(() => hasPermission("issues.update.reporting", "guest")).toThrow(
       /ownership-based permissions/
     );
     expect(() => hasPermission("machines.edit", "member")).toThrow(
       /ownership-based permissions/
     );
+    // own_or_owner variant (PP-0x98)
+    expect(() =>
+      hasPermission("machines.timeline.comment.delete", "member")
+    ).toThrow(/ownership-based permissions/);
   });
 });
 
@@ -159,6 +163,17 @@ describe("requiresOwnershipCheck", () => {
       true
     );
     expect(requiresOwnershipCheck("machines.edit", "member")).toBe(true);
+    // own_or_owner variant (PP-0x98)
+    expect(
+      requiresOwnershipCheck("machines.timeline.comment.delete", "member")
+    ).toBe(true);
+    expect(
+      requiresOwnershipCheck("machines.timeline.comment.delete", "technician")
+    ).toBe(true);
+    // admin has unconditional `true`, not own_or_owner — should NOT require check
+    expect(
+      requiresOwnershipCheck("machines.timeline.comment.delete", "admin")
+    ).toBe(false);
   });
 
   it("should return false for simple boolean permissions", () => {
@@ -183,6 +198,10 @@ describe("Permission hierarchy", () => {
     "machines.view.ownerNotes",
     "comments.edit",
     "comments.delete",
+    // Editing a machine-timeline comment is author-only at every level
+    // (admin included) — see matrix entry's rationale: putting words in
+    // someone else's mouth is worse than removing them.
+    "machines.timeline.comment.edit",
   ]);
 
   it("should grant admin all permissions that technician has (except excluded)", () => {
@@ -198,7 +217,11 @@ describe("Permission hierarchy", () => {
           expect(adminValue).toBe(true);
         }
         // If technician has conditional, admin should have full
-        if (techValue === "own" || techValue === "owner") {
+        if (
+          techValue === "own" ||
+          techValue === "owner" ||
+          techValue === "own_or_owner"
+        ) {
           expect(adminValue).toBe(true);
         }
       }
@@ -217,9 +240,16 @@ describe("Permission hierarchy", () => {
         }
 
         // If member has conditional permission, technician should have at least the same
-        if (memberValue === "own" || memberValue === "owner") {
+        if (
+          memberValue === "own" ||
+          memberValue === "owner" ||
+          memberValue === "own_or_owner"
+        ) {
           expect(
-            techValue === true || techValue === "own" || techValue === "owner"
+            techValue === true ||
+              techValue === "own" ||
+              techValue === "owner" ||
+              techValue === "own_or_owner"
           ).toBe(true);
         }
       }
@@ -411,6 +441,42 @@ describe("Specific permission rules from design", () => {
         "owner"
       );
       expect(getPermission("machines.view.ownerNotes", "admin")).toBe("owner");
+    });
+
+    it("should define machines.timeline.comment.add: members+ can post (PP-0x98)", () => {
+      expect(
+        getPermission("machines.timeline.comment.add", "unauthenticated")
+      ).toBe(false);
+      expect(getPermission("machines.timeline.comment.add", "guest")).toBe(
+        false
+      );
+      expect(getPermission("machines.timeline.comment.add", "member")).toBe(
+        true
+      );
+      expect(getPermission("machines.timeline.comment.add", "technician")).toBe(
+        true
+      );
+      expect(getPermission("machines.timeline.comment.add", "admin")).toBe(
+        true
+      );
+    });
+
+    it("should define machines.timeline.comment.delete: own_or_owner for non-admin roles, true for admin (PP-0x98)", () => {
+      expect(
+        getPermission("machines.timeline.comment.delete", "unauthenticated")
+      ).toBe(false);
+      expect(getPermission("machines.timeline.comment.delete", "guest")).toBe(
+        false
+      );
+      expect(getPermission("machines.timeline.comment.delete", "member")).toBe(
+        "own_or_owner"
+      );
+      expect(
+        getPermission("machines.timeline.comment.delete", "technician")
+      ).toBe("own_or_owner");
+      expect(getPermission("machines.timeline.comment.delete", "admin")).toBe(
+        true
+      );
     });
 
     it("should allow authenticated users to view ownerRequirements", () => {

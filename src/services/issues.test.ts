@@ -52,7 +52,13 @@ const mockInsertReturning = <T>(value: T) => {
 
 const mockInsertVoid = () => {
   const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
-  const values = vi.fn().mockReturnValue({ onConflictDoNothing });
+  // `createMachineTimelineEvent` calls `.returning({ id })` (PP-tv9l) to get
+  // the new event id for its `timeline_event_people` rows, so the void insert
+  // mock must also expose a `returning` resolving to a row with an id.
+  const returning = vi
+    .fn()
+    .mockResolvedValue([{ id: "00000000-0000-4000-8000-00000000ev01" }]);
+  const values = vi.fn().mockReturnValue({ onConflictDoNothing, returning });
   return { values } as unknown as ReturnType<typeof db.insert>;
 };
 
@@ -204,8 +210,10 @@ describe("Issue Service", () => {
 
       await createIssue(params);
 
-      // Verify two inserts were made: issue + issueWatchers (auto-watch for reporter)
-      expect(mockDb.insert).toHaveBeenCalledTimes(2);
+      // Four inserts: issue + issueWatchers (auto-watch for reporter)
+      // + timeline_events (issue_opened duplicate-write — PP-0x98 Task 10)
+      // + timeline_event_people (the reporter person-reference — PP-tv9l).
+      expect(mockDb.insert).toHaveBeenCalledTimes(4);
 
       expect(createNotification).toHaveBeenCalledWith(
         {
@@ -244,8 +252,10 @@ describe("Issue Service", () => {
 
       await createIssue(params);
 
-      // Only the issue insert should have been called — no issueWatchers insert
-      expect(mockDb.insert).toHaveBeenCalledTimes(1);
+      // Three inserts: issue + timeline_events (issue_opened, PP-0x98 Task 10)
+      // + timeline_event_people (the reporter person-reference — PP-tv9l).
+      // The watcher insert is skipped because autoWatchReporter is false.
+      expect(mockDb.insert).toHaveBeenCalledTimes(3);
     });
 
     it("extracts mention IDs from description and dispatches a 'mentioned' notification", async () => {

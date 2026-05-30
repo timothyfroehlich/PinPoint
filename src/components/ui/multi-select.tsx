@@ -55,6 +55,12 @@ export interface Option {
   badgeLabel?: string;
   group?: string;
   icon?: React.ComponentType<{ className?: string }>;
+  /**
+   * Optional semantic-token text color for the option icon (e.g.
+   * `"text-warning"`). Defaults to `text-muted-foreground` to preserve the
+   * existing muted look for callers that don't set it.
+   */
+  iconColor?: string;
 }
 
 export interface GroupedOption {
@@ -86,6 +92,8 @@ interface MultiSelectProps {
   placeholder?: string;
   searchPlaceholder?: string;
   className?: string;
+  /** Accessible name for the trigger when the placeholder isn't descriptive. */
+  ariaLabel?: string;
   "data-testid"?: string;
 }
 
@@ -98,6 +106,7 @@ export function MultiSelect({
   placeholder = "Select options...",
   searchPlaceholder = "Search...",
   className,
+  ariaLabel,
   "data-testid": testId,
 }: MultiSelectProps): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
@@ -142,7 +151,7 @@ export function MultiSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-label={placeholder}
+          aria-label={ariaLabel ?? placeholder}
           data-testid={testId}
           className={cn(
             "w-full justify-between h-9 px-3 py-2 font-normal",
@@ -253,7 +262,12 @@ export function MultiSelect({
                           className="h-4 w-4"
                         />
                         {option.icon && (
-                          <option.icon className="h-4 w-4 text-muted-foreground" />
+                          <option.icon
+                            className={cn(
+                              "h-4 w-4",
+                              option.iconColor ?? "text-muted-foreground"
+                            )}
+                          />
                         )}
                         <span className="flex-1">{option.label}</span>
                       </CommandItem>
@@ -338,7 +352,12 @@ export function MultiSelect({
                       >
                         <Checkbox checked={isSelected} className="h-4 w-4" />
                         {option.icon && (
-                          <option.icon className="h-4 w-4 text-muted-foreground" />
+                          <option.icon
+                            className={cn(
+                              "h-4 w-4",
+                              option.iconColor ?? "text-muted-foreground"
+                            )}
+                          />
                         )}
                         <span className="flex-1">{option.label}</span>
                       </CommandItem>

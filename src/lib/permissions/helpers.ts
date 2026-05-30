@@ -41,6 +41,7 @@ export function getAccessLevel(
  * Handles conditional permissions:
  * - 'own': Requires userId === reporterId
  * - 'owner': Requires userId === machineOwnerId
+ * - 'own_or_owner': Requires userId === reporterId OR userId === machineOwnerId
  *
  * @param permissionId - The permission to check (e.g., 'issues.update.reporting')
  * @param accessLevel - The user's access level
@@ -61,13 +62,18 @@ export function checkPermission(
   // Conditional permissions require context
   if (!context?.userId) return false;
 
-  // At this point, value is either "own" or "owner"
   if (value === "own") {
     return context.userId === context.reporterId;
   }
+  if (value === "owner") {
+    return context.userId === context.machineOwnerId;
+  }
 
-  // value === "owner"
-  return context.userId === context.machineOwnerId;
+  // value === "own_or_owner" — OR semantics
+  return (
+    context.userId === context.reporterId ||
+    context.userId === context.machineOwnerId
+  );
 }
 
 /**
@@ -105,7 +111,11 @@ export function getPermissionState(
   const isOwner =
     value === "own"
       ? context.userId === context.reporterId
-      : context.userId === context.machineOwnerId;
+      : value === "owner"
+        ? context.userId === context.machineOwnerId
+        : // value === "own_or_owner"
+          context.userId === context.reporterId ||
+          context.userId === context.machineOwnerId;
 
   if (isOwner) {
     return { allowed: true };
@@ -201,5 +211,5 @@ export function isConditionalPermission(
   accessLevel: AccessLevel
 ): boolean {
   const value = getPermission(permissionId, accessLevel);
-  return value === "own" || value === "owner";
+  return value === "own" || value === "owner" || value === "own_or_owner";
 }
