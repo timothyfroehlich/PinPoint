@@ -96,7 +96,18 @@ export function BaselineCombobox({
             value={query}
             onValueChange={setQuery}
           />
-          <CommandList>
+          {/* macOS hides overlay scrollbars by default, so a scrollbar alone
+              is not a reliable cutoff cue. A static fade-mask on the bottom
+              of the scroll viewport makes overflow unmistakable: the last
+              visible row literally fades, signalling more is below. When the
+              list fits exactly, the fade lands on empty space and has no
+              visible effect. */}
+          <CommandList
+            className={cn(
+              "max-h-[280px]",
+              "[mask-image:linear-gradient(to_bottom,#000_calc(100%-1.25rem),transparent)]"
+            )}
+          >
             <CommandEmpty>
               No preset matches — press the row above to use what you typed.
             </CommandEmpty>

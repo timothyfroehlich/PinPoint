@@ -159,7 +159,7 @@ function AddSectionMenu({
   onAdd,
 }: AddSectionMenuProps): React.JSX.Element {
   return (
-    <div className="border-t border-outline-variant/30 py-2.5">
+    <div className="border-t border-outline-variant/60 py-2.5">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="text-muted-foreground">
@@ -516,8 +516,10 @@ export function SettingsSetCard({
       </div>
 
       {/* Description preview — always visible, click anywhere to edit.
-          pl-11 aligns it under the set name (past the chevron). */}
-      <div className="pb-3 pl-11 pr-4">
+          pl-11 aligns it under the set name (past the chevron). The header
+          row above carries py-3, so only a small bottom inset is needed
+          here — prose margins are zeroed inside InlineMarkdownField. */}
+      <div className="-mt-1 pb-2 pl-11 pr-4">
         <InlineMarkdownField
           value={set.description}
           canEdit={contentEditable}
@@ -557,7 +559,7 @@ export function SettingsSetCard({
           </DndContext>
 
           {set.sections.length === 0 && !contentEditable && (
-            <p className="border-t border-outline-variant/30 py-3 text-sm italic text-muted-foreground">
+            <p className="border-t border-outline-variant/60 py-3 text-sm italic text-muted-foreground">
               No settings recorded yet.
             </p>
           )}

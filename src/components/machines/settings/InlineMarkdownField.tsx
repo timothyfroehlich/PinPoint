@@ -66,7 +66,10 @@ export function InlineMarkdownField({
     setIsEditing(false);
   }
 
-  const textSize = compact ? "text-xs" : "text-sm";
+  // Both modes render body text at the same size (14px) — "compact" only kills
+  // prose's vertical rhythm so the field can sit flush with its container
+  // (used by the card-header description).
+  const textSize = "text-sm";
 
   return (
     <div className={compact ? undefined : "space-y-1.5"}>
@@ -145,7 +148,11 @@ export function InlineMarkdownField({
             className={cn(
               "relative z-[1] [&_a]:pointer-events-auto",
               textSize,
-              compact && "text-muted-foreground",
+              // Compact kills prose's vertical rhythm (margins + 1.7 leading)
+              // so the description sits flush with its container while still
+              // rendering at the same 14px as the surrounding body fields.
+              compact &&
+                "text-muted-foreground [&_*]:!my-0 [&_*]:!text-sm [&_*]:!leading-snug",
               canEdit && "pointer-events-none"
             )}
           />
