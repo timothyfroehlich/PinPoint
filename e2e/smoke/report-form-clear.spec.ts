@@ -7,8 +7,8 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { STORAGE_STATE } from "../support/auth-state";
-import { cleanupTestEntities } from "../support/cleanup";
+import { STORAGE_STATE } from "../support/auth-state.js";
+import { cleanupTestEntities } from "../support/cleanup.js";
 import {
   fillReportForm,
   submitFormAndWaitForRedirect,

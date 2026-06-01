@@ -12,7 +12,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { STORAGE_STATE } from "../support/auth-state";
+import { STORAGE_STATE } from "../support/auth-state.js";
 import { assertNoA11yViolations } from "../support/actions.js";
 
 test.describe("Admin Discord integration page", () => {

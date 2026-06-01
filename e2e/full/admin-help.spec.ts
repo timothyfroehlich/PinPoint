@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
-import { TEST_USERS } from "../support/constants";
+import { loginAs } from "../support/actions.js";
+import { TEST_USERS } from "../support/constants.js";
 
 test.describe("Admin Help Page", () => {
   test("admin can navigate to admin help page from help page", async ({

@@ -19,17 +19,17 @@ import {
   logout,
   selectOption,
   assertSelectValue,
-} from "../support/actions";
-import { cleanupTestEntities } from "../support/cleanup";
-import { seededMachines, TEST_USERS } from "../support/constants";
+} from "../support/actions.js";
+import { cleanupTestEntities } from "../support/cleanup.js";
+import { seededMachines, TEST_USERS } from "../support/constants.js";
 import {
   fillReportForm,
   submitFormAndWaitForRedirect,
-} from "../support/page-helpers";
+} from "../support/page-helpers.js";
 import {
   getTestMachineInitials,
   getTestPrefix,
-} from "../support/test-isolation";
+} from "../support/test-isolation.js";
 
 // Worker-unique prefix so one worker's afterEach cannot delete another worker's
 // freshly-created issues. getTestPrefix() returns e.g. "w0_kg5x" — stable for

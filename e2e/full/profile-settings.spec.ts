@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { TEST_USERS } from "../support/constants";
-import { STORAGE_STATE } from "../support/auth-state";
+import { TEST_USERS } from "../support/constants.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
 
 test.describe("Profile Settings", () => {
   test.use({ storageState: STORAGE_STATE.member });

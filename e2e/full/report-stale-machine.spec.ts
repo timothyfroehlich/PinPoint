@@ -25,8 +25,8 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn } from "../support/actions";
-import { TEST_USERS } from "../support/constants";
+import { ensureLoggedIn } from "../support/actions.js";
+import { TEST_USERS } from "../support/constants.js";
 
 const STALE_UUID = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 
