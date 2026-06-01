@@ -276,11 +276,11 @@ export default [
         {
           restrict: [
             {
-              pattern: "^(?:[a-z0-9-]+:)*(?:bg|text|border|ring|fill|stroke|outline|divide|placeholder|caret|accent|decoration|shadow|from|via|to)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-[0-9]+(?:\\/[0-9]{1,3})?$",
+              pattern: "^(?:[^:]+:)*(?:bg|text|border|ring|fill|stroke|outline|divide|placeholder|caret|accent|decoration|shadow|from|via|to)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-[0-9]+(?:\\/[0-9]{1,3})?$",
               message: "Raw Tailwind palette classes are forbidden. Please use semantic tokens instead (e.g. bg-primary, text-destructive). See pinpoint-ui §Color System and pinpoint-design-bible §1.",
             },
             {
-              pattern: "^(?:[a-z0-9-]+:)*[a-z0-9-]+-\\[#[0-9a-fA-F]+\\](?:\\/.*)?$",
+              pattern: "^(?:[^:]+:)*[a-z0-9-]+-\\[(?:[^\\]]*?)#[0-9a-fA-F]{3,8}(?:[^\\]]*?)\\](?:\\/.*)?$",
               message: "Hardcoded arbitrary hex values are forbidden. Please use semantic tokens instead (e.g. text-muted-foreground, bg-primary). See pinpoint-ui §Color System and pinpoint-design-bible §1.",
             },
           ],
