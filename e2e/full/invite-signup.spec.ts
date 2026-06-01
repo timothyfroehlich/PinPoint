@@ -93,10 +93,7 @@ test.describe("User Invitation & Signup Flow", () => {
 
     console.log("[test] Admin logged out");
 
-    // 3. Get signup link from Mailpit
-    // Add small delay to allow backend processing time for email transmission.
-    // getSignupLink() performs internal polling, but this initial wait helps avoid early empty results.
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // 3. Get signup link from Mailpit (getSignupLink polls for up to 30 s)
     const signupLink = await getSignupLink(userEmail);
     console.log(`[test] Got signup link: ${signupLink}`);
     expect(signupLink).toContain("/signup");
@@ -184,7 +181,6 @@ test.describe("User Invitation & Signup Flow", () => {
     // 3. Logout and complete signup
     await logout(page, testInfo);
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
     const signupLink = await getSignupLink(userEmail);
     await page.goto(signupLink);
 
