@@ -117,6 +117,23 @@ Use the Sentry MCP tools:
 
 Flag issues with high event counts or new regressions.
 
+### Group F: Supabase Advisors
+
+Run the Supabase advisor checks against **prod** (project_id `udhesuizjsgxfeotqybn`, name: PinPoint-Prod). Call `mcp__plugin_supabase_supabase__get_advisors` twice:
+
+1. `type: "security"` — RLS gaps, exposed tables/functions, auth misconfig
+2. `type: "performance"` — unindexed FKs, RLS initplan re-evaluation, unused indexes
+
+**This is a deferred MCP tool**: load its schema first via `ToolSearch` query `select:mcp__plugin_supabase_supabase__get_advisors` before calling it.
+
+- If the tool schema comes back → run both checks.
+- If `No matching deferred tools found` → the Supabase MCP isn't connected. This is a **soft skip**: surface a one-line `Supabase MCP not connected, advisor check skipped` note in the briefing output and move on. Unlike Group E (Sentry), this is NOT a stop-and-ask gate — just don't drop it silently.
+
+**Triage guidance**: each lint carries a `level` — ERROR / WARN / INFO.
+
+- **ERROR-level security lints are immediate-attention items** (e.g. a public table with RLS disabled). Flag ERROR and WARN security lints prominently; INFO is informational.
+- Some findings are intentional by design. Tables with RLS **enabled but zero policies** are the deliberate "Drizzle-superuser-only access" pattern from migration 0034, not a regression. Cross-check every finding against known-intentional patterns before reporting it as a new problem.
+
 ---
 
 ## Step 2 — Structured Briefing Output
@@ -131,7 +148,7 @@ Synthesize all gathered data into this format:
 📅 Date: [today]
 
 ## 🚨 Needs Immediate Attention
-[Anything failing on main, critical security alerts, P0 bugs]
+[Anything failing on main, critical security alerts, P0 bugs, ERROR-level Supabase advisor findings]
 
 ## 🔐 Security
 pnpm audit:    [X vulns (critical/high/moderate)] or ✅ clean
@@ -151,6 +168,11 @@ Highlight: any with unresolved Copilot comments, failing CI, or stale > 7 days
 ## ⚠️ Sentry — New Errors
 [List: Error message | First seen | Event count | URL]
 Or: ✅ No new errors in last 5 days
+
+## 🛡️ Supabase Advisors
+Security:    [X errors, Y warnings] — list any ERROR-level findings with table/function name
+Performance: [X warnings, Z info] — summarize (unindexed FKs, RLS initplan, unused indexes)
+Or: ✅ No actionable advisor findings
 
 ## 📦 Beads State
 Ready to pick up: [top 5 from `bd ready`]
