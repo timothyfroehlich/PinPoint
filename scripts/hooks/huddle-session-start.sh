@@ -128,12 +128,15 @@ except Exception:
 " 2>/dev/null || echo "")
     fi
     NOW_DATE=$(date +%F)
-    printf '## ⚠️ Huddle rotation needed\n\n'
+    printf '## ⚠️ Huddle rotation needed — DISPATCH NOW, do not defer\n\n'
     printf 'The active coordination bead points to date %s, but today is %s.\n' "$STORED_DATE" "$NOW_DATE"
-    printf 'Before continuing, dispatch the rotation subagent — it will summarize\n'
-    printf 'the previous day, create today'\''s bead, update pointers, and post\n'
-    printf '"continued in" markers on closed beads.\n\n'
-    printf 'Dispatch template in .agents/skills/pinpoint-huddle/SKILL.md.\n'
+    printf 'Dispatch the rotation subagent IMMEDIATELY — before other work or your\n'
+    printf 'reply. This is a standing instruction, not optional: do NOT skip it,\n'
+    printf 'defer it, or ask the user whether to run it. It will summarize the\n'
+    printf 'previous day, create today'\''s bead, update pointers, and post\n'
+    printf '"continued in" markers on closed beads. Safe even if a peer already\n'
+    printf 'rotated (the subagent no-ops under a file lock).\n\n'
+    printf 'Dispatch template: .agents/skills/pinpoint-huddle/SKILL.md.\n'
     exit 0
   fi
 fi
