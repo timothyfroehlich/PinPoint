@@ -154,14 +154,6 @@ def load_manifest() -> dict[str, int]:
         return {}
 
 
-def save_manifest(slots: dict[str, int]) -> None:
-    """Write the slot manifest (not atomic — callers use flock for safety)."""
-    MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-    MANIFEST_PATH.write_text(
-        json.dumps({"version": 1, "slots": slots}, indent=2) + "\n"
-    )
-
-
 def prune_manifest(slots: dict[str, int]) -> dict[str, int]:
     """Remove entries whose worktree directories no longer exist."""
     return {path: slot for path, slot in slots.items() if Path(path).is_dir()}

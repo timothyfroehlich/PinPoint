@@ -23,7 +23,6 @@ from worktree_setup import (
     parse_env_file,
     prune_manifest,
     resolve_brainstorm_server_path,
-    save_manifest,
 )
 
 # Testing philosophy for worktree setup
@@ -461,11 +460,6 @@ class TestManifest:
         slots = load_manifest()
         assert slots == {}
         assert self.manifest_path.exists()
-
-    def test_save_and_load_roundtrip(self) -> None:
-        save_manifest({"/tmp/wt-a": 3, "/tmp/wt-b": 7})
-        slots = load_manifest()
-        assert slots == {"/tmp/wt-a": 3, "/tmp/wt-b": 7}
 
     def test_prune_removes_nonexistent_paths(self, tmp_path: Path) -> None:
         existing_dir = tmp_path / "exists"
