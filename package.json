@@ -18,7 +18,7 @@
     "test": "pnpm run test:ensure-schema && vitest run --project unit --silent --no-color --reporter=dot --max-workers=4",
     "test:integration": "pnpm run test:ensure-schema && bash scripts/workflow/heavy-run.sh vitest run --project integration --silent --no-color --reporter=dot --max-workers=2",
     "test:integration:supabase": "pnpm run test:ensure-schema && bash scripts/workflow/heavy-run.sh vitest run --project integration-supabase --silent --no-color --reporter=dot --max-workers=2",
-    "test:changed": "vitest run --changed origin/main --reporter=dot",
+    "test:changed": "pnpm run test:ensure-schema && vitest run --changed origin/main --reporter=dot",
     "test:watch": "pnpm run test:ensure-schema && vitest watch --project unit",
     "test:coverage": "pnpm run test:ensure-schema && vitest run --project unit --coverage --silent --no-color --reporter=dot",
     "test:_generate-schema": "drizzle-kit export --dialect=postgresql --schema=./src/server/db/schema.ts > src/test/setup/schema.sql",

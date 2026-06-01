@@ -3,8 +3,13 @@
 #
 # Guards memory-intensive commands (test:integration, build, smoke) from
 # stacking up across parallel worktree sessions on a 16 GB Mac. Uses the same
-# semaphore id / slot count as preflight-locked.sh so all heavy jobs compete
-# for the same pool.
+# --jobs 2 slot count as preflight-locked.sh, but a SEPARATE semaphore id
+# (`pinpoint-heavy` vs `pinpoint-preflight`). The two pools are intentionally
+# distinct: preflight already holds an outer `pinpoint-preflight` slot and then
+# invokes these same heavy steps internally, so sharing one id would have
+# preflight wait on a slot it already owns — a self-deadlock. Bare heavy
+# commands (run outside preflight) contend within `pinpoint-heavy`; preflight
+# runs contend within `pinpoint-preflight`. Each pool independently caps at 2.
 #
 # Transparent passthrough when:
 #   - Running in CI ($CI is set), where resource isolation is already handled
@@ -19,6 +24,11 @@
 #   "test:integration": "pnpm run test:ensure-schema && bash scripts/workflow/heavy-run.sh vitest run …"
 
 set -euo pipefail
+
+if [ "$#" -eq 0 ]; then
+  echo "Usage: bash scripts/workflow/heavy-run.sh <command> [args…]" >&2
+  exit 64 # EX_USAGE
+fi
 
 # CI passthrough — runners already provide isolation; semaphore would deadlock
 # on single-slot environments.
@@ -36,7 +46,8 @@ if ! command -v sem >/dev/null 2>&1 \
   exec "$@"
 fi
 
-# --jobs 2:               up to 2 concurrent heavy jobs across all worktrees
-# --id pinpoint-heavy:    named semaphore shared with preflight slots
+# --jobs 2:               up to 2 concurrent bare heavy jobs across all worktrees
+# --id pinpoint-heavy:    pool distinct from preflight's (see header — avoids
+#                         a self-deadlock when preflight nests these commands)
 # --fg:                   block synchronously and propagate exit code
 exec sem --jobs 2 --id pinpoint-heavy --fg "$@"
