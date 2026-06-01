@@ -4,6 +4,7 @@ import typescriptParser from "@typescript-eslint/parser";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import promisePlugin from "eslint-plugin-promise";
 import eslintCommentsPlugin from "@eslint-community/eslint-plugin-eslint-comments";
+import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 
 export default [
   js.configs.recommended,
@@ -245,6 +246,46 @@ export default [
       "@typescript-eslint/explicit-function-return-type": "off",
       "no-restricted-imports": "off",
       "eslint-comments/no-restricted-disable": "off",
+    },
+  },
+  {
+    // Enforce semantic Tailwind tokens, blocking raw palette classes and hardcoded hex values.
+    // Design-layer files and tests are allowed.
+    files: ["**/*.ts", "**/*.tsx"],
+    ignores: [
+      "src/lib/issues/status.ts",
+      "src/lib/machines/status.ts",
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
+      "e2e/**",
+      "src/test/fixtures/**",
+    ],
+    plugins: {
+      "better-tailwindcss": betterTailwindcss,
+    },
+    settings: {
+      "better-tailwindcss": {
+        entryPoint: "src/app/globals.css",
+      },
+    },
+    rules: {
+      "better-tailwindcss/no-restricted-classes": [
+        "error",
+        {
+          restrict: [
+            {
+              pattern: "^(?:[^:]+:)*(?:bg|text|border|ring|fill|stroke|outline|divide|placeholder|caret|accent|decoration|shadow|from|via|to)-(?:red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-[0-9]+(?:\\/[0-9]{1,3})?$",
+              message: "Raw Tailwind palette classes are forbidden. Please use semantic tokens instead (e.g. bg-primary, text-destructive). See pinpoint-ui §Color System and pinpoint-design-bible §1.",
+            },
+            {
+              pattern: "^(?:[^:]+:)*[a-z0-9-]+-\\[(?:[^\\]]*?)#[0-9a-fA-F]{3,8}(?:[^\\]]*?)\\](?:\\/.*)?$",
+              message: "Hardcoded arbitrary hex values are forbidden. Please use semantic tokens instead (e.g. text-muted-foreground, bg-primary). See pinpoint-ui §Color System and pinpoint-design-bible §1.",
+            },
+          ],
+        },
+      ],
     },
   },
 ];

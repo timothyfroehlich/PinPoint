@@ -26,7 +26,7 @@ Use this skill when:
 3. **shadcn/ui only**: No MUI components
 4. **Direct Server Action references**: No inline wrappers in forms
 5. **Dropdown Server Actions**: Use `onSelect`, not forms
-6. **Tailwind CSS v4 + semantic tokens**: Use `bg-primary`, `text-destructive`, etc. — no raw palette classes (`bg-cyan-500`, `text-red-500`) and no hardcoded hex
+6. **Tailwind CSS v4 + semantic tokens**: Use `bg-primary`, `text-destructive`, etc. — no raw palette classes (`bg-cyan-500`, `text-red-500`) and no hardcoded hex (enforced via ESLint `better-tailwindcss/no-restricted-classes`)
 7. **TooltipProvider is hoisted**: `<TooltipProvider>` is mounted once in `ClientProviders` — don't add nested providers. See `pinpoint-design-bible` §12.
 8. **Baseline Widely available is the floor** (CORE-UI-005): use `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, native form validation directly — no polyfills. Newly-available features (Popover API, View Transitions, anchor positioning) require a per-feature opt-in in `pinpoint-design-bible` §19. See **Browser Support** section below.
 9. **Form correctness** (CORE-FORM-001..006): right `type`, correct `autocomplete` token, `:user-invalid` styling, `aria-invalid` blur sync, visible required-field indicator, `enterkeyhint` on sequential mobile fields. See **Form Correctness** below.
@@ -174,7 +174,7 @@ Every authenticated page should compose `<MainLayout>` → `<PageContainer>` →
 
 ## Color System
 
-- **Use semantic tokens** (`bg-primary`, `text-destructive`, `text-muted-foreground`, `border-success/40`). Raw Tailwind palette classes (`bg-cyan-500`, `text-red-500`, `border-fuchsia-500`) and hardcoded hex are **forbidden in component code** — see design-bible §1 for the full rule and the design-layer config exceptions.
+- **Use semantic tokens** (`bg-primary`, `text-destructive`, `text-muted-foreground`, `border-success/40`). Raw Tailwind palette classes (`bg-cyan-500`, `text-red-500`, `border-fuchsia-500`) and hardcoded hex are **forbidden in component code** (enforced via ESLint flat config rule `better-tailwindcss/no-restricted-classes`) — see design-bible §1 for the full rule and the design-layer config exceptions.
 - Status / severity / priority / frequency colors come from `STATUS_CONFIG` / `SEVERITY_CONFIG` / `PRIORITY_CONFIG` / `FREQUENCY_CONFIG` in `src/lib/issues/status.ts` — never freestyle.
 - Theme tokens are defined in `src/app/globals.css` via Tailwind v4 `@theme` block. Dark-only — `dark:` utility classes are dead code, remove them when you touch the file.
 - Primary: `--color-primary` (APC Neon Green `#4ade80`)
