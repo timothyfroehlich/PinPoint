@@ -40,6 +40,16 @@
             "timeout": 5000
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-main-worktree-branch-switch.cjs",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "PostToolUse": [
