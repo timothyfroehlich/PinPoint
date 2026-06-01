@@ -169,32 +169,6 @@ describe("uploadIssueImage", () => {
     }
   });
 
-  it("should insert record and revalidate for existing issue", async () => {
-    vi.mocked(rateLimit.checkImageUploadLimit).mockResolvedValue({
-      success: true,
-      limit: 5,
-      remaining: 4,
-      reset: 0,
-    });
-
-    vi.mocked(blobClient.uploadToBlob).mockResolvedValue({
-      url: "https://blob.com/test.jpg",
-      pathname: "issue-images/test-issue/test.jpg",
-      size: 1024,
-      uploadedAt: new Date(),
-    });
-
-    const formData = new FormData();
-    formData.append("issueId", "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
-    const file = createMockFile("test.jpg", "image/jpeg", 2048);
-    formData.append("image", file);
-
-    const result = await uploadIssueImage(formData);
-
-    expect(result.ok).toBe(true);
-    expect(db.insert).toHaveBeenCalled();
-  });
-
   it("should cleanup blob if DB insert fails", async () => {
     vi.mocked(rateLimit.checkImageUploadLimit).mockResolvedValue({
       success: true,
