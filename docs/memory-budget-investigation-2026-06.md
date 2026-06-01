@@ -11,7 +11,7 @@ The whole reduction strategy follows from this: **deduplicate the things a team 
 ## Method (so the numbers are trustworthy)
 
 - Metric is **`phys_footprint`** (via `footprint -p <pid>`), _not_ RSS. RSS double-counts shared frameworks across processes — that's literally why the Force-Quit panel showed cmux and Chrome at an identical, inflated 14.24 GB (its per-app numbers sum to ~34 GB on a 16 GB machine; they're unreliable).
-- Harness: `scripts/diagnostics/mem-budget.sh` (`snap` / `watch` / `reduce`), attributing per-app subtrees and per-run process trees by pgid.
+- Harness: `scripts/diagnostics/mem-budget.sh` (`snap` / `watch` / `reduce`), attributing per-app footprint by process-name pattern (`pgrep -f`) and tracking system free/swap/compressor for per-run deltas. (Per-run vitest-tree isolation by pgid was done with auxiliary throwaway scripts during the investigation, not this harness.)
 - **Lesson paid for in this investigation:** the first two "max-workers" measurements were invalid — `pnpm run test:integration -- --max-workers=1` appends _after_ the script's hardcoded `--max-workers=4` and vitest ignored the override, so "1 vs 4" was really "4 vs 4." Always verify a cap took effect (wall-clock is the tell) before trusting a comparison.
 
 ## Measured memory budget (phys_footprint)
@@ -59,7 +59,7 @@ The whole reduction strategy follows from this: **deduplicate the things a team 
 ### Tier 3 — hygiene & correctness (from the audit)
 
 8. **Fix the preflight race:** serialize `lint:fix` → `format:fix`; write `schema.sql` atomically (tmp+rename); run `test:ensure-schema` once as a serial pre-step. Ends the intermittent startup failures. _(trivial / low)_
-9. **Prune the unit layer (PR #1469).** Merge Wave 1 deletes now; the asset is your integration/permissions tests, the liability is mock-heavy/implementation-coupled unit tests. Run **Stryker once, scoped to `src/lib/permissions/**`\*_ as a one-time value audit — not a standing gate. _(medium / low)\*
+9. **Prune the unit layer (PR #1469).** Merge Wave 1 deletes now; the asset is your integration/permissions tests, the liability is mock-heavy/implementation-coupled unit tests. Run a one-time **Stryker** value audit scoped to `src/lib/permissions/**` — not a standing gate. _(medium / low)_
 10. **Audit bugs:** `db:fast-reset` truncates `user_profiles` but not `auth.users`; 8 leaked nested-worktree slots (`worktree_orphan_sweep.py --apply`); one unit-project file misusing PGlite; dead `save_manifest()`. _(trivial / low)_
 
 ### Deliberately NOT recommended
