@@ -87,3 +87,10 @@ else
     echo -e "${RED}❌ Seeding failed!${NC}"
     exit 1
 fi
+
+# Backfill historical machine-timeline events from the freshly loaded prod data.
+# The prod dump carries machines/issues but no synthesized timeline_events for
+# pre-V1 history, so without this the Timeline tab is empty locally (PP-7kil).
+# Idempotent NOT-EXISTS backfill; matches what db:reset / db:fast-reset do.
+echo -e "${BLUE}🕓 Backfilling machine timeline events...${NC}"
+pnpm run db:_seed-timeline-backfill
