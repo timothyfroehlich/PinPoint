@@ -7,7 +7,7 @@
 #                                   if pressure clears → GO;
 #                                   if still tight at timeout → HARD-BLOCK.
 #   HARD-BLOCK  (free < 800 MB
-#                OR swap > 6500 MB): exit non-zero immediately with a message.
+#                OR swap >= 6500 MB): exit non-zero immediately with a message.
 #
 # "Free RAM" = (pages free + pages inactive) × page size, which matches what
 # macOS considers "available" (inactive pages are immediately reclaimable).
@@ -37,6 +37,15 @@ fi
 
 if [ "${FORCE_MEM_PRECHECK:-}" = "skip" ]; then
   echo "[mem-precheck] override: FORCE_MEM_PRECHECK=skip — skipping check." >&2
+  exit 0
+fi
+
+# Non-Darwin fail-open. The gate's metrics (vm_stat, sysctl vm.swapusage) are
+# macOS-only. On Linux/remote dev hosts vm_stat fails, _free_mb() reads 0, and
+# the script would HARD-BLOCK — wedging build/integration. The gate only
+# applies where its metrics are valid, so elsewhere we allow unconditionally.
+if [ "$(uname)" != "Darwin" ]; then
+  echo "[mem-precheck] non-Darwin host — skipping check (gate is macOS-only)." >&2
   exit 0
 fi
 
@@ -77,23 +86,32 @@ _swap_used_mb() {
   local raw
   raw=$(sysctl -n vm.swapusage 2>/dev/null) || { echo "0"; return; }
   # Format: "total = NNN.NNM  used = NNN.NNM  free = NNN.NNM  (encrypted)"
-  # Extract the "used = NNN.NNM" part and convert to integer MB.
-  local used_val used_unit
-  used_val=$(echo "$raw"  | awk '{ for(i=1;i<=NF;i++) if ($i=="used") print $(i+2) }')
-  used_unit=$(echo "$raw" | awk '{ for(i=1;i<=NF;i++) if ($i=="used") print $(i+3) }')
+  # The figure after "used =" is a single token with the unit suffixed, e.g.
+  # "280.88M" or "6.50G". Grab that one token (two fields after "used").
+  local used_token
+  used_token=$(echo "$raw" \
+    | awk '{ for (i=1;i<=NF;i++) if ($i=="used") { print $(i+2); break } }')
 
-  if [ -z "$used_val" ]; then
+  if [ -z "$used_token" ]; then
     echo "0"
     return
   fi
 
-  # Remove any trailing 'M' from the value (e.g., "280.88M" → "280.88")
-  used_val="${used_val%M}"
+  # Pull the trailing unit letter off the SAME token, then strip it from the
+  # numeric value. Default to M if no recognizable unit suffix is present.
+  local unit numeric
+  unit=$(printf '%s' "$used_token" | sed -E 's/^[0-9.]+//; s/[^A-Za-z].*$//')
+  numeric=$(printf '%s' "$used_token" | sed -E 's/[A-Za-z].*$//')
 
-  # Convert to integer MB (truncate decimals with printf)
-  case "${used_unit:-M}" in
-    G*) printf "%.0f\n" "$(echo "$used_val * 1024" | awk '{printf "%.0f", $1 * $3}')" ;;
-    *)  printf "%.0f\n" "$used_val" ;;
+  if [ -z "$numeric" ]; then
+    echo "0"
+    return
+  fi
+
+  # Convert to integer MB. G → ×1024, anything else (M/empty) → as-is.
+  case "${unit:-M}" in
+    G | g) awk -v v="$numeric" 'BEGIN { printf "%.0f\n", v * 1024 }' ;;
+    *)     awk -v v="$numeric" 'BEGIN { printf "%.0f\n", v }' ;;
   esac
 }
 
@@ -107,7 +125,7 @@ _hard_block() {
   echo "╚══════════════════════════════════════════════╝" >&2
   echo ""                                                >&2
   echo "  Free RAM : ${free_mb} MB  (need >= ${THRESHOLD_QUEUE} MB to queue, >= ${THRESHOLD_GO} MB to run)" >&2
-  echo "  Swap used: ${swap_mb} MB  (hard-block if > ${THRESHOLD_SWAP} MB)" >&2
+  echo "  Swap used: ${swap_mb} MB  (hard-block if >= ${THRESHOLD_SWAP} MB)" >&2
   echo ""                                                >&2
   echo "  Heavy command blocked. Options:" >&2
   echo "    • Wait for other sessions to finish, then retry." >&2

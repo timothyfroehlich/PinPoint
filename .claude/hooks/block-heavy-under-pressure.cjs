@@ -74,6 +74,15 @@ async function main() {
     process.exit(0);
   }
 
+  // Honor an INLINE override: `FORCE_MEM_PRECHECK=skip pnpm run build`.
+  // The shell only exports that var into the child process when the command
+  // runs — it is NOT in this hook's own process.env. Without this check the
+  // hook would run the precheck and could deny a command the user explicitly
+  // told us to skip. Allow immediately when the inline override is present.
+  if (/(^|\s)FORCE_MEM_PRECHECK=skip(\s|$)/.test(command)) {
+    process.exit(0);
+  }
+
   // Locate the precheck script relative to the hook's own location.
   // Hook lives at .claude/hooks/; script is at scripts/guard/mem-precheck.sh.
   // We resolve from CLAUDE_PROJECT_DIR if available (set by Claude Code), then
