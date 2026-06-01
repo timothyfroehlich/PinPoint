@@ -42,10 +42,33 @@ function classifyCommand(command) {
     // Tokenize on whitespace. Good enough for the flag/branch checks below.
     const tokens = segment.split(/\s+/).filter(Boolean);
 
-    // Locate `git` and the subcommand (`checkout`/`switch`) that follows it.
-    // Skip global options between `git` and the subcommand (e.g. `git -C path checkout`).
-    const gitIdx = tokens.indexOf("git");
-    if (gitIdx === -1) continue;
+    // Resolve the effective command of the segment by skipping:
+    //   (a) leading environment-assignment tokens (VAR=value, VAR+=value, etc.)
+    //   (b) leading wrapper commands that do not consume the command slot
+    //       themselves: sudo, env, command, time, nice.
+    // Only if the resulting resolved command token is exactly "git" does this
+    // segment count as a git invocation. Anything else (e.g. `echo git checkout`,
+    // `rg git checkout`) is NOT a git invocation → skip to the next segment.
+    //
+    // Fail-open on wrappers-with-flags: if a wrapper is followed by its own flags
+    // (e.g. `sudo -u root git checkout`) before `git`, we stop scanning wrappers
+    // the moment we see a flag-like token, so the segment ALLOWS (the resolved
+    // command would be the flag, not `git`). This is intentionally conservative.
+    const WRAPPERS = new Set(["sudo", "env", "command", "time", "nice"]);
+    const ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*[+:]?=/;
+
+    let cmdIdx = -1;
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      if (ENV_ASSIGN.test(t)) continue; // skip VAR=value
+      if (WRAPPERS.has(t)) continue;    // skip wrapper command itself
+      cmdIdx = i;
+      break;
+    }
+    if (cmdIdx === -1 || tokens[cmdIdx] !== "git") continue;
+
+    // From here, `tokens[cmdIdx]` is exactly `git`.
+    const gitIdx = cmdIdx;
 
     // Git global options that consume the NEXT token as their value
     // (e.g. `git -C path checkout`, `git --git-dir=... ` uses `=` so is self-contained).
