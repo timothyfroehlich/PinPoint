@@ -31,10 +31,18 @@ if [ "$#" -eq 0 ]; then
 fi
 
 # CI passthrough — runners already provide isolation; semaphore would deadlock
-# on single-slot environments.
+# on single-slot environments. mem-precheck also exits 0 in CI (redundant but
+# harmless), so skip the whole block.
 if [ -n "${CI:-}" ]; then
   exec "$@"
 fi
+
+# Memory-pressure gate — run BEFORE acquiring the sem slot so a heavy command
+# can never queue onto the semaphore while the host is already critically low.
+# The gate is banded: GO / QUEUE (polls up to 5 min) / HARD-BLOCK (exit 1).
+# Override: FORCE_MEM_PRECHECK=skip <command> bypasses the gate for one run.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "${SCRIPT_DIR}/../guard/mem-precheck.sh"
 
 # Detect GNU parallel's sem. moreutils also ships a `sem` binary that doesn't
 # speak --jobs/--id/--fg, so probe the version banner too.
