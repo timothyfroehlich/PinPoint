@@ -11,7 +11,8 @@
 #                                 Combine with --force to bypass currency + threads + ci together.
 #
 # no_conflict gate is NEVER bypassable — GitHub rejects conflicting merges regardless of --admin.
-# Authorship gate has no bypass; this script operates only on PRs you authored.
+# Authorship gate has no bypass; this script operates only on PRs you authored OR PRs authored
+# by trusted Dependabot bot identities (app/dependabot, dependabot[bot], dependabot).
 # Both --force and --bypass-merge-requirements require manual permission approval
 # (settings.json permissions.ask).
 
@@ -49,8 +50,17 @@ PR_LABELS=$(jq -r '.labels | map(.name) | join(",")' <<< "$PR_INFO")
 PR_HEAD_SHA=$(jq -r .headRefOid <<< "$PR_INFO")
 CURRENT_USER=$(gh api user --jq .login)
 
-if [ "$PR_AUTHOR" != "$CURRENT_USER" ]; then
-  echo "REFUSE: merge-pr.sh only operates on your own PRs (PR author: $PR_AUTHOR, you: $CURRENT_USER)" >&2
+is_trusted_author() {
+  local author="$1"
+  [ "$author" = "$CURRENT_USER" ] && return 0
+  case "$author" in
+    "app/dependabot"|"dependabot[bot]"|"dependabot") return 0 ;;
+  esac
+  return 1
+}
+
+if ! is_trusted_author "$PR_AUTHOR"; then
+  echo "REFUSE: merge-pr.sh only operates on your own PRs or Dependabot PRs (PR author: $PR_AUTHOR, you: $CURRENT_USER)" >&2
   exit 1
 fi
 
