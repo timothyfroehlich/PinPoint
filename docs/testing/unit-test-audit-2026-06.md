@@ -1,8 +1,8 @@
 # Unit / Integration Test Suite Audit — 2026-06
 
 **Status:** DRAFT — pending Tim review of verdicts before the reclass/rewrite waves are filed as beads.
-Wave 1 whole-file redundant deletes (3 files) are executed in the PR that carries this doc; everything
-else is a proposal.
+Wave 1 whole-file deletes (4 files: 3 redundant + 1 obsolete) are executed in the PR that carries this
+doc; everything else is a proposal.
 **Scope:** All three Vitest projects — `unit` (jsdom), `integration` (PGlite), `integration-supabase`
 (local Supabase). ~1,473 classified `it`/`test` leaf blocks across 176 files (raw regex count is higher
 due to `it.each` expansion).
