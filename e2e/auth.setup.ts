@@ -5,7 +5,7 @@
  * declare `dependencies: ["auth-setup"]` so this runs before any test.
  *
  * Usage in tests (opt-in):
- *   import { STORAGE_STATE } from "./support/auth-state";
+ *   import { STORAGE_STATE } from "./support/auth-state.js";
  *   test.use({ storageState: STORAGE_STATE.member });
  *
  * Exclude criteria (do NOT use storageState):
@@ -19,8 +19,8 @@ import { mkdirSync } from "fs";
 import { dirname } from "path";
 import { expect, type Page, test as setup } from "@playwright/test";
 
-import { TEST_USERS } from "./support/constants";
-import { STORAGE_STATE } from "./support/auth-state";
+import { TEST_USERS } from "./support/constants.js";
+import { STORAGE_STATE } from "./support/auth-state.js";
 
 /**
  * Logs in via UI and saves storageState to disk.

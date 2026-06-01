@@ -8,8 +8,8 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { STORAGE_STATE } from "../support/auth-state";
-import { seededMachines } from "../support/constants";
+import { STORAGE_STATE } from "../support/auth-state.js";
+import { seededMachines } from "../support/constants.js";
 
 test.describe("Technician Role Permissions", () => {
   test.use({ storageState: STORAGE_STATE.technician });

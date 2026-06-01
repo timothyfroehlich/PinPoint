@@ -6,10 +6,10 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
-import { cleanupTestEntities } from "../support/cleanup";
-import { TEST_USERS } from "../support/constants";
-import { fillReportForm } from "../support/page-helpers";
+import { loginAs } from "../support/actions.js";
+import { cleanupTestEntities } from "../support/cleanup.js";
+import { TEST_USERS } from "../support/constants.js";
+import { fillReportForm } from "../support/page-helpers.js";
 
 const PUBLIC_PREFIX = "E2E Public Report";
 

@@ -9,7 +9,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { seededMachines } from "../support/constants";
+import { seededMachines } from "../support/constants.js";
 
 test.describe("Machines Public Access", () => {
   test("unauthenticated user can view machines list", async ({ page }) => {

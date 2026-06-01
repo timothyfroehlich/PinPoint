@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAs, logout } from "../support/actions";
+import { loginAs, logout } from "../support/actions.js";
 import { createTestUser, deleteTestUser } from "../support/supabase-admin.js";
 
 const originalPassword = "TestPassword123";

@@ -35,9 +35,9 @@ import {
   loginAs,
   logout,
   assertNoA11yViolations,
-} from "../support/actions";
-import { seededMachines, TEST_USERS } from "../support/constants";
-import { clearMachineField } from "../support/supabase-admin";
+} from "../support/actions.js";
+import { seededMachines, TEST_USERS } from "../support/constants.js";
+import { clearMachineField } from "../support/supabase-admin.js";
 
 test.describe("Machine Details Redesign", () => {
   test.beforeEach(async ({ page }, testInfo) => {

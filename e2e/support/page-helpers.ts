@@ -11,7 +11,7 @@
  */
 
 import type { Page, Locator } from "@playwright/test";
-import { selectOption } from "./actions";
+import { selectOption } from "./actions.js";
 
 declare global {
   interface Window {
