@@ -2,10 +2,13 @@
  * Integration Tests for Issue Images
  *
  * Tests image database operations, limits, and cascade behavior with PGlite.
+ * Also contains action-level integration tests for uploadIssueImage that verify
+ * real DB persistence and permission-enforcement via real DB ownership rows.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { eq, count } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestUser } from "~/test/helpers/factories";
 import {
@@ -16,6 +19,36 @@ import {
   issueImages,
 } from "~/server/db/schema";
 import { BLOB_CONFIG } from "~/lib/blob/config";
+import { createClient } from "~/lib/supabase/server";
+import { checkImageUploadLimit } from "~/lib/rate-limit";
+import { uploadToBlob } from "~/lib/blob/client";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
+
+// Route the production `db` import to the PGlite worker instance so that
+// uploadIssueImage reads/writes real rows instead of a hand-rolled mock.
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  return { db: await getTestDb() };
+});
+
+vi.mock("~/lib/supabase/server", () => ({
+  createClient: vi.fn(),
+}));
+
+vi.mock("~/lib/blob/client", () => ({
+  uploadToBlob: vi.fn(),
+  deleteFromBlob: vi.fn(),
+}));
+
+vi.mock("~/lib/rate-limit", () => ({
+  checkImageUploadLimit: vi.fn(),
+  getClientIp: vi.fn(() => Promise.resolve("127.0.0.1")),
+  formatResetTime: vi.fn(() => "15 minutes"),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
 
 describe("Issue Images Database Operations (PGlite)", () => {
   setupTestDb();
@@ -287,5 +320,239 @@ describe("Issue Images Database Operations (PGlite)", () => {
 
       expect(activeCount[0].val).toBe(1);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Action-level integration tests for uploadIssueImage
+// ---------------------------------------------------------------------------
+// These tests call the real server action against PGlite and only mock the
+// three external boundaries: blob storage, rate limiting, and Supabase auth.
+// ---------------------------------------------------------------------------
+
+describe("uploadIssueImage — action integration (PGlite)", () => {
+  setupTestDb();
+
+  // Helpers ----------------------------------------------------------------
+
+  function createMockFile(
+    name: string,
+    type: string,
+    sizeInBytes: number
+  ): File {
+    const content = new Array(sizeInBytes).fill("x").join("");
+    return new File([content], name, { type });
+  }
+
+  // The action only calls `supabase.auth.getUser()`, so we provide a faithful
+  // full `getUser` response (`{ data, error: null }`) typed against the SDK's
+  // own return type. A single narrow cast to `SupabaseClient` is used at the SDK
+  // boundary because the mock implements only the `auth` slice the action
+  // consumes — no `unknown as` double-cast (CORE-TS-007).
+  type GetUserResult = Awaited<ReturnType<SupabaseClient["auth"]["getUser"]>>;
+
+  function mockAuth(userId: string | null) {
+    const user = userId ? ({ id: userId } as User) : null;
+    const getUserResult: GetUserResult = user
+      ? { data: { user }, error: null }
+      : {
+          data: { user: null },
+          error: {
+            name: "AuthSessionMissingError",
+            message: "Auth session missing!",
+          } as GetUserResult["error"],
+        };
+
+    const auth: Pick<SupabaseClient["auth"], "getUser"> = {
+      getUser: vi.fn().mockResolvedValue(getUserResult),
+    };
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth,
+    } as SupabaseClient);
+  }
+
+  function mockRateLimitPass() {
+    vi.mocked(checkImageUploadLimit).mockResolvedValue({
+      success: true,
+      limit: 5,
+      remaining: 4,
+      reset: 0,
+    });
+  }
+
+  // Echo the pathname the action actually constructs back through the blob
+  // result, so the action's `blobPathname` output reflects the real key it built
+  // (per-issue prefix + timestamp) rather than a hardcoded test string.
+  function mockBlobUpload() {
+    vi.mocked(uploadToBlob).mockImplementation((_file, pathname) =>
+      Promise.resolve({
+        url: `https://blob.com/${pathname}`,
+        pathname,
+        size: 1024,
+        uploadedAt: new Date(),
+      })
+    );
+  }
+
+  async function seedIssueWithOwner(
+    reporterRole: "member" | "guest" | "technician" | "admin" = "member"
+  ) {
+    const db = await getTestDb();
+    const reporterId = randomUUID();
+    const ownerId = randomUUID();
+
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: reporterId, role: reporterRole }));
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: ownerId, role: "member" }));
+
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Action Test Machine", initials: "ATM", ownerId })
+      .returning();
+
+    const [issue] = await db
+      .insert(issues)
+      .values({
+        title: "Action Test Issue",
+        machineInitials: machine.initials,
+        issueNumber: 1,
+        severity: "playable",
+        reportedBy: reporterId,
+      })
+      .returning();
+
+    return { reporterId, ownerId, issueId: issue.id };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Block: "should insert record and revalidate for existing issue"
+  // RECLASS-integration: the real assertion is that an issueImages row persists
+  // in the DB. The unit test only checked that db.insert was called on a mock.
+  it("inserts an issueImages row for an existing issue", async () => {
+    const { reporterId, issueId } = await seedIssueWithOwner("member");
+    mockAuth(reporterId);
+    mockRateLimitPass();
+    mockBlobUpload();
+
+    const { uploadIssueImage } = await import("~/server/actions/images");
+
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("image", createMockFile("test.jpg", "image/jpeg", 2048));
+
+    const result = await uploadIssueImage(formData);
+
+    // The action must construct the blob key with a per-issue prefix derived
+    // from the real issueId — assert the actual argument it passed to the blob
+    // client, not just the echoed mock value. This catches pathname-construction
+    // regressions (e.g. wrong prefix, leaked "pending"/"new" path).
+    const expectedPrefix = `issue-images/${issueId}/`;
+    expect(uploadToBlob).toHaveBeenCalledTimes(1);
+    // mock.calls[0] is the [file, pathname] tuple; assert on the pathname arg
+    // the action constructed.
+    const constructedPathname = vi.mocked(uploadToBlob).mock.calls[0][1];
+    expect(constructedPathname.startsWith(expectedPrefix)).toBe(true);
+    // The key suffix is `<timestamp>-<sanitized-filename>`; assert the filename
+    // survives and a numeric timestamp prefixes it.
+    expect(constructedPathname).toMatch(/\/\d+-test\.jpg$/);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.imageId).toBeDefined();
+      // The action returns the key it built; it must carry the per-issue prefix.
+      expect(result.value.blobPathname).toBe(constructedPathname);
+      expect(result.value.blobPathname.startsWith(expectedPrefix)).toBe(true);
+    }
+
+    // Assert the row actually persists in the real PGlite DB
+    const db = await getTestDb();
+    const rows = await db
+      .select()
+      .from(issueImages)
+      .where(eq(issueImages.issueId, issueId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.uploadedBy).toBe(reporterId);
+    expect(rows[0]?.fullBlobPathname).toBe(constructedPathname);
+    expect(rows[0]?.fullBlobPathname.startsWith(expectedPrefix)).toBe(true);
+  });
+
+  // NEW coverage: permission-denied path for a non-reporter/non-owner member
+  // The unit test could not test this honestly — it required mocking DB ownership
+  // rows and the permission helpers simultaneously. Here we use real DB rows.
+  //
+  // Scenario: a `guest` user who is NOT the reporter of the issue and NOT the
+  // machine owner attempts to upload. `issues.update.reporting` grants guest
+  // access only on own issues (access: "own"), so this should be AUTH-denied.
+  it("denies upload to a guest who is not the issue reporter or machine owner", async () => {
+    const db = await getTestDb();
+
+    // Seed reporter (member) and a separate guest outsider
+    const reporterId = randomUUID();
+    const outsiderId = randomUUID();
+    const ownerId = randomUUID();
+
+    await db
+      .insert(userProfiles)
+      .values([
+        createTestUser({ id: reporterId, role: "member" }),
+        createTestUser({ id: outsiderId, role: "guest" }),
+        createTestUser({ id: ownerId, role: "member" }),
+      ]);
+
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Perm Test Machine", initials: "PTM", ownerId })
+      .returning();
+
+    const [issue] = await db
+      .insert(issues)
+      .values({
+        title: "Perm Test Issue",
+        machineInitials: machine.initials,
+        issueNumber: 2,
+        severity: "playable",
+        reportedBy: reporterId,
+      })
+      .returning();
+
+    // Auth: the outsider guest makes the request
+    mockAuth(outsiderId);
+    mockRateLimitPass();
+
+    vi.mocked(uploadToBlob).mockResolvedValue({
+      url: "https://blob.com/should-not-upload.jpg",
+      pathname: "issue-images/should-not-upload.jpg",
+      size: 1024,
+      uploadedAt: new Date(),
+    });
+
+    const { uploadIssueImage } = await import("~/server/actions/images");
+
+    const formData = new FormData();
+    formData.append("issueId", issue.id);
+    formData.append("image", createMockFile("test.jpg", "image/jpeg", 2048));
+
+    const result = await uploadIssueImage(formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("AUTH");
+      expect(result.message).toContain("permission");
+    }
+
+    // No blob should have been uploaded or DB row inserted
+    expect(uploadToBlob).not.toHaveBeenCalled();
+    const rows = await db
+      .select()
+      .from(issueImages)
+      .where(eq(issueImages.issueId, issue.id));
+    expect(rows).toHaveLength(0);
   });
 });
