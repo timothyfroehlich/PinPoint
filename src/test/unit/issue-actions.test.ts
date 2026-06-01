@@ -41,8 +41,10 @@ vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
-// Mock DB (only needed for revalidation path after addIssueComment; never
-// reached by the three KEEP-unit blocks below, but kept to satisfy the import)
+// Mock DB to satisfy the import: the actions module imports ~/server/db,
+// which throws on a missing POSTGRES_URL in unit tests, so the mock is required
+// just to load the module. The three KEEP-unit blocks below never exercise a
+// real query — the revalidation path after addIssueComment is the only consumer.
 vi.mock("~/server/db", () => ({
   db: {
     insert: vi.fn(),
