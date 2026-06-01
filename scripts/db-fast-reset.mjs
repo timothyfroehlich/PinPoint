@@ -21,8 +21,16 @@ async function fastReset() {
 
   try {
     console.log("🧹 Truncating tables...");
-    // Truncate all tables except migrations/schema-related if any
-    // We cascade to handle foreign keys
+    // Truncate all application tables except migrations/schema-related if any.
+    // We cascade to handle foreign keys.
+    //
+    // NOTE: auth.users is intentionally NOT truncated here. supabase/seed-users.mjs
+    // uses supabase.auth.admin.createUser with an "already exists" fallback that
+    // fetches the existing ID and upserts the public.user_profiles row, so the seed
+    // is idempotent even when auth.users retains rows from a prior run. Truncating
+    // auth.users would require Supabase Admin API access (the Postgres user cannot
+    // directly DELETE from auth.users in production configurations) and would break
+    // any active sessions. (PP-3vdr.6)
     await client`
       TRUNCATE TABLE
         "issue_images",
