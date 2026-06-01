@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import React from "react";
 import { render } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -6,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { machines, userProfiles } from "~/server/db/schema";
 import { createTestMachine, createTestUser } from "~/test/helpers/factories";
-import MachineInfoTab from "./page";
+import MachineInfoTab from "~/app/(app)/m/[initials]/(tabs)/page";
 
 // Mock Supabase Server Client
 const mockGetUser = vi.fn();
@@ -40,7 +41,7 @@ vi.mock("~/server/db", async () => {
 const mockMachineTextFields = vi.fn(() => (
   <div data-testid="machine-text-fields" />
 ));
-vi.mock("../machine-text-fields", () => ({
+vi.mock("~/app/(app)/m/[initials]/machine-text-fields", () => ({
   MachineTextFields: (props: {
     machineId: string;
     description: string | null;
