@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine, createTestUser } from "~/test/helpers/factories";
@@ -6,6 +6,44 @@ import { issues, machines, userProfiles } from "~/server/db/schema";
 import { getPermissionState } from "~/lib/permissions/helpers";
 import { type OwnershipContext } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
+
+// ---------------------------------------------------------------------------
+// Module mocks for action-level integration tests (Wave 3 RECLASS, PP-x4li.1.3)
+//
+// These mocks route the production `db` through the PGlite worker instance
+// so real DB state drives the permission checks. Supabase auth, next/cache,
+// notifications, and logger are boundary mocks — they must not reach the
+// network in tests.
+//
+// The existing permission-state tests (below) call getTestDb() directly and
+// do NOT import from ~/server/db, so adding these mocks does not affect them.
+// ---------------------------------------------------------------------------
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  return { db: await getTestDb() };
+});
+
+vi.mock("~/lib/supabase/server", () => ({
+  createClient: vi.fn(),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
+vi.mock("~/lib/notifications", () => ({
+  createNotification: vi.fn().mockResolvedValue(undefined),
+  getChannels: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("~/lib/logger", () => ({
+  log: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
 
 describe("Issue detail permission states (integration)", () => {
   setupTestDb();
@@ -209,5 +247,178 @@ describe("Issue detail permission states (integration)", () => {
       await buildContext("member", ownerId)
     );
     expect(state).toEqual({ allowed: true });
+  });
+});
+
+// =============================================================================
+// Wave 3 RECLASS: issue-actions permission wiring (PP-x4li.1.3)
+//
+// Migrated from src/test/unit/issue-actions.test.ts:
+//   - "should allow update if authorized" (updateIssueStatusAction describe)
+//   - "should deny update if unauthorized" (updateIssueStatusAction describe)
+//   - "should successfully update frequency" (updateIssueFrequencyAction describe)
+//
+// These three blocks were using a mocked checkPermission, which only verified
+// the mock was called — they did NOT exercise real permission logic. Here we
+// drive the real actions against PGlite and the real checkPermission so that
+// DB-derived ownership context (reportedBy, machine.ownerId) genuinely controls
+// the allow/deny outcome.
+//
+// External boundary mocks (Supabase auth, next/cache, notifications, logger)
+// are declared at the top of this file and shared across both describe blocks.
+// =============================================================================
+describe("issue action permission wiring — action-level integration (PP-x4li.1.3)", () => {
+  setupTestDb();
+
+  // Stable UUIDs for this describe block — distinct from the sibling describe
+  // above to avoid PGlite uniqueness conflicts when tests run in the same worker.
+  const MEMBER_USER_ID = "a0000000-0000-0000-0000-000000000001";
+  const GUEST_REPORTER_ID = "a0000000-0000-0000-0000-000000000002";
+  const GUEST_OTHER_ID = "a0000000-0000-0000-0000-000000000003";
+  const MACHINE_OWNER_ID = "a0000000-0000-0000-0000-000000000004";
+
+  let memberIssueId: string;
+  let guestOwnedIssueId: string;
+
+  beforeEach(async () => {
+    const db = await getTestDb();
+
+    // Seed users — tables are cleaned by setupTestDb()'s afterEach, so no
+    // conflict handling is needed.
+    await db.insert(userProfiles).values([
+      createTestUser({
+        id: MACHINE_OWNER_ID,
+        role: "member",
+        email: "owner-action@test.com",
+      }),
+      createTestUser({
+        id: MEMBER_USER_ID,
+        role: "member",
+        email: "member-action@test.com",
+      }),
+      createTestUser({
+        id: GUEST_REPORTER_ID,
+        role: "guest",
+        email: "guest-reporter-action@test.com",
+      }),
+      createTestUser({
+        id: GUEST_OTHER_ID,
+        role: "guest",
+        email: "guest-other-action@test.com",
+      }),
+    ]);
+
+    // Seed machine
+    await db.insert(machines).values(
+      createTestMachine({
+        id: "b0000000-0000-0000-0000-000000000001",
+        initials: "PAT",
+        name: "Permission Action Test",
+        ownerId: MACHINE_OWNER_ID,
+      })
+    );
+
+    // Issue reported by a member (any member can update its reporting fields)
+    const [memberIssue] = await db
+      .insert(issues)
+      .values({
+        machineInitials: "PAT",
+        issueNumber: 10,
+        title: "Member-reported action test issue",
+        severity: "minor",
+        priority: "low",
+        frequency: "intermittent",
+        status: "new",
+        reportedBy: MEMBER_USER_ID,
+      })
+      .returning();
+    memberIssueId = memberIssue.id;
+
+    // Issue reported by a guest (only that guest can update its reporting fields)
+    const [guestIssue] = await db
+      .insert(issues)
+      .values({
+        machineInitials: "PAT",
+        issueNumber: 11,
+        title: "Guest-reported action test issue",
+        severity: "minor",
+        priority: "low",
+        frequency: "intermittent",
+        status: "new",
+        reportedBy: GUEST_REPORTER_ID,
+      })
+      .returning();
+    guestOwnedIssueId = guestIssue.id;
+  });
+
+  async function mockAuth(userId: string) {
+    const { createClient } = await import("~/lib/supabase/server");
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: userId } } }),
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>);
+  }
+
+  // -------------------------------------------------------------------------
+  // updateIssueStatusAction — permission wiring
+  //
+  // Migrated from the "should allow update if authorized" and
+  // "should deny update if unauthorized" blocks. The old unit tests mocked
+  // checkPermission; these drive the real permission matrix via PGlite state.
+  // -------------------------------------------------------------------------
+  it("allows updateIssueStatusAction for a member (issues.update.reporting = true for member)", async () => {
+    await mockAuth(MEMBER_USER_ID);
+    const { updateIssueStatusAction } =
+      await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+    formData.append("issueId", memberIssueId);
+    formData.append("status", "in_progress");
+
+    const result = await updateIssueStatusAction(undefined, formData);
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("denies updateIssueStatusAction for a guest acting on another user's issue (issues.update.reporting = 'own')", async () => {
+    // GUEST_OTHER_ID is a guest who did NOT report guestOwnedIssueId
+    // (guestOwnedIssueId.reportedBy === GUEST_REPORTER_ID)
+    await mockAuth(GUEST_OTHER_ID);
+    const { updateIssueStatusAction } =
+      await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+    formData.append("issueId", guestOwnedIssueId);
+    formData.append("status", "in_progress");
+
+    const result = await updateIssueStatusAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // updateIssueFrequencyAction — permission wiring
+  //
+  // Migrated from "should successfully update frequency". The original block
+  // mocked checkPermission to return true; here we verify the real permission
+  // path allows a member (issues.update.reporting = true) and the action
+  // returns ok.
+  // -------------------------------------------------------------------------
+  it("allows updateIssueFrequencyAction for a member (issues.update.reporting = true for member)", async () => {
+    await mockAuth(MEMBER_USER_ID);
+    const { updateIssueFrequencyAction } =
+      await import("~/app/(app)/issues/actions");
+
+    const formData = new FormData();
+    formData.append("issueId", memberIssueId);
+    formData.append("frequency", "constant");
+
+    const result = await updateIssueFrequencyAction(undefined, formData);
+
+    expect(result.ok).toBe(true);
   });
 });

@@ -1,10 +1,27 @@
+/**
+ * Unit Tests — issue Server Actions (PP-x4li.1.3 post-RECLASS)
+ *
+ * KEEP-unit blocks only. The permission/authorization blocks and the service-
+ * delegation block were migrated or superseded in Wave 3 (PP-x4li.1.3):
+ *
+ * Migrated to src/test/integration/issue-detail-permissions.test.ts:
+ *   - updateIssueStatusAction: "should allow update if authorized"
+ *   - updateIssueStatusAction: "should deny update if unauthorized"
+ *   - updateIssueFrequencyAction: "should successfully update frequency"
+ *   (All three now exercise the real checkPermission against PGlite state.)
+ *
+ * Superseded by existing coverage in src/test/integration/issue-services.test.ts:
+ *   - addCommentAction: "should successfully add a comment"
+ *   (addIssueComment DB state + notification dispatch is block 7 in that file.)
+ *
+ * Remaining tests cover the boundaries that belong at the unit layer:
+ *   - Auth gate (unauthenticated → UNAUTHORIZED before any DB/service call)
+ *   - Zod validation (empty/malformed input → VALIDATION without side effects)
+ *   - Service-boundary error handling (service throws → SERVER result)
+ */
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  addCommentAction,
-  updateIssueStatusAction,
-  updateIssueFrequencyAction,
-} from "~/app/(app)/issues/actions";
-import { checkPermission } from "~/lib/permissions/helpers";
+import { addCommentAction } from "~/app/(app)/issues/actions";
 
 // Mock Next.js modules
 vi.mock("next/navigation", () => ({
@@ -24,7 +41,8 @@ vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
-// Mock DB
+// Mock DB (only needed for revalidation path after addIssueComment; never
+// reached by the three KEEP-unit blocks below, but kept to satisfy the import)
 vi.mock("~/server/db", () => ({
   db: {
     insert: vi.fn(),
@@ -63,20 +81,8 @@ vi.mock("~/services/issues", () => ({
   addIssueComment: vi.fn(),
 }));
 
-// Mock permissions
-vi.mock("~/lib/permissions/helpers", () => ({
-  checkPermission: vi.fn(),
-  getAccessLevel: vi.fn().mockReturnValue("member"),
-}));
-
-import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
-import {
-  addIssueComment,
-  updateIssueStatus,
-  updateIssueFrequency,
-} from "~/services/issues";
-import { db } from "~/server/db";
+import { addIssueComment } from "~/services/issues";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -97,38 +103,6 @@ describe("addCommentAction", () => {
 
     // Setup service mock
     vi.mocked(addIssueComment).mockResolvedValue(undefined as any);
-
-    // Setup DB mock for fetching issue details
-    vi.mocked(db.query.issues.findFirst).mockResolvedValue({
-      machineInitials: "MM",
-      issueNumber: 1,
-    } as any);
-  });
-
-  it("should successfully add a comment", async () => {
-    const commentObj = {
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: "Test comment" }],
-        },
-      ],
-    };
-    const formData = new FormData();
-    formData.append("issueId", validUuid);
-    formData.append("comment", JSON.stringify(commentObj));
-
-    const result = await addCommentAction(initialState, formData);
-
-    expect(result.ok).toBe(true);
-    expect(addIssueComment).toHaveBeenCalledWith({
-      issueId: validUuid,
-      content: commentObj,
-      userId: mockUser.id,
-      imagesMetadata: [],
-    });
-    expect(revalidatePath).toHaveBeenCalledWith("/m/MM/i/1");
   });
 
   it("should return an error if not authenticated", async () => {
@@ -187,138 +161,5 @@ describe("addCommentAction", () => {
     if (!result.ok) {
       expect(result.code).toBe("SERVER");
     }
-  });
-});
-
-describe("updateIssueStatusAction", () => {
-  const validUuid = "123e4567-e89b-12d3-a456-426614174000";
-  const mockUser = { id: "user-123" };
-  const initialState = undefined;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    // Setup default successful auth
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
-      },
-    } as unknown as SupabaseClient);
-  });
-
-  it("should allow update if authorized", async () => {
-    // Mock issue found
-    vi.mocked(db.query.issues.findFirst).mockResolvedValue({
-      status: "new",
-      machineInitials: "MM",
-      issueNumber: 1,
-      reportedBy: "user-123",
-      assignedTo: null,
-      machine: { ownerId: "owner-123", name: "Test Machine" },
-    } as any);
-
-    // Mock user profile
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
-    });
-
-    // Mock permission check true
-    vi.mocked(checkPermission).mockReturnValue(true);
-
-    // Mock update success
-    vi.mocked(updateIssueStatus).mockResolvedValue({
-      issueId: validUuid,
-      oldStatus: "new",
-      newStatus: "in_progress",
-    });
-
-    const formData = new FormData();
-    formData.append("issueId", validUuid);
-    formData.append("status", "in_progress");
-
-    const result = await updateIssueStatusAction(initialState, formData);
-
-    expect(result.ok).toBe(true);
-    expect(checkPermission).toHaveBeenCalled();
-    expect(updateIssueStatus).toHaveBeenCalled();
-    expect(revalidatePath).toHaveBeenCalledWith("/m/MM/i/1");
-    expect(revalidatePath).toHaveBeenCalledWith("/m/MM");
-  });
-
-  it("should deny update if unauthorized", async () => {
-    // Mock issue found
-    vi.mocked(db.query.issues.findFirst).mockResolvedValue({
-      status: "new",
-      machineInitials: "MM",
-      issueNumber: 1,
-      reportedBy: "other-user",
-      assignedTo: null,
-      machine: { ownerId: "owner-123" },
-    } as any);
-
-    // Mock user profile
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
-    });
-
-    // Mock permission check false
-    vi.mocked(checkPermission).mockReturnValue(false);
-
-    const formData = new FormData();
-    formData.append("issueId", validUuid);
-    formData.append("status", "in_progress");
-
-    const result = await updateIssueStatusAction(initialState, formData);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("UNAUTHORIZED");
-    }
-    expect(checkPermission).toHaveBeenCalled();
-    expect(updateIssueStatus).not.toHaveBeenCalled();
-  });
-});
-
-describe("updateIssueFrequencyAction", () => {
-  const validUuid = "123e4567-e89b-12d3-a456-426614174000";
-  const mockUser = { id: "user-123" };
-  const initialState = undefined;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
-      },
-    } as any);
-  });
-
-  it("should successfully update frequency", async () => {
-    vi.mocked(db.query.issues.findFirst).mockResolvedValue({
-      machineInitials: "MM",
-      issueNumber: 1,
-      reportedBy: mockUser.id,
-      assignedTo: null,
-      machine: { ownerId: "owner-123" },
-    } as any);
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
-    } as any);
-    vi.mocked(checkPermission).mockReturnValue(true);
-    vi.mocked(updateIssueFrequency).mockResolvedValue({
-      issueId: validUuid,
-      oldFrequency: "intermittent",
-      newFrequency: "constant",
-    });
-
-    const formData = new FormData();
-    formData.append("issueId", validUuid);
-    formData.append("frequency", "constant");
-
-    const result = await updateIssueFrequencyAction(initialState, formData);
-
-    expect(result.ok).toBe(true);
-    expect(checkPermission).toHaveBeenCalled();
-    expect(updateIssueFrequency).toHaveBeenCalled();
   });
 });
