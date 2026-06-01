@@ -48,5 +48,5 @@ fi
 #                     `--fg` alone is the synchronous form.)
 exec sem --jobs 2 --id pinpoint-preflight --fg \
   npm-run-all --silent \
-    --parallel typecheck lint:fix format:fix test check:config \
+    --parallel typecheck fix:lint-format test check:config \
     --sequential db:fast-reset build test:integration test:integration:supabase smoke
