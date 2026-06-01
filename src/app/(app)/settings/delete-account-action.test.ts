@@ -182,26 +182,13 @@ describe("deleteAccountAction", () => {
     }
   });
 
-  it("deletes account and redirects on success", async () => {
-    const { redirect } = await import("next/navigation");
-
-    await expect(
-      deleteAccountAction(undefined, makeFormData("DELETE"))
-    ).rejects.toThrow("NEXT_REDIRECT");
-
-    // Admin signOut must revoke all sessions BEFORE the auth row is deleted —
-    // otherwise issued JWTs remain valid until they expire per the configured
-    // Supabase access token TTL.
-    expect(mockAdminSignOut).toHaveBeenCalledWith("user-1", "global");
-    expect(mockDeleteUser).toHaveBeenCalledWith("user-1");
-    const signOutOrder = mockAdminSignOut.mock.invocationCallOrder[0];
-    const deleteOrder = mockDeleteUser.mock.invocationCallOrder[0];
-    expect(signOutOrder).toBeDefined();
-    expect(deleteOrder).toBeDefined();
-    expect(signOutOrder).toBeLessThan(deleteOrder);
-    expect(mockSignOut).toHaveBeenCalled();
-    expect(redirect).toHaveBeenCalledWith("/");
-  });
+  // NOTE: "deletes account and redirects on success" — RECLASS'd to
+  // src/test/integration/account-deletion.test.ts (Wave 3, PP-x4li.1.3).
+  // The integration test wires real PGlite and verifies DB state changes
+  // (issues/comments/machine references SET NULL). The external-boundary
+  // ordering invariant (admin signOut MUST revoke sessions before
+  // admin deleteUser removes the auth row) is a Supabase-admin-SDK boundary
+  // concern and is asserted at the unit layer in the best-effort test below.
 
   it("still redirects when auth deletion fails (best-effort)", async () => {
     const { redirect } = await import("next/navigation");
@@ -235,6 +222,17 @@ describe("deleteAccountAction", () => {
     );
     // Deletion must still run even when token revocation reports an error,
     // because anonymized data has been committed and the row needs to go.
+    expect(mockAdminSignOut).toHaveBeenCalledWith("user-1", "global");
     expect(mockDeleteUser).toHaveBeenCalledWith("user-1");
+
+    // SECURITY INVARIANT: admin signOut must revoke all sessions BEFORE the
+    // auth row is deleted — deleteUser() does not invalidate issued JWTs, so
+    // revoking sessions first prevents the deleted account remaining accessible
+    // until JWT expiry. Assert the call ordering explicitly.
+    const signOutOrder = mockAdminSignOut.mock.invocationCallOrder[0];
+    const deleteOrder = mockDeleteUser.mock.invocationCallOrder[0];
+    expect(signOutOrder).toBeDefined();
+    expect(deleteOrder).toBeDefined();
+    expect(signOutOrder).toBeLessThan(deleteOrder);
   });
 });

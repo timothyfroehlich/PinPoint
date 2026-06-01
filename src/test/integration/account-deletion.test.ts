@@ -5,7 +5,7 @@
  * uses PGlite to verify database state changes and constraint adherence.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
@@ -25,6 +25,78 @@ import {
   getReassignmentTargets,
 } from "~/app/(app)/settings/account-deletion";
 import { randomUUID } from "node:crypto";
+
+// ---------------------------------------------------------------------------
+// Module mocks required by deleteAccountAction integration describe block.
+// vi.mock() calls are hoisted to module scope by Vitest — they apply to the
+// entire file, but only the deleteAccountAction block actually invokes them.
+// ---------------------------------------------------------------------------
+
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  return { db: await getTestDb() };
+});
+
+const mockGetUser = vi.fn();
+const mockSignOut = vi.fn();
+vi.mock("~/lib/supabase/server", () => ({
+  createClient: vi.fn(() =>
+    Promise.resolve({
+      auth: {
+        getUser: mockGetUser,
+        signOut: mockSignOut,
+      },
+    })
+  ),
+}));
+
+const mockDeleteUser = vi.fn();
+const mockAdminSignOut = vi.fn();
+vi.mock("~/lib/supabase/admin", () => ({
+  createAdminClient: vi.fn(() => ({
+    auth: {
+      admin: {
+        deleteUser: mockDeleteUser,
+        signOut: mockAdminSignOut,
+      },
+    },
+  })),
+}));
+
+vi.mock("~/lib/blob/client", () => ({
+  deleteFromBlob: vi.fn(),
+}));
+
+vi.mock("~/lib/logger", () => ({
+  log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock("~/lib/observability/report-error", () => ({
+  reportError: vi.fn(),
+  serverActionError: vi.fn(
+    (_error: unknown, code: string, message: string) => ({
+      ok: false as const,
+      code,
+      message,
+    })
+  ),
+}));
+
+class RedirectError extends Error {
+  constructor() {
+    super("NEXT_REDIRECT");
+    this.name = "RedirectError";
+  }
+}
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn(() => {
+    throw new RedirectError();
+  }),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
 
 describe("Account Deletion Anonymization (PGlite)", () => {
   setupTestDb();
@@ -246,5 +318,124 @@ describe("Account Deletion Reassign Picker — guest filter (PP-hci / PP-aby)", 
 
     // The deleting user themselves must not appear (ne filter)
     expect(resultIds).not.toContain(deletingUserId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave-3 RECLASS: deleteAccountAction — action-level DB integration
+//
+// Block 4 of delete-account-action.test.ts ("deletes account and redirects
+// on success") was RECLASS'd here because its interesting assertion is about
+// DB state: after calling deleteAccountAction with real PGlite wired in via
+// vi.mock("~/server/db"), we can assert that anonymizeUserReferences actually
+// committed its anonymization transaction (issues/comments SET NULL'd,
+// machine unassigned).  The unit layer cannot make that assertion — it only
+// verified that the mock transaction callback was invoked.
+//
+// External-boundary checks (signOut/deleteUser call order) remain in the
+// unit file where they belong.
+// ---------------------------------------------------------------------------
+
+describe("deleteAccountAction — DB integration (PGlite)", () => {
+  setupTestDb();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSignOut.mockResolvedValue({ error: null });
+    mockDeleteUser.mockResolvedValue({ error: null });
+    mockAdminSignOut.mockResolvedValue({ error: null });
+  });
+
+  it("anonymizes DB references and redirects on successful account deletion", async () => {
+    const { deleteAccountAction } =
+      await import("~/app/(app)/settings/actions");
+    const { redirect } = await import("next/navigation");
+    const db = await getTestDb();
+
+    // Use proper UUIDs — PGlite enforces uuid column types
+    const userId = randomUUID();
+    const otherUserId = randomUUID();
+
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+
+    await db.insert(userProfiles).values([
+      createTestUser({
+        id: userId,
+        email: "deleter@example.com",
+        role: "member",
+      }),
+      createTestUser({ id: otherUserId, email: "other@example.com" }),
+    ]);
+
+    const machine = createTestMachine({ ownerId: userId, initials: "DM" });
+    await db.insert(machines).values(machine);
+
+    const issue = createTestIssue("DM", {
+      reportedBy: userId,
+      assignedTo: userId,
+      issueNumber: 1,
+    });
+    await db.insert(issues).values(issue);
+
+    const [comment] = await db
+      .insert(issueComments)
+      .values({ issueId: issue.id, authorId: userId, content: "goodbye" })
+      .returning();
+
+    // Call the real action — DB hits PGlite, external SDKs are mocked
+    const fd = new FormData();
+    fd.set("confirmation", "DELETE");
+    fd.set("reassignTo", "");
+
+    await expect(deleteAccountAction(undefined, fd)).rejects.toThrow(
+      "NEXT_REDIRECT"
+    );
+    expect(redirect).toHaveBeenCalledWith("/");
+
+    // New integration assertion — the unit layer could NOT verify these:
+    // anonymizeUserReferences committed its transaction, nulling out all references.
+    const updatedIssue = await db.query.issues.findFirst({
+      where: eq(issues.id, issue.id),
+    });
+    expect(updatedIssue?.reportedBy).toBeNull();
+    expect(updatedIssue?.assignedTo).toBeNull();
+
+    const updatedComment = await db.query.issueComments.findFirst({
+      where: eq(issueComments.id, comment.id),
+    });
+    expect(updatedComment?.authorId).toBeNull();
+    expect(updatedComment?.content).toBe("goodbye"); // content preserved
+
+    const updatedMachine = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(updatedMachine?.ownerId).toBeNull(); // machine unassigned
+  });
+
+  it("returns SOLE_ADMIN from action when user is last admin in real DB", async () => {
+    const { deleteAccountAction } =
+      await import("~/app/(app)/settings/actions");
+    const db = await getTestDb();
+
+    // Use proper UUID — PGlite enforces uuid column types
+    const userId = randomUUID();
+    mockGetUser.mockResolvedValue({ data: { user: { id: userId } } });
+
+    await db
+      .insert(userProfiles)
+      .values(
+        createTestUser({ id: userId, email: "sole@example.com", role: "admin" })
+      );
+
+    const fd = new FormData();
+    fd.set("confirmation", "DELETE");
+    fd.set("reassignTo", "");
+
+    const result = await deleteAccountAction(undefined, fd);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("SOLE_ADMIN");
+    }
   });
 });
