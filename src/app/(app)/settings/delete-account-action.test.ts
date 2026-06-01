@@ -182,26 +182,10 @@ describe("deleteAccountAction", () => {
     }
   });
 
-  it("deletes account and redirects on success", async () => {
-    const { redirect } = await import("next/navigation");
-
-    await expect(
-      deleteAccountAction(undefined, makeFormData("DELETE"))
-    ).rejects.toThrow("NEXT_REDIRECT");
-
-    // Admin signOut must revoke all sessions BEFORE the auth row is deleted —
-    // otherwise issued JWTs remain valid until they expire per the configured
-    // Supabase access token TTL.
-    expect(mockAdminSignOut).toHaveBeenCalledWith("user-1", "global");
-    expect(mockDeleteUser).toHaveBeenCalledWith("user-1");
-    const signOutOrder = mockAdminSignOut.mock.invocationCallOrder[0];
-    const deleteOrder = mockDeleteUser.mock.invocationCallOrder[0];
-    expect(signOutOrder).toBeDefined();
-    expect(deleteOrder).toBeDefined();
-    expect(signOutOrder).toBeLessThan(deleteOrder);
-    expect(mockSignOut).toHaveBeenCalled();
-    expect(redirect).toHaveBeenCalledWith("/");
-  });
+  // NOTE: "deletes account and redirects on success" — RECLASS'd to
+  // src/test/integration/account-deletion.test.ts (Wave 3, PP-x4li.1.3).
+  // The integration test wires real PGlite and verifies DB state changes;
+  // external-boundary ordering (signOut → deleteUser) tests remain below.
 
   it("still redirects when auth deletion fails (best-effort)", async () => {
     const { redirect } = await import("next/navigation");
