@@ -133,11 +133,19 @@ function classifyCommand(command) {
       continue;
     }
 
-    if (target === "main") {
+    // Strip a single pair of surrounding matching quotes so `git checkout "main"`
+    // / `git checkout 'main'` compare equal to `main` and ALLOW.
+    const unquoted =
+      (target.startsWith('"') && target.endsWith('"')) ||
+      (target.startsWith("'") && target.endsWith("'"))
+        ? target.slice(1, -1)
+        : target;
+
+    if (unquoted === "main") {
       continue; // ALLOW switching to main.
     }
 
-    return { block: true, detail: `git ${sub} ${target}` };
+    return { block: true, detail: `git ${sub} ${unquoted}` };
   }
 
   return { block: false, detail: "" };
@@ -190,10 +198,19 @@ if (require.main === module) {
       process.exit(0);
     }
 
-    const cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    // Use the per-invocation working directory from the stdin payload, NOT
+    // CLAUDE_PROJECT_DIR (a stable project-root path). Worktree detection must
+    // reflect where the command actually runs: a lead relocated via EnterWorktree
+    // or an Agent-Team teammate operates in a LINKED worktree whose root differs
+    // from the project root — using CLAUDE_PROJECT_DIR would misclassify them as
+    // the MAIN worktree and wrongly block legit switches. Repo convention: see
+    // normalize-workspace-paths.cjs (`input.cwd || process.cwd()`) and the
+    // push-check.sh / definition-of-done.sh `jq -r '.cwd'` reads.
+    const detectCwd = payload.cwd || process.cwd();
 
-    // 2. Single-use bypass sentinel.
-    const sentinel = path.join(cwd, ".claude-worktree-switch-bypass");
+    // 2. Single-use bypass sentinel. In the main worktree the cwd and root
+    // coincide, so the sentinel lives at the cwd root — same detectCwd.
+    const sentinel = path.join(detectCwd, ".claude-worktree-switch-bypass");
     if (fs.existsSync(sentinel)) {
       try {
         fs.unlinkSync(sentinel);
@@ -202,7 +219,7 @@ if (require.main === module) {
     }
 
     // 3. Main-worktree detection. Linked worktree / non-repo / git error → allow.
-    if (!isMainWorktree(cwd)) {
+    if (!isMainWorktree(detectCwd)) {
       process.exit(0);
     }
 
