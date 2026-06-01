@@ -3,6 +3,7 @@
 # Claude Code control files (ephemeral, worktree-local)
 .claude-hook-bypass
 .claude-merge-bypass
+.claude-worktree-switch-bypass
 .prototype-mode
 .claude-task-contract
 .claude/scheduled_tasks.lock
