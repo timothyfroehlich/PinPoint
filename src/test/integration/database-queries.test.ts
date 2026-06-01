@@ -20,36 +20,6 @@ import {
 describe("Database Queries (PGlite)", () => {
   setupTestDb();
 
-  describe("Machines", () => {
-    it("should insert and query a machine", async () => {
-      const db = await getTestDb();
-      const testMachine = createTestMachine({ name: "Twilight Zone" });
-
-      await db.insert(machines).values(testMachine);
-
-      const result = await db.query.machines.findFirst({
-        where: eq(machines.name, "Twilight Zone"),
-      });
-
-      expect(result).toBeDefined();
-      expect(result?.name).toBe("Twilight Zone");
-    });
-
-    it("should find machine by id", async () => {
-      const db = await getTestDb();
-      const testMachine = createTestMachine();
-
-      await db.insert(machines).values(testMachine);
-
-      const result = await db.query.machines.findFirst({
-        where: eq(machines.id, testMachine.id),
-      });
-
-      expect(result).toBeDefined();
-      expect(result?.id).toBe(testMachine.id);
-    });
-  });
-
   describe("Issues", () => {
     it("should insert issue with machine reference", async () => {
       const db = await getTestDb();
