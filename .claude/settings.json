@@ -28,6 +28,11 @@
             "type": "command",
             "command": "node .claude/hooks/block-bad-shell-patterns.cjs",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-heavy-under-pressure.cjs",
+            "timeout": 335000
           }
         ]
       },
