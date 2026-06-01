@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { submitPublicIssueAction } from "~/app/(app)/report/actions";
 
 // Mock server-only (no-op in test environment)
@@ -12,6 +12,10 @@ vi.mock("next/headers", () => ({
 
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
 }));
 
 // Mock logger
@@ -35,7 +39,8 @@ vi.mock("~/lib/rate-limit", () => ({
   formatResetTime: vi.fn().mockReturnValue("0s"),
 }));
 
-// Mock Supabase
+// Mock Supabase — unauthenticated by default (error-sanitization test is for
+// the anonymous path; createIssue throws before any user-specific logic).
 vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn().mockResolvedValue({
     auth: {
@@ -44,7 +49,8 @@ vi.mock("~/lib/supabase/server", () => ({
   }),
 }));
 
-// Mock DB
+// Mock DB — error-sanitization test mocks createIssue to throw before the DB
+// is queried for permission resolution, so the machine lookup still needs a stub.
 vi.mock("~/server/db", () => ({
   db: {
     query: {
@@ -58,18 +64,30 @@ vi.mock("~/server/db", () => ({
   },
 }));
 
-// Mock Service
+// Mock observability
+vi.mock("~/lib/observability/report-error", () => ({
+  reportError: vi.fn(),
+  serverActionError: vi.fn(),
+}));
+
+// Mock Service — createIssue is mocked to throw a sensitive error
 vi.mock("~/services/issues", () => ({
   createIssue: vi.fn(),
 }));
 
 import { createIssue } from "~/services/issues";
 
+/**
+ * KEEP-unit: error-message sanitization at the action boundary.
+ *
+ * createIssue is mocked to throw a sensitive DB error; we assert that the
+ * action returns a generic client-facing message and never leaks internals.
+ * No real DB state is needed — this is purely a boundary sanitization check.
+ *
+ * The 5 assignedTo permission tests have been RECLASS'd to:
+ *   src/test/integration/public-issue-submit.test.ts  (PP-x4li.1.3)
+ */
 describe("Public Issue Reporting Security", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -95,177 +113,5 @@ describe("Public Issue Reporting Security", () => {
     expect(result.error).not.toBe(sensitiveError);
     expect(result.error).not.toContain("duplicate key");
     expect(result.error).toBe("Unable to submit the issue. Please try again.");
-  });
-
-  describe("assignedTo permission handling", () => {
-    const validUuid = "00000000-0000-0000-0000-000000000000";
-    const assigneeUuid = "11111111-1111-1111-8111-111111111111";
-
-    const createValidFormData = (assignedTo?: string) => {
-      const formData = new FormData();
-      formData.set("machineId", validUuid);
-      formData.set("title", "Test Issue");
-      formData.set("severity", "minor");
-      formData.set("frequency", "intermittent");
-      if (assignedTo !== undefined) {
-        formData.set("assignedTo", assignedTo);
-      }
-      return formData;
-    };
-
-    it("member can assign issue to another user", async () => {
-      // Setup: authenticated member
-      const { createClient } = await import("~/lib/supabase/server");
-      vi.mocked(createClient).mockResolvedValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: validUuid } },
-          }),
-        },
-      } as never);
-
-      const { db } = await import("~/server/db");
-      // Must mock both machines and userProfiles since clearAllMocks resets them
-      vi.mocked(db.query.machines.findFirst).mockResolvedValue({
-        initials: "MCH",
-      } as never);
-      vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-        role: "member",
-      } as never);
-
-      vi.mocked(createIssue).mockResolvedValue({
-        id: "issue-1",
-        issueNumber: 1,
-      } as never);
-
-      const formData = createValidFormData(assigneeUuid);
-      await submitPublicIssueAction({ error: "" }, formData);
-
-      expect(createIssue).toHaveBeenCalledWith(
-        expect.objectContaining({ assignedTo: assigneeUuid })
-      );
-    });
-
-    it("admin can assign issue to another user", async () => {
-      const { createClient } = await import("~/lib/supabase/server");
-      vi.mocked(createClient).mockResolvedValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: validUuid } },
-          }),
-        },
-      } as never);
-
-      const { db } = await import("~/server/db");
-      vi.mocked(db.query.machines.findFirst).mockResolvedValue({
-        initials: "MCH",
-      } as never);
-      vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-        role: "admin",
-      } as never);
-
-      vi.mocked(createIssue).mockResolvedValue({
-        id: "issue-1",
-        issueNumber: 1,
-      } as never);
-
-      const formData = createValidFormData(assigneeUuid);
-      await submitPublicIssueAction({ error: "" }, formData);
-
-      expect(createIssue).toHaveBeenCalledWith(
-        expect.objectContaining({ assignedTo: assigneeUuid })
-      );
-    });
-
-    it("member with empty assignedTo normalizes to null", async () => {
-      const { createClient } = await import("~/lib/supabase/server");
-      vi.mocked(createClient).mockResolvedValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: validUuid } },
-          }),
-        },
-      } as never);
-
-      const { db } = await import("~/server/db");
-      vi.mocked(db.query.machines.findFirst).mockResolvedValue({
-        initials: "MCH",
-      } as never);
-      vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-        role: "member",
-      } as never);
-
-      vi.mocked(createIssue).mockResolvedValue({
-        id: "issue-1",
-        issueNumber: 1,
-      } as never);
-
-      const formData = createValidFormData(""); // Empty string = Unassigned
-      await submitPublicIssueAction({ error: "" }, formData);
-
-      expect(createIssue).toHaveBeenCalledWith(
-        expect.objectContaining({ assignedTo: null })
-      );
-    });
-
-    it("guest assignedTo is stripped (unauthenticated)", async () => {
-      // Default mock: user = null (unauthenticated)
-      const { createClient } = await import("~/lib/supabase/server");
-      vi.mocked(createClient).mockResolvedValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: null },
-          }),
-        },
-      } as never);
-
-      const { db } = await import("~/server/db");
-      vi.mocked(db.query.machines.findFirst).mockResolvedValue({
-        initials: "MCH",
-      } as never);
-
-      vi.mocked(createIssue).mockResolvedValue({
-        id: "issue-1",
-        issueNumber: 1,
-      } as never);
-
-      const formData = createValidFormData(assigneeUuid);
-      await submitPublicIssueAction({ error: "" }, formData);
-
-      expect(createIssue).toHaveBeenCalledWith(
-        expect.objectContaining({ assignedTo: null })
-      );
-    });
-
-    it("non-member authenticated user assignedTo is stripped", async () => {
-      const { createClient } = await import("~/lib/supabase/server");
-      vi.mocked(createClient).mockResolvedValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: { id: validUuid } },
-          }),
-        },
-      } as never);
-
-      const { db } = await import("~/server/db");
-      vi.mocked(db.query.machines.findFirst).mockResolvedValue({
-        initials: "MCH",
-      } as never);
-      vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-        role: "guest", // Not member or admin
-      } as never);
-
-      vi.mocked(createIssue).mockResolvedValue({
-        id: "issue-1",
-        issueNumber: 1,
-      } as never);
-
-      const formData = createValidFormData(assigneeUuid);
-      await submitPublicIssueAction({ error: "" }, formData);
-
-      expect(createIssue).toHaveBeenCalledWith(
-        expect.objectContaining({ assignedTo: null })
-      );
-    });
   });
 });
