@@ -10,6 +10,7 @@ import {
   softDeleteMachineComment,
   getMachineTimeline,
 } from "~/lib/timeline/machine-events";
+import { DEFAULT_TIMELINE_TAGS } from "~/lib/timeline/machine-tags";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 describe("machine-events helpers (PGlite)", () => {
@@ -336,6 +337,30 @@ describe("machine-events helpers (PGlite)", () => {
 
       expect(rows).toHaveLength(1);
       expect(rows[0].tag).toBe("maintenance");
+    });
+
+    it("omitted filter === DEFAULT_TIMELINE_TAGS (byte-identical default)", async () => {
+      const { db, user, machine } = await seed();
+      for (const tag of ["maintenance", "cleaning", "inspection"] as const) {
+        await createMachineComment(
+          machine.id,
+          {
+            content: { type: "doc", content: [] },
+            tag,
+            authorId: user.id,
+          },
+          db
+        );
+      }
+
+      const omitted = await getMachineTimeline(db, { machineId: machine.id });
+      const withDefault = await getMachineTimeline(db, {
+        machineId: machine.id,
+        tags: [...DEFAULT_TIMELINE_TAGS],
+      });
+
+      expect(omitted.length).toBeGreaterThan(0);
+      expect(withDefault.map((r) => r.id)).toEqual(omitted.map((r) => r.id));
     });
 
     it("includes soft-deleted rows (UI handles tombstone display)", async () => {
