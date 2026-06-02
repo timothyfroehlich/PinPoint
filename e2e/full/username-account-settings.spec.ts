@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
+import { loginAs } from "../support/actions.js";
 
 test.describe("Username Account Settings", () => {
   test("settings page shows 'no email on file' for username accounts", async ({

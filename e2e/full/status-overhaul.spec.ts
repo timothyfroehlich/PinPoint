@@ -1,9 +1,12 @@
 import { test, expect } from "@playwright/test";
-import { updateIssueField, visibleIssueFieldControl } from "../support/actions";
-import { cleanupTestEntities } from "../support/cleanup";
-import { seededMachines, TEST_USERS } from "../support/constants";
-import { fillReportForm } from "../support/page-helpers";
-import { STORAGE_STATE } from "../support/auth-state";
+import {
+  updateIssueField,
+  visibleIssueFieldControl,
+} from "../support/actions.js";
+import { cleanupTestEntities } from "../support/cleanup.js";
+import { seededMachines, TEST_USERS } from "../support/constants.js";
+import { fillReportForm } from "../support/page-helpers.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
 
 test.describe("Status Overhaul E2E", () => {
   test.use({ storageState: STORAGE_STATE.member });

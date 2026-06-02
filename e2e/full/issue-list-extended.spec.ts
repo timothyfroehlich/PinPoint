@@ -1,9 +1,13 @@
 import { test, expect } from "@playwright/test";
-import { cleanupTestEntities } from "../support/cleanup";
-import { TEST_USERS, seededIssues, seededMachines } from "../support/constants";
-import { fillReportForm } from "../support/page-helpers";
-import { getTestIssueTitle } from "../support/test-isolation";
-import { STORAGE_STATE } from "../support/auth-state";
+import { cleanupTestEntities } from "../support/cleanup.js";
+import {
+  TEST_USERS,
+  seededIssues,
+  seededMachines,
+} from "../support/constants.js";
+import { fillReportForm } from "../support/page-helpers.js";
+import { getTestIssueTitle } from "../support/test-isolation.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
 
 test.describe("Issue List Features - Extended", () => {
   // Use Admin to ensure permissions for all inline edits

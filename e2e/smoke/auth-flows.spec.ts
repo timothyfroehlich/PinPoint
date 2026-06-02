@@ -8,7 +8,7 @@
 
 import { test, expect } from "@playwright/test";
 import { loginAs, logout, assertNoA11yViolations } from "../support/actions.js";
-import { TEST_USERS } from "../support/constants";
+import { TEST_USERS } from "../support/constants.js";
 
 test.describe("Username Account Login", () => {
   test("login with username (no @) redirects to dashboard", async ({

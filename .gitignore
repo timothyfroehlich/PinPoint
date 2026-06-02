@@ -3,6 +3,7 @@
 # Claude Code control files (ephemeral, worktree-local)
 .claude-hook-bypass
 .claude-merge-bypass
+.claude-worktree-switch-bypass
 .prototype-mode
 .claude-task-contract
 .claude/scheduled_tasks.lock
@@ -165,6 +166,9 @@ __pycache__/
 
 # Auto-generated test schema
 src/test/setup/schema.sql
+# Transient lock + temp files from concurrent schema regeneration (PP-3vdr.5)
+src/test/setup/.schema.lock
+src/test/setup/.schema.*.sql.tmp
 supabase/migrations/
 
 # bv (beads viewer) local config and caches

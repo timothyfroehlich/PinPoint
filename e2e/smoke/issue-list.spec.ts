@@ -2,9 +2,9 @@ import { test, expect } from "@playwright/test";
 import {
   assertNoHorizontalOverflow,
   assertNoA11yViolations,
-} from "../support/actions";
-import { seededIssues } from "../support/constants";
-import { STORAGE_STATE } from "../support/auth-state";
+} from "../support/actions.js";
+import { seededIssues } from "../support/constants.js";
+import { STORAGE_STATE } from "../support/auth-state.js";
 
 test.describe("Issue List Features", () => {
   // Use Admin to ensure permissions for all operations

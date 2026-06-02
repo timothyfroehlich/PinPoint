@@ -79,6 +79,7 @@ export default async function IssueDetailPage({
         eq(issues.machineInitials, initials),
         eq(issues.issueNumber, issueNum)
       ),
+      columns: { reporterEmail: false },
       with: {
         machine: {
           columns: {

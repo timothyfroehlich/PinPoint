@@ -374,7 +374,7 @@ export const timelineEvents = pgTable(
       t.tag
     ),
   })
-);
+).enableRLS();
 
 /**
  * Timeline Event People (PP-tv9l)
@@ -422,7 +422,7 @@ export const timelineEventPeople = pgTable(
     // The signup conversion's rewrite WHERE clause.
     invitedIdIdx: index("idx_timeline_event_people_invited_id").on(t.invitedId),
   })
-);
+).enableRLS();
 
 /**
  * Issue Images Table

@@ -1,8 +1,11 @@
 // e2e/full/rich-text.spec.ts
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
-import { createTestUser, createTestMachine } from "../support/supabase-admin";
-import { getTestPrefix } from "../support/test-isolation";
+import { loginAs } from "../support/actions.js";
+import {
+  createTestUser,
+  createTestMachine,
+} from "../support/supabase-admin.js";
+import { getTestPrefix } from "../support/test-isolation.js";
 
 /**
  * E2E tests for Rich Text Editor and @Mentions

@@ -171,92 +171,10 @@ describe("getRecentIssuesAction", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Success path
+  // Success path (input-acceptance — DB mock is incidental; real DB checks
+  // are in src/test/integration/recent-issues.test.ts)
   // ---------------------------------------------------------------------------
   describe("success path", () => {
-    it("returns ok with properly serialized rows", async () => {
-      const fakeDate = new Date("2025-06-15T12:00:00.000Z");
-      vi.mocked(db.query.issues.findMany).mockResolvedValue([
-        {
-          id: "issue-1",
-          issueNumber: 42,
-          title: "Stuck flipper",
-          status: "new" as const,
-          severity: "major" as const,
-          priority: "high" as const,
-          frequency: "intermittent" as const,
-          createdAt: fakeDate,
-        },
-      ]);
-
-      const result = await getRecentIssuesAction("MM", 5);
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value).toHaveLength(1);
-        expect(result.value[0]).toEqual({
-          id: "issue-1",
-          issueNumber: 42,
-          title: "Stuck flipper",
-          status: "new",
-          severity: "major",
-          priority: "high",
-          frequency: "intermittent",
-          createdAt: "2025-06-15T12:00:00.000Z",
-        });
-      }
-      expect(db.query.issues.findMany).toHaveBeenCalledOnce();
-    });
-
-    it("returns ok with empty array when no issues exist", async () => {
-      vi.mocked(db.query.issues.findMany).mockResolvedValue([]);
-
-      const result = await getRecentIssuesAction("ABC", 10);
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value).toEqual([]);
-      }
-    });
-
-    it("returns multiple rows preserving order", async () => {
-      const dates = [
-        new Date("2025-06-15T12:00:00.000Z"),
-        new Date("2025-06-14T12:00:00.000Z"),
-      ];
-      vi.mocked(db.query.issues.findMany).mockResolvedValue([
-        {
-          id: "issue-1",
-          issueNumber: 10,
-          title: "First",
-          status: "new" as const,
-          severity: "minor" as const,
-          priority: "low" as const,
-          frequency: "constant" as const,
-          createdAt: dates[0],
-        },
-        {
-          id: "issue-2",
-          issueNumber: 9,
-          title: "Second",
-          status: "confirmed" as const,
-          severity: "cosmetic" as const,
-          priority: "medium" as const,
-          frequency: "frequent" as const,
-          createdAt: dates[1],
-        },
-      ]);
-
-      const result = await getRecentIssuesAction("XY", 5);
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value).toHaveLength(2);
-        expect(result.value[0]?.createdAt).toBe("2025-06-15T12:00:00.000Z");
-        expect(result.value[1]?.createdAt).toBe("2025-06-14T12:00:00.000Z");
-      }
-    });
-
     it("accepts machineInitials with hyphens", async () => {
       vi.mocked(db.query.issues.findMany).mockResolvedValue([]);
 

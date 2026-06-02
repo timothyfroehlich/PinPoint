@@ -343,6 +343,841 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       expect(createdMachine).toBeDefined();
       expect(createdMachine?.ownerId).toBe(guestUser.id);
     });
+
+    it("should allow technician to use forcePromoteUserId to create machine with owner", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const techUser = await createUser("technician");
+      const guestUser = await createUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: techUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `T${String(machineCounter).padStart(3, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Tech Promote Machine");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", guestUser.id);
+      formData.append("forcePromoteUserId", guestUser.id);
+
+      const result = await createMachineAction(undefined, formData);
+      expect(result.ok).toBe(true);
+
+      // Verify promotion happened
+      const promotedUser = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(promotedUser?.role).toBe("member");
+
+      // Verify machine was created
+      const createdMachine = await db.query.machines.findFirst({
+        where: eq(machines.ownerId, guestUser.id),
+      });
+      expect(createdMachine).toBeDefined();
+    });
+
+    it("should reject forcePromoteUserId from member (UNAUTHORIZED)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const memberUser = await createUser("member");
+      const guestUser = await createUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: memberUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `R${String(machineCounter).padStart(3, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Should Be Rejected");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", guestUser.id);
+      formData.append("forcePromoteUserId", guestUser.id);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only failure path: target guest NOT promoted, no machine inserted
+      const targetAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(targetAfter?.role).toBe("guest");
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
+    });
+
+    it("should reject forcePromoteUserId when it does not match ownerId (VALIDATION)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const guestUser = await createUser("guest");
+      const otherGuestUser = await createUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `V${String(machineCounter).padStart(3, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Mismatch Machine");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", guestUser.id);
+      // forcePromoteUserId points at a different user than ownerId
+      formData.append("forcePromoteUserId", otherGuestUser.id);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+
+      // Read-only failure path: neither guest promoted, no machine inserted
+      const guestAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(guestAfter?.role).toBe("guest");
+      const otherGuestAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, otherGuestUser.id),
+      });
+      expect(otherGuestAfter?.role).toBe("guest");
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
+    });
+
+    it("should reject forcePromoteUserId pointing at non-guest user (VALIDATION)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const memberTarget = await createUser("member");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `G${String(machineCounter).padStart(3, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Non-Guest Machine");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", memberTarget.id);
+      // forcePromoteUserId points at a member, not a guest
+      formData.append("forcePromoteUserId", memberTarget.id);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+        expect(result.message).toMatch(/not a guest/i);
+      }
+
+      // Read-only failure path: target member record unchanged, no machine inserted
+      const targetAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, memberTarget.id),
+      });
+      expect(targetAfter?.role).toBe("member");
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
+    });
+  });
+
+  describe("createMachineAction — permission checks", () => {
+    it("should reject creation for non-admin users (member)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+
+      const memberUser = await createUser("member");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: memberUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `MR${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Medieval Madness");
+      formData.append("initials", uniqueInitials);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+    });
+
+    it("should reject creation for guest users", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+
+      const guestUser = await createUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: guestUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `GR${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Medieval Madness");
+      formData.append("initials", uniqueInitials);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+    });
+
+    it("should allow technician to create a machine", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const techUser = await createUser("technician");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: techUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `TC${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Medieval Madness");
+      formData.append("initials", uniqueInitials);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.redirectTo).toMatch(/^\/m\//);
+      }
+
+      // Verify machine was inserted in real DB
+      const createdMachine = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(createdMachine).toBeDefined();
+    });
+  });
+
+  describe("createMachineAction — ownerId null regression", () => {
+    it("should NOT default ownerId to caller when field is explicitly empty string (regression)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `ER${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Empty Owner Machine");
+      formData.append("initials", uniqueInitials);
+      // Explicitly empty ownerId (not omitted — was previously defaulting to caller)
+      formData.append("ownerId", "");
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+
+      // Real DB row must have null ownerId, not the caller's ID
+      const machine = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machine).toBeDefined();
+      expect(machine?.ownerId).toBeNull();
+    });
+  });
+
+  describe("createMachineAction — ASSIGNEE_NOT_MEMBER via createMachineAction", () => {
+    it("should return ASSIGNEE_NOT_MEMBER when active guest is assigned as owner via createMachineAction", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+
+      const adminUser = await createUser("admin");
+      const guestUser = await createUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `AG${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Medieval Madness");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", guestUser.id);
+      // No forcePromoteUserId — should fail with ASSIGNEE_NOT_MEMBER
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("ASSIGNEE_NOT_MEMBER");
+        expect(result.meta?.assignee.id).toBe(guestUser.id);
+        expect(result.meta?.assignee.role).toBe("guest");
+        expect(result.meta?.assignee.type).toBe("active");
+      }
+    });
+
+    it("should return ASSIGNEE_NOT_MEMBER when invited guest is assigned as owner via createMachineAction", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+
+      const adminUser = await createUser("admin");
+      const invitedGuest = await createInvitedUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `IG${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Medieval Madness");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", invitedGuest.id);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("ASSIGNEE_NOT_MEMBER");
+        expect(result.meta?.assignee.type).toBe("invited");
+      }
+    });
+  });
+
+  describe("updateMachineAction — permission and data checks", () => {
+    // Routing-table blocks 1–5, 9–10, 14–18 (PP-x4li.1.3 Wave 3 RECLASS)
+
+    it("should allow admin to update unowned machine", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      // No owner: exercises the machineOwnerId === null path in
+      // checkPermission("machines.edit", ...) — admin can edit an unowned machine.
+      const machine = await createMachine();
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", "Admin Updated Name");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.machineId).toBe(machine.id);
+      }
+
+      // Verify the name was updated in the real DB
+      const updatedMachine = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(updatedMachine?.name).toBe("Admin Updated Name");
+    });
+
+    it("should allow owner to update their own machine", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", "Owner Updated Name");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.machineId).toBe(machine.id);
+      }
+
+      // Verify the name was updated in the real DB
+      const updatedMachine = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(updatedMachine?.name).toBe("Owner Updated Name");
+    });
+
+    it("should return UNAUTHORIZED when guest-owner tries to edit (regression: drift fix)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      // Legacy/drift scenario: a guest is stored as a machine owner — a bad state
+      // that the production DB trigger (check_machine_owner_not_guest) now prevents.
+      // NOTE: this PGlite suite is built from the schema.sql export, which does NOT
+      // include migration-defined triggers (see file header), so no trigger runs
+      // here. We seed the drift state directly by raw-updating the ownerId — there
+      // is no trigger to bypass in this environment.
+      const guestUser = await createUser("guest");
+      const adminUser = await createUser("admin");
+      // Create machine owned by admin first, then raw-update to guest to seed the drift state.
+      const machine = await createMachine(adminUser.id);
+      await db
+        .update(machines)
+        .set({ ownerId: guestUser.id })
+        .where(eq(machines.id, machine.id));
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: guestUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", "Sneaky Update");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only invariant: machine name must NOT have changed
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.name).toBe(machine.name);
+    });
+
+    it("should return UNAUTHORIZED when non-owner member tries to update a machine", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const nonOwnerMember = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: nonOwnerMember.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", "Unauthorized Update");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only invariant: machine must be unchanged
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.name).toBe(machine.name);
+      expect(machineAfter?.ownerId).toBe(ownerUser.id);
+    });
+
+    it("should return NOT_FOUND when machine does not exist", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+
+      const memberUser = await createUser("member");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: memberUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", randomUUID());
+      formData.append("name", "Does Not Exist");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("NOT_FOUND");
+      }
+    });
+
+    it("should update machine presence status", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("presenceStatus", "removed");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+
+      // Verify presence status persisted in real DB
+      const updatedMachine = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(updatedMachine?.presenceStatus).toBe("removed");
+    });
+
+    it("should allow member owner to transfer ownership to another member", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const newOwner = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("ownerId", newOwner.id);
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.machineId).toBe(machine.id);
+      }
+
+      // Verify new ownerId persisted in real DB
+      const updatedMachine = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(updatedMachine?.ownerId).toBe(newOwner.id);
+    });
+
+    it("should allow technician to use forcePromoteUserId (tech has the permission)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const techUser = await createUser("technician");
+      const guestUser = await createUser("guest");
+      // Machine not owned by this technician
+      const otherOwner = await createUser("member");
+      const machine = await createMachine(otherOwner.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: techUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("ownerId", guestUser.id);
+      formData.append("forcePromoteUserId", guestUser.id);
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+
+      // Verify guest was promoted in real DB
+      const promotedUser = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(promotedUser?.role).toBe("member");
+
+      // Verify machine ownership transferred
+      const updatedMachine = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(updatedMachine?.ownerId).toBe(guestUser.id);
+    });
+
+    it("should reject forcePromoteUserId from member (UNAUTHORIZED)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerMember = await createUser("member");
+      const guestUser = await createUser("guest");
+      const machine = await createMachine(ownerMember.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: ownerMember.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("ownerId", guestUser.id);
+      formData.append("forcePromoteUserId", guestUser.id);
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only invariant: guest NOT promoted, machine unchanged
+      const guestAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(guestAfter?.role).toBe("guest");
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerId).toBe(ownerMember.id);
+    });
+
+    it("should reject forcePromoteUserId when it does not match ownerId (VALIDATION)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const guestUser = await createUser("guest");
+      const otherGuestUser = await createUser("guest");
+      const machine = await createMachine(adminUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("ownerId", guestUser.id);
+      // forcePromoteUserId points at a different user than ownerId
+      formData.append("forcePromoteUserId", otherGuestUser.id);
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+
+      // Read-only invariant: neither guest promoted, machine ownership unchanged
+      const guestAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(guestAfter?.role).toBe("guest");
+
+      const otherGuestAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, otherGuestUser.id),
+      });
+      expect(otherGuestAfter?.role).toBe("guest");
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerId).toBe(adminUser.id);
+    });
+
+    it("should reject forcePromoteUserId pointing at non-guest user (VALIDATION)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const memberTarget = await createUser("member");
+      const machine = await createMachine(adminUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("ownerId", memberTarget.id);
+      // forcePromoteUserId points at a member, not a guest
+      formData.append("forcePromoteUserId", memberTarget.id);
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+        expect(result.message).toMatch(/not a guest/i);
+      }
+
+      // Read-only invariant: member role unchanged, machine ownership unchanged
+      const targetAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, memberTarget.id),
+      });
+      expect(targetAfter?.role).toBe("member");
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerId).toBe(adminUser.id);
+    });
+
+    it("should reject ownerId not found in user_profiles or invited_users", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const machine = await createMachine(adminUser.id);
+      const bogusOwnerId = randomUUID();
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("ownerId", bogusOwnerId);
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+        expect(result.message).toBe("Selected owner does not exist.");
+      }
+
+      // Read-only invariant: machine ownership unchanged
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerId).toBe(adminUser.id);
+    });
   });
 
   describe("ASSIGNEE_NOT_MEMBER validation", () => {
