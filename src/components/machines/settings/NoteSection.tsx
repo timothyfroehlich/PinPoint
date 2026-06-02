@@ -5,15 +5,7 @@ import { InlineEditableText } from "~/components/machines/settings/InlineEditabl
 import { InlineMarkdownField } from "~/components/machines/settings/InlineMarkdownField";
 import { SECTION_LABEL_CLASS } from "~/components/machines/settings/styles";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
-
-export interface NoteSectionData {
-  id: string;
-  title: string;
-  body: ProseMirrorDoc | null;
-  /** Other/Notes entries own an editable title; presets (Post positions,
-   *  Rubbers) keep a fixed heading. */
-  customTitle: boolean;
-}
+import type { NoteSectionData } from "~/lib/machines/settings-types";
 
 interface NoteSectionProps {
   note: NoteSectionData;

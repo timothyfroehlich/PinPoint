@@ -46,46 +46,14 @@ import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { InlineEditableText } from "~/components/machines/settings/InlineEditableText";
 import { InlineMarkdownField } from "~/components/machines/settings/InlineMarkdownField";
 import { SortableSection } from "~/components/machines/settings/SortableSection";
+import { NoteSection } from "~/components/machines/settings/NoteSection";
+import { SoftwareSettingsSection } from "~/components/machines/settings/SoftwareSettingsSection";
+import { DipBankSection } from "~/components/machines/settings/DipBankSection";
 import {
-  NoteSection,
-  type NoteSectionData,
-} from "~/components/machines/settings/NoteSection";
-import {
-  SoftwareSettingsSection,
-  type SoftwareSetting,
-} from "~/components/machines/settings/SoftwareSettingsSection";
-import {
-  DipBankSection,
-  type DipSwitchBank,
-} from "~/components/machines/settings/DipBankSection";
-
-// Preset note titles that may appear at most once per set.
-export const PRESET_NOTE_TITLES = ["Post positions", "Rubbers"] as const;
-
-/**
- * A set's body is a single ordered list of sections, each one of three kinds.
- * The unified list is what makes free drag-reordering across kinds possible.
- */
-export type Section =
-  | { id: string; kind: "software"; baseline: string; rows: SoftwareSetting[] }
-  | ({ kind: "dip" } & DipSwitchBank)
-  | ({ kind: "note" } & NoteSectionData);
-
-/** What the "Add section" menu hands back to the parent. */
-export type AddSectionSpec =
-  | { kind: "software" }
-  | { kind: "dip" }
-  | { kind: "note"; title: string; customTitle: boolean };
-
-export interface SettingsSetData {
-  id: string;
-  name: string;
-  isPreferred: boolean;
-  updatedBy: string;
-  updatedAt: string;
-  description: ProseMirrorDoc | null;
-  sections: Section[];
-}
+  type AddSectionSpec,
+  type SettingsSection,
+  type SettingsSetData,
+} from "~/lib/machines/settings-types";
 
 interface SettingsSetCardProps {
   set: SettingsSetData;
@@ -221,7 +189,7 @@ function AddSectionMenu({
   );
 }
 
-function describeSection(section: Section): string {
+function describeSection(section: SettingsSection): string {
   switch (section.kind) {
     case "software":
       return "the Software settings section";
@@ -232,7 +200,7 @@ function describeSection(section: Section): string {
   }
 }
 
-function sectionHasContent(section: Section): boolean {
+function sectionHasContent(section: SettingsSection): boolean {
   switch (section.kind) {
     case "software":
       return section.rows.some((r) => r.id || r.name || r.value);
@@ -313,7 +281,7 @@ export function SettingsSetCard({
     if (ok) onDelete();
   }
 
-  function confirmDeleteSection(section: Section): void {
+  function confirmDeleteSection(section: SettingsSection): void {
     if (sectionHasContent(section)) {
       const ok = window.confirm(
         `Delete ${describeSection(section)}? This can't be undone.`
@@ -323,7 +291,7 @@ export function SettingsSetCard({
     onDeleteSection(section.id);
   }
 
-  function renderSection(section: Section): React.JSX.Element {
+  function renderSection(section: SettingsSection): React.JSX.Element {
     switch (section.kind) {
       case "software":
         return (

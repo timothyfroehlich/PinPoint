@@ -5,12 +5,12 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Button } from "~/components/ui/button";
+import { SettingsSetCard } from "~/components/machines/settings/SettingsSetCard";
 import {
-  SettingsSetCard,
   type AddSectionSpec,
-  type Section,
+  type SettingsSection,
   type SettingsSetData,
-} from "~/components/machines/settings/SettingsSetCard";
+} from "~/lib/machines/settings-types";
 import { plainTextToDoc, type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 function makeKey(): string {
@@ -331,7 +331,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
   // -- Section-level operations --
   function mapSections(
     setId: string,
-    fn: (sections: Section[]) => Section[]
+    fn: (sections: SettingsSection[]) => SettingsSection[]
   ): void {
     setSets((prev) =>
       prev.map((s) => (s.id === setId ? { ...s, sections: fn(s.sections) } : s))
@@ -341,7 +341,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
   function updateSection(
     setId: string,
     sectionId: string,
-    updater: (section: Section) => Section
+    updater: (section: SettingsSection) => SettingsSection
   ): void {
     mapSections(setId, (sections) =>
       sections.map((sec) => (sec.id === sectionId ? updater(sec) : sec))
@@ -352,7 +352,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     setSets((prev) =>
       prev.map((s) => {
         if (s.id !== setId) return s;
-        let section: Section;
+        let section: SettingsSection;
         if (spec.kind === "software") {
           section = {
             id: makeKey(),
@@ -640,7 +640,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
 }
 
 /** Deep-clone one section, regenerating every key/id so the copy is isolated. */
-function cloneSection(section: Section): Section {
+function cloneSection(section: SettingsSection): SettingsSection {
   switch (section.kind) {
     case "software":
       return {

@@ -16,19 +16,7 @@ import { Switch } from "~/components/ui/switch";
 import { EditableCell } from "~/components/machines/settings/EditableCell";
 import { InlineEditableText } from "~/components/machines/settings/InlineEditableText";
 import { SECTION_LABEL_CLASS } from "~/components/machines/settings/styles";
-
-export interface DipSwitchEntry {
-  _key: string;
-  switch: string;
-  position: "ON" | "OFF";
-  note: string;
-}
-
-export interface DipSwitchBank {
-  id: string;
-  name: string;
-  switches: DipSwitchEntry[];
-}
+import type { DipSwitchBank } from "~/lib/machines/settings-types";
 
 interface DipBankSectionProps {
   bank: DipSwitchBank;

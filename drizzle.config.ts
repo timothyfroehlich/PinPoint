@@ -78,6 +78,7 @@ export default defineConfig({
     "discord_integration_config",
     "timeline_events",
     "timeline_event_people",
+    "machine_settings_sets",
   ],
   schemaFilter: ["public"],
   verbose: true,

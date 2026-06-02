@@ -16,13 +16,7 @@ import { BaselineCombobox } from "~/components/machines/settings/BaselineCombobo
 import { EditableCell } from "~/components/machines/settings/EditableCell";
 import { SECTION_LABEL_CLASS } from "~/components/machines/settings/styles";
 import { cn } from "~/lib/utils";
-
-export interface SoftwareSetting {
-  _key: string;
-  id: string;
-  name: string;
-  value: string;
-}
+import type { SoftwareSetting } from "~/lib/machines/settings-types";
 
 interface SoftwareSettingsSectionProps {
   baseline: string;
