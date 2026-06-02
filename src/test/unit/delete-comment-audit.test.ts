@@ -13,8 +13,9 @@
  * These stay as unit tests because they test input-parsing boundaries that
  * require no real DB or auth infrastructure.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { deleteCommentAction } from "~/app/(app)/issues/actions";
+import { db } from "~/server/db";
 
 // Mock Next.js modules
 vi.mock("next/cache", () => ({
@@ -77,6 +78,20 @@ vi.mock("~/lib/observability/report-error", () => ({
 }));
 
 describe("deleteCommentAction — input validation (KEEP-unit)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Asserts the action short-circuits on a Zod validation failure BEFORE any
+  // DB access. Catches regressions where a DB read/write accidentally moves
+  // ahead of input validation.
+  function expectNoDbAccess() {
+    expect(db.query.issueComments.findFirst).not.toHaveBeenCalled();
+    expect(db.query.issues.findFirst).not.toHaveBeenCalled();
+    expect(db.query.userProfiles.findFirst).not.toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
+  }
+
   it("should return VALIDATION error for invalid commentId", async () => {
     const formData = new FormData();
     formData.append("commentId", "not-a-uuid");
@@ -87,6 +102,7 @@ describe("deleteCommentAction — input validation (KEEP-unit)", () => {
     if (!result.ok) {
       expect(result.code).toBe("VALIDATION");
     }
+    expectNoDbAccess();
   });
 
   it("should return VALIDATION error for missing commentId", async () => {
@@ -99,5 +115,6 @@ describe("deleteCommentAction — input validation (KEEP-unit)", () => {
     if (!result.ok) {
       expect(result.code).toBe("VALIDATION");
     }
+    expectNoDbAccess();
   });
 });
