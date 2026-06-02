@@ -18,7 +18,11 @@ import {
 import { createClient } from "~/lib/supabase/server";
 import { isMachineIssueEvent } from "~/lib/timeline/machine-event-types";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
-import { tagSchema, type TimelineTag } from "~/lib/timeline/machine-tags";
+import {
+  DEFAULT_TIMELINE_TAGS,
+  tagSchema,
+  type TimelineTag,
+} from "~/lib/timeline/machine-tags";
 import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
 
@@ -105,11 +109,16 @@ export default async function MachineTimelinePage({
   const machineOwnerId = machine.ownerId;
   const machineName = machine.name;
 
+  // At the default (no ?tag=), apply the explicit default tag set rather than
+  // omitting the filter — the query seam PP-43q3 needs to default a tag OFF.
+  // Equal to the full tag list today, so results are byte-identical.
+  const effectiveTags = tags.length > 0 ? tags : [...DEFAULT_TIMELINE_TAGS];
+
   // Fetch one extra row so we can detect whether a next page exists without
   // a separate COUNT(*) query. Trim it back to PAGE_SIZE before rendering.
   const fetched = await getMachineTimeline(db, {
     machineId,
-    ...(tags.length > 0 ? { tags } : {}),
+    tags: effectiveTags,
     limit: PAGE_SIZE + 1,
     offset: (currentPage - 1) * PAGE_SIZE,
   });
