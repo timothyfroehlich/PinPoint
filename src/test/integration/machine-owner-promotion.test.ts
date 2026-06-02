@@ -387,6 +387,7 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
     it("should reject forcePromoteUserId from member (UNAUTHORIZED)", async () => {
       const { createClient } = await import("~/lib/supabase/server");
       const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
 
       const memberUser = await createUser("member");
       const guestUser = await createUser("guest");
@@ -413,11 +414,22 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       if (!result.ok) {
         expect(result.code).toBe("UNAUTHORIZED");
       }
+
+      // Read-only failure path: target guest NOT promoted, no machine inserted
+      const targetAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(targetAfter?.role).toBe("guest");
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
     });
 
     it("should reject forcePromoteUserId when it does not match ownerId (VALIDATION)", async () => {
       const { createClient } = await import("~/lib/supabase/server");
       const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
 
       const adminUser = await createUser("admin");
       const guestUser = await createUser("guest");
@@ -446,11 +458,26 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       if (!result.ok) {
         expect(result.code).toBe("VALIDATION");
       }
+
+      // Read-only failure path: neither guest promoted, no machine inserted
+      const guestAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(guestAfter?.role).toBe("guest");
+      const otherGuestAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, otherGuestUser.id),
+      });
+      expect(otherGuestAfter?.role).toBe("guest");
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
     });
 
     it("should reject forcePromoteUserId pointing at non-guest user (VALIDATION)", async () => {
       const { createClient } = await import("~/lib/supabase/server");
       const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
 
       const adminUser = await createUser("admin");
       const memberTarget = await createUser("member");
@@ -479,6 +506,16 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
         expect(result.code).toBe("VALIDATION");
         expect(result.message).toMatch(/not a guest/i);
       }
+
+      // Read-only failure path: target member record unchanged, no machine inserted
+      const targetAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, memberTarget.id),
+      });
+      expect(targetAfter?.role).toBe("member");
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
     });
   });
 
