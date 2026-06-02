@@ -56,7 +56,14 @@ export interface NoteSectionData {
  * and is why `sections` persists as one JSONB array rather than column-per-kind.
  */
 export type SettingsSection =
-  | { id: string; kind: "software"; baseline: string; rows: SoftwareSetting[] }
+  | {
+      id: string;
+      kind: "software";
+      baseline: string;
+      /** Free-text hint on where/how to find the baseline on the machine. */
+      baselineNote: string;
+      rows: SoftwareSetting[];
+    }
   | ({ kind: "dip" } & DipSwitchBank)
   | ({ kind: "note" } & NoteSectionData);
 
@@ -110,6 +117,7 @@ export const settingsSectionSchema = z.discriminatedUnion("kind", [
     kind: z.literal("software"),
     id: z.string().max(ID_MAX),
     baseline: z.string().max(NAME_MAX),
+    baselineNote: z.string().max(2000),
     rows: z.array(softwareSettingSchema).max(ROWS_MAX),
   }),
   z.object({

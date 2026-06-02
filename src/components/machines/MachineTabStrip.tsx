@@ -30,9 +30,9 @@ interface TabSpec {
 // status vocabulary used elsewhere in the app.
 const TABS: readonly TabSpec[] = [
   { slug: "", label: "Info" },
+  { slug: "settings", label: "Settings" },
   { slug: "maintenance", label: "Service" },
   { slug: "timeline", label: "Timeline" },
-  { slug: "settings", label: "Settings" },
 ] as const;
 
 export function MachineTabStrip({

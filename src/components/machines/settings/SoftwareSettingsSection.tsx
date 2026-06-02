@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
+import { Input } from "~/components/ui/input";
 import { BaselineCombobox } from "~/components/machines/settings/BaselineCombobox";
 import { EditableCell } from "~/components/machines/settings/EditableCell";
 import { SECTION_LABEL_CLASS } from "~/components/machines/settings/styles";
@@ -20,9 +21,11 @@ import type { SoftwareSetting } from "~/lib/machines/settings-types";
 
 interface SoftwareSettingsSectionProps {
   baseline: string;
+  baselineNote: string;
   rows: SoftwareSetting[];
   canEdit: boolean;
   onBaselineChange?: (newValue: string) => void;
+  onBaselineNoteChange?: (newValue: string) => void;
   onAddRow?: () => string | undefined;
   onUpdateRow?: (
     rowKey: string,
@@ -34,9 +37,11 @@ interface SoftwareSettingsSectionProps {
 
 export function SoftwareSettingsSection({
   baseline,
+  baselineNote,
   rows,
   canEdit,
   onBaselineChange,
+  onBaselineNoteChange,
   onAddRow,
   onUpdateRow,
   onDeleteRow,
@@ -52,19 +57,32 @@ export function SoftwareSettingsSection({
     <div className="py-2.5">
       <p className={cn("mb-1.5", SECTION_LABEL_CLASS)}>Software Settings</p>
 
-      {/* Baseline strip */}
-      <div className="mb-3 flex items-center gap-2 text-sm">
+      {/* Baseline strip: the starting-point preset + a free-text hint on where
+          to find it on the machine. */}
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
         <span className="font-medium text-foreground">Initial Install:</span>
         {canEdit ? (
-          <BaselineCombobox
-            value={baseline}
-            onChange={(val) => {
-              onBaselineChange?.(val);
-            }}
-          />
+          <>
+            <BaselineCombobox
+              value={baseline}
+              onChange={(val) => {
+                onBaselineChange?.(val);
+              }}
+            />
+            <Input
+              value={baselineNote}
+              onChange={(e) => {
+                onBaselineNoteChange?.(e.target.value);
+              }}
+              placeholder="Add instructions for finding it"
+              aria-label="Where to find this setting"
+              className="h-8 min-w-48 flex-1 text-sm"
+            />
+          </>
         ) : (
           <span className="text-muted-foreground">
             {baseline || "Not specified"}
+            {baselineNote ? ` — ${baselineNote}` : ""}
           </span>
         )}
       </div>

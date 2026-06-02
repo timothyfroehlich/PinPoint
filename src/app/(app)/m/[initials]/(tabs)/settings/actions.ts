@@ -243,10 +243,13 @@ export async function deleteSettingsSetAction(
   return { success: true };
 }
 
-/** Duplicate a settings set (never preferred; fresh authorship/timestamps). */
+/**
+ * Duplicate a settings set (never preferred; fresh authorship/timestamps).
+ * Returns the new id so the client can reconcile its optimistic copy.
+ */
 export async function duplicateSettingsSetAction(
   input: z.input<typeof idSchema>
-): Promise<ActionResult> {
+): Promise<SaveResult> {
   const parsed = idSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: "Invalid input" };
 
@@ -265,19 +268,23 @@ export async function duplicateSettingsSetAction(
   const auth = await authorizeManage(machine.ownerId);
   if (!auth.ok) return { success: false, error: auth.error };
 
-  await db.insert(machineSettingsSets).values({
-    machineId: original.machineId,
-    name: `${original.name} (copy)`,
-    description: original.description,
-    sections: original.sections,
-    isPreferred: false,
-    createdBy: auth.userId,
-    updatedBy: auth.userId,
-  });
+  const [inserted] = await db
+    .insert(machineSettingsSets)
+    .values({
+      machineId: original.machineId,
+      name: `${original.name} (copy)`,
+      description: original.description,
+      sections: original.sections,
+      isPreferred: false,
+      createdBy: auth.userId,
+      updatedBy: auth.userId,
+    })
+    .returning({ id: machineSettingsSets.id });
+  if (!inserted) return { success: false, error: "Could not duplicate set" };
 
   // §4: emitSettingsSetCreated(tx, machine.id, `${original.name} (copy)`, auth.userId)
   revalidateMachine(machine.initials);
-  return { success: true };
+  return { success: true, id: inserted.id };
 }
 
 /**

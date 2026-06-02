@@ -98,7 +98,9 @@ export function InlineMarkdownField({
           <RichTextEditor
             content={draft}
             onChange={setDraft}
-            mentionsEnabled={true}
+            // Settings descriptions/notes are documentation, not conversation —
+            // @-mentions (which notify) make no sense here (PP-43q3).
+            mentionsEnabled={false}
             placeholder={placeholder}
             ariaLabel={label ?? "Edit text"}
             compact

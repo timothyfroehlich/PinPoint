@@ -84,6 +84,7 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
         id: "sec-soft",
         kind: "software",
         baseline: "Competition Install",
+        baselineNote: "Coin door, left bank",
         rows: [{ id: "S-001", name: "Replay score", value: "700,000,000" }],
       },
       {

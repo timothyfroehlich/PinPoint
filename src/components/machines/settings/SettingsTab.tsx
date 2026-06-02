@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Button } from "~/components/ui/button";
@@ -11,224 +11,99 @@ import {
   type SettingsSection,
   type SettingsSetData,
 } from "~/lib/machines/settings-types";
-import { plainTextToDoc, type ProseMirrorDoc } from "~/lib/tiptap/types";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  deleteSettingsSetAction,
+  duplicateSettingsSetAction,
+  saveSettingsSetAction,
+  setPreferredSettingsSetAction,
+} from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
 
 function makeKey(): string {
   return `k-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xfff).toString(36)}`;
 }
 
-// ---------------------------------------------------------------------------
-// Hardcoded scaffold data — replaced by DB query once schema lands (PP-43q3)
-// ---------------------------------------------------------------------------
-function makeSampleSets(): SettingsSetData[] {
-  return [
-    {
-      id: "set-1",
-      name: "Standard House",
-      isPreferred: true,
-      updatedBy: "Bob",
-      updatedAt: "2026-05-12",
-      description: plainTextToDoc(
-        "Our day-to-day setup — slightly harder than factory but accessible."
-      ),
-      sections: [
-        {
-          id: makeKey(),
-          kind: "software",
-          baseline: "Competition Install",
-          rows: [
-            {
-              _key: makeKey(),
-              id: "S-001",
-              name: "Replay score",
-              value: "700,000,000",
-            },
-            { _key: makeKey(), id: "S-014", name: "Tilt warnings", value: "2" },
-            {
-              _key: makeKey(),
-              id: "S-021",
-              name: "Balls per game",
-              value: "3",
-            },
-            { _key: makeKey(), id: "S-040", name: "Free play", value: "On" },
-          ],
-        },
-        {
-          id: makeKey(),
-          kind: "note",
-          title: "Rubbers",
-          customTitle: false,
-          body: plainTextToDoc(
-            '3/8" silicone on outlane posts. Leave everything else stock.'
-          ),
-        },
-        {
-          id: makeKey(),
-          kind: "note",
-          title: "Post positions",
-          customTitle: false,
-          body: plainTextToDoc(
-            "Outlane posts — middle hole. Center post installed."
-          ),
-        },
-        {
-          id: makeKey(),
-          kind: "note",
-          title: "Notes",
-          customTitle: true,
-          body: plainTextToDoc(
-            "Right scoop has a slight kickout issue. No impact on gameplay; just flag if it gets worse."
-          ),
-        },
-      ],
-    },
-    {
-      id: "set-2",
-      name: "Friday Tournament",
-      isPreferred: false,
-      updatedBy: "Alice",
-      updatedAt: "2026-05-12",
-      description: plainTextToDoc(
-        "Tightened for league night — tilt sensitive, no extra balls."
-      ),
-      sections: [
-        {
-          id: makeKey(),
-          kind: "software",
-          baseline: "Competition Install",
-          rows: [
-            {
-              _key: makeKey(),
-              id: "S-001",
-              name: "Replay score",
-              value: "800,000,000",
-            },
-            { _key: makeKey(), id: "S-014", name: "Tilt warnings", value: "1" },
-            {
-              _key: makeKey(),
-              id: "S-021",
-              name: "Balls per game",
-              value: "3",
-            },
-            {
-              _key: makeKey(),
-              id: "S-030",
-              name: "Extra ball award",
-              value: "Off",
-            },
-            {
-              _key: makeKey(),
-              id: "S-041",
-              name: "Match feature",
-              value: "Off",
-            },
-          ],
-        },
-        {
-          id: makeKey(),
-          kind: "note",
-          title: "Rubbers",
-          customTitle: false,
-          body: plainTextToDoc("Same as Standard House."),
-        },
-        {
-          id: makeKey(),
-          kind: "note",
-          title: "Post positions",
-          customTitle: false,
-          body: plainTextToDoc("Outlane posts — top hole (tighter lane)."),
-        },
-        {
-          id: makeKey(),
-          kind: "note",
-          title: "Notes",
-          customTitle: true,
-          body: plainTextToDoc("Review ball times after each league session."),
-        },
-      ],
-    },
-    {
-      id: "set-3",
-      name: "Black Knight (early SS demo)",
-      isPreferred: false,
-      updatedBy: "Bob",
-      updatedAt: "2026-05-12",
-      description: plainTextToDoc(
-        "Sample early-solid-state set showing how DIP-switch banks render on a machine with no software settings."
-      ),
-      sections: [
-        {
-          id: makeKey(),
-          kind: "dip",
-          name: "MPU",
-          switches: [
-            {
-              _key: makeKey(),
-              switch: "DS1",
-              position: "ON",
-              note: "Free play",
-            },
-            { _key: makeKey(), switch: "DS3", position: "ON", note: "3-ball" },
-            {
-              _key: makeKey(),
-              switch: "DS7",
-              position: "OFF",
-              note: "Match off",
-            },
-          ],
-        },
-        {
-          id: makeKey(),
-          kind: "dip",
-          name: "Sound",
-          switches: [
-            {
-              _key: makeKey(),
-              switch: "DS1",
-              position: "OFF",
-              note: "Attract music off",
-            },
-          ],
-        },
-        {
-          id: makeKey(),
-          kind: "note",
-          title: "Rubbers",
-          customTitle: false,
-          body: plainTextToDoc("Standard outlane post rubber."),
-        },
-        {
-          id: makeKey(),
-          kind: "note",
-          title: "Post positions",
-          customTitle: false,
-          body: plainTextToDoc("Stock."),
-        },
-      ],
-    },
-  ];
+function makeTempSetId(): string {
+  return `tmp-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffff).toString(36)}`;
 }
 
-function makeSetId(): string {
-  return `set-${Date.now().toString()}-${String(
-    Math.floor(Math.random() * 1000)
-  )}`;
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Guard against losing unsaved edits. `beforeunload` covers refresh / tab-close
+ * / hard navigation (the Baseline guarantee). A capturing click listener covers
+ * in-app soft navigation (App Router has no stable blocker) by confirming
+ * before following any same-tab link while edits are pending.
+ */
+function useUnsavedChangesGuard(enabled: boolean): void {
+  useEffect(() => {
+    if (!enabled) return;
+
+    const onBeforeUnload = (e: BeforeUnloadEvent): void => {
+      // Modern browsers show the native prompt on preventDefault alone.
+      e.preventDefault();
+    };
+    const onClickCapture = (e: MouseEvent): void => {
+      if (
+        e.defaultPrevented ||
+        e.button !== 0 ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.shiftKey ||
+        e.altKey
+      ) {
+        return;
+      }
+      const anchor = (e.target as HTMLElement | null)?.closest("a");
+      if (!anchor) return;
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("#") || anchor.target === "_blank") return;
+      const ok = window.confirm(
+        "You have unsaved settings changes. Leave without saving?"
+      );
+      if (!ok) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClickCapture, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClickCapture, true);
+    };
+  }, [enabled]);
 }
 
 interface SettingsTabProps {
   canEdit: boolean;
+  machineId: string;
+  machineInitials: string;
+  initialSets: SettingsSetData[];
 }
 
-export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
-  const initial = makeSampleSets();
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    new Set([initial[0]!.id])
+export function SettingsTab({
+  canEdit,
+  machineId,
+  initialSets,
+}: SettingsTabProps): React.JSX.Element {
+  const [sets, setSets] = useState<SettingsSetData[]>(initialSets);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() =>
+    initialSets[0] ? new Set([initialSets[0].id]) : new Set()
   );
-  const [sets, setSets] = useState<SettingsSetData[]>(initial);
-  // Edit mode is PER SET — content editing unlocks only for the sets in this
-  // set. Set-level operations (Duplicate, Delete, Preferred, New set) stay
-  // available whenever `canEdit` (the owner/tech+ permission) is true.
+  // Edit mode is PER SET — content editing unlocks only for sets in this set.
+  // Set-level operations (Duplicate, Delete, Preferred, New set) stay available
+  // whenever `canEdit` (the owner/tech+ permission) is true.
   const [editingIds, setEditingIds] = useState<Set<string>>(new Set());
+  // Sets created this session that haven't been persisted yet (temp id). Save
+  // on Done inserts them and swaps the temp id for the server UUID.
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
+
+  // Any set in edit mode may have unsaved changes (save happens on Done).
+  useUnsavedChangesGuard(editingIds.size > 0);
 
   // The preferred set is always pinned to the top. A stable sort preserves the
   // insertion order of everything else (new sets, etc.).
@@ -236,17 +111,79 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     (a, b) => Number(b.isPreferred) - Number(a.isPreferred)
   );
 
-  function toggleSetEdit(id: string): void {
-    setEditingIds((prev) => {
+  function removeLocal(id: string): void {
+    setSets((prev) => prev.filter((s) => s.id !== id));
+    setExpandedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-        setExpandedIds((ex) => new Set(ex).add(id));
-      }
+      next.delete(id);
       return next;
     });
+    setEditingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setNewIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  /** Persist a set on leaving edit mode (insert when new, else update). */
+  async function saveSet(id: string): Promise<void> {
+    const set = sets.find((s) => s.id === id);
+    if (!set) return;
+    const isNew = newIds.has(id);
+
+    const result = await saveSettingsSetAction({
+      machineId,
+      ...(isNew ? {} : { id }),
+      name: set.name,
+      description: set.description,
+      sections: set.sections,
+    });
+    if (!result.success) {
+      window.alert(result.error);
+      return; // stay in edit mode so the user can retry
+    }
+
+    // Leave edit mode; reconcile the temp id → server UUID for new sets in a
+    // single pass across every id-keyed piece of state.
+    const realId = result.id;
+    setEditingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    if (isNew && realId !== id) {
+      setSets((prev) =>
+        prev.map((s) =>
+          s.id === id
+            ? { ...s, id: realId, updatedBy: "You", updatedAt: today() }
+            : s
+        )
+      );
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.delete(id)) next.add(realId);
+        return next;
+      });
+      setNewIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  function toggleSetEdit(id: string): void {
+    if (editingIds.has(id)) {
+      void saveSet(id);
+      return;
+    }
+    setEditingIds((prev) => new Set(prev).add(id));
+    setExpandedIds((prev) => new Set(prev).add(id));
   }
 
   function toggleExpand(id: string): void {
@@ -261,11 +198,23 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     });
   }
 
-  function togglePreferred(id: string): void {
+  async function togglePreferred(id: string): Promise<void> {
+    if (newIds.has(id)) return; // can't prefer an unsaved set
+    const set = sets.find((s) => s.id === id);
+    if (!set) return;
+    const next = !set.isPreferred;
+    const result = await setPreferredSettingsSetAction({
+      id,
+      isPreferred: next,
+    });
+    if (!result.success) {
+      window.alert(result.error);
+      return;
+    }
     setSets((prev) =>
       prev.map((s) => ({
         ...s,
-        isPreferred: s.id === id ? !s.isPreferred : false,
+        isPreferred: s.id === id ? next : next ? false : s.isPreferred,
       }))
     );
   }
@@ -274,37 +223,49 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     setSets((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
   }
 
-  function duplicateSet(id: string): void {
+  async function duplicateSet(id: string): Promise<void> {
+    if (newIds.has(id)) return; // save the original before copying it
+    const original = sets.find((s) => s.id === id);
+    if (!original) return;
+    const result = await duplicateSettingsSetAction({ id });
+    if (!result.success) {
+      window.alert(result.error);
+      return;
+    }
+    // Reconstruct the copy locally using the server-returned id so subsequent
+    // ops target the real row.
+    const copy: SettingsSetData = {
+      ...original,
+      id: result.id,
+      name: `${original.name} (copy)`,
+      isPreferred: false,
+      updatedBy: "You",
+      updatedAt: today(),
+      sections: original.sections.map(cloneSection),
+    };
     setSets((prev) => {
       const idx = prev.findIndex((s) => s.id === id);
-      if (idx < 0) return prev;
-      const original = prev[idx]!;
-      // Deep-clone every section (and its inner rows/switches) so edits on the
-      // copy don't mutate the original.
-      const copy: SettingsSetData = {
-        ...original,
-        id: makeSetId(),
-        name: `${original.name} (copy)`,
-        isPreferred: false,
-        sections: original.sections.map(cloneSection),
-      };
       const next = [...prev];
       next.splice(idx + 1, 0, copy);
       return next;
     });
   }
 
-  function deleteSet(id: string): void {
-    setSets((prev) => prev.filter((s) => s.id !== id));
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
+  async function deleteSet(id: string): Promise<void> {
+    if (newIds.has(id)) {
+      removeLocal(id); // unsaved — nothing to delete server-side
+      return;
+    }
+    const result = await deleteSettingsSetAction({ id });
+    if (!result.success) {
+      window.alert(result.error);
+      return;
+    }
+    removeLocal(id);
   }
 
   function addNewSet(): void {
-    const id = makeSetId();
+    const id = makeTempSetId();
     const newSet: SettingsSetData = {
       id,
       // Intentionally blank — the card opens with the name field focused and
@@ -312,14 +273,14 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
       name: "",
       isPreferred: false,
       updatedBy: "You",
-      updatedAt: "2026-05-25",
+      updatedAt: today(),
       description: null,
       sections: [],
     };
-    // New sets go to the top, expand, and open straight into edit mode.
     setSets((prev) => [newSet, ...prev]);
-    setExpandedIds((prev) => new Set([...prev, id]));
-    setEditingIds((prev) => new Set([...prev, id]));
+    setExpandedIds((prev) => new Set(prev).add(id));
+    setEditingIds((prev) => new Set(prev).add(id));
+    setNewIds((prev) => new Set(prev).add(id));
   }
 
   function updateDescription(id: string, value: ProseMirrorDoc | null): void {
@@ -358,6 +319,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
             id: makeKey(),
             kind: "software",
             baseline: "Factory Install",
+            baselineNote: "",
             rows: [{ _key: makeKey(), id: "", name: "", value: "" }],
           };
         } else if (spec.kind === "dip") {
@@ -403,7 +365,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
     });
   }
 
-  // -- Software-settings row handlers (scoped to a software section) --
+  // -- Software-settings handlers (scoped to a software section) --
   function updateBaseline(
     setId: string,
     sectionId: string,
@@ -411,6 +373,16 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
   ): void {
     updateSection(setId, sectionId, (sec) =>
       sec.kind === "software" ? { ...sec, baseline } : sec
+    );
+  }
+
+  function updateBaselineNote(
+    setId: string,
+    sectionId: string,
+    baselineNote: string
+  ): void {
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "software" ? { ...sec, baselineNote } : sec
     );
   }
 
@@ -580,16 +552,16 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
                 toggleSetEdit(set.id);
               }}
               onTogglePreferred={() => {
-                togglePreferred(set.id);
+                void togglePreferred(set.id);
               }}
               onRename={(name) => {
                 renameSet(set.id, name);
               }}
               onDuplicate={() => {
-                duplicateSet(set.id);
+                void duplicateSet(set.id);
               }}
               onDelete={() => {
-                deleteSet(set.id);
+                void deleteSet(set.id);
               }}
               onUpdateDescription={(value) => {
                 updateDescription(set.id, value);
@@ -605,6 +577,9 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
               }}
               onUpdateBaseline={(sectionId, value) => {
                 updateBaseline(set.id, sectionId, value);
+              }}
+              onUpdateBaselineNote={(sectionId, value) => {
+                updateBaselineNote(set.id, sectionId, value);
               }}
               onAddSoftwareRow={(sectionId) =>
                 addSoftwareRow(set.id, sectionId)
