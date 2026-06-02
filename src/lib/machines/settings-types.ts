@@ -1,4 +1,5 @@
-import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import { z } from "zod";
+import { type ProseMirrorDoc, proseMirrorDocSchema } from "~/lib/tiptap/types";
 
 /**
  * Shared data shapes for the Machine Settings tab (PP-43q3).
@@ -17,6 +18,9 @@ import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 export const PRESET_NOTE_TITLES = ["Post positions", "Rubbers"] as const;
 
 export interface SoftwareSetting {
+  /** Client render key — always present in the working copy (mapper-supplied);
+   *  stripped before persist (the Zod payload schema omits it) and re-derived
+   *  on read. */
   _key: string;
   id: string;
   name: string;
@@ -24,6 +28,7 @@ export interface SoftwareSetting {
 }
 
 export interface DipSwitchEntry {
+  /** Client render key — see SoftwareSetting._key. */
   _key: string;
   switch: string;
   position: "ON" | "OFF";
@@ -70,3 +75,63 @@ export interface SettingsSetData {
   description: ProseMirrorDoc | null;
   sections: SettingsSection[];
 }
+
+// ---------------------------------------------------------------------------
+// Runtime validation for the save action's payload.
+//
+// `$type<>` on the DB column is a COMPILE-TIME hint only — the server actions
+// are public endpoints, so the `sections`/`description` payload from the client
+// must be validated at runtime. These schemas also bound string/array sizes to
+// prevent payload bloat. Object schemas strip unknown keys by default, so the
+// client-only `_key` is dropped here — the parsed output is the persist-ready
+// shape (no `_key`), satisfying "strip before write".
+// ---------------------------------------------------------------------------
+
+const NAME_MAX = 200;
+const ID_MAX = 120;
+const ROWS_MAX = 200;
+const SWITCHES_MAX = 128;
+const SECTIONS_MAX = 50;
+
+const softwareSettingSchema = z.object({
+  id: z.string().max(ID_MAX),
+  name: z.string().max(NAME_MAX),
+  value: z.string().max(500),
+});
+
+const dipSwitchEntrySchema = z.object({
+  switch: z.string().max(60),
+  position: z.enum(["ON", "OFF"]),
+  note: z.string().max(2000),
+});
+
+export const settingsSectionSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("software"),
+    id: z.string().max(ID_MAX),
+    baseline: z.string().max(NAME_MAX),
+    rows: z.array(softwareSettingSchema).max(ROWS_MAX),
+  }),
+  z.object({
+    kind: z.literal("dip"),
+    id: z.string().max(ID_MAX),
+    name: z.string().max(NAME_MAX),
+    switches: z.array(dipSwitchEntrySchema).max(SWITCHES_MAX),
+  }),
+  z.object({
+    kind: z.literal("note"),
+    id: z.string().max(ID_MAX),
+    title: z.string().max(NAME_MAX),
+    body: proseMirrorDocSchema.nullable(),
+    customTitle: z.boolean(),
+  }),
+]);
+
+/** The validated, persist-ready content of a settings set (no client `_key`). */
+export const settingsSetPayloadSchema = z.object({
+  name: z.string().min(1, "Name this set").max(NAME_MAX),
+  description: proseMirrorDocSchema.nullable(),
+  sections: z.array(settingsSectionSchema).max(SECTIONS_MAX),
+});
+
+export type SettingsSetPayload = z.infer<typeof settingsSetPayloadSchema>;

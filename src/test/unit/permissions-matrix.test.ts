@@ -419,6 +419,18 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.watch", "guest")).toBe(true);
     });
 
+    it("should allow owners, technicians, and admins to manage settings (PP-43q3)", () => {
+      expect(getPermission("machines.settings.manage", "unauthenticated")).toBe(
+        false
+      );
+      expect(getPermission("machines.settings.manage", "guest")).toBe(false);
+      expect(getPermission("machines.settings.manage", "member")).toBe("owner");
+      expect(getPermission("machines.settings.manage", "technician")).toBe(
+        true
+      );
+      expect(getPermission("machines.settings.manage", "admin")).toBe(true);
+    });
+
     it("should allow owner-only access for ownerNotes editing", () => {
       expect(getPermission("machines.edit.ownerNotes", "unauthenticated")).toBe(
         false

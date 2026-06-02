@@ -88,6 +88,28 @@ describe("checkPermission", () => {
       expect(checkPermission("machines.edit", "member")).toBe(false);
     });
 
+    it("should resolve machines.settings.manage by ownership for members (PP-43q3)", () => {
+      const asOwner: OwnershipContext = { userId, machineOwnerId: userId };
+      const asNonOwner: OwnershipContext = {
+        userId,
+        machineOwnerId: otherUserId,
+      };
+      // Member: only their own machine.
+      expect(
+        checkPermission("machines.settings.manage", "member", asOwner)
+      ).toBe(true);
+      expect(
+        checkPermission("machines.settings.manage", "member", asNonOwner)
+      ).toBe(false);
+      // Technician/admin: any machine, ownership irrelevant.
+      expect(
+        checkPermission("machines.settings.manage", "technician", asNonOwner)
+      ).toBe(true);
+      expect(
+        checkPermission("machines.settings.manage", "admin", asNonOwner)
+      ).toBe(true);
+    });
+
     it("should deny if userId not provided for conditional permission", () => {
       const context: OwnershipContext = {
         reporterId: userId,
