@@ -343,6 +343,377 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       expect(createdMachine).toBeDefined();
       expect(createdMachine?.ownerId).toBe(guestUser.id);
     });
+
+    it("should allow technician to use forcePromoteUserId to create machine with owner", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const techUser = await createUser("technician");
+      const guestUser = await createUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: techUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `T${String(machineCounter).padStart(3, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Tech Promote Machine");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", guestUser.id);
+      formData.append("forcePromoteUserId", guestUser.id);
+
+      const result = await createMachineAction(undefined, formData);
+      expect(result.ok).toBe(true);
+
+      // Verify promotion happened
+      const promotedUser = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(promotedUser?.role).toBe("member");
+
+      // Verify machine was created
+      const createdMachine = await db.query.machines.findFirst({
+        where: eq(machines.ownerId, guestUser.id),
+      });
+      expect(createdMachine).toBeDefined();
+    });
+
+    it("should reject forcePromoteUserId from member (UNAUTHORIZED)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const memberUser = await createUser("member");
+      const guestUser = await createUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: memberUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `R${String(machineCounter).padStart(3, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Should Be Rejected");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", guestUser.id);
+      formData.append("forcePromoteUserId", guestUser.id);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only failure path: target guest NOT promoted, no machine inserted
+      const targetAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(targetAfter?.role).toBe("guest");
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
+    });
+
+    it("should reject forcePromoteUserId when it does not match ownerId (VALIDATION)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const guestUser = await createUser("guest");
+      const otherGuestUser = await createUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `V${String(machineCounter).padStart(3, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Mismatch Machine");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", guestUser.id);
+      // forcePromoteUserId points at a different user than ownerId
+      formData.append("forcePromoteUserId", otherGuestUser.id);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+
+      // Read-only failure path: neither guest promoted, no machine inserted
+      const guestAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(guestAfter?.role).toBe("guest");
+      const otherGuestAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, otherGuestUser.id),
+      });
+      expect(otherGuestAfter?.role).toBe("guest");
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
+    });
+
+    it("should reject forcePromoteUserId pointing at non-guest user (VALIDATION)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const memberTarget = await createUser("member");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `G${String(machineCounter).padStart(3, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Non-Guest Machine");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", memberTarget.id);
+      // forcePromoteUserId points at a member, not a guest
+      formData.append("forcePromoteUserId", memberTarget.id);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+        expect(result.message).toMatch(/not a guest/i);
+      }
+
+      // Read-only failure path: target member record unchanged, no machine inserted
+      const targetAfter = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, memberTarget.id),
+      });
+      expect(targetAfter?.role).toBe("member");
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machineAfter).toBeUndefined();
+    });
+  });
+
+  describe("createMachineAction — permission checks", () => {
+    it("should reject creation for non-admin users (member)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+
+      const memberUser = await createUser("member");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: memberUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `MR${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Medieval Madness");
+      formData.append("initials", uniqueInitials);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+    });
+
+    it("should reject creation for guest users", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+
+      const guestUser = await createUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: guestUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `GR${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Medieval Madness");
+      formData.append("initials", uniqueInitials);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+    });
+
+    it("should allow technician to create a machine", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const techUser = await createUser("technician");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: techUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `TC${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Medieval Madness");
+      formData.append("initials", uniqueInitials);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.redirectTo).toMatch(/^\/m\//);
+      }
+
+      // Verify machine was inserted in real DB
+      const createdMachine = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(createdMachine).toBeDefined();
+    });
+  });
+
+  describe("createMachineAction — ownerId null regression", () => {
+    it("should NOT default ownerId to caller when field is explicitly empty string (regression)", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `ER${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Empty Owner Machine");
+      formData.append("initials", uniqueInitials);
+      // Explicitly empty ownerId (not omitted — was previously defaulting to caller)
+      formData.append("ownerId", "");
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+
+      // Real DB row must have null ownerId, not the caller's ID
+      const machine = await db.query.machines.findFirst({
+        where: eq(machines.initials, uniqueInitials),
+      });
+      expect(machine).toBeDefined();
+      expect(machine?.ownerId).toBeNull();
+    });
+  });
+
+  describe("createMachineAction — ASSIGNEE_NOT_MEMBER via createMachineAction", () => {
+    it("should return ASSIGNEE_NOT_MEMBER when active guest is assigned as owner via createMachineAction", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+
+      const adminUser = await createUser("admin");
+      const guestUser = await createUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `AG${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Medieval Madness");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", guestUser.id);
+      // No forcePromoteUserId — should fail with ASSIGNEE_NOT_MEMBER
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("ASSIGNEE_NOT_MEMBER");
+        expect(result.meta?.assignee.id).toBe(guestUser.id);
+        expect(result.meta?.assignee.role).toBe("guest");
+        expect(result.meta?.assignee.type).toBe("active");
+      }
+    });
+
+    it("should return ASSIGNEE_NOT_MEMBER when invited guest is assigned as owner via createMachineAction", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { createMachineAction } = await import("~/app/(app)/m/actions");
+
+      const adminUser = await createUser("admin");
+      const invitedGuest = await createInvitedUser("guest");
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      machineCounter += 1;
+      const uniqueInitials = `IG${String(machineCounter).padStart(2, "0")}`;
+      const formData = new FormData();
+      formData.append("name", "Medieval Madness");
+      formData.append("initials", uniqueInitials);
+      formData.append("ownerId", invitedGuest.id);
+
+      const result = await createMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("ASSIGNEE_NOT_MEMBER");
+        expect(result.meta?.assignee.type).toBe("invited");
+      }
+    });
   });
 
   describe("ASSIGNEE_NOT_MEMBER validation", () => {
