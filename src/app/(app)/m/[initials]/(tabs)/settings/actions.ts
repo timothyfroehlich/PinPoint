@@ -28,6 +28,7 @@ import {
   settingsSetPayloadSchema,
 } from "~/lib/machines/settings-types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import { emitSettingsSetEvent } from "~/lib/timeline/machine-events";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import {
@@ -137,22 +138,32 @@ export async function saveSettingsSetAction(
 
   // ---- Insert ----
   if (!id) {
-    const [inserted] = await db
-      .insert(machineSettingsSets)
-      .values({
+    const newId = await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(machineSettingsSets)
+        .values({
+          machineId,
+          name,
+          description,
+          sections,
+          createdBy: auth.userId,
+          updatedBy: auth.userId,
+        })
+        .returning({ id: machineSettingsSets.id });
+      if (!inserted) return undefined;
+      await emitSettingsSetEvent(
         machineId,
+        "settings_set_created",
         name,
-        description,
-        sections,
-        createdBy: auth.userId,
-        updatedBy: auth.userId,
-      })
-      .returning({ id: machineSettingsSets.id });
-    if (!inserted) return { success: false, error: "Could not create set" };
+        auth.userId,
+        tx
+      );
+      return inserted.id;
+    });
+    if (!newId) return { success: false, error: "Could not create set" };
 
-    // §4: emitSettingsSetCreated(tx, machine.id, name, auth.userId)
     revalidateMachine(machine.initials);
-    return { success: true, id: inserted.id };
+    return { success: true, id: newId };
   }
 
   // ---- Update ----
@@ -185,18 +196,26 @@ export async function saveSettingsSetAction(
   );
   if (unchanged) return { success: true, id };
 
-  await db
-    .update(machineSettingsSets)
-    .set({
+  await db.transaction(async (tx) => {
+    await tx
+      .update(machineSettingsSets)
+      .set({
+        name,
+        description,
+        sections,
+        updatedBy: auth.userId,
+        updatedAt: new Date(),
+      })
+      .where(eq(machineSettingsSets.id, id));
+    await emitSettingsSetEvent(
+      machineId,
+      "settings_set_updated",
       name,
-      description,
-      sections,
-      updatedBy: auth.userId,
-      updatedAt: new Date(),
-    })
-    .where(eq(machineSettingsSets.id, id));
+      auth.userId,
+      tx
+    );
+  });
 
-  // §4: emitSettingsSetUpdated(tx, existing.machineId, name, auth.userId)
   revalidateMachine(machine.initials);
   return { success: true, id };
 }
@@ -234,11 +253,19 @@ export async function deleteSettingsSetAction(
   const auth = await authorizeManage(loaded.machine.ownerId);
   if (!auth.ok) return { success: false, error: auth.error };
 
-  await db
-    .delete(machineSettingsSets)
-    .where(eq(machineSettingsSets.id, parsed.data.id));
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(machineSettingsSets)
+      .where(eq(machineSettingsSets.id, parsed.data.id));
+    await emitSettingsSetEvent(
+      loaded.machine.id,
+      "settings_set_deleted",
+      loaded.set.name,
+      auth.userId,
+      tx
+    );
+  });
 
-  // §4: emitSettingsSetDeleted(tx, loaded.machine.id, loaded.set.name, auth.userId)
   revalidateMachine(loaded.machine.initials);
   return { success: true };
 }
@@ -268,23 +295,34 @@ export async function duplicateSettingsSetAction(
   const auth = await authorizeManage(machine.ownerId);
   if (!auth.ok) return { success: false, error: auth.error };
 
-  const [inserted] = await db
-    .insert(machineSettingsSets)
-    .values({
-      machineId: original.machineId,
-      name: `${original.name} (copy)`,
-      description: original.description,
-      sections: original.sections,
-      isPreferred: false,
-      createdBy: auth.userId,
-      updatedBy: auth.userId,
-    })
-    .returning({ id: machineSettingsSets.id });
-  if (!inserted) return { success: false, error: "Could not duplicate set" };
+  const copyName = `${original.name} (copy)`;
+  const newId = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(machineSettingsSets)
+      .values({
+        machineId: original.machineId,
+        name: copyName,
+        description: original.description,
+        sections: original.sections,
+        isPreferred: false,
+        createdBy: auth.userId,
+        updatedBy: auth.userId,
+      })
+      .returning({ id: machineSettingsSets.id });
+    if (!inserted) return undefined;
+    await emitSettingsSetEvent(
+      machine.id,
+      "settings_set_created",
+      copyName,
+      auth.userId,
+      tx
+    );
+    return inserted.id;
+  });
+  if (!newId) return { success: false, error: "Could not duplicate set" };
 
-  // §4: emitSettingsSetCreated(tx, machine.id, `${original.name} (copy)`, auth.userId)
   revalidateMachine(machine.initials);
-  return { success: true, id: inserted.id };
+  return { success: true, id: newId };
 }
 
 /**
@@ -325,9 +363,19 @@ export async function setPreferredSettingsSetAction(
         updatedAt: new Date(),
       })
       .where(eq(machineSettingsSets.id, parsed.data.id));
+
+    // Only promotion is timeline-worthy; un-preferring has no event kind.
+    if (parsed.data.isPreferred) {
+      await emitSettingsSetEvent(
+        loaded.machine.id,
+        "settings_set_preferred",
+        loaded.set.name,
+        auth.userId,
+        tx
+      );
+    }
   });
 
-  // §4: emitSettingsSetPreferred(tx, loaded.machine.id, loaded.set.name, auth.userId)
   revalidateMachine(loaded.machine.initials);
   return { success: true };
 }

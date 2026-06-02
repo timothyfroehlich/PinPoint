@@ -4,6 +4,7 @@ import {
   Eye,
   History,
   Package,
+  Settings,
   SlidersHorizontal,
   Sparkles,
   StickyNote,
@@ -110,6 +111,11 @@ const RESERVED_TAG_DECORATION: Record<
   issue: {
     Icon: CircleDot,
     badgeClass: "border-secondary/40 bg-secondary/15 text-secondary",
+  },
+  settings: {
+    Icon: Settings,
+    badgeClass:
+      "border-outline-variant bg-surface-variant/30 text-muted-foreground",
   },
 };
 

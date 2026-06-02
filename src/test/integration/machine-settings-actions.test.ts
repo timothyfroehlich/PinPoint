@@ -16,6 +16,7 @@ import {
   authUsers,
   machineSettingsSets,
   machines,
+  timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
 import type { SettingsSetPayload } from "~/lib/machines/settings-types";
@@ -463,5 +464,74 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
     expect(result.success).toBe(false);
     if (result.success === false)
       expect(result.error).toBe("Not authenticated");
+  });
+
+  // -- timeline events (PP-43q3 §4) -----------------------------------------
+
+  async function settingsEvents(machineId: string) {
+    const db = await getTestDb();
+    return db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machineId));
+  }
+
+  it("emits a settings-tagged timeline event for create/update/delete/preferred and skips no-ops", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(owner.id);
+    const {
+      saveSettingsSetAction,
+      setPreferredSettingsSetAction,
+      deleteSettingsSetAction,
+    } = await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    // create
+    const created = await saveSettingsSetAction({
+      machineId: machine.id,
+      name: "Tournament",
+      description: null,
+      sections: sampleSections(),
+    });
+    if (!created.success) throw new Error("create failed");
+
+    // no-op update — must NOT emit
+    await saveSettingsSetAction({
+      machineId: machine.id,
+      id: created.id,
+      name: "Tournament",
+      description: null,
+      sections: sampleSections(),
+    });
+
+    // real update
+    await saveSettingsSetAction({
+      machineId: machine.id,
+      id: created.id,
+      name: "Tournament v2",
+      description: null,
+      sections: sampleSections(),
+    });
+
+    await setPreferredSettingsSetAction({ id: created.id, isPreferred: true });
+    await deleteSettingsSetAction({ id: created.id });
+
+    const events = await settingsEvents(machine.id);
+    const kinds = events
+      .filter((e) => e.tag === "settings")
+      .map((e) => (e.eventData as { kind: string } | null)?.kind)
+      .sort();
+    // created + updated (one real, the no-op skipped) + preferred + deleted = 4
+    expect(kinds).toEqual([
+      "settings_set_created",
+      "settings_set_deleted",
+      "settings_set_preferred",
+      "settings_set_updated",
+    ]);
+    // All carry the actor + the settings tag.
+    for (const e of events.filter((ev) => ev.tag === "settings")) {
+      expect(e.sourceType).toBe("lifecycle");
+      expect(e.authorId).toBe(owner.id);
+    }
   });
 });

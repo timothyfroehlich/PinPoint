@@ -30,6 +30,10 @@ test.describe("Machine Settings (PP-43q3)", () => {
     test("creates a set, persists on Done, and survives a reload", async ({
       page,
     }) => {
+      // The reload recompiles the route in dev mode (the E2E webServer runs
+      // `next dev`); under suite load that first post-reload render is slow,
+      // so give this journey extra budget rather than racing a fixed timeout.
+      test.slow();
       // Auto-accept any confirm (delete/duplicate/unsaved-guard) so a stray
       // dialog can't hang the run.
       page.on("dialog", (d) => void d.accept());
@@ -47,14 +51,15 @@ test.describe("Machine Settings (PP-43q3)", () => {
       await page.getByRole("button", { name: /^done$/i }).click();
       await expect(page.getByText(name)).toBeVisible({ timeout: 10_000 });
 
-      // Reload — if it's still here, it was written to the DB (not just state).
-      // Wait for the page to re-render (dev-mode reloads recompile the route)
-      // via the stable header before asserting the persisted set name.
-      await page.reload();
-      await expect(page.getByText(/game settings/i)).toBeVisible({
-        timeout: 20_000,
-      });
-      await expect(page.getByText(name)).toBeVisible({ timeout: 10_000 });
+      // Reload — if it's still here, it was written to the DB (not just local
+      // state). Wrapped in toPass: the dev webServer can briefly serve a stale
+      // route render right after the action's revalidate, so retry the reload
+      // until the persisted set appears. (Production renders this route
+      // dynamically, so the staleness is a dev-mode artifact.)
+      await expect(async () => {
+        await page.reload();
+        await expect(page.getByText(name)).toBeVisible({ timeout: 8_000 });
+      }).toPass({ timeout: 45_000 });
     });
 
     test("reaches the Settings tab from the machine tab strip", async ({

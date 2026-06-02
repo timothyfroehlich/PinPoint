@@ -258,7 +258,7 @@ export default async function MachineTimelinePage({
       <MachineTimelineActionsRow
         machineId={machineId}
         machineName={machineName}
-        currentTags={tags}
+        currentTags={effectiveTags}
         canCompose={canCompose}
       />
       {rows.length === 0 ? (

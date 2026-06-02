@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { MultiSelect, type Option } from "~/components/ui/multi-select";
 import {
+  DEFAULT_TIMELINE_TAGS,
   TIMELINE_TAGS,
   getTagLabel,
   tagSchema,
@@ -24,11 +25,12 @@ interface Props {
  * visible checkboxes + count badge + search), the same control the issue
  * list uses. Visible checkboxes make the multi-select nature obvious.
  *
- * "All" is the empty selection, not a row: no tags selected = no `?tag=`
- * param = everything shown. Each option carries its tag icon + color so the
- * dropdown matches the composer/edit pickers and the row badges.
- *
- * URL: `?tag=` missing = all; `?tag=maintenance,upgrade` = explicit subset.
+ * The default view (no `?tag=`) shows {@link DEFAULT_TIMELINE_TAGS} — every
+ * tag except the default-off ones (e.g. `settings`, PP-43q3). The page passes
+ * that effective set as `currentTags`, so the chips reflect what's actually
+ * shown and toggling a default-off tag ON adds it to the full set (rather than
+ * narrowing to it alone). Selecting exactly the default set collapses back to a
+ * clean `?tag=`-less URL. Each option carries its tag icon + color.
  */
 const TAG_OPTIONS: Option[] = TIMELINE_TAGS.map((t) => {
   const { Icon, badgeClass } = TAG_DECORATION[t];
@@ -48,9 +50,14 @@ export function MachineTimelineFilter({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const isDefaultSelection = (tags: TimelineTag[]): boolean =>
+    tags.length === DEFAULT_TIMELINE_TAGS.length &&
+    DEFAULT_TIMELINE_TAGS.every((t) => tags.includes(t));
+
   const writeTags = (next: TimelineTag[]): void => {
     const params = new URLSearchParams(searchParams.toString());
-    if (next.length === 0) {
+    // Empty OR exactly the default set → clean `?tag=`-less URL (default view).
+    if (next.length === 0 || isDefaultSelection(next)) {
       params.delete("tag");
     } else {
       params.set("tag", next.join(","));
