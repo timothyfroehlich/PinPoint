@@ -725,8 +725,9 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       const db = await getTestDb();
 
       const adminUser = await createUser("admin");
-      const owner = await createUser("member");
-      const machine = await createMachine(owner.id);
+      // No owner: exercises the machineOwnerId === null path in
+      // checkPermission("machines.edit", ...) — admin can edit an unowned machine.
+      const machine = await createMachine();
 
       vi.mocked(createClient).mockResolvedValue({
         auth: {
@@ -793,11 +794,15 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       const { updateMachineAction } = await import("~/app/(app)/m/actions");
       const db = await getTestDb();
 
-      // Guest user who happens to be stored as owner (bad state, now prevented by DB trigger)
-      // We insert directly bypassing the trigger check to set up the scenario.
+      // Legacy/drift scenario: a guest is stored as a machine owner — a bad state
+      // that the production DB trigger (check_machine_owner_not_guest) now prevents.
+      // NOTE: this PGlite suite is built from the schema.sql export, which does NOT
+      // include migration-defined triggers (see file header), so no trigger runs
+      // here. We seed the drift state directly by raw-updating the ownerId — there
+      // is no trigger to bypass in this environment.
       const guestUser = await createUser("guest");
       const adminUser = await createUser("admin");
-      // Create machine owned by admin first, then raw-update to guest to simulate legacy drift
+      // Create machine owned by admin first, then raw-update to guest to seed the drift state.
       const machine = await createMachine(adminUser.id);
       await db
         .update(machines)
