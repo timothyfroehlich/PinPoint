@@ -1278,6 +1278,335 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
     });
   });
 
+  describe("updateMachineTextField — field edit permission", () => {
+    // Wave 3 RECLASS (PP-x4li.1.3): blocks 4–11, 13–14 from
+    // src/test/unit/machine-actions.test.ts updateMachineTextField describe.
+    // Tests real permission matrix (checkPermission) against a real PGlite DB.
+    //
+    // Permission matrix reference:
+    //   machines.edit: unauthenticated=false, guest=false, member="owner",
+    //                  technician=true, admin=true
+    //   machines.edit.ownerNotes: all roles = "owner" (owner-only, even for admins)
+    //   machines.edit.ownerRequirements: owner-scoped
+
+    // A minimal valid ProseMirror doc for test payloads
+    const validDoc = {
+      type: "doc" as const,
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "hello" }] },
+      ],
+    };
+
+    it("guest (non-owner) edits description → UNAUTHORIZED, field unchanged in DB", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineDescription } =
+        await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const guestUser = await createUser("guest");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: guestUser.id } } }),
+        },
+      } as any);
+
+      const result = await updateMachineDescription(machine.id, validDoc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only invariant: description must NOT have changed
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.description).toBeNull();
+    });
+
+    it("member-owner edits description → ok, description persisted in DB", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineDescription } =
+        await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
+        },
+      } as any);
+
+      const result = await updateMachineDescription(machine.id, validDoc);
+
+      expect(result.ok).toBe(true);
+
+      // Persistence invariant: description must be stored in DB
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.description).toBeDefined();
+      expect(machineAfter?.description).not.toBeNull();
+    });
+
+    it("member-owner edits ownerNotes → ok, ownerNotes persisted in DB", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineOwnerNotes } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
+        },
+      } as any);
+
+      const result = await updateMachineOwnerNotes(machine.id, validDoc);
+
+      expect(result.ok).toBe(true);
+
+      // Persistence invariant: ownerNotes must be stored in DB
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerNotes).toBeDefined();
+      expect(machineAfter?.ownerNotes).not.toBeNull();
+    });
+
+    it("member NON-owner attempts ownerNotes → UNAUTHORIZED (owner-scoped), ownerNotes unchanged", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineOwnerNotes } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const nonOwnerMember = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: nonOwnerMember.id } } }),
+        },
+      } as any);
+
+      const result = await updateMachineOwnerNotes(machine.id, validDoc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only invariant: ownerNotes must NOT have changed
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerNotes).toBeNull();
+    });
+
+    it("technician NON-owner edits description → ok (machines.edit: technician=true), description persisted", async () => {
+      // Key behavioral test: machines.edit grants technician=true unconditionally,
+      // so a technician can edit description regardless of machine ownership.
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineDescription } =
+        await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const techUser = await createUser("technician");
+      // Machine owned by member, technician is NOT the owner
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: techUser.id } } }),
+        },
+      } as any);
+
+      const result = await updateMachineDescription(machine.id, validDoc);
+
+      expect(result.ok).toBe(true);
+
+      // Persistence invariant: description must be stored in DB
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.description).toBeDefined();
+      expect(machineAfter?.description).not.toBeNull();
+    });
+
+    it("technician NON-owner attempts ownerNotes → UNAUTHORIZED (machines.edit.ownerNotes: technician='owner'), ownerNotes unchanged", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineOwnerNotes } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const techUser = await createUser("technician");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: techUser.id } } }),
+        },
+      } as any);
+
+      const result = await updateMachineOwnerNotes(machine.id, validDoc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only invariant: ownerNotes must NOT have changed
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerNotes).toBeNull();
+    });
+
+    it("admin NON-owner edits description → ok (machines.edit: admin=true), description persisted", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineDescription } =
+        await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const adminUser = await createUser("admin");
+      // Machine owned by member, admin is NOT the owner
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      const result = await updateMachineDescription(machine.id, validDoc);
+
+      expect(result.ok).toBe(true);
+
+      // Persistence invariant: description must be stored in DB
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.description).toBeDefined();
+      expect(machineAfter?.description).not.toBeNull();
+    });
+
+    it("admin NON-owner attempts ownerNotes → UNAUTHORIZED (machines.edit.ownerNotes: admin='owner'), ownerNotes unchanged", async () => {
+      // Matrix: machines.edit.ownerNotes is "owner" for ALL roles, including admin.
+      // Even an admin cannot edit ownerNotes unless they are the machine owner.
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineOwnerNotes } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const adminUser = await createUser("admin");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      const result = await updateMachineOwnerNotes(machine.id, validDoc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only invariant: ownerNotes must NOT have changed
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerNotes).toBeNull();
+    });
+
+    it("owner edits ownerRequirements → ok, ownerRequirements persisted in DB", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineOwnerRequirements } =
+        await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
+        },
+      } as any);
+
+      const result = await updateMachineOwnerRequirements(machine.id, validDoc);
+
+      expect(result.ok).toBe(true);
+
+      // Persistence invariant: ownerRequirements must be stored in DB
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerRequirements).toBeDefined();
+      expect(machineAfter?.ownerRequirements).not.toBeNull();
+    });
+
+    it("non-owner member → ownerRequirements UNAUTHORIZED (owner-scoped), ownerRequirements unchanged", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineOwnerRequirements } =
+        await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const ownerUser = await createUser("member");
+      const nonOwnerMember = await createUser("member");
+      const machine = await createMachine(ownerUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: nonOwnerMember.id } } }),
+        },
+      } as any);
+
+      const result = await updateMachineOwnerRequirements(machine.id, validDoc);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("UNAUTHORIZED");
+      }
+
+      // Read-only invariant: ownerRequirements must NOT have changed
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerRequirements).toBeNull();
+    });
+  });
+
   describe("DB trigger semantics — raw SQL (requires migration 0027 to be applied)", () => {
     it("should detect whether the trigger function exists in the PGlite schema", async () => {
       const db = await getTestDb();
