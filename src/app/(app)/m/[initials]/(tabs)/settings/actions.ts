@@ -8,11 +8,9 @@
  * Save model: whole-set save-on-Done. `saveSettingsSetAction` upserts the
  * entire set; Delete / Duplicate / SetPreferred are instant single-set ops.
  *
- * NOTE (§4 / PP-8oy0): each mutation will additionally emit a `settings`-tagged
- * timeline event. Those emit calls land once the timeline-filter precursor
- * (PP-8oy0) merges and the `settings` tag exists — see the marked insertion
- * points below. The CRUD + permissions + validation here are complete and
- * independently testable.
+ * Each mutation also emits a `settings`-tagged timeline event
+ * (`emitSettingsSetEvent`) inside its transaction, so the event commits
+ * atomically with the write. No-op saves and un-preferring emit nothing.
  */
 
 "use server";
@@ -40,7 +38,9 @@ import {
 
 type ActionResult = { success: true } | { success: false; error: string };
 type SaveResult =
-  | { success: true; id: string }
+  // `changed` is false only for a no-op update (deep-compare matched), so the
+  // client can skip refreshing updatedBy/updatedAt for an unchanged save.
+  | { success: true; id: string; changed: boolean }
   | { success: false; error: string };
 
 // Aggregate byte ceiling on the persisted JSON content of one set — a backstop
@@ -98,8 +98,8 @@ function revalidateMachine(initials: string): void {
  * Upsert a whole settings set. Insert when `id` is absent (returns the new id),
  * else update the existing row. On update the set's `machineId` is taken from
  * the persisted row and cross-checked against the input (no re-parenting).
- * A no-op save (no content change) skips both the write and the `updatedAt`
- * bump — and, in §4, the timeline emit.
+ * A no-op save (no content change) skips the write, the `updatedAt` bump, and
+ * the timeline emit, and reports `changed: false`.
  */
 export async function saveSettingsSetAction(
   input: z.input<typeof saveSchema>
@@ -166,7 +166,7 @@ export async function saveSettingsSetAction(
     if (!newId) return { success: false, error: "Could not create set" };
 
     revalidateMachine(machine.initials);
-    return { success: true, id: newId };
+    return { success: true, id: newId, changed: true };
   }
 
   // ---- Update ----
@@ -186,9 +186,9 @@ export async function saveSettingsSetAction(
     return { success: false, error: "Settings set not found" };
   }
 
-  // No-op guard: skip the write (and the §4 emit) when nothing changed. Both
-  // sides are already `_key`-free (Zod stripped the input; the column never
-  // stored it), so a structural deep-equal is exact.
+  // No-op guard: skip the write (and its timeline emit) when nothing changed.
+  // Both sides are already `_key`-free (Zod stripped the input; the column
+  // never stored it), so a structural deep-equal is exact.
   const unchanged = isDeepStrictEqual(
     {
       name: existing.name,
@@ -197,7 +197,7 @@ export async function saveSettingsSetAction(
     },
     { name, description: description ?? null, sections }
   );
-  if (unchanged) return { success: true, id };
+  if (unchanged) return { success: true, id, changed: false };
 
   await db.transaction(async (tx) => {
     await tx
@@ -220,7 +220,7 @@ export async function saveSettingsSetAction(
   });
 
   revalidateMachine(machine.initials);
-  return { success: true, id };
+  return { success: true, id, changed: true };
 }
 
 /**
@@ -325,7 +325,7 @@ export async function duplicateSettingsSetAction(
   if (!newId) return { success: false, error: "Could not duplicate set" };
 
   revalidateMachine(machine.initials);
-  return { success: true, id: newId };
+  return { success: true, id: newId, changed: true };
 }
 
 /**

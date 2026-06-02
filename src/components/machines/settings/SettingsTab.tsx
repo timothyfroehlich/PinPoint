@@ -174,10 +174,10 @@ export function SettingsTab({
         next.delete(id);
         return next;
       });
-    } else {
-      // Existing set saved — reflect the new editor/timestamp locally so the
-      // "updated by … " line isn't stale until the next load. (A no-op save
-      // self-corrects on reload, where the server's unchanged updatedAt wins.)
+    } else if (result.changed) {
+      // Existing set actually changed — reflect the new editor/timestamp
+      // locally so the "updated by …" line isn't stale until the next load.
+      // A no-op save (changed === false) leaves the metadata untouched.
       setSets((prev) =>
         prev.map((s) =>
           s.id === id ? { ...s, updatedBy: "You", updatedAt: today() } : s
