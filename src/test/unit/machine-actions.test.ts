@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   updateMachineAction,
   updateMachineDescription,
-  updateMachineOwnerNotes,
   updateMachineOwnerRequirements,
 } from "~/app/(app)/m/actions";
 import { createClient } from "~/lib/supabase/server";
@@ -212,21 +211,23 @@ describe("updateMachineAction", () => {
 });
 
 // ---------------------------------------------------------------------------
-// updateMachineTextField unit tests (via exported wrapper functions)
+// updateMachineTextField unit tests (KEEP-unit blocks only)
 //
 // Permission matrix for reference:
 //   machines.edit: unauthenticated=false, guest=false, member="owner",
 //                  technician=true, admin=true
 //   machines.edit.ownerNotes: all roles = "owner" (owner-only, even for admins)
 //
-// Behavioral-change test: technician NON-owner can now edit description
-// (machines.edit: technician=true). Before the drift fix, the hardcoded
-// `role === "admin"` check denied technicians. The matrix now governs this.
+// Blocks 4–11 and 13–14 have been RECLASS'd to machine-owner-promotion.test.ts
+// (Wave 3 RECLASS, PP-x4li.1.3). Only pre-permission gate tests remain here:
+//   Block 1: unauthenticated auth gate (KEEP-unit)
+//   Block 2: machine not found existence gate (KEEP-unit)
+//   Block 3: invalid machineId Zod validation (KEEP-unit)
+//   Block 12: unauthenticated ownerRequirements auth gate (KEEP-unit)
 // ---------------------------------------------------------------------------
 
 describe("updateMachineTextField", () => {
   const ownerUserId = "550e8400-e29b-41d4-a716-446655440000";
-  const nonOwnerUserId = "550e8400-e29b-41d4-a716-446655440001";
   const machineId = "550e8400-e29b-41d4-a716-446655440002";
 
   // A minimal valid ProseMirror doc for test payloads
@@ -235,20 +236,6 @@ describe("updateMachineTextField", () => {
     content: [
       { type: "paragraph", content: [{ type: "text", text: "hello" }] },
     ],
-  };
-
-  // machine owned by ownerUserId
-  const ownedMachine = {
-    id: machineId,
-    ownerId: ownerUserId,
-    initials: "TM",
-  };
-
-  // machine owned by someone else (not the authenticated user)
-  const unownedMachine = {
-    id: machineId,
-    ownerId: "550e8400-e29b-41d4-a716-446655440099",
-    initials: "TM",
   };
 
   beforeEach(() => {
@@ -313,210 +300,8 @@ describe("updateMachineTextField", () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
-  it("guest (non-owner) attempts to edit description → err('UNAUTHORIZED'), no DB write", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: nonOwnerUserId } } }),
-      },
-    } as unknown as SupabaseClient);
-
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "guest",
-    } as any);
-    vi.mocked(db.query.machines.findFirst).mockResolvedValue(
-      unownedMachine as any
-    );
-
-    const result = await updateMachineDescription(machineId, validDoc);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("UNAUTHORIZED");
-    }
-    expect(db.update).not.toHaveBeenCalled();
-  });
-
-  it("member-owner edits description → ok, DB write called", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: ownerUserId } } }),
-      },
-    } as unknown as SupabaseClient);
-
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
-    } as any);
-    vi.mocked(db.query.machines.findFirst).mockResolvedValue(
-      ownedMachine as any
-    );
-    // db.update chain returns undefined (no .returning() needed for setText)
-    chain.where.mockResolvedValue(undefined);
-
-    const result = await updateMachineDescription(machineId, validDoc);
-
-    expect(result.ok).toBe(true);
-    expect(db.update).toHaveBeenCalled();
-  });
-
-  it("member-owner edits ownerNotes → ok, DB write called", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: ownerUserId } } }),
-      },
-    } as unknown as SupabaseClient);
-
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
-    } as any);
-    vi.mocked(db.query.machines.findFirst).mockResolvedValue(
-      ownedMachine as any
-    );
-    chain.where.mockResolvedValue(undefined);
-
-    const result = await updateMachineOwnerNotes(machineId, validDoc);
-
-    expect(result.ok).toBe(true);
-    expect(db.update).toHaveBeenCalled();
-  });
-
-  it("member NON-owner attempts ownerNotes → err('UNAUTHORIZED') (owner-scoped permission)", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: nonOwnerUserId } } }),
-      },
-    } as unknown as SupabaseClient);
-
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
-    } as any);
-    vi.mocked(db.query.machines.findFirst).mockResolvedValue(
-      unownedMachine as any
-    );
-
-    const result = await updateMachineOwnerNotes(machineId, validDoc);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("UNAUTHORIZED");
-    }
-    expect(db.update).not.toHaveBeenCalled();
-  });
-
-  it("technician NON-owner edits description → ok (drift-fix behavioral test: machines.edit: technician=true)", async () => {
-    // This is the key regression test. Before the drift fix, the production code had a
-    // hardcoded `role === "admin"` check which denied technicians. After the fix,
-    // the matrix governs: machines.edit grants technician=true unconditionally,
-    // so a technician can edit description regardless of machine ownership.
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: nonOwnerUserId } } }),
-      },
-    } as unknown as SupabaseClient);
-
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "technician",
-    } as any);
-    // Machine owned by someone else — technician is NOT the owner
-    vi.mocked(db.query.machines.findFirst).mockResolvedValue(
-      unownedMachine as any
-    );
-    chain.where.mockResolvedValue(undefined);
-
-    const result = await updateMachineDescription(machineId, validDoc);
-
-    expect(result.ok).toBe(true);
-    expect(db.update).toHaveBeenCalled();
-  });
-
-  it("technician NON-owner attempts ownerNotes → err('UNAUTHORIZED') (machines.edit.ownerNotes: technician='owner')", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: nonOwnerUserId } } }),
-      },
-    } as unknown as SupabaseClient);
-
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "technician",
-    } as any);
-    vi.mocked(db.query.machines.findFirst).mockResolvedValue(
-      unownedMachine as any
-    );
-
-    const result = await updateMachineOwnerNotes(machineId, validDoc);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("UNAUTHORIZED");
-    }
-    expect(db.update).not.toHaveBeenCalled();
-  });
-
-  it("admin NON-owner edits description → ok (machines.edit: admin=true)", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: nonOwnerUserId } } }),
-      },
-    } as unknown as SupabaseClient);
-
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "admin",
-    } as any);
-    vi.mocked(db.query.machines.findFirst).mockResolvedValue(
-      unownedMachine as any
-    );
-    chain.where.mockResolvedValue(undefined);
-
-    const result = await updateMachineDescription(machineId, validDoc);
-
-    expect(result.ok).toBe(true);
-    expect(db.update).toHaveBeenCalled();
-  });
-
-  it("admin NON-owner attempts ownerNotes → err('UNAUTHORIZED') (machines.edit.ownerNotes: admin='owner')", async () => {
-    // Matrix: machines.edit.ownerNotes is "owner" for ALL roles, including admin.
-    // Even an admin cannot edit ownerNotes unless they are the machine owner.
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: nonOwnerUserId } } }),
-      },
-    } as unknown as SupabaseClient);
-
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "admin",
-    } as any);
-    vi.mocked(db.query.machines.findFirst).mockResolvedValue(
-      unownedMachine as any
-    );
-
-    const result = await updateMachineOwnerNotes(machineId, validDoc);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("UNAUTHORIZED");
-    }
-    expect(db.update).not.toHaveBeenCalled();
-  });
-
   // ---------------------------------------------------------------------------
-  // ownerRequirements permission tests
-  // (downgrades from e2e/full/machine-details-extended.spec.ts —
-  //  "should hide owner requirements from unauthenticated users" class-E)
+  // ownerRequirements auth gate (KEEP-unit — pre-permission, block 12)
   // ---------------------------------------------------------------------------
 
   it("unauthenticated caller → ownerRequirements err('UNAUTHORIZED'), no DB write", async () => {
@@ -525,54 +310,6 @@ describe("updateMachineTextField", () => {
         getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
       },
     } as unknown as SupabaseClient);
-
-    const result = await updateMachineOwnerRequirements(machineId, validDoc);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("UNAUTHORIZED");
-    }
-    expect(db.update).not.toHaveBeenCalled();
-  });
-
-  it("owner edits ownerRequirements → ok, DB write called", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: ownerUserId } } }),
-      },
-    } as unknown as SupabaseClient);
-
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
-    } as any);
-    vi.mocked(db.query.machines.findFirst).mockResolvedValue(
-      ownedMachine as any
-    );
-    chain.where.mockResolvedValue(undefined);
-
-    const result = await updateMachineOwnerRequirements(machineId, validDoc);
-
-    expect(result.ok).toBe(true);
-    expect(db.update).toHaveBeenCalled();
-  });
-
-  it("non-owner member → ownerRequirements err('UNAUTHORIZED') (owner-scoped)", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi
-          .fn()
-          .mockResolvedValue({ data: { user: { id: nonOwnerUserId } } }),
-      },
-    } as unknown as SupabaseClient);
-
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
-    } as any);
-    vi.mocked(db.query.machines.findFirst).mockResolvedValue(
-      unownedMachine as any
-    );
 
     const result = await updateMachineOwnerRequirements(machineId, validDoc);
 

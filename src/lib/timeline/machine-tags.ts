@@ -29,6 +29,16 @@ export const TIMELINE_TAGS = [
 
 export type TimelineTag = (typeof TIMELINE_TAGS)[number];
 
+/**
+ * The tag set applied when the machine-timeline filter has no explicit `?tag=`
+ * param. Currently equals the full {@link TIMELINE_TAGS} list, so the default
+ * view is byte-identical to "show everything". It exists as a separate explicit
+ * constant so PP-43q3 can later default an individual tag (e.g. `settings`) OFF
+ * by editing this one line without touching the query/filter wiring. KEEP THIS
+ * EQUAL TO `TIMELINE_TAGS` until PP-43q3 deliberately drops a tag.
+ */
+export const DEFAULT_TIMELINE_TAGS = TIMELINE_TAGS;
+
 export const RESERVED_TAGS = [
   "lifecycle",
   "issue",

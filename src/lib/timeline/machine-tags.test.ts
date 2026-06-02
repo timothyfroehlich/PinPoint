@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   TIMELINE_TAGS,
+  DEFAULT_TIMELINE_TAGS,
   RESERVED_TAGS,
   tagSchema,
   userTagSchema,
@@ -21,6 +22,10 @@ describe("machine-tags", () => {
       "note",
       "highlight",
     ]);
+  });
+
+  it("DEFAULT_TIMELINE_TAGS equals the full tag list (until PP-43q3)", () => {
+    expect([...DEFAULT_TIMELINE_TAGS]).toEqual([...TIMELINE_TAGS]);
   });
 
   it("marks lifecycle and issue as reserved", () => {
