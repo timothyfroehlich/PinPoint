@@ -83,7 +83,7 @@ export function DipBankSection({
 
       {bank.switches.length === 0 ? (
         <p className="py-1 text-xs italic text-muted-foreground">
-          No switches in this bank yet
+          No switches in this bank yet.
         </p>
       ) : (
         <Table aria-label={`Switches for ${bank.name || "DIP"} bank`}>

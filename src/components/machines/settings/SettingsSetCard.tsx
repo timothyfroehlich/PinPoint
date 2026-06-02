@@ -182,7 +182,7 @@ function AddSectionMenu({
               onAdd({ kind: "dip" });
             }}
           >
-            DIP switch
+            DIP switch bank
           </DropdownMenuItem>
           {!hasPostPositions && (
             <DropdownMenuItem
@@ -288,6 +288,12 @@ export function SettingsSetCard({
   // Content edits (name, description, cells, add/delete, reorder) unlock only
   // when this set is in edit mode. Set-level ops (kebab, preferred) use canEdit.
   const contentEditable = canEdit && isEditing;
+  // The description block sits flush under the header as a subtitle. In view
+  // mode an empty description renders nothing, so skip the wrapper entirely to
+  // avoid trailing dead space below description-less cards.
+  const descriptionIsEmpty =
+    !set.description || docToPlainText(set.description).trim() === "";
+  const showDescription = contentEditable || !descriptionIsEmpty;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -397,7 +403,10 @@ export function SettingsSetCard({
   return (
     <Card
       className={cn(
-        "overflow-hidden transition-colors duration-150 motion-reduce:transition-none",
+        // gap-0 overrides shadcn's default gap-6: the header, description, and
+        // body stack with their own paddings instead of a 24px gutter between
+        // each, which was the source of the dead space in the header area.
+        "gap-0 overflow-hidden transition-colors duration-150 motion-reduce:transition-none",
         set.isPreferred
           ? "border-warning/40 ring-1 ring-warning/30"
           : "border-outline-variant"
@@ -515,19 +524,21 @@ export function SettingsSetCard({
         )}
       </div>
 
-      {/* Description preview — always visible, click anywhere to edit.
-          pl-11 aligns it under the set name (past the chevron). The header
-          row above carries py-3, so only a small bottom inset is needed
-          here — prose margins are zeroed inside InlineMarkdownField. */}
-      <div className="-mt-1 pb-2 pl-11 pr-4">
-        <InlineMarkdownField
-          value={set.description}
-          canEdit={contentEditable}
-          placeholder="Add a short description…"
-          compact
-          onValueChange={onUpdateDescription}
-        />
-      </div>
+      {/* Description preview — click anywhere to edit. pl-11 aligns it under
+          the set name (past the chevron). -mt-1 keeps it grouped with the
+          header as a subtitle while leaving a little breathing room; pb-3
+          separates it from the body divider below. */}
+      {showDescription && (
+        <div className="-mt-1 pb-3 pl-11 pr-4">
+          <InlineMarkdownField
+            value={set.description}
+            canEdit={contentEditable}
+            placeholder="Add a short description…"
+            compact
+            onValueChange={onUpdateDescription}
+          />
+        </div>
+      )}
 
       {/* Expanded body */}
       {isExpanded && (

@@ -154,7 +154,7 @@ function makeSampleSets(): SettingsSetData[] {
       updatedBy: "Bob",
       updatedAt: "2026-05-12",
       description: plainTextToDoc(
-        "Sample early-solid-state set so you can see how DIP-switch banks render alongside no software."
+        "Sample early-solid-state set showing how DIP-switch banks render on a machine with no software settings."
       ),
       sections: [
         {
@@ -561,7 +561,7 @@ export function SettingsTab({ canEdit }: SettingsTabProps): React.JSX.Element {
               create one.
             </>
           ) : (
-            "No settings sets recorded."
+            "No settings sets recorded yet."
           )}
         </p>
       ) : (
