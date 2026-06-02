@@ -17,6 +17,7 @@
 
 "use server";
 
+import { Buffer } from "node:buffer";
 import { isDeepStrictEqual } from "node:util";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -120,9 +121,11 @@ export async function saveSettingsSetAction(
   // the branded SettingsSection (whose `_key` is re-derived on read).
   const sections = parsed.data.sections as unknown as SettingsSection[];
 
+  // True UTF-8 byte count (not UTF-16 code units) so multibyte content is
+  // measured accurately against the ceiling.
   const bytes =
-    JSON.stringify(sections).length +
-    JSON.stringify(description ?? null).length;
+    Buffer.byteLength(JSON.stringify(sections), "utf8") +
+    Buffer.byteLength(JSON.stringify(description ?? null), "utf8");
   if (bytes > PAYLOAD_BYTES_MAX) {
     return { success: false, error: "Settings are too large to save." };
   }

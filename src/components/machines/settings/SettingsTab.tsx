@@ -174,6 +174,15 @@ export function SettingsTab({
         next.delete(id);
         return next;
       });
+    } else {
+      // Existing set saved — reflect the new editor/timestamp locally so the
+      // "updated by … " line isn't stale until the next load. (A no-op save
+      // self-corrects on reload, where the server's unchanged updatedAt wins.)
+      setSets((prev) =>
+        prev.map((s) =>
+          s.id === id ? { ...s, updatedBy: "You", updatedAt: today() } : s
+        )
+      );
     }
   }
 
