@@ -54,8 +54,15 @@ if ! command -v sem >/dev/null 2>&1 \
   exec "$@"
 fi
 
+# sem re-joins its command argv and re-parses it through a shell, so an argument
+# that legitimately contains a space (e.g. --project='Mobile Chrome' from the
+# `smoke` script) would be word-split into two tokens. Pre-quote each argument
+# with printf %q and hand sem a single string; the shell sem spawns then
+# reconstructs the exact original argv. See PP-yso5.
+quoted_cmd="$(printf '%q ' "$@")"
+
 # --jobs 2:               up to 2 concurrent bare heavy jobs across all worktrees
 # --id pinpoint-heavy:    pool distinct from preflight's (see header — avoids
 #                         a self-deadlock when preflight nests these commands)
 # --fg:                   block synchronously and propagate exit code
-exec sem --jobs 2 --id pinpoint-heavy --fg "$@"
+exec sem --jobs 2 --id pinpoint-heavy --fg "$quoted_cmd"
