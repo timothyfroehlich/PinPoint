@@ -21,6 +21,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import {
   NAME_MAX,
@@ -354,40 +355,53 @@ export async function setPreferredSettingsSetAction(
     return { success: true };
   }
 
-  await db.transaction(async (tx) => {
-    if (parsed.data.isPreferred) {
-      // Clear the machine's current preferred set first so the partial unique
-      // index never sees two preferred rows (per-statement check, same tx).
+  try {
+    await db.transaction(async (tx) => {
+      if (parsed.data.isPreferred) {
+        // Clear the machine's current preferred set first so the partial unique
+        // index never sees two preferred rows (per-statement check, same tx).
+        await tx
+          .update(machineSettingsSets)
+          .set({ isPreferred: false })
+          .where(
+            and(
+              eq(machineSettingsSets.machineId, loaded.machine.id),
+              eq(machineSettingsSets.isPreferred, true)
+            )
+          );
+      }
       await tx
         .update(machineSettingsSets)
-        .set({ isPreferred: false })
-        .where(
-          and(
-            eq(machineSettingsSets.machineId, loaded.machine.id),
-            eq(machineSettingsSets.isPreferred, true)
-          )
-        );
-    }
-    await tx
-      .update(machineSettingsSets)
-      .set({
-        isPreferred: parsed.data.isPreferred,
-        updatedBy: auth.userId,
-        updatedAt: new Date(),
-      })
-      .where(eq(machineSettingsSets.id, parsed.data.id));
+        .set({
+          isPreferred: parsed.data.isPreferred,
+          updatedBy: auth.userId,
+          updatedAt: new Date(),
+        })
+        .where(eq(machineSettingsSets.id, parsed.data.id));
 
-    // Only promotion is timeline-worthy; un-preferring has no event kind.
-    if (parsed.data.isPreferred) {
-      await emitSettingsSetEvent(
-        loaded.machine.id,
-        "settings_set_preferred",
-        loaded.set.name,
-        auth.userId,
-        tx
-      );
+      // Only promotion is timeline-worthy; un-preferring has no event kind.
+      if (parsed.data.isPreferred) {
+        await emitSettingsSetEvent(
+          loaded.machine.id,
+          "settings_set_preferred",
+          loaded.set.name,
+          auth.userId,
+          tx
+        );
+      }
+    });
+  } catch (error) {
+    // Two callers promoting different sets concurrently can collide on the
+    // partial unique index (uniq_machine_settings_preferred). Surface a
+    // retryable message instead of a 500.
+    if (isPgErrorCode(error, "23505")) {
+      return {
+        success: false,
+        error: "Another set was just made preferred. Please try again.",
+      };
     }
-  });
+    throw error;
+  }
 
   revalidateMachine(loaded.machine.initials);
   return { success: true };

@@ -71,7 +71,10 @@ export function InlineMarkdownField({
   }
 
   function commitAndClose(): void {
-    const newValue = draft && docToPlainText(draft) ? draft : null;
+    // Trim before the empty check so a whitespace-only doc persists as null
+    // rather than an "invisible but saved" description (matches the timeline
+    // comment actions, which reject docToPlainText(...).trim() empties).
+    const newValue = draft && docToPlainText(draft).trim() ? draft : null;
     onValueChange(newValue);
     setIsEditing(false);
   }

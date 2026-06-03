@@ -52,7 +52,6 @@ export default async function MachineSettingsTab({
       <SettingsTab
         canEdit={canEdit}
         machineId={machine.id}
-        machineInitials={machine.initials}
         initialSets={sets}
       />
     </div>

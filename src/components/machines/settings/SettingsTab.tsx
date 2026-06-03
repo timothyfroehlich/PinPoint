@@ -87,7 +87,6 @@ function useUnsavedChangesGuard(enabled: boolean): void {
 interface SettingsTabProps {
   canEdit: boolean;
   machineId: string;
-  machineInitials: string;
   initialSets: SettingsSetData[];
 }
 
