@@ -23,6 +23,7 @@ import { z } from "zod";
 
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import {
+  NAME_MAX,
   type SettingsSection,
   settingsSetPayloadSchema,
 } from "~/lib/machines/settings-types";
@@ -48,14 +49,14 @@ type SaveResult =
 const PAYLOAD_BYTES_MAX = 200_000;
 
 const saveSchema = settingsSetPayloadSchema.extend({
-  machineId: z.string().uuid(),
+  machineId: z.uuid(),
   // Absent → insert; present → update.
-  id: z.string().uuid().optional(),
+  id: z.uuid().optional(),
 });
 
-const idSchema = z.object({ id: z.string().uuid() });
+const idSchema = z.object({ id: z.uuid() });
 const setPreferredSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   isPreferred: z.boolean(),
 });
 
@@ -227,12 +228,12 @@ export async function saveSettingsSetAction(
  * Load a set + its machine for the single-set (id-only) operations.
  */
 async function loadSetWithMachine(setId: string): Promise<{
-  set: { id: string; machineId: string; name: string };
+  set: { id: string; machineId: string; name: string; isPreferred: boolean };
   machine: { id: string; initials: string; ownerId: string | null };
 } | null> {
   const set = await db.query.machineSettingsSets.findFirst({
     where: eq(machineSettingsSets.id, setId),
-    columns: { id: true, machineId: true, name: true },
+    columns: { id: true, machineId: true, name: true, isPreferred: true },
   });
   if (!set) return null;
   const machine = await db.query.machines.findFirst({
@@ -298,7 +299,11 @@ export async function duplicateSettingsSetAction(
   const auth = await authorizeManage(machine.ownerId);
   if (!auth.ok) return { success: false, error: auth.error };
 
-  const copyName = `${original.name} (copy)`;
+  // Cap the copy name so a long original (up to NAME_MAX) plus the " (copy)"
+  // suffix can't exceed NAME_MAX — otherwise the duplicate would persist but
+  // fail the save schema on any later edit.
+  const COPY_SUFFIX = " (copy)";
+  const copyName = `${original.name.slice(0, NAME_MAX - COPY_SUFFIX.length)}${COPY_SUFFIX}`;
   const newId = await db.transaction(async (tx) => {
     const [inserted] = await tx
       .insert(machineSettingsSets)
@@ -343,6 +348,11 @@ export async function setPreferredSettingsSetAction(
 
   const auth = await authorizeManage(loaded.machine.ownerId);
   if (!auth.ok) return { success: false, error: auth.error };
+
+  // Idempotent: already in the requested state → no write, no timeline event.
+  if (loaded.set.isPreferred === parsed.data.isPreferred) {
+    return { success: true };
+  }
 
   await db.transaction(async (tx) => {
     if (parsed.data.isPreferred) {

@@ -110,8 +110,9 @@ export default async function MachineTimelinePage({
   const machineName = machine.name;
 
   // At the default (no ?tag=), apply the explicit default tag set rather than
-  // omitting the filter — the query seam PP-43q3 needs to default a tag OFF.
-  // Equal to the full tag list today, so results are byte-identical.
+  // omitting the filter. DEFAULT_TIMELINE_TAGS excludes the default-off
+  // `settings` tag (PP-43q3), so the unfiltered view hides settings events
+  // until the user opts in via the tag chip.
   const effectiveTags = tags.length > 0 ? tags : [...DEFAULT_TIMELINE_TAGS];
 
   // Fetch one extra row so we can detect whether a next page exists without

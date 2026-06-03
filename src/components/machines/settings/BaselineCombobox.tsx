@@ -73,8 +73,19 @@ export function BaselineCombobox({
     setQuery("");
   }
 
+  function handleOpenChange(next: boolean): void {
+    // Closing (Escape / click-away / trigger toggle): don't silently discard
+    // free text the user typed but didn't explicitly pick from the list.
+    // Commit it, unless it exactly matches a preset (they can click/Enter that).
+    if (!next) {
+      if (trimmed && !hasExactMatch) onChange(trimmed);
+      setQuery("");
+    }
+    setOpen(next);
+  }
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

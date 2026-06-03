@@ -94,7 +94,7 @@ export interface SettingsSetData {
 // shape (no `_key`), satisfying "strip before write".
 // ---------------------------------------------------------------------------
 
-const NAME_MAX = 200;
+export const NAME_MAX = 200;
 const ID_MAX = 120;
 const ROWS_MAX = 200;
 const SWITCHES_MAX = 128;

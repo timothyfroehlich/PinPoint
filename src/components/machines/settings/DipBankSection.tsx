@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -47,10 +47,18 @@ export function DipBankSection({
   // Which freshly-added switch should mount focused. Not cleared: EditableCell
   // only reads it on its initial mount, and the next add replaces the value.
   const [autoFocusKey, setAutoFocusKey] = useState<string | null>(null);
+  // Deleting a switch removes the focused trash button; move focus to the
+  // always-present "Add switch" button so keyboard users aren't dropped to <body>.
+  const addSwitchRef = useRef<HTMLButtonElement>(null);
 
   function handleAddSwitch(): void {
     const switchKey = onAddSwitch();
     if (switchKey) setAutoFocusKey(switchKey);
+  }
+
+  function handleDeleteSwitch(switchKey: string): void {
+    onDeleteSwitch(switchKey);
+    addSwitchRef.current?.focus();
   }
 
   return (
@@ -119,7 +127,7 @@ export function DipBankSection({
                           checked ? "ON" : "OFF"
                         );
                       }}
-                      aria-label={`Position: ${sw.position}`}
+                      aria-label={`${sw.switch || "Switch"} position (toggle on/off)`}
                     />
                     <span className="text-[11px] font-semibold text-muted-foreground">
                       {sw.position}
@@ -144,7 +152,7 @@ export function DipBankSection({
                       size="icon"
                       className="size-6 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:opacity-100 motion-reduce:transition-none"
                       onClick={() => {
-                        onDeleteSwitch(sw._key);
+                        handleDeleteSwitch(sw._key);
                       }}
                       aria-label={`Delete switch ${sw.switch || "row"}`}
                     >
@@ -160,6 +168,7 @@ export function DipBankSection({
 
       {canEdit && (
         <Button
+          ref={addSwitchRef}
           variant="ghost"
           size="sm"
           className="mt-1 text-muted-foreground"

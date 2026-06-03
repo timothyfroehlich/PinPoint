@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -47,10 +47,18 @@ export function SoftwareSettingsSection({
   onDeleteRow,
 }: SoftwareSettingsSectionProps): React.JSX.Element {
   const [autoFocusKey, setAutoFocusKey] = useState<string | null>(null);
+  // Deleting a row removes the focused trash button; move focus to the always-
+  // present "Add row" button so keyboard users aren't dropped to <body>.
+  const addRowRef = useRef<HTMLButtonElement>(null);
 
   function handleAddRow(): void {
     const newKey = onAddRow?.();
     if (newKey) setAutoFocusKey(newKey);
+  }
+
+  function handleDeleteRow(rowKey: string): void {
+    onDeleteRow?.(rowKey);
+    addRowRef.current?.focus();
   }
 
   return (
@@ -149,7 +157,7 @@ export function SoftwareSettingsSection({
                     size="icon"
                     className="size-6 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:opacity-100 motion-reduce:transition-none"
                     onClick={() => {
-                      onDeleteRow?.(row._key);
+                      handleDeleteRow(row._key);
                     }}
                     aria-label={`Delete software setting ${row.id || "row"}`}
                   >
@@ -164,6 +172,7 @@ export function SoftwareSettingsSection({
 
       {canEdit && (
         <Button
+          ref={addRowRef}
           variant="ghost"
           size="sm"
           className="mt-1 text-muted-foreground"

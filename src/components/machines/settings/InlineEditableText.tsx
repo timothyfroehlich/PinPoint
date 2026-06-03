@@ -75,6 +75,13 @@ export function InlineEditableText({
   }
 
   function cancel(): void {
+    // A required field with no prior value (e.g. a freshly created set) has
+    // nothing valid to revert to — Escape would strand it blank. Keep it open
+    // and surface the requirement instead of silently closing.
+    if (required && value.trim() === "") {
+      setShowRequiredError(true);
+      return;
+    }
     setDraft(value);
     setIsEditing(false);
   }

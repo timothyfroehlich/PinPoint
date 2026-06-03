@@ -5,6 +5,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Trash2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import { usePrefersReducedMotion } from "~/hooks/use-prefers-reduced-motion";
 import { cn } from "~/lib/utils";
 
 interface SortableSectionProps {
@@ -42,11 +43,18 @@ export function SortableSection({
     transition,
     isDragging,
   } = useSortable({ id });
+  // dnd-kit applies its reorder animation via an inline `transition` style,
+  // which a `motion-reduce:` class can't override — so honor the preference in
+  // JS by dropping the transition entirely when reduced motion is requested.
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition: prefersReducedMotion ? undefined : transition,
+      }}
       className={cn(
         "border-t border-outline-variant/60",
         isDragging && "relative z-10 rounded-md bg-card shadow-lg"

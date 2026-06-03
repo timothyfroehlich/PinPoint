@@ -3,11 +3,13 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Button } from "~/components/ui/button";
 import { SettingsSetCard } from "~/components/machines/settings/SettingsSetCard";
 import {
   type AddSectionSpec,
+  NAME_MAX,
   type SettingsSection,
   type SettingsSetData,
 } from "~/lib/machines/settings-types";
@@ -19,12 +21,16 @@ import {
   setPreferredSettingsSetAction,
 } from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
 
+// Collision-free client keys (render keys + section ids + temp set ids).
+// `crypto.randomUUID()` is available in every browser PinPoint targets and on
+// localhost (a secure context); the timestamp+small-random scheme it replaces
+// could collide when several keys were minted in the same millisecond.
 function makeKey(): string {
-  return `k-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xfff).toString(36)}`;
+  return globalThis.crypto.randomUUID();
 }
 
 function makeTempSetId(): string {
-  return `tmp-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffff).toString(36)}`;
+  return `tmp-${globalThis.crypto.randomUUID()}`;
 }
 
 function today(): string {
@@ -101,9 +107,42 @@ export function SettingsTab({
   // Sets created this session that haven't been persisted yet (temp id). Save
   // on Done inserts them and swaps the temp id for the server UUID.
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  // Sets with an in-flight save — drives the "Saving…" label and guards against
+  // a double-submit (a second Done that would insert a new set twice).
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  // Sets that just saved — drives the brief "Saved!" confirmation, cleared by a
+  // timer in flashSaved.
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  // A pending save id, set by the Done click and consumed by the effect below.
+  // Deferring through state lets the save read `sets` AFTER the focused cell's
+  // on-blur commit has flushed (clicking Done blurs the active cell first) —
+  // saving straight from the click handler would snapshot the pre-commit `sets`
+  // and silently drop the last edit.
+  const [saveRequest, setSaveRequest] = useState<string | null>(null);
 
   // Any set in edit mode may have unsaved changes (save happens on Done).
   useUnsavedChangesGuard(editingIds.size > 0);
+
+  // Fire only when a save is requested. `saveSet` is read from this render's
+  // closure, which holds the post-blur-commit `sets` — the whole reason the
+  // save is deferred through state rather than called from the click handler.
+  useEffect(() => {
+    if (saveRequest === null) return;
+    const id = saveRequest;
+    setSaveRequest(null);
+    void saveSet(id);
+  }, [saveRequest]);
+
+  function flashSaved(id: string): void {
+    setSavedIds((prev) => new Set(prev).add(id));
+    window.setTimeout(() => {
+      setSavedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 2500);
+  }
 
   // The preferred set is always pinned to the top. A stable sort preserves the
   // insertion order of everything else (new sets, etc.).
@@ -132,19 +171,30 @@ export function SettingsTab({
 
   /** Persist a set on leaving edit mode (insert when new, else update). */
   async function saveSet(id: string): Promise<void> {
+    if (savingIds.has(id)) return; // a save is already in flight — don't double-submit
     const set = sets.find((s) => s.id === id);
     if (!set) return;
     const isNew = newIds.has(id);
 
-    const result = await saveSettingsSetAction({
-      machineId,
-      ...(isNew ? {} : { id }),
-      name: set.name,
-      description: set.description,
-      sections: set.sections,
-    });
+    setSavingIds((prev) => new Set(prev).add(id));
+    let result: Awaited<ReturnType<typeof saveSettingsSetAction>>;
+    try {
+      result = await saveSettingsSetAction({
+        machineId,
+        ...(isNew ? {} : { id }),
+        name: set.name,
+        description: set.description,
+        sections: set.sections,
+      });
+    } finally {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
     if (!result.success) {
-      window.alert(result.error);
+      toast.error(result.error);
       return; // stay in edit mode so the user can retry
     }
 
@@ -184,11 +234,15 @@ export function SettingsTab({
         )
       );
     }
+    // Brief "Saved!" confirmation on the (now collapsed) set's button.
+    flashSaved(isNew && realId !== id ? realId : id);
   }
 
   function toggleSetEdit(id: string): void {
     if (editingIds.has(id)) {
-      void saveSet(id);
+      // Defer the save to the effect so it runs after the focused cell's
+      // on-blur commit has flushed into `sets` (see saveRequest above).
+      setSaveRequest(id);
       return;
     }
     setEditingIds((prev) => new Set(prev).add(id));
@@ -217,13 +271,18 @@ export function SettingsTab({
       isPreferred: next,
     });
     if (!result.success) {
-      window.alert(result.error);
+      toast.error(result.error);
       return;
     }
     setSets((prev) =>
       prev.map((s) => ({
         ...s,
         isPreferred: s.id === id ? next : next ? false : s.isPreferred,
+        // The server bumps updatedBy/updatedAt only on the promoted set; mirror
+        // that locally so its "updated by …" line isn't stale until reload.
+        ...(s.id === id && next
+          ? { updatedBy: "You", updatedAt: today() }
+          : {}),
       }))
     );
   }
@@ -238,15 +297,18 @@ export function SettingsTab({
     if (!original) return;
     const result = await duplicateSettingsSetAction({ id });
     if (!result.success) {
-      window.alert(result.error);
+      toast.error(result.error);
       return;
     }
     // Reconstruct the copy locally using the server-returned id so subsequent
     // ops target the real row.
+    // Match the server's name capping (NAME_MAX) so the optimistic copy name
+    // is byte-identical to what was persisted.
+    const COPY_SUFFIX = " (copy)";
     const copy: SettingsSetData = {
       ...original,
       id: result.id,
-      name: `${original.name} (copy)`,
+      name: `${original.name.slice(0, NAME_MAX - COPY_SUFFIX.length)}${COPY_SUFFIX}`,
       isPreferred: false,
       updatedBy: "You",
       updatedAt: today(),
@@ -267,7 +329,7 @@ export function SettingsTab({
     }
     const result = await deleteSettingsSetAction({ id });
     if (!result.success) {
-      window.alert(result.error);
+      toast.error(result.error);
       return;
     }
     removeLocal(id);
@@ -554,6 +616,8 @@ export function SettingsTab({
               isExpanded={expandedIds.has(set.id)}
               canEdit={canEdit}
               isEditing={editingIds.has(set.id)}
+              isSaving={savingIds.has(set.id)}
+              justSaved={savedIds.has(set.id)}
               onToggleExpand={() => {
                 toggleExpand(set.id);
               }}

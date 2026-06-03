@@ -133,7 +133,6 @@ export function MachineTabStrip({
                     "rounded-md border px-1.5 py-0.5 text-xs font-semibold tabular-nums",
                     getMachineStatusStyles(maintenance.status)
                   )}
-                  title={`${String(maintenance.openCount)} open — ${getMachineStatusLabel(maintenance.status)}`}
                   aria-label={`${String(maintenance.openCount)} open issues, status ${getMachineStatusLabel(maintenance.status)}`}
                 >
                   {maintenance.openCount}

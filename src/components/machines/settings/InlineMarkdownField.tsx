@@ -4,7 +4,11 @@ import type React from "react";
 import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { cn } from "~/lib/utils";
-import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  docToPlainText,
+  type ProseMirrorDoc,
+  type ProseMirrorNode,
+} from "~/lib/tiptap/types";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 
@@ -42,11 +46,17 @@ export function InlineMarkdownField({
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<ProseMirrorDoc | null>(value);
 
-  const firstNode = value?.content[0];
+  // `content` is required on the ProseMirrorDoc *type* but optional in the
+  // persisted *schema* (proseMirrorDocSchema), so a stored bare `{ type: "doc" }`
+  // arrives with no `content` at runtime. Read it through an undefined-tolerant
+  // alias so the guards below are real — a direct `.content[0]` would crash.
+  const docContent: ProseMirrorNode[] | undefined = value?.content;
+  const firstNode = docContent?.[0];
+  const contentLength = docContent?.length ?? 0;
   const isEmpty =
     !value ||
-    value.content.length === 0 ||
-    (value.content.length === 1 &&
+    contentLength === 0 ||
+    (contentLength === 1 &&
       firstNode?.type === "paragraph" &&
       !firstNode.content);
 

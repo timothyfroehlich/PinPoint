@@ -8,6 +8,7 @@ import {
   Plus,
   Pencil,
   Check,
+  Loader2,
 } from "lucide-react";
 import {
   DndContext,
@@ -63,6 +64,10 @@ interface SettingsSetCardProps {
   canEdit: boolean;
   /** Whether THIS set is currently in content-edit mode. */
   isEditing: boolean;
+  /** A save for THIS set is in flight (Done → "Saving…", disabled). */
+  isSaving: boolean;
+  /** This set just saved — briefly confirm with "Saved!" on the button. */
+  justSaved: boolean;
   onToggleExpand: () => void;
   onToggleEdit: () => void;
   onTogglePreferred: () => void;
@@ -220,6 +225,8 @@ export function SettingsSetCard({
   isExpanded,
   canEdit,
   isEditing,
+  isSaving,
+  justSaved,
   onToggleExpand,
   onToggleEdit,
   onTogglePreferred,
@@ -356,8 +363,8 @@ export function SettingsSetCard({
   const headerTitle = (
     // Spans (not divs) so this can live inside the view-mode <button> without
     // invalid <div>-in-<button> nesting.
-    <span className="flex flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-      <span className="text-sm font-semibold text-foreground">
+    <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+      <span className="min-w-0 text-sm font-semibold text-foreground [overflow-wrap:anywhere]">
         <InlineEditableText
           value={set.name}
           onValueChange={onRename}
@@ -437,27 +444,49 @@ export function SettingsSetCard({
 
         {canEdit && (
           <Button
-            variant={isEditing ? "default" : "ghost"}
+            variant={isEditing || justSaved ? "default" : "ghost"}
             size="sm"
             // Kept focusable while blocked (aria-disabled, not disabled) so AT
             // can announce why Done is unavailable; the click is guarded below.
-            className={cn("h-7 shrink-0", blockDone && "opacity-50")}
-            aria-disabled={blockDone || undefined}
+            className={cn(
+              "h-7 shrink-0 transition-colors duration-300 motion-reduce:transition-none",
+              blockDone && "opacity-50",
+              justSaved &&
+                "bg-success text-success-foreground hover:bg-success/90"
+            )}
+            aria-disabled={blockDone || isSaving || undefined}
             aria-label={
               blockDone
                 ? "Name the set and all sections before finishing"
-                : undefined
+                : isSaving
+                  ? "Saving settings set"
+                  : undefined
             }
             onClick={(e) => {
               e.stopPropagation();
-              if (blockDone) return;
+              if (blockDone || isSaving) return;
               onToggleEdit();
             }}
           >
             {isEditing ? (
+              isSaving ? (
+                <>
+                  <Loader2
+                    className="animate-spin motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <Check aria-hidden="true" />
+                  Done
+                </>
+              )
+            ) : justSaved ? (
               <>
                 <Check aria-hidden="true" />
-                Done
+                Saved!
               </>
             ) : (
               <>
