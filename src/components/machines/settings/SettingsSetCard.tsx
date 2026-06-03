@@ -64,6 +64,9 @@ interface SettingsSetCardProps {
   canEdit: boolean;
   /** Whether THIS set is currently in content-edit mode. */
   isEditing: boolean;
+  /** Unsaved set (temp id). Preferred/Duplicate target a persisted row, so they
+   *  are disabled until the first save. */
+  isNew: boolean;
   /** A save for THIS set is in flight (Done → "Saving…", disabled). */
   isSaving: boolean;
   /** This set just saved — briefly confirm with "Saved!" on the button. */
@@ -225,6 +228,7 @@ export function SettingsSetCard({
   isExpanded,
   canEdit,
   isEditing,
+  isNew,
   isSaving,
   justSaved,
   onToggleExpand,
@@ -510,10 +514,12 @@ export function SettingsSetCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onTogglePreferred}>
+              {/* Preferred + Duplicate act on a persisted row, so they're
+                  disabled until an unsaved (temp-id) set is first saved. */}
+              <DropdownMenuItem disabled={isNew} onSelect={onTogglePreferred}>
                 {set.isPreferred ? "Unset preferred" : "Set preferred"}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={onDuplicate}>
+              <DropdownMenuItem disabled={isNew} onSelect={onDuplicate}>
                 Duplicate
               </DropdownMenuItem>
               <DropdownMenuItem

@@ -617,6 +617,7 @@ export function SettingsTab({
               isExpanded={expandedIds.has(set.id)}
               canEdit={canEdit}
               isEditing={editingIds.has(set.id)}
+              isNew={newIds.has(set.id)}
               isSaving={savingIds.has(set.id)}
               justSaved={savedIds.has(set.id)}
               onToggleExpand={() => {
