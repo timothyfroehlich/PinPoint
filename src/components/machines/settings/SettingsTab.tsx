@@ -48,11 +48,10 @@ function useUnsavedChangesGuard(enabled: boolean): void {
     if (!enabled) return;
 
     const onBeforeUnload = (e: BeforeUnloadEvent): void => {
-      // preventDefault triggers the native prompt in modern browsers; the
-      // empty returnValue is the legacy/Safari fallback (matches the repo's
-      // other unsaved-change guards).
+      // Modern browsers (incl. current Safari) show the native prompt on
+      // preventDefault alone. The legacy `returnValue` is deprecated, so we
+      // deliberately don't set it.
       e.preventDefault();
-      e.returnValue = "";
     };
     const onClickCapture = (e: MouseEvent): void => {
       if (
