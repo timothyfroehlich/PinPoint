@@ -114,7 +114,7 @@ export function SoftwareSettingsSection({
         </TableHeader>
         <TableBody>
           {rows.map((row) => (
-            <TableRow key={row._key} className="group">
+            <TableRow key={row._key}>
               <TableCell className="font-mono text-sm text-muted-foreground">
                 <EditableCell
                   value={row.id}
@@ -155,7 +155,7 @@ export function SoftwareSettingsSection({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-6 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:opacity-100 motion-reduce:transition-none"
+                    className="size-6 text-muted-foreground transition-colors hover:text-destructive focus-visible:opacity-100 motion-reduce:transition-none"
                     onClick={() => {
                       handleDeleteRow(row._key);
                     }}

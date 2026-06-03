@@ -101,7 +101,7 @@ export function DipBankSection({
           </TableHeader>
           <TableBody>
             {bank.switches.map((sw) => (
-              <TableRow key={sw._key} className="group">
+              <TableRow key={sw._key}>
                 <TableCell className="font-mono text-sm text-muted-foreground">
                   <EditableCell
                     value={sw.switch}
@@ -150,7 +150,7 @@ export function DipBankSection({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-6 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:opacity-100 motion-reduce:transition-none"
+                      className="size-6 text-muted-foreground transition-colors hover:text-destructive focus-visible:opacity-100 motion-reduce:transition-none"
                       onClick={() => {
                         handleDeleteSwitch(sw._key);
                       }}
