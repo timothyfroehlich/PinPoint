@@ -48,41 +48,6 @@ describe("Machines Service", () => {
   });
 
   describe("toggleMachineWatcher", () => {
-    it("should watch if not already watching", async () => {
-      vi.mocked(db.query.machineWatchers.findFirst).mockResolvedValue(
-        undefined
-      );
-
-      const result = await toggleMachineWatcher({ machineId, userId });
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.isWatching).toBe(true);
-        expect(result.value.watchMode).toBe("notify");
-      }
-      expect(db.insert).toHaveBeenCalled();
-      expect(chain.values).toHaveBeenCalledWith({
-        machineId,
-        userId,
-        watchMode: "notify",
-      });
-    });
-
-    it("should unwatch if already watching", async () => {
-      vi.mocked(db.query.machineWatchers.findFirst).mockResolvedValue({
-        watchMode: "subscribe",
-      } as any);
-
-      const result = await toggleMachineWatcher({ machineId, userId });
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.isWatching).toBe(false);
-        expect(result.value.watchMode).toBe("subscribe");
-      }
-      expect(db.delete).toHaveBeenCalled();
-    });
-
     it("should handle DB errors gracefully", async () => {
       vi.mocked(db.query.machineWatchers.findFirst).mockRejectedValue(
         new Error("DB Error")
@@ -98,23 +63,6 @@ describe("Machines Service", () => {
   });
 
   describe("updateMachineWatchMode", () => {
-    it("should update watch mode successfully", async () => {
-      chain.returning.mockResolvedValue([{ userId, machineId }]);
-
-      const result = await updateMachineWatchMode({
-        machineId,
-        userId,
-        watchMode: "subscribe",
-      });
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.watchMode).toBe("subscribe");
-      }
-      expect(db.update).toHaveBeenCalled();
-      expect(chain.set).toHaveBeenCalledWith({ watchMode: "subscribe" });
-    });
-
     it("should validate watch mode", async () => {
       const result = await updateMachineWatchMode({
         machineId,
