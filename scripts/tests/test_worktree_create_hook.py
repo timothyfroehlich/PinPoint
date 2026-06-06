@@ -31,8 +31,8 @@ echo "$@" >> {calls_log}
     }
 
 
-def run_hook(
-    stdin_data: dict, tmp_path: Path, env_modifications: dict = None
+def run_hook_raw(
+    stdin_raw: str, tmp_path: Path, env_modifications: dict = None
 ) -> tuple[int, str, str]:
     env = os.environ.copy()
     # Isolate HOME and XDG_CONFIG_HOME to prevent test flakiness and interference
@@ -53,8 +53,14 @@ def run_hook(
         env=env,
         text=True,
     )
-    stdout, stderr = process.communicate(input=json.dumps(stdin_data))
+    stdout, stderr = process.communicate(input=stdin_raw)
     return process.returncode, stdout, stderr
+
+
+def run_hook(
+    stdin_data: dict, tmp_path: Path, env_modifications: dict = None
+) -> tuple[int, str, str]:
+    return run_hook_raw(json.dumps(stdin_data), tmp_path, env_modifications)
 
 
 def test_hook_empirical_shape(mock_git: dict, tmp_path: Path) -> None:
@@ -124,3 +130,11 @@ def test_hook_missing_required_fields(mock_git: dict, tmp_path: Path) -> None:
 
     assert return_code != 0
     assert "missing cwd, worktree_id, or name" in stderr
+
+
+def test_hook_malformed_json(mock_git: dict, tmp_path: Path) -> None:
+    env_mods = {"PATH": f"{mock_git['bin_dir']}:{os.environ['PATH']}"}
+    return_code, stdout, stderr = run_hook_raw("not valid json", tmp_path, env_mods)
+
+    assert return_code != 0
+    assert "invalid JSON" in stderr
