@@ -31,24 +31,24 @@ pnpm exec vitest run --project integration <file># one integration test file
 
 ## Key reuse facts (from research — verified 2026-06-06)
 
-| Fact                                                                                                                                   | Where                                                                                               |
-| -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `getMachineTimeline(tx: DbTransaction, args)` — args `{ machineId: string; tags?; limit?; offset? }`; rows already include `machineId` | `src/lib/timeline/machine-events.ts:214-322`                                                        |
-| `DbTransaction` type                                                                                                                   | `import { db, type DbTransaction } from "~/server/db"`                                              |
-| Issues filter already supports `machine: string[]` (initials) via `inArray(issues.machineInitials, ...)`                               | `src/lib/issues/filters-queries.ts:189-191`                                                         |
-| `IssueList` is fully props-driven (no internal fetch)                                                                                  | `src/components/issues/IssueList.tsx:74-81`                                                         |
-| `useTableResponsiveColumns(columns, baseWidth, baseBuffer)` → `{ visibleColumns, containerRef }`; lower `priority` hides first         | `src/hooks/use-table-responsive-columns.ts:38-42`                                                   |
-| `deriveMachineStatus(issues)` + `IssueForStatus`                                                                                       | `src/lib/machines/status.ts:6-35`                                                                   |
-| `MachineStatusBadge`/`MachinePresenceBadge` (`status`, `size`)                                                                         | `src/components/machines/MachineStatusBadge.tsx`, `MachinePresenceBadge.tsx`                        |
-| Layout pattern to mirror: `cache()`-wrapped query + header + tab strip                                                                 | `src/app/(app)/m/[initials]/(tabs)/layout.tsx`, `src/app/(app)/m/[initials]/_data.ts`               |
-| Tab strip to model: route-driven, `aria-current="page"`, count badge                                                                   | `src/components/machines/MachineTabStrip.tsx`                                                       |
-| Timeline page to adapt (param parsing, bucketing, row dispatch, pagination)                                                            | `src/app/(app)/m/[initials]/(tabs)/timeline/page.tsx`                                               |
-| `MultiSelect` props: `{ options, value, onChange, placeholder, ariaLabel, ... }`; `Option` has `badgeLabel` for initials chips         | `src/components/ui/multi-select.tsx:85-98`                                                          |
-| Ticking relative time                                                                                                                  | `import { RelativeTime } from "~/components/issues/RelativeTime"` — `<RelativeTime value={date} />` |
-| Tag → label                                                                                                                            | `getTagLabel(tag)` in `src/lib/timeline/machine-tags.ts`                                            |
-| PGlite test setup: `setupTestDb()` + `getTestDb()`; integration tests in `src/test/integration/`                                       | `src/test/setup/pglite.ts`                                                                          |
-| RTL `next/navigation` mocking pattern                                                                                                  | `src/components/machines/timeline/MachineTimelineFilter.test.tsx:1-35`                              |
-| Smoke E2E: `ensureLoggedIn(page, testInfo)`, specs in `e2e/smoke/`                                                                     | `e2e/smoke/machine-details-redesign.spec.ts`                                                        |
+| Fact                                                                                                                                                          | Where                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `getMachineTimeline(tx: DbTransaction, args)` — args `{ machineId: string; tags?; limit?; offset? }`; rows already include `machineId`                        | `src/lib/timeline/machine-events.ts:214-322`                                                        |
+| `DbTransaction` type                                                                                                                                          | `import { db, type DbTransaction } from "~/server/db"`                                              |
+| Issues filter already supports `machine: string[]` (initials) via `inArray(issues.machineInitials, ...)`                                                      | `src/lib/issues/filters-queries.ts:189-191`                                                         |
+| `IssueList` is fully props-driven (no internal fetch)                                                                                                         | `src/components/issues/IssueList.tsx:74-81`                                                         |
+| `useTableResponsiveColumns(columns, baseWidth, baseBuffer)` → `{ visibleColumns, containerRef }`; lower `priority` hides first                                | `src/hooks/use-table-responsive-columns.ts:38-42`                                                   |
+| `deriveMachineStatus(issues)` + `IssueForStatus`                                                                                                              | `src/lib/machines/status.ts:6-35`                                                                   |
+| `MachineStatusBadge`/`MachinePresenceBadge` (`status`, `size`)                                                                                                | `src/components/machines/MachineStatusBadge.tsx`, `MachinePresenceBadge.tsx`                        |
+| Layout pattern to mirror: `cache()`-wrapped query + header + tab strip                                                                                        | `src/app/(app)/m/[initials]/(tabs)/layout.tsx`, `src/app/(app)/m/[initials]/_data.ts`               |
+| Tab strip to model: route-driven, `aria-current="page"`, count badge                                                                                          | `src/components/machines/MachineTabStrip.tsx`                                                       |
+| Timeline page to adapt (param parsing, bucketing, row dispatch, pagination)                                                                                   | `src/app/(app)/m/[initials]/(tabs)/timeline/page.tsx`                                               |
+| `MultiSelect` props: `{ options, value, onChange, placeholder, ariaLabel, ... }`; `Option` has `badgeLabel` for initials chips                                | `src/components/ui/multi-select.tsx:85-98`                                                          |
+| Ticking relative time                                                                                                                                         | `import { RelativeTime } from "~/components/issues/RelativeTime"` — `<RelativeTime value={date} />` |
+| Tag → label                                                                                                                                                   | `getTagLabel(tag)` in `src/lib/timeline/machine-tags.ts`                                            |
+| PGlite test setup: `setupTestDb()` + `getTestDb()`; integration tests in `src/test/integration/`                                                              | `src/test/setup/pglite.ts`                                                                          |
+| RTL `next/navigation` mocking pattern                                                                                                                         | `src/components/machines/timeline/MachineTimelineFilter.test.tsx:1-35`                              |
+| Smoke E2E auth: `test.use({ storageState: STORAGE_STATE.member })` from `e2e/support/auth-state.js` (storageState migration, PR #1503); specs in `e2e/smoke/` | `e2e/smoke/machine-details-redesign.spec.ts`                                                        |
 
 ---
 
@@ -2200,16 +2200,16 @@ Determine: (a) does the E2E login user own machines? (b) is there a seeded machi
 
 ```ts
 import { test, expect } from "@playwright/test";
+import { STORAGE_STATE } from "../support/auth-state.js";
 import {
   assertNoA11yViolations,
   assertNoHorizontalOverflow,
-  ensureLoggedIn,
 } from "../support/actions.js";
 
 test.describe("Collection view (PP-slrd.1)", () => {
-  test.beforeEach(async ({ page }, testInfo) => {
-    await ensureLoggedIn(page, testInfo);
-  });
+  // storageState auth (PR #1503 pattern) — pick the role that owns seeded
+  // machines if one exists (check STORAGE_STATE keys in auth-state.js).
+  test.use({ storageState: STORAGE_STATE.member });
 
   test("My Machines via user menu renders Overview without 500", async ({
     page,
