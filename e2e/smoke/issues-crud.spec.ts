@@ -31,7 +31,6 @@ const rememberIssueId = (page: Page): void => {
 
 test.describe("Issues System", () => {
   test.use({ storageState: STORAGE_STATE.member });
-  // eslint-disable-next-line no-empty-pattern -- Playwright requires destructuring pattern for first arg
   test.beforeEach(({}, testInfo) => {
     // Mobile Safari can take longer to settle Server Action redirects.
     test.setTimeout(

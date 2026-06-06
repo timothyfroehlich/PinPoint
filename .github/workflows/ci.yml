@@ -271,6 +271,9 @@ jobs:
       - name: Install Ruff
         run: pipx install "ruff==0.15.1"
 
+      - name: Install pytest
+        run: pipx install "pytest==9.0.3"
+
       - name: YAML lint
         run: yamllint .github/workflows/
 
@@ -289,6 +292,9 @@ jobs:
 
       - name: Ruff format check
         run: ruff format --check scripts/
+
+      - name: Pytest (scripts)
+        run: pytest scripts/tests/
 
       - name: ShellCheck
         run: find scripts/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck

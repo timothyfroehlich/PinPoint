@@ -124,13 +124,13 @@ const DEFAULT_PROPS = {
   allUsers: [],
 };
 
-describe("IssueList bottom pagination buttons (audit row 7, class-H)", () => {
+describe("IssueList pagination buttons (audit row 7, class-H)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe("when there is only one page of results", () => {
-    it("renders both bottom pagination buttons", () => {
+    it("renders both top and bottom pagination buttons", () => {
       const issues = [makeIssue(1), makeIssue(2)];
       render(
         <IssueList
@@ -142,11 +142,13 @@ describe("IssueList bottom pagination buttons (audit row 7, class-H)", () => {
         />
       );
 
+      expect(screen.getByTestId("top-prev-page")).toBeInTheDocument();
+      expect(screen.getByTestId("top-next-page")).toBeInTheDocument();
       expect(screen.getByTestId("bottom-prev-page")).toBeInTheDocument();
       expect(screen.getByTestId("bottom-next-page")).toBeInTheDocument();
     });
 
-    it("disables both buttons on the only page", () => {
+    it("disables all buttons on the only page", () => {
       const issues = [makeIssue(1), makeIssue(2)];
       render(
         <IssueList
@@ -158,6 +160,8 @@ describe("IssueList bottom pagination buttons (audit row 7, class-H)", () => {
         />
       );
 
+      expect(screen.getByTestId("top-prev-page")).toBeDisabled();
+      expect(screen.getByTestId("top-next-page")).toBeDisabled();
       expect(screen.getByTestId("bottom-prev-page")).toBeDisabled();
       expect(screen.getByTestId("bottom-next-page")).toBeDisabled();
     });
@@ -176,6 +180,8 @@ describe("IssueList bottom pagination buttons (audit row 7, class-H)", () => {
         />
       );
 
+      expect(screen.getByTestId("top-prev-page")).toBeDisabled();
+      expect(screen.getByTestId("top-next-page")).toBeEnabled();
       expect(screen.getByTestId("bottom-prev-page")).toBeDisabled();
       expect(screen.getByTestId("bottom-next-page")).toBeEnabled();
     });
@@ -192,6 +198,8 @@ describe("IssueList bottom pagination buttons (audit row 7, class-H)", () => {
         />
       );
 
+      expect(screen.getByTestId("top-prev-page")).toBeEnabled();
+      expect(screen.getByTestId("top-next-page")).toBeDisabled();
       expect(screen.getByTestId("bottom-prev-page")).toBeEnabled();
       expect(screen.getByTestId("bottom-next-page")).toBeDisabled();
     });
@@ -208,6 +216,8 @@ describe("IssueList bottom pagination buttons (audit row 7, class-H)", () => {
         />
       );
 
+      expect(screen.getByTestId("top-prev-page")).toBeEnabled();
+      expect(screen.getByTestId("top-next-page")).toBeEnabled();
       expect(screen.getByTestId("bottom-prev-page")).toBeEnabled();
       expect(screen.getByTestId("bottom-next-page")).toBeEnabled();
     });
@@ -215,7 +225,7 @@ describe("IssueList bottom pagination buttons (audit row 7, class-H)", () => {
     it("clicking next-page calls router.push with page=2", async () => {
       const user = userEvent.setup();
       const issues = Array.from({ length: 15 }, (_, i) => makeIssue(i + 1));
-      render(
+      const { unmount } = render(
         <IssueList
           {...DEFAULT_PROPS}
           issues={issues}
@@ -230,12 +240,31 @@ describe("IssueList bottom pagination buttons (audit row 7, class-H)", () => {
       expect(mockPush).toHaveBeenCalledTimes(1);
       const calledUrl = mockPush.mock.calls[0]?.[0] as string;
       expect(calledUrl).toContain("page=2");
+
+      vi.clearAllMocks();
+      unmount();
+
+      render(
+        <IssueList
+          {...DEFAULT_PROPS}
+          issues={issues}
+          totalCount={30}
+          page={1}
+          pageSize={15}
+        />
+      );
+
+      await user.click(screen.getByTestId("top-next-page"));
+
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      const topCalledUrl = mockPush.mock.calls[0]?.[0] as string;
+      expect(topCalledUrl).toContain("page=2");
     });
 
     it("clicking prev-page calls router.push without a page param (back to page 1)", async () => {
       const user = userEvent.setup();
       const issues = Array.from({ length: 15 }, (_, i) => makeIssue(i + 16));
-      render(
+      const { unmount } = render(
         <IssueList
           {...DEFAULT_PROPS}
           issues={issues}
@@ -249,13 +278,31 @@ describe("IssueList bottom pagination buttons (audit row 7, class-H)", () => {
 
       expect(mockPush).toHaveBeenCalledTimes(1);
       const calledUrl = mockPush.mock.calls[0]?.[0] as string;
-      // page=1 is the default and is omitted from the URL per useSearchFilters
       expect(calledUrl).not.toContain("page=");
+
+      vi.clearAllMocks();
+      unmount();
+
+      render(
+        <IssueList
+          {...DEFAULT_PROPS}
+          issues={issues}
+          totalCount={30}
+          page={2}
+          pageSize={15}
+        />
+      );
+
+      await user.click(screen.getByTestId("top-prev-page"));
+
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      const topCalledUrl = mockPush.mock.calls[0]?.[0] as string;
+      expect(topCalledUrl).not.toContain("page=");
     });
   });
 
   describe("when there are no issues", () => {
-    it("does not render the bottom pagination bar", () => {
+    it("does not render the bottom pagination bar but renders disabled top pagination", () => {
       render(
         <IssueList
           {...DEFAULT_PROPS}
@@ -268,6 +315,8 @@ describe("IssueList bottom pagination buttons (audit row 7, class-H)", () => {
 
       expect(screen.queryByTestId("bottom-prev-page")).not.toBeInTheDocument();
       expect(screen.queryByTestId("bottom-next-page")).not.toBeInTheDocument();
+      expect(screen.getByTestId("top-prev-page")).toBeDisabled();
+      expect(screen.getByTestId("top-next-page")).toBeDisabled();
     });
   });
 });

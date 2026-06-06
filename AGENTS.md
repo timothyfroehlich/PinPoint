@@ -70,6 +70,9 @@ One-time install for tools the workflow scripts depend on:
   - macOS: `brew install parallel`
   - Linux: `apt install parallel`
   - Without it, `pnpm run preflight` fails with a clear install hint; use `pnpm run preflight:unlocked` to bypass the cap.
+- **pytest** (used by `pnpm run check:pytest` to run hook tests):
+  - macOS: `brew install pytest`
+  - Linux: `pipx install pytest` (requires pipx: `apt install pipx`)
 
 ### Worktrees & ports
 
