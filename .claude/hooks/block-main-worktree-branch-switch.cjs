@@ -224,11 +224,10 @@ if (require.main === module) {
     // Use the per-invocation working directory from the stdin payload, NOT
     // CLAUDE_PROJECT_DIR (a stable project-root path). Worktree detection must
     // reflect where the command actually runs: a lead relocated via EnterWorktree
-    // or an Agent-Team teammate operates in a LINKED worktree whose root differs
-    // from the project root — using CLAUDE_PROJECT_DIR would misclassify them as
-    // the MAIN worktree and wrongly block legit switches. Repo convention: see
-    // normalize-workspace-paths.cjs (`input.cwd || process.cwd()`) and the
-    // push-check.sh / definition-of-done.sh `jq -r '.cwd'` reads.
+    // or a worktree-isolated subagent operates in a LINKED worktree whose root
+    // differs from the project root — using CLAUDE_PROJECT_DIR would misclassify
+    // them as the MAIN worktree and wrongly block legit switches. Repo convention:
+    // see normalize-workspace-paths.cjs (`input.cwd || process.cwd()`).
     const detectCwd = payload.cwd || process.cwd();
 
     // 2. Single-use bypass sentinel. In the main worktree the cwd and root

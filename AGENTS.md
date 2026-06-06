@@ -42,23 +42,22 @@
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
-| Category    | Skill                            | When to use                                                             |
-| :---------- | :------------------------------- | :---------------------------------------------------------------------- |
-| UI          | `pinpoint-ui`                    | Components, shadcn/ui, forms, responsive design                         |
-| UI          | `pinpoint-design-bible`          | Design system, page archetypes, spacing, surfaces                       |
-| TypeScript  | `pinpoint-typescript`            | Type errors, generics, Drizzle types                                    |
-| Testing     | `pinpoint-testing`               | Writing tests, PGlite, test-layer decisions                             |
-| Testing     | `pinpoint-e2e`                   | E2E tests, worker isolation, Playwright stability                       |
-| Security    | `pinpoint-security`              | Auth, CSP, Zod, Supabase SSR                                            |
-| Patterns    | `pinpoint-patterns`              | Server Actions, data fetching, architecture                             |
-| Workflow    | `pinpoint-prototype-mode`        | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt |
-| Workflow    | `pinpoint-briefing`              | Session-start health review                                             |
-| Workflow    | `pinpoint-pr-workflow`           | Full PR lifecycle: commit, push, CI, Copilot, merge                     |
-| Workflow    | `pinpoint-orchestrator`          | Parallel subagent work in worktrees                                     |
-| Workflow    | `pinpoint-dispatch-e2e-teammate` | Dispatching a teammate end-to-end                                       |
-| Antigravity | `pinpoint-agy-triage`            | Grooming: evaluate whether a bead is agy-ready/agy-ui                   |
-| Antigravity | `pinpoint-agy-dispatch`          | Emit an Antigravity copy-paste prompt for a chosen bead                 |
-| Antigravity | `pinpoint-agy-execute`           | Runbook for Antigravity to execute an agy-ready bead end-to-end         |
+| Category    | Skill                     | When to use                                                             |
+| :---------- | :------------------------ | :---------------------------------------------------------------------- |
+| UI          | `pinpoint-ui`             | Components, shadcn/ui, forms, responsive design                         |
+| UI          | `pinpoint-design-bible`   | Design system, page archetypes, spacing, surfaces                       |
+| TypeScript  | `pinpoint-typescript`     | Type errors, generics, Drizzle types                                    |
+| Testing     | `pinpoint-testing`        | Writing tests, PGlite, test-layer decisions                             |
+| Testing     | `pinpoint-e2e`            | E2E tests, worker isolation, Playwright stability                       |
+| Security    | `pinpoint-security`       | Auth, CSP, Zod, Supabase SSR                                            |
+| Patterns    | `pinpoint-patterns`       | Server Actions, data fetching, architecture                             |
+| Workflow    | `pinpoint-prototype-mode` | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt |
+| Workflow    | `pinpoint-briefing`       | Session-start health review                                             |
+| Workflow    | `pinpoint-pr-workflow`    | Full PR lifecycle: commit, push, CI, Copilot, merge                     |
+| Workflow    | `pinpoint-orchestrator`   | Parallel subagent work in worktrees: dispatch, monitor, follow-up       |
+| Antigravity | `pinpoint-agy-triage`     | Grooming: evaluate whether a bead is agy-ready/agy-ui                   |
+| Antigravity | `pinpoint-agy-dispatch`   | Emit an Antigravity copy-paste prompt for a chosen bead                 |
+| Antigravity | `pinpoint-agy-execute`    | Runbook for Antigravity to execute an agy-ready bead end-to-end         |
 
 ## 4. Environment
 
