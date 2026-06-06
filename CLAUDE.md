@@ -53,18 +53,12 @@ See `pinpoint-orchestrator` skill Phase 2 for the full technical record.
 
 For multiple independent tasks, use worktree-isolated subagents.
 
-**Primary**: Standalone subagents with `isolation: "worktree"` + `run_in_background: true`. Use `resume` for follow-up (Copilot comments, CI fixes). The `post-checkout` hook automatically allocates ports and generates configs.
+**Primary**: Standalone subagents with `isolation: "worktree"` + `run_in_background: true`. Use `SendMessage` (by agent ID or `name`) for follow-up (Copilot comments, CI fixes). The `post-checkout` hook automatically allocates ports and generates configs.
 
-**Fallback**: Agent Teams for bidirectional real-time communication. Note: `isolation: "worktree"` is broken when `team_name` is set — teammates land in the lead's repo. Create worktrees manually with `git worktree add`.
-
-**Quality Enforcement**:
-
-- **Standalone subagents**: Self-enforced via prompt instructions (`pnpm run check` before returning). Hooks don't fire.
-- **Agent Teams**: `TaskCompleted` hook runs `pnpm run check`; `TeammateIdle` hook blocks unpushed commits. Requires `isolation: "worktree"` for correct CWD (broken — see above).
+**Quality Enforcement**: Self-enforced via prompt instructions (`pnpm run check` before returning). Hooks don't fire for subagents.
 
 **Anti-patterns**:
 
-- DON'T use Agent Teams as default — standalone subagents have working worktree isolation
 - DON'T forget to check Copilot comments before merging
 - DON'T dispatch `Agent(isolation: "worktree")` from a linked (non-primary) worktree — see "Worktree Dispatch Safety" above (bug #47548, WorktreeCreate hook cannot fix this)
 - DON'T fire N+ `Agent(isolation: "worktree")` calls without the WorktreeCreate hook active — with the hook any N is safe from the main worktree (flock serializes); without it, serialize to N=1-per-message
@@ -73,7 +67,7 @@ See `pinpoint-orchestrator` skill for the full workflow and known-bug details.
 
 ### Session Completion (Claude Code specifics)
 
-The `TeammateIdle` hook enforces push-before-idle automatically for teammates. The manual "Landing the Plane" checklist in AGENTS.md applies to the lead agent and solo sessions.
+The "Landing the Plane" checklist in AGENTS.md applies to the lead agent and solo sessions.
 
 ### Antigravity
 

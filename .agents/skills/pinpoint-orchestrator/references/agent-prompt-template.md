@@ -1,6 +1,6 @@
 # Agent Prompt Template
 
-## Standalone Subagent (Primary)
+## Standalone Subagent
 
 ```markdown
 ## Task: {task_title}
@@ -17,15 +17,9 @@
 
 {specific_task_instructions}
 
-### Task Contract
-
-Write this to `.claude-task-contract` in your worktree root:
-
-{contract_content}
-
 ### Quality Gates
 
-Run `pnpm run check` before returning. Check off all contract items.
+Run `pnpm run check` before returning.
 If Copilot review doesn't arrive within 5 minutes, note the timeout.
 
 ### Environment Setup
@@ -59,16 +53,7 @@ If tests fail with `POSTGRES_URL is not set`:
 2. Quality is self-enforced — explicit `pnpm run check` replaces hook enforcement
 3. Structured return format enables quick lead assessment
 
-## Agent Teams (Fallback)
-
-Add to the prompt:
-
-- `**Worktree**: {absolute_worktree_path}` (required — isolation broken with `team_name`)
-- `**Team**: {team_name}` / `**Your Name**: {agent_name}`
-- Replace return format with `SendMessage` instructions
-- Add: "ALL file operations MUST use absolute paths under `{worktree_path}`"
-
-## Resume Prompt (Follow-Up)
+## Follow-Up Prompt (via SendMessage)
 
 ```markdown
 ## Follow-Up: {reason}

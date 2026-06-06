@@ -88,28 +88,6 @@
         ]
       }
     ],
-    "TaskCompleted": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/definition-of-done.sh",
-            "timeout": 120000
-          }
-        ]
-      }
-    ],
-    "TeammateIdle": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/push-check.sh",
-            "timeout": 15000
-          }
-        ]
-      }
-    ],
     "WorktreeCreate": [
       {
         "hooks": [
