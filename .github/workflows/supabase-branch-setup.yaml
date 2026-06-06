@@ -53,7 +53,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: supabase/setup-cli@df56b21da46c98abb12a9804e4fb1f657773e333  # ratchet:supabase/setup-cli@v2.0.0
+      - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
         with:
           version: latest
 

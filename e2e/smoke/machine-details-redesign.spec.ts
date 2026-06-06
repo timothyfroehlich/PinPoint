@@ -29,20 +29,16 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { STORAGE_STATE } from "../support/auth-state.js";
 import {
   assertNoHorizontalOverflow,
-  ensureLoggedIn,
-  loginAs,
-  logout,
   assertNoA11yViolations,
 } from "../support/actions.js";
-import { seededMachines, TEST_USERS } from "../support/constants.js";
+import { seededMachines } from "../support/constants.js";
 import { clearMachineField } from "../support/supabase-admin.js";
 
 test.describe("Machine Details Redesign", () => {
-  test.beforeEach(async ({ page }, testInfo) => {
-    await ensureLoggedIn(page, testInfo);
-  });
+  test.use({ storageState: STORAGE_STATE.member });
 
   // The ownerRequirements test in full/ writes to Medieval Madness. Always clear it so
   // subsequent runs don't see stale data.
@@ -86,26 +82,18 @@ test.describe("Machine Details Redesign", () => {
 
   // Absorbed from e2e/smoke/machines-crud.spec.ts (Row 26 MERGE):
   // overflow check on the machines list page (/m)
-  test("should display machine list page without horizontal overflow", async ({
-    page,
-  }, testInfo) => {
-    // Login as admin to ensure "Add Machine" button renders (exercises full list layout)
-    await logout(page, testInfo);
-    await loginAs(page, testInfo, {
-      email: TEST_USERS.admin.email,
-      password: TEST_USERS.admin.password,
-    });
+  test.describe("Admin machine list overflow check", () => {
+    test.use({ storageState: STORAGE_STATE.admin });
 
-    await page.goto("/m?availability=all");
-    await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
-    await assertNoHorizontalOverflow(page);
-    await assertNoA11yViolations(page);
-
-    // Restore default user
-    await logout(page, testInfo);
-    await loginAs(page, testInfo, {
-      email: TEST_USERS.member.email,
-      password: TEST_USERS.member.password,
+    test("should display machine list page without horizontal overflow", async ({
+      page,
+    }) => {
+      await page.goto("/m?availability=all");
+      await expect(
+        page.getByRole("heading", { name: "Machines" })
+      ).toBeVisible();
+      await assertNoHorizontalOverflow(page);
+      await assertNoA11yViolations(page);
     });
   });
 

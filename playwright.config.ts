@@ -4,7 +4,15 @@ import { defineConfig, devices } from "@playwright/test";
 
 // Load .env.local using the same loader Next.js uses at runtime.
 // Idempotent — safe if Playwright re-evaluates this config per project.
-loadEnvConfig(process.cwd());
+//
+// `dev: true` is REQUIRED, not cosmetic. @next/env defaults `dev` to false,
+// which makes loadEnvConfig load PRODUCTION env files (.env.production.local
+// first, highest precedence). On a checkout that has a .env.production.local
+// (the root checkout keeps one for prod ops), that silently points the entire
+// E2E harness — including global-setup's `db:reset` / `supabase db reset` /
+// migrate — at PRODUCTION. Forcing dev mode loads .env.local (local stack)
+// and never touches .env.production.local. See PP-yso5 follow-up.
+loadEnvConfig(process.cwd(), true);
 
 // Worktree-aware: PORT is set per-worktree in .env.local by post-checkout hook
 const port = Number(process.env["PORT"] ?? "3000");

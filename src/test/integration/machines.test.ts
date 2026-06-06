@@ -3,19 +3,76 @@
  *
  * Tests machine queries, mutations, and status derivation with PGlite.
  * Verifies that machine status is correctly derived from associated issues.
+ *
+ * Wave 4 RECLASS additions (PP-x4li.1.4): migrated 3 watcher-service blocks from
+ * src/test/unit/machines.test.ts that required real DB-state assertions
+ * (toggleMachineWatcher watch/unwatch, updateMachineWatchMode persist).
+ * The 3 KEEP-unit blocks (Zod validation, forced DB errors) remain in the unit file.
  */
 
-import { describe, it, expect } from "vitest";
-import { eq } from "drizzle-orm";
+import { describe, it, expect, vi, beforeAll } from "vitest";
+import { eq, and } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
-import { machines, issues } from "~/server/db/schema";
-import { createTestMachine, createTestIssue } from "~/test/helpers/factories";
+import {
+  machines,
+  issues,
+  userProfiles,
+  machineWatchers,
+} from "~/server/db/schema";
+import {
+  createTestMachine,
+  createTestIssue,
+  createTestUser,
+} from "~/test/helpers/factories";
 import { deriveMachineStatus } from "~/lib/machines/status";
 import { createMachineSchema } from "~/app/(app)/m/schemas";
 import {
   applyMachineFilters,
   type MachineWithDerivedStatus,
 } from "~/lib/machines/filters-queries";
+import {
+  toggleMachineWatcher,
+  updateMachineWatchMode,
+} from "~/services/machines";
+
+// ---------------------------------------------------------------------------
+// DB proxy — routes service-layer `db` imports to the worker-scoped PGlite
+// instance. Only needed by the Machine Watcher Service describe at the bottom.
+// The existing CRUD/status/presence describes use getTestDb() directly and
+// are unaffected by this mock.
+// ---------------------------------------------------------------------------
+vi.mock("~/server/db", () => ({
+  db: {
+    insert: vi.fn((...args: any[]) =>
+      (globalThis as any).testDb.insert(...args)
+    ),
+    update: vi.fn((...args: any[]) =>
+      (globalThis as any).testDb.update(...args)
+    ),
+    delete: vi.fn((...args: any[]) =>
+      (globalThis as any).testDb.delete(...args)
+    ),
+    select: vi.fn((...args: any[]) =>
+      (globalThis as any).testDb.select(...args)
+    ),
+    query: {
+      machineWatchers: {
+        findFirst: vi.fn((...args: any[]) =>
+          (globalThis as any).testDb.query.machineWatchers.findFirst(...args)
+        ),
+      },
+    },
+  },
+}));
+
+vi.mock("~/lib/logger", () => ({
+  log: {
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
 
 describe("Machine CRUD Operations (PGlite)", () => {
   // Set up worker-scoped PGlite and auto-cleanup after each test
@@ -554,5 +611,148 @@ describe("Machine Presence Filtering (applyMachineFilters)", () => {
     expect(result).toHaveLength(2);
     expect(result.map((m) => m.initials)).toContain("OL");
     expect(result.map((m) => m.initials)).toContain("FF");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Machine Watcher Service (PGlite integration)
+//
+// Wave 4 RECLASS (PP-x4li.1.4): migrated 3 blocks from
+// src/test/unit/machines.test.ts.
+//
+// RECLASS:
+//   - "should watch if not already watching"  → real INSERT into machineWatchers
+//   - "should unwatch if already watching"    → seed + DELETE, assert row gone
+//   - "should update watch mode successfully" → real UPDATE, assert persisted
+//
+// KEPT in unit (forced-error / Zod cases — can't reproduce with real DB):
+//   - toggleMachineWatcher: "should handle DB errors gracefully"
+//   - updateMachineWatchMode: "should validate watch mode"
+//   - updateMachineWatchMode: "should handle DB errors gracefully"
+// ---------------------------------------------------------------------------
+describe("Machine Watcher Service (PGlite)", () => {
+  setupTestDb();
+
+  beforeAll(async () => {
+    // Re-assign after setupTestDb seeds globalThis (no-op: setupTestDb calls
+    // getTestDb() which sets the worker-scoped instance; we assign here so the
+    // proxy has a reference before any test runs).
+    (globalThis as any).testDb = await getTestDb();
+  });
+
+  // Seed a fresh machine + user before each test via direct PGlite writes.
+  // afterEach cleanup is handled by setupTestDb (cleanupTestDb).
+  it("should watch if not already watching", async () => {
+    const db = await getTestDb();
+
+    const [user] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "WT1" }))
+      .returning();
+
+    const result = await toggleMachineWatcher({
+      machineId: machine.id,
+      userId: user.id,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.isWatching).toBe(true);
+      expect(result.value.watchMode).toBe("notify");
+    }
+
+    // Assert a machineWatchers row was inserted in the real DB
+    const row = await db.query.machineWatchers.findFirst({
+      where: and(
+        eq(machineWatchers.machineId, machine.id),
+        eq(machineWatchers.userId, user.id)
+      ),
+    });
+    expect(row).toBeDefined();
+    expect(row?.watchMode).toBe("notify");
+  });
+
+  it("should unwatch if already watching", async () => {
+    const db = await getTestDb();
+
+    const [user] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "WT2" }))
+      .returning();
+
+    // Seed an existing watcher row
+    await db.insert(machineWatchers).values({
+      machineId: machine.id,
+      userId: user.id,
+      watchMode: "subscribe",
+    });
+
+    const result = await toggleMachineWatcher({
+      machineId: machine.id,
+      userId: user.id,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.isWatching).toBe(false);
+      expect(result.value.watchMode).toBe("subscribe");
+    }
+
+    // Assert the row was removed from the real DB
+    const row = await db.query.machineWatchers.findFirst({
+      where: and(
+        eq(machineWatchers.machineId, machine.id),
+        eq(machineWatchers.userId, user.id)
+      ),
+    });
+    expect(row).toBeUndefined();
+  });
+
+  it("should update watch mode successfully", async () => {
+    const db = await getTestDb();
+
+    const [user] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "WT3" }))
+      .returning();
+
+    // Seed a watcher row with default notify mode
+    await db.insert(machineWatchers).values({
+      machineId: machine.id,
+      userId: user.id,
+      watchMode: "notify",
+    });
+
+    const result = await updateMachineWatchMode({
+      machineId: machine.id,
+      userId: user.id,
+      watchMode: "subscribe",
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.watchMode).toBe("subscribe");
+    }
+
+    // Assert the watch mode was persisted in the real DB
+    const row = await db.query.machineWatchers.findFirst({
+      where: and(
+        eq(machineWatchers.machineId, machine.id),
+        eq(machineWatchers.userId, user.id)
+      ),
+    });
+    expect(row?.watchMode).toBe("subscribe");
   });
 });
