@@ -21,6 +21,10 @@ import {
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
 import {
+  MachineAttributionLine,
+  type MachineLabel,
+} from "~/components/machines/timeline/MachineAttributionLine";
+import {
   TagPill,
   TagSelect,
   USER_TAGS,
@@ -62,6 +66,11 @@ interface Props {
    * undefined since the bucket banner names the day.
    */
   rowDateLabel?: string;
+  /**
+   * Opt-in machine attribution line for combined (collection) feeds.
+   * Per-machine timelines never set this — their rendering is unchanged.
+   */
+  machineLabel?: MachineLabel;
 }
 
 /**
@@ -83,6 +92,7 @@ export function MachineTimelineCommentRow({
   canDelete,
   showRelativeTime = true,
   rowDateLabel,
+  machineLabel,
 }: Props): React.JSX.Element {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -114,6 +124,9 @@ export function MachineTimelineCommentRow({
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
+        {machineLabel ? (
+          <MachineAttributionLine machine={machineLabel} />
+        ) : null}
         <div className="flex items-center gap-2 text-xs">
           {/*
            * Left cluster: author + tag. The tag pill sits *inline* with the

@@ -3,6 +3,10 @@
 import type React from "react";
 import Link from "next/link";
 
+import {
+  MachineAttributionLine,
+  type MachineLabel,
+} from "./MachineAttributionLine";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { useTimelineRowDensity } from "~/hooks/use-timeline-row-density";
@@ -44,6 +48,11 @@ interface Props {
    * the bucket banner already names the day.
    */
   rowDateLabel?: string;
+  /**
+   * Opt-in machine attribution line for combined (collection) feeds.
+   * Per-machine timelines never set this — their rendering is unchanged.
+   */
+  machineLabel?: MachineLabel;
 }
 
 /**
@@ -69,6 +78,7 @@ export function MachineTimelineIssueRow({
   machineInitials,
   showRelativeTime = true,
   rowDateLabel,
+  machineLabel,
 }: Props): React.JSX.Element {
   const { Icon, colorClass } = MACHINE_EVENT_ICONS[row.eventData.kind];
   const actor = resolveActor(row);
@@ -104,6 +114,9 @@ export function MachineTimelineIssueRow({
         <Icon aria-hidden="true" className={cn("size-5", colorClass)} />
       </div>
       <div className="min-w-0 flex-1" ref={containerRef}>
+        {machineLabel ? (
+          <MachineAttributionLine machine={machineLabel} />
+        ) : null}
         <div
           className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden text-sm"
           data-density={density}

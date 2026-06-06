@@ -1,5 +1,9 @@
 import type React from "react";
 
+import {
+  MachineAttributionLine,
+  type MachineLabel,
+} from "./MachineAttributionLine";
 import { RelativeTime } from "~/components/issues/RelativeTime";
 import { MACHINE_EVENT_ICONS } from "~/lib/timeline/machine-event-icons";
 import { formatMachineEvent } from "~/lib/timeline/format-machine-event";
@@ -35,6 +39,11 @@ interface Props {
    * undefined since the bucket banner names the day.
    */
   rowDateLabel?: string;
+  /**
+   * Opt-in machine attribution line for combined (collection) feeds.
+   * Per-machine timelines never set this — their rendering is unchanged.
+   */
+  machineLabel?: MachineLabel;
 }
 
 /**
@@ -53,6 +62,7 @@ export function MachineTimelineSystemRow({
   row,
   showRelativeTime = true,
   rowDateLabel,
+  machineLabel,
 }: Props): React.JSX.Element {
   // Lifecycle events never reference an issue, so there is no issue link to
   // extract here (issue events render via MachineTimelineIssueRow).
@@ -83,12 +93,24 @@ export function MachineTimelineSystemRow({
       <div className="flex size-10 shrink-0 items-center justify-center">
         <Icon aria-hidden="true" className={cn("size-5", colorClass)} />
       </div>
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-        <span>{text}</span>
-        {rightMeta ? (
-          <span className="ml-auto text-xs tabular-nums">{rightMeta}</span>
-        ) : null}
-      </div>
+      {machineLabel ? (
+        <div className="min-w-0 flex-1">
+          <MachineAttributionLine machine={machineLabel} />
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <span>{text}</span>
+            {rightMeta ? (
+              <span className="ml-auto text-xs tabular-nums">{rightMeta}</span>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <span>{text}</span>
+          {rightMeta ? (
+            <span className="ml-auto text-xs tabular-nums">{rightMeta}</span>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
