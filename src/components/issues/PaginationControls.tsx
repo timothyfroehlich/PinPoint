@@ -24,10 +24,12 @@ export function PaginationControls({
   nextTestId,
   className,
 }: PaginationControlsProps): React.JSX.Element {
-  const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
-  const end = totalCount === 0 ? 0 : Math.min(totalCount, page * pageSize);
-  const isFirstPage = page <= 1;
-  const isLastPage = end >= totalCount;
+  const maxPage = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(Math.max(1, page), maxPage);
+  const start = totalCount === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const end = totalCount === 0 ? 0 : Math.min(totalCount, safePage * pageSize);
+  const isFirstPage = safePage <= 1;
+  const isLastPage = safePage >= maxPage;
 
   return (
     <div
@@ -41,10 +43,11 @@ export function PaginationControls({
       </span>
       <div className="flex items-center gap-1">
         <Button
+          type="button"
           variant="ghost"
           size="icon"
           className="h-7 w-7 hover:bg-muted"
-          onClick={() => onNavigate(page - 1)}
+          onClick={() => onNavigate(safePage - 1)}
           disabled={isFirstPage}
           aria-label="Previous page"
           data-testid={prevTestId}
@@ -52,10 +55,11 @@ export function PaginationControls({
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="icon"
           className="h-7 w-7 hover:bg-muted"
-          onClick={() => onNavigate(page + 1)}
+          onClick={() => onNavigate(safePage + 1)}
           disabled={isLastPage}
           aria-label="Next page"
           data-testid={nextTestId}
