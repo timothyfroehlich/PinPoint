@@ -58,7 +58,6 @@ describe("ExportButton", () => {
 
   it("disables the button while export is in progress", async () => {
     // Action never resolves so the button stays disabled throughout the test
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- intentional hang for in-progress state test
     mockExportAction.mockReturnValue(new Promise(() => {}));
 
     const user = userEvent.setup();

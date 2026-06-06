@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable no-undef -- Browser globals not in default config */
-
 import type React from "react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";

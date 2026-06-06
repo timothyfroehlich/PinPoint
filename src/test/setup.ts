@@ -7,22 +7,19 @@
 import "@testing-library/jest-dom/vitest";
 
 // Ensure POSTGRES_URL is set for tests to avoid db/index.ts throwing error
-// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Must catch empty string from vitest.config.ts env spreading
-process.env.POSTGRES_URL ||= "postgres://postgres:postgres@localhost:5432/test";
+if (process.env.POSTGRES_URL === undefined || process.env.POSTGRES_URL === "") {
+  process.env.POSTGRES_URL = "postgres://postgres:postgres@localhost:5432/test";
+}
 
 // Mock ResizeObserver
 if (typeof window !== "undefined") {
   globalThis.ResizeObserver = class ResizeObserver {
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking ResizeObserver
     observe() {}
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking ResizeObserver
     unobserve() {}
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking ResizeObserver
     disconnect() {}
   };
 
   // Mock PointerEvent (required for Radix UI)
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill PointerEvent if missing
   if (!globalThis.PointerEvent) {
     class PointerEvent extends MouseEvent {
       public height: number;
@@ -55,7 +52,6 @@ if (typeof window !== "undefined") {
   }
 
   // Mock scrollIntoView
-  // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking scrollIntoView
   window.HTMLElement.prototype.scrollIntoView = function () {};
 
   // Mock Pointer Capture API — required by vaul drag-to-dismiss and by Radix
@@ -63,17 +59,12 @@ if (typeof window !== "undefined") {
   // events). jsdom doesn't implement these, so we polyfill no-ops only when
   // they're missing — keeps any real implementation in a future jsdom or alt
   // environment intact.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill setPointerCapture if missing
   if (!window.Element.prototype.setPointerCapture) {
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking setPointerCapture
     window.Element.prototype.setPointerCapture = function () {};
   }
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill releasePointerCapture if missing
   if (!window.Element.prototype.releasePointerCapture) {
-    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking releasePointerCapture
     window.Element.prototype.releasePointerCapture = function () {};
   }
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill hasPointerCapture if missing
   if (!window.Element.prototype.hasPointerCapture) {
     window.Element.prototype.hasPointerCapture = function (): boolean {
       return false;

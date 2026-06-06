@@ -21,9 +21,7 @@ import { updateSession } from "~/lib/supabase/middleware";
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   // 1. Run Supabase middleware first to handle session
   const response = await updateSession(request);
-
   // 2. Generate nonce for CSP using Web Crypto API (Edge Runtime compatible)
-  // eslint-disable-next-line no-undef -- crypto is a global in Edge Runtime
   const nonce = crypto.randomUUID();
 
   // 3. Get Supabase URL from environment

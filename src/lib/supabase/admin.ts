@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Creates a Supabase admin client using the service role key.
@@ -11,9 +12,9 @@ import { createClient } from "@supabase/supabase-js";
  * IMPORTANT: This must only be used in server-side code. The "server-only"
  * import above ensures Next.js will throw a build error if this module
  * is ever imported from a Client Component.
+ *
  */
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- Supabase createClient has complex generic return type
-export function createAdminClient() {
+export function createAdminClient(): SupabaseClient {
   const url =
     process.env["SUPABASE_URL"] ?? process.env["NEXT_PUBLIC_SUPABASE_URL"];
 
@@ -25,7 +26,7 @@ export function createAdminClient() {
     );
   }
 
-  return createClient(url, serviceRoleKey, {
+  return createClient<Record<string, unknown>, "public">(url, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

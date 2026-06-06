@@ -154,7 +154,6 @@ export async function submitFormAndWaitForRedirect(
   const interceptorNavPromise: Promise<void> = (async () => {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- claimed is mutated from sibling async branches; TS narrows it to false in this scope
       if (claimed) {
         // Another branch already navigated. Stop polling.
         await new Promise<void>(() => undefined);

@@ -5,6 +5,7 @@ import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import promisePlugin from "eslint-plugin-promise";
 import eslintCommentsPlugin from "@eslint-community/eslint-plugin-eslint-comments";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
+import globals from "globals";
 
 export default [
   js.configs.recommended,
@@ -37,17 +38,11 @@ export default [
         project: "./tsconfig.json",
         tsconfigRootDir: import.meta.dirname,
       },
-      globals: {
-        process: "readonly",
-        // Browser globals for client components
-        document: "readonly",
-        window: "readonly",
-        navigator: "readonly",
-        console: "readonly",
-        fetch: "readonly",
-      },
     },
     rules: {
+      "no-undef": "off",
+      "no-empty-pattern": ["error", { "allowObjectPatternsAsParameters": true }],
+
       // TypeScript recommended rules
       ...typescriptEslint.configs["recommended-type-checked"].rules,
       ...typescriptEslint.configs["stylistic-type-checked"].rules,
@@ -174,13 +169,6 @@ export default [
         project: "./tsconfig.tests.json",
         tsconfigRootDir: import.meta.dirname,
       },
-      globals: {
-        // E2E tests run in Playwright (Node + browser APIs)
-        fetch: "readonly",
-        setTimeout: "readonly",
-        process: "readonly",
-        console: "readonly",
-      },
     },
     rules: {
       // Allow any in tests for mocking
@@ -202,6 +190,10 @@ export default [
 
       // Allow disabling rules in tests if needed (mocking often requires it)
       "eslint-comments/no-restricted-disable": "off",
+
+      "@typescript-eslint/no-empty-function": "off",
+      "@typescript-eslint/no-unnecessary-condition": "off",
+      "no-restricted-imports": "off",
     },
   },
   {
@@ -246,6 +238,13 @@ export default [
       "@typescript-eslint/explicit-function-return-type": "off",
       "no-restricted-imports": "off",
       "eslint-comments/no-restricted-disable": "off",
+    },
+  },
+  {
+    // Seed scripts environment globals
+    files: ["supabase/**/*.mjs"],
+    languageOptions: {
+      globals: globals.node,
     },
   },
   {

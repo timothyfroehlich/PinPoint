@@ -1,7 +1,5 @@
 import type { APIRequestContext } from "@playwright/test";
 import { describe, it, expect, vi } from "vitest";
-
-// eslint-disable-next-line no-restricted-imports -- e2e helpers live outside src alias paths
 import { cleanupTestEntities } from "../../../e2e/support/cleanup";
 
 type MinimalRequest = Pick<APIRequestContext, "post">;
