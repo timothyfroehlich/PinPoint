@@ -22,11 +22,12 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 ./scripts/workflow/orchestration-status.sh               # PR dashboard + worktree health + beads + security alerts
 ./scripts/workflow/orchestration-status.sh --prs-only    # Just PR dashboard
 ./scripts/workflow/orchestration-status.sh --security-only  # Just Dependabot alerts
+# (also: --worktrees-only, --beads-only)
 
 # PR monitoring
 ./scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + Copilot + merge status table (all open PRs if no args)
 ./scripts/workflow/pr-watch.py <PR>                      # Stream CI + review events (Monitor-tool compatible; canonical)
-./scripts/workflow/pr-watch.py --check-ready <PR>        # One-shot readiness check (structured tokens)
+./scripts/workflow/pr-watch.py --check-ready <PR>        # One-shot readiness audit (pass/fail; exits 0 if ready)
 
 # Copilot thread inspection + reply → use MCP via pinpoint-pr-workflow skill Phase 3
 # (mcp__github__pull_request_read / add_reply_to_pull_request_comment / pull_request_review_write)
@@ -36,7 +37,8 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 bash scripts/workflow/merge-pr.sh <PR>                   # Composite gate-then-merge enforcer (--dry-run, --force)
 bash scripts/workflow/merge-pr.sh <PR> --dry-run         # Preview gate evaluation without merging
 
-# Worktree health
+# Worktree health — covers manually created ../pinpoint-worktrees/* ONLY;
+# agent-created .claude/worktrees/* are handled by the WorktreeRemove hook and not scanned here
 ./scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
 ./scripts/workflow/stale-worktrees.sh --clean            # Auto-remove stale worktrees
 
@@ -268,11 +270,11 @@ python3 scripts/worktree_cleanup.py ../pinpoint-worktrees/<branch>
 
 ## Error Recovery
 
-| Problem                                      | Fix                                                                                                                                    |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Subagent fails to create PR                  | Check output, verify worktree state, message it with context                                                                           |
-| Permission denied on worktree                | Add paths to `.claude/settings.json`, restart session                                                                                  |
-| Worktree creation fails                      | `supabase stop` (current worktree only — **never** `--all`), then re-create with `git worktree add`                                    |
-| `.git/config.lock` race on parallel dispatch | anthropics/claude-code#47266. Serialize: one `Agent(isolation: "worktree")` per message, confirm worktree appeared, then dispatch next |
-| Parent branch flips after dispatch           | anthropics/claude-code#47548. You dispatched from a linked worktree. Always dispatch from the main worktree                            |
-| Husky post-checkout hook fails               | Check `.husky/post-checkout` for merge conflict markers                                                                                |
+| Problem                                      | Fix                                                                                                                                                                                                            |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Subagent fails to create PR                  | Check output, verify worktree state, message it with context                                                                                                                                                   |
+| Permission denied on worktree                | Add paths to `.claude/settings.json`, restart session                                                                                                                                                          |
+| Worktree creation fails                      | `supabase stop` (current worktree only — **never** `--all`), then re-create with `git worktree add`                                                                                                            |
+| `.git/config.lock` race on parallel dispatch | anthropics/claude-code#47266 — the `WorktreeCreate` hook mitigates this. Verify `worktree-create.sh` is registered in `.claude/settings.json`; only if missing/disabled, serialize to one dispatch per message |
+| Parent branch flips after dispatch           | anthropics/claude-code#47548. You dispatched from a linked worktree. Always dispatch from the main worktree                                                                                                    |
+| Husky post-checkout hook fails               | Check `.husky/post-checkout` for merge conflict markers                                                                                                                                                        |
