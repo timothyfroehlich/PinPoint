@@ -34,6 +34,41 @@ export function deriveMachineStatus(issues: IssueForStatus[]): MachineStatus {
   return "operational";
 }
 
+/** Sort rank for issue severities — higher is worse. */
+export const SEVERITY_RANK: Record<IssueSeverity, number> = {
+  cosmetic: 0,
+  minor: 1,
+  major: 2,
+  unplayable: 3,
+};
+
+/** Sort rank for derived machine statuses — higher is worse. */
+export const MACHINE_STATUS_RANK: Record<MachineStatus, number> = {
+  operational: 0,
+  needs_service: 1,
+  unplayable: 2,
+};
+
+/**
+ * The highest-ranked severity among a machine's OPEN issues, or null when
+ * nothing is open. Closed issues never count (mirrors deriveMachineStatus).
+ */
+export function worstOpenSeverity(
+  issues: IssueForStatus[]
+): IssueSeverity | null {
+  let worst: IssueSeverity | null = null;
+  for (const issue of issues) {
+    if ((CLOSED_STATUSES as readonly string[]).includes(issue.status)) continue;
+    if (
+      worst === null ||
+      SEVERITY_RANK[issue.severity] > SEVERITY_RANK[worst]
+    ) {
+      worst = issue.severity;
+    }
+  }
+  return worst;
+}
+
 /**
  * Get display label for machine status
  */
