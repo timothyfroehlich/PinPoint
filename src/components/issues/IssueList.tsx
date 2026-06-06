@@ -7,8 +7,6 @@ import {
   ArrowUpDown,
   AlertCircle,
   Check,
-  ChevronLeft,
-  ChevronRight,
   SlidersHorizontal,
 } from "lucide-react";
 import { EmptyState } from "~/components/ui/empty-state";
@@ -55,6 +53,7 @@ import {
   type ColumnConfig,
 } from "~/hooks/use-table-responsive-columns";
 import { ExportButton } from "~/components/issues/ExportButton";
+import { PaginationControls } from "~/components/issues/PaginationControls";
 
 export type SortDirection = "asc" | "desc" | null;
 
@@ -137,11 +136,6 @@ export function IssueList({
     setSort(newSort);
   };
 
-  const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
-  const end = totalCount === 0 ? 0 : Math.min(totalCount, page * pageSize);
-  const isFirstPage = page <= 1;
-  const isLastPage = end >= totalCount;
-
   const currentColumn = sort.split("_")[0];
   const currentDirection = sort.split("_")[1] as SortDirection;
 
@@ -213,33 +207,15 @@ export function IssueList({
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground mr-2">
-            <span>
-              {start}-{end} of {totalCount}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 hover:bg-muted"
-                onClick={() => setPage(page - 1)}
-                disabled={isFirstPage}
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 hover:bg-muted"
-                onClick={() => setPage(page + 1)}
-                disabled={isLastPage}
-                aria-label="Next page"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <PaginationControls
+            page={page}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onNavigate={setPage}
+            prevTestId="top-prev-page"
+            nextTestId="top-next-page"
+            className="mr-2"
+          />
 
           <ExportButton filters={filters} />
 
@@ -650,35 +626,14 @@ export function IssueList({
 
       {totalCount > 0 && (
         <div className="flex items-center justify-end gap-3 pt-2">
-          <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
-            <span>
-              {start}-{end} of {totalCount}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 hover:bg-muted"
-                onClick={() => setPage(page - 1)}
-                disabled={isFirstPage}
-                aria-label="Previous page"
-                data-testid="bottom-prev-page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 hover:bg-muted"
-                onClick={() => setPage(page + 1)}
-                disabled={isLastPage}
-                aria-label="Next page"
-                data-testid="bottom-next-page"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <PaginationControls
+            page={page}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onNavigate={setPage}
+            prevTestId="bottom-prev-page"
+            nextTestId="bottom-next-page"
+          />
         </div>
       )}
     </div>
