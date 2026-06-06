@@ -9,7 +9,33 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+import pytest
+
 HOOK_PATH = Path(__file__).parent.parent / "hooks" / "huddle-pr-announce.sh"
+
+
+@pytest.fixture(autouse=True)
+def ensure_huddle_config() -> Iterator[None]:
+    repo_root = Path(__file__).parent.parent.parent
+    huddle_dir = repo_root / ".agents" / "huddle"
+    config_file = huddle_dir / "config.json"
+
+    existed = config_file.exists()
+    old_content = None
+    if existed:
+        old_content = config_file.read_text()
+    else:
+        huddle_dir.mkdir(parents=True, exist_ok=True)
+        config_file.write_text('{"root_bead_id": "PP-root-123"}')
+
+    try:
+        yield
+    finally:
+        if not existed:
+            if config_file.exists():
+                config_file.unlink()
+        elif old_content is not None:
+            config_file.write_text(old_content)
 
 
 @contextmanager
