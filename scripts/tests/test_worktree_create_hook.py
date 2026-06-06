@@ -32,7 +32,7 @@ echo "$@" >> {calls_log}
 
 
 def run_hook_raw(
-    stdin_raw: str, tmp_path: Path, env_modifications: dict = None
+    stdin_raw: str, tmp_path: Path, env_modifications: dict | None = None
 ) -> tuple[int, str, str]:
     env = os.environ.copy()
     # Isolate HOME and XDG_CONFIG_HOME to prevent test flakiness and interference
@@ -58,7 +58,7 @@ def run_hook_raw(
 
 
 def run_hook(
-    stdin_data: dict, tmp_path: Path, env_modifications: dict = None
+    stdin_data: dict, tmp_path: Path, env_modifications: dict | None = None
 ) -> tuple[int, str, str]:
     return run_hook_raw(json.dumps(stdin_data), tmp_path, env_modifications)
 
