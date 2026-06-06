@@ -634,13 +634,6 @@ describe("Machine Watcher Service (PGlite)", () => {
   setupTestDb();
 
   beforeAll(async () => {
-    (globalThis as any).testDb = await getTestDb();
-  });
-
-  let testMachine: { id: string; initials: string };
-  let testUser: { id: string };
-
-  beforeAll(async () => {
     // Re-assign after setupTestDb seeds globalThis (no-op: setupTestDb calls
     // getTestDb() which sets the worker-scoped instance; we assign here so the
     // proxy has a reference before any test runs).
