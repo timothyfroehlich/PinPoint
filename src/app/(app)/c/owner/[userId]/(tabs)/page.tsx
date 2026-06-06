@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { getLatestTimelineEventPerMachine } from "~/lib/collections/latest-activity";
 import { deriveMachineStatus, worstOpenSeverity } from "~/lib/machines/status";
 import { getOwnerCollectionForLayout } from "../_data";
-// CollectionOverviewTable arrives in Task 6 (PP-slrd.1) — placeholder below.
-// import type { CollectionOverviewRow } from "~/components/collections/CollectionOverviewTable";
+import {
+  CollectionOverviewTable,
+  type CollectionOverviewRow,
+} from "~/components/collections/CollectionOverviewTable";
 
 interface PageProps {
   params: Promise<{ userId: string }>;
@@ -30,7 +32,7 @@ export default async function CollectionOverviewPage({
     collection.machines.map((m) => m.id)
   );
 
-  const rows = collection.machines.map((m) => ({
+  const rows: CollectionOverviewRow[] = collection.machines.map((m) => ({
     id: m.id,
     initials: m.initials,
     name: m.name,
@@ -41,5 +43,5 @@ export default async function CollectionOverviewPage({
     presence: m.presenceStatus,
   }));
 
-  return <pre>{JSON.stringify(rows.map((r) => r.initials))}</pre>;
+  return <CollectionOverviewTable rows={rows} />;
 }
