@@ -1,4 +1,3 @@
-/* eslint-disable eslint-comments/no-restricted-disable, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument -- Auth callback requires direct Supabase client usage which returns any */
 /**
  * Auth callback route requires direct use of createServerClient with custom cookie handling
  * to properly set cookies in the response. Standard SSR wrapper cannot be used here.
@@ -8,7 +7,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { type NextRequest } from "next/server";
-import type { EmailOtpType } from "@supabase/supabase-js";
+import type { EmailOtpType, SupabaseClient } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
@@ -111,7 +110,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const otpType = isValidEmailOtpType(typeParam);
   if (tokenHash && otpType) {
     const { error } = await supabase.auth.verifyOtp({
-      type: otpType,
+      type: typeParam,
       token_hash: tokenHash,
     });
 
@@ -123,7 +122,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     reportError(error, {
       action: "auth.callback",
       step: "verifyOtp",
-      type: otpType,
+      type: typeParam,
     });
   }
 
@@ -150,9 +149,7 @@ function isValidEmailOtpType(value: string | null): value is EmailOtpType {
   );
 }
 
-async function syncDiscordIdentity(
-  supabase: ReturnType<typeof createServerClient>
-): Promise<void> {
+async function syncDiscordIdentity(supabase: SupabaseClient): Promise<void> {
   // Errors here are non-fatal for the OAuth callback (the user is signed in
   // either way) but they cause UI/runtime drift: the Connected Accounts
   // panel reads auth.identities while testDiscordDmAction reads
@@ -204,7 +201,7 @@ async function syncDiscordIdentity(
 }
 
 function createSupabaseClient(request: NextRequest): {
-  supabase: ReturnType<typeof createServerClient>;
+  supabase: SupabaseClient;
   pendingCookies: { name: string; value: string; options?: CookieOptions }[];
 } {
   const { url: supabaseUrl, publishableKey: supabaseKey } = getSupabaseEnv();

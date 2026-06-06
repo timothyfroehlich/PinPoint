@@ -336,7 +336,6 @@ describe("Invited Users Integration", () => {
       })
       .returning();
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Safe check, returning() might be empty
     if (!invited) throw new Error("Failed to create invited user");
 
     // 2. Create machine owned by invited user
@@ -350,7 +349,6 @@ describe("Invited Users Integration", () => {
       )
       .returning();
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Safe check, returning() might be empty
     if (!machine) throw new Error("Failed to create machine");
 
     // 3. Simulate signup - insert auth user then profile (triggers auto-link)
@@ -413,7 +411,6 @@ describe("Invited Users Integration", () => {
       })
       .returning();
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Safe check, returning() might be empty
     if (!invited) throw new Error("Failed to create invited user");
 
     // 2. Create machine owned by invited user
@@ -427,7 +424,6 @@ describe("Invited Users Integration", () => {
       )
       .returning();
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Safe check, returning() might be empty
     if (!machine) throw new Error("Failed to create machine");
 
     // 3. Create issue reported by invited user
@@ -441,7 +437,6 @@ describe("Invited Users Integration", () => {
       })
       .returning();
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Safe check, returning() might be empty
     if (!invitedIssue) throw new Error("Failed to create invited issue");
 
     // 4. Create guest issue (reported by email)
@@ -455,7 +450,6 @@ describe("Invited Users Integration", () => {
       })
       .returning();
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Safe check, returning() might be empty
     if (!guestIssue) throw new Error("Failed to create guest issue");
 
     // 5. Call ensureUserProfile with a user object having the same email

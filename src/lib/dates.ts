@@ -33,8 +33,7 @@ export interface TimelineBucket {
  * Coerce a Date | string | number to a Date.
  * Throws TypeError if date is null/undefined at runtime.
  */
-function toDate(date: Date | string | number): Date {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- guard against 'any' or untyped JSON input
+function toDate(date: Date | string | number | null | undefined): Date {
   if (date == null) {
     throw new TypeError("Expected date to be a Date, string, or number");
   }

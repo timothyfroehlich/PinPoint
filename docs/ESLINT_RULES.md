@@ -124,6 +124,9 @@ const result = dangerousOperation();
 const result = dangerousOperation() as SafeType;
 ```
 
+**`no-undef`** - Off
+Disabled for TS/TSX files because the TypeScript compiler already performs type checking and reports undefined variables/types, making this rule redundant and prone to false positives on environment-specific globals (e.g., `crypto` in Edge Middleware or `performance` in Client Components).
+
 ---
 
 ### 🛑 ESLint Directive Control
@@ -229,6 +232,9 @@ Test files have relaxed rules for pragmatic testing:
 - `@typescript-eslint/no-floating-promises`: off (test runners handle)
 - `@typescript-eslint/explicit-function-return-type`: off (concise tests)
 - `eslint-comments/no-restricted-disable`: off (allows mocking hacks)
+- `@typescript-eslint/no-empty-function`: off (mocks/spies are inherently empty)
+- `@typescript-eslint/no-unnecessary-condition`: off (tsconfig gap: `tsconfig.tests.json` lacks `noUncheckedIndexedAccess`, causing false positives on legitimate defensive checks)
+- `no-restricted-imports`: off (tests legitimately cross the src/e2e boundary)
 
 ### Config Files
 
@@ -238,6 +244,12 @@ Build and config files have relaxed type checking:
 - `@typescript-eslint/explicit-function-return-type`: off
 - `no-restricted-imports`: off
 - `eslint-comments/no-restricted-disable`: off
+
+### Seed Scripts
+
+Supabase seed scripts in `supabase/**/*.mjs` have standard Node environment globals enabled:
+
+- Globals configuration is populated using the standard `globals` package (`globals.node`), enabling Node.js specific globals like `process` and `console` without manual declarations.
 
 ---
 
