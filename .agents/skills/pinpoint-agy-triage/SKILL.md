@@ -121,7 +121,7 @@ The `--priority-max=2` filter is a heuristic — P1/P2 beads first. Remove it to
 
 ### Post-execution
 
-After Antigravity ships a PR, treat it like any other agent PR: Copilot review, CI, ready-for-review label, then Tim merges. No special handling needed.
+After Antigravity ships a PR, treat it like any other agent PR: CI, ready-for-review label, then Tim merges. No special handling needed.
 
 ---
 

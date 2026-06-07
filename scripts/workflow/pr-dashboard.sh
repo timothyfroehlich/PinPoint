@@ -1,22 +1,12 @@
 #!/bin/bash
 # scripts/workflow/pr-dashboard.sh
-# Shows all open PRs with CI status, Copilot comment count, and readiness.
+# Shows all open PRs with CI status, merge state, and readiness.
 #
 # Usage:
 #   ./scripts/workflow/pr-dashboard.sh          # All open PRs
 #   ./scripts/workflow/pr-dashboard.sh 918 920  # Specific PRs only
 
 set -euo pipefail
-
-# shellcheck source=./_pr-gates.sh
-# shellcheck disable=SC1091
-source "$(dirname "$0")/_pr-gates.sh"
-
-OWNER_REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-OWNER=$(cut -d/ -f1 <<< "$OWNER_REPO")
-REPO=$(cut -d/ -f2 <<< "$OWNER_REPO")
-
-LOGINS_JSON=$(printf '%s\n' "${COPILOT_LOGINS[@]}" | jq -R . | jq -s .)
 
 # Get PR list
 if [ $# -gt 0 ]; then
@@ -31,8 +21,8 @@ if [ -z "$PRS" ]; then
 fi
 
 # Header
-printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "PR" "Title" "CI" "Copilot" "Merge" "Draft" "Branch"
-printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "------" "----------------------------------------" "------------" "----------" "----------" "--------" "-------------------"
+printf "%-6s %-40s %-12s %-10s %-8s %s\n" "PR" "Title" "CI" "Merge" "Draft" "Branch"
+printf "%-6s %-40s %-12s %-10s %-8s %s\n" "------" "----------------------------------------" "------------" "----------" "--------" "-------------------"
 
 for pr in $PRS; do
     if ! [[ "$pr" =~ ^[0-9]+$ ]]; then
@@ -62,44 +52,6 @@ for pr in $PRS; do
         ci_status="All passed"
     fi
 
-    # Copilot comments (unresolved threads only) — cursor-paginated to avoid first:100 truncation
-    copilot_count=0
-    cursor=""
-    has_next=true
-    copilot_ok=true
-    while [ "$has_next" = "true" ]; do
-        after_arg=""
-        [ -n "$cursor" ] && after_arg=", after: \"$cursor\""
-        # shellcheck disable=SC2016
-        resp=$(gh api graphql -f query="
-          {
-            repository(owner: \"$OWNER\", name: \"$REPO\") {
-              pullRequest(number: $pr) {
-                reviewThreads(first: 100$after_arg) {
-                  pageInfo { hasNextPage endCursor }
-                  nodes {
-                    isResolved
-                    comments(first: 1) {
-                      nodes { author { login } }
-                    }
-                  }
-                }
-              }
-            }
-          }" 2>/dev/null) || { copilot_ok=false; break; }
-        page_count=$(jq --argjson logins "$LOGINS_JSON" '
-          [.data.repository.pullRequest.reviewThreads.nodes[]
-           | select(.isResolved == false)
-           | select(.comments.nodes | length > 0)
-           | .comments.nodes[0] as $comment
-           | select($logins | index($comment.author.login))]
-           | length' <<< "$resp") || { copilot_ok=false; break; }
-        copilot_count=$((copilot_count + page_count))
-        has_next=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<< "$resp")
-        cursor=$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty' <<< "$resp")
-    done
-    [ "$copilot_ok" = "false" ] && copilot_count="?"
-
     # Merge status
     case "$merge_state" in
         CONFLICTING) merge_str="CONFLICT" ;;
@@ -117,5 +69,5 @@ for pr in $PRS; do
         draft_str="draft"
     fi
 
-    printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "#${pr}" "$title" "$ci_status" "$copilot_count" "$merge_str" "$draft_str" "$branch"
+    printf "%-6s %-40s %-12s %-10s %-8s %s\n" "#${pr}" "$title" "$ci_status" "$merge_str" "$draft_str" "$branch"
 done

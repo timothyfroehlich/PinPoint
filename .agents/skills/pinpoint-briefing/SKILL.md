@@ -75,7 +75,7 @@ Launch these five groups simultaneously:
 ./scripts/workflow/orchestration-status.sh
 ```
 
-Covers: open PRs (CI + Copilot + merge), worktree health, beads ready/in-progress, Dependabot alerts.
+Covers: open PRs (CI + merge), worktree health, beads ready/in-progress, Dependabot alerts.
 
 ### Group B: Security Audit
 
@@ -169,8 +169,8 @@ Dependabot:    [X open alerts] — link to any mergeable PRs
 Weekly Review: #NNNN (week of <dates>) — <verdict>; <X> findings [Y tracked, Z UNTRACKED]
 
 ## 📋 Open PRs
-[Table from pr-dashboard.sh: PR# | Title | CI | Copilot | Merge Ready]
-Highlight: any with unresolved Copilot comments, failing CI, or stale > 7 days
+[Table from pr-dashboard.sh: PR# | Title | CI | Merge Ready]
+Highlight: any with failing CI or stale > 7 days
 
 ## 🏗️ Main Branch Health
 [Last 5 post-submit runs: pass/fail summary]
@@ -214,8 +214,8 @@ relation to open PRs). Reference bead ID and title. Wait for user confirmation b
 
 ## Relationship to Other Skills
 
-| Skill                   | When to Use                                                                                     |
-| ----------------------- | ----------------------------------------------------------------------------------------------- |
-| `pinpoint-briefing`     | Start of session — situational awareness and triage                                             |
-| `pinpoint-orchestrator` | After briefing — dispatching parallel subagents for chosen work                                 |
-| `pinpoint-pr-workflow`  | During & end of work — commit, CI watch, Copilot review (via MCP), readiness label, gated merge |
+| Skill                   | When to Use                                                           |
+| ----------------------- | --------------------------------------------------------------------- |
+| `pinpoint-briefing`     | Start of session — situational awareness and triage                   |
+| `pinpoint-orchestrator` | After briefing — dispatching parallel subagents for chosen work       |
+| `pinpoint-pr-workflow`  | During & end of work — commit, CI watch, readiness label, gated merge |

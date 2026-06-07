@@ -184,7 +184,7 @@ Result: all passing.
 <any pre-existing failures, deliberate omissions from the bead's "out of scope", or noteworthy decisions>
 ```
 
-Open as **non-draft** (i.e., `draft: false`) — the `ready-for-review` label is applied later in Step 11 after CI is green and Copilot threads are clean.
+Open as **non-draft** (i.e., `draft: false`) — the `ready-for-review` label is applied later in Step 10 after CI is green.
 
 ---
 
@@ -211,56 +211,11 @@ If CI fails: diagnose, fix, commit (Step 6), push (Step 7), repeat from Step 9. 
 
 ---
 
-## Step 10 — Address Copilot review
+## Step 10 — Label ready-for-review
 
-Use GitHub MCP throughout. Do not rely on `copilot-comments.sh` / `respond-to-copilot.sh` shell scripts — use MCP directly.
+Once CI is green:
 
-**List unresolved threads:**
-
-```
-mcp__github__pull_request_read(
-  method: "get_review_comments",
-  owner: "timothyfroehlich",
-  repo: "PinPoint",
-  pullNumber: <PR-number>
-)
-```
-
-Filter for `author.login == "copilot-pull-request-reviewer[bot]"` and unresolved threads.
-
-**For each unresolved thread, choose one:**
-
-Option A — Fix the code: commit and push the fix. Copilot auto-resolves when it detects the change in a subsequent CI run.
-
-Option B — Decline: Post a one-sentence justification reply, then manually resolve the thread.
-
-```
-mcp__github__add_reply_to_pull_request_comment(
-  owner: "timothyfroehlich",
-  repo: "PinPoint",
-  pullNumber: <PR-number>,
-  commentId: <thread-comment-id>,
-  body: "<one-sentence justification> —Antigravity"
-)
-
-mcp__github__pull_request_review_write(
-  method: "resolve_thread",
-  owner: "timothyfroehlich",
-  repo: "PinPoint",
-  pullNumber: <PR-number>,
-  threadId: <thread-id>
-)
-```
-
-Sign all replies with `—Antigravity` (em-dash U+2014, not a hyphen). Declined comments **must** receive a reply — no silent ignores.
-
----
-
-## Step 11 — Label ready-for-review
-
-Once CI is green **and** zero unresolved Copilot threads remain:
-
-**`agy-ui` branch:** Before applying the label, re-verify the UI. Copilot fixes may introduce regressions. Use `/browser` to open the app at the worktree's port and confirm the acceptance criteria still hold. If the stack is no longer running, restart it (`supabase start` + `pnpm dev`) first — `/browser` grants Chrome access only.
+**`agy-ui` branch:** Before applying the label, re-verify the UI. Late fixes may introduce regressions. Use `/browser` to open the app at the worktree's port and confirm the acceptance criteria still hold. If the stack is no longer running, restart it (`supabase start` + `pnpm dev`) first — `/browser` grants Chrome access only.
 
 Once UI verification passes (or the bead has no `agy-ui` label):
 
@@ -281,7 +236,7 @@ gh pr edit <PR-number> --add-label ready-for-review
 
 ---
 
-## Step 12 — Hand off
+## Step 11 — Hand off
 
 ```sh
 bd comment <id> 'PR #<number> open and labeled ready-for-review: <PR-URL>
