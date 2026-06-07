@@ -125,6 +125,7 @@ export async function MainLayout({
         isAuthenticated={!!user}
         userName={userProfile?.name ?? "User"}
         role={userProfile?.role}
+        userId={user?.id}
         notifications={enrichedNotifications}
         issuesPath={issuesPath}
         newChangelogCount={newChangelogCount}
