@@ -1,0 +1,191 @@
+# On-demand Preview Controller
+#
+# Comment-driven control surface for ephemeral Supabase preview branches.
+# There is NO automatic preview for a PR — branches exist only when explicitly
+# requested via a comment, and a TTL'd reaper (preview-reaper.yaml) tears them
+# down. Native Supabase auto-branching is disabled in the dashboard.
+#
+# Commands (PR comments only, from authors with write access):
+#   /preview          create or restart the preview; TTL = now + 48h
+#   /preview extend   push the TTL +48h (no DB work)
+#   /preview stop     tear down the preview now
+#
+# Required GitHub Secrets:
+#   SUPABASE_ACCESS_TOKEN - supabase.com/dashboard/account/tokens (90-day expiry)
+#   SUPABASE_PROJECT_ID   - production project ref
+#   VERCEL_TOKEN          - vercel.com/account/tokens
+#   VERCEL_ORG_ID         - Vercel team/org id
+#   VERCEL_PROJECT_ID     - Vercel project id
+
+name: Preview Controller
+
+on:
+  issue_comment:
+    types: [created]
+
+# Least privilege: we read the PR and write a sticky comment.
+permissions:
+  contents: read
+  pull-requests: write
+
+# One control action per PR at a time so rapid comments don't race.
+concurrency:
+  group: preview-control-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    name: Preview command
+    runs-on: ubuntu-latest
+    # Gate: PR comments only, author has write access, body is a /preview command.
+    if: >-
+      github.event.issue.pull_request &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association) &&
+      startsWith(github.event.comment.body, '/preview')
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}  # zizmor: ignore[secrets-outside-env]
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}  # zizmor: ignore[secrets-outside-env]
+    steps:
+      - name: Parse command
+        id: parse
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          # Normalise: trim, collapse whitespace, take the command line only.
+          line="$(printf '%s' "$COMMENT_BODY" | head -n1 | tr -s '[:space:]' ' ' | sed 's/ *$//')"
+          case "$line" in
+            "/preview")        action="start" ;;
+            "/preview extend") action="extend" ;;
+            "/preview stop")   action="stop" ;;
+            *)
+              echo "Unrecognised command: '${line}' — ignoring."
+              action="noop"
+              ;;
+          esac
+          echo "action=${action}" >> "$GITHUB_OUTPUT"
+          echo "Parsed action: ${action}"
+
+      - name: Acknowledge
+        if: steps.parse.outputs.action != 'noop'
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
+          ACTION: ${{ steps.parse.outputs.action }}
+        run: |
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/reactions" \
+            -f content=eyes >/dev/null 2>&1 || true
+          echo "Acknowledged '${ACTION}' on PR #${PR_NUMBER}"
+
+      # Resolve the PR head BEFORE checkout so we can deploy the PR's code (on
+      # issue_comment events checkout defaults to the repo's default branch).
+      # gh uses the API, so no checkout is needed yet. The author gate above
+      # restricts this to OWNER/MEMBER/COLLABORATOR, so checking out PR head is
+      # safe (no untrusted code runs with our secrets).
+      - name: Resolve PR head
+        id: pr
+        if: steps.parse.outputs.action != 'noop'
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          read -r head_ref head_sha < <(gh pr view "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json headRefName,headRefOid \
+            --jq '"\(.headRefName) \(.headRefOid)"')
+          if [[ -z "$head_ref" || -z "$head_sha" ]]; then
+            echo "::error::Could not resolve head branch/SHA for PR #${PR_NUMBER}"
+            exit 1
+          fi
+          echo "head_ref=${head_ref}" >> "$GITHUB_OUTPUT"
+          echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+          echo "PR #${PR_NUMBER} head: ${head_ref} @ ${head_sha}"
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # ratchet:actions/checkout@v6.0.2
+        if: steps.parse.outputs.action != 'noop'
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          persist-credentials: false
+
+      - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        if: steps.parse.outputs.action == 'start' || steps.parse.outputs.action == 'stop'
+        with:
+          version: latest
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061  # ratchet:pnpm/action-setup@v4.2.0
+        if: steps.parse.outputs.action == 'start'
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        if: steps.parse.outputs.action == 'start'
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        if: steps.parse.outputs.action == 'start'
+        run: pnpm install --frozen-lockfile
+
+      # --- start / restart ---------------------------------------------------
+      - name: Create preview
+        id: create
+        if: steps.parse.outputs.action == 'start'
+        env:
+          GIT_BRANCH: ${{ steps.pr.outputs.head_ref }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: bash scripts/workflow/preview/preview-create.sh
+
+      - name: Post active status (start)
+        if: steps.parse.outputs.action == 'start'
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
+          GIT_BRANCH: ${{ steps.pr.outputs.head_ref }}
+          PREVIEW_URL: ${{ steps.create.outputs.preview_url }}
+        run: |
+          expires="$(date -u -d '+48 hours' +%Y-%m-%dT%H:%M:%SZ)"
+          bash scripts/workflow/preview/preview-status.sh active \
+            "$GIT_BRANCH" "$PREVIEW_URL" "$expires" \
+            | bash scripts/workflow/preview/sticky-comment.sh upsert "$PR_NUMBER" -
+
+      # --- extend ------------------------------------------------------------
+      - name: Extend TTL
+        if: steps.parse.outputs.action == 'extend'
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
+          GIT_BRANCH: ${{ steps.pr.outputs.head_ref }}
+        run: |
+          existing="$(bash scripts/workflow/preview/sticky-comment.sh find "$PR_NUMBER")"
+          if ! printf '%s' "$existing" | grep -q 'Expires:'; then
+            bash scripts/workflow/preview/preview-status.sh none \
+              | bash scripts/workflow/preview/sticky-comment.sh upsert "$PR_NUMBER" -
+            exit 0
+          fi
+          expires="$(date -u -d '+48 hours' +%Y-%m-%dT%H:%M:%SZ)"
+          # Recover the existing preview URL from the active comment so we keep it.
+          url="$(printf '%s' "$existing" | grep -oE 'https://[^ ]+\.vercel\.app' | head -n1)"
+          bash scripts/workflow/preview/preview-status.sh extended \
+            "$GIT_BRANCH" "$url" "$expires" \
+            | bash scripts/workflow/preview/sticky-comment.sh upsert "$PR_NUMBER" -
+          echo "Extended preview TTL to ${expires}"
+
+      # --- stop --------------------------------------------------------------
+      - name: Destroy preview
+        if: steps.parse.outputs.action == 'stop'
+        env:
+          GIT_BRANCH: ${{ steps.pr.outputs.head_ref }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: bash scripts/workflow/preview/preview-destroy.sh
+
+      - name: Post stopped status (stop)
+        if: steps.parse.outputs.action == 'stop'
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
+          GIT_BRANCH: ${{ steps.pr.outputs.head_ref }}
+        run: |
+          bash scripts/workflow/preview/preview-status.sh stopped "$GIT_BRANCH" \
+            | bash scripts/workflow/preview/sticky-comment.sh upsert "$PR_NUMBER" -

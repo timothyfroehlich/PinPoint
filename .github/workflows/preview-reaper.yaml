@@ -1,0 +1,55 @@
+# Preview Reaper
+#
+# TTL + closed-PR enforcement for on-demand Supabase preview branches.
+# Supersedes the old supabase-branch-cleanup.yaml. Runs hourly and on demand.
+#
+# For each Supabase preview branch:
+#   - PR closed/merged (or no open PR)  -> destroy the branch
+#   - sticky comment `Expires:` in past -> destroy + flip comment to "expired"
+#   - otherwise                         -> keep
+#
+# Required GitHub Secrets:
+#   SUPABASE_ACCESS_TOKEN - supabase.com/dashboard/account/tokens (90-day expiry)
+#   SUPABASE_PROJECT_ID   - production project ref
+#   VERCEL_TOKEN          - vercel.com/account/tokens (for env-var cleanup)
+#   VERCEL_ORG_ID         - Vercel team/org id
+#   VERCEL_PROJECT_ID     - Vercel project id
+
+name: Preview Reaper
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # hourly
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: preview-reaper
+  cancel-in-progress: false
+
+jobs:
+  reap:
+    name: Reap expired / closed-PR branches
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}  # zizmor: ignore[secrets-outside-env]
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}  # zizmor: ignore[secrets-outside-env]
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}  # zizmor: ignore[secrets-outside-env]
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}  # zizmor: ignore[secrets-outside-env]
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}  # zizmor: ignore[secrets-outside-env]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # ratchet:actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        with:
+          version: latest
+
+      - name: Reap preview branches
+        run: bash scripts/workflow/preview/preview-reap.sh
