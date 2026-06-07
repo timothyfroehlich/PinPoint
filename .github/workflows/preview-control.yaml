@@ -70,13 +70,14 @@ jobs:
       - name: Acknowledge
         if: steps.parse.outputs.action != 'noop'
         env:
-          PR_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_ID: ${{ github.event.comment.id }}
           ACTION: ${{ steps.parse.outputs.action }}
         run: |
+          # React on the triggering command comment, not the PR itself.
           gh api --method POST \
-            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/reactions" \
+            "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
             -f content=eyes >/dev/null 2>&1 || true
-          echo "Acknowledged '${ACTION}' on PR #${PR_NUMBER}"
+          echo "Acknowledged '${ACTION}' on comment ${COMMENT_ID}"
 
       # Resolve the PR head BEFORE checkout so we can deploy the PR's code (on
       # issue_comment events checkout defaults to the repo's default branch).
@@ -132,6 +133,7 @@ jobs:
         id: create
         if: steps.parse.outputs.action == 'start'
         env:
+          PR_NUMBER: ${{ github.event.issue.number }}
           GIT_BRANCH: ${{ steps.pr.outputs.head_ref }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -175,6 +177,7 @@ jobs:
       - name: Destroy preview
         if: steps.parse.outputs.action == 'stop'
         env:
+          PR_NUMBER: ${{ github.event.issue.number }}
           GIT_BRANCH: ${{ steps.pr.outputs.head_ref }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

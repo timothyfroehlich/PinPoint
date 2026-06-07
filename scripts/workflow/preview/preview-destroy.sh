@@ -11,28 +11,34 @@ set -euo pipefail
 # Idempotent: succeeds even if the branch or env vars are already gone.
 #
 # Required environment:
-#   GIT_BRANCH             git branch name whose preview should be destroyed
+#   PR_NUMBER              PR number — Supabase branch identity (pr-<N>)
+#   GIT_BRANCH             PR head branch name — Vercel env scope only
 #   SUPABASE_PROJECT_ID    production project ref
 # Optional (Vercel cleanup is best-effort and skipped if unset):
 #   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
 
+: "${PR_NUMBER:?PR_NUMBER is required}"
 : "${GIT_BRANCH:?GIT_BRANCH is required}"
 : "${SUPABASE_PROJECT_ID:?SUPABASE_PROJECT_ID is required}"
 
+# Supabase branch identity is the deterministic name `pr-<PR_NUMBER>` (see
+# preview-create.sh for why we cannot match on the git_branch field).
+BRANCH_NAME="pr-${PR_NUMBER}"
+
 # --- Delete the Supabase branch ---------------------------------------------
 
-echo "::group::Delete Supabase branch for git branch '${GIT_BRANCH}'"
+echo "::group::Delete Supabase branch '${BRANCH_NAME}'"
 BRANCHES_JSON="$(supabase branches list \
   --project-ref "$SUPABASE_PROJECT_ID" \
   --output json 2>/dev/null || echo '[]')"
 
-BRANCH_NAME="$(echo "$BRANCHES_JSON" \
-  | jq -r --arg gb "$GIT_BRANCH" \
-    '.[] | select(.git_branch == $gb) | .name' \
+FOUND_NAME="$(echo "$BRANCHES_JSON" \
+  | jq -r --arg n "$BRANCH_NAME" \
+    '.[] | select(.name == $n) | .name' \
   | head -n1)"
 
-if [[ -z "$BRANCH_NAME" ]]; then
-  echo "No Supabase branch found for '${GIT_BRANCH}' (already gone)"
+if [[ -z "$FOUND_NAME" ]]; then
+  echo "No Supabase branch named '${BRANCH_NAME}' (already gone)"
 else
   echo "Deleting Supabase branch: ${BRANCH_NAME}"
   supabase branches delete "$BRANCH_NAME" \

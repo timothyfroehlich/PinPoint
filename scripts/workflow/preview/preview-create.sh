@@ -7,16 +7,19 @@ set -euo pipefail
 #
 # Invoked by .github/workflows/preview-control.yaml on `/preview`.
 #
-# Idempotent: if a Supabase branch already exists for the git branch, it is
+# Idempotent: if the Supabase branch `pr-<PR_NUMBER>` already exists it is
 # reused rather than recreated. Vercel env vars are overwritten with --force.
 #
 # Required environment:
-#   GIT_BRANCH                 PR head branch name (e.g. feat/foo)
+#   GIT_BRANCH                 PR head branch name (e.g. feat/foo) — Vercel only
+#   PR_NUMBER                  PR number — Supabase branch identity (pr-<N>)
 #   SUPABASE_ACCESS_TOKEN      Supabase management API token
 #   SUPABASE_PROJECT_ID        production project ref
 #   VERCEL_TOKEN               Vercel auth token
 #   VERCEL_ORG_ID              Vercel team/org id
 #   VERCEL_PROJECT_ID          Vercel project id
+# Optional:
+#   PREVIEW_BRANCH_SIZE        Supabase branch compute size (default: micro)
 #
 # Outputs (appended to $GITHUB_OUTPUT when set):
 #   preview_url                the git-branch preview alias URL
@@ -28,32 +31,42 @@ set -euo pipefail
 # not been run end-to-end against the live project in this environment.
 
 : "${GIT_BRANCH:?GIT_BRANCH is required}"
+: "${PR_NUMBER:?PR_NUMBER is required}"
 : "${SUPABASE_PROJECT_ID:?SUPABASE_PROJECT_ID is required}"
+
+# Supabase branch identity is the deterministic name `pr-<PR_NUMBER>`, NOT the
+# git branch. `supabase branches create` (CLI) has no git-branch binding flag —
+# only the (now-disabled) GitHub integration populates the `git_branch` field —
+# so a CLI-created branch has a null `git_branch`. Matching on it would never
+# find our branch (duplicate creates) and would make the reaper skip it forever
+# (it shares the empty-`git_branch` clause with main/production -> unbounded
+# cost). The git branch name is kept only for Vercel env scoping + the alias.
+BRANCH_NAME="pr-${PR_NUMBER}"
 
 # --- Supabase branch create (idempotent) ------------------------------------
 
-echo "::group::Resolve or create Supabase branch for '${GIT_BRANCH}'"
+echo "::group::Resolve or create Supabase branch '${BRANCH_NAME}'"
 
-# List existing branches and find one already bound to this git branch.
+# List existing branches and reuse one already named `pr-<PR_NUMBER>`.
 EXISTING_JSON="$(supabase branches list \
   --project-ref "$SUPABASE_PROJECT_ID" \
   --output json 2>/dev/null || echo '[]')"
 
 EXISTING_NAME="$(echo "$EXISTING_JSON" \
-  | jq -r --arg gb "$GIT_BRANCH" \
-    '.[] | select(.git_branch == $gb) | .name' \
+  | jq -r --arg n "$BRANCH_NAME" \
+    '.[] | select(.name == $n) | .name' \
   | head -n1)"
 
 if [[ -n "$EXISTING_NAME" ]]; then
   echo "Reusing existing Supabase branch: ${EXISTING_NAME}"
-  BRANCH_NAME="$EXISTING_NAME"
 else
-  echo "Creating Supabase branch for git branch '${GIT_BRANCH}'"
-  # `supabase branches create` names the branch after the current git branch.
-  supabase branches create "$GIT_BRANCH" \
+  echo "Creating Supabase branch '${BRANCH_NAME}' (size: ${PREVIEW_BRANCH_SIZE:-micro})"
+  # Explicit name = deterministic identity. --size keeps the branch DB small;
+  # micro is enough to run migrate + seed for a fresh preview schema.
+  supabase branches create "$BRANCH_NAME" \
     --project-ref "$SUPABASE_PROJECT_ID" \
+    --size "${PREVIEW_BRANCH_SIZE:-micro}" \
     --output json >/dev/null
-  BRANCH_NAME="$GIT_BRANCH"
 fi
 echo "::endgroup::"
 
@@ -184,6 +197,17 @@ trigger_vercel_build() {
   export VERCEL_ORG_ID VERCEL_PROJECT_ID
   # --force => no build cache, guaranteeing NEXT_PUBLIC_* values are re-inlined
   # from the env vars we just set. stdout is the deployment URL.
+  #
+  # KNOWN RISK (pending live verification): a CLI `vercel deploy` from a
+  # detached-HEAD checkout creates a standalone deployment that may NOT receive
+  # the `pinpoint-git-<slug>.vercel.app` git alias — that alias is assigned by
+  # Vercel's Git integration on push-triggered builds, not CLI deploys. If the
+  # live test confirms this, the computed PREVIEW_URL below won't point at the
+  # deployment we built with the branch creds. Likely fallback: don't `vercel
+  # deploy` at all — set the env vars, then redeploy the EXISTING git-integration
+  # deployment for the branch with build cache disabled via the Vercel REST API
+  # (POST /v13/deployments with the branch's `gitSource` and no cache reuse), so
+  # the git alias is preserved while the build re-inlines the new env vars.
   local deployment_url
   if deployment_url="$($VERCEL deploy \
       --target=preview \
