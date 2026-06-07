@@ -107,4 +107,17 @@ describe("MachineTimelineFilter (shared MultiSelect)", () => {
     // Reset the shared search-params override so subsequent tests start clean.
     searchParamsValue = "";
   });
+
+  it("pushes to baseUrl when provided (collection feed)", async () => {
+    pushMock.mockClear();
+    const user = userEvent.setup();
+    render(
+      <MachineTimelineFilter currentTags={[]} baseUrl="/c/owner/u1/timeline" />
+    );
+    await user.click(screen.getByRole("combobox", { name: /filter by tag/i }));
+    await user.click(screen.getByText("Maintenance"));
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/c\/owner\/u1\/timeline\?/)
+    );
+  });
 });
