@@ -53,13 +53,12 @@ See `pinpoint-orchestrator` skill Phase 2 for the full technical record.
 
 For multiple independent tasks, use worktree-isolated subagents.
 
-**Primary**: Standalone subagents with `isolation: "worktree"` + `run_in_background: true`. Use `SendMessage` (by agent ID or `name`) for follow-up (Copilot comments, CI fixes). The `post-checkout` hook automatically allocates ports and generates configs.
+**Primary**: Standalone subagents with `isolation: "worktree"` + `run_in_background: true`. Use `SendMessage` (by agent ID or `name`) for follow-up (review comments, CI fixes). The `post-checkout` hook automatically allocates ports and generates configs.
 
 **Quality Enforcement**: Self-enforced via prompt instructions (`pnpm run check` before returning). Hooks don't fire for subagents.
 
 **Anti-patterns**:
 
-- DON'T forget to check Copilot comments before merging
 - DON'T dispatch `Agent(isolation: "worktree")` from a linked (non-primary) worktree — see "Worktree Dispatch Safety" above (bug #47548, WorktreeCreate hook cannot fix this)
 - DON'T fire N+ `Agent(isolation: "worktree")` calls without the WorktreeCreate hook active — with the hook any N is safe from the main worktree (flock serializes); without it, serialize to N=1-per-message
 

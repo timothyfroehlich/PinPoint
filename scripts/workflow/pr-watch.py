@@ -1,30 +1,29 @@
 #!/usr/bin/env python3
-"""PR CI + review watcher for the Claude Code Monitor tool.
+"""PR CI watcher for the Claude Code Monitor tool.
 
-Streams timestamped events to stdout as GitHub Actions runs complete
-and polls for new Copilot reviews. One Monitor call handles both.
+Streams timestamped events to stdout as GitHub Actions runs complete.
 
 Usage: ./scripts/workflow/pr-watch.py [--check-ready | --force] [--verbose] <PR_NUMBER>
-  (no flag)      Run blocking pre-checks (mergeable, no failed CI Gate, no
-                 unresolved Copilot threads), then watch CI + reviews. CI
-                 Gate absent or in-progress is NOT a blocking condition —
-                 the watch loop handles those by waiting.
+  (no flag)      Run blocking pre-checks (mergeable, no failed CI Gate),
+                 then watch CI. CI Gate absent or in-progress is NOT a
+                 blocking condition — the watch loop handles those by
+                 waiting.
   --check-ready  Run the full readiness check (mergeable + CI Gate present
-                 + Copilot resolved + ready label) and exit. CI Gate
-                 absent IS a fail here — this mode answers "is this PR
-                 ready for human review right now?".
+                 + ready label) and exit. CI Gate absent IS a fail here —
+                 this mode answers "is this PR ready for human review
+                 right now?".
   --force        Skip the pre-check entirely and watch unconditionally.
   --verbose      Emit per-job progressive updates ("X passed", "CI Gate
                  in_progress — continuing to wait", "Watching PR #N — N
                  run(s)", per-run icon listing, startup retries). Default
                  behavior is quiet — only terminal verdicts (CI Gate
                  decided, check PASS/FAIL) and action items (failure
-                 details, new Copilot review) are emitted, so that
-                 running under Claude Code's Monitor doesn't wake the
-                 agent on every job transition.
+                 details) are emitted, so that running under Claude
+                 Code's Monitor doesn't wake the agent on every job
+                 transition.
 
-Exit 0: all checks passed, or stopped for new Copilot review,
-        or (with --check-ready) the PR is ready for human review.
+Exit 0: all checks passed, or (with --check-ready) the PR is ready
+        for human review.
 Exit 1: one or more checks failed, no matching runs found,
         or (with --check-ready) the PR is not ready.
 """
@@ -39,16 +38,9 @@ import threading
 import time
 from datetime import datetime, timezone
 
-REPO_OWNER = "timothyfroehlich"
-REPO_NAME = "PinPoint"
-COPILOT_LOGINS = (
-    "copilot-pull-request-reviewer",
-    "copilot-pull-request-reviewer[bot]",
-)
 READY_LABEL = "ready-for-review"
 CI_GATE_NAME = "CI Gate"
 
-REVIEW_POLL_INTERVAL = 60  # seconds — GitHub rate limit friendly
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
 STARTUP_WAIT = 10  # seconds between startup retries
 LOG_DIR = "tmp/gh-monitor"
@@ -80,7 +72,7 @@ def emit_event(msg: str) -> None:
     informational lines that are useful interactively but noisy when the
     script is invoked under Monitor (each stdout line is a notification).
     Reserve emit() for terminal verdicts (CI Gate decided, audit PASS/FAIL)
-    and action items (failure details, new Copilot review).
+    and action items (failure details).
     """
     if VERBOSE_MODE:
         emit(msg)
@@ -97,49 +89,6 @@ def gh(*args: str) -> str:
 # ---------------------------------------------------------------------------
 # Readiness audit
 # ---------------------------------------------------------------------------
-
-
-def get_review_threads(pr: int) -> list[dict]:
-    """Fetch every review thread for a PR, paginating via GraphQL cursor.
-
-    The `after:` argument is omitted on the first page because GraphQL rejects
-    empty strings for that input. Subsequent pages inline the cursor literally.
-    """
-    threads: list[dict] = []
-    cursor: str | None = None
-    while True:
-        after_arg = f', after: "{cursor}"' if cursor else ""
-        query = f"""
-        query {{
-          repository(owner: "{REPO_OWNER}", name: "{REPO_NAME}") {{
-            pullRequest(number: {pr}) {{
-              reviewThreads(first: 100{after_arg}) {{
-                pageInfo {{ hasNextPage endCursor }}
-                nodes {{
-                  isResolved
-                  comments(first: 1) {{ nodes {{ author {{ login }} }} }}
-                }}
-              }}
-            }}
-          }}
-        }}"""
-        data = json.loads(gh("api", "graphql", "-f", f"query={query}"))
-        rt = data["data"]["repository"]["pullRequest"]["reviewThreads"]
-        threads.extend(rt["nodes"])
-        if not rt["pageInfo"]["hasNextPage"]:
-            return threads
-        cursor = rt["pageInfo"]["endCursor"]
-
-
-def _unresolved_copilot(threads: list[dict]) -> int:
-    count = 0
-    for t in threads:
-        if t["isResolved"]:
-            continue
-        nodes = t["comments"]["nodes"]
-        if nodes and nodes[0]["author"]["login"] in COPILOT_LOGINS:
-            count += 1
-    return count
 
 
 def _ci_gate_state(pr: int) -> tuple[str, str]:
@@ -205,10 +154,10 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
 
     Used by the default watch mode as a fail-fast pre-check BEFORE entering the
     watch loop. Distinguishes conditions that won't resolve by waiting (bad merge
-    state, already-failed CI Gate, unresolved Copilot threads) from conditions
-    that the watch loop is designed to wait through (CI Gate not yet posted, CI
-    Gate in progress). The latter MUST pass this pre-check so the watch loop can
-    fire and `_finalize_via_ci_gate` can poll for completion.
+    state, already-failed CI Gate) from conditions that the watch loop is
+    designed to wait through (CI Gate not yet posted, CI Gate in progress).
+    The latter MUST pass this pre-check so the watch loop can fire and
+    `_finalize_via_ci_gate` can poll for completion.
 
     Readiness-check mode (run_audit, --check-ready) keeps its stricter
     semantics — there, CI-Gate-absent IS correctly a "no, not ready right now".
@@ -228,10 +177,6 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
             f"CI Gate already failed (conclusion={ci_conclusion or 'unknown'})",
         )
 
-    unresolved = _unresolved_copilot(get_review_threads(pr))
-    if unresolved > 0:
-        return False, f"{unresolved} unresolved Copilot thread(s)"
-
     return True, ""
 
 
@@ -239,7 +184,6 @@ def run_audit(pr: int) -> bool:
     """Print a pass/fail report for review-readiness. Return True if all pass."""
     merge_state, labels = _fetch_merge_state(pr)
     ci_status, ci_conclusion = _ci_gate_state(pr)
-    unresolved = _unresolved_copilot(get_review_threads(pr))
 
     bad_merge = merge_state in ("DIRTY", "CONFLICTING", "BEHIND")
     merge_detail = f"mergeStateStatus={merge_state}"
@@ -263,13 +207,6 @@ def run_audit(pr: int) -> bool:
     checks = [
         (not bad_merge, "mergeable", merge_detail),
         (ci_check[0], "ci-gate", ci_check[1]),
-        (
-            unresolved == 0,
-            "copilot-resolved",
-            "all resolved"
-            if unresolved == 0
-            else f"{unresolved} unresolved (use MCP pull_request_read to inspect threads)",
-        ),
         (True, "ready-label", label_detail),
     ]
 
@@ -350,45 +287,6 @@ def watch_run(
         with _lock:
             failures.append(run_id)
         return
-
-
-_COPILOT_JQ = (
-    '[.[] | select(.user.login == "copilot-pull-request-reviewer"'
-    ' or .user.login == "copilot-pull-request-reviewer[bot]")] | length'
-)
-
-
-def watch_reviews(
-    pr: int,
-    baseline: int | None,
-    stop: threading.Event,
-    review_seen: threading.Event,
-) -> None:
-    """Poll for new Copilot-only reviews every REVIEW_POLL_INTERVAL seconds.
-
-    baseline=None means the initial fetch failed; the first successful poll
-    establishes the baseline instead of comparing against zero.
-    """
-    while not stop.wait(REVIEW_POLL_INTERVAL):
-        try:
-            count = int(
-                gh(
-                    "api",
-                    f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews?per_page=100",
-                    "--jq",
-                    _COPILOT_JQ,
-                )
-            )
-        except Exception:  # noqa: BLE001
-            continue  # transient API failure — skip cycle
-        if baseline is None:
-            baseline = count  # establish baseline on first successful poll
-            continue
-        if count > baseline:
-            emit("📝 New Copilot review posted")
-            review_seen.set()
-            stop.set()
-            return
 
 
 def write_failure_artifact(run_id: int) -> str:
@@ -541,21 +439,7 @@ def main() -> int:
         icon = "▶ " if run["status"] == "in_progress" else "⏳"
         emit_event(f"{icon} {run['name']}")
 
-    baseline: int | None
-    try:
-        baseline = int(
-            gh(
-                "api",
-                f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews?per_page=100",
-                "--jq",
-                _COPILOT_JQ,
-            )
-        )
-    except Exception:  # noqa: BLE001
-        baseline = None  # established on first successful poll in watch_reviews
-
     stop = threading.Event()
-    review_seen = threading.Event()
     failures: list[int] = []
 
     ci_threads = [
@@ -566,24 +450,14 @@ def main() -> int:
         )
         for run in active
     ]
-    review_thread = threading.Thread(
-        target=watch_reviews,
-        args=(pr, baseline, stop, review_seen),
-        daemon=True,
-    )
 
     for t in ci_threads:
         t.start()
-    review_thread.start()
 
     for t in ci_threads:
         t.join()
 
     stop.set()
-    review_thread.join(timeout=5)
-
-    if review_seen.is_set():
-        return 0
 
     if failures:
         for run_id in failures:

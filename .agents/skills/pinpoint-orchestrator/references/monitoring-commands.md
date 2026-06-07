@@ -18,7 +18,7 @@ gh pr view <PR_NUMBER> --json statusCheckRollup \
   --jq '.statusCheckRollup[] | select(.conclusion == "FAILURE") | .name'  # Failures only
 ```
 
-## Copilot Review Comments
+## Review Comments
 
 Preferred: use MCP via the `pinpoint-pr-workflow` skill (Phase 3.2-3.3).
 
@@ -32,13 +32,13 @@ mcp__github__pull_request_read(
 )
 ```
 
-Filter to threads where `comments[0].author.login` is `copilot-pull-request-reviewer` or `copilot-pull-request-reviewer[bot]`. Each thread has `is_resolved` (snake_case), `is_outdated`, and a thread node ID (`PRRT_kwDOxxx`) for resolving via `mcp__github__pull_request_review_write(method: "resolve_thread", threadId)`.
+Each thread has `is_resolved` (snake_case), `is_outdated`, and a thread node ID (`PRRT_kwDOxxx`) for resolving via `mcp__github__pull_request_review_write(method: "resolve_thread", threadId)`.
 
 Fallback (raw REST):
 
 ```bash
 gh api repos/timothyfroehlich/PinPoint/pulls/<PR_NUMBER>/comments --paginate \
-  --jq '.[] | select(.user.login | test("^copilot-pull-request-reviewer(\\[bot\\])?$")) | "File: \(.path):\(.line // .original_line)\n\(.body)\n---"'
+  --jq '.[] | "File: \(.path):\(.line // .original_line)\n\(.body)\n---"'
 ```
 
 ## Worktree Status
@@ -71,9 +71,9 @@ done
 ```markdown
 ## Agent Status Report
 
-| Task       | PR           | CI Status    | Copilot Comments |
-| ---------- | ------------ | ------------ | ---------------- |
-| {beads_id} | #{pr_number} | {ci_summary} | {comment_count}  |
+| Task       | PR           | CI Status    |
+| ---------- | ------------ | ------------ |
+| {beads_id} | #{pr_number} | {ci_summary} |
 
 ### PRs Ready for Review
 
