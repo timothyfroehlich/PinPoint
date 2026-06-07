@@ -10,8 +10,8 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 ## When to Use This Skill
 
 - Multiple independent beads issues ready to work (`bd ready` shows 2+ items)
-- Assigning an issue end-to-end to a subagent (implement → PR → Copilot → CI green)
-- Copilot review feedback on multiple PRs needs addressing
+- Assigning an issue end-to-end to a subagent (implement → PR → CI green)
+- Review feedback on multiple PRs needs addressing
 - Parallel feature development across branches
 - User says "spin up agents", "orchestrate", "parallel work", "dispatch"
 
@@ -25,16 +25,16 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 # (also: --worktrees-only, --beads-only)
 
 # PR monitoring
-./scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + Copilot + merge status table (all open PRs if no args)
-./scripts/workflow/pr-watch.py <PR>                      # Stream CI + review events (Monitor-tool compatible; canonical)
+./scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + merge status table (all open PRs if no args)
+./scripts/workflow/pr-watch.py <PR>                      # Stream CI events (Monitor-tool compatible; canonical)
 ./scripts/workflow/pr-watch.py --check-ready <PR>        # One-shot readiness audit (pass/fail; exits 0 if ready)
 
-# Copilot thread inspection + reply → use MCP via pinpoint-pr-workflow skill Phase 3
+# Review thread inspection + reply → use MCP via pinpoint-pr-workflow skill Phase 3
 # (mcp__github__pull_request_read / add_reply_to_pull_request_comment / pull_request_review_write)
 
-# Readiness label + merge: pinpoint-pr-workflow skill Phases 3.5 + 4
+# Readiness label + merge: pinpoint-pr-workflow skill Phases 3.4 + 4
 # Apply label via mcp__github__issue_write or `gh pr edit --add-label`
-bash scripts/workflow/merge-pr.sh <PR>                   # Composite gate-then-merge enforcer (--dry-run, --force)
+bash scripts/workflow/merge-pr.sh <PR>                   # Composite gate-then-merge enforcer (--dry-run)
 bash scripts/workflow/merge-pr.sh <PR> --dry-run         # Preview gate evaluation without merging
 
 # Worktree health — covers manually created ../pinpoint-worktrees/* ONLY;
@@ -113,8 +113,8 @@ Agent(
 1. Beads issue context (`bd show` output)
 2. Specific files to modify and what to change
 3. Quality gate: "Run `pnpm run check` before returning."
-4. Full PR lifecycle: "Create PR, poll for Copilot review, address comments, verify CI green."
-5. Structured return format: branch, PR#, CI status, Copilot status, blockers
+4. Full PR lifecycle: "Create PR, verify CI green."
+5. Structured return format: branch, PR#, CI status, blockers
 
 **Prompt template:**
 
@@ -134,7 +134,6 @@ Agent(
 ## Quality Gates
 
 Run `pnpm run check` before returning.
-If Copilot review doesn't arrive within 5 minutes, note timeout and return.
 
 ## Return Format
 
@@ -143,7 +142,6 @@ Report back with:
 - **Branch**: <branch name>
 - **PR**: #<number>
 - **CI**: passing/failing/pending
-- **Copilot**: no comments / N comments addressed / pending timeout
 - **Blockers**: none or description
 ```
 
@@ -158,14 +156,13 @@ Full annotated version: `references/agent-prompt-template.md`.
 ```bash
 ./scripts/workflow/pr-dashboard.sh 940 941 942       # Specific PRs
 ./scripts/workflow/pr-dashboard.sh                    # All open PRs
-./scripts/workflow/pr-watch.py <PR>                   # Stream one PR's CI + review events
+./scripts/workflow/pr-watch.py <PR>                   # Stream one PR's CI events
 ```
 
 ### Follow-Up via SendMessage
 
 A spawned agent keeps its context — continue it with `SendMessage` using its ID or name rather than spawning fresh. Common scenarios:
 
-- Subagent returns "Copilot pending" → wait for review → send the actual comments
 - CI fails → get failure logs → send failure context
 - User requests changes → send review feedback
 
@@ -177,7 +174,7 @@ A spawned agent keeps its context — continue it with `SendMessage` using its I
 gh run view <run-id> --log-failed | tail -50
 ```
 
-**Copilot comments** → Inspect via MCP (see pinpoint-pr-workflow skill Phase 3.2-3.3), then message the subagent:
+**Review comments** → Inspect via MCP (see pinpoint-pr-workflow skill Phase 3.2-3.3), then message the subagent:
 
 ```
 mcp__github__pull_request_read(method: "get_review_comments", owner, repo, pullNumber, perPage: 100)
@@ -191,7 +188,7 @@ gh run rerun <run-id> --failed
 
 ### Label Ready PRs
 
-See pinpoint-pr-workflow skill Phase 3.5. Apply `ready-for-review` after CI green + zero unresolved Copilot threads via:
+See pinpoint-pr-workflow skill Phase 3.4. Apply `ready-for-review` after CI green + zero unresolved review threads via:
 
 ```
 mcp__github__issue_write(method: "update", owner, repo, issue_number: <PR>, labels: [<existing>..., "ready-for-review"])
@@ -222,7 +219,7 @@ PRs Ready for Review:
 - #123: Fix machine dropdown — All checks passing
 
 PRs Needing Attention:
-- #124: Add owner link — 2 Copilot comments
+- #124: Add owner link — CI failing
 
 Remaining Worktrees:
 - feat/task-def (PR #124 needs work)
@@ -264,7 +261,6 @@ python3 scripts/worktree_cleanup.py ../pinpoint-worktrees/<branch>
 ## Anti-Patterns
 
 - **DON'T assume hooks enforce quality for subagents** — include `pnpm run check` in the prompt
-- **DON'T forget to check Copilot comments before merging**
 - **DON'T fix code yourself as the orchestrator** — message the subagent
 - **DON'T dispatch from a linked worktree** — bug #47548 (see Phase 2)
 

@@ -93,7 +93,7 @@ UI verification (this is an `agy-ui` bead):
 
 Before opening the PR (after Step 5, before Step 8): start Supabase (`supabase start`) and the dev server (`pnpm dev`) for this worktree. The assigned port is in `.env.local` and `.claude/launch.json`. Use `/browser` to open the app at that port and confirm: <paste acceptance criteria verbatim>.
 
-After addressing Copilot review (after Step 10, before Step 11): re-run `/browser` to confirm the review changes did not break the UI.
+If any fixes land after the first UI check (e.g. CI failures, before Step 10's label): re-run `/browser` to confirm the changes did not break the UI.
 
 Note: `/browser` grants Chrome access only. You must start the stack manually before using it.
 ```

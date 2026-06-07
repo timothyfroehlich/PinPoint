@@ -11,7 +11,7 @@
 
 {task_description}
 
-{any_copilot_feedback_if_applicable}
+{any_review_feedback_if_applicable}
 
 ### Specific Instructions
 
@@ -20,7 +20,6 @@
 ### Quality Gates
 
 Run `pnpm run check` before returning.
-If Copilot review doesn't arrive within 5 minutes, note the timeout.
 
 ### Environment Setup
 
@@ -34,16 +33,13 @@ If tests fail with `POSTGRES_URL is not set`:
 1. Commit with conventional commit message
 2. Push: `git push -u origin {branch_name}`
 3. Create PR: `gh pr create --title "..." --body "..."`
-4. Poll for Copilot review (up to 5 minutes)
-5. Address any Copilot comments, push fixes
-6. Verify CI: `gh pr checks <PR>`
+4. Verify CI: `gh pr checks <PR>`
 
 ### Return Format
 
 - **Branch**: {branch_name}
 - **PR**: #{number}
 - **CI**: passing/failing/pending
-- **Copilot**: no comments / N comments addressed / pending timeout
 - **Blockers**: none or description
 ```
 

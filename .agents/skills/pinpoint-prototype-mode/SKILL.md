@@ -65,7 +65,7 @@ Goal: <one line: what are we exploring?>
 - **Don't write test coverage yet.** Log "needs tests: <what>" in the ledger.
 - **Don't polish for DRY / architecture / Rule-of-Three.** Duplicate freely;
   note it for later.
-- **Don't spawn review subagents or worry about Copilot/CI.**
+- **Don't spawn review subagents or worry about CI.**
 
 Every time you skip one of these, add a concrete line to the ledger. "Later"
 must be a real checklist, not an implied promise.

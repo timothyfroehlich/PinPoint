@@ -1,39 +1,35 @@
 #!/usr/bin/env bash
 # merge-pr.sh — composite gate-then-merge enforcer.
-# Re-evaluates all 4 PR gates at merge time (TOCTOU safety vs label-time gates),
+# Re-evaluates the PR gates at merge time (TOCTOU safety vs label-time gates),
 # squash-merges with --match-head-commit if all pass, removes ready-for-review label on failure.
 #
-# Usage: merge-pr.sh <PR> [--dry-run] [--force] [--bypass-merge-requirements]
+# Usage: merge-pr.sh <PR> [--dry-run] [--bypass-merge-requirements]
 #   --dry-run                     Print would-do summary, take no action.
-#   --force                       Bypass currency + threads gates.
 #   --bypass-merge-requirements   Bypass ci gate AND pass --admin to gh pr merge
 #                                 (overrides GitHub branch-protection rules).
-#                                 Combine with --force to bypass currency + threads + ci together.
 #
 # no_conflict gate is NEVER bypassable — GitHub rejects conflicting merges regardless of --admin.
 # Authorship gate has no bypass; this script operates only on PRs you authored OR PRs authored
 # by trusted Dependabot bot identities (app/dependabot, dependabot[bot], dependabot).
-# Both --force and --bypass-merge-requirements require manual permission approval
+# --bypass-merge-requirements requires manual permission approval
 # (settings.json permissions.ask).
 
 set -euo pipefail
 
 PR=""
 DRY_RUN=false
-FORCE=false
 BYPASS_REQS=false
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run)                   DRY_RUN=true ;;
-    --force)                     FORCE=true ;;
     --bypass-merge-requirements) BYPASS_REQS=true ;;
     *) if [ -z "$PR" ]; then PR="$arg"; else echo "Error: unexpected argument $arg" >&2; exit 1; fi ;;
   esac
 done
 
 if [ -z "$PR" ] || ! [[ "$PR" =~ ^[0-9]+$ ]]; then
-  echo "Usage: $0 <PR> [--dry-run] [--force] [--bypass-merge-requirements]" >&2
+  echo "Usage: $0 <PR> [--dry-run] [--bypass-merge-requirements]" >&2
   exit 1
 fi
 
@@ -68,8 +64,8 @@ echo "Target: PR #$PR — $PR_TITLE"
 echo "URL: $PR_URL"
 echo "Head SHA: $PR_HEAD_SHA"
 
-# --- Run all 4 gates, collect statuses ---
-# Per-gate bypass kind: "none" (never bypassable), "force" (--force), "admin" (--bypass-merge-requirements).
+# --- Run all gates, collect statuses ---
+# Per-gate bypass kind: "none" (never bypassable), "admin" (--bypass-merge-requirements).
 GATE_FAILURES=()
 
 run_gate() {
@@ -87,12 +83,6 @@ run_gate() {
   if [ "$rc" -ne 0 ]; then
     local bypassed=false
     case "$bypass_kind" in
-      force)
-        if [ "$FORCE" = "true" ]; then
-          echo "  (--force: $name gate non-pass, bypassed)"
-          bypassed=true
-        fi
-        ;;
       admin)
         if [ "$BYPASS_REQS" = "true" ]; then
           echo "  (--bypass-merge-requirements: $name gate non-pass, bypassed)"
@@ -108,8 +98,6 @@ run_gate() {
 }
 
 run_gate ci          check_ci                  admin
-run_gate currency    check_copilot_currency    force
-run_gate threads     check_unresolved_threads  force
 run_gate no_conflict check_no_merge_conflict   none
 
 # --- Decide ---
