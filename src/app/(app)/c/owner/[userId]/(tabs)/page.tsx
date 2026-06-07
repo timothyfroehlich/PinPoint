@@ -40,6 +40,15 @@ export default async function CollectionOverviewPage({
     openCount: m.issues.length,
     worstSeverity: worstOpenSeverity(m.issues),
     lastActivity: latest.get(m.id) ?? null,
+    // `issues` is open-only (filtered in the resolver), so the minimum
+    // createdAt is the longest-outstanding open issue.
+    oldestOpenAt:
+      m.issues.length > 0
+        ? m.issues.reduce(
+            (oldest, i) => (i.createdAt < oldest ? i.createdAt : oldest),
+            m.issues[0]?.createdAt ?? new Date()
+          )
+        : null,
     presence: m.presenceStatus,
   }));
 

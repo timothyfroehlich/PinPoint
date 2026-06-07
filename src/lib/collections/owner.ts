@@ -12,7 +12,7 @@ export interface CollectionMachine {
   initials: string;
   name: string;
   presenceStatus: MachinePresenceStatus;
-  issues: { status: IssueStatus; severity: IssueSeverity }[];
+  issues: { status: IssueStatus; severity: IssueSeverity; createdAt: Date }[];
 }
 
 export interface OwnerCollection {
@@ -50,7 +50,7 @@ export async function getOwnerCollection(
     with: {
       issues: {
         where: notInArray(issues.status, [...CLOSED_STATUSES]),
-        columns: { status: true, severity: true },
+        columns: { status: true, severity: true, createdAt: true },
       },
     },
     orderBy: [asc(machines.name)],

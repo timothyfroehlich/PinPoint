@@ -46,6 +46,7 @@ function row(over: Partial<CollectionOverviewRow>): CollectionOverviewRow {
     openCount: 0,
     worstSeverity: null,
     lastActivity: null,
+    oldestOpenAt: null,
     presence: "on_the_floor",
     ...over,
   };
@@ -59,6 +60,7 @@ const ROWS: CollectionOverviewRow[] = [
     status: "unplayable",
     openCount: 2,
     worstSeverity: "unplayable",
+    oldestOpenAt: new Date("2026-05-01T00:00:00Z"),
   }),
   row({
     initials: "MEH",
@@ -66,6 +68,7 @@ const ROWS: CollectionOverviewRow[] = [
     status: "needs_service",
     openCount: 1,
     worstSeverity: "major",
+    oldestOpenAt: new Date("2026-01-01T00:00:00Z"), // oldest backlog
   }),
 ];
 
@@ -100,6 +103,21 @@ describe("CollectionOverviewTable", () => {
       .getAllByRole("row")
       .map((r) => r.getAttribute("data-initials"));
     expect(bodyRows).toEqual(["MEH", "BAD", "OK"]); // Aching, Broken, Fine
+  });
+
+  it("sorts oldest open issue first on first click; no-backlog machines last", async () => {
+    const user = userEvent.setup();
+    render(<CollectionOverviewTable rows={ROWS} />);
+    const header = screen.getByRole("columnheader", {
+      name: /oldest open issue/i,
+    });
+    await user.click(within(header).getByRole("button"));
+    expect(header).toHaveAttribute("aria-sort", "ascending");
+    const bodyRows = within(screen.getByTestId("collection-overview-body"))
+      .getAllByRole("row")
+      .map((r) => r.getAttribute("data-initials"));
+    // MEH's backlog (Jan) predates BAD's (May); OK has none -> last.
+    expect(bodyRows).toEqual(["MEH", "BAD", "OK"]);
   });
 
   it("hides a column via the picker and persists to localStorage", async () => {

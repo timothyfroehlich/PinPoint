@@ -55,7 +55,9 @@ describe("getOwnerCollection", () => {
     expect(collection?.owner).toEqual({ id: owner.id, name: "Alice Owner" });
     expect(collection?.machines.map((m) => m.initials)).toEqual(["AA", "ZZ"]);
     const zetaRow = collection?.machines.find((m) => m.initials === "ZZ");
-    expect(zetaRow?.issues).toEqual([{ status: "new", severity: "major" }]);
+    expect(zetaRow?.issues).toEqual([
+      { status: "new", severity: "major", createdAt: expect.any(Date) },
+    ]);
     const alphaRow = collection?.machines.find((m) => m.initials === "AA");
     expect(alphaRow?.issues).toEqual([]);
   });

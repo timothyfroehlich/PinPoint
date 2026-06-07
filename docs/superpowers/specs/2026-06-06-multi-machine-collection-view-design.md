@@ -50,7 +50,7 @@ Future: `/c/tag/[slug]` etc. URLs may diverge per source type; they share the co
 
 Dense status table, one row per machine, **worst-first default sort**.
 
-Columns: status (dot/badge) · machine (name + initials, links to `/m/[initials]`) · open issues · worst severity · last activity (relative time + latest timeline event type, e.g. "2h ago — issue reported") · presence.
+Columns: status (dot/badge) · machine (name + initials, links to `/m/[initials]`) · open issues · worst severity · oldest open issue (age of the longest-outstanding open issue; ascending first-click so neglected machines surface) · last activity (relative time + latest timeline event type, e.g. "2h ago — issue reported") · presence.
 
 - **Sortable headers** on every column; `<th scope="col">` + `aria-sort` + accessible names (CORE-A11Y).
 - **Column picker** ("Columns" dropdown), persisted in **localStorage** (per-device is acceptable for a display preference; promoting to user prefs later is additive). Status + Machine are un-hideable.

@@ -35,6 +35,8 @@ export interface CollectionOverviewRow {
   openCount: number;
   worstSeverity: IssueSeverity | null;
   lastActivity: { createdAt: Date; tag: TimelineTag } | null;
+  /** Created date of the longest-outstanding OPEN issue, null when none. */
+  oldestOpenAt: Date | null;
   presence: MachinePresenceStatus;
 }
 
@@ -43,20 +45,23 @@ type ColumnKey =
   | "machine"
   | "open"
   | "severity"
+  | "oldest"
   | "activity"
   | "presence";
 
 const HIDEABLE: readonly ColumnKey[] = [
   "open",
   "severity",
+  "oldest",
   "activity",
   "presence",
 ];
 const COLUMN_LABELS: Record<ColumnKey, string> = {
   status: "Status",
   machine: "Machine",
-  open: "Open",
+  open: "Open Issues",
   severity: "Worst severity",
+  oldest: "Oldest open issue",
   activity: "Last activity",
   presence: "Presence",
 };
@@ -77,6 +82,7 @@ const DEFAULT_DIR: Record<ColumnKey, "asc" | "desc"> = {
   machine: "asc",
   open: "desc",
   severity: "desc",
+  oldest: "asc", // oldest (most neglected) first
   activity: "desc",
   presence: "asc",
 };
@@ -106,6 +112,13 @@ function compareRows(
       const ta = a.lastActivity?.createdAt.getTime() ?? 0;
       const tb = b.lastActivity?.createdAt.getTime() ?? 0;
       return ta - tb;
+    }
+    case "oldest": {
+      // No open issues sorts as "newest" so ascending (oldest-first, the
+      // meaningful direction) puts machines with real backlogs on top.
+      const ta = a.oldestOpenAt?.getTime() ?? Number.POSITIVE_INFINITY;
+      const tb = b.oldestOpenAt?.getTime() ?? Number.POSITIVE_INFINITY;
+      return ta === tb ? 0 : ta < tb ? -1 : 1;
     }
     case "presence":
       return a.presence.localeCompare(b.presence);
@@ -203,8 +216,9 @@ export function CollectionOverviewTable({
     () => [
       { key: "presence", minWidth: 110, priority: 1 },
       { key: "severity", minWidth: 130, priority: 2 },
-      { key: "activity", minWidth: 180, priority: 3 },
-      { key: "open", minWidth: 70, priority: 4 },
+      { key: "oldest", minWidth: 130, priority: 3 },
+      { key: "activity", minWidth: 180, priority: 4 },
+      { key: "open", minWidth: 100, priority: 5 },
     ],
     []
   );
@@ -285,6 +299,13 @@ export function CollectionOverviewTable({
                   onSort={handleSort}
                 />
               )}
+              {isShown("oldest") && (
+                <SortableHeader
+                  column="oldest"
+                  sort={sort}
+                  onSort={handleSort}
+                />
+              )}
               {isShown("activity") && (
                 <SortableHeader
                   column="activity"
@@ -330,6 +351,15 @@ export function CollectionOverviewTable({
                 {isShown("severity") && (
                   <td className="px-3 py-2.5 text-muted-foreground">
                     {row.worstSeverity ?? "—"}
+                  </td>
+                )}
+                {isShown("oldest") && (
+                  <td className="px-3 py-2.5 text-muted-foreground">
+                    {row.oldestOpenAt ? (
+                      <RelativeTime value={row.oldestOpenAt} />
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 )}
                 {isShown("activity") && (

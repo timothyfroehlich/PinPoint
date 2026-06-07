@@ -15,14 +15,16 @@ function machine(
   };
 }
 
+const AT = new Date("2026-05-01T00:00:00Z");
+
 describe("summarizeCollection", () => {
   it("counts machines by derived status and sums open issues", () => {
     const summary = summarizeCollection([
       machine([]), // operational
-      machine([{ status: "new", severity: "major" }]), // needs_service
+      machine([{ status: "new", severity: "major", createdAt: AT }]), // needs_service
       machine([
-        { status: "new", severity: "unplayable" },
-        { status: "confirmed", severity: "minor" },
+        { status: "new", severity: "unplayable", createdAt: AT },
+        { status: "confirmed", severity: "minor", createdAt: AT },
       ]), // unplayable, 2 open
     ]);
     expect(summary).toEqual({
