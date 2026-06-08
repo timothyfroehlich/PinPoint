@@ -148,7 +148,7 @@ importers:
         version: 16.2.6(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       nodemailer:
         specifier: ^8.0.5
-        version: 8.0.7
+        version: 8.0.8
       pino:
         specifier: ^10.3.1
         version: 10.3.1
@@ -5298,8 +5298,8 @@ packages:
     resolution: {integrity: sha512-Uzmd6LXpouKo8EUK68IjH4+E01w/hXyV3R3g/geCJo+rXLNfh1xucB+LOzYEOQPSiUK3h/xZf0cQGcSsmyL2Og==}
     engines: {node: '>=18'}
 
-  nodemailer@8.0.7:
-    resolution: {integrity: sha512-pkjE4mkBzQjdJT4/UmlKl3pX0rC9fZmjh7c6C9o7lv66Ac6w9WCnzPzhbPNxwZAzlF4mdq4CSWB5+FbK6FWCow==}
+  nodemailer@8.0.8:
+    resolution: {integrity: sha512-p+XsnzXGdtIHXUu2ugxdfG+eX2nehsGhMjW9h0CWj1BhE30hrFz0kh0yIM0/VjUgVsRrDj+80ZO+I1nSkGE4tA==}
     engines: {node: '>=6.0.0'}
 
   normalize-package-data@2.5.0:
@@ -11892,7 +11892,7 @@ snapshots:
 
   node-releases@2.0.47: {}
 
-  nodemailer@8.0.7: {}
+  nodemailer@8.0.8: {}
 
   normalize-package-data@2.5.0:
     dependencies:
