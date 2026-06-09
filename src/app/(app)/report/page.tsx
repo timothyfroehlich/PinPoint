@@ -13,6 +13,13 @@ import { getRecentIssuesAction, type RecentIssueData } from "./actions";
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
 export const dynamic = "force-dynamic";
 
+// Bound the route (which hosts the report Server Action) so a slow submission
+// fails fast as a deterministic 504 rather than an opaque platform SIGKILL —
+// giving submitPublicIssueAction's catch + Sentry.flush a chance to run. This
+// is the interim guard for the silent-failure class (incident: Doodle Bug).
+// (PP-2053.1)
+export const maxDuration = 60;
+
 export default async function PublicReportPage({
   searchParams,
 }: {
