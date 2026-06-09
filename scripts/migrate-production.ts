@@ -20,14 +20,15 @@ interface MigrationJournal {
 }
 
 // Skip migrations on Vercel preview deployments.
-// The Supabase integration triggers a redeployment with preview branch DB
-// credentials, but that DB user lacks CREATE SCHEMA privileges, causing
-// `CREATE SCHEMA IF NOT EXISTS "drizzle"` to fail. This is harmless because
-// the GHA "Supabase Branch Setup" workflow already runs drizzle-kit migrate
-// on the branch DB before the preview deployment needs it.
+// On-demand preview branches are created, migrated, and seeded by the
+// "Preview Controller" GHA workflow (.github/workflows/preview-control.yaml)
+// in response to a `/preview` PR comment. The branch DB user lacks CREATE
+// SCHEMA privileges, so attempting `CREATE SCHEMA IF NOT EXISTS "drizzle"`
+// here would fail — but it's unnecessary, because the controller already ran
+// drizzle-kit migrate on the branch DB before triggering the preview build.
 if (process.env["VERCEL_ENV"] === "preview") {
   console.log(
-    "⏭️  Skipping migrations on Vercel preview (handled by GHA Supabase Branch Setup)"
+    "⏭️  Skipping migrations on Vercel preview (handled by GHA Preview Controller)"
   );
   process.exit(0);
 }

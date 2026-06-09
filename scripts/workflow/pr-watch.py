@@ -105,8 +105,8 @@ def _finalize_via_ci_gate(pr: int, timeout_sec: int = 1200, poll_sec: int = 10) 
     """Anchor exit status on the CI Gate aggregate check, not the visible workflow runs.
 
     The "any completed run with no failures" heuristic produces false greens when
-    preview-side workflows (Supabase Branch Setup) finish before the main CI
-    workflow has been queued. Wait for CI Gate to actually report a conclusion;
+    side workflows (e.g. the on-demand Preview Controller) finish before the main
+    CI workflow has been queued. Wait for CI Gate to actually report a conclusion;
     only then return 0 (success/neutral) or 1 (anything else, or timeout).
     """
     deadline = time.monotonic() + timeout_sec
@@ -428,8 +428,9 @@ def main() -> int:
                 emit(f"{len(failures)} failure(s) detected — check artifact for logs")
                 return 1
             # No active runs and no failures among completed runs — but those
-            # completed runs may just be preview-side workflows that finished
-            # before the main CI was queued. Anchor on CI Gate before exiting.
+            # completed runs may just be side workflows (e.g. the Preview
+            # Controller) that finished before the main CI was queued. Anchor on
+            # CI Gate before exiting.
             return _finalize_via_ci_gate(pr)
         emit(f"No runs found for current commit on PR #{pr}.")
         return 1
