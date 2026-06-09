@@ -114,6 +114,32 @@ fi
 echo "Branch credentials loaded (project: ${SUPABASE_URL##*/})"
 echo "::endgroup::"
 
+# --- Wait for the database to actually accept connections -------------------
+# `branches get` returns a connection string as soon as the branch *record*
+# exists, but a freshly-provisioned (micro) instance may still be booting and
+# refuse connections through the pooler. drizzle-kit migrate (below) is the
+# first thing to open a connection, so probe the exact pooled URL it will use
+# until a real round-trip succeeds. Without this, migrate races the cold start
+# and exits 1 with no Postgres error. (Casework: pr-1524 migrate flake,
+# 2026-06-09.) This is a data-plane readiness gate — the "branch ready" loop
+# above only confirms the control plane minted credentials, not that Postgres
+# answers.
+
+echo "::group::Wait for database to accept connections"
+DB_ATTEMPTS=0
+DB_MAX_ATTEMPTS=12   # ~2 minutes at 10s intervals
+until psql "$POSTGRES_URL" -tAc 'select 1' >/dev/null 2>&1; do
+  DB_ATTEMPTS=$((DB_ATTEMPTS + 1))
+  if [[ "$DB_ATTEMPTS" -ge "$DB_MAX_ATTEMPTS" ]]; then
+    echo "::error::Database for '${BRANCH_NAME}' did not accept connections in time"
+    exit 1
+  fi
+  echo "  database not accepting connections yet (attempt ${DB_ATTEMPTS}/${DB_MAX_ATTEMPTS})..."
+  sleep 10
+done
+echo "Database is accepting connections"
+echo "::endgroup::"
+
 # --- Migrate + seed (lifted near-verbatim from supabase-branch-setup.yaml) ---
 
 echo "::group::Run Drizzle migrations"
