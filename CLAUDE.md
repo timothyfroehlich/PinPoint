@@ -29,6 +29,10 @@
 - For simple PRs (< 5 files changed), do not spawn more than 2 sub-agents.
 - Do not over-engineer or spawn excessive parallel agents for straightforward tasks.
 
+### Status Vocabulary
+
+- **"Shipped" means the change is live in production — deployed, nothing less.** Never call work "shipped" at an earlier stage. Use precise words for the rungs below it: _implemented_ (code written, local checks green), _PR opened / in review_ (pushed, PR exists, CI pending), _merged_ (on `main`). Match the word to the actual rung — don't let an earlier stage borrow a later word.
+
 ### Worktree Dispatch Safety
 
 Two upstream Claude Code bugs affect `Agent(isolation: "worktree")` dispatch. One (`#47548`) requires active enforcement — the hook cannot fix it. The other (`#47266`) is mitigated by the `WorktreeCreate` hook (PP-bg45) at the OS lock level. "Main worktree" below means the original repository clone — the worktree where `.git/` is a directory, not a file pointing into `.git/worktrees/`. It is **not** about being on the `main` branch.

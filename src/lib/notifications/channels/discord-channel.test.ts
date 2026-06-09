@@ -70,7 +70,6 @@ function ctx(overrides: Partial<ChannelContext> = {}): ChannelContext {
     commentContent: undefined,
     newStatus: undefined,
     issueDescription: undefined,
-    tx: undefined as unknown as ChannelContext["tx"],
     ...overrides,
   };
 }

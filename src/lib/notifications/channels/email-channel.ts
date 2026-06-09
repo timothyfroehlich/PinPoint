@@ -8,7 +8,7 @@ import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getSiteUrl } from "~/lib/url";
 import { getThreadingHeaders } from "~/lib/notifications/email-threading";
 import type {
-  NotificationChannel,
+  DeliveryChannel,
   NotificationPreferencesRow,
   ChannelContext,
   DeliveryResult,
@@ -297,7 +297,7 @@ export function getEmailHtml({
     `;
 }
 
-export const emailChannel: NotificationChannel = {
+export const emailChannel: DeliveryChannel = {
   key: "email",
   shouldDeliver(
     prefs: NotificationPreferencesRow,

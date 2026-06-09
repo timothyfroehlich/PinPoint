@@ -15,6 +15,7 @@ import { reportError } from "~/lib/observability/report-error";
 import { getChannels } from "./channels/registry";
 import type {
   ChannelContext,
+  DeliveryChannel,
   DeliveryResult,
   NotificationChannel,
 } from "./channels/types";
@@ -33,6 +34,28 @@ export type NotificationType =
   | "mentioned";
 
 type ResourceType = "issue" | "machine";
+
+/**
+ * Narrow a channel to one that performs external delivery. Narrowing the whole
+ * object (rather than extracting `channel.deliver` into a local) keeps the
+ * method bound to its channel, so the deferred thunk calls it with the right
+ * `this` and avoids the unbound-method footgun. (PP-2053.2)
+ */
+function isDeliveryChannel(
+  channel: NotificationChannel
+): channel is DeliveryChannel {
+  return typeof channel.deliver === "function";
+}
+
+/**
+ * Output of `planNotification`: the tx-free external deliveries (email, Discord)
+ * to run AFTER the DB transaction commits. In-app rows are already written
+ * transactionally during planning, so they are not represented here. Pass this
+ * to `dispatchNotification` post-commit. (PP-2053.2)
+ */
+export interface DeliveryPlan {
+  deliveries: (() => Promise<DeliveryResult>)[];
+}
 
 export interface CreateNotificationProps {
   type: NotificationType;
@@ -61,7 +84,7 @@ export interface CreateNotificationProps {
   additionalRecipientIds?: string[] | undefined;
 }
 
-export async function createNotification(
+export async function planNotification(
   {
     type,
     resourceId,
@@ -78,10 +101,10 @@ export async function createNotification(
   }: CreateNotificationProps,
   tx: DbTransaction = db,
   preResolvedChannels?: readonly NotificationChannel[]
-): Promise<void> {
+): Promise<DeliveryPlan> {
   log.debug(
-    { type, resourceId, actorId, action: "createNotification" },
-    "Creating notification"
+    { type, resourceId, actorId, action: "planNotification" },
+    "Planning notification"
   );
 
   // 1. Determine recipients
@@ -112,6 +135,13 @@ export async function createNotification(
       machineOwnerId = issue?.machine.ownerId ?? null;
       resolvedIssueTitle = resolvedIssueTitle ?? issue?.title;
       resolvedMachineName = resolvedMachineName ?? issue?.machine.name;
+      // Derive the formatted id from the SAME row we just fetched — the query
+      // above selects all issue columns, so a second findFirst for
+      // issueNumber/machineInitials is redundant round-trip inside the
+      // transaction window. (PP-2053.2 review)
+      if (!resolvedFormattedIssueId && issue) {
+        resolvedFormattedIssueId = `${issue.machineInitials}-${String(issue.issueNumber).padStart(2, "0")}`;
+      }
     } else {
       const machine = await tx.query.machines.findFirst({
         where: eq(machines.id, resourceId),
@@ -120,16 +150,6 @@ export async function createNotification(
       machineId = machine?.id ?? null;
       machineOwnerId = machine?.ownerId ?? null;
       resolvedMachineName = resolvedMachineName ?? machine?.name;
-    }
-
-    if (!resolvedFormattedIssueId && resourceType === "issue") {
-      const issue = await tx.query.issues.findFirst({
-        where: eq(issues.id, resourceId),
-        columns: { issueNumber: true, machineInitials: true },
-      });
-      if (issue) {
-        resolvedFormattedIssueId = `${issue.machineInitials}-${String(issue.issueNumber).padStart(2, "0")}`;
-      }
     }
 
     const globalSubscribers = await tx.query.notificationPreferences.findMany({
@@ -191,7 +211,7 @@ export async function createNotification(
     recipientIds.delete(actorId);
   }
 
-  if (recipientIds.size === 0) return;
+  if (recipientIds.size === 0) return { deliveries: [] };
 
   // 2. Fetch preferences
   const preferences = await tx.query.notificationPreferences.findMany({
@@ -257,7 +277,6 @@ export async function createNotification(
       commentContent,
       newStatus,
       issueDescription,
-      tx,
     };
 
     for (const channel of channels) {
@@ -271,41 +290,85 @@ export async function createNotification(
           resourceId,
           resourceType,
         });
-      } else {
-        // Email (and future Discord): deferred until after the in-app insert
-        // succeeds. Pushing a thunk (not the promise itself) prevents deliver()
-        // from starting mid-loop, which would send side-effects before the DB
-        // write completes and on insert failure leave emails sent without rows.
+      } else if (isDeliveryChannel(channel)) {
+        // External channel (email/Discord): captured as a thunk and run only
+        // in dispatchNotification, AFTER the transaction commits — never
+        // holding the connection open across an HTTP call. (PP-2053.2)
         deferredDeliveries.push(() => channel.deliver(ctx));
+      } else {
+        // A channel that wants delivery (shouldDeliver true) but is neither the
+        // transactional in_app channel nor an external DeliveryChannel can't be
+        // routed. Today this is unreachable (registry = in_app/email/discord),
+        // but fail loud rather than silently drop a recipient if that changes.
+        log.warn(
+          { channelKey: channel.key, action: "planNotification" },
+          "Channel wants delivery but has no delivery path; skipping"
+        );
       }
     }
   }
 
   if (notificationsToInsert.length > 0) {
     log.debug(
-      { count: notificationsToInsert.length, action: "createNotification" },
+      { count: notificationsToInsert.length, action: "planNotification" },
       "Inserting notifications"
     );
     await tx.insert(notifications).values(notificationsToInsert);
   }
 
-  if (deferredDeliveries.length > 0) {
-    const results = await Promise.allSettled(
-      deferredDeliveries.map((fn) => fn())
-    );
-    for (const r of results) {
-      if (r.status === "rejected") {
-        // Channel.deliver() is expected to catch its own errors and return
-        // {ok:false}. A rejection here means a bug — log at error level and report to Sentry.
-        // bestEffort: true because notification fan-out is a post-commit side-effect;
-        // failures here do not affect the primary user-facing action.
-        reportError(r.reason, {
-          bestEffort: true,
-          action: "notifications.dispatch.fanout",
-        });
-      }
+  // In-app rows are now written inside the caller's transaction. The external
+  // deliveries are returned UNRUN so the caller dispatches them AFTER commit
+  // (see dispatchNotification) — the fix for the silent Doodle Bug, where the
+  // email ran inside the transaction and was sent even though it rolled back.
+  // (PP-2053.2)
+  return { deliveries: deferredDeliveries };
+}
+
+/**
+ * Run the external deliveries (email/Discord) produced by `planNotification`.
+ * Call this AFTER the DB transaction has committed — never inside it. Failures
+ * are best-effort: the issue is already durably saved, so a send that fails
+ * must not surface as a primary-action error. (PP-2053.2)
+ */
+export async function dispatchNotification(plan: DeliveryPlan): Promise<void> {
+  if (plan.deliveries.length === 0) return;
+  const results = await Promise.allSettled(plan.deliveries.map((fn) => fn()));
+  for (const r of results) {
+    if (r.status === "rejected") {
+      // Channel.deliver() is expected to catch its own errors and return
+      // {ok:false}. A rejection here means a bug — report it.
+      reportError(r.reason, {
+        bestEffort: true,
+        action: "notifications.dispatch.fanout",
+      });
+    } else if (!r.value.ok && r.value.reason !== "skipped") {
+      // A fulfilled-but-failed send (bounced email, blocked Discord DM). These
+      // are caught inside the channel and returned as {ok:false}, so they never
+      // reject — without this branch they'd vanish silently, exactly the
+      // observability gap this epic exists to close. "skipped" (no Discord id /
+      // not configured) is expected and intentionally not logged. (PP-2053.2)
+      log.warn(
+        { reason: r.value.reason, action: "notifications.dispatch.fanout" },
+        "Notification delivery failed"
+      );
     }
   }
+}
+
+/**
+ * Backward-compatible one-shot: plan inside `tx`, then immediately dispatch.
+ * Retained for callers not yet split into plan / post-commit-dispatch and for
+ * tests. NOTE: when `tx` is a live transaction this still sends before commit —
+ * transactional callers should instead call `planNotification` inside the
+ * transaction and `dispatchNotification` after it resolves. (PP-2053.2)
+ */
+export async function createNotification(
+  props: CreateNotificationProps,
+  tx: DbTransaction = db,
+  preResolvedChannels?: readonly NotificationChannel[]
+): Promise<void> {
+  const plan = await planNotification(props, tx, preResolvedChannels);
+  await dispatchNotification(plan);
 }
 
 /**
