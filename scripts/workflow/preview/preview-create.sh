@@ -196,24 +196,33 @@ inject_vercel_env() {
 trigger_vercel_build() {
   echo "::group::Trigger fresh Vercel preview build"
   export VERCEL_ORG_ID VERCEL_PROJECT_ID
-  # --force => no build cache, guaranteeing NEXT_PUBLIC_* values are re-inlined
-  # from the env vars we just set. stdout is the deployment URL.
-  #
-  # KNOWN RISK (pending live verification): a CLI `vercel deploy` from a
-  # detached-HEAD checkout creates a standalone deployment that may NOT receive
-  # the `pinpoint-git-<slug>.vercel.app` git alias — that alias is assigned by
-  # Vercel's Git integration on push-triggered builds, not CLI deploys. If the
-  # live test confirms this, the computed PREVIEW_URL below won't point at the
-  # deployment we built with the branch creds. Likely fallback: don't `vercel
-  # deploy` at all — set the env vars, then redeploy the EXISTING git-integration
-  # deployment for the branch with build cache disabled via the Vercel REST API
-  # (POST /v13/deployments with the branch's `gitSource` and no cache reuse), so
-  # the git alias is preserved while the build re-inlines the new env vars.
+  # A bare CLI `vercel deploy` is NOT linked to the git branch, so Vercel gives
+  # it neither the branch-scoped env vars nor the stable
+  # `<project>-git-<branch>-<scope>.vercel.app` alias (Vercel KB: "branch
+  # specific variables and domains not linked to CLI deployments"). Passing git
+  # metadata via `-m` links the deployment to the branch, so it inherits the
+  # branch-scoped preview env we just set AND is reachable at the stable branch
+  # alias computed below. `--force` skips the build cache so NEXT_PUBLIC_* values
+  # re-inline from the freshly-set env vars (a cached build keeps stale ones).
+  local head_sha owner repo
+  head_sha="$(git rev-parse HEAD 2>/dev/null || true)"
+  owner="${GITHUB_REPOSITORY%%/*}"
+  repo="${GITHUB_REPOSITORY##*/}"
+
+  local -a meta=(
+    -m githubDeployment=1
+    -m "githubCommitRef=${GIT_BRANCH}"
+    -m "githubOrg=${owner}"
+    -m "githubRepo=${repo}"
+  )
+  [[ -n "$head_sha" ]] && meta+=(-m "githubCommitSha=${head_sha}")
+
   local deployment_url
   if deployment_url="$($VERCEL deploy \
       --target=preview \
       --force \
-      --token="$VERCEL_TOKEN" 2>/dev/null)"; then
+      --token="$VERCEL_TOKEN" \
+      "${meta[@]}" 2>/dev/null)"; then
     echo "Deployment URL: ${deployment_url}"
     DEPLOYMENT_URL="$deployment_url"
   else
@@ -227,10 +236,16 @@ inject_vercel_env
 DEPLOYMENT_URL=""
 trigger_vercel_build
 
-# Stable git-branch preview alias. Vercel slugifies the branch (slashes and
-# other non-alphanumerics become hyphens). This is the friendly URL to share.
+# Stable git-branch preview alias assigned by Vercel to the branch-linked
+# deployment above: `<project>-git-<branch-slug>-<scope-slug>.vercel.app`.
+# Vercel lowercases the branch and replaces non-alphanumerics with hyphens.
+# Project/scope are overridable but default to this project's bespoke values.
+# (Caveat: very long branch names overflow the 63-char DNS label and Vercel
+# falls back to a hashed alias — keep preview branch names short.)
+PROJECT_NAME="${VERCEL_PROJECT_NAME:-pin-point}"
+TEAM_SLUG="${VERCEL_TEAM_SLUG:-advacar}"
 BRANCH_SLUG="$(echo "$GIT_BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')"
-PREVIEW_URL="https://pinpoint-git-${BRANCH_SLUG}.vercel.app"
+PREVIEW_URL="https://${PROJECT_NAME}-git-${BRANCH_SLUG}-${TEAM_SLUG}.vercel.app"
 
 echo "Preview URL (git-branch alias): ${PREVIEW_URL}"
 
