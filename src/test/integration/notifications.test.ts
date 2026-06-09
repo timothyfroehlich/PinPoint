@@ -4,8 +4,13 @@ import {
   createNotification,
   planNotification,
   dispatchNotification,
+  type DeliveryPlan,
 } from "~/lib/notifications";
 import { sendEmail } from "~/lib/email/client";
+import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
+import type * as ReportErrorModule from "~/lib/observability/report-error";
+import type { DeliveryResult } from "~/lib/notifications/channels/types";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   userProfiles,
@@ -35,6 +40,13 @@ vi.mock("~/lib/logger", () => ({
     debug: vi.fn(),
   },
 }));
+
+// Spy on reportError without dropping the module's other exports
+// (serverActionError, ReportContext).
+vi.mock("~/lib/observability/report-error", async (importOriginal) => {
+  const actual = await importOriginal<typeof ReportErrorModule>();
+  return { ...actual, reportError: vi.fn() };
+});
 
 describe("createNotification (Integration)", () => {
   setupTestDb();
@@ -571,10 +583,13 @@ describe("createNotification (Integration)", () => {
     expect(notificationsList).toHaveLength(1);
     expect(notificationsList[0].type).toBe("new_issue");
 
-    // Verify email sent
+    // Verify email sent, with the formatted issue id (WATCH-01) derived inside
+    // planNotification from the issue row — pins the single-query derivation
+    // (PP-2053.2 review: the redundant second issues query was removed).
     expect(sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "watcher@test.com",
+        subject: expect.stringContaining("WATCH-01"),
       })
     );
   });
@@ -947,6 +962,51 @@ describe("createNotification (Integration)", () => {
     it("dispatchNotification on an empty plan is a no-op", async () => {
       await dispatchNotification({ deliveries: [] });
       expect(sendEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  // PP-2053.2 review: the dispatcher must never let a failed external send
+  // surface as a primary-action error (the issue is already saved), and a
+  // fulfilled-but-failed send must still be observable — it was silently
+  // dropped before, the exact gap this epic exists to close. These exercise
+  // dispatchNotification directly with hand-built delivery thunks (no DB).
+  describe("dispatchNotification failure handling", () => {
+    it("swallows a rejecting delivery, reports it, and still runs siblings", async () => {
+      const sibling = vi.fn(
+        (): Promise<DeliveryResult> => Promise.resolve({ ok: true })
+      );
+      const plan: DeliveryPlan = {
+        deliveries: [() => Promise.reject(new Error("boom")), sibling],
+      };
+
+      // Must not throw — a failed send cannot fail the already-committed action.
+      await expect(dispatchNotification(plan)).resolves.toBeUndefined();
+      // A rejection is treated as a bug and reported...
+      expect(reportError).toHaveBeenCalledTimes(1);
+      // ...and the sibling delivery still ran despite the earlier rejection.
+      expect(sibling).toHaveBeenCalledTimes(1);
+    });
+
+    it("logs fulfilled permanent/transient failures but stays quiet on skipped/ok", async () => {
+      const plan: DeliveryPlan = {
+        deliveries: [
+          (): Promise<DeliveryResult> =>
+            Promise.resolve({ ok: false, reason: "permanent" }),
+          (): Promise<DeliveryResult> =>
+            Promise.resolve({ ok: false, reason: "transient" }),
+          (): Promise<DeliveryResult> =>
+            Promise.resolve({ ok: false, reason: "skipped" }),
+          (): Promise<DeliveryResult> => Promise.resolve({ ok: true }),
+        ],
+      };
+
+      await dispatchNotification(plan);
+
+      // permanent + transient are real failures worth surfacing; skipped
+      // (no Discord id / not configured) and ok are expected, so stay silent.
+      expect(log.warn).toHaveBeenCalledTimes(2);
+      // A returned {ok:false} is an expected outcome, not a thrown bug.
+      expect(reportError).not.toHaveBeenCalled();
     });
   });
 });
