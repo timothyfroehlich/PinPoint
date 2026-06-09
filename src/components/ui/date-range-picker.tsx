@@ -90,7 +90,7 @@ export function DateRangePicker({
             align="start"
           >
             <Calendar
-              initialFocus
+              autoFocus
               mode="range"
               {...(date?.from ? { defaultMonth: date.from } : {})}
               selected={date}
