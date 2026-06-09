@@ -1,12 +1,12 @@
-import { notifications } from "~/server/db/schema";
-import type {
-  NotificationChannel,
-  NotificationPreferencesRow,
-  ChannelContext,
-  DeliveryResult,
-} from "./types";
+import type { NotificationChannel, NotificationPreferencesRow } from "./types";
 import type { NotificationType } from "~/lib/notifications/dispatch";
 
+/**
+ * In-app is a *transactional* channel: its `notifications` row is written
+ * inside the DB transaction by `planNotification` (batched across all
+ * recipients), NOT through a post-commit `deliver()`. So it implements only
+ * `shouldDeliver`. (PP-2053.2)
+ */
 export const inAppChannel: NotificationChannel = {
   key: "in_app",
   shouldDeliver(
@@ -28,14 +28,5 @@ export const inAppChannel: NotificationChannel = {
       case "mentioned":
         return prefs.inAppNotifyOnMentioned;
     }
-  },
-  async deliver(ctx: ChannelContext): Promise<DeliveryResult> {
-    await ctx.tx.insert(notifications).values({
-      userId: ctx.userId,
-      type: ctx.type,
-      resourceId: ctx.resourceId,
-      resourceType: ctx.resourceType,
-    });
-    return { ok: true };
   },
 };

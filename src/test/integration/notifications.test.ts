@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { createNotification } from "~/lib/notifications";
+import {
+  createNotification,
+  planNotification,
+  dispatchNotification,
+} from "~/lib/notifications";
 import { sendEmail } from "~/lib/email/client";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
@@ -819,6 +823,130 @@ describe("createNotification (Integration)", () => {
       expect(sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({ to: "mention-pref@test.com" })
       );
+    });
+  });
+
+  // PP-2053.2: the Doodle Bug regression guard. The original failure was that
+  // the confirmation email fired from *inside* the issue-creation transaction,
+  // so a recipient could be emailed about an issue whose INSERT later rolled
+  // back (or whose function was SIGKILLed mid-commit). The fix splits the work:
+  // planNotification does only transactional DB writes (in-app rows) and
+  // returns the external sends UNRUN; dispatchNotification runs them later,
+  // after the caller's transaction has committed. These tests pin that the
+  // external side effect cannot escape planning.
+  describe("two-phase separation (planNotification / dispatchNotification)", () => {
+    it("planNotification writes the in-app row but does NOT send email until dispatch", async () => {
+      const db = await getTestDb();
+
+      const [actor] = await db
+        .insert(userProfiles)
+        .values(createTestUser())
+        .returning();
+      const [recipient] = await db
+        .insert(userProfiles)
+        .values(createTestUser({ email: "two-phase@test.com" }))
+        .returning();
+      const [machine] = await db
+        .insert(machines)
+        .values(createTestMachine({ initials: "TWO" }))
+        .returning();
+      const [issue] = await db
+        .insert(issues)
+        .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+        .returning();
+
+      await db.insert(issueWatchers).values({
+        issueId: issue.id,
+        userId: recipient.id,
+      });
+      await db.insert(notificationPreferences).values({
+        userId: recipient.id,
+        emailEnabled: true,
+        inAppEnabled: true,
+        emailNotifyOnNewComment: true,
+        inAppNotifyOnNewComment: true,
+      });
+
+      const plan = await planNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: false,
+          commentContent: "Test comment",
+        },
+        db
+      );
+
+      // The transactional write happened during planning...
+      const afterPlan = await db.query.notifications.findMany({
+        where: eq(notifications.userId, recipient.id),
+      });
+      expect(afterPlan).toHaveLength(1);
+      // ...but the external email is still pending, captured as an unrun thunk.
+      expect(sendEmail).not.toHaveBeenCalled();
+      expect(plan.deliveries.length).toBeGreaterThan(0);
+
+      // Only the explicit post-commit dispatch sends it.
+      await dispatchNotification(plan);
+      expect(sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "two-phase@test.com" })
+      );
+    });
+
+    it("a plan that is never dispatched sends no email (the rolled-back-commit case)", async () => {
+      const db = await getTestDb();
+
+      const [actor] = await db
+        .insert(userProfiles)
+        .values(createTestUser())
+        .returning();
+      const [recipient] = await db
+        .insert(userProfiles)
+        .values(createTestUser({ email: "never-dispatch@test.com" }))
+        .returning();
+      const [machine] = await db
+        .insert(machines)
+        .values(createTestMachine({ initials: "NVR" }))
+        .returning();
+      const [issue] = await db
+        .insert(issues)
+        .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+        .returning();
+
+      await db.insert(issueWatchers).values({
+        issueId: issue.id,
+        userId: recipient.id,
+      });
+      await db.insert(notificationPreferences).values({
+        userId: recipient.id,
+        emailEnabled: true,
+        inAppEnabled: true,
+        emailNotifyOnNewComment: true,
+        inAppNotifyOnNewComment: true,
+      });
+
+      // Plan, then deliberately drop the plan — emulating a caller whose
+      // transaction rolled back, so it never reaches dispatchNotification.
+      await planNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: false,
+          commentContent: "Test comment",
+        },
+        db
+      );
+
+      expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it("dispatchNotification on an empty plan is a no-op", async () => {
+      await dispatchNotification({ deliveries: [] });
+      expect(sendEmail).not.toHaveBeenCalled();
     });
   });
 });

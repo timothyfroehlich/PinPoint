@@ -4,7 +4,7 @@ import { formatDiscordMessage } from "~/lib/discord/messages";
 import { getSiteUrl } from "~/lib/url";
 import { log } from "~/lib/logger";
 import type {
-  NotificationChannel,
+  DeliveryChannel,
   NotificationPreferencesRow,
   ChannelContext,
   DeliveryResult,
@@ -18,9 +18,7 @@ import type { NotificationType } from "~/lib/notifications/dispatch";
  * per `getChannels()` call so that fan-out delivery to N recipients makes
  * exactly one Vault round-trip, not N+1.
  */
-export function createDiscordChannel(
-  config: DiscordConfig
-): NotificationChannel {
+export function createDiscordChannel(config: DiscordConfig): DeliveryChannel {
   return {
     key: "discord",
     shouldDeliver(
