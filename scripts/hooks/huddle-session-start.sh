@@ -184,11 +184,16 @@ if [[ -n "$NAME" ]]; then
   # Resolve today_bead_id for the copy-paste command (fail-open: fall back to placeholder)
   _TODAY_ID_REG=$(huddle_today_bead_id 2>/dev/null) || _TODAY_ID_REG="<today-bead-id>"
   [[ -n "$_TODAY_ID_REG" ]] || _TODAY_ID_REG="<today-bead-id>"
-  printf 'Post a coordination update when you:\n'
-  printf '  - File a bead for a non-obvious finding: "Filed PP-xxx: <finding>. —<YourName>"\n'
-  printf '  - Touch an area others may conflict on: "Working on <file/area> in <branch>; flag if conflict. —<YourName>"\n'
-  printf '  (Merges and PR opens are auto-posted — no manual action needed for those.)\n\n'
+  printf 'Once you understand what this session is tackling — and it'\''s real work or an\n'
+  printf 'investigation (not a quick question or one-line fix) — post a ONE-LINE kickoff to\n'
+  printf 'today'\''s bead, once, so parallel sessions know and anyone with context can chime in:\n'
+  printf '    bd comments add %s "Starting: <what> in <area/branch>. Ping me if you have context. —%s"\n\n' "$_TODAY_ID_REG" "$NAME"
+  printf 'Also post when you: file a bead for a non-obvious finding ("Filed PP-xxx: <finding>"),\n'
+  printf 'or touch an area others may conflict on ("Working on <file/area> in <branch>; flag if conflict").\n'
+  printf '  (Merges and PR opens are auto-posted — no manual action needed for those.)\n'
   printf '    bd comments add %s "Your update. —%s"\n\n' "$_TODAY_ID_REG" "$NAME"
+  printf 'If a peer'\''s kickoff scrolls by and you have specific relevant context — a conflict,\n'
+  printf 'a gotcha, a related in-flight branch/bead — reply with it; don'\''t ack-spam.\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown
   printf 'Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`\n'
 else
@@ -209,7 +214,9 @@ else
   printf 'The harness prefix lets Tim see "two Claudes and one Antigravity are running."\n\n'
   printf 'Register with:\n'
   printf '    bash scripts/hooks/huddle-whoami.sh register <YourName> %s\n\n' "$SESSION_ID"
-  printf 'If the name is taken, the helper suggests variations.\n'
+  printf 'If the name is taken, the helper suggests variations.\n\n'
+  printf 'After registering, post a one-line kickoff to today'\''s bead describing what this\n'
+  printf 'session is tackling (skip it for trivial questions or one-line fixes).\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown
   printf 'Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`\n'
 fi
