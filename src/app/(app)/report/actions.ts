@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
@@ -406,6 +407,15 @@ export async function submitPublicIssueAction(
     return {
       error: "Unable to submit the issue. Please try again.",
     };
+  } finally {
+    // Flush queued Sentry events before the serverless function returns and the
+    // instance can be frozen/reclaimed. Without this, an error captured by the
+    // catch above (or any best-effort reportError on this request) can be
+    // dropped on exit — the silence that hid the Doodle Bug incident. With no
+    // events pending this settles in a microtask; when events are queued it
+    // waits up to 2s to send them — the intended trade for guaranteed delivery
+    // on this low-frequency submit path. (PP-2053.1)
+    await Sentry.flush(2000);
   }
 }
 
