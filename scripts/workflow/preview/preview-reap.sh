@@ -106,17 +106,29 @@ echo "$ALL_BRANCHES_JSON" | jq -r '.[].name' | while IFS= read -r name; do
   fi
   pr_number="${name#pr-}"
 
-  # Is the PR still open?
+  # Resolve the PR's state. Fail SAFE: only tear down on an explicit
+  # CLOSED/MERGED state. A transient `gh`/API error (or rate limit) returns an
+  # empty string here, and treating that as "closed" would nuke a live,
+  # non-expired preview — so we keep the branch and retry next run. (The safe
+  # tradeoff: a genuinely hard-deleted PR, which is rare on GitHub, won't be
+  # auto-reaped.) This mirrors the fail-safe expiry handling below.
   pr_state="$(gh pr view "$pr_number" \
     --repo "$REPO" \
     --json state \
     --jq '.state' 2>/dev/null || true)"
 
-  if [[ "$pr_state" != "OPEN" ]]; then
-    echo "DESTROY (PR closed/merged/missing): ${name} (PR #${pr_number}, state=${pr_state:-none})"
-    destroy "$pr_number" "$(resolve_git_branch "$pr_number")"
-    continue
-  fi
+  case "$pr_state" in
+    CLOSED | MERGED)
+      echo "DESTROY (PR ${pr_state}): ${name} (PR #${pr_number})"
+      destroy "$pr_number" "$(resolve_git_branch "$pr_number")"
+      continue
+      ;;
+    OPEN) ;; # fall through to the expiry check
+    *)
+      echo "::warning::KEEP (could not resolve PR #${pr_number} state, state='${pr_state:-none}'); will retry next run"
+      continue
+      ;;
+  esac
 
   # Open PR — check the sticky comment's expiry.
   sticky_body="$(GITHUB_REPOSITORY="$REPO" bash "${HERE}/sticky-comment.sh" find "$pr_number" || true)"

@@ -165,12 +165,13 @@ set_vercel_env() {
   fi
   # `vercel env add NAME preview <git-branch>` reads the value from stdin.
   # --force overwrites an existing var for the same target without prompting.
-  printf '%s' "$value" \
+  if printf '%s' "$value" \
     | $VERCEL env add "$name" preview "$GIT_BRANCH" --force --token="$VERCEL_TOKEN" \
-    >/dev/null 2>&1 || {
-      echo "::warning::failed to set Vercel env ${name} for branch ${GIT_BRANCH}"
-    }
-  echo "  set ${name}"
+    >/dev/null 2>&1; then
+    echo "  set ${name}"
+  else
+    echo "::warning::failed to set Vercel env ${name} for branch ${GIT_BRANCH}"
+  fi
 }
 
 inject_vercel_env() {
