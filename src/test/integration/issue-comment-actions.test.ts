@@ -82,6 +82,13 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
 }));
 
+// after() needs a request scope at runtime; in tests run the callback inline. (PP-2053.3)
+vi.mock("next/server", () => ({
+  after: (cb: () => unknown) => {
+    void cb();
+  },
+}));
+
 vi.mock("~/lib/logger", () => ({
   log: {
     info: vi.fn(),
@@ -99,7 +106,8 @@ vi.mock("~/lib/observability/report-error", () => ({
 }));
 
 vi.mock("~/lib/notifications", () => ({
-  createNotification: vi.fn().mockResolvedValue(undefined),
+  planNotification: vi.fn().mockResolvedValue({ deliveries: [] }),
+  dispatchNotification: vi.fn().mockResolvedValue(undefined),
   getChannels: vi.fn().mockResolvedValue([]),
 }));
 
