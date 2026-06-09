@@ -201,7 +201,7 @@ Native Supabase auto-branching is **disabled** — no PR gets a preview by defau
 - **State**: a single sticky bot comment per PR, keyed by `<!-- pinpoint-preview-status -->`, holds the `Expires:` timestamp. It's the source of truth for TTL.
 - **Reaper**: `Preview Reaper` workflow runs hourly (+ `workflow_dispatch`). It deletes branches past expiry or whose PR is closed/merged, and flips the sticky comment to "expired — comment `/preview` to restart". "Restart" = comment `/preview` again (deterministic recreate, since these PRs carry migrations + seed).
 - **Workflows / scripts**: `.github/workflows/preview-control.yaml`, `.github/workflows/preview-reaper.yaml`, `scripts/workflow/preview/*.sh`.
-- **Required secrets**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID` (existing) plus `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (we self-manage Vercel env injection — `NEXT_PUBLIC_*` is inlined at build time, so creds are set **before** a forced fresh build).
+- **Required secrets**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID` are repo-level (existing). `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` are scoped to the `Preview` GitHub Environment, so both jobs declare `environment: Preview` to read them (repo-level secrets stay readable). We self-manage Vercel env injection — `NEXT_PUBLIC_*` is inlined at build time, so creds are set **before** a forced fresh build.
 - Env var fallbacks in `server.ts`/`middleware.ts` cover both PinPoint and integration naming.
 
 ## 7. Documentation

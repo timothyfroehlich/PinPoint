@@ -37,6 +37,9 @@ jobs:
   preview:
     name: Preview command
     runs-on: ubuntu-latest
+    # The Vercel secrets live in the `Preview` GitHub Environment, so the job
+    # must declare it to read them. Repo-level secrets (SUPABASE_*) stay readable.
+    environment: Preview
     # Gate: PR comments only, author has write access, body is a /preview command.
     if: >-
       github.event.issue.pull_request &&

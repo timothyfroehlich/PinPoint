@@ -34,6 +34,9 @@ jobs:
   reap:
     name: Reap expired / closed-PR branches
     runs-on: ubuntu-latest
+    # The Vercel secrets live in the `Preview` GitHub Environment, so the job
+    # must declare it to read them. Repo-level secrets (SUPABASE_*) stay readable.
+    environment: Preview
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_REPOSITORY: ${{ github.repository }}
