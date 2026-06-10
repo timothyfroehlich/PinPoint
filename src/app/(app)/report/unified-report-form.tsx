@@ -108,6 +108,10 @@ export function UnifiedReportForm({
   const [assignedTo, setAssignedTo] = useState("");
   const [watchIssue, setWatchIssue] = useState(true);
 
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
   const [turnstileToken, setTurnstileToken] = useState("");
   // CAPTCHA is only required for anonymous reporters. Logged-in users skip it
@@ -149,7 +153,9 @@ export function UnifiedReportForm({
 
     window.localStorage.removeItem("report_form_state");
 
-    // Native form reset — clears uncontrolled inputs (firstName/lastName/email/website)
+    // Native form reset — clears the website honeypot and any browser autofill
+    // that bypassed controlled inputs. firstName/lastName/email are now controlled
+    // and reset below via their state setters.
     formRef.current?.reset();
 
     // Controlled state — preserve machine when URL param drove the page,
@@ -178,6 +184,9 @@ export function UnifiedReportForm({
     setStatus("new");
     setAssignedTo("");
     setWatchIssue(true);
+    setFirstName("");
+    setLastName("");
+    setEmail("");
     setUploadedImages([]);
     setTurnstileToken("");
     // RichTextEditor and TurnstileWidget are uncontrolled internally —
@@ -208,6 +217,10 @@ export function UnifiedReportForm({
         priority: IssuePriority | "";
         frequency: IssueFrequency | "";
         watchIssue: boolean;
+        firstName: string;
+        lastName: string;
+        email: string;
+        uploadedImages: Pick<ImageMetadata, "blobUrl" | "blobPathname">[];
       }>;
 
       // If URL points to a different machine than the draft, treat this as a new report.
@@ -245,6 +258,27 @@ export function UnifiedReportForm({
       if (parsed.frequency) setFrequency(parsed.frequency);
       if (typeof parsed.watchIssue === "boolean")
         setWatchIssue(parsed.watchIssue);
+      if (parsed.firstName) setFirstName(parsed.firstName);
+      if (parsed.lastName) setLastName(parsed.lastName);
+      if (parsed.email) setEmail(parsed.email);
+      if (
+        Array.isArray(parsed.uploadedImages) &&
+        parsed.uploadedImages.length > 0
+      ) {
+        // Restore image metadata stubs (blobUrl + blobPathname only).
+        // The full ImageMetadata fields not persisted are left as empty strings —
+        // the gallery only needs the URL for display; submit uses the hidden
+        // imagesMetadata input which is re-serialised from state on every render.
+        setUploadedImages(
+          parsed.uploadedImages.map((img) => ({
+            blobUrl: img.blobUrl,
+            blobPathname: img.blobPathname,
+            originalFilename: "",
+            fileSizeBytes: 0,
+            mimeType: "",
+          }))
+        );
+      }
     } catch {
       // Clear corrupted localStorage
       window.localStorage.removeItem("report_form_state");
@@ -263,6 +297,15 @@ export function UnifiedReportForm({
       priority,
       frequency,
       watchIssue,
+      firstName,
+      lastName,
+      email,
+      // Persist only the URL and pathname — not the full file bytes or metadata
+      // fields that can't be meaningfully restored (fileSizeBytes, mimeType, etc.).
+      uploadedImages: uploadedImages.map(({ blobUrl, blobPathname }) => ({
+        blobUrl,
+        blobPathname,
+      })),
     };
     window.localStorage.setItem(
       "report_form_state",
@@ -276,6 +319,10 @@ export function UnifiedReportForm({
     priority,
     frequency,
     watchIssue,
+    firstName,
+    lastName,
+    email,
+    uploadedImages,
     state.success,
   ]);
 
@@ -607,6 +654,8 @@ export function UnifiedReportForm({
                         id="firstName"
                         name="firstName"
                         autoComplete="given-name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
                         className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
@@ -621,6 +670,8 @@ export function UnifiedReportForm({
                         id="lastName"
                         name="lastName"
                         autoComplete="family-name"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
                         className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
@@ -634,6 +685,8 @@ export function UnifiedReportForm({
                       name="email"
                       type="email"
                       autoComplete="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                     />
                     <p className="text-[10px] text-muted-foreground leading-none">
@@ -767,6 +820,9 @@ export function UnifiedReportForm({
                     setStatus("new");
                     setAssignedTo("");
                     setWatchIssue(true);
+                    setFirstName("");
+                    setLastName("");
+                    setEmail("");
                     setUploadedImages([]);
                     setTurnstileToken("");
                     setEditorResetKey((k) => k + 1);
