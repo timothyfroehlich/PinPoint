@@ -232,6 +232,7 @@ export function UnifiedReportForm({
         lastName: string;
         email: string;
         uploadedImages: Pick<ImageMetadata, "blobUrl" | "blobPathname">[];
+        idempotencyKey: string;
       }>;
 
       // If URL points to a different machine than the draft, treat this as a new report.
@@ -272,6 +273,11 @@ export function UnifiedReportForm({
       if (parsed.firstName) setFirstName(parsed.firstName);
       if (parsed.lastName) setLastName(parsed.lastName);
       if (parsed.email) setEmail(parsed.email);
+      // Restore the idempotency key so a retry after a remount (a 504 + the
+      // report error boundary, a login redirect, or a manual reload) reuses the
+      // SAME key. Otherwise the resubmit mints a fresh key and createIssue
+      // creates a DUPLICATE — defeating PP-2053.7 for its primary retry path.
+      if (parsed.idempotencyKey) setIdempotencyKey(parsed.idempotencyKey);
       if (
         Array.isArray(parsed.uploadedImages) &&
         parsed.uploadedImages.length > 0
@@ -311,6 +317,7 @@ export function UnifiedReportForm({
       firstName,
       lastName,
       email,
+      idempotencyKey,
       // Persist only the URL and pathname — not the full file bytes or metadata
       // fields that can't be meaningfully restored (fileSizeBytes, mimeType, etc.).
       uploadedImages: uploadedImages.map(({ blobUrl, blobPathname }) => ({
@@ -333,6 +340,7 @@ export function UnifiedReportForm({
     firstName,
     lastName,
     email,
+    idempotencyKey,
     uploadedImages,
     state.success,
   ]);

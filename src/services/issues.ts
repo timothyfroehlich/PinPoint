@@ -169,7 +169,9 @@ export async function createIssue({
     //    verbatim with an empty delivery plan — no counter increment, no second
     //    notification. The check runs first so a retry never advances the
     //    machine's nextIssueNumber. (Rate-limit + CAPTCHA already ran in the
-    //    action; a retry of the same key does not consume a rate-limit slot.)
+    //    action, BEFORE this check — so a same-key retry DOES still consume a
+    //    rate-limit slot. Making retries slot-exempt would mean moving an
+    //    idempotency lookup ahead of the rate limiter; deferred as a follow-up.)
     if (idempotencyKey) {
       const existing = await tx.query.issues.findFirst({
         where: eq(issues.idempotencyKey, idempotencyKey),
