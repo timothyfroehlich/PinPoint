@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { AuthSessionMissingError } from "@supabase/supabase-js";
 
 const captureExceptionMock = vi.fn();
 const logErrorMock = vi.fn();
@@ -19,6 +20,7 @@ vi.mock("~/lib/logger", () => ({
 }));
 
 import {
+  reportAuthError,
   reportError,
   serverActionError,
 } from "~/lib/observability/report-error";
@@ -73,6 +75,40 @@ describe("reportError", () => {
     });
     const [payload] = logErrorMock.mock.calls[0] ?? [];
     expect(payload).toMatchObject({ action: "notify", bestEffort: true });
+  });
+});
+
+describe("reportAuthError", () => {
+  it("does NOT report an AuthSessionMissingError (normal no-session response)", () => {
+    const error = new AuthSessionMissingError();
+    reportAuthError(error, { action: "my-page.auth.getUser" });
+
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(logErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("forwards a real auth error (non-AuthSessionMissingError) to Sentry and log", () => {
+    const error = new Error("token validation failed");
+    reportAuthError(error, {
+      action: "my-page.auth.getUser",
+      bestEffort: true,
+    });
+
+    expect(captureExceptionMock).toHaveBeenCalledTimes(1);
+    expect(captureExceptionMock).toHaveBeenCalledWith(error, {
+      contexts: {
+        pinpoint: { action: "my-page.auth.getUser", bestEffort: true },
+      },
+    });
+    expect(logErrorMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("works with no context argument", () => {
+    const error = new Error("network error");
+    reportAuthError(error);
+
+    expect(captureExceptionMock).toHaveBeenCalledTimes(1);
+    expect(logErrorMock).toHaveBeenCalledTimes(1);
   });
 });
 
