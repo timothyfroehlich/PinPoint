@@ -1,5 +1,5 @@
 import type React from "react";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
@@ -67,7 +67,7 @@ export default async function IssueDetailPage({
   const issueNum = parseInt(issueNumber, 10);
 
   if (isNaN(issueNum) || issueNum < 1) {
-    redirect(`/m/${initials}`);
+    notFound();
   }
 
   // CORE-PERF-003: parallelize what's safe before role is known; the roster
@@ -157,7 +157,7 @@ export default async function IssueDetailPage({
   ]);
 
   if (!issue) {
-    redirect(`/m/${initials}`);
+    notFound();
   }
 
   const issueWithRelations = issue as unknown as IssueWithAllRelations;
