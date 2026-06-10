@@ -6,6 +6,7 @@ import promisePlugin from "eslint-plugin-promise";
 import eslintCommentsPlugin from "@eslint-community/eslint-plugin-eslint-comments";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 import globals from "globals";
+import { noSideEffectsInTransactionOptions } from "./eslint-rules/no-side-effects-in-transaction.mjs";
 
 export default [
   js.configs.recommended,
@@ -97,6 +98,13 @@ export default [
           ],
         },
       ],
+
+      // ===== CORE-ARCH-011: no external side effects in db.transaction =====
+      // Static backstop to the runtime tripwire (transaction-context.ts).
+      // Rule options + rationale live in
+      // ./eslint-rules/no-side-effects-in-transaction.mjs (single source of
+      // truth, also exercised by src/test/eslint/*.test.ts).
+      "no-restricted-syntax": ["error", ...noSideEffectsInTransactionOptions],
 
       // ===== TypeScript Safety =====
 
