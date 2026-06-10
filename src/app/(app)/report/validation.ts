@@ -59,6 +59,7 @@ export function parsePublicIssueForm(
     status: toOptionalString(formData.get("status")),
     assignedTo: toOptionalString(formData.get("assignedTo")),
     watchIssue: toBooleanFromForm(formData.get("watchIssue")),
+    idempotencyKey: toOptionalString(formData.get("idempotencyKey")),
   };
 
   const validation = publicIssueSchema.safeParse(rawData);

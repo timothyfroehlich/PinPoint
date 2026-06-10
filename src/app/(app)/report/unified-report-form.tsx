@@ -114,6 +114,14 @@ export function UnifiedReportForm({
 
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
   const [turnstileToken, setTurnstileToken] = useState("");
+  // Idempotency key: a UUID generated ONCE per fresh form, stable across
+  // re-renders (lazy state initializer, never recomputed). Submitted as a
+  // hidden field so a retried submission (same key) is deduped server-side
+  // (PP-2053.7). Regenerated on every reset (success + Clear) so the next
+  // genuine report gets a distinct key and is not deduped against the last one.
+  const [idempotencyKey, setIdempotencyKey] = useState(() =>
+    crypto.randomUUID()
+  );
   // CAPTCHA is only required for anonymous reporters. Logged-in users skip it
   // both client-side (no widget rendered) and server-side (action checks
   // auth.getUser() before calling verifyTurnstileToken).
@@ -189,6 +197,9 @@ export function UnifiedReportForm({
     setEmail("");
     setUploadedImages([]);
     setTurnstileToken("");
+    // Fresh idempotency key for the next report — the submitted one is now tied
+    // to a committed issue, so reusing it would dedup a genuine new submission.
+    setIdempotencyKey(crypto.randomUUID());
     // RichTextEditor and TurnstileWidget are uncontrolled internally —
     // bumping their keys remounts them so visible state matches the cleared
     // controlled state.
@@ -421,6 +432,8 @@ export function UnifiedReportForm({
               tabIndex={-1}
               autoComplete="off"
             />
+            {/* Idempotency key — stable per fresh form; dedupes retries (PP-2053.7) */}
+            <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
             <div className="space-y-1.5">
               <Label htmlFor="machineId" className="text-foreground">
                 Machine *
@@ -825,6 +838,8 @@ export function UnifiedReportForm({
                     setEmail("");
                     setUploadedImages([]);
                     setTurnstileToken("");
+                    // Fresh idempotency key — Clear starts a brand-new report.
+                    setIdempotencyKey(crypto.randomUUID());
                     setEditorResetKey((k) => k + 1);
                     setTurnstileWidgetKey((k) => k + 1);
                     setIsClearOpen(false);
