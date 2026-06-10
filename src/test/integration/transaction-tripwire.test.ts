@@ -72,6 +72,7 @@ describe("transaction tripwire (CORE-ARCH-011, PP-2053)", () => {
       await expect(
         db.transaction(async () => {
           // Guard fires before any transport use — no network is touched.
+          // eslint-disable-next-line pinpoint/no-side-effects-in-transaction -- deliberate CORE-ARCH-011 violation: this test proves the RUNTIME tripwire throws; the static rule (PP-2053.13) correctly flags it, so we suppress it here only.
           await sendEmail({ to: "a@b.test", subject: "s", html: "<p>x</p>" });
         })
       ).rejects.toThrow(/inside a database transaction/);
@@ -82,6 +83,7 @@ describe("transaction tripwire (CORE-ARCH-011, PP-2053)", () => {
       await expect(
         db.transaction(async () => {
           // Guard fires before createAdminClient — Supabase is never reached.
+          // eslint-disable-next-line pinpoint/no-side-effects-in-transaction -- deliberate CORE-ARCH-011 violation: this test proves the RUNTIME tripwire throws; the static rule (PP-2053.13) correctly flags it, so we suppress it here only.
           await getDiscordConfig();
         })
       ).rejects.toThrow(/inside a database transaction/);

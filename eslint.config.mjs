@@ -6,6 +6,7 @@ import promisePlugin from "eslint-plugin-promise";
 import eslintCommentsPlugin from "@eslint-community/eslint-plugin-eslint-comments";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 import globals from "globals";
+import { pinpointTransactionPlugin } from "./eslint-rules/no-side-effects-in-transaction.mjs";
 
 export default [
   js.configs.recommended,
@@ -31,6 +32,7 @@ export default [
       "unused-imports": unusedImportsPlugin,
       promise: promisePlugin,
       "eslint-comments": eslintCommentsPlugin,
+      pinpoint: pinpointTransactionPlugin,
     },
     languageOptions: {
       parser: typescriptParser,
@@ -97,6 +99,16 @@ export default [
           ],
         },
       ],
+
+      // ===== CORE-ARCH-011: no external side effects in db.transaction =====
+      // Static backstop to the runtime tripwire (transaction-context.ts).
+      // Implemented as a custom rule (not no-restricted-syntax) so it keeps its
+      // own "error" severity slot — the e2e block owns no-restricted-syntax at
+      // "warn" for an unrelated nudge, and flat config replaces (not merges)
+      // rule options. Logic + rationale live in
+      // ./eslint-rules/no-side-effects-in-transaction.mjs (single source of
+      // truth, also exercised by src/test/eslint/*.test.ts).
+      "pinpoint/no-side-effects-in-transaction": "error",
 
       // ===== TypeScript Safety =====
 
@@ -197,7 +209,18 @@ export default [
     },
   },
   {
-    // E2E-only anti-patterns
+    // E2E-only anti-patterns.
+    //
+    // NOTE: this block redefines `no-restricted-syntax` (at "warn") for the
+    // @test.com nudge. In flat config that REPLACES (does not merge) the rule's
+    // options, so it must NOT also carry the CORE-ARCH-011 side-effect
+    // selectors — they'd be dropped, or be dragged up to "error" and break the
+    // documented `getTestEmail("…@test.com")` false positive. The CORE-ARCH-011
+    // backstop instead lives in a separate custom rule
+    // (`pinpoint/no-side-effects-in-transaction`, "error") in the main
+    // `**/*.ts(x)` block above, which also matches `e2e/**/*.ts(x)` — so e2e
+    // files are covered at "error" with no hole, while this block keeps its own
+    // independent "warn" severity. (PP-2053.13.)
     files: ["e2e/**/*"],
     rules: {
       "no-restricted-properties": [
