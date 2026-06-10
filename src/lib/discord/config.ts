@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "~/lib/supabase/admin";
+import { assertNotInTransaction } from "~/server/db/transaction-context";
 
 /**
  * Discord integration configuration, as loaded by `getDiscordConfig()`.
@@ -46,6 +47,11 @@ interface DiscordConfigRow {
 }
 
 async function fetchDiscordConfigRow(): Promise<DiscordConfigRow | null> {
+  // CORE-ARCH-011 tripwire: the Vault decrypt RPC is an external round-trip and
+  // must run before opening a transaction, never inside one (the Doodle Bug,
+  // PP-2053). The issue services already fetch channels pre-transaction.
+  assertNotInTransaction("getDiscordConfig");
+
   const supabase = createAdminClient();
   // The `get_discord_config` RPC is defined in 0028_natural_vengeance.sql but
   // is not present in Supabase's generated types. Cast the response to the

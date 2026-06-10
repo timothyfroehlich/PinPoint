@@ -1,5 +1,6 @@
 import "server-only";
 import { log } from "~/lib/logger";
+import { assertNotInTransaction } from "~/server/db/transaction-context";
 
 const DISCORD_API = "https://discord.com/api/v10";
 const MAX_RETRY_AFTER_SECONDS = 5;
@@ -18,6 +19,10 @@ export interface SendDmInput {
 }
 
 export async function sendDm(input: SendDmInput): Promise<SendDmResult> {
+  // CORE-ARCH-011 tripwire: Discord DMs go out post-commit, never inside a
+  // transaction (the Doodle Bug, PP-2053).
+  assertNotInTransaction("sendDm");
+
   if (!input.botToken) return { ok: false, reason: "not_configured" };
 
   const channel = await openDmChannel(input.botToken, input.discordUserId);
