@@ -42,6 +42,7 @@ trigger: always_on
 20. Forms ship with the correct input `type`, `autocomplete` token, `:user-invalid` styling, and visible required indicators (CORE-FORM-001..006)
 21. Accessibility floor: skip link, semantic table markup, `motion-reduce:` paired with animations, no `<div role="button">`, `title` is not a tooltip (CORE-A11Y-001..006)
 22. Image priority and preconnect discipline: `priority` is for the LCP candidate only; preconnect to known image origins (CORE-PERF-003)
+23. External side effects (HTTP, email, Discord, blob, Vault RPC) never run inside a DB transaction; deliver them post-commit (CORE-ARCH-011)
 
 ---
 
@@ -360,6 +361,13 @@ trigger: always_on
 - **Why:** Premature abstractions invented for the first or second use case usually fit one of those shapes badly and force the third to bend. Pre-beta code with no scale data can't predict the right shape.
 - **Do:** Wait until you have three concrete instances before extracting a helper, hook, or service abstraction. Inline duplication is cheaper than the wrong abstraction.
 - **Don't:** Build a DAL, service layer, error hierarchy, or shared hook because you "might need it later." Don't refactor on the second duplication.
+
+**CORE-ARCH-011:** External side effects never run inside a DB transaction
+
+- **Severity:** Critical
+- **Why:** The "Doodle Bug" (PP-2053). A user reported an issue, got a confirmation email with a working link, but the issue was never persisted and no alert fired. Root cause: the confirmation email was sent from a Resend HTTP call executed _inside_ the issue-creation transaction, before COMMIT. When the request was killed mid-flight the transaction rolled back, but the email had already gone out — a silent write-loss. A transaction can roll back at any point; anything irreversible done before COMMIT can outlive a write that never lands.
+- **Do:** Keep transaction callbacks to transactional DB work only. Fetch external inputs (e.g. the Discord Vault token via `getDiscordConfig()`) _before_ opening the transaction. Deliver external effects _after_ commit — use `after()` in a Server Action plus the two-phase `planNotification` (in-transaction writes) / `dispatchNotification` (post-commit fan-out) split. A runtime tripwire enforces this: `db.transaction` sets an in-transaction `AsyncLocalStorage` flag (`~/server/db/transaction-context`), and the email / Discord / blob / Vault-RPC client wrappers throw `SideEffectInTransactionError` if invoked while it is set — failing loudly in dev, test, and CI.
+- **Don't:** Call `sendEmail`, `sendDm`, `uploadToBlob`/`deleteFromBlob`, `getDiscordConfig`, `fetch`, or any other HTTP/IO from inside a `db.transaction(...)` callback. Don't "optimize" by moving a pre-fetch into the transaction. Don't catch and swallow `SideEffectInTransactionError` — fix the call site to run post-commit.
 
 ---
 

@@ -10,6 +10,7 @@ import {
 } from "./transport";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
+import { assertNotInTransaction } from "~/server/db/transaction-context";
 
 // Re-export for backward compatibility
 export { EMAIL_FROM };
@@ -69,6 +70,10 @@ export async function sendEmail({
   inReplyTo,
   references,
 }: EmailParams): Promise<EmailResult> {
+  // CORE-ARCH-011 tripwire: email must be sent post-commit, never inside a
+  // transaction (the Doodle Bug, PP-2053).
+  assertNotInTransaction("sendEmail");
+
   log.info({ to, subject }, "[Email] Attempting to send email");
 
   if (!transport) {
