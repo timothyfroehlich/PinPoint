@@ -257,30 +257,50 @@ trigger_vercel_build() {
   # Unlike `vercel deploy`, this is branch-linked: it reads the branch-scoped
   # env injected above and Vercel assigns it the stable branch alias (which it
   # also re-points to every future push, so the URL survives new commits).
+  # Vercel's REST API identifies the GitHub repo by numeric id (the SDK resolves
+  # org/repo -> repoId under the hood). GITHUB_REPOSITORY_ID is a default Actions
+  # env var; fall back to org/repo strings if it is somehow unset.
   local owner repo payload
   owner="${GITHUB_REPOSITORY%%/*}"
   repo="${GITHUB_REPOSITORY##*/}"
-  payload="$(jq -n \
-    --arg name "${VERCEL_PROJECT_NAME:-pin-point}" \
-    --arg org "$owner" \
-    --arg repo "$repo" \
-    --arg ref "$GIT_BRANCH" \
-    '{name: $name, target: "preview",
-      gitSource: {type: "github", org: $org, repo: $repo, ref: $ref}}')"
+  if [[ -n "${GITHUB_REPOSITORY_ID:-}" ]]; then
+    payload="$(jq -n \
+      --arg name "${VERCEL_PROJECT_NAME:-pin-point}" \
+      --argjson repoId "$GITHUB_REPOSITORY_ID" \
+      --arg ref "$GIT_BRANCH" \
+      '{name: $name, target: "preview",
+        gitSource: {type: "github", repoId: $repoId, ref: $ref}}')"
+  else
+    payload="$(jq -n \
+      --arg name "${VERCEL_PROJECT_NAME:-pin-point}" \
+      --arg org "$owner" --arg repo "$repo" --arg ref "$GIT_BRANCH" \
+      '{name: $name, target: "preview",
+        gitSource: {type: "github", org: $org, repo: $repo, ref: $ref}}')"
+  fi
 
-  local response dep_id dep_url
-  if response="$(curl -fsS -X POST \
-      "https://api.vercel.com/v13/deployments?teamId=${VERCEL_ORG_ID}&forceNew=1" \
-      -H "Authorization: Bearer ${VERCEL_TOKEN}" \
-      -H "Content-Type: application/json" \
-      -d "$payload" 2>/dev/null)"; then
-    dep_id="$(echo "$response" | jq -r '.id // empty')"
-    dep_url="$(echo "$response" | jq -r '.url // empty')"
+  # Capture body + HTTP status separately so a 4xx surfaces Vercel's error
+  # message (the request token is in a header, never echoed; the payload carries
+  # no secrets — branch creds live in Vercel's env store, set above).
+  local raw http_code body dep_id dep_url
+  raw="$(curl -sS -X POST \
+    "https://api.vercel.com/v13/deployments?teamId=${VERCEL_ORG_ID}&forceNew=1&skipAutoDetectionConfirmation=1" \
+    -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "$payload" \
+    -w $'\n%{http_code}' 2>/dev/null || true)"
+  http_code="$(printf '%s' "$raw" | tail -n1)"
+  body="$(printf '%s' "$raw" | sed '$d')"
+
+  if [[ "$http_code" =~ ^20 ]]; then
+    dep_id="$(printf '%s' "$body" | jq -r '.id // empty')"
+    dep_url="$(printf '%s' "$body" | jq -r '.url // empty')"
     DEPLOYMENT_URL="${dep_url:+https://$dep_url}"
     echo "Created git-integration deployment: ${dep_id:-unknown} (${DEPLOYMENT_URL:-no url})"
     wait_for_ready "$dep_id"
   else
-    echo "::warning::Vercel deployment API call failed; preview build not triggered"
+    echo "::warning::Vercel deployment API returned HTTP ${http_code:-?}"
+    printf '%s' "$body" | jq -r '.error // .' 2>/dev/null | head -c 800
+    echo
     DEPLOYMENT_URL=""
   fi
   echo "::endgroup::"
