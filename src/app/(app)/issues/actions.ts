@@ -9,6 +9,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { type z } from "zod";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
@@ -46,6 +47,7 @@ import {
   updateIssueTitle,
   reassignIssueMachine,
 } from "~/services/issues";
+import { dispatchNotification } from "~/lib/notifications";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import {
   type ProseMirrorDoc,
@@ -199,11 +201,13 @@ export async function updateIssueStatusAction(
     }
 
     // Update status
-    await updateIssueStatus({
+    const { deliveryPlan } = await updateIssueStatus({
       issueId,
       status,
       userId: user.id,
     });
+    // Deliver post-commit, after the response (PP-2053.3).
+    after(() => dispatchNotification(deliveryPlan));
 
     const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
     revalidatePath(issuePath);
@@ -586,11 +590,13 @@ export async function assignIssueAction(
     }
 
     // Assign issue via service
-    await assignIssue({
+    const deliveryPlan = await assignIssue({
       issueId,
       assignedTo,
       actorId: user.id,
     });
+    // Deliver post-commit, after the response (PP-2053.3).
+    after(() => dispatchNotification(deliveryPlan));
 
     const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
     revalidatePath(issuePath);
@@ -674,12 +680,14 @@ export async function addCommentAction(
   }
 
   try {
-    await addIssueComment({
+    const { deliveryPlan } = await addIssueComment({
       issueId,
       content: comment,
       userId: user.id,
       imagesMetadata,
     });
+    // Deliver post-commit, after the response (PP-2053.3).
+    after(() => dispatchNotification(deliveryPlan));
   } catch (error) {
     return serverActionError(error, "SERVER", "Failed to add comment", {
       action: "addComment",

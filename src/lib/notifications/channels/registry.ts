@@ -1,5 +1,6 @@
 import { getDiscordConfig } from "~/lib/discord/config";
 import { log } from "~/lib/logger";
+import { SideEffectInTransactionError } from "~/server/db/transaction-context";
 import { createDiscordChannel } from "./discord-channel";
 import { emailChannel } from "./email-channel";
 import { inAppChannel } from "./in-app-channel";
@@ -29,6 +30,10 @@ export async function getChannels(): Promise<readonly NotificationChannel[]> {
     const discord = await getDiscordConfig();
     if (discord) channels.push(createDiscordChannel(discord));
   } catch (err) {
+    // The CORE-ARCH-011 tripwire is a programming-error signal, not a
+    // transient Vault/RPC failure — never swallow it, or a future caller that
+    // resolves channels inside a transaction would silently defeat the guard.
+    if (err instanceof SideEffectInTransactionError) throw err;
     log.warn(
       {
         err,

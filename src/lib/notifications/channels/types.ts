@@ -1,4 +1,3 @@
-import type { DbTransaction } from "~/server/db";
 import type { notificationPreferences } from "~/server/db/schema";
 import type { NotificationType } from "~/lib/notifications/dispatch";
 
@@ -11,8 +10,12 @@ export type NotificationPreferencesRow =
   typeof notificationPreferences.$inferSelect;
 
 /**
- * Per-notification context assembled by the dispatcher and passed to
- * every channel. Channels read only the fields they need.
+ * Per-recipient delivery context for an external channel (email, Discord).
+ *
+ * Deliberately carries NO database handle: external delivery is a post-commit
+ * side effect (see `dispatchNotification`), so it must never hold a transaction
+ * open across a slow HTTP call. The transactional in-app write happens earlier,
+ * inside `planNotification`, not through a channel `deliver()`. (PP-2053.2)
  */
 export interface ChannelContext {
   userId: string;
@@ -22,16 +25,13 @@ export interface ChannelContext {
   // Recipient profile data
   email: string | null;
   discordUserId: string | null;
-  // Resolved at the top of createNotification before the fan-out
+  // Resolved at the top of planNotification before the fan-out
   issueTitle?: string | undefined;
   machineName?: string | undefined;
   formattedIssueId?: string | undefined;
   commentContent?: string | undefined;
   newStatus?: string | undefined;
   issueDescription?: string | undefined;
-  // The Drizzle transaction/db handle for channels that write to the DB
-  // (in-app channel inserts a `notifications` row).
-  tx: DbTransaction;
 }
 
 /**
@@ -61,10 +61,21 @@ export interface NotificationChannel {
     type: NotificationType
   ): boolean;
   /**
-   * Perform the actual delivery. Called concurrently with other
-   * channels under Promise.allSettled. Errors are caught and logged
-   * by the dispatcher — channels should still handle their own
-   * expected failures.
+   * Perform the actual external delivery (email/Discord HTTP). Run AFTER the
+   * DB transaction commits, concurrently with other channels under
+   * Promise.allSettled; errors are caught and logged by the dispatcher.
+   *
+   * Optional: transactional channels (in_app) omit it — their row is written
+   * inside `planNotification`, not delivered post-commit. (PP-2053.2)
    */
+  deliver?(ctx: ChannelContext): Promise<DeliveryResult>;
+}
+
+/**
+ * A channel that performs external delivery (email, Discord). Distinguished
+ * from the transactional in-app channel by a *required* `deliver` — these are
+ * the channels run post-commit by `dispatchNotification`. (PP-2053.2)
+ */
+export interface DeliveryChannel extends NotificationChannel {
   deliver(ctx: ChannelContext): Promise<DeliveryResult>;
 }

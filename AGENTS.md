@@ -28,6 +28,7 @@
 15. **Baseline Widely available is the UI floor** (CORE-UI-005, CORE-UI-006): reach for `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, etc. directly — no polyfills, no feature detection. Look up modern patterns via the `modern-web-guidance` plugin (`npx -y modern-web-guidance@latest search "<query>"` then `retrieve "<id>"`); each guide tags its Baseline status. Newly-available features (Popover API, View Transitions, anchor positioning, scroll-driven animations) require a per-feature opt-in documented in `pinpoint-design-bible` §19.
 16. **Form correctness** (CORE-FORM-001..006): right `type` (`email`/`tel`/`url`/`password`), correct `autocomplete` token (`current-password` / `new-password` / `off` on confirm), `:user-invalid` styling on the shared Input, `aria-invalid` synced on blur, visible required-field indicators, `enterkeyhint` on sequential mobile fields.
 17. **Accessibility floor** (CORE-A11Y-001..006): skip-to-main link, `motion-reduce:` paired with animations, `<th scope="col">` + `aria-sort` + accessible name on data tables, real `<button>` (never `<div role="button">`), `title` is not a tooltip, `inert` on background regions when a modal opens.
+18. **No side effects inside DB transactions** (CORE-ARCH-011): external/non-transactional effects (HTTP, email, Discord, blob, Vault RPC) never run inside `db.transaction` — fetch inputs before it, deliver effects after commit (`after()` + `planNotification`/`dispatchNotification`). A runtime tripwire throws `SideEffectInTransactionError` if violated. (The Doodle Bug, PP-2053.)
 
 ### 2.2 Workflow
 
@@ -142,7 +143,7 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 
 - **Check for conflicts first**: `gh pr view <PR> --json mergeable,mergeStateStatus`. `DIRTY`/`CONFLICTING` means GitHub silently skips workflow runs until you resolve. `pnpm run check` includes a `check:behind-main` warning.
 - **Required check**: only `CI Gate` (ruleset `6326455`). Vercel is not required. `BLOCKED` while E2E is still running is normal.
-- **Vercel preview migrations**: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The `Supabase Branch Setup` GHA workflow handles migrations on labeled previews. Production deploys still migrate.
+- **Vercel preview migrations**: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The on-demand `Preview Controller` workflow migrates + seeds the branch DB before building the preview (see §6 "Preview deployments"). Production deploys still migrate.
 
 ### Migration conflicts
 
@@ -190,11 +191,18 @@ When a decision is **visual or hard to convey in prose** — color/contrast, spa
 - Vercel runs `pnpm run migrate:production` on build (production only).
 - Stuck migration fix: `POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`.
 
-### Preview deployments (Supabase branching)
+### Preview deployments (on-demand, TTL'd Supabase branches)
 
-- Default: PRs do **not** get a usable branch DB (saves ~$0.32/day/branch).
-- Enable: add the `preview` label. Within ~5 min, `Supabase Branch Setup` GHA runs Drizzle migrations + seed.
-- Cleanup: `Supabase Branch Cleanup` cron runs every 3h.
+Native Supabase auto-branching is **disabled** — no PR gets a preview by default (zero branches, zero cost). Previews are created on demand via PR comment commands and torn down on a TTL.
+
+- **Control surface = PR comments** (from authors with write access only):
+  - `/preview` — create (or restart after expiry) a Supabase branch, migrate + seed it, wire its creds into the Vercel preview, and post a sticky status comment with the live URL and a 48h expiry.
+  - `/preview extend` — push the expiry +48h. No DB work.
+  - `/preview stop` — tear down the branch + Vercel env vars now.
+- **State**: a single sticky bot comment per PR, keyed by `<!-- pinpoint-preview-status -->`, holds the `Expires:` timestamp. It's the source of truth for TTL.
+- **Reaper**: `Preview Reaper` workflow runs hourly (+ `workflow_dispatch`). It deletes branches past expiry or whose PR is closed/merged, and flips the sticky comment to "expired — comment `/preview` to restart". "Restart" = comment `/preview` again (deterministic recreate, since these PRs carry migrations + seed).
+- **Workflows / scripts**: `.github/workflows/preview-control.yaml`, `.github/workflows/preview-reaper.yaml`, `scripts/workflow/preview/*.sh`.
+- **Required secrets**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID` are repo-level (existing). `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` are scoped to the `Preview` GitHub Environment, so both jobs declare `environment: Preview` to read them (repo-level secrets stay readable). We self-manage Vercel env injection — `NEXT_PUBLIC_*` is inlined at build time, so creds are set **before** a forced fresh build.
 - Env var fallbacks in `server.ts`/`middleware.ts` cover both PinPoint and integration naming.
 
 ## 7. Documentation

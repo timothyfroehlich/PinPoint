@@ -21,7 +21,11 @@ import {
   emitIssueReassignedOut,
   emitIssueReassignedIn,
 } from "~/lib/timeline/issue-timeline-helpers";
-import { createNotification, getChannels } from "~/lib/notifications";
+import {
+  planNotification,
+  getChannels,
+  type DeliveryPlan,
+} from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
 import { formatIssueId } from "~/lib/issues/utils";
@@ -147,7 +151,7 @@ export async function createIssue({
   reporterEmail,
   assignedTo,
   autoWatchReporter = true,
-}: CreateIssueParams): Promise<Issue> {
+}: CreateIssueParams): Promise<{ issue: Issue; deliveryPlan: DeliveryPlan }> {
   // Resolve channels outside the transaction to avoid an HTTP round-trip
   // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
   const channels = await getChannels();
@@ -261,14 +265,18 @@ export async function createIssue({
       ...(reportedBy ? { actorId: reportedBy } : {}),
     });
 
-    // 6. Notifications
+    // 6. Notifications — planned inside the transaction (transactional in-app
+    //    rows + watcher backfill), delivered post-commit by the caller via
+    //    after() so a slow/failed external send can neither roll back nor delay
+    //    the committed issue. This is the Doodle Bug fix. (PP-2053.3)
+    const deliveries: DeliveryPlan["deliveries"] = [];
     try {
       const formattedId = formatIssueId(machineInitials, issueNumber);
       const plainDescription = description
         ? docToPlainText(description)
         : undefined;
       // Trigger Notification (actorId optional for public reports)
-      await createNotification(
+      const newIssuePlan = await planNotification(
         {
           type: "new_issue",
           resourceId: issue.id,
@@ -282,6 +290,7 @@ export async function createIssue({
         tx,
         channels
       );
+      deliveries.push(...newIssuePlan.deliveries);
 
       // Extract and notify mentions — batch all mentioned users into one call
       // to avoid O(N) round-trips inside the transaction.
@@ -289,7 +298,7 @@ export async function createIssue({
         const mentions = extractMentions(description);
         if (mentions.length > 0) {
           const commentContent = plainDescription;
-          await createNotification(
+          const mentionPlan = await planNotification(
             {
               type: "mentioned",
               resourceId: issue.id,
@@ -305,6 +314,7 @@ export async function createIssue({
             tx,
             channels
           );
+          deliveries.push(...mentionPlan.deliveries);
         }
       }
     } catch (error) {
@@ -315,7 +325,7 @@ export async function createIssue({
       });
     }
 
-    return issue;
+    return { issue, deliveryPlan: { deliveries } };
   });
 }
 
@@ -331,6 +341,7 @@ export async function updateIssueStatus({
   issueId: string;
   oldStatus: string;
   newStatus: string;
+  deliveryPlan: DeliveryPlan;
 }> {
   // Pre-transaction no-op check: avoid the cost of resolving channels (HTTP
   // round-trip via getDiscordConfig() Vault decrypt) AND opening a write
@@ -345,7 +356,12 @@ export async function updateIssueStatus({
   }
 
   if (preCheckIssue.status === status) {
-    return { issueId, oldStatus: preCheckIssue.status, newStatus: status };
+    return {
+      issueId,
+      oldStatus: preCheckIssue.status,
+      newStatus: status,
+      deliveryPlan: { deliveries: [] },
+    };
   }
 
   // Resolve channels outside the transaction to avoid an HTTP round-trip
@@ -377,7 +393,12 @@ export async function updateIssueStatus({
 
     // Re-check inside the transaction in case of a race with another writer.
     if (oldStatus === status) {
-      return { issueId, oldStatus, newStatus: status };
+      return {
+        issueId,
+        oldStatus,
+        newStatus: status,
+        deliveryPlan: { deliveries: [] },
+      };
     }
 
     // 1. Update Status
@@ -440,9 +461,10 @@ export async function updateIssueStatus({
       "Issue status updated"
     );
 
-    // 3. Trigger Notification
+    // 3. Trigger Notification — planned in-tx, delivered post-commit (PP-2053.3)
+    const deliveries: DeliveryPlan["deliveries"] = [];
     try {
-      await createNotification(
+      const plan = await planNotification(
         {
           type: "issue_status_changed",
           resourceId: issueId,
@@ -459,6 +481,7 @@ export async function updateIssueStatus({
         tx,
         channels
       );
+      deliveries.push(...plan.deliveries);
     } catch (error) {
       reportError(error, {
         action: "updateIssueStatusNotifications",
@@ -467,7 +490,12 @@ export async function updateIssueStatus({
       });
     }
 
-    return { issueId, oldStatus, newStatus: status };
+    return {
+      issueId,
+      oldStatus,
+      newStatus: status,
+      deliveryPlan: { deliveries },
+    };
   });
 }
 
@@ -480,7 +508,10 @@ export async function addIssueComment({
   content,
   userId,
   imagesMetadata = [],
-}: AddIssueCommentParams): Promise<IssueComment> {
+}: AddIssueCommentParams): Promise<{
+  comment: IssueComment;
+  deliveryPlan: DeliveryPlan;
+}> {
   // Resolve channels outside the transaction to avoid an HTTP round-trip
   // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
   const channels = await getChannels();
@@ -520,7 +551,8 @@ export async function addIssueComment({
       .values({ issueId, userId })
       .onConflictDoNothing();
 
-    // 4. Trigger Notification
+    // 4. Trigger Notification — planned in-tx, delivered post-commit (PP-2053.3)
+    const deliveries: DeliveryPlan["deliveries"] = [];
     try {
       const issue = await tx.query.issues.findFirst({
         where: eq(issues.id, issueId),
@@ -539,7 +571,7 @@ export async function addIssueComment({
         : undefined;
       const plainTextContent = docToPlainText(content);
 
-      await createNotification(
+      const commentPlan = await planNotification(
         {
           type: "new_comment",
           resourceId: issueId,
@@ -553,12 +585,13 @@ export async function addIssueComment({
         tx,
         channels
       );
+      deliveries.push(...commentPlan.deliveries);
 
       // Extract and notify mentions — batch all mentioned users into one call
       // to avoid O(N) round-trips inside the transaction.
       const mentions = extractMentions(content);
       if (mentions.length > 0) {
-        await createNotification(
+        const mentionPlan = await planNotification(
           {
             type: "mentioned",
             resourceId: issueId,
@@ -574,6 +607,7 @@ export async function addIssueComment({
           tx,
           channels
         );
+        deliveries.push(...mentionPlan.deliveries);
       }
     } catch (error) {
       reportError(error, {
@@ -583,7 +617,7 @@ export async function addIssueComment({
         commentId: comment.id,
       });
     }
-    return comment;
+    return { comment, deliveryPlan: { deliveries } };
   });
 }
 
@@ -633,7 +667,7 @@ export async function assignIssue({
   issueId,
   assignedTo,
   actorId,
-}: AssignIssueParams): Promise<void> {
+}: AssignIssueParams): Promise<DeliveryPlan> {
   // Pre-transaction no-op check: avoid the cost of resolving channels (HTTP
   // round-trip via getDiscordConfig() Vault decrypt) AND opening a write
   // transaction when the assignment is unchanged (PP-rfc, Copilot follow-up).
@@ -647,13 +681,13 @@ export async function assignIssue({
   }
 
   if (preCheckIssue.assignedTo === assignedTo) {
-    return;
+    return { deliveries: [] };
   }
 
   // Only resolve channels when a notification will actually fire (a
   // notification is only sent when assignedTo is non-null below).
   const channels = assignedTo ? await getChannels() : undefined;
-  await db.transaction(async (tx) => {
+  return await db.transaction(async (tx) => {
     // Re-read inside the transaction so that subsequent mutations and the
     // notification payload reflect the row's current state under the
     // transaction's snapshot (and handle the unlikely race where it was
@@ -682,7 +716,7 @@ export async function assignIssue({
 
     // Re-check inside the transaction in case of a race with another writer.
     if (currentIssue.assignedTo === assignedTo) {
-      return;
+      return { deliveries: [] };
     }
 
     // Get new assignee name if assigning to someone
@@ -745,11 +779,11 @@ export async function assignIssue({
       "Issue assignment updated"
     );
 
-    // Trigger Notification
+    // Trigger Notification — planned in-tx, delivered post-commit (PP-2053.3)
+    const deliveries: DeliveryPlan["deliveries"] = [];
     try {
       if (assignedTo) {
-        // Notify
-        await createNotification(
+        const plan = await planNotification(
           {
             type: "issue_assigned",
             resourceId: issueId,
@@ -770,6 +804,7 @@ export async function assignIssue({
           tx,
           channels
         );
+        deliveries.push(...plan.deliveries);
       }
     } catch (error) {
       reportError(error, {
@@ -778,6 +813,8 @@ export async function assignIssue({
         issueId,
       });
     }
+
+    return { deliveries };
   });
 }
 

@@ -3,6 +3,7 @@ import type { PutBlobResult } from "@vercel/blob";
 import path from "path";
 import fs from "fs/promises";
 import { log } from "~/lib/logger";
+import { assertNotInTransaction } from "~/server/db/transaction-context";
 
 function shouldUseMockBlobStorage(): boolean {
   if (process.env["MOCK_BLOB_STORAGE"] === "true") {
@@ -26,6 +27,10 @@ export async function uploadToBlob(
   file: File,
   pathname: string
 ): Promise<PutBlobResult> {
+  // CORE-ARCH-011 tripwire: blob I/O runs post-commit, never inside a
+  // transaction (the Doodle Bug, PP-2053).
+  assertNotInTransaction("uploadToBlob");
+
   // Mock implementation for local testing without Vercel credentials
   if (shouldUseMockBlobStorage()) {
     // Determine local path in public/uploads and sanitize to prevent path traversal
@@ -83,6 +88,10 @@ export async function uploadToBlob(
  * @param pathname The pathname of the file to delete
  */
 export async function deleteFromBlob(pathname: string): Promise<void> {
+  // CORE-ARCH-011 tripwire: blob I/O runs post-commit, never inside a
+  // transaction (the Doodle Bug, PP-2053).
+  assertNotInTransaction("deleteFromBlob");
+
   // Mock implementation for local testing
   if (shouldUseMockBlobStorage()) {
     try {
