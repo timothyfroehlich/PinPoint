@@ -1,3 +1,26 @@
+/**
+ * Unit Tests: cleanupOrphanedBlobs — blob-SDK boundary and time-logic
+ *
+ * Wave 4 RECLASS (PP-x4li.1.4): two blocks were migrated to
+ * src/test/integration/blob-cleanup.test.ts because their real assertion
+ * was about DB-state (which blobs are referenced per the real DB):
+ *
+ *   RECLASSED → integration:
+ *   - getReferencedBlobUrls "collects avatar URLs and image URLs"
+ *   - cleanupOrphanedBlobs "does not delete referenced blobs"
+ *
+ *   KEPT here (blob-SDK / time-logic, no DB-state dependency):
+ *   - "returns zero counts when storage is empty"
+ *   - "skips orphaned blobs within the 24-hour grace period"
+ *   - "deletes orphaned blobs older than the grace period"
+ *   - "handles deletion errors gracefully"
+ *   - "paginates through blob listing"
+ *
+ * ~/server/db is mocked here because these tests only care about the
+ * @vercel/blob SDK boundary and the grace-period time logic. The DB mock
+ * always returns empty sets so no blob is ever "referenced".
+ */
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock @vercel/blob
@@ -40,7 +63,7 @@ vi.mock("~/server/db/schema", () => ({
   },
 }));
 
-import { cleanupOrphanedBlobs, getReferencedBlobUrls } from "./cleanup";
+import { cleanupOrphanedBlobs } from "./cleanup";
 
 /** Helper to build a chainable select → from → where mock */
 function chainableSelect(rows: Record<string, unknown>[]) {
@@ -88,33 +111,6 @@ describe("cleanupOrphanedBlobs", () => {
     expect(result.deletedBlobs).toBe(0);
     expect(result.skippedGracePeriod).toBe(0);
     expect(result.errors).toEqual([]);
-  });
-
-  it("does not delete referenced blobs", async () => {
-    const referencedUrl = "https://store.blob.vercel-storage.com/avatar.jpg";
-    const oldDate = new Date("2025-06-10T00:00:00Z");
-
-    mockList.mockResolvedValue({
-      blobs: [{ url: referencedUrl, uploadedAt: oldDate }],
-      hasMore: false,
-      cursor: "",
-    });
-
-    const avatarChain = chainableSelect([{ url: referencedUrl }]);
-    const imageChain = chainableSelect([]);
-    let selectCallCount = 0;
-    mockSelect.mockImplementation(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) return { from: avatarChain.from };
-      return { from: imageChain.from };
-    });
-
-    const result = await cleanupOrphanedBlobs();
-
-    expect(result.totalBlobs).toBe(1);
-    expect(result.referencedBlobs).toBe(1);
-    expect(result.deletedBlobs).toBe(0);
-    expect(mockDel).not.toHaveBeenCalled();
   });
 
   it("skips orphaned blobs within the 24-hour grace period", async () => {
@@ -243,34 +239,5 @@ describe("cleanupOrphanedBlobs", () => {
     expect(mockList).toHaveBeenCalledWith(
       expect.objectContaining({ cursor: "cursor-1" })
     );
-  });
-});
-
-describe("getReferencedBlobUrls", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("collects avatar URLs and image URLs", async () => {
-    const avatarUrl = "https://store.blob.vercel-storage.com/avatar.jpg";
-    const fullUrl = "https://store.blob.vercel-storage.com/full.jpg";
-    const croppedUrl = "https://store.blob.vercel-storage.com/cropped.jpg";
-
-    const avatarChain = chainableSelect([{ url: avatarUrl }]);
-    const imageChain = chainableSelect([{ fullUrl, croppedUrl }]);
-
-    let selectCallCount = 0;
-    mockSelect.mockImplementation(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) return { from: avatarChain.from };
-      return { from: imageChain.from };
-    });
-
-    const urls = await getReferencedBlobUrls();
-
-    expect(urls.has(avatarUrl)).toBe(true);
-    expect(urls.has(fullUrl)).toBe(true);
-    expect(urls.has(croppedUrl)).toBe(true);
-    expect(urls.size).toBe(3);
   });
 });

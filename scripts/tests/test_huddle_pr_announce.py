@@ -9,7 +9,33 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+import pytest
+
 HOOK_PATH = Path(__file__).parent.parent / "hooks" / "huddle-pr-announce.sh"
+
+
+@pytest.fixture(autouse=True)
+def ensure_huddle_config() -> Iterator[None]:
+    repo_root = Path(__file__).parent.parent.parent
+    huddle_dir = repo_root / ".agents" / "huddle"
+    config_file = huddle_dir / "config.json"
+
+    existed = config_file.exists()
+    old_content = None
+    if existed:
+        old_content = config_file.read_text()
+    else:
+        huddle_dir.mkdir(parents=True, exist_ok=True)
+        config_file.write_text('{"root_bead_id": "PP-root-123"}')
+
+    try:
+        yield
+    finally:
+        if not existed:
+            if config_file.exists():
+                config_file.unlink()
+        elif old_content is not None:
+            config_file.write_text(old_content)
 
 
 @contextmanager
@@ -40,16 +66,35 @@ def run_hook(
     if env_modifications:
         env.update(env_modifications)
 
-    process = subprocess.Popen(
-        ["bash", str(HOOK_PATH)],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        env=env,
-        text=True,
-    )
-    stdout, stderr = process.communicate(input=json.dumps(stdin_data))
-    return process.returncode, stdout, stderr
+    # Ensure a stub 'bd' exists on PATH so command -v bd doesn't fail the hook,
+    # and bd comments/show work correctly.
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        bd_stub = Path(tmp_dir) / "bd"
+        bd_stub.write_text("""#!/usr/bin/env bash
+if [[ "$1" == "comments" ]]; then
+  echo '[]'
+elif [[ "$1" == "show" ]]; then
+  echo '[{"notes": "{\\"today_bead\\": {\\"id\\": \\"PP-today-123\\"}}"}]'
+fi
+exit 0
+""")
+        bd_stub.chmod(
+            bd_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        current_path = env.get("PATH", "")
+        env["PATH"] = f"{tmp_dir}{os.pathsep}{current_path}"
+
+        process = subprocess.Popen(
+            ["bash", str(HOOK_PATH)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+            text=True,
+        )
+        stdout, stderr = process.communicate(input=json.dumps(stdin_data))
+        return process.returncode, stdout, stderr
 
 
 # ---------------------------------------------------------------------------

@@ -375,6 +375,8 @@ export const timelineEvents = pgTable(
       t.machineId,
       t.tag
     ),
+    authorIdIdx: index("idx_timeline_events_author_id").on(t.authorId),
+    deletedByIdx: index("idx_timeline_events_deleted_by").on(t.deletedBy),
   })
 ).enableRLS();
 
@@ -423,6 +425,7 @@ export const timelineEventPeople = pgTable(
     eventIdIdx: index("idx_timeline_event_people_event_id").on(t.eventId),
     // The signup conversion's rewrite WHERE clause.
     invitedIdIdx: index("idx_timeline_event_people_invited_id").on(t.invitedId),
+    userIdIdx: index("idx_timeline_event_people_user_id").on(t.userId),
   })
 ).enableRLS();
 

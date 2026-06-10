@@ -1,10 +1,13 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
 import { createIssue } from "~/services/issues";
+import { dispatchNotification } from "~/lib/notifications";
 import {
   reportError,
   serverActionError,
@@ -262,7 +265,7 @@ export async function submitPublicIssueAction(
     "Submitting unified issue report..."
   );
   try {
-    const issue = await createIssue({
+    const { issue, deliveryPlan } = await createIssue({
       title,
       description: description ?? null,
       machineInitials: machine.initials,
@@ -276,6 +279,11 @@ export async function submitPublicIssueAction(
       assignedTo: finalAssignedTo ?? null,
       autoWatchReporter: watchIssue,
     });
+
+    // Deliver notifications AFTER the transaction has committed and after the
+    // HTTP response is sent. The issue is durably saved at this point, so a
+    // slow or failed external send can no longer roll it back. (PP-2053.3)
+    after(() => dispatchNotification(deliveryPlan));
 
     // 7. Link uploaded images
     const imagesMetadataStr = formData.get("imagesMetadata");
@@ -406,6 +414,15 @@ export async function submitPublicIssueAction(
     return {
       error: "Unable to submit the issue. Please try again.",
     };
+  } finally {
+    // Flush queued Sentry events before the serverless function returns and the
+    // instance can be frozen/reclaimed. Without this, an error captured by the
+    // catch above (or any best-effort reportError on this request) can be
+    // dropped on exit — the silence that hid the Doodle Bug incident. With no
+    // events pending this settles in a microtask; when events are queued it
+    // waits up to 2s to send them — the intended trade for guaranteed delivery
+    // on this low-frequency submit path. (PP-2053.1)
+    await Sentry.flush(2000);
   }
 }
 

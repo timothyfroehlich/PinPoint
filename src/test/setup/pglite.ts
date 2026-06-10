@@ -17,6 +17,7 @@ import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { beforeAll, afterEach } from "vitest";
 import * as schema from "~/server/db/schema";
+import { runInTransactionContext } from "~/server/db/transaction-context";
 import { cleanupTestDb as runSchemaCleanup } from "~/test/setup/cleanup";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,7 +40,20 @@ export async function getTestDb(): Promise<PgliteDatabase<typeof schema>> {
   pgliteInstance = new PGlite({ extensions: { citext } });
 
   // Create Drizzle instance
-  testDb = drizzle(pgliteInstance, { schema });
+  const drizzleDb = drizzle(pgliteInstance, { schema });
+
+  // Mirror the production tripwire (CORE-ARCH-011, the Doodle Bug): run every
+  // transaction callback inside the in-transaction context so the side-effect
+  // wrappers throw if invoked pre-commit. This is what exercises the tripwire
+  // in integration tests and CI.
+  const baseTransaction = drizzleDb.transaction.bind(drizzleDb);
+  const wrappedTransaction: typeof drizzleDb.transaction = (callback, config) =>
+    baseTransaction(
+      (tx) => runInTransactionContext(() => callback(tx)),
+      config
+    );
+  drizzleDb.transaction = wrappedTransaction;
+  testDb = drizzleDb;
 
   // Create auth schema for tests (required for auth.users table)
   await pgliteInstance.exec('CREATE SCHEMA IF NOT EXISTS "auth";');

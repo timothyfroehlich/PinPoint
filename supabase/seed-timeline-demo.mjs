@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* eslint-disable no-undef */
 /**
  * Machine Timeline Demo Seed (PP-0x98) — LOCAL ONLY
  *

@@ -381,8 +381,7 @@ export async function signupAction(
     }
 
     // Check if email confirmation is required (user created but no session)
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- data.user check might be redundant by types but ensuring safety
-    if (data.user && !data.session) {
+    if (!data.session) {
       log.info(
         { userId: data.user.id, action: "signup", email: data.user.email },
         "User signed up, confirmation required (no session)"

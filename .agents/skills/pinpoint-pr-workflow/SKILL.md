@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, Copilot review (via MCP), readiness labeling, gate-enforced merge. Use when committing changes, opening PRs, watching CI, addressing Copilot reviews, or merging.
+description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, review-comment handling (via MCP), readiness labeling, gate-enforced merge. Use when committing changes, opening PRs, watching CI, addressing review comments, or merging.
 ---
 
 # PinPoint PR Workflow
@@ -90,7 +90,7 @@ Open as draft if WIP. Mark ready when CI has been run at least once locally.
 
 ---
 
-## Phase 3: Review (CI + Copilot + label)
+## Phase 3: Review (CI + label)
 
 ### 3.1 Watch CI
 
@@ -105,11 +105,11 @@ timeout_ms: 3600000
 )
 ```
 
-Exit 0 = all passed or stopped for new Copilot review. Exit 1 = failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
+Exit 0 = all passed. Exit 1 = failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
 
-### 3.2 Read Copilot review state
+### 3.2 Check for review comments
 
-Use MCP:
+If the PR has review comments (from Tim or another agent), read them via MCP:
 
 ```
 mcp__github__pull_request_read(
@@ -127,13 +127,11 @@ Returns array of review threads. Each thread has:
 - `is_outdated`
 - `comments[]` with `path`, `line`, `body`, `author.login`, `html_url`, and crucially a thread node ID for resolving
 
-Filter to threads where first comment's author is `copilot-pull-request-reviewer` or `copilot-pull-request-reviewer[bot]`.
+### 3.3 Address review comments
 
-### 3.3 Address Copilot comments
+For each unresolved thread, evaluate critically. Not all suggestions warrant code changes.
 
-For each unresolved Copilot thread, evaluate critically. Not all suggestions warrant code changes.
-
-**To fix**: edit code, commit, push. Copilot auto-resolves threads on detecting the fix commit. No reply needed.
+**To fix**: edit code, commit, push, then resolve the thread.
 
 **To decline**: post a one-sentence justification reply AND resolve the thread:
 
@@ -165,25 +163,9 @@ pullNumber: <PR>
 
 Sign replies with your agent name (`—Claude-Plunger`, `—Claude-Spinner`, etc.).
 
-### 3.4 Verify Copilot reviewed the latest commit
+### 3.4 Apply `ready-for-review` label
 
-This catches the silent-skip case where `update_pull_request_branch` or merge-from-main commits don't trigger Copilot's `review_requested` event (per PR #1342 case).
-
-Compare:
-
-- `pull_request_read(method: "get_reviews")` → latest `submitted_at` for a Copilot review
-- `get_commit(sha: <head_sha>)` → `commit.committer.date`
-
-If head is newer than the latest Copilot review:
-
-- Elapsed < 600s → wait, Copilot may still be reviewing
-- Elapsed >= 600s → call `request_copilot_review` once; if no review after another 60s, proceed (per the 10-minute threshold in `_pr-gates.sh`)
-
-`merge-pr.sh` re-checks this at merge time, so the skill version is advisory; the script enforces.
-
-### 3.5 Apply `ready-for-review` label
-
-Once CI green + zero unresolved Copilot threads + Copilot reviewed head commit + no merge conflict:
+Once CI green + zero unresolved review threads + no merge conflict:
 
 1. Read current labels via `pull_request_read(method: "get")` and extract `.labels[]`.
 2. Build new labels array: existing labels + `"ready-for-review"`.
@@ -218,11 +200,9 @@ bash scripts/workflow/merge-pr.sh <PR>
 Flags (stackable, order-independent):
 
 - `--dry-run` — preview only, no action.
-- `--force` — bypass `currency` + `threads` gates. Requires manual permission approval.
 - `--bypass-merge-requirements` — bypass `ci` gate AND pass `--admin` to `gh pr merge`,
   overriding GitHub branch-protection rules. Requires manual permission approval.
 
-Combine `--force --bypass-merge-requirements` to bypass `currency` + `threads` + `ci` together.
 The `no_conflict` gate is NEVER bypassable — GitHub rejects conflicting merges regardless of `--admin`.
 
 ### 4.2 Interpret output
@@ -235,8 +215,6 @@ Script emits structured status tokens:
 | `FAIL: <gate>: <state>`  | Gate failed                                            | Fix underlying issue, push, retry     |
 | `WAIT: <gate>: <state>`  | Transient (e.g., GitHub computing mergeable)           | Retry merge-pr.sh after a few seconds |
 | `BLOCK: <gate>: <state>` | State mismatch requiring action (e.g., merge conflict) | Resolve, push, retry                  |
-| `WARN: <gate>: <state>`  | Permitted to proceed with notice                       | Continue, but be informed             |
-| `SKIP: <gate>: <reason>` | Gate doesn't apply                                     | Continue                              |
 
 On any FAIL: script removes `ready-for-review` label if present (the label's contract is "click-merge-without-thinking"; if a gate fails at merge time, that contract is broken). Exit 1.
 
@@ -244,23 +222,16 @@ On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --match-
 
 ### 4.3 Escape hatches
 
-**`--force`** — for Copilot/review-state issues:
-
-- API failure on threads or currency gate where you've manually verified the underlying state is fine
-- Copilot has silently-skipped a merge-from-main commit AND you've reviewed the diff manually
-- You're aware threads or currency gates would fail and you're explicitly accepting
-
 **`--bypass-merge-requirements`** — for CI/branch-protection issues:
 
 - A required check is failing for known-irrelevant reasons (infrastructure flake, unrelated job)
   AND you've manually verified the change is safe
 - An emergency hotfix where waiting for CI is not acceptable
-- Combine with `--force` when both review-state and CI gates need to be skipped
 
 Do NOT bypass when:
 
 - Merge conflict exists (`no_conflict` gate is never bypassable; conflicts can't be ignored)
-- You haven't manually verified the underlying state. Both flags require manual permission approval
+- You haven't manually verified the underlying state. The flag requires manual permission approval
   in the chat — treat the approval prompt as a "are you sure?" checkpoint.
 
 ### 4.4 Bypass the hook (emergency only)

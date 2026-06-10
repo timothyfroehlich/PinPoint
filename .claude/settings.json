@@ -4,7 +4,6 @@
       "Bash(supabase db push:*)"
     ],
     "ask": [
-      "Bash(*merge-pr.sh*--force*)",
       "Bash(*merge-pr.sh*--bypass-merge-requirements*)"
     ]
   },
@@ -84,28 +83,6 @@
             "type": "command",
             "command": "HUDDLE_THROTTLE_SECONDS=180 bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/huddle-poll.sh",
             "timeout": 10000
-          }
-        ]
-      }
-    ],
-    "TaskCompleted": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/definition-of-done.sh",
-            "timeout": 120000
-          }
-        ]
-      }
-    ],
-    "TeammateIdle": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/push-check.sh",
-            "timeout": 15000
           }
         ]
       }

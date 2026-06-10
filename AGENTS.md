@@ -29,6 +29,7 @@
 15. **Baseline Widely available is the UI floor** (CORE-UI-005, CORE-UI-006): reach for `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, etc. directly — no polyfills, no feature detection. Look up modern patterns via the `modern-web-guidance` plugin (`npx -y modern-web-guidance@latest search "<query>"` then `retrieve "<id>"`); each guide tags its Baseline status. Newly-available features (Popover API, View Transitions, anchor positioning, scroll-driven animations) require a per-feature opt-in documented in `pinpoint-design-bible` §19.
 16. **Form correctness** (CORE-FORM-001..006): right `type` (`email`/`tel`/`url`/`password`), correct `autocomplete` token (`current-password` / `new-password` / `off` on confirm), `:user-invalid` styling on the shared Input, `aria-invalid` synced on blur, visible required-field indicators, `enterkeyhint` on sequential mobile fields.
 17. **Accessibility floor** (CORE-A11Y-001..006): skip-to-main link, `motion-reduce:` paired with animations, `<th scope="col">` + `aria-sort` + accessible name on data tables, real `<button>` (never `<div role="button">`), `title` is not a tooltip, `inert` on background regions when a modal opens.
+18. **No side effects inside DB transactions** (CORE-ARCH-011): external/non-transactional effects (HTTP, email, Discord, blob, Vault RPC) never run inside `db.transaction` — fetch inputs before it, deliver effects after commit (`after()` + `planNotification`/`dispatchNotification`). A runtime tripwire throws `SideEffectInTransactionError` if violated. (The Doodle Bug, PP-2053.)
 
 ### 2.2 Workflow
 
@@ -43,23 +44,22 @@
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
-| Category    | Skill                            | When to use                                                             |
-| :---------- | :------------------------------- | :---------------------------------------------------------------------- |
-| UI          | `pinpoint-ui`                    | Components, shadcn/ui, forms, responsive design                         |
-| UI          | `pinpoint-design-bible`          | Design system, page archetypes, spacing, surfaces                       |
-| TypeScript  | `pinpoint-typescript`            | Type errors, generics, Drizzle types                                    |
-| Testing     | `pinpoint-testing`               | Writing tests, PGlite, test-layer decisions                             |
-| Testing     | `pinpoint-e2e`                   | E2E tests, worker isolation, Playwright stability                       |
-| Security    | `pinpoint-security`              | Auth, CSP, Zod, Supabase SSR                                            |
-| Patterns    | `pinpoint-patterns`              | Server Actions, data fetching, architecture                             |
-| Workflow    | `pinpoint-prototype-mode`        | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt |
-| Workflow    | `pinpoint-briefing`              | Session-start health review                                             |
-| Workflow    | `pinpoint-pr-workflow`           | Full PR lifecycle: commit, push, CI, Copilot, merge                     |
-| Workflow    | `pinpoint-orchestrator`          | Parallel subagent work in worktrees                                     |
-| Workflow    | `pinpoint-dispatch-e2e-teammate` | Dispatching a teammate end-to-end                                       |
-| Antigravity | `pinpoint-agy-triage`            | Grooming: evaluate whether a bead is agy-ready/agy-ui                   |
-| Antigravity | `pinpoint-agy-dispatch`          | Emit an Antigravity copy-paste prompt for a chosen bead                 |
-| Antigravity | `pinpoint-agy-execute`           | Runbook for Antigravity to execute an agy-ready bead end-to-end         |
+| Category    | Skill                     | When to use                                                             |
+| :---------- | :------------------------ | :---------------------------------------------------------------------- |
+| UI          | `pinpoint-ui`             | Components, shadcn/ui, forms, responsive design                         |
+| UI          | `pinpoint-design-bible`   | Design system, page archetypes, spacing, surfaces                       |
+| TypeScript  | `pinpoint-typescript`     | Type errors, generics, Drizzle types                                    |
+| Testing     | `pinpoint-testing`        | Writing tests, PGlite, test-layer decisions                             |
+| Testing     | `pinpoint-e2e`            | E2E tests, worker isolation, Playwright stability                       |
+| Security    | `pinpoint-security`       | Auth, CSP, Zod, Supabase SSR                                            |
+| Patterns    | `pinpoint-patterns`       | Server Actions, data fetching, architecture                             |
+| Workflow    | `pinpoint-prototype-mode` | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt |
+| Workflow    | `pinpoint-briefing`       | Session-start health review                                             |
+| Workflow    | `pinpoint-pr-workflow`    | Full PR lifecycle: commit, push, CI, merge                              |
+| Workflow    | `pinpoint-orchestrator`   | Parallel subagent work in worktrees: dispatch, monitor, follow-up       |
+| Antigravity | `pinpoint-agy-triage`     | Grooming: evaluate whether a bead is agy-ready/agy-ui                   |
+| Antigravity | `pinpoint-agy-dispatch`   | Emit an Antigravity copy-paste prompt for a chosen bead                 |
+| Antigravity | `pinpoint-agy-execute`    | Runbook for Antigravity to execute an agy-ready bead end-to-end         |
 
 ## 4. Environment
 
@@ -71,6 +71,9 @@ One-time install for tools the workflow scripts depend on:
   - macOS: `brew install parallel`
   - Linux: `apt install parallel`
   - Without it, `pnpm run preflight` fails with a clear install hint; use `pnpm run preflight:unlocked` to bypass the cap.
+- **pytest** (used by `pnpm run check:pytest` to run hook tests):
+  - macOS: `brew install pytest`
+  - Linux: `pipx install pytest` (requires pipx: `apt install pipx`)
 
 ### Worktrees & ports
 
@@ -141,7 +144,7 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 
 - **Check for conflicts first**: `gh pr view <PR> --json mergeable,mergeStateStatus`. `DIRTY`/`CONFLICTING` means GitHub silently skips workflow runs until you resolve. `pnpm run check` includes a `check:behind-main` warning.
 - **Required check**: only `CI Gate` (ruleset `6326455`). Vercel is not required. `BLOCKED` while E2E is still running is normal.
-- **Vercel preview migrations**: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The `Supabase Branch Setup` GHA workflow handles migrations on labeled previews. Production deploys still migrate.
+- **Vercel preview migrations**: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The on-demand `Preview Controller` workflow migrates + seeds the branch DB before building the preview (see §6 "Preview deployments"). Production deploys still migrate.
 
 ### Migration conflicts
 
@@ -158,14 +161,9 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 Before merging any migration PR: every new `.sql` has a matching `_snapshot.json`; `pnpm db:generate` reports "No schema changes".
 
-### Copilot reviews
+### Review comments
 
-Full protocol: `pinpoint-pr-workflow` skill (Phase 3). Summary:
-
-1. Read unresolved comments via `mcp__github__pull_request_read(method: "get_review_comments", …)`. Filter `author.login` = `copilot-pull-request-reviewer[bot]`.
-2. Fix the code, OR decline with a one-sentence reply (`add_reply_to_pull_request_comment`) and resolve the thread (`pull_request_review_write(method: "resolve_thread")`).
-3. Applied suggestions auto-resolve when Copilot detects the fix commit.
-4. Sign replies with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). Declined comments must get a reply — no silent ignores.
+If a PR accumulates review comments (from Tim or another agent): fix the code, OR decline with a one-sentence reply (`add_reply_to_pull_request_comment`) and resolve the thread (`pull_request_review_write(method: "resolve_thread")`). Sign replies with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). Declined comments must get a reply — no silent ignores.
 
 ### Parallel subagent work
 
@@ -194,11 +192,19 @@ When a decision is **visual or hard to convey in prose** — color/contrast, spa
 - Vercel runs `pnpm run migrate:production` on build (production only).
 - Stuck migration fix: `POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`.
 
-### Preview deployments (Supabase branching)
+### Preview deployments (on-demand, TTL'd Supabase branches)
 
-- Default: PRs do **not** get a usable branch DB (saves ~$0.32/day/branch).
-- Enable: add the `preview` label. Within ~5 min, `Supabase Branch Setup` GHA runs Drizzle migrations + seed.
-- Cleanup: `Supabase Branch Cleanup` cron runs every 3h.
+Native Supabase auto-branching is **disabled** — no PR gets a preview by default (zero branches, zero cost). Previews are created on demand via PR comment commands and torn down on a TTL.
+
+- **Control surface = PR comments** (from authors with write access only):
+  - `/preview` — create (or restart after expiry) a Supabase branch, migrate + seed it, wire its creds into the Vercel preview, and post a sticky status comment with the live URL and a 48h expiry.
+  - `/preview extend` — push the expiry +48h. No DB work.
+  - `/preview stop` — tear down the branch + Vercel env vars now.
+- **State**: a single sticky bot comment per PR, keyed by `<!-- pinpoint-preview-status -->`, holds the `Expires:` timestamp. It's the source of truth for TTL.
+- **Reaper**: `Preview Reaper` workflow runs hourly (+ `workflow_dispatch`). It deletes branches past expiry or whose PR is closed/merged, and flips the sticky comment to "expired — comment `/preview` to restart". "Restart" = comment `/preview` again (deterministic recreate, since these PRs carry migrations + seed).
+- **Workflows / scripts**: `.github/workflows/preview-control.yaml`, `.github/workflows/preview-reaper.yaml`, `scripts/workflow/preview/*.sh`.
+- **Vercel wiring**: with native auto-branching off, the controller (1) sets the branch DB creds as **git-branch-scoped Preview env vars** (`vercel env add … preview <branch>`), then (2) creates a **git-integration deployment** from the branch HEAD via the Vercel REST API (`POST /v13/deployments` with `gitSource`). A git-integration build reads the branch-scoped env with precedence and is assigned the stable `pin-point-git-<branch>-advacar.vercel.app` alias — which Vercel re-points to every later push, so **one URL survives new commits** while staying on the branch DB. A bare CLI `vercel deploy` does **not** work here (it is not branch-linked: no alias, no branch env). Teardown removes the env vars.
+- **Required secrets**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID` are repo-level (existing). `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` are scoped to the `Preview` GitHub Environment, so both jobs declare `environment: Preview` to read them (repo-level secrets stay readable).
 - Env var fallbacks in `server.ts`/`middleware.ts` cover both PinPoint and integration naming.
 
 ## 7. Documentation

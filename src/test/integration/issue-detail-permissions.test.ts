@@ -31,8 +31,16 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+// after() needs a request scope at runtime; in tests run the callback inline. (PP-2053.3)
+vi.mock("next/server", () => ({
+  after: (cb: () => unknown) => {
+    void cb();
+  },
+}));
+
 vi.mock("~/lib/notifications", () => ({
-  createNotification: vi.fn().mockResolvedValue(undefined),
+  planNotification: vi.fn().mockResolvedValue({ deliveries: [] }),
+  dispatchNotification: vi.fn().mockResolvedValue(undefined),
   getChannels: vi.fn().mockResolvedValue([]),
 }));
 

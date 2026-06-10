@@ -167,6 +167,8 @@ When the hook finds new comments since this worktree's last cursor, it injects t
 
 Comments signed by your own session (matching `—<YourName>` or `—Claude-<YourName>`) are filtered out — you won't see your own posts re-injected.
 
+**Peer-response etiquette:** when a peer's kickoff or update scrolls by, reply only if you have _specific relevant context_ — a conflict with what they're touching, a gotcha you hit there, a related in-flight branch or bead. Don't ack-spam ("sounds good", "noted") — silence is the correct response when you have nothing concrete to add.
+
 ### Throttle override
 
 Edit `.claude/settings.json` and update `HUDDLE_THROTTLE_SECONDS=180` on the PostToolUse hook command line. Setting it to `0` polls on every tool call — useful for debugging only. To stop PostToolUse polling entirely, remove the entire PostToolUse entry from `.claude/settings.json` (UserPromptSubmit polling continues regardless).
@@ -180,6 +182,7 @@ Edit `.claude/settings.json` and update `HUDDLE_THROTTLE_SECONDS=180` on the Pos
 
 **What still requires a manual post** (the judgment calls automation can't make):
 
+- **A session kickoff** — once per session, after you understand the goal, for substantive work or investigations (not trivial Q&A or one-line fixes): "Starting: <what> in <area/branch>. Ping me if you have context." This lets parallel sessions learn about your work early — before something ships — so anyone with a relevant gotcha, conflict, or in-flight branch can chime in.
 - A bead you filed for a non-obvious finding: "Filed PP-xxx: <finding>."
 - A coordination need — file/area conflict risk: "Working on <file/area> in <branch>; flag if conflict."
 
@@ -196,7 +199,7 @@ Things NOT worth posting:
 
 - Every single commit
 - Internal debugging chatter
-- "I started working on X" (merges and PR-opens are already auto-posted)
+- A _bare_ status ping with no scope or invitation ("I started working on X") — that's noise. But a **scoped kickoff with an invitation** (specific area/branch + "ping me if you have context") **is** worth posting, once per session, for substantive work — see "What still requires a manual post" above.
 
 Sign with `—<YourFullRegisteredName>` (em-dash + your registered name). The self-filter matches this suffix to suppress your own echoes.
 

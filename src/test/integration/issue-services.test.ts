@@ -32,7 +32,7 @@ import {
   reassignIssueMachine,
   updateIssueTitle,
 } from "~/services/issues";
-import { createNotification } from "~/lib/notifications";
+import { planNotification } from "~/lib/notifications";
 import { plainTextToDoc, type ProseMirrorDoc } from "~/lib/tiptap/types";
 import { resolveIssueReporter } from "~/lib/issues/utils";
 
@@ -44,7 +44,11 @@ import { resolveIssueReporter } from "~/lib/issues/utils";
 // ~/lib/timeline/events or ~/lib/timeline/issue-timeline-helpers.
 // ---------------------------------------------------------------------------
 vi.mock("~/lib/notifications", () => ({
-  createNotification: vi.fn().mockResolvedValue(undefined),
+  // Services now plan inside the tx and return the plan; the action dispatches
+  // post-commit. These tests call the services directly, so they assert the
+  // planning payload. planNotification must resolve a DeliveryPlan so the
+  // service's `deliveries.push(...plan.deliveries)` works. (PP-2053.3)
+  planNotification: vi.fn().mockResolvedValue({ deliveries: [] }),
   getChannels: vi.fn().mockResolvedValue([]),
 }));
 
@@ -281,7 +285,7 @@ describe("Issue Service Functions (Integration)", () => {
         reporterEmail: "guest@example.com",
       };
 
-      const issue = await createIssue(guestInfo);
+      const { issue } = await createIssue(guestInfo);
 
       expect(issue.reporterName).toBe(guestInfo.reporterName);
       expect(issue.reporterEmail).toBe(guestInfo.reporterEmail);
@@ -307,7 +311,7 @@ describe("Issue Service Functions (Integration)", () => {
         severity: "major" as const,
       };
 
-      const issue = await createIssue(anonInfo);
+      const { issue } = await createIssue(anonInfo);
 
       expect(issue.reporterName).toBeNull();
       expect(issue.reporterEmail).toBeNull();
@@ -333,7 +337,7 @@ describe("Issue Service Functions (Integration)", () => {
         reportedBy: testUser.id,
       };
 
-      const issue = await createIssue(memberInfo);
+      const { issue } = await createIssue(memberInfo);
 
       expect(issue.reportedBy).toBe(testUser.id);
       expect(issue.reporterName).toBeNull();
@@ -532,7 +536,7 @@ describe("Issue Service Functions (Integration)", () => {
     it("auto-watches the reporter when autoWatchReporter is true (default)", async () => {
       const db = await getTestDb();
 
-      const issue = await createIssue({
+      const { issue } = await createIssue({
         title: "Auto-watched issue",
         machineInitials: testMachine.initials,
         severity: "minor" as const,
@@ -553,7 +557,7 @@ describe("Issue Service Functions (Integration)", () => {
     it("does not auto-watch the reporter when autoWatchReporter is false", async () => {
       const db = await getTestDb();
 
-      const issue = await createIssue({
+      const { issue } = await createIssue({
         title: "Unwatched issue",
         machineInitials: testMachine.initials,
         severity: "minor" as const,
@@ -575,7 +579,7 @@ describe("Issue Service Functions (Integration)", () => {
 
       // Guest/anonymous report — reportedBy is null, so the watcher insert
       // is skipped regardless of the autoWatchReporter flag.
-      const issue = await createIssue({
+      const { issue } = await createIssue({
         title: "Anonymous issue",
         machineInitials: testMachine.initials,
         severity: "minor" as const,
@@ -687,7 +691,7 @@ describe("Issue Service Functions (Integration)", () => {
         actorId: testUser.id,
       });
 
-      const mockFn = createNotification as ReturnType<typeof vi.fn>;
+      const mockFn = planNotification as ReturnType<typeof vi.fn>;
       expect(mockFn).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "issue_assigned",
@@ -729,7 +733,7 @@ describe("Issue Service Functions (Integration)", () => {
         actorId: testUser.id,
       });
 
-      const mockFn = createNotification as ReturnType<typeof vi.fn>;
+      const mockFn = planNotification as ReturnType<typeof vi.fn>;
       expect(mockFn).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "issue_assigned",
@@ -751,14 +755,14 @@ describe("Issue Service Functions (Integration)", () => {
   // -----------------------------------------------------------------------
   describe("createIssue notification dispatch", () => {
     it("sends a new_issue notification to machine owner (block 3)", async () => {
-      const issue = await createIssue({
+      const { issue } = await createIssue({
         title: "New Notification Issue",
         machineInitials: testMachine.initials,
         severity: "minor" as const,
         reportedBy: testUser.id,
       });
 
-      const mockFn = createNotification as ReturnType<typeof vi.fn>;
+      const mockFn = planNotification as ReturnType<typeof vi.fn>;
       expect(mockFn).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "new_issue",
@@ -790,7 +794,7 @@ describe("Issue Service Functions (Integration)", () => {
         ],
       };
 
-      const issue = await createIssue({
+      const { issue } = await createIssue({
         title: "Issue with Mentions",
         description,
         machineInitials: testMachine.initials,
@@ -798,7 +802,7 @@ describe("Issue Service Functions (Integration)", () => {
         reportedBy: testUser.id,
       });
 
-      const mockFn = createNotification as ReturnType<typeof vi.fn>;
+      const mockFn = planNotification as ReturnType<typeof vi.fn>;
       const mentionCalls = mockFn.mock.calls.filter(
         ([payload]: [{ type?: string }]) => payload.type === "mentioned"
       );
@@ -834,7 +838,7 @@ describe("Issue Service Functions (Integration)", () => {
         reportedBy: testUser.id,
       });
 
-      const mockFn = createNotification as ReturnType<typeof vi.fn>;
+      const mockFn = planNotification as ReturnType<typeof vi.fn>;
       const mentionCalls = mockFn.mock.calls.filter(
         ([payload]: [{ type?: string }]) => payload.type === "mentioned"
       );
@@ -858,7 +862,7 @@ describe("Issue Service Functions (Integration)", () => {
         ],
       };
 
-      const comment = await addIssueComment({
+      const { comment } = await addIssueComment({
         issueId: testIssue.id,
         content,
         userId: testUser.id,
@@ -875,7 +879,7 @@ describe("Issue Service Functions (Integration)", () => {
       expect(watchers.some((w) => w.userId === testUser.id)).toBe(true);
 
       // Verify notification dispatch
-      const mockFn = createNotification as ReturnType<typeof vi.fn>;
+      const mockFn = planNotification as ReturnType<typeof vi.fn>;
       expect(mockFn).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "new_comment",
@@ -918,7 +922,7 @@ describe("Issue Service Functions (Integration)", () => {
       expect(updated?.status).toBe("fixed");
 
       // Verify notification dispatch
-      const mockFn = createNotification as ReturnType<typeof vi.fn>;
+      const mockFn = planNotification as ReturnType<typeof vi.fn>;
       expect(mockFn).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "issue_status_changed",
@@ -944,6 +948,7 @@ describe("Issue Service Functions (Integration)", () => {
         issueId: testIssue.id,
         oldStatus: "new",
         newStatus: "new",
+        deliveryPlan: { deliveries: [] },
       });
 
       // Verify no timeline event was created
@@ -953,7 +958,7 @@ describe("Issue Service Functions (Integration)", () => {
       expect(events.filter((e) => e.isSystem)).toHaveLength(0);
 
       // Verify no notification dispatched
-      const mockFn = createNotification as ReturnType<typeof vi.fn>;
+      const mockFn = planNotification as ReturnType<typeof vi.fn>;
       expect(mockFn).not.toHaveBeenCalled();
     });
   });

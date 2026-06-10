@@ -1,6 +1,6 @@
 ---
 name: pinpoint-orchestrator
-description: Orchestrate parallel subagent work in git worktrees using resumed standalone subagents (primary) or Agent Teams (fallback).
+description: Orchestrate parallel subagent work in git worktrees — task selection, end-to-end dispatch, monitoring, follow-up, and cleanup.
 ---
 
 # Pinpoint Orchestrator
@@ -10,9 +10,10 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 ## When to Use This Skill
 
 - Multiple independent beads issues ready to work (`bd ready` shows 2+ items)
-- Copilot review feedback on multiple PRs needs addressing
+- Assigning an issue end-to-end to a subagent (implement → PR → CI green)
+- Review feedback on multiple PRs needs addressing
 - Parallel feature development across branches
-- User says "spin up agents", "orchestrate", "parallel work", "use teams"
+- User says "spin up agents", "orchestrate", "parallel work", "dispatch"
 
 ## Scripts Reference
 
@@ -21,58 +22,42 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 ./scripts/workflow/orchestration-status.sh               # PR dashboard + worktree health + beads + security alerts
 ./scripts/workflow/orchestration-status.sh --prs-only    # Just PR dashboard
 ./scripts/workflow/orchestration-status.sh --security-only  # Just Dependabot alerts
+# (also: --worktrees-only, --beads-only)
 
 # PR monitoring
-./scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + Copilot + merge status table (all open PRs if no args)
+./scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + merge status table (all open PRs if no args)
+./scripts/workflow/pr-watch.py <PR>                      # Stream CI events (Monitor-tool compatible; canonical)
+./scripts/workflow/pr-watch.py --check-ready <PR>        # One-shot readiness audit (pass/fail; exits 0 if ready)
 
-# Copilot thread inspection + reply → use MCP via pinpoint-pr-workflow skill Phase 3
+# Review thread inspection + reply → use MCP via pinpoint-pr-workflow skill Phase 3
 # (mcp__github__pull_request_read / add_reply_to_pull_request_comment / pull_request_review_write)
 
-# Readiness label + merge: pinpoint-pr-workflow skill Phases 3.5 + 4
+# Readiness label + merge: pinpoint-pr-workflow skill Phases 3.4 + 4
 # Apply label via mcp__github__issue_write or `gh pr edit --add-label`
-bash scripts/workflow/merge-pr.sh <PR>                   # Composite gate-then-merge enforcer (--dry-run, --force)
+bash scripts/workflow/merge-pr.sh <PR>                   # Composite gate-then-merge enforcer (--dry-run)
 bash scripts/workflow/merge-pr.sh <PR> --dry-run         # Preview gate evaluation without merging
 
-# CI watching
-./scripts/workflow/pr-watch.py <PR>                      # Stream CI + review events (Monitor-tool compatible; canonical)
-
-# Worktree health
+# Worktree health — covers manually created ../pinpoint-worktrees/* ONLY;
+# agent-created .claude/worktrees/* are handled by the WorktreeRemove hook and not scanned here
 ./scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
 ./scripts/workflow/stale-worktrees.sh --clean            # Auto-remove stale worktrees
 
 # Worktree management (post-checkout hook auto-configures ports + Supabase)
-git worktree add ../pinpoint-worktrees/<branch> -b <branch>  # Create worktree (hook runs scripts/worktree_setup.py)
 git worktree list                                             # Show all worktrees
-python3 scripts/worktree_cleanup.py ../pinpoint-worktrees/<branch>  # Full cleanup (Supabase stop, Docker volumes, manifest, worktree removal)
+python3 scripts/worktree_cleanup.py <worktree-path>           # Full cleanup (Supabase stop, Docker volumes, manifest, worktree removal)
 ```
 
 ---
 
-## Quality Gates
+## Lead Orchestrator Role
 
-### Standalone Subagents (Primary) — Self-Enforced
+You are a **coordinator, not an implementer**:
 
-Hooks don't fire for standalone subagents. Include in every prompt:
+- **DO** launch subagents, review their output, send them follow-up corrections
+- **DO** check CI dashboards, manage beads
+- **DON'T** directly fix code in worktrees — message the subagent instead
 
-- `pnpm run check` before returning
-- Self-check `.claude-task-contract` items
-- Structured return format with CI/Copilot status
-
-### Agent Teams (Fallback) — Hook-Enforced
-
-- **`TaskCompleted` hook** → runs `pnpm run check`
-- **`TeammateIdle` hook** → blocks idle if unpushed commits
-- Requires `isolation: "worktree"` for correct CWD (broken with `team_name` — see Phase 2)
-
-### Coverage Expectations by Change Type
-
-| Change Type        | Unit                  | Integration     | E2E                                        |
-| ------------------ | --------------------- | --------------- | ------------------------------------------ |
-| New server action  | Required              | Required        | Required (UI that calls it)                |
-| New UI component   | —                     | —               | Required (click every interactive element) |
-| Permission changes | Required (matrix)     | —               | Required (visible/hidden/disabled states)  |
-| Bug fix            | Required (regression) | If data-related | If UI-related                              |
-| Config/middleware  | —                     | Required        | Required (route behavior)                  |
+If a subagent can't be reached (GC'd, session ended), spawn a new one on the same branch.
 
 ---
 
@@ -94,15 +79,13 @@ Present options to user. Before proceeding, verify tasks are independent:
 
 `isolation: "worktree"` handles creation automatically. The Husky `post-checkout` hook runs `scripts/worktree_setup.py` to allocate ports and generate configs.
 
-> **Known bug — team_name**: `isolation: "worktree"` is silently ignored when `team_name` is set. For Agent Teams, create worktrees manually with `git worktree add`.
->
 > **Known bug — dispatch-from-linked-worktree** (anthropics/claude-code#47548): Dispatching `Agent(isolation: "worktree")` from inside a linked (non-primary) worktree, e.g. `.claude/worktrees/agent-*`, silently switches the parent worktree's branch to the subagent's new branch. Fires at N=1. **Always dispatch from the main worktree** — the original clone where `.git/` is a directory. The `WorktreeCreate` hook does NOT fix this bug (it is path-based, not race-based).
 >
 > **Parallel-batch race mitigated — hook active** (anthropics/claude-code#47266): The `.claude/hooks/worktree-create.sh` hook (PP-bg45) wraps `git worktree add` with `lockf(1)` (macOS `flock(2)` equivalent) on `~/.config/pinpoint/worktree-add.lock` — a kernel-level lock shared across all Claude sessions on the host — plus retry + exponential backoff. **Any N `Agent(isolation: "worktree")` calls per message are now safe from the main worktree** — the hook serializes worktree creation at the OS level. The prior N=1-per-message rule from PR #1353 is relaxed.
 >
 > **Fallback**: If the hook is disabled or missing, revert to the N=1-per-message rule: dispatch one, confirm `.claude/worktrees/agent-*` appeared on disk, then dispatch the next.
 
-Manual worktree creation is for the lead's own use or Agent Teams worktree setup:
+Manual worktree creation is for the lead's own use only:
 
 ```bash
 git worktree add ../pinpoint-worktrees/<branch-name> -b <branch-name>
@@ -112,49 +95,57 @@ git worktree add ../pinpoint-worktrees/<branch-name> -b <branch-name>
 
 ## Phase 3: Agent Dispatch
 
-### Option A: Standalone Subagents (Primary)
-
 ```
 Agent(
   subagent_type: "general-purpose",
-  model: "sonnet",
   isolation: "worktree",
   run_in_background: true,
   mode: "bypassPermissions",
-  prompt: "<full prompt — see agent-prompt-template.md>"
+  name: "<short-name>",          # optional but useful — makes the agent addressable via SendMessage({to: name})
+  prompt: "<full prompt — see template below>"
 )
 ```
 
-Do NOT set `team_name` or `name` — these activate Agent Teams where `isolation: "worktree"` is broken.
+**Model**: omit `model` to inherit the session model (usually correct). Override only when confident a tier fits: a heavier model for judgment-heavy work, a lighter one for mechanical, well-specified changes.
 
-**Prompt requirements** — each subagent prompt MUST include:
+**Quality is self-enforced** — hooks don't fire for subagents. Every prompt MUST include:
 
 1. Beads issue context (`bd show` output)
 2. Specific files to modify and what to change
-3. Quality self-enforcement: "Run `pnpm run check` before returning. Verify all contract items."
-4. Full PR lifecycle: "Create PR, poll for Copilot review, address comments, verify CI green."
-5. Structured return format: branch, PR#, CI status, Copilot status, blockers
+3. Quality gate: "Run `pnpm run check` before returning."
+4. Full PR lifecycle: "Create PR, verify CI green."
+5. Structured return format: branch, PR#, CI status, blockers
 
-### Option B: Agent Teams (Fallback)
+**Prompt template:**
 
-Use when you need bidirectional real-time communication (dependent tasks, mid-flight questions).
+```markdown
+## Task: <issue title>
 
-Create worktrees manually (isolation is broken with `team_name`), then spawn:
+<beads issue ID and description>
 
-```bash
-git worktree add ../pinpoint-worktrees/feat-<branch-name> -b feat/<branch-name>
+## Files to Modify
+
+<specific files and what to change>
+
+## Notes
+
+<any task-specific context>
+
+## Quality Gates
+
+Run `pnpm run check` before returning.
+
+## Return Format
+
+Report back with:
+
+- **Branch**: <branch name>
+- **PR**: #<number>
+- **CI**: passing/failing/pending
+- **Blockers**: none or description
 ```
 
-```
-Agent(
-  subagent_type: "general-purpose",
-  model: "sonnet",
-  team_name: "pinpoint-<summary>",
-  name: "dropdown-fix",
-  mode: "bypassPermissions",
-  prompt: "<prompt with ABSOLUTE worktree path>"
-)
-```
+Full annotated version: `references/agent-prompt-template.md`.
 
 ---
 
@@ -165,25 +156,25 @@ Agent(
 ```bash
 ./scripts/workflow/pr-dashboard.sh 940 941 942       # Specific PRs
 ./scripts/workflow/pr-dashboard.sh                    # All open PRs
+./scripts/workflow/pr-watch.py <PR>                   # Stream one PR's CI events
 ```
 
-### Resume for Follow-Up
+### Follow-Up via SendMessage
 
-Common resume scenarios:
+A spawned agent keeps its context — continue it with `SendMessage` using its ID or name rather than spawning fresh. Common scenarios:
 
-- Subagent returns "Copilot pending" → lead waits for review → resumes with comments
-- CI fails → lead gets failure logs → resumes with failure context
-- User requests changes → resumes with review feedback
+- CI fails → get failure logs → send failure context
+- User requests changes → send review feedback
 
 ### Handle Failures
 
-**CI fails** → Get context, then resume subagent:
+**CI fails** → Get context, then message the subagent:
 
 ```bash
 gh run view <run-id> --log-failed | tail -50
 ```
 
-**Copilot comments** → Inspect via MCP (see pinpoint-pr-workflow skill Phase 3.2-3.3), then resume subagent:
+**Review comments** → Inspect via MCP (see pinpoint-pr-workflow skill Phase 3.2-3.3), then message the subagent:
 
 ```
 mcp__github__pull_request_read(method: "get_review_comments", owner, repo, pullNumber, perPage: 100)
@@ -197,13 +188,13 @@ gh run rerun <run-id> --failed
 
 ### Label Ready PRs
 
-See pinpoint-pr-workflow skill Phase 3.5. Apply `ready-for-review` after CI green + zero unresolved Copilot threads via:
+See pinpoint-pr-workflow skill Phase 3.4. Apply `ready-for-review` after CI green + zero unresolved review threads via:
 
 ```
 mcp__github__issue_write(method: "update", owner, repo, issue_number: <PR>, labels: [<existing>..., "ready-for-review"])
 ```
 
-Or fallback: `gh pr edit <PR> --add-label ready-for-review`. Worktree cleanup is now a separate step: `python3 scripts/worktree_cleanup.py <path>`.
+Or fallback: `gh pr edit <PR> --add-label ready-for-review`.
 
 ---
 
@@ -228,7 +219,7 @@ PRs Ready for Review:
 - #123: Fix machine dropdown — All checks passing
 
 PRs Needing Attention:
-- #124: Add owner link — 2 Copilot comments
+- #124: Add owner link — CI failing
 
 Remaining Worktrees:
 - feat/task-def (PR #124 needs work)
@@ -236,8 +227,10 @@ Remaining Worktrees:
 
 ### Cleanup
 
+Worktrees created by `Agent(isolation: "worktree")` are cleaned up by Claude Code's `WorktreeRemove` hook (runs `scripts/worktree_cleanup.py`). For manually created worktrees, run the script yourself — plain `git worktree remove` leaks slot entries and Docker volumes:
+
 ```bash
-git worktree remove ../pinpoint-worktrees/<branch>
+python3 scripts/worktree_cleanup.py ../pinpoint-worktrees/<branch>
 ```
 
 ---
@@ -265,39 +258,19 @@ git worktree remove ../pinpoint-worktrees/<branch>
 
 ---
 
-## Task Contract (End-to-End Dispatch)
-
-For full lifecycle tasks, use the **`pinpoint-dispatch-e2e-teammate`** skill. It covers worktree creation, task contract, and prompt template.
-
----
-
-## Lead Orchestrator Role
-
-You are a **coordinator, not an implementer**:
-
-- **DO** launch subagents, review their output, resume them with corrections
-- **DO** check CI dashboards, manage beads
-- **DON'T** directly fix code in worktrees — resume the subagent instead
-
-If a subagent can't be resumed (GC'd), spawn a new one on the same branch.
-
 ## Anti-Patterns
 
-- **DON'T use Agent Teams as default** — `isolation: "worktree"` is broken with `team_name`
-- **DON'T assume hooks enforce quality for standalone subagents** — include `pnpm run check` in prompt
-- **DON'T forget to check Copilot comments before merging**
-- **DON'T fix code yourself as the orchestrator** — resume the subagent
+- **DON'T assume hooks enforce quality for subagents** — include `pnpm run check` in the prompt
+- **DON'T fix code yourself as the orchestrator** — message the subagent
+- **DON'T dispatch from a linked worktree** — bug #47548 (see Phase 2)
 
 ## Error Recovery
 
-| Problem                                      | Fix                                                                                                                                    |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Subagent fails to create PR                  | Check output, verify worktree state, resume with context                                                                               |
-| Permission denied on worktree                | Add paths to `.claude/settings.json`, restart session                                                                                  |
-| Worktree creation fails                      | `supabase stop` (current worktree only — **never** `--all`), then re-create with `git worktree add`                                    |
-| Agent Teams isolation broken                 | Known bug. Use standalone subagents (Option A) instead                                                                                 |
-| `.git/config.lock` race on parallel dispatch | anthropics/claude-code#47266. Serialize: one `Agent(isolation: "worktree")` per message, confirm worktree appeared, then dispatch next |
-| Parent branch flips after dispatch           | anthropics/claude-code#47548. You dispatched from a linked worktree. Always dispatch from the main worktree                            |
-| Hooks fire from wrong directory              | Hooks skip for non-worktree CWD. Safeword: `touch .claude-hook-bypass`                                                                 |
-| Session dies with active team                | `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>`                                                                                 |
-| Husky post-checkout hook fails               | Check `.husky/post-checkout` for merge conflict markers                                                                                |
+| Problem                                      | Fix                                                                                                                                                                                                            |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Subagent fails to create PR                  | Check output, verify worktree state, message it with context                                                                                                                                                   |
+| Permission denied on worktree                | Add paths to `.claude/settings.json`, restart session                                                                                                                                                          |
+| Worktree creation fails                      | `supabase stop` (current worktree only — **never** `--all`), then re-create with `git worktree add`                                                                                                            |
+| `.git/config.lock` race on parallel dispatch | anthropics/claude-code#47266 — the `WorktreeCreate` hook mitigates this. Verify `worktree-create.sh` is registered in `.claude/settings.json`; only if missing/disabled, serialize to one dispatch per message |
+| Parent branch flips after dispatch           | anthropics/claude-code#47548. You dispatched from a linked worktree. Always dispatch from the main worktree                                                                                                    |
+| Husky post-checkout hook fails               | Check `.husky/post-checkout` for merge conflict markers                                                                                                                                                        |

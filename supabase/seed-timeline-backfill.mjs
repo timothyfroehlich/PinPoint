@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* eslint-disable no-undef */
 /**
  * Machine Timeline Backfill (PP-0x98)
  *
