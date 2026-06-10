@@ -33,7 +33,9 @@ vi.mock("~/server/db", async () => {
 });
 
 vi.mock("~/lib/notifications", () => ({
-  createNotification: vi.fn().mockResolvedValue(undefined),
+  // Services plan inside the tx now (PP-2053.3); must resolve a DeliveryPlan so
+  // `deliveries.push(...plan.deliveries)` works.
+  planNotification: vi.fn().mockResolvedValue({ deliveries: [] }),
   // Hoisted by issues.ts (PP-rfc) — must be present in the mock so the
   // dynamic import doesn't blow up with "No 'getChannels' export defined".
   getChannels: vi.fn().mockResolvedValue([]),
@@ -105,7 +107,7 @@ describe("createIssue duplicate-writes to machine timeline (PP-0x98)", () => {
     const machine = await makeMachine();
 
     const { createIssue } = await import("~/services/issues");
-    const issue = await createIssue({
+    const { issue } = await createIssue({
       title: "Flipper broken",
       machineInitials: machine.initials,
       severity: "minor",
@@ -258,7 +260,7 @@ describe("updateIssueStatus duplicate-writes to machine timeline (PP-0x98)", () 
     machine: { id: string; initials: string }
   ) {
     const { createIssue } = await import("~/services/issues");
-    return createIssue({
+    const { issue } = await createIssue({
       title: "x",
       machineInitials: machine.initials,
       severity: "minor",
@@ -268,6 +270,7 @@ describe("updateIssueStatus duplicate-writes to machine timeline (PP-0x98)", () 
       reportedBy: reporter.id,
       autoWatchReporter: false,
     });
+    return issue;
   }
 
   async function clearTimelineEventsForMachine(machineId: string) {
@@ -443,7 +446,7 @@ describe("assignIssue duplicate-writes to machine timeline (PP-0x98)", () => {
     machine: { id: string; initials: string }
   ) {
     const { createIssue } = await import("~/services/issues");
-    return createIssue({
+    const { issue } = await createIssue({
       title: "x",
       machineInitials: machine.initials,
       severity: "minor",
@@ -453,6 +456,7 @@ describe("assignIssue duplicate-writes to machine timeline (PP-0x98)", () => {
       reportedBy: reporter.id,
       autoWatchReporter: false,
     });
+    return issue;
   }
 
   async function clearTimelineEventsForMachine(machineId: string) {
@@ -608,7 +612,7 @@ describe("reassignIssueMachine duplicate-writes dual rows (PP-0x98)", () => {
     machine: { id: string; initials: string }
   ) {
     const { createIssue } = await import("~/services/issues");
-    return createIssue({
+    const { issue } = await createIssue({
       title: "x",
       machineInitials: machine.initials,
       severity: "minor",
@@ -618,6 +622,7 @@ describe("reassignIssueMachine duplicate-writes dual rows (PP-0x98)", () => {
       reportedBy: reporter.id,
       autoWatchReporter: false,
     });
+    return issue;
   }
 
   async function clearTimelineEventsForMachine(machineId: string) {
