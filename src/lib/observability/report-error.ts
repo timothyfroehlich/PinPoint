@@ -13,6 +13,7 @@
 import "server-only";
 
 import * as Sentry from "@sentry/nextjs";
+import { isAuthSessionMissingError } from "@supabase/supabase-js";
 
 import { log } from "~/lib/logger";
 import { err, type Result } from "~/lib/result";
@@ -41,6 +42,32 @@ export function reportError(error: unknown, context: ReportContext = {}): void {
   Sentry.captureException(error, { contexts: { pinpoint: context } });
   // Spread context first so a stray `context.err` cannot shadow the actual error.
   log.error({ ...context, err: error }, context.action ?? "Caught error");
+}
+
+/**
+ * Report an auth error to Sentry and the structured log, unless it is the
+ * normal no-session response (`AuthSessionMissingError`).
+ *
+ * Supabase SSR returns `AuthSessionMissingError` whenever `auth.getUser()` is
+ * called for a logged-out visitor — this is expected on every public page and
+ * must not reach Sentry. Any other auth error (token validation failure,
+ * network error, etc.) is a real problem and is forwarded to `reportError`.
+ *
+ * @example
+ *   const { data: { user }, error: authError } = await supabase.auth.getUser();
+ *   if (authError) {
+ *     reportAuthError(authError, { action: "my-page.auth.getUser", bestEffort: true });
+ *   }
+ */
+export function reportAuthError(
+  error: unknown,
+  context: ReportContext = {}
+): void {
+  if (isAuthSessionMissingError(error)) {
+    // Normal no-session response — not an error, do not report.
+    return;
+  }
+  reportError(error, context);
 }
 
 /**
