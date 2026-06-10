@@ -268,13 +268,13 @@ trigger_vercel_build() {
       --arg name "${VERCEL_PROJECT_NAME:-pin-point}" \
       --argjson repoId "$GITHUB_REPOSITORY_ID" \
       --arg ref "$GIT_BRANCH" \
-      '{name: $name, target: "preview",
+      '{name: $name,
         gitSource: {type: "github", repoId: $repoId, ref: $ref}}')"
   else
     payload="$(jq -n \
       --arg name "${VERCEL_PROJECT_NAME:-pin-point}" \
       --arg org "$owner" --arg repo "$repo" --arg ref "$GIT_BRANCH" \
-      '{name: $name, target: "preview",
+      '{name: $name,
         gitSource: {type: "github", org: $org, repo: $repo, ref: $ref}}')"
   fi
 
