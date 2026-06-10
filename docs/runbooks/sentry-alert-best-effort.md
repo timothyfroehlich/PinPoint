@@ -33,13 +33,13 @@ Create two alert rules in **Alerts → Issue Alerts**:
 
 ### Rule 1 — Primary-path error (page immediately)
 
-| Field       | Value                                                               |
-| ----------- | ------------------------------------------------------------------- |
-| Name        | `Primary-path error`                                                |
-| Environment | `production`                                                        |
-| Condition   | An event is seen with tag `pinpoint.bestEffort` not equal to `true` |
-| Action      | PagerDuty / Slack `#alerts-critical`                                |
-| Frequency   | 1 min (deduplicated per issue)                                      |
+| Field       | Value                                                                        |
+| ----------- | ---------------------------------------------------------------------------- |
+| Name        | `Primary-path error`                                                         |
+| Environment | `production`                                                                 |
+| Condition   | An event is seen with tag `contexts.pinpoint.bestEffort` not equal to `true` |
+| Action      | PagerDuty / Slack `#alerts-critical`                                         |
+| Frequency   | 1 min (deduplicated per issue)                                               |
 
 > Sentry surfaces `contexts.*` entries as searchable tags in Issue Alerts using
 > the `contexts.pinpoint.bestEffort` key. In the UI, use the
