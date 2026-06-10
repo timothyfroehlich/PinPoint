@@ -142,6 +142,7 @@ export async function submitPublicIssueAction(
     status,
     assignedTo,
     watchIssue,
+    idempotencyKey,
   } = parsedValue.data;
 
   // Parse description JSON if present
@@ -278,6 +279,9 @@ export async function submitPublicIssueAction(
       reporterEmail,
       assignedTo: finalAssignedTo ?? null,
       autoWatchReporter: watchIssue,
+      // Empty string (JS-disabled / legacy client) → null: no dedup, normal insert.
+      idempotencyKey:
+        idempotencyKey && idempotencyKey.length > 0 ? idempotencyKey : null,
     });
 
     // Deliver notifications AFTER the transaction has committed and after the

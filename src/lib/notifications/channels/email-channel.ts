@@ -339,6 +339,12 @@ export const emailChannel: DeliveryChannel = {
           ? getThreadingHeaders(ctx.formattedIssueId)
           : undefined;
 
+      // Deterministic per recipient + resource + notification type, so a
+      // retried post-commit dispatch (after() re-run, transient-failure replay)
+      // produces the SAME key and Resend dedupes the second send rather than
+      // double-emailing the recipient. (PP-2053.7)
+      const emailIdempotencyKey = `notif:${ctx.resourceType}:${ctx.resourceId}:${ctx.type}:${ctx.userId}`;
+
       await sendEmail({
         to: ctx.email,
         subject: getEmailSubject(
@@ -358,6 +364,7 @@ export const emailChannel: DeliveryChannel = {
           userId: ctx.userId,
           issueDescription: ctx.issueDescription,
         }),
+        idempotencyKey: emailIdempotencyKey,
         ...threadingHeaders,
       });
       return { ok: true };

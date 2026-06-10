@@ -16,6 +16,13 @@ export interface EmailParams {
   inReplyTo?: string | undefined;
   /** RFC 5322 References header value (e.g. "<issue-PP-1234@pinpoint.austinpinballcollective.org>") */
   references?: string | undefined;
+  /**
+   * Idempotency key sent to Resend as the `Idempotency-Key` header. A retried
+   * post-commit dispatch that produces the same key is deduped by Resend (24h
+   * window) so the recipient is not double-emailed. Derived deterministically
+   * per recipient + resource + notification type. (PP-2053.7)
+   */
+  idempotencyKey?: string | undefined;
 }
 
 export interface EmailResult {
@@ -48,6 +55,7 @@ export class ResendTransport implements EmailTransport {
     html,
     inReplyTo,
     references,
+    idempotencyKey,
   }: EmailParams): Promise<EmailResult> {
     try {
       // Build optional RFC 5322 threading headers.
@@ -56,13 +64,18 @@ export class ResendTransport implements EmailTransport {
       if (inReplyTo) headers["In-Reply-To"] = inReplyTo;
       if (references) headers["References"] = references;
 
-      const data = await this.client.emails.send({
-        from: EMAIL_FROM,
-        to,
-        subject,
-        html,
-        ...(Object.keys(headers).length > 0 ? { headers } : {}),
-      });
+      const data = await this.client.emails.send(
+        {
+          from: EMAIL_FROM,
+          to,
+          subject,
+          html,
+          ...(Object.keys(headers).length > 0 ? { headers } : {}),
+        },
+        // Resend dedupes retried sends carrying the same key (sent as the
+        // `Idempotency-Key` header) within a 24h window. (PP-2053.7)
+        idempotencyKey ? { idempotencyKey } : {}
+      );
 
       return { success: true, data };
     } catch (error) {
