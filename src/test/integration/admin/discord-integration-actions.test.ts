@@ -109,6 +109,7 @@ import {
 } from "~/app/(app)/admin/integrations/discord/actions";
 import { createClient } from "~/lib/supabase/server";
 import { getDiscordTokenForAdmin } from "~/lib/discord/config";
+import { reportError } from "~/lib/observability/report-error";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -548,6 +549,39 @@ describe("saveDiscordConfig", () => {
       const calls = mockExecute.mock.calls.map((c) => JSON.stringify(c[0]));
       expect(calls.some((c) => c.includes("update_secret"))).toBe(true);
       expect(calls.some((c) => c.includes("delete_secret"))).toBe(false);
+    });
+
+    it("vault RPC rejection returns {ok:false} and reports to Sentry instead of throwing uncaught", async () => {
+      mockHappyProbes();
+      mockFindFirst.mockResolvedValue({ botTokenVaultId: "existing-vault-id" });
+
+      // Vault is down: the pre-transaction vault.update_secret rejects.
+      // This call now lives inside the action's try, so the failure must be
+      // caught and surfaced as a structured error — not escape to Next.js's
+      // generic server-action error boundary.
+      mockExecute.mockRejectedValue(new Error("vault unavailable"));
+
+      const fd = makeFormData({
+        enabled: "true",
+        newToken: VALID_TOKEN,
+        guildId: "123456789012345678",
+      });
+
+      // Must not throw.
+      const result = await saveDiscordConfig(fd);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => e.field === "guildId")).toBe(true);
+      }
+
+      // Sentry signal preserved.
+      expect(reportError).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ action: "saveDiscordConfig" })
+      );
+
+      // The transaction never opened (vault RPC failed first).
+      expect(mockTransaction).not.toHaveBeenCalled();
     });
   });
 });

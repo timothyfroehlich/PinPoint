@@ -347,43 +347,59 @@ export async function saveDiscordConfig(
   //   - create: delete the freshly-created (now-orphaned) secret.
   //   - update (rotate in place): nothing to undo — see the note below.
   //
+  // The pre-transaction read, both Vault RPCs, AND the transaction all run
+  // inside ONE try, so the single catch (log + Sentry + structured
+  // {ok:false} + create-path orphan cleanup) handles every failure: a Vault
+  // RPC rejection (Vault down / permission / network), a malformed
+  // create_secret result, the race-guard throw, or the pre-read failing.
+  // Putting these outside the try would let those failures escape uncaught
+  // to Next.js's generic error boundary — losing the Sentry signal and the
+  // structured field error the form renders. A try is not a transaction, so
+  // CORE-ARCH-011 still holds: the Vault RPCs stay OUTSIDE db.transaction.
+  //
   // (The `orphanGuard` object holds the create-path vault id in a field so
   // TypeScript flow analysis preserves the `string | null` type across the
   // awaited transaction rather than narrowing it to a stale value.)
   const orphanGuard: { vaultId: string | null } = { vaultId: null };
 
-  // Read the existing vault pointer up front (plain read) so we can decide
-  // create-vs-update before opening the transaction. `newVaultId` is only
-  // set on the create path; on the update path the row keeps the same id.
-  const existing = await db.query.discordIntegrationConfig.findFirst({
-    where: eq(discordIntegrationConfig.id, "singleton"),
-    columns: { botTokenVaultId: true },
-  });
-  let newVaultId: string | null = null;
-
-  if (hasTypedNewToken) {
-    const newToken = validated.newToken ?? "";
-    if (existing?.botTokenVaultId) {
-      // Update path: rotate the secret in place on the main connection.
-      // db.execute (raw SQL), not tx.execute — Vault must not live inside
-      // the Drizzle transaction.
-      await db.execute(
-        sql`SELECT vault.update_secret(${existing.botTokenVaultId}::uuid, ${newToken}, 'discord_bot_token', 'Discord bot token (rotated via UI)')`
-      );
-    } else {
-      const rows = (await db.execute(
-        sql`SELECT vault.create_secret(${newToken}, 'discord_bot_token', 'Discord bot token (saved via UI)') AS id`
-      )) as { id: string }[];
-      const createdId = rows[0]?.id;
-      if (!createdId) {
-        throw new Error("Vault create_secret returned no id");
-      }
-      newVaultId = createdId;
-      orphanGuard.vaultId = createdId;
-    }
-  }
-
   try {
+    // Read the existing vault pointer up front (plain read) so we can decide
+    // create-vs-update before opening the transaction. `newVaultId` is only
+    // set on the create path; on the update path the row keeps the same id.
+    const existing = await db.query.discordIntegrationConfig.findFirst({
+      where: eq(discordIntegrationConfig.id, "singleton"),
+      columns: { botTokenVaultId: true },
+    });
+    let newVaultId: string | null = null;
+
+    if (hasTypedNewToken) {
+      const newToken = validated.newToken ?? "";
+      if (existing?.botTokenVaultId) {
+        // Update path: rotate the secret in place on the main connection.
+        // db.execute (raw SQL), not tx.execute — Vault must not live inside
+        // the Drizzle transaction.
+        await db.execute(
+          sql`SELECT vault.update_secret(${existing.botTokenVaultId}::uuid, ${newToken}, 'discord_bot_token', 'Discord bot token (rotated via UI)')`
+        );
+      } else {
+        const rows = (await db.execute(
+          sql`SELECT vault.create_secret(${newToken}, 'discord_bot_token', 'Discord bot token (saved via UI)') AS id`
+        )) as { id: string }[];
+        const createdId = rows[0]?.id;
+        if (!createdId) {
+          // Residual we cannot compensate: if create_secret succeeded
+          // server-side but this result read rejected/returned no id, we
+          // have no id to delete_secret — the orphan (if any) is
+          // unrecoverable here. Throwing still routes through the catch for
+          // the Sentry signal + structured error; orphanGuard.vaultId stays
+          // null because there's nothing actionable to clean up.
+          throw new Error("Vault create_secret returned no id");
+        }
+        newVaultId = createdId;
+        orphanGuard.vaultId = createdId;
+      }
+    }
+
     await db.transaction(async (tx) => {
       // Drizzle row writes only — no external side effects in here.
       if (newVaultId) {
