@@ -22,13 +22,13 @@ set -euo pipefail
 #   PREVIEW_BRANCH_SIZE        Supabase branch compute size (default: micro)
 #
 # Outputs (appended to $GITHUB_OUTPUT when set):
-#   preview_url                the git-branch preview alias URL
-#   deployment_url             the deployment URL returned by `vercel deploy`
+#   preview_url                the stable git-branch preview alias URL
+#   deployment_url             the deployment hash URL from the Vercel API
 #
-# The Vercel section is isolated in inject_vercel_env() + trigger_vercel_build()
-# and is PENDING LIVE VERIFICATION — see comments there. CLI syntax was taken
-# from the Vercel CLI docs (vercel env / vercel deploy / global options) but has
-# not been run end-to-end against the live project in this environment.
+# The Vercel section is isolated in inject_vercel_env() + trigger_vercel_build():
+# inject branch-scoped Preview env vars, then create a git-integration deployment
+# from the branch HEAD via the REST API so it reads that env and owns the stable
+# branch alias. See the comments there for why a CLI `vercel deploy` does not work.
 
 : "${GIT_BRANCH:?GIT_BRANCH is required}"
 : "${PR_NUMBER:?PR_NUMBER is required}"
@@ -163,17 +163,22 @@ SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
 echo "::endgroup::"
 
 # --- Vercel wiring ----------------------------------------------------------
-# PENDING LIVE VERIFICATION. With native Supabase auto-branching disabled,
-# Vercel will NOT receive branch DB creds automatically, so we inject them as
-# git-branch-scoped preview env vars and trigger a fresh build. NEXT_PUBLIC_*
-# vars are inlined at BUILD time, so the env vars MUST be set before the build
-# (a cache-reusing redeploy is not enough — hence `vercel deploy --force`).
+# With native Supabase auto-branching disabled, Vercel does NOT receive branch
+# DB creds automatically. Two steps, in order:
+#   1. inject_vercel_env  — set the branch DB creds as *git-branch-scoped* Preview
+#      env vars. A git-integration build for this branch reads these with
+#      precedence over the all-branches Preview vars (Vercel's documented "test a
+#      branch against a different database" feature).
+#   2. trigger_vercel_build — ask Vercel to create a *git-integration* deployment
+#      from the branch HEAD (REST API), so it reads the env from step 1 and is
+#      assigned the stable `<project>-git-<branch>-<scope>.vercel.app` alias.
+# We do NOT use `vercel deploy`: a CLI deploy is not git-branch-linked, so it
+# neither owns that alias nor reads branch-scoped env — Vercel's own
+# push-triggered build owns the alias (prod-wired). (Casework: pr-1524.)
 #
-# Vercel CLI reference used:
-#   env add:  vercel env add NAME preview <git-branch> --force < value-file
-#   deploy:   vercel deploy --target=preview --force   (prints URL on stdout)
-#   auth:     VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID env vars
-#             (no `vercel link` needed in CI)
+#   env add (CLI):  vercel env add NAME preview <git-branch> --force < value-file
+#   deploy (API):   POST /v13/deployments  gitSource:{github, org, repo, ref}
+#   auth:           VERCEL_TOKEN + VERCEL_ORG_ID (teamId)
 # The CLI is invoked via npx so no global install / setup-node step is needed;
 # override $VERCEL for a pinned version or a preinstalled binary.
 VERCEL="${VERCEL:-npx --yes vercel@latest}"
@@ -219,40 +224,63 @@ inject_vercel_env() {
   echo "::endgroup::"
 }
 
+wait_for_ready() {
+  # wait_for_ready <deployment-id> — bounded poll so the sticky comment posts
+  # only once the preview is actually live. Non-fatal: on timeout/error we warn
+  # and return 0 (Vercel still finishes the build; the alias updates when ready).
+  local id="$1"
+  [[ -z "$id" ]] && return 0
+  local attempts=0 max=40 state   # ~6.7 min at 10s intervals
+  while ((attempts < max)); do
+    state="$(curl -sS \
+      "https://api.vercel.com/v13/deployments/${id}?teamId=${VERCEL_ORG_ID}" \
+      -H "Authorization: Bearer ${VERCEL_TOKEN}" 2>/dev/null \
+      | jq -r '.readyState // .status // empty' || true)"
+    case "$state" in
+      READY) echo "Deployment ${id} is READY"; return 0 ;;
+      ERROR | CANCELED) echo "::warning::deployment ${id} ended in ${state}"; return 0 ;;
+    esac
+    attempts=$((attempts + 1))
+    echo "  build ${state:-pending} (${attempts}/${max})..."
+    sleep 10
+  done
+  echo "::warning::deployment ${id} not READY within budget; alias updates when it finishes"
+  return 0
+}
+
 trigger_vercel_build() {
-  echo "::group::Trigger fresh Vercel preview build"
-  export VERCEL_ORG_ID VERCEL_PROJECT_ID
-  # A bare CLI `vercel deploy` is NOT linked to the git branch, so Vercel gives
-  # it neither the branch-scoped env vars nor the stable
-  # `<project>-git-<branch>-<scope>.vercel.app` alias (Vercel KB: "branch
-  # specific variables and domains not linked to CLI deployments"). Passing git
-  # metadata via `-m` links the deployment to the branch, so it inherits the
-  # branch-scoped preview env we just set AND is reachable at the stable branch
-  # alias computed below. `--force` skips the build cache so NEXT_PUBLIC_* values
-  # re-inline from the freshly-set env vars (a cached build keeps stale ones).
-  local head_sha owner repo
-  head_sha="$(git rev-parse HEAD 2>/dev/null || true)"
+  echo "::group::Trigger git-integration preview build"
+  : "${VERCEL_TOKEN:?VERCEL_TOKEN is required for Vercel wiring}"
+  : "${VERCEL_ORG_ID:?VERCEL_ORG_ID is required for Vercel wiring}"
+
+  # Create a git-integration deployment from the branch HEAD via the REST API.
+  # Unlike `vercel deploy`, this is branch-linked: it reads the branch-scoped
+  # env injected above and Vercel assigns it the stable branch alias (which it
+  # also re-points to every future push, so the URL survives new commits).
+  local owner repo payload
   owner="${GITHUB_REPOSITORY%%/*}"
   repo="${GITHUB_REPOSITORY##*/}"
+  payload="$(jq -n \
+    --arg name "${VERCEL_PROJECT_NAME:-pin-point}" \
+    --arg org "$owner" \
+    --arg repo "$repo" \
+    --arg ref "$GIT_BRANCH" \
+    '{name: $name, target: "preview",
+      gitSource: {type: "github", org: $org, repo: $repo, ref: $ref}}')"
 
-  local -a meta=(
-    -m githubDeployment=1
-    -m "githubCommitRef=${GIT_BRANCH}"
-    -m "githubOrg=${owner}"
-    -m "githubRepo=${repo}"
-  )
-  [[ -n "$head_sha" ]] && meta+=(-m "githubCommitSha=${head_sha}")
-
-  local deployment_url
-  if deployment_url="$($VERCEL deploy \
-      --target=preview \
-      --force \
-      --token="$VERCEL_TOKEN" \
-      "${meta[@]}" 2>/dev/null)"; then
-    echo "Deployment URL: ${deployment_url}"
-    DEPLOYMENT_URL="$deployment_url"
+  local response dep_id dep_url
+  if response="$(curl -fsS -X POST \
+      "https://api.vercel.com/v13/deployments?teamId=${VERCEL_ORG_ID}&forceNew=1" \
+      -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d "$payload" 2>/dev/null)"; then
+    dep_id="$(echo "$response" | jq -r '.id // empty')"
+    dep_url="$(echo "$response" | jq -r '.url // empty')"
+    DEPLOYMENT_URL="${dep_url:+https://$dep_url}"
+    echo "Created git-integration deployment: ${dep_id:-unknown} (${DEPLOYMENT_URL:-no url})"
+    wait_for_ready "$dep_id"
   else
-    echo "::warning::vercel deploy failed; preview build not triggered"
+    echo "::warning::Vercel deployment API call failed; preview build not triggered"
     DEPLOYMENT_URL=""
   fi
   echo "::endgroup::"
