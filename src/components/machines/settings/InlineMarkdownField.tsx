@@ -3,6 +3,7 @@
 import type React from "react";
 import { useState } from "react";
 import { Pencil } from "lucide-react";
+import { Toggle } from "~/components/ui/toggle";
 import { cn } from "~/lib/utils";
 import {
   docToPlainText,
@@ -45,6 +46,10 @@ export function InlineMarkdownField({
 }: InlineMarkdownFieldProps): React.JSX.Element | null {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<ProseMirrorDoc | null>(value);
+  // Mini→full editor (the timeline composer pattern): the editor opens mini —
+  // single-line height, no toolbar — and the "Aa" toggle expands it to the
+  // full editor with formatting controls. Resets to mini on every open.
+  const [fullMode, setFullMode] = useState(false);
 
   // `content` is required on the ProseMirrorDoc *type* but optional in the
   // persisted *schema* (proseMirrorDocSchema), so a stored bare `{ type: "doc" }`
@@ -67,6 +72,7 @@ export function InlineMarkdownField({
     // Let users click links in the rendered content without entering edit.
     if (target.closest("a")) return;
     setDraft(value);
+    setFullMode(false);
     setIsEditing(true);
   }
 
@@ -116,9 +122,22 @@ export function InlineMarkdownField({
             mentionsEnabled={false}
             placeholder={placeholder}
             ariaLabel={label ?? "Edit text"}
-            compact
+            showToolbar={fullMode}
+            compact={!fullMode}
             className={textSize}
           />
+          <Toggle
+            size="sm"
+            pressed={fullMode}
+            onPressedChange={setFullMode}
+            aria-label={fullMode ? "Hide formatting" : "Show formatting"}
+            title={fullMode ? "Hide formatting" : "Show formatting"}
+            className="mt-1 h-6 gap-1.5 px-1.5 text-muted-foreground data-[state=on]:text-foreground"
+          >
+            <span className="text-sm font-semibold leading-none tracking-tight">
+              Aa
+            </span>
+          </Toggle>
         </div>
       ) : isEmpty ? (
         // Empty + editable: a real <button> (not a div[role=button]) so the
@@ -168,6 +187,11 @@ export function InlineMarkdownField({
               // rendering at the same 14px as the surrounding body fields.
               compact &&
                 "text-muted-foreground [&_*]:!my-0 [&_*]:!text-sm [&_*]:!leading-snug",
+              // Non-compact (note/section bodies): tighten leading and shrink
+              // paragraph margins on mobile only for the density redesign;
+              // desktop keeps prose's default rhythm.
+              !compact &&
+                "max-md:leading-snug max-md:[&_p]:!my-1 max-md:[&_*]:!leading-snug",
               canEdit && "pointer-events-none"
             )}
           />

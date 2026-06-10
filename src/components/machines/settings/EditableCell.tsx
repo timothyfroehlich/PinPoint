@@ -83,7 +83,7 @@ export function EditableCell({
       <Input
         ref={inputRef}
         value={draft}
-        className={cn("h-7 px-1.5 py-0", inputClassName)}
+        className={cn("h-7 px-1.5 py-0 max-md:text-[13px]", inputClassName)}
         placeholder={placeholder}
         aria-label={ariaLabel}
         onChange={(e) => {
@@ -105,12 +105,14 @@ export function EditableCell({
 
   // Read-only: a plain span, not a disabled <button> (a disabled interactive
   // element is needless noise in the AT tree for a value that can't change).
+  // No horizontal padding: the editable button cancels its px-1 with -mx-1,
+  // so a padded span here would sit 4px off from the same text in edit mode.
+  // Empty values render an em-dash, not the editing placeholder — "S-…" is an
+  // input hint and reads as noise to viewers who can't edit.
   if (!canEdit) {
     return (
-      <span className={cn("px-1", textClassName)}>
-        {value || (
-          <span className="italic text-muted-foreground/60">{placeholder}</span>
-        )}
+      <span className={textClassName}>
+        {value || <span className="text-muted-foreground/60">—</span>}
       </span>
     );
   }

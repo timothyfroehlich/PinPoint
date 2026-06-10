@@ -1,26 +1,22 @@
 "use client";
 
 import type React from "react";
-import { useRef, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
-import { Button } from "~/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "~/components/ui/table";
-import { Switch } from "~/components/ui/switch";
-import { EditableCell } from "~/components/machines/settings/EditableCell";
+  EditableSettingsTable,
+  type SettingsTableColumn,
+} from "~/components/machines/settings/EditableSettingsTable";
 import { InlineEditableText } from "~/components/machines/settings/InlineEditableText";
-import { SECTION_LABEL_CLASS } from "~/components/machines/settings/styles";
-import type { DipSwitchBank } from "~/lib/machines/settings-types";
+import { SECTION_TITLE_CLASS } from "~/components/machines/settings/styles";
+import { cn } from "~/lib/utils";
+import type {
+  DipSwitchBank,
+  DipSwitchEntry,
+} from "~/lib/machines/settings-types";
 
 interface DipBankSectionProps {
   bank: DipSwitchBank;
   canEdit: boolean;
+  reserveEditUi?: boolean;
   onRenameBank: (name: string) => void;
   onAddSwitch: () => string | undefined;
   onUpdateSwitch: (
@@ -39,32 +35,69 @@ interface DipBankSectionProps {
 export function DipBankSection({
   bank,
   canEdit,
+  reserveEditUi = false,
   onRenameBank,
   onAddSwitch,
   onUpdateSwitch,
   onDeleteSwitch,
 }: DipBankSectionProps): React.JSX.Element {
-  // Which freshly-added switch should mount focused. Not cleared: EditableCell
-  // only reads it on its initial mount, and the next add replaces the value.
-  const [autoFocusKey, setAutoFocusKey] = useState<string | null>(null);
-  // Deleting a switch removes the focused trash button; move focus to the
-  // always-present "Add switch" button so keyboard users aren't dropped to <body>.
-  const addSwitchRef = useRef<HTMLButtonElement>(null);
-
-  function handleAddSwitch(): void {
-    const switchKey = onAddSwitch();
-    if (switchKey) setAutoFocusKey(switchKey);
-  }
-
-  function handleDeleteSwitch(switchKey: string): void {
-    onDeleteSwitch(switchKey);
-    addSwitchRef.current?.focus();
-  }
+  // Column roles mirror the ID / Setting / Value tables so stacked sections
+  // read consistently: Switch↔ID (left), the note field shown as "Setting"
+  // (flexible middle), Position↔Value (right). Position therefore takes Value's
+  // width so the two line up across sections.
+  const columns: SettingsTableColumn<DipSwitchEntry>[] = [
+    {
+      key: "switch",
+      header: "Switch",
+      kind: "text",
+      mono: true,
+      read: (s) => s.switch,
+      commit: (s, v) => {
+        onUpdateSwitch(s._key, "switch", v);
+      },
+      placeholder: "DS-…",
+      ariaLabel: "Switch number",
+      headClassName: "w-24 max-md:h-8 max-md:w-px max-md:pl-0 max-md:pr-1",
+      cellClassName:
+        "font-mono text-sm text-muted-foreground max-md:pl-0 max-md:pr-1 max-md:py-1 max-md:text-xs",
+    },
+    {
+      key: "note",
+      header: "Setting",
+      kind: "text",
+      read: (s) => s.note,
+      commit: (s, v) => {
+        onUpdateSwitch(s._key, "note", v);
+      },
+      placeholder: "Setting",
+      ariaLabel: "Switch setting",
+      // whitespace-normal overrides the Table default nowrap — setting text is
+      // sentence-length and must wrap instead of forcing horizontal scroll.
+      headClassName: "md:w-2/3 max-md:h-8 max-md:px-1",
+      cellClassName:
+        "min-w-36 whitespace-normal text-sm text-foreground max-md:px-1 max-md:py-1 max-md:text-[13px]",
+    },
+    {
+      key: "position",
+      header: "Position",
+      kind: "toggle",
+      read: (s) => s.position,
+      commit: (s, v) => {
+        onUpdateSwitch(s._key, "position", v);
+      },
+      ariaLabel: (s) => `${s.switch || "Switch"} position (toggle on/off)`,
+      headClassName:
+        "md:w-1/3 max-md:h-8 max-md:w-auto max-md:pl-1 max-md:pr-0",
+      cellClassName: "max-md:pl-1 max-md:pr-0 max-md:py-1",
+    },
+  ];
 
   return (
-    <div className="py-2.5">
-      <div className="mb-1.5 flex items-baseline gap-2">
-        <span className="text-sm font-semibold text-foreground">
+    <div className="py-2.5 max-md:py-1.5">
+      {/* pr-14 in edit mode keeps the title input clear of SortableSection's
+          floating grip/delete cluster at the row's right end. */}
+      <div className={cn("mb-1.5", canEdit && "pr-14")}>
+        <span className={SECTION_TITLE_CLASS}>
           <InlineEditableText
             value={bank.name}
             canEdit={canEdit}
@@ -74,110 +107,28 @@ export function DipBankSection({
             inputClassName="h-7 text-sm font-semibold"
           />
         </span>
-        <span className={SECTION_LABEL_CLASS}>DIP bank</span>
       </div>
-
-      {bank.switches.length === 0 ? (
-        <p className="py-1 text-xs italic text-muted-foreground">
-          No switches in this bank yet.
-        </p>
-      ) : (
-        <Table aria-label={`Switches for ${bank.name || "DIP"} bank`}>
-          <TableHeader>
-            <TableRow>
-              <TableHead scope="col" className="w-24">
-                Switch
-              </TableHead>
-              <TableHead scope="col" className="w-24">
-                Position
-              </TableHead>
-              <TableHead scope="col">Note</TableHead>
-              {canEdit && (
-                <TableHead scope="col" className="w-8">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {bank.switches.map((sw) => (
-              <TableRow key={sw._key}>
-                <TableCell className="font-mono text-sm text-muted-foreground">
-                  <EditableCell
-                    value={sw.switch}
-                    canEdit={canEdit}
-                    onCommit={(v) => {
-                      onUpdateSwitch(sw._key, "switch", v);
-                    }}
-                    autoFocusOnMount={sw._key === autoFocusKey}
-                    placeholder="DS-…"
-                    ariaLabel="Switch number"
-                    inputClassName="font-mono"
-                  />
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={sw.position === "ON"}
-                      disabled={!canEdit}
-                      onCheckedChange={(checked) => {
-                        onUpdateSwitch(
-                          sw._key,
-                          "position",
-                          checked ? "ON" : "OFF"
-                        );
-                      }}
-                      aria-label={`${sw.switch || "Switch"} position (toggle on/off)`}
-                    />
-                    <span className="text-[11px] font-semibold text-muted-foreground">
-                      {sw.position}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm text-foreground">
-                  <EditableCell
-                    value={sw.note}
-                    canEdit={canEdit}
-                    onCommit={(v) => {
-                      onUpdateSwitch(sw._key, "note", v);
-                    }}
-                    placeholder="Note"
-                    ariaLabel="Switch note"
-                  />
-                </TableCell>
-                {canEdit && (
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-6 text-muted-foreground transition-colors hover:text-destructive focus-visible:opacity-100 motion-reduce:transition-none"
-                      onClick={() => {
-                        handleDeleteSwitch(sw._key);
-                      }}
-                      aria-label={`Delete switch ${sw.switch || "row"}`}
-                    >
-                      <Trash2 className="size-3.5" aria-hidden="true" />
-                    </Button>
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-
-      {canEdit && (
-        <Button
-          ref={addSwitchRef}
-          variant="ghost"
-          size="sm"
-          className="mt-1 text-muted-foreground"
-          onClick={handleAddSwitch}
-        >
-          <Plus aria-hidden="true" />
-          Add switch
-        </Button>
-      )}
+      {/* Section content hangs indented under the heading so headings read as the structural landmarks. */}
+      <div className="pl-2">
+        <EditableSettingsTable
+          rows={bank.switches}
+          columns={columns}
+          canEdit={canEdit}
+          reserveEditUi={reserveEditUi}
+          onAddRow={onAddSwitch}
+          onDeleteRow={onDeleteSwitch}
+          tableAriaLabel={`Switches for ${bank.name || "DIP"} bank`}
+          addLabel="Add switch"
+          deleteAriaLabel={(s) => `Delete switch ${s.switch || "row"}`}
+          sheetTitle="Edit switch"
+          sheetSubtitle={bank.name || "DIP bank"}
+          emptyState={
+            <p className="py-1 text-xs italic text-muted-foreground">
+              No switches in this bank yet.
+            </p>
+          }
+        />
+      </div>
     </div>
   );
 }

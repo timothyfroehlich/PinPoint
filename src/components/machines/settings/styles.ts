@@ -1,7 +1,6 @@
 /**
- * Shared overline label style for settings-section headings (Software
- * Settings, Rubbers, a DIP bank, etc.). Centralized so the three section
- * components don't drift (Rule of Three — CORE-ARCH-010).
+ * Primary section heading (Software settings, Post positions, a bank name).
+ * Section titles carry the visual hierarchy inside a set — they outrank
+ * supporting lines like the baseline strip.
  */
-export const SECTION_LABEL_CLASS =
-  "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+export const SECTION_TITLE_CLASS = "text-sm font-semibold text-foreground";

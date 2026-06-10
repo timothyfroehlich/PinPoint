@@ -64,12 +64,20 @@ export type SettingsSection =
       baselineNote: string;
       rows: SoftwareSetting[];
     }
+  | {
+      id: string;
+      kind: "table";
+      /** Editable section heading (e.g. "Jones plugs", "Transformer taps"). */
+      title: string;
+      rows: SoftwareSetting[];
+    }
   | ({ kind: "dip" } & DipSwitchBank)
   | ({ kind: "note" } & NoteSectionData);
 
 /** What the "Add section" menu hands back to the parent. */
 export type AddSectionSpec =
   | { kind: "software" }
+  | { kind: "table" }
   | { kind: "dip" }
   | { kind: "note"; title: string; customTitle: boolean };
 
@@ -118,6 +126,12 @@ export const settingsSectionSchema = z.discriminatedUnion("kind", [
     id: z.string().max(ID_MAX),
     baseline: z.string().max(NAME_MAX),
     baselineNote: z.string().max(2000),
+    rows: z.array(softwareSettingSchema).max(ROWS_MAX),
+  }),
+  z.object({
+    kind: z.literal("table"),
+    id: z.string().max(ID_MAX),
+    title: z.string().max(NAME_MAX),
     rows: z.array(softwareSettingSchema).max(ROWS_MAX),
   }),
   z.object({

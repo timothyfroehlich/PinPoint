@@ -19,7 +19,10 @@ import {
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
-import type { SettingsSetPayload } from "~/lib/machines/settings-types";
+import {
+  type SettingsSetPayload,
+  settingsSetPayloadSchema,
+} from "~/lib/machines/settings-types";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 
 vi.mock("~/server/db", async () => {
@@ -97,6 +100,90 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
       },
     ];
   }
+
+  // -- generic table section: schema round-trip -----------------------------
+
+  it("round-trips a table section through the payload schema (strips _key)", () => {
+    const parsed = settingsSetPayloadSchema.safeParse({
+      name: "With table",
+      description: null,
+      sections: [
+        {
+          id: "sec-table",
+          kind: "table",
+          title: "Jones plugs",
+          rows: [
+            // _key is client-only and must be stripped by the schema.
+            { _key: "k1", id: "J-1", name: "Coin door", value: "Connected" },
+          ],
+        },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    const section = parsed.data.sections[0];
+    expect(section.kind).toBe("table");
+    if (section.kind !== "table") return;
+    expect(section.title).toBe("Jones plugs");
+    expect(section.rows[0]).not.toHaveProperty("_key");
+    expect(section.rows[0].name).toBe("Coin door");
+  });
+
+  it("rejects a table section whose title exceeds the limit", () => {
+    const parsed = settingsSetPayloadSchema.safeParse({
+      name: "Oversized table title",
+      description: null,
+      sections: [
+        {
+          id: "sec-table",
+          kind: "table",
+          title: "x".repeat(201), // NAME_MAX is 200
+          rows: [],
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  // -- generic table section: save + reload ---------------------------------
+
+  it("saves and reloads a set containing a table section", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(owner.id);
+    const { saveSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+    const { getMachineSettingsSets } =
+      await import("~/lib/machines/settings-queries");
+
+    const created = await saveSettingsSetAction({
+      machineId: machine.id,
+      name: "Mechanism notes",
+      description: null,
+      sections: [
+        {
+          id: "sec-table",
+          kind: "table",
+          title: "Transformer taps",
+          rows: [{ id: "T-1", name: "Primary", value: "120V" }],
+        },
+      ],
+    });
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+
+    const db = await getTestDb();
+    const sets = await getMachineSettingsSets(db, machine.id);
+    expect(sets).toHaveLength(1);
+    const section = sets[0].sections[0];
+    expect(section.kind).toBe("table");
+    if (section.kind !== "table") return;
+    expect(section.title).toBe("Transformer taps");
+    expect(section.rows).toHaveLength(1);
+    expect(section.rows[0].name).toBe("Primary");
+    // Read path re-derives the client render key.
+    expect(section.rows[0]._key).toBeTruthy();
+  });
 
   // -- save: insert ---------------------------------------------------------
 

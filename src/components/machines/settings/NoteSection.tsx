@@ -3,7 +3,8 @@
 import type React from "react";
 import { InlineEditableText } from "~/components/machines/settings/InlineEditableText";
 import { InlineMarkdownField } from "~/components/machines/settings/InlineMarkdownField";
-import { SECTION_LABEL_CLASS } from "~/components/machines/settings/styles";
+import { SECTION_TITLE_CLASS } from "~/components/machines/settings/styles";
+import { cn } from "~/lib/utils";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import type { NoteSectionData } from "~/lib/machines/settings-types";
 
@@ -27,8 +28,10 @@ export function NoteSection({
   onBodyChange,
 }: NoteSectionProps): React.JSX.Element {
   return (
-    <div className="py-2.5">
-      <div className="mb-1.5">
+    <div className="py-2.5 max-md:py-1.5">
+      {/* pr-14 in edit mode keeps the title input clear of SortableSection's
+          floating grip/delete cluster at the row's right end. */}
+      <div className={cn("mb-1.5", note.customTitle && canEdit && "pr-14")}>
         {note.customTitle && canEdit ? (
           <InlineEditableText
             value={note.title}
@@ -37,20 +40,22 @@ export function NoteSection({
             required
             placeholder="Section title"
             ariaLabel="section title"
-            className={SECTION_LABEL_CLASS}
-            inputClassName="h-6 text-xs"
+            className={SECTION_TITLE_CLASS}
+            inputClassName="h-7 text-sm font-semibold"
           />
         ) : (
-          <p className={SECTION_LABEL_CLASS}>{note.title || "Untitled"}</p>
+          <p className={SECTION_TITLE_CLASS}>{note.title || "Untitled"}</p>
         )}
       </div>
-
-      <InlineMarkdownField
-        value={note.body}
-        canEdit={canEdit}
-        placeholder={`Add ${(note.title || "notes").toLowerCase()}…`}
-        onValueChange={onBodyChange}
-      />
+      {/* Section content hangs indented under the heading so headings read as the structural landmarks. */}
+      <div className="pl-2">
+        <InlineMarkdownField
+          value={note.body}
+          canEdit={canEdit}
+          placeholder={`Add ${(note.title || "notes").toLowerCase()}…`}
+          onValueChange={onBodyChange}
+        />
+      </div>
     </div>
   );
 }

@@ -16,6 +16,7 @@ function withRenderKeys(sections: SettingsSection[]): SettingsSection[] {
   return sections.map((section) => {
     switch (section.kind) {
       case "software":
+      case "table":
         return {
           ...section,
           rows: section.rows.map((r) => ({ ...r, _key: randomUUID() })),

@@ -3,8 +3,8 @@
 import type React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Trash2 } from "lucide-react";
-import { Button } from "~/components/ui/button";
+import { GripVertical } from "lucide-react";
+import { ConfirmingDeleteButton } from "~/components/machines/settings/ConfirmingDeleteButton";
 import { usePrefersReducedMotion } from "~/hooks/use-prefers-reduced-motion";
 import { cn } from "~/lib/utils";
 
@@ -60,40 +60,31 @@ export function SortableSection({
         isDragging && "relative z-10 rounded-md bg-card shadow-lg"
       )}
     >
-      {/* Fixed-width grip and delete gutters: the columns exist whether or not
-          the buttons are rendered, so toggling edit mode never reflows the
-          section content. */}
-      <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_1.5rem] items-start gap-1">
-        <div className="flex items-start justify-center">
-          {editing && (
+      {/* No reserved gutters in either mode — the section's hanging indent
+          carries the structure. While editing, the grip + delete float as a
+          cluster over the heading row's (empty) right end, so content never
+          reflows between modes. */}
+      <div className="relative">
+        {editing && (
+          <div className="absolute right-0 top-2 z-[1] flex items-center gap-1">
             <button
               type="button"
               ref={setActivatorNodeRef}
               {...attributes}
               {...listeners}
               aria-label="Drag to reorder section"
-              className="mt-3 cursor-grab touch-none rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none"
+              className="cursor-grab touch-none rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none"
             >
               <GripVertical className="size-4" aria-hidden="true" />
             </button>
-          )}
-        </div>
+            <ConfirmingDeleteButton
+              ariaLabel={deleteLabel}
+              onConfirmedDelete={onDelete}
+            />
+          </div>
+        )}
 
         <div className="min-w-0">{children}</div>
-
-        <div>
-          {editing && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="mt-2 size-6 text-muted-foreground transition-colors hover:text-destructive focus-visible:opacity-100 motion-reduce:transition-none"
-              onClick={onDelete}
-              aria-label={deleteLabel}
-            >
-              <Trash2 className="size-3.5" aria-hidden="true" />
-            </Button>
-          )}
-        </div>
       </div>
     </div>
   );

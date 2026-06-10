@@ -10,6 +10,7 @@ import {
   MessageCircleQuestion,
   Plug,
   Shield,
+  SlidersHorizontal,
 } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
@@ -55,6 +56,13 @@ const referenceCards = [
     href: "/help/permissions",
     icon: Shield,
     description: "What each access level can do",
+  },
+  {
+    title: "Machine Settings",
+    href: "/help/machine-settings",
+    icon: SlidersHorizontal,
+    description:
+      "Recording how a machine is configured — software, DIP switches, and more",
   },
   {
     title: "Notifications",

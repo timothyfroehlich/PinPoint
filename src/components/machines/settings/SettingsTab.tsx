@@ -1,12 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Button } from "~/components/ui/button";
 import { SettingsSetCard } from "~/components/machines/settings/SettingsSetCard";
+import { serializeSetForDirtyCheck } from "~/lib/machines/settings-dirty";
 import {
   type AddSectionSpec,
   NAME_MAX,
@@ -120,9 +121,32 @@ export function SettingsTab({
   // saving straight from the click handler would snapshot the pre-commit `sets`
   // and silently drop the last edit.
   const [saveRequest, setSaveRequest] = useState<string | null>(null);
+  // Last-saved canonical form of each persisted set, keyed by id. Compared
+  // against the live working copy to tell whether a set is actually dirty
+  // (mirrors the server's no-op guard). New sets have no snapshot until saved.
+  const [savedSnapshots, setSavedSnapshots] = useState<Map<string, string>>(
+    () => new Map(initialSets.map((s) => [s.id, serializeSetForDirtyCheck(s)]))
+  );
 
-  // Any set in edit mode may have unsaved changes (save happens on Done).
-  useUnsavedChangesGuard(editingIds.size > 0);
+  // A set is dirty only while being edited and only when its content differs
+  // from the last save (or it's brand-new and never persisted). Drives the
+  // in-card "Unsaved changes" marker and the precise leave-prompt below.
+  const dirtyIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const set of sets) {
+      if (!editingIds.has(set.id)) continue;
+      if (
+        newIds.has(set.id) ||
+        serializeSetForDirtyCheck(set) !== savedSnapshots.get(set.id)
+      ) {
+        ids.add(set.id);
+      }
+    }
+    return ids;
+  }, [sets, editingIds, newIds, savedSnapshots]);
+
+  // Warn before unload only when something is genuinely unsaved.
+  useUnsavedChangesGuard(dirtyIds.size > 0);
 
   // Fire only when a save is requested. `saveSet` is read from this render's
   // closure, which holds the post-blur-commit `sets` — the whole reason the
@@ -168,6 +192,11 @@ export function SettingsTab({
       next.delete(id);
       return next;
     });
+    setSavedSnapshots((prev) => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
   /** Persist a set on leaving edit mode (insert when new, else update). */
@@ -202,6 +231,15 @@ export function SettingsTab({
     // Leave edit mode; reconcile the temp id → server UUID for new sets in a
     // single pass across every id-keyed piece of state.
     const realId = result.id;
+    // Baseline the just-saved content (keyed by the real id) so the set reads as
+    // clean; for a new set, drop the temp-id entry in the same pass.
+    const snapshot = serializeSetForDirtyCheck(set);
+    setSavedSnapshots((prev) => {
+      const next = new Map(prev);
+      if (isNew && realId !== id) next.delete(id);
+      next.set(realId, snapshot);
+      return next;
+    });
     setEditingIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -321,6 +359,11 @@ export function SettingsTab({
       next.splice(idx + 1, 0, copy);
       return next;
     });
+    // The copy is already persisted server-side — baseline it so a later edit
+    // compares against the right starting point.
+    setSavedSnapshots((prev) =>
+      new Map(prev).set(copy.id, serializeSetForDirtyCheck(copy))
+    );
   }
 
   async function deleteSet(id: string): Promise<void> {
@@ -394,6 +437,13 @@ export function SettingsTab({
             baselineNote: "",
             rows: [{ _key: makeKey(), id: "", name: "", value: "" }],
           };
+        } else if (spec.kind === "table") {
+          section = {
+            id: makeKey(),
+            kind: "table",
+            title: "",
+            rows: [],
+          };
         } else if (spec.kind === "dip") {
           const num = s.sections.filter((x) => x.kind === "dip").length + 1;
           section = {
@@ -458,10 +508,14 @@ export function SettingsTab({
     );
   }
 
+  // Both "software" and "table" sections carry an ID/Setting/Value `rows` array,
+  // so the three row operations are shared (matched on either kind, narrowed by
+  // the `rows` property). Prop names stay "software"-flavored so SettingsSetCard
+  // wiring is unchanged — TableSection receives the same handlers.
   function addSoftwareRow(setId: string, sectionId: string): string {
     const newKey = makeKey();
     updateSection(setId, sectionId, (sec) =>
-      sec.kind === "software"
+      sec.kind === "software" || sec.kind === "table"
         ? {
             ...sec,
             rows: [...sec.rows, { _key: newKey, id: "", name: "", value: "" }],
@@ -479,7 +533,7 @@ export function SettingsTab({
     value: string
   ): void {
     updateSection(setId, sectionId, (sec) =>
-      sec.kind === "software"
+      sec.kind === "software" || sec.kind === "table"
         ? {
             ...sec,
             rows: sec.rows.map((r) =>
@@ -496,9 +550,20 @@ export function SettingsTab({
     rowKey: string
   ): void {
     updateSection(setId, sectionId, (sec) =>
-      sec.kind === "software"
+      sec.kind === "software" || sec.kind === "table"
         ? { ...sec, rows: sec.rows.filter((r) => r._key !== rowKey) }
         : sec
+    );
+  }
+
+  // -- Generic-table handlers (scoped to a table section) --
+  function updateTableTitle(
+    setId: string,
+    sectionId: string,
+    title: string
+  ): void {
+    updateSection(setId, sectionId, (sec) =>
+      sec.kind === "table" ? { ...sec, title } : sec
     );
   }
 
@@ -581,7 +646,7 @@ export function SettingsTab({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-md:space-y-2.5">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-foreground">
           Game settings{" "}
@@ -609,7 +674,9 @@ export function SettingsTab({
           )}
         </p>
       ) : (
-        <div className="space-y-3">
+        // Mobile: an 8px slice of page background between sets — with the
+        // header band + divider it gives each set a card-like silhouette.
+        <div className="space-y-3 max-md:space-y-2">
           {orderedSets.map((set) => (
             <SettingsSetCard
               key={set.id}
@@ -620,6 +687,7 @@ export function SettingsTab({
               isNew={newIds.has(set.id)}
               isSaving={savingIds.has(set.id)}
               justSaved={savedIds.has(set.id)}
+              isDirty={dirtyIds.has(set.id)}
               onToggleExpand={() => {
                 toggleExpand(set.id);
               }}
@@ -675,6 +743,9 @@ export function SettingsTab({
               onDeleteDipSwitch={(sectionId, switchKey) => {
                 deleteDipSwitch(set.id, sectionId, switchKey);
               }}
+              onUpdateTableTitle={(sectionId, title) => {
+                updateTableTitle(set.id, sectionId, title);
+              }}
               onUpdateNoteTitle={(sectionId, title) => {
                 updateNoteTitle(set.id, sectionId, title);
               }}
@@ -693,6 +764,7 @@ export function SettingsTab({
 function cloneSection(section: SettingsSection): SettingsSection {
   switch (section.kind) {
     case "software":
+    case "table":
       return {
         ...section,
         id: makeKey(),

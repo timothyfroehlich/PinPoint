@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { useState } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -8,7 +9,6 @@ import {
   Plus,
   Pencil,
   Check,
-  Loader2,
 } from "lucide-react";
 import {
   DndContext,
@@ -28,6 +28,16 @@ import {
   restrictToParentElement,
   restrictToVerticalAxis,
 } from "@dnd-kit/modifiers";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 import { Card, CardContent } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import {
@@ -49,6 +59,7 @@ import { InlineMarkdownField } from "~/components/machines/settings/InlineMarkdo
 import { SortableSection } from "~/components/machines/settings/SortableSection";
 import { NoteSection } from "~/components/machines/settings/NoteSection";
 import { SoftwareSettingsSection } from "~/components/machines/settings/SoftwareSettingsSection";
+import { TableSection } from "~/components/machines/settings/TableSection";
 import { DipBankSection } from "~/components/machines/settings/DipBankSection";
 import {
   type AddSectionSpec,
@@ -71,6 +82,9 @@ interface SettingsSetCardProps {
   isSaving: boolean;
   /** This set just saved — briefly confirm with "Saved!" on the button. */
   justSaved: boolean;
+  /** Editing and the content differs from the last save (or never saved) —
+   *  drives the "Unsaved changes" marker on the audit line. */
+  isDirty: boolean;
   onToggleExpand: () => void;
   onToggleEdit: () => void;
   onTogglePreferred: () => void;
@@ -93,6 +107,8 @@ interface SettingsSetCardProps {
     value: string
   ) => void;
   onDeleteSoftwareRow: (sectionId: string, rowKey: string) => void;
+  // Generic table section title (rows reuse the software-row handlers above)
+  onUpdateTableTitle: (sectionId: string, title: string) => void;
   // DIP switches
   onRenameDipBank: (sectionId: string, name: string) => void;
   onAddDipSwitch: (sectionId: string) => string | undefined;
@@ -136,7 +152,7 @@ function AddSectionMenu({
   onAdd,
 }: AddSectionMenuProps): React.JSX.Element {
   return (
-    <div className="border-t border-outline-variant/60 py-2.5">
+    <div className="border-t border-outline-variant/60 py-2.5 max-md:py-1.5">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="text-muted-foreground">
@@ -160,6 +176,13 @@ function AddSectionMenu({
             }}
           >
             DIP switch bank
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              onAdd({ kind: "table" });
+            }}
+          >
+            Other table…
           </DropdownMenuItem>
           {!hasPostPositions && (
             <DropdownMenuItem
@@ -202,24 +225,12 @@ function describeSection(section: SettingsSection): string {
   switch (section.kind) {
     case "software":
       return "the Software settings section";
+    case "table":
+      return `the ${section.title || "untitled"} table`;
     case "dip":
       return `the ${section.name || "DIP"} bank`;
     case "note":
       return `the ${section.title || "untitled"} section`;
-  }
-}
-
-function sectionHasContent(section: SettingsSection): boolean {
-  switch (section.kind) {
-    case "software":
-      return section.rows.some((r) => r.id || r.name || r.value);
-    case "dip":
-      return section.switches.some((s) => s.switch || s.note);
-    case "note":
-      return (
-        section.title.trim() !== "" ||
-        (section.body !== null && docToPlainText(section.body).trim() !== "")
-      );
   }
 }
 
@@ -231,6 +242,7 @@ export function SettingsSetCard({
   isNew,
   isSaving,
   justSaved,
+  isDirty,
   onToggleExpand,
   onToggleEdit,
   onTogglePreferred,
@@ -246,6 +258,7 @@ export function SettingsSetCard({
   onAddSoftwareRow,
   onUpdateSoftwareRow,
   onDeleteSoftwareRow,
+  onUpdateTableTitle,
   onRenameDipBank,
   onAddDipSwitch,
   onUpdateDipSwitch,
@@ -255,10 +268,13 @@ export function SettingsSetCard({
 }: SettingsSetCardProps): React.JSX.Element {
   const ChevronIcon = isExpanded ? ChevronDown : ChevronRight;
   const nameMissing = set.name.trim() === "";
-  // A custom (Other/Notes) section must be titled before edit mode can be
-  // left — presets carry fixed titles, so only custom ones can be blank.
+  // Custom (Other/Notes) and table sections must be titled before edit mode
+  // can be left — presets and DIP banks carry default titles, so only these
+  // two can be blank.
   const sectionTitleMissing = set.sections.some(
-    (s) => s.kind === "note" && s.customTitle && s.title.trim() === ""
+    (s) =>
+      (s.kind === "note" && s.customTitle && s.title.trim() === "") ||
+      (s.kind === "table" && s.title.trim() === "")
   );
   const blockDone = isEditing && (nameMissing || sectionTitleMissing);
   const hasSoftware = set.sections.some((s) => s.kind === "software");
@@ -269,6 +285,10 @@ export function SettingsSetCard({
   // Content edits (name, description, cells, add/delete, reorder) unlock only
   // when this set is in edit mode. Set-level ops (kebab, preferred) use canEdit.
   const contentEditable = canEdit && isEditing;
+  // Editor viewing this set (can edit, but not editing right now): reserve the
+  // edit affordances' footprint at desktop widths so clicking Edit reveals them
+  // in place instead of reflowing the card. Read-only viewers never reserve.
+  const reserveEditUi = canEdit && !isEditing;
   // The description block sits flush under the header as a subtitle. In view
   // mode an empty description renders nothing, so skip the wrapper entirely to
   // avoid trailing dead space below description-less cards.
@@ -289,20 +309,12 @@ export function SettingsSetCard({
     }
   }
 
-  function handleDelete(): void {
-    const ok = window.confirm(`Delete "${set.name}"? This can't be undone.`);
-    if (ok) onDelete();
-  }
+  // Set-level delete confirms via AlertDialog (design bible §17) — the most
+  // destructive action on the page gets the most explicit confirmation.
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  function confirmDeleteSection(section: SettingsSection): void {
-    if (sectionHasContent(section)) {
-      const ok = window.confirm(
-        `Delete ${describeSection(section)}? This can't be undone.`
-      );
-      if (!ok) return;
-    }
-    onDeleteSection(section.id);
-  }
+  // Section deletion is confirmed by the two-tap ConfirmingDeleteButton in
+  // SortableSection (no window.confirm — the armed second tap IS the confirm).
 
   function renderSection(section: SettingsSection): React.JSX.Element {
     switch (section.kind) {
@@ -313,6 +325,7 @@ export function SettingsSetCard({
             baselineNote={section.baselineNote}
             rows={section.rows}
             canEdit={contentEditable}
+            reserveEditUi={reserveEditUi}
             onBaselineChange={(v) => {
               onUpdateBaseline(section.id, v);
             }}
@@ -328,11 +341,31 @@ export function SettingsSetCard({
             }}
           />
         );
+      case "table":
+        return (
+          <TableSection
+            title={section.title}
+            rows={section.rows}
+            canEdit={contentEditable}
+            reserveEditUi={reserveEditUi}
+            onTitleChange={(title) => {
+              onUpdateTableTitle(section.id, title);
+            }}
+            onAddRow={() => onAddSoftwareRow(section.id)}
+            onUpdateRow={(rowKey, field, value) => {
+              onUpdateSoftwareRow(section.id, rowKey, field, value);
+            }}
+            onDeleteRow={(rowKey) => {
+              onDeleteSoftwareRow(section.id, rowKey);
+            }}
+          />
+        );
       case "dip":
         return (
           <DipBankSection
             bank={section}
             canEdit={contentEditable}
+            reserveEditUi={reserveEditUi}
             onRenameBank={(name) => {
               onRenameDipBank(section.id, name);
             }}
@@ -361,6 +394,27 @@ export function SettingsSetCard({
     }
   }
 
+  // Preferred badge leads the title (after the chevron) so it lives on the
+  // name's line instead of wrapping with the controls block.
+  const preferredBadge = set.isPreferred && (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>
+          <Badge
+            className="border-warning/30 bg-warning/10 text-warning"
+            variant="outline"
+          >
+            ★<span className="max-md:hidden">&nbsp;Preferred</span>
+            <span className="sr-only md:hidden">Preferred</span>
+          </Badge>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {canEdit ? "Preferred set — change in the ⋮ menu" : "Preferred set"}
+      </TooltipContent>
+    </Tooltip>
+  );
+
   // Name + meta, shared by both header modes. The name is editable only in
   // edit mode (otherwise InlineEditableText renders plain text — safe to nest
   // inside the view-mode toggle <button>).
@@ -369,6 +423,14 @@ export function SettingsSetCard({
     // invalid <div>-in-<button> nesting.
     <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
       <span className="min-w-0 text-sm font-semibold text-foreground [overflow-wrap:anywhere]">
+        {/* Badge joins the name's inline flow in BOTH modes — identical layout
+            view↔edit so toggling Edit never nudges the name sideways. A long
+            name wraps under the star rather than dropping whole to a new line. */}
+        {preferredBadge && (
+          <span className="mr-2 inline-flex align-middle">
+            {preferredBadge}
+          </span>
+        )}
         <InlineEditableText
           value={set.name}
           onValueChange={onRename}
@@ -378,9 +440,6 @@ export function SettingsSetCard({
           ariaLabel="set name"
           inputClassName="h-7 text-sm font-semibold"
         />
-      </span>
-      <span className="text-xs text-muted-foreground">
-        updated by {set.updatedBy} {formatShortDate(set.updatedAt)}
       </span>
     </span>
   );
@@ -392,166 +451,239 @@ export function SettingsSetCard({
         // body stack with their own paddings instead of a 24px gutter between
         // each, which was the source of the dead space in the header area.
         "gap-0 overflow-hidden transition-colors duration-150 motion-reduce:transition-none",
+        // Mobile: strip the card chrome (border/bg/shadow/rounding) so sets read
+        // as a flat divided list; the parent supplies the dividers between them.
+        // Negative margins bleed the set to the screen edge (mirroring
+        // MainLayout's px-4 / sm:px-8 gutters) so the divider and the header
+        // band run edge-to-edge; content padding is restored inside.
+        "max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:shadow-none max-md:-mx-4 sm:max-md:-mx-8",
         set.isPreferred
-          ? "border-warning/40 ring-1 ring-warning/30"
-          : "border-outline-variant"
+          ? "border-warning/40 ring-1 ring-warning/30 max-md:ring-0"
+          : "border-outline-variant",
+        // Last so it wins over border-0 and the preferred border color: on
+        // mobile every set carries a strong 2px top rule — the divider between
+        // sets (and between the tab header and the first set). Deliberately
+        // heavier than the 1px/60% hairlines between sections inside a set.
+        "max-md:border-t-2 max-md:border-t-outline-variant"
       )}
     >
-      {/* Header block — always visible */}
-      <div className="flex items-center gap-2.5 px-4 py-3">
-        {isEditing ? (
-          // Edit mode: the card is locked open, so the title area is a plain
-          // (non-collapsing) row rather than a toggle button.
-          <>
-            <ChevronIcon
-              className="size-4 shrink-0 text-muted-foreground"
-              aria-hidden="true"
-            />
-            {headerTitle}
-          </>
-        ) : (
-          // View mode: a real <button> disclosure trigger (CORE-A11Y-004).
-          <button
-            type="button"
-            onClick={onToggleExpand}
-            aria-expanded={isExpanded}
-            aria-label={`${set.name || "Unnamed"} settings set`}
-            className="-mx-1 flex flex-1 items-center gap-2.5 rounded px-1 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none"
-          >
-            <ChevronIcon
-              className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none"
-              aria-hidden="true"
-            />
-            {headerTitle}
-          </button>
-        )}
+      {/* Header band: title + description + audit line share a faint tinted
+          surface so the header reads as one zone on every breakpoint. Mobile:
+          flush under the 2px divider, edge-to-edge (the px restores the page
+          gutters the Card's negative margins bled through), giving each set a
+          card-like identity without giving up any horizontal space. Desktop:
+          spans the card, clipped by its rounded corners. */}
+      {/* bg-muted (#27272a, opaque): the same elevation token table headers
+          use, ~1.3:1 vs the page bg with the muted audit text at ~5.8:1 AA.
+          A lighter band (≳16% white) would push that text below the 4.5:1
+          floor — don't brighten without rechecking. */}
+      <div className="bg-muted max-md:px-4 sm:max-md:px-8">
+        {/* Header block — always visible */}
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 px-4 py-3 max-md:px-0 max-md:py-2">
+          {isEditing ? (
+            // Edit mode: the card is locked open, so the title area is a plain
+            // (non-collapsing) row rather than a toggle button.
+            <>
+              <ChevronIcon
+                className="size-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              {headerTitle}
+            </>
+          ) : (
+            // View mode: a real <button> disclosure trigger (CORE-A11Y-004).
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              aria-expanded={isExpanded}
+              aria-label={`${set.name || "Unnamed"} settings set`}
+              // On mobile the title sizes to its natural one-line width (grow keeps
+              // basis:auto; max-md:shrink-0 refuses compression) capped at the full
+              // row (max-w-full) — a name that doesn't fit beside the controls pushes
+              // the whole controls group onto a second row instead of wrapping
+              // mid-title next to them. Desktop keeps flex-1 (basis:0) so the title
+              // shrinks-and-wraps in place on one row.
+              // hover is a white overlay (not bg-muted/30, which is invisible
+              // against the header band's own white tint)
+              className="-mx-1 flex max-w-full grow items-center gap-2.5 rounded px-1 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:shrink-0 md:flex-1 motion-reduce:transition-none"
+            >
+              <ChevronIcon
+                className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none"
+                aria-hidden="true"
+              />
+              {headerTitle}
+            </button>
+          )}
 
-        {set.isPreferred && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="shrink-0">
-                <Badge
-                  className="border-warning/30 bg-warning/10 text-warning"
-                  variant="outline"
-                >
-                  ★ Preferred
-                </Badge>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {canEdit
-                ? "Preferred set — change in the ⋮ menu"
-                : "Preferred set"}
-            </TooltipContent>
-          </Tooltip>
-        )}
-
-        {canEdit && (
-          <Button
-            variant={isEditing || justSaved ? "default" : "ghost"}
-            size="sm"
-            // Kept focusable while blocked (aria-disabled, not disabled) so AT
-            // can announce why Done is unavailable; the click is guarded below.
-            className={cn(
-              "h-7 shrink-0 transition-colors duration-300 motion-reduce:transition-none",
-              blockDone && "opacity-50",
-              justSaved &&
-                "bg-success text-success-foreground hover:bg-success/90"
-            )}
-            aria-disabled={blockDone || isSaving || undefined}
-            aria-label={
-              blockDone
-                ? "Name the set and all sections before finishing"
-                : isSaving
-                  ? "Saving settings set"
-                  : undefined
-            }
-            onClick={(e) => {
-              e.stopPropagation();
-              if (blockDone || isSaving) return;
-              onToggleEdit();
-            }}
-          >
-            {isEditing ? (
-              isSaving ? (
-                <>
-                  <Loader2
-                    className="animate-spin motion-reduce:animate-none"
-                    aria-hidden="true"
-                  />
-                  Saving…
-                </>
-              ) : (
-                <>
-                  <Check aria-hidden="true" />
-                  Done
-                </>
-              )
-            ) : justSaved ? (
-              <>
-                <Check aria-hidden="true" />
-                Saved!
-              </>
-            ) : (
-              <>
-                <Pencil aria-hidden="true" />
-                Edit
-              </>
-            )}
-          </Button>
-        )}
-
-        {canEdit && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 shrink-0 text-muted-foreground"
-                aria-label="More options"
-              >
-                <MoreVertical className="size-4" aria-hidden="true" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {/* Preferred + Duplicate act on a persisted row, so they're
+          {/* Only the ⋮ stays in the title row — the ★ badge lives on the title
+            line and Edit/Done sits on the audit line below. */}
+          <span className="ml-auto flex shrink-0 items-center gap-2.5">
+            {canEdit && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 text-muted-foreground"
+                    aria-label="More options"
+                  >
+                    <MoreVertical className="size-4" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {/* Preferred + Duplicate act on a persisted row, so they're
                   disabled until an unsaved (temp-id) set is first saved. */}
-              <DropdownMenuItem disabled={isNew} onSelect={onTogglePreferred}>
-                {set.isPreferred ? "Unset preferred" : "Set preferred"}
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={isNew} onSelect={onDuplicate}>
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onSelect={handleDelete}
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
+                  <DropdownMenuItem
+                    disabled={isNew}
+                    onSelect={onTogglePreferred}
+                  >
+                    {set.isPreferred ? "Unset preferred" : "Set preferred"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled={isNew} onSelect={onDuplicate}>
+                    Duplicate
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onSelect={() => {
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </span>
+        </div>
 
-      {/* Description preview — click anywhere to edit. pl-11 aligns it under
+        {canEdit && (
+          <AlertDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Delete “{set.name || "this set"}”?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This deletes the whole settings set and everything in it. This
+                  can’t be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction type="button" onClick={onDelete}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
+        {/* Description preview — click anywhere to edit. pl-11 aligns it under
           the set name (past the chevron). -mt-1 keeps it grouped with the
           header as a subtitle while leaving a little breathing room; pb-3
-          separates it from the body divider below. */}
-      {showDescription && (
-        <div className="-mt-1 pb-3 pl-11 pr-4">
-          <InlineMarkdownField
-            value={set.description}
-            canEdit={contentEditable}
-            placeholder="Add a short description…"
-            compact
-            onValueChange={onUpdateDescription}
-          />
-        </div>
-      )}
+          separates it from the body divider below. On mobile the indent is
+          dropped entirely — density beats subtitle alignment there. */}
+        {showDescription && (
+          <div className="-mt-1 pb-1 pl-11 pr-4 max-md:px-0">
+            <InlineMarkdownField
+              value={set.description}
+              canEdit={contentEditable}
+              placeholder="Add a short description…"
+              compact
+              onValueChange={onUpdateDescription}
+            />
+          </div>
+        )}
 
-      {/* Expanded body */}
+        {/* Audit line — sits under the description (or directly under the
+          header when there is none), same placement on all breakpoints. The
+          Edit/Done button rides its right end, off the crowded title row. */}
+        <div className="flex items-center gap-2 pb-3 pl-11 pr-4 max-md:px-0 max-md:pb-2">
+          <p className="min-w-0 text-xs text-muted-foreground">
+            updated by {set.updatedBy} {formatShortDate(set.updatedAt)}
+          </p>
+          {/* Unsaved-changes marker — ml-auto clusters it (and the Done button
+              that follows) at the right end of the audit line, so it reads as
+              part of the save affordance. role="status" announces it when edits
+              make the set dirty. */}
+          {canEdit && isDirty && (
+            <span
+              role="status"
+              className="ml-auto flex shrink-0 items-center gap-1.5 text-sm font-semibold text-warning"
+            >
+              <span
+                className="size-2 rounded-full bg-warning"
+                aria-hidden="true"
+              />
+              Unsaved changes
+            </span>
+          )}
+          {canEdit && (
+            <Button
+              variant={isEditing || justSaved ? "default" : "ghost"}
+              size="sm"
+              // Kept focusable while blocked (aria-disabled, not disabled) so AT
+              // can announce why Done is unavailable; the click is guarded below.
+              // Fixed width: the label cycles Edit → Done → Saving… → Saved! and
+              // a width that changes with it makes the row jitter.
+              className={cn(
+                "h-7 w-20 shrink-0 transition-colors duration-300 motion-reduce:transition-none",
+                // The dirty marker (when shown) carries ml-auto and the button
+                // follows it; without the marker the button needs ml-auto itself
+                // to stay pinned right. Two ml-auto siblings would split the gap.
+                !isDirty && "ml-auto",
+                blockDone && "opacity-50",
+                justSaved &&
+                  "bg-success text-success-foreground hover:bg-success/90"
+              )}
+              aria-disabled={blockDone || isSaving || undefined}
+              aria-label={
+                blockDone
+                  ? "Name the set and all sections before finishing"
+                  : isSaving
+                    ? "Saving settings set"
+                    : undefined
+              }
+              onClick={(e) => {
+                e.stopPropagation();
+                if (blockDone || isSaving) return;
+                onToggleEdit();
+              }}
+            >
+              {isEditing ? (
+                isSaving ? (
+                  // No spinner (width cost), but plain static text reads as
+                  // nothing happening — pulse the label as the in-flight cue.
+                  <span className="animate-pulse motion-reduce:animate-none">
+                    Saving…
+                  </span>
+                ) : (
+                  <>
+                    <Check aria-hidden="true" />
+                    Done
+                  </>
+                )
+              ) : justSaved ? (
+                // No icon: with the fixed width, icon + "Saved!" reads crowded.
+                "Saved!"
+              ) : (
+                <>
+                  <Pencil aria-hidden="true" />
+                  Edit
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded body. Mobile px mirrors the page gutters the Card's negative
+          margins removed, so body content keeps its original x-position. */}
       {isExpanded && (
-        <CardContent className="px-4 pb-4 pt-0">
+        <CardContent className="px-4 pb-4 pt-0 max-md:pb-3 sm:max-md:px-8">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -569,7 +701,7 @@ export function SettingsSetCard({
                   editing={contentEditable}
                   deleteLabel={`Delete ${describeSection(section)}`}
                   onDelete={() => {
-                    confirmDeleteSection(section);
+                    onDeleteSection(section.id);
                   }}
                 >
                   {renderSection(section)}
@@ -591,6 +723,22 @@ export function SettingsSetCard({
               hasRubbers={hasPreset("Rubbers")}
               onAdd={onAddSection}
             />
+          )}
+          {/* Hold the "Add section" row's height (desktop only) so entering
+              edit mode doesn't push the next card down. Invisible + inert here;
+              the live menu above replaces it once editing. */}
+          {reserveEditUi && (
+            <div
+              className="invisible pointer-events-none max-md:hidden"
+              aria-hidden
+            >
+              <AddSectionMenu
+                hasSoftware={hasSoftware}
+                hasPostPositions={hasPreset("Post positions")}
+                hasRubbers={hasPreset("Rubbers")}
+                onAdd={onAddSection}
+              />
+            </div>
           )}
         </CardContent>
       )}
