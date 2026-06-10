@@ -8,6 +8,7 @@ import { Forbidden } from "~/components/errors/Forbidden";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { reportAuthError } from "~/lib/observability/report-error";
 
 export const metadata = {
   title: "Admin Help | PinPoint",
@@ -17,7 +18,15 @@ export default async function AdminHelpPage(): Promise<React.JSX.Element> {
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+
+  if (authError) {
+    reportAuthError(authError, {
+      action: "admin-help-page.auth.getUser",
+      bestEffort: true,
+    });
+  }
 
   if (!user) {
     redirect("/login");

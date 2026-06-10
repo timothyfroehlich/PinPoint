@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { PageContainer } from "~/components/layout/PageContainer";
+import { reportAuthError } from "~/lib/observability/report-error";
 
 export const metadata = {
   title: "Help | PinPoint",
@@ -127,7 +128,15 @@ export default async function HelpPage(): Promise<React.JSX.Element> {
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+
+  if (authError) {
+    reportAuthError(authError, {
+      action: "help-page.auth.getUser",
+      bestEffort: true,
+    });
+  }
 
   if (user) {
     const profile = await db.query.userProfiles.findFirst({
