@@ -17,6 +17,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { UnifiedReportForm } from "./unified-report-form";
 import type { ActionState } from "./unified-report-form";
+// Import the REAL schema (NOT mocked) so the round-trip test proves a restored
+// draft's images survive submit-time validation. This is the regression guard
+// for the silent-image-drop bug (PP-2053.6 review): restored images must carry
+// originalFilename/fileSizeBytes/mimeType or imagesMetadataArraySchema.parse
+// rejects them inside a swallowing try/catch and the photos vanish.
+import { imagesMetadataArraySchema } from "../issues/schemas";
 
 // ---------------------------------------------------------------------------
 // Module-level mocks
@@ -123,6 +129,18 @@ function idleState(
   return [overrides, vi.fn(), false];
 }
 
+// A fully-valid image-metadata row: a Vercel-blob hostname (always accepted by
+// imageMetadataSchema's URL refinement) plus all three fields the schema
+// requires. Mirrors what ImageUploadButton.onUploadComplete produces.
+const VALID_IMAGE = {
+  blobUrl:
+    "https://abc123.public.blob.vercel-storage.com/uploads/photo-xyz.jpg",
+  blobPathname: "uploads/photo-xyz.jpg",
+  originalFilename: "photo.jpg",
+  fileSizeBytes: 123456,
+  mimeType: "image/jpeg",
+};
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -163,14 +181,31 @@ describe("UnifiedReportForm draft persistence (PP-2053.6)", () => {
       );
     });
 
-    it("restores uploaded image metadata and renders the gallery stub", () => {
+    it("restores full image metadata and renders the gallery stub", () => {
+      localStorage.setItem(
+        "report_form_state",
+        JSON.stringify({ uploadedImages: [VALID_IMAGE] })
+      );
+
+      render(<UnifiedReportForm {...DEFAULT_PROPS} />);
+
+      const gallery = screen.getByTestId("image-gallery");
+      expect(gallery).toHaveAttribute("data-image-count", "1");
+    });
+
+    it("drops legacy slim-only image rows that lack required metadata", () => {
+      // A draft written before the metadata fix carries only blobUrl/blobPathname.
+      // Restoring it as-is would let the submit action silently reject the images
+      // (schema requires originalFilename/fileSizeBytes/mimeType). The restore
+      // effect filters such rows so the gallery never shows photos that won't
+      // actually be saved.
       localStorage.setItem(
         "report_form_state",
         JSON.stringify({
           uploadedImages: [
             {
-              blobUrl: "https://example.com/img1.jpg",
-              blobPathname: "uploads/img1.jpg",
+              blobUrl: VALID_IMAGE.blobUrl,
+              blobPathname: VALID_IMAGE.blobPathname,
             },
           ],
         })
@@ -178,8 +213,7 @@ describe("UnifiedReportForm draft persistence (PP-2053.6)", () => {
 
       render(<UnifiedReportForm {...DEFAULT_PROPS} />);
 
-      const gallery = screen.getByTestId("image-gallery");
-      expect(gallery).toHaveAttribute("data-image-count", "1");
+      expect(screen.queryByTestId("image-gallery")).not.toBeInTheDocument();
     });
 
     it("does not restore uploadedImages when the array is empty", () => {
@@ -267,51 +301,64 @@ describe("UnifiedReportForm draft persistence (PP-2053.6)", () => {
     });
   });
 
-  describe("localStorage save effect — only blobUrl + blobPathname are persisted for images", () => {
-    it("persists only blobUrl and blobPathname, not fileSizeBytes or mimeType", () => {
-      // Render the form; localStorage will be written by the save effect
+  describe("restored image metadata survives submit-time validation (silent-drop guard)", () => {
+    // Regression guard for PP-2053.6 review: persisting only blobUrl+blobPathname
+    // made restored images fail imagesMetadataArraySchema.parse in actions.ts —
+    // a throw swallowed by a non-blocking try/catch — so the issue was created
+    // with ZERO images while the gallery still showed them. We run the value the
+    // form actually serializes into the hidden imagesMetadata input through the
+    // REAL schema (NOT the mocked ./actions) and assert it validates.
+    function readSerializedImagesMetadata(): unknown {
+      const hidden = document.querySelector<HTMLInputElement>(
+        'input[name="imagesMetadata"]'
+      );
+      expect(hidden).not.toBeNull();
+      return JSON.parse(hidden?.value ?? "[]") as unknown;
+    }
+
+    it("re-serializes restored images so imagesMetadataArraySchema accepts them", () => {
+      // Seed a draft with full metadata, render, and read the hidden input the
+      // submit action would receive.
+      localStorage.setItem(
+        "report_form_state",
+        JSON.stringify({ uploadedImages: [VALID_IMAGE] })
+      );
+
       mockUseActionState.mockReturnValue(idleState());
       render(<UnifiedReportForm {...DEFAULT_PROPS} />);
 
-      // Manually seed an image with full metadata into localStorage, as if the
-      // upload button set it, to verify that restoring only keeps the slim fields.
-      // (We can't simulate the upload itself, so we test round-trip via localStorage.)
-      const fullMeta = {
-        blobUrl: "https://example.com/photo.jpg",
-        blobPathname: "uploads/photo.jpg",
-        originalFilename: "photo.jpg",
-        fileSizeBytes: 123456,
-        mimeType: "image/jpeg",
-      };
+      const serialized = readSerializedImagesMetadata();
 
-      // Write a draft that includes a full ImageMetadata object
-      localStorage.setItem(
-        "report_form_state",
-        JSON.stringify({
-          uploadedImages: [
-            { blobUrl: fullMeta.blobUrl, blobPathname: fullMeta.blobPathname },
-          ],
-        })
-      );
-
-      const saved = JSON.parse(
-        localStorage.getItem("report_form_state") ?? "{}"
-      ) as {
-        uploadedImages?: {
-          blobUrl: string;
-          blobPathname: string;
-          fileSizeBytes?: number;
-          mimeType?: string;
-        }[];
-      };
-
-      expect(saved.uploadedImages?.[0]).toMatchObject({
-        blobUrl: fullMeta.blobUrl,
-        blobPathname: fullMeta.blobPathname,
+      // The exact parse actions.ts performs. It MUST succeed — otherwise the
+      // image is silently dropped at submit time.
+      const result = imagesMetadataArraySchema.safeParse(serialized);
+      expect(result.success).toBe(true);
+      expect(result.success && result.data).toHaveLength(1);
+      expect(result.success && result.data[0]).toMatchObject({
+        blobUrl: VALID_IMAGE.blobUrl,
+        blobPathname: VALID_IMAGE.blobPathname,
+        originalFilename: VALID_IMAGE.originalFilename,
+        fileSizeBytes: VALID_IMAGE.fileSizeBytes,
+        mimeType: VALID_IMAGE.mimeType,
       });
-      // The slim format should NOT have fileSizeBytes or mimeType
-      expect(saved.uploadedImages?.[0]).not.toHaveProperty("fileSizeBytes");
-      expect(saved.uploadedImages?.[0]).not.toHaveProperty("mimeType");
+    });
+
+    it("proves the OLD slim shape would have FAILED the schema (locks in the fix)", () => {
+      // Directly assert that the previous behavior (placeholder metadata) does not
+      // validate — so any regression back to slim persistence is caught here.
+      const slimRestored = [
+        {
+          blobUrl: VALID_IMAGE.blobUrl,
+          blobPathname: VALID_IMAGE.blobPathname,
+          originalFilename: "",
+          fileSizeBytes: 0,
+          mimeType: "",
+        },
+      ];
+
+      expect(imagesMetadataArraySchema.safeParse(slimRestored).success).toBe(
+        false
+      );
     });
   });
 });

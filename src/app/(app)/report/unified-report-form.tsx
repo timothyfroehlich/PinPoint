@@ -231,7 +231,7 @@ export function UnifiedReportForm({
         firstName: string;
         lastName: string;
         email: string;
-        uploadedImages: Pick<ImageMetadata, "blobUrl" | "blobPathname">[];
+        uploadedImages: ImageMetadata[];
         idempotencyKey: string;
       }>;
 
@@ -282,18 +282,26 @@ export function UnifiedReportForm({
         Array.isArray(parsed.uploadedImages) &&
         parsed.uploadedImages.length > 0
       ) {
-        // Restore image metadata stubs (blobUrl + blobPathname only).
-        // The full ImageMetadata fields not persisted are left as empty strings —
-        // the gallery only needs the URL for display; submit uses the hidden
-        // imagesMetadata input which is re-serialised from state on every render.
+        // Restore the FULL image metadata. The hidden imagesMetadata input
+        // re-serialises this on every render and the submit action validates it
+        // against imagesMetadataArraySchema, which requires originalFilename,
+        // fileSizeBytes, and mimeType. Restoring placeholder values (""/0) would
+        // fail that parse — and the parse is swallowed by a non-blocking
+        // try/catch — silently dropping the user's photos. Keep only rows that
+        // carry the required fields so a malformed legacy draft can't poison
+        // submission. (PP-2053.6 review)
         setUploadedImages(
-          parsed.uploadedImages.map((img) => ({
-            blobUrl: img.blobUrl,
-            blobPathname: img.blobPathname,
-            originalFilename: "",
-            fileSizeBytes: 0,
-            mimeType: "",
-          }))
+          parsed.uploadedImages.filter(
+            (img): img is ImageMetadata =>
+              typeof img.blobUrl === "string" &&
+              typeof img.blobPathname === "string" &&
+              typeof img.originalFilename === "string" &&
+              img.originalFilename.length > 0 &&
+              typeof img.fileSizeBytes === "number" &&
+              img.fileSizeBytes > 0 &&
+              typeof img.mimeType === "string" &&
+              img.mimeType.startsWith("image/")
+          )
         );
       }
     } catch {
@@ -318,12 +326,15 @@ export function UnifiedReportForm({
       lastName,
       email,
       idempotencyKey,
-      // Persist only the URL and pathname — not the full file bytes or metadata
-      // fields that can't be meaningfully restored (fileSizeBytes, mimeType, etc.).
-      uploadedImages: uploadedImages.map(({ blobUrl, blobPathname }) => ({
-        blobUrl,
-        blobPathname,
-      })),
+      // Persist the FULL image metadata (NOT the image bytes — those live in blob
+      // storage, referenced by blobUrl). originalFilename/fileSizeBytes/mimeType
+      // are tiny and MUST be kept: imagesMetadataArraySchema in actions.ts
+      // requires them (originalFilename.min(1), fileSizeBytes.positive(),
+      // mimeType.startsWith("image/")). Persisting only blobUrl+blobPathname
+      // would make a restored draft fail that parse — which is swallowed by a
+      // non-blocking try/catch — silently dropping the user's photos.
+      // (PP-2053.6 review)
+      uploadedImages,
     };
     window.localStorage.setItem(
       "report_form_state",

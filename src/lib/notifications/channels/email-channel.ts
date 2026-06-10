@@ -7,6 +7,7 @@ import { NON_TEXT_TAGS } from "~/lib/sanitize-html-config";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getSiteUrl } from "~/lib/url";
 import { getThreadingHeaders } from "~/lib/notifications/email-threading";
+import { reportError } from "~/lib/observability/report-error";
 import type {
   DeliveryChannel,
   NotificationPreferencesRow,
@@ -368,7 +369,10 @@ export const emailChannel: DeliveryChannel = {
       });
       return { ok: true };
     } catch (err) {
-      log.error({ err }, "Failed to send email notification");
+      reportError(err, {
+        action: "email-channel.deliver",
+        bestEffort: true,
+      });
       return { ok: false, reason: "transient" };
     }
   },
