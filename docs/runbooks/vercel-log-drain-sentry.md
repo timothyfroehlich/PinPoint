@@ -14,9 +14,29 @@ Wiring a Vercel Log Drain to Sentry makes those events observable:
 - Cold-start failures
 - Edge middleware rejections
 
-This complements the `enableLogs: true` change (PP-2053.12) that forwards
-structured pino logs from within the process. Together they close the full
-observability gap exposed by the Doodle Bug (PP-2053).
+### What `enableLogs: true` does — and does NOT — do
+
+PP-2053.12 set `enableLogs: true` in the server, edge, and client Sentry
+configs. This only **opens Sentry's Logs ingestion channel** — it does not by
+itself forward any application logs. Nothing emits into that channel yet:
+
+- There are no `Sentry.logger.*` calls in the codebase.
+- `consoleLoggingIntegration` is not enabled.
+- The app's pino logger writes only to stdout; it is **not** wired to Sentry.
+
+So `enableLogs: true` is a prerequisite toggle, not a working log pipeline.
+Two separate, still-pending pieces of work close the actual gaps:
+
+1. **Platform kills (this runbook): the Vercel Log Drain is the real
+   mechanism.** 504/SIGKILL/OOM events live in Vercel's runtime log stream,
+   outside the Node.js process, and can never reach the Sentry SDK. The drain
+   below is what makes them observable.
+2. **In-process app-log forwarding (FOLLOW-UP, tracked as PP-2ta0).** Routing
+   pino logs (or `console.*`) into Sentry's Logs channel — via
+   `consoleLoggingIntegration` or a pino transport — plus a `beforeSendLog`
+   PII/noise scrubber (touches CORE-SEC-007 email privacy). **Not done here.**
+
+This runbook covers item 1 only.
 
 ---
 
