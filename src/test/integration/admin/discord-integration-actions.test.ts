@@ -409,6 +409,147 @@ describe("saveDiscordConfig", () => {
       }
     });
   });
+
+  // ── CORE-ARCH-011: Vault RPCs run OUTSIDE the db.transaction ──────────────
+  describe("vault writes are non-transactional (CORE-ARCH-011)", () => {
+    /** Stub Discord probes so a token-rotation save reaches persistence. */
+    function mockHappyProbes(): void {
+      mockFetch((url) => {
+        if (url.includes("/users/@me")) {
+          return new Response(JSON.stringify({ username: "TestBot" }), {
+            status: 200,
+          });
+        }
+        return new Response(JSON.stringify({ name: "Test Guild" }), {
+          status: 200,
+        });
+      });
+    }
+
+    it("update path: rotates the existing secret via db.execute before opening the transaction", async () => {
+      mockHappyProbes();
+      mockFindFirst.mockResolvedValue({ botTokenVaultId: "existing-vault-id" });
+
+      // Record call order across the vault RPC and the transaction.
+      const order: string[] = [];
+      mockExecute.mockImplementation(() => {
+        order.push("execute");
+        return Promise.resolve([]);
+      });
+      mockTransaction.mockImplementation(
+        (callback: (tx: unknown) => unknown) => {
+          order.push("transaction");
+          return callback({
+            query: { discordIntegrationConfig: { findFirst: mockFindFirst } },
+            update: mockUpdate,
+            execute: mockExecute,
+          });
+        }
+      );
+
+      const fd = makeFormData({
+        enabled: "true",
+        newToken: VALID_TOKEN,
+        guildId: "123456789012345678",
+      });
+      const result = await saveDiscordConfig(fd);
+      expect(result.ok).toBe(true);
+
+      // The vault.update_secret call (db.execute) happened, and it ran
+      // before the transaction opened.
+      expect(mockExecute).toHaveBeenCalledTimes(1);
+      const sqlArg = mockExecute.mock.calls[0]?.[0] as {
+        queryChunks?: unknown;
+      };
+      expect(JSON.stringify(sqlArg)).toContain("update_secret");
+      expect(order[0]).toBe("execute");
+      expect(order).toContain("transaction");
+    });
+
+    it("create path: creates the secret pre-transaction, then writes botTokenVaultId inside the transaction", async () => {
+      mockHappyProbes();
+      // No existing vault id → create path.
+      mockFindFirst.mockResolvedValue({ botTokenVaultId: null });
+      mockExecute.mockResolvedValue([{ id: "new-vault-id" }]);
+
+      const fd = makeFormData({
+        enabled: "true",
+        newToken: VALID_TOKEN,
+        guildId: "123456789012345678",
+      });
+      const result = await saveDiscordConfig(fd);
+      expect(result.ok).toBe(true);
+
+      // create_secret ran on the main connection.
+      expect(mockExecute).toHaveBeenCalledTimes(1);
+      const sqlArg = mockExecute.mock.calls[0]?.[0];
+      expect(JSON.stringify(sqlArg)).toContain("create_secret");
+
+      // The singleton row was pointed at the new vault id with the
+      // race-guard set (botTokenVaultId present in the .set() payload).
+      const setPayloads = mockUpdateSet.mock.calls.map((c) => c[0]);
+      expect(
+        setPayloads.some(
+          (p) =>
+            (p as { botTokenVaultId?: string }).botTokenVaultId ===
+            "new-vault-id"
+        )
+      ).toBe(true);
+    });
+
+    it("create path: deletes the orphaned secret when the transaction fails", async () => {
+      mockHappyProbes();
+      mockFindFirst.mockResolvedValue({ botTokenVaultId: null });
+
+      // First execute = create_secret (returns id); later execute =
+      // delete_secret in the catch block.
+      mockExecute
+        .mockResolvedValueOnce([{ id: "new-vault-id" }])
+        .mockResolvedValue([]);
+
+      // Force the transaction to fail after the secret was created.
+      mockTransaction.mockImplementation(() => {
+        throw new Error("simulated transaction failure");
+      });
+
+      const fd = makeFormData({
+        enabled: "true",
+        newToken: VALID_TOKEN,
+        guildId: "123456789012345678",
+      });
+      const result = await saveDiscordConfig(fd);
+      expect(result.ok).toBe(false);
+
+      // create_secret + delete_secret both ran.
+      const calls = mockExecute.mock.calls.map((c) => JSON.stringify(c[0]));
+      expect(calls.some((c) => c.includes("create_secret"))).toBe(true);
+      expect(calls.some((c) => c.includes("delete_secret"))).toBe(true);
+    });
+
+    it("update path: does NOT delete the secret when the transaction fails (no orphan to undo)", async () => {
+      mockHappyProbes();
+      mockFindFirst.mockResolvedValue({ botTokenVaultId: "existing-vault-id" });
+      mockExecute.mockResolvedValue([]);
+
+      mockTransaction.mockImplementation(() => {
+        throw new Error("simulated transaction failure");
+      });
+
+      const fd = makeFormData({
+        enabled: "true",
+        newToken: VALID_TOKEN,
+        guildId: "123456789012345678",
+      });
+      const result = await saveDiscordConfig(fd);
+      expect(result.ok).toBe(false);
+
+      // Only update_secret ran — no delete_secret compensation on the
+      // rotate-in-place path.
+      const calls = mockExecute.mock.calls.map((c) => JSON.stringify(c[0]));
+      expect(calls.some((c) => c.includes("update_secret"))).toBe(true);
+      expect(calls.some((c) => c.includes("delete_secret"))).toBe(false);
+    });
+  });
 });
 
 // ── validateBotToken ──────────────────────────────────────────────────────────

@@ -335,61 +335,82 @@ export async function saveDiscordConfig(
   // Persist. Token rotation goes to Vault; everything else updates the
   // singleton row.
   //
-  // Atomicity note: vault.create_secret + the Drizzle row update are not
-  // guaranteed to roll back together (Vault lives in a separate schema
-  // with its own SECURITY DEFINER scope). On a partial failure we
-  // explicitly delete the freshly-created vault secret in the catch block
-  // to avoid orphans. (The closure mutates `orphanGuard.vaultId` so
-  // TypeScript flow analysis preserves the `string | null` type after
-  // the awaited transaction.)
+  // CORE-ARCH-011: Supabase Vault mutations are an external,
+  // non-transactional side effect — Vault lives in a separate schema with
+  // its own SECURITY DEFINER scope, so vault.create_secret/update_secret do
+  // NOT roll back with the Drizzle transaction on a client-side abort. We
+  // therefore run the Vault RPCs (and the pre-read that decides create vs.
+  // update) on the main connection BEFORE opening the transaction, and the
+  // transaction itself does only Drizzle row writes.
+  //
+  // The catch block compensates the pre-transaction Vault write per path:
+  //   - create: delete the freshly-created (now-orphaned) secret.
+  //   - update (rotate in place): nothing to undo — see the note below.
+  //
+  // (The `orphanGuard` object holds the create-path vault id in a field so
+  // TypeScript flow analysis preserves the `string | null` type across the
+  // awaited transaction rather than narrowing it to a stale value.)
   const orphanGuard: { vaultId: string | null } = { vaultId: null };
+
+  // Read the existing vault pointer up front (plain read) so we can decide
+  // create-vs-update before opening the transaction. `newVaultId` is only
+  // set on the create path; on the update path the row keeps the same id.
+  const existing = await db.query.discordIntegrationConfig.findFirst({
+    where: eq(discordIntegrationConfig.id, "singleton"),
+    columns: { botTokenVaultId: true },
+  });
+  let newVaultId: string | null = null;
+
+  if (hasTypedNewToken) {
+    const newToken = validated.newToken ?? "";
+    if (existing?.botTokenVaultId) {
+      // Update path: rotate the secret in place on the main connection.
+      // db.execute (raw SQL), not tx.execute — Vault must not live inside
+      // the Drizzle transaction.
+      await db.execute(
+        sql`SELECT vault.update_secret(${existing.botTokenVaultId}::uuid, ${newToken}, 'discord_bot_token', 'Discord bot token (rotated via UI)')`
+      );
+    } else {
+      const rows = (await db.execute(
+        sql`SELECT vault.create_secret(${newToken}, 'discord_bot_token', 'Discord bot token (saved via UI)') AS id`
+      )) as { id: string }[];
+      const createdId = rows[0]?.id;
+      if (!createdId) {
+        throw new Error("Vault create_secret returned no id");
+      }
+      newVaultId = createdId;
+      orphanGuard.vaultId = createdId;
+    }
+  }
+
   try {
     await db.transaction(async (tx) => {
-      const existing = await tx.query.discordIntegrationConfig.findFirst({
-        where: eq(discordIntegrationConfig.id, "singleton"),
-        columns: { botTokenVaultId: true },
-      });
-
-      if (hasTypedNewToken) {
-        const newToken = validated.newToken ?? "";
-        if (existing?.botTokenVaultId) {
-          await tx.execute(
-            sql`SELECT vault.update_secret(${existing.botTokenVaultId}::uuid, ${newToken}, 'discord_bot_token', 'Discord bot token (rotated via UI)')`
-          );
-        } else {
-          const rows = (await tx.execute(
-            sql`SELECT vault.create_secret(${newToken}, 'discord_bot_token', 'Discord bot token (saved via UI)') AS id`
-          )) as { id: string }[];
-          const newVaultId = rows[0]?.id;
-          if (!newVaultId) {
-            throw new Error("Vault create_secret returned no id");
-          }
-          orphanGuard.vaultId = newVaultId;
-
-          // The WHERE clause guards against an admin race writing the
-          // singleton's bot_token_vault_id between our SELECT and this
-          // UPDATE. If 0 rows are affected, the freshly-created vault
-          // secret has no DB reference — throw so the catch block fires
-          // and deletes the orphan.
-          const updated = await tx
-            .update(discordIntegrationConfig)
-            .set({
-              botTokenVaultId: newVaultId,
-              updatedAt: new Date(),
-              updatedBy: userId,
-            })
-            .where(
-              and(
-                eq(discordIntegrationConfig.id, "singleton"),
-                isNull(discordIntegrationConfig.botTokenVaultId)
-              )
+      // Drizzle row writes only — no external side effects in here.
+      if (newVaultId) {
+        // Create path: point the singleton at the freshly-created secret.
+        // The WHERE clause guards against an admin race writing the
+        // singleton's bot_token_vault_id between our pre-transaction read
+        // and this UPDATE. If 0 rows are affected, the freshly-created
+        // vault secret has no DB reference — throw so the catch block fires
+        // and deletes the orphan.
+        const updated = await tx
+          .update(discordIntegrationConfig)
+          .set({
+            botTokenVaultId: newVaultId,
+            updatedAt: new Date(),
+            updatedBy: userId,
+          })
+          .where(
+            and(
+              eq(discordIntegrationConfig.id, "singleton"),
+              isNull(discordIntegrationConfig.botTokenVaultId)
             )
-            .returning({ id: discordIntegrationConfig.id });
-          if (updated.length === 0) {
-            throw new Error(
-              "Race: singleton row already has a bot_token_vault_id"
-            );
-          }
+          )
+          .returning({ id: discordIntegrationConfig.id });
+        if (updated.length === 0) {
+          throw new Error(
+            "Race: singleton row already has a bot_token_vault_id"
+          );
         }
       }
 
@@ -422,12 +443,23 @@ export async function saveDiscordConfig(
       userId,
     });
 
+    // Compensation is create-path-only by design:
+    //   - Create path: a fresh vault secret was created pre-transaction but
+    //     the row update rolled back, so the secret is orphaned (nothing in
+    //     the DB references it). Delete it below.
+    //   - Update path (rotate in place): there is NO deletable orphan. The
+    //     singleton row keeps the same botTokenVaultId, so it still points
+    //     at the (now-rotated) secret, and the previous plaintext is gone —
+    //     vault.update_secret overwrites it irreversibly. Even if the config
+    //     update rolls back, the rotation is intentional and self-consistent
+    //     (the row → vault pointer is unchanged). Do NOT try to "undo" it.
+    //     Hence orphanGuard.vaultId is only ever set on the create path.
     if (orphanGuard.vaultId) {
       try {
-        // vault.delete_secret is the inverse of vault.create_secret/
-        // update_secret used above (pg_vault extension). Best-effort —
-        // a failure here just leaves a stray encrypted secret in
-        // vault.secrets; the singleton row already isn't pointing at it.
+        // vault.delete_secret is the inverse of vault.create_secret used
+        // above (pg_vault extension). Best-effort — a failure here just
+        // leaves a stray encrypted secret in vault.secrets; the singleton
+        // row already isn't pointing at it.
         await db.execute(
           sql`SELECT vault.delete_secret(${orphanGuard.vaultId}::uuid)`
         );
