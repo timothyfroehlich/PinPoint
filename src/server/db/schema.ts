@@ -206,6 +206,12 @@ export const issues = pgTable(
     reporterName: text("reporter_name"),
     reporterEmail: citext("reporter_email"),
     assignedTo: uuid("assigned_to").references(() => userProfiles.id),
+    // Client-generated UUID, stable across submission retries. Lets createIssue
+    // dedup a retried submission (no second counter increment, no second
+    // notification) via INSERT ... ON CONFLICT DO NOTHING on the unique index
+    // below. Nullable: legacy rows and non-form callers have no key. No TTL
+    // sweep — keys persist (follow-up). (PP-2053.7)
+    idempotencyKey: uuid("idempotency_key"),
     closedAt: timestamp("closed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -219,6 +225,12 @@ export const issues = pgTable(
       t.machineInitials,
       t.issueNumber
     ),
+    // Partial unique index — only enforced on non-NULL keys, so legacy /
+    // non-form rows (NULL key) are unconstrained while a retried form
+    // submission collides and is deduped. (PP-2053.7)
+    idempotencyKeyIdx: uniqueIndex("idx_issues_idempotency_key")
+      .on(t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} IS NOT NULL`),
     reporterCheck: check(
       "reporter_check",
       sql`(${t.reportedBy} IS NULL AND ${t.invitedReportedBy} IS NULL) OR

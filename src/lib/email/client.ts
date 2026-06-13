@@ -69,6 +69,7 @@ export async function sendEmail({
   html,
   inReplyTo,
   references,
+  idempotencyKey,
 }: EmailParams): Promise<EmailResult> {
   // CORE-ARCH-011 tripwire: email must be sent post-commit, never inside a
   // transaction (the Doodle Bug, PP-2053).
@@ -90,6 +91,7 @@ export async function sendEmail({
     html,
     inReplyTo,
     references,
+    idempotencyKey,
   });
   if (result.success) {
     log.info({ to, subject }, "[Email] Email sent successfully");
