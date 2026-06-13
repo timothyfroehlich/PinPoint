@@ -1009,4 +1009,137 @@ describe("createNotification (Integration)", () => {
       expect(reportError).not.toHaveBeenCalled();
     });
   });
+
+  // PP-pfyf: email idempotency key must include a per-event discriminator so
+  // that two distinct comments on the same issue produce distinct keys, while a
+  // genuine retry of the SAME comment keeps the same key (allowing Resend to
+  // dedup it). Without the discriminator, Resend drops the second email silently.
+  describe("email idempotency key (PP-pfyf)", () => {
+    it("two distinct comments on the same issue produce distinct idempotency keys", async () => {
+      const db = await getTestDb();
+
+      const [recipient] = await db
+        .insert(userProfiles)
+        .values(createTestUser({ email: "key-test@test.com" }))
+        .returning();
+      const [machine] = await db
+        .insert(machines)
+        .values(createTestMachine({ initials: "IK" }))
+        .returning();
+      const [issue] = await db
+        .insert(issues)
+        .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+        .returning();
+
+      await db.insert(issueWatchers).values({
+        issueId: issue.id,
+        userId: recipient.id,
+      });
+      await db.insert(notificationPreferences).values({
+        userId: recipient.id,
+        emailEnabled: true,
+        inAppEnabled: false,
+        emailNotifyOnNewComment: true,
+        inAppNotifyOnNewComment: false,
+      });
+
+      // First comment notification — distinct event id
+      await createNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          commentContent: "First comment",
+          eventId: "comment-uuid-aaa",
+        },
+        db
+      );
+
+      // Second comment notification — different event id (different logical event)
+      await createNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          commentContent: "Second comment",
+          eventId: "comment-uuid-bbb",
+        },
+        db
+      );
+
+      expect(sendEmail).toHaveBeenCalledTimes(2);
+      const [firstCall, secondCall] = (sendEmail as ReturnType<typeof vi.fn>)
+        .mock.calls as [
+        [{ idempotencyKey?: string }],
+        [{ idempotencyKey?: string }],
+      ];
+      const key1 = firstCall[0].idempotencyKey;
+      const key2 = secondCall[0].idempotencyKey;
+      expect(key1).toBeDefined();
+      expect(key2).toBeDefined();
+      expect(key1).not.toBe(key2);
+    });
+
+    it("a retry of the same comment event produces the same idempotency key", async () => {
+      const db = await getTestDb();
+
+      const [recipient] = await db
+        .insert(userProfiles)
+        .values(createTestUser({ email: "retry-key@test.com" }))
+        .returning();
+      const [machine] = await db
+        .insert(machines)
+        .values(createTestMachine({ initials: "RT" }))
+        .returning();
+      const [issue] = await db
+        .insert(issues)
+        .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+        .returning();
+
+      await db.insert(issueWatchers).values({
+        issueId: issue.id,
+        userId: recipient.id,
+      });
+      await db.insert(notificationPreferences).values({
+        userId: recipient.id,
+        emailEnabled: true,
+        inAppEnabled: false,
+        emailNotifyOnNewComment: true,
+        inAppNotifyOnNewComment: false,
+      });
+
+      const SAME_EVENT_ID = "comment-uuid-retry-test";
+
+      // Simulate two attempts to dispatch the same comment event (retry scenario)
+      await createNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          commentContent: "Same comment, first attempt",
+          eventId: SAME_EVENT_ID,
+        },
+        db
+      );
+      await createNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          commentContent: "Same comment, retry attempt",
+          eventId: SAME_EVENT_ID,
+        },
+        db
+      );
+
+      expect(sendEmail).toHaveBeenCalledTimes(2);
+      const [firstCall, secondCall] = (sendEmail as ReturnType<typeof vi.fn>)
+        .mock.calls as [
+        [{ idempotencyKey?: string }],
+        [{ idempotencyKey?: string }],
+      ];
+      // Both calls must produce the SAME key — Resend uses it to dedup the retry.
+      expect(firstCall[0].idempotencyKey).toBe(secondCall[0].idempotencyKey);
+    });
+  });
 });

@@ -640,6 +640,7 @@ export async function addIssueComment({
           machineName: issue?.machine.name ?? undefined,
           formattedIssueId: formattedId,
           commentContent: plainTextContent,
+          eventId: comment.id,
         },
         tx,
         channels
@@ -662,6 +663,7 @@ export async function addIssueComment({
             machineName: issue?.machine.name ?? undefined,
             formattedIssueId: formattedId,
             commentContent: plainTextContent,
+            eventId: comment.id,
           },
           tx,
           channels
