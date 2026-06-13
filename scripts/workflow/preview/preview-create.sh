@@ -154,10 +154,25 @@ export DRIZZLE_FORCE_PRODUCTION="1"
 migrate_url="${POSTGRES_URL/:6543/:5432}"
 export POSTGRES_URL_NON_POOLING="$migrate_url"
 echo "migrate connection: $(printf '%s' "$migrate_url" | sed -E 's#://[^@]+@#://***@#')"
-# Pipe through `tr '\r' '\n'` so drizzle-kit's spinner can't bury the real error
-# behind carriage-return overwrites in the captured CI log (PP-l9qb). pipefail
-# (set above) preserves drizzle-kit's exit code across the pipe.
-pnpm exec drizzle-kit migrate 2>&1 | tr '\r' '\n'
+# Cold-start race: a freshly-provisioned branch can fail the first migrate ~3s
+# in (no surfaced Postgres error) yet succeed on a warm retry against the SAME
+# endpoint (evidence: PR #1388 run 27481880209 cold-failed, run 27482214047
+# warm-passed on the identical :6543 url). The `select 1` readiness gate above
+# does not cover this, so retry migrate itself with a short backoff. Migrations
+# are journaled + per-migration transactional, so a retry re-applies cleanly.
+# Pipe through `tr '\r' '\n'` so drizzle-kit's spinner can't bury a real error
+# behind carriage-return overwrites; pipefail (set above) preserves its exit code.
+migrate_attempt=0
+migrate_max=4
+until pnpm exec drizzle-kit migrate 2>&1 | tr '\r' '\n'; do
+  migrate_attempt=$((migrate_attempt + 1))
+  if [[ "$migrate_attempt" -ge "$migrate_max" ]]; then
+    echo "::error::drizzle-kit migrate failed after ${migrate_attempt} attempts"
+    exit 1
+  fi
+  echo "migrate failed (cold-start race?); retrying in 10s (${migrate_attempt}/${migrate_max})..."
+  sleep 10
+done
 echo "::endgroup::"
 
 echo "::group::Run seed SQL (triggers + grants)"
