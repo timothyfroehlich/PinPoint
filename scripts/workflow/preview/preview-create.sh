@@ -143,13 +143,21 @@ echo "::endgroup::"
 # --- Migrate + seed (lifted near-verbatim from supabase-branch-setup.yaml) ---
 
 echo "::group::Run Drizzle migrations"
-# Use the pooled connection (IPv4, port 6543) because GitHub Actions runners
-# cannot reach the direct connection (IPv6, port 5432). drizzle.config.ts
-# prefers POSTGRES_URL_NON_POOLING for directUrl, so point it at the pooled URL
-# too. POSTGRES_URL is already exported into this shell from the creds file.
+# drizzle-kit reads POSTGRES_URL_NON_POOLING as its (direct) migrate URL. The
+# branch's POSTGRES_URL is the :6543 TRANSACTION pooler, which does not reliably
+# support the DDL / prepared statements a migration run issues (see the warning
+# in drizzle.config.ts) — the suspected cause of "migrate exits 1 with no
+# surfaced Postgres error" (PP-l9qb). Use the SESSION-mode pooler instead: same
+# host, port 5432, IPv4-reachable from runners AND DDL-capable. (The *direct* db
+# host on :5432 is IPv6 and unreachable from runners — a different endpoint.)
 export DRIZZLE_FORCE_PRODUCTION="1"
-export POSTGRES_URL_NON_POOLING="$POSTGRES_URL"
-pnpm exec drizzle-kit migrate
+migrate_url="${POSTGRES_URL/:6543/:5432}"
+export POSTGRES_URL_NON_POOLING="$migrate_url"
+echo "migrate connection: $(printf '%s' "$migrate_url" | sed -E 's#://[^@]+@#://***@#')"
+# Pipe through `tr '\r' '\n'` so drizzle-kit's spinner can't bury the real error
+# behind carriage-return overwrites in the captured CI log (PP-l9qb). pipefail
+# (set above) preserves drizzle-kit's exit code across the pipe.
+pnpm exec drizzle-kit migrate 2>&1 | tr '\r' '\n'
 echo "::endgroup::"
 
 echo "::group::Run seed SQL (triggers + grants)"
