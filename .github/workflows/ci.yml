@@ -498,6 +498,7 @@ jobs:
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
         with:
           version: latest
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       - name: Setup Supabase
         uses: ./.github/actions/setup-supabase
@@ -559,6 +560,7 @@ jobs:
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
         with:
           version: latest
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       - name: Setup Supabase
         uses: ./.github/actions/setup-supabase
@@ -614,6 +616,7 @@ jobs:
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
         with:
           version: latest
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # ratchet:actions/cache@v5.0.5
@@ -695,6 +698,7 @@ jobs:
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
         with:
           version: latest
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # ratchet:actions/cache@v5.0.5
@@ -776,6 +780,7 @@ jobs:
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
         with:
           version: latest
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # ratchet:actions/cache@v5.0.5
@@ -858,6 +863,7 @@ jobs:
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
         with:
           version: latest
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # ratchet:actions/cache@v5.0.5
