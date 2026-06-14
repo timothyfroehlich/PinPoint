@@ -28,8 +28,11 @@
  * Deterministic: every run wipes AFM's existing sets and re-inserts these two,
  * so re-seeding never duplicates or leaves stale demo rows.
  *
- * NEVER run on prod. The script refuses to run unless POSTGRES_URL points at a
- * localhost/127.0.0.1 host.
+ * Demo data — DO NOT point at prod. Like the other seed scripts (seed-users.mjs)
+ * this runs against whatever POSTGRES_URL is set, with no host guard: local dev
+ * (db:reset) and the on-demand preview pipeline both target ephemeral branch DBs.
+ * Reaching prod requires deliberately exporting a prod POSTGRES_URL and running
+ * by hand — which the read-only root checkout and AGENTS.md rules already forbid.
  */
 
 import postgres from "postgres";
@@ -40,17 +43,6 @@ const databaseUrl =
 if (!databaseUrl) {
   console.error("❌ POSTGRES_URL or POSTGRES_URL_NON_POOLING is not defined");
   process.exit(1);
-}
-
-// Hard refusal on non-local URLs (db safety: never seed prod).
-{
-  const url = new URL(databaseUrl);
-  if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") {
-    console.error(
-      `❌ seed-machine-settings refuses to run against non-local DB (${url.hostname})`
-    );
-    process.exit(1);
-  }
 }
 
 /** Wrap a single sentence of plain text in a minimal ProseMirror doc. */
