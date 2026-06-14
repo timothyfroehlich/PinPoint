@@ -9,6 +9,7 @@ import { MachineTimelineFilter } from "~/components/machines/timeline/MachineTim
 import { MachineTimelineIssueRow } from "~/components/machines/timeline/MachineTimelineIssueRow";
 import { MachineTimelineSystemRow } from "~/components/machines/timeline/MachineTimelineSystemRow";
 import { MachineTimelineTombstoneRow } from "~/components/machines/timeline/MachineTimelineTombstoneRow";
+import { TimelineBucketBanner } from "~/components/machines/timeline/TimelineBucketBanner";
 import type { MachineLabel } from "~/components/machines/timeline/MachineAttributionLine";
 import { formatTimelineBucket, type TimelineBucket } from "~/lib/dates";
 import { isMachineIssueEvent } from "~/lib/timeline/machine-event-types";
@@ -259,16 +260,7 @@ export default async function CollectionTimelinePage({
               isToday(firstEntry.row.createdAt);
             return (
               <section key={group.bucket.key} className="pt-6 first:pt-0">
-                {/* Bold green-rail banner — same section-divider treatment
-                    as the per-machine timeline (PP-0x98 round 2). */}
-                <div
-                  className="sticky top-14 z-10 -mx-4 mb-3 border-l-[3px] border-primary bg-gradient-to-r from-card to-background px-3 py-2 sm:-mx-8 lg:-mx-10"
-                  data-bucket-tier={group.bucket.tier}
-                >
-                  <h3 className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    {group.bucket.label}
-                  </h3>
-                </div>
+                <TimelineBucketBanner bucket={group.bucket} />
                 <div>
                   {group.entries.map((entry) =>
                     renderRow(
