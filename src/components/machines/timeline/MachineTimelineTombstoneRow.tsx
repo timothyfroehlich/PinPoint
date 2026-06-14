@@ -1,10 +1,19 @@
 import type React from "react";
 
+import {
+  MachineAttributionLine,
+  type MachineLabel,
+} from "./MachineAttributionLine";
 import { formatRelative } from "~/lib/dates";
 
 interface Props {
   deletedByName: string | null;
   deletedAt: Date;
+  /**
+   * Opt-in machine attribution line for combined (collection) feeds.
+   * Per-machine timelines never set this — their rendering is unchanged.
+   */
+  machineLabel?: MachineLabel;
 }
 
 /**
@@ -17,7 +26,19 @@ interface Props {
 export function MachineTimelineTombstoneRow({
   deletedByName,
   deletedAt,
+  machineLabel,
 }: Props): React.JSX.Element {
+  if (machineLabel) {
+    return (
+      <div className="border-b py-1.5">
+        <MachineAttributionLine machine={machineLabel} />
+        <div className="text-xs italic text-muted-foreground">
+          Comment deleted by {deletedByName ?? "a user"} ·{" "}
+          {formatRelative(deletedAt)}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="border-b py-1.5 text-xs italic text-muted-foreground">
       Comment deleted by {deletedByName ?? "a user"} ·{" "}
