@@ -9,7 +9,10 @@ import {
   FileText,
   Pencil,
   Plus,
+  Settings,
+  Star,
   StickyNote,
+  Trash2,
   Trophy,
   UserCheck,
   UserCog,
@@ -65,6 +68,12 @@ export const MACHINE_EVENT_ICONS: Record<
     Icon: StickyNote,
     colorClass: "text-muted-foreground",
   },
+
+  // Settings sets (PP-43q3)
+  settings_set_created: { Icon: Settings, colorClass: "text-muted-foreground" },
+  settings_set_updated: { Icon: Settings, colorClass: "text-muted-foreground" },
+  settings_set_deleted: { Icon: Trash2, colorClass: "text-muted-foreground" },
+  settings_set_preferred: { Icon: Star, colorClass: "text-warning" },
 
   // Issue events
   issue_opened: { Icon: CircleDot, colorClass: "text-secondary" },

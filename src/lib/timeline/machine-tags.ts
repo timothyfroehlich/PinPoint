@@ -17,6 +17,7 @@ import { z } from "zod";
 export const TIMELINE_TAGS = [
   "lifecycle",
   "issue",
+  "settings",
   "maintenance",
   "adjustment",
   "parts",
@@ -34,14 +35,19 @@ export type TimelineTag = (typeof TIMELINE_TAGS)[number];
  * param. Currently equals the full {@link TIMELINE_TAGS} list, so the default
  * view is byte-identical to "show everything". It exists as a separate explicit
  * constant so PP-43q3 can later default an individual tag (e.g. `settings`) OFF
- * by editing this one line without touching the query/filter wiring. KEEP THIS
- * EQUAL TO `TIMELINE_TAGS` until PP-43q3 deliberately drops a tag.
+ * by editing this one line without touching the query/filter wiring.
+ *
+ * PP-43q3: `settings` defaults OFF — settings-change events are noise on the
+ * default timeline view, surfaced only when the user opts into the tag.
  */
-export const DEFAULT_TIMELINE_TAGS = TIMELINE_TAGS;
+export const DEFAULT_TIMELINE_TAGS = TIMELINE_TAGS.filter(
+  (t): t is TimelineTag => t !== "settings"
+);
 
 export const RESERVED_TAGS = [
   "lifecycle",
   "issue",
+  "settings",
 ] as const satisfies readonly TimelineTag[];
 
 export type ReservedTag = (typeof RESERVED_TAGS)[number];
@@ -59,6 +65,7 @@ export const userTagSchema = z
 const TAG_LABELS: Record<TimelineTag, string> = {
   lifecycle: "Lifecycle",
   issue: "Issue",
+  settings: "Settings",
   maintenance: "Maintenance",
   adjustment: "Adjustment",
   parts: "Parts",

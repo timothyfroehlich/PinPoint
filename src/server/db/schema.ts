@@ -22,6 +22,7 @@ import { type TimelineEventData } from "~/lib/timeline/types";
 import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
 import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
+import { type SettingsSection } from "~/lib/machines/settings-types";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -441,6 +442,54 @@ export const timelineEventPeople = pgTable(
 ).enableRLS();
 
 /**
+ * Machine Settings Sets (PP-43q3)
+ *
+ * Owner-defined sets capturing how a machine is configured (software
+ * adjustments, DIP banks, rubbers, post positions, notes). The whole ordered
+ * body lives in one `sections` JSONB array (a discriminated union — see
+ * `~/lib/machines/settings-types`) so sections of any kind reorder freely;
+ * `description` is a ProseMirror doc. At most one set per machine may be
+ * `is_preferred`, enforced by a partial unique index.
+ */
+export const machineSettingsSets = pgTable(
+  "machine_settings_sets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    machineId: uuid("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: jsonb("description").$type<ProseMirrorDoc>(),
+    sections: jsonb("sections")
+      .$type<SettingsSection[]>()
+      .notNull()
+      .default([]),
+    isPreferred: boolean("is_preferred").notNull().default(false),
+    createdBy: uuid("created_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+    updatedBy: uuid("updated_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // No Drizzle $onUpdate — every UPDATE sets this explicitly in the action.
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    machineIdx: index("idx_machine_settings_sets_machine").on(t.machineId),
+    // At most one preferred set per machine — the DB backstop for the
+    // exclusive-Preferred guarantee (the action also clears-then-sets).
+    onePreferredPerMachine: uniqueIndex("uniq_machine_settings_preferred")
+      .on(t.machineId)
+      .where(sql`${t.isPreferred}`),
+  })
+).enableRLS();
+
+/**
  * Issue Images Table
  *
  * Images attached to issues and comments with soft-delete support.
@@ -675,7 +724,22 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
     relationName: "invited_owner",
   }),
   watchers: many(machineWatchers),
+  settingsSets: many(machineSettingsSets),
 }));
+
+export const machineSettingsSetsRelations = relations(
+  machineSettingsSets,
+  ({ one }) => ({
+    machine: one(machines, {
+      fields: [machineSettingsSets.machineId],
+      references: [machines.id],
+    }),
+    updatedByUser: one(userProfiles, {
+      fields: [machineSettingsSets.updatedBy],
+      references: [userProfiles.id],
+    }),
+  })
+);
 
 export const issuesRelations = relations(issues, ({ one, many }) => ({
   machine: one(machines, {

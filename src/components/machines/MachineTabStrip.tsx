@@ -30,6 +30,7 @@ interface TabSpec {
 // status vocabulary used elsewhere in the app.
 const TABS: readonly TabSpec[] = [
   { slug: "", label: "Info" },
+  { slug: "settings", label: "Settings" },
   { slug: "maintenance", label: "Service" },
   { slug: "timeline", label: "Timeline" },
 ] as const;
@@ -132,7 +133,6 @@ export function MachineTabStrip({
                     "rounded-md border px-1.5 py-0.5 text-xs font-semibold tabular-nums",
                     getMachineStatusStyles(maintenance.status)
                   )}
-                  title={`${String(maintenance.openCount)} open — ${getMachineStatusLabel(maintenance.status)}`}
                   aria-label={`${String(maintenance.openCount)} open issues, status ${getMachineStatusLabel(maintenance.status)}`}
                 >
                   {maintenance.openCount}

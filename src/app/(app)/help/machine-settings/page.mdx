@@ -1,0 +1,81 @@
+import { HelpPage } from "~/components/help/HelpPage";
+
+export const metadata = {
+  title: "Machine Settings | PinPoint",
+};
+
+<HelpPage breadcrumb="Machine Settings" title="Machine Settings" description="Record a machine's configuration — software adjustments, DIP switches, post positions — as one or more named settings sets.">
+
+## Settings Sets
+
+The **Settings** tab on a machine holds one or more **settings sets** — each a
+named, standalone configuration (e.g. _Tournament_, _Home_, _Factory defaults_).
+Sets stack on the tab, preferred first.
+
+- **New set** — adds an empty set. Name it, then add sections.
+- **★ Preferred** — the ⋮ menu's _Set preferred_ flags the machine's normal
+  configuration. It sorts to the top and shows a ★ badge. Only one set per
+  machine can be preferred; setting a new one clears the old.
+- **Duplicate** (⋮ menu) — copies a set as "_name_ (copy)", not preferred. Use it
+  to branch a new configuration off an existing one.
+- **Delete** (⋮ menu) — removes the set and everything in it. Confirmation
+  required; it can't be undone.
+- **Description** — optional one-line summary under the set name.
+
+A new set must be saved once (see below) before _Set preferred_ and _Duplicate_
+are available on it.
+
+## Sections
+
+A set's body is an ordered list of **sections** added from **Add section**. Drag a
+section by its grip to reorder; the ⋮ on each section deletes it.
+
+- **Software settings** — the game's adjustments menu. Rows are **ID / Setting /
+  Value** (e.g. `A.1 01` / `Balls Per Game` / `5`). Has a **baseline** picker for
+  the overall starting point (Factory, Competition, …) and a free-text line for
+  where to find the menu on the machine. One per set.
+- **DIP switch bank** — physical switches on EMs and early solid-state games. Each
+  row is a switch number, an **ON/OFF** toggle, and a setting description. Repeats
+  — add one bank per physical bank. Rename the bank inline.
+- **Other table** — a free **ID / Setting / Value** table under a heading you set,
+  for anything else (Jones plugs, transformer taps, board jumpers, rotary
+  selectors). Repeats.
+- **Post positions** / **Rubbers** — preset note sections with fixed headings, for
+  the two most common physical-setup notes. One each per set.
+- **Other / Notes** — a free note section with a heading you set. Repeats.
+
+Note sections (Post positions, Rubbers, Other / Notes) take rich text — headings,
+lists, bold, links.
+
+## Editing a Set
+
+Editing is per set; other sets stay locked.
+
+1. **Edit** unlocks that set's fields.
+2. **Desktop** — click any value to edit it inline; commit with Enter or by
+   clicking away, cancel with Esc. **Add row** appends a row; **Add section** adds
+   a section; the trash icon on a row or section removes it. Drag sections to
+   reorder.
+3. **Mobile** — tap a row to edit it in a sheet; toggles and inline edits live
+   there.
+4. **Done** saves the whole set (the button shows _Saving…_ then _Saved!_).
+
+Changes persist on **Done**, not keystroke-by-keystroke. A set with edits you
+haven't saved shows an **Unsaved changes** marker by its Edit/Done button, and
+leaving the page with unsaved changes prompts first. The ⋮ actions (_Set
+preferred_, _Duplicate_, _Delete_) and **New set** apply immediately, no Edit
+needed.
+
+## Who Can Edit
+
+Viewing is public. Editing is limited to the machine's **owner**, any
+**technician**, and any **admin** — see [Roles & Permissions](/help/permissions).
+Without edit rights the tab is read-only and the controls don't appear.
+
+## Timeline
+
+Every create / edit / delete / preferred change records a **settings**-tagged
+entry on the machine's Timeline tab. That tag is **off by default** — turn on the
+**settings** filter on the Timeline to see configuration history.
+
+</HelpPage>
