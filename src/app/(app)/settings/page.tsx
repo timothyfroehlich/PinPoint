@@ -1,7 +1,8 @@
 import type React from "react";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { getLoginUrl } from "~/lib/url";
+import { reportError } from "~/lib/observability/report-error";
 import { db } from "~/server/db";
 import {
   userProfiles,
@@ -36,8 +37,16 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   });
 
   if (!profile) {
-    // Should not happen due to trigger, but handle gracefully
-    redirect(getLoginUrl("/settings"));
+    // Data-integrity anomaly: auth.users row exists but handle_new_user trigger
+    // did not create the user_profiles row. Redirecting to login would send the
+    // authenticated user into an infinite loop (login → already-authed → /settings
+    // → no profile → login again). Report to Sentry so the gap is visible, then
+    // render a 404 rather than looping.
+    reportError(new Error("Authenticated user has no user_profiles row"), {
+      action: "settings-page.missing-profile",
+      userId: user.id,
+    });
+    notFound();
   }
 
   // Fetch notification preferences
