@@ -159,7 +159,16 @@ export async function createIssue({
   assignedTo,
   autoWatchReporter = true,
   idempotencyKey,
-}: CreateIssueParams): Promise<{ issue: Issue; deliveryPlan: DeliveryPlan }> {
+}: CreateIssueParams): Promise<{
+  issue: Issue;
+  deliveryPlan: DeliveryPlan;
+  /**
+   * `true` when the idempotency key matched a prior successful submission and
+   * the existing issue was returned without any new writes. The caller MUST
+   * skip post-insert side effects (e.g. linking images) to avoid duplicates.
+   */
+  deduped: boolean;
+}> {
   // Resolve channels outside the transaction to avoid an HTTP round-trip
   // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
   const channels = await getChannels();
@@ -181,7 +190,11 @@ export async function createIssue({
           { issueId: existing.id, idempotencyKey, action: "createIssue" },
           "Idempotent retry — returning existing issue, no new write"
         );
-        return { issue: existing, deliveryPlan: { deliveries: [] } };
+        return {
+          issue: existing,
+          deliveryPlan: { deliveries: [] },
+          deduped: true,
+        };
       }
     }
 
@@ -249,7 +262,11 @@ export async function createIssue({
             { issueId: winner.id, idempotencyKey, action: "createIssue" },
             "Idempotency conflict on insert — returning race winner"
           );
-          return { issue: winner, deliveryPlan: { deliveries: [] } };
+          return {
+            issue: winner,
+            deliveryPlan: { deliveries: [] },
+            deduped: true,
+          };
         }
       }
       throw new Error("Issue creation failed");
@@ -384,7 +401,7 @@ export async function createIssue({
       });
     }
 
-    return { issue, deliveryPlan: { deliveries } };
+    return { issue, deliveryPlan: { deliveries }, deduped: false };
   });
 }
 

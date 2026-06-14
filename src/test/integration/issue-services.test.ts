@@ -370,8 +370,10 @@ describe("Issue Service Functions (Integration)", () => {
       };
 
       // First submission creates the row and plans a notification.
-      const { issue: first } = await createIssue(params);
+      const { issue: first, deduped: firstDeduped } = await createIssue(params);
       expect(first.idempotencyKey).toBe(idempotencyKey);
+      // Fresh insert: deduped must be false.
+      expect(firstDeduped).toBe(false);
       const planCallsAfterFirst = vi.mocked(planNotification).mock.calls.length;
       expect(planCallsAfterFirst).toBeGreaterThan(0);
 
@@ -383,9 +385,16 @@ describe("Issue Service Functions (Integration)", () => {
       });
 
       // Retry with the SAME key returns the existing issue.
-      const { issue: second, deliveryPlan } = await createIssue(params);
+      const {
+        issue: second,
+        deliveryPlan,
+        deduped,
+      } = await createIssue(params);
       expect(second.id).toBe(first.id);
       expect(second.issueNumber).toBe(first.issueNumber);
+
+      // deduped flag MUST be true on a retry so callers can skip side effects.
+      expect(deduped).toBe(true);
 
       // No second counter increment.
       const machineAfterSecond = await db.query.machines.findFirst({
