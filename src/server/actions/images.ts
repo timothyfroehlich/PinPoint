@@ -21,6 +21,7 @@ import {
 } from "~/lib/rate-limit";
 import { eq, count, and, isNull } from "drizzle-orm";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 const uploadSchema = z.object({
@@ -247,6 +248,10 @@ export async function uploadIssueImage(formData: FormData): Promise<
         },
         "DB insert failed for image, cleaning up blob"
       );
+      reportError(caughtErr, {
+        action: "uploadIssueImage.dbInsert",
+        blobPathname: uploadedBlobPathname,
+      });
       // Step 4: Actual cleanup
       if (uploadedBlobPathname) {
         await deleteFromBlob(uploadedBlobPathname);
