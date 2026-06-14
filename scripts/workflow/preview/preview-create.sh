@@ -143,13 +143,36 @@ echo "::endgroup::"
 # --- Migrate + seed (lifted near-verbatim from supabase-branch-setup.yaml) ---
 
 echo "::group::Run Drizzle migrations"
-# Use the pooled connection (IPv4, port 6543) because GitHub Actions runners
-# cannot reach the direct connection (IPv6, port 5432). drizzle.config.ts
-# prefers POSTGRES_URL_NON_POOLING for directUrl, so point it at the pooled URL
-# too. POSTGRES_URL is already exported into this shell from the creds file.
+# drizzle-kit reads POSTGRES_URL_NON_POOLING as its (direct) migrate URL. The
+# branch's POSTGRES_URL is the :6543 TRANSACTION pooler, which does not reliably
+# support the DDL / prepared statements a migration run issues (see the warning
+# in drizzle.config.ts) — the suspected cause of "migrate exits 1 with no
+# surfaced Postgres error" (PP-l9qb). Use the SESSION-mode pooler instead: same
+# host, port 5432, IPv4-reachable from runners AND DDL-capable. (The *direct* db
+# host on :5432 is IPv6 and unreachable from runners — a different endpoint.)
 export DRIZZLE_FORCE_PRODUCTION="1"
-export POSTGRES_URL_NON_POOLING="$POSTGRES_URL"
-pnpm exec drizzle-kit migrate
+migrate_url="${POSTGRES_URL/:6543/:5432}"
+export POSTGRES_URL_NON_POOLING="$migrate_url"
+echo "migrate connection: $(printf '%s' "$migrate_url" | sed -E 's#://[^@]+@#://***@#')"
+# Cold-start race: a freshly-provisioned branch can fail the first migrate ~3s
+# in (no surfaced Postgres error) yet succeed on a warm retry against the SAME
+# endpoint (evidence: PR #1388 run 27481880209 cold-failed, run 27482214047
+# warm-passed on the identical :6543 url). The `select 1` readiness gate above
+# does not cover this, so retry migrate itself with a short backoff. Migrations
+# are journaled + per-migration transactional, so a retry re-applies cleanly.
+# Pipe through `tr '\r' '\n'` so drizzle-kit's spinner can't bury a real error
+# behind carriage-return overwrites; pipefail (set above) preserves its exit code.
+migrate_attempt=0
+migrate_max=4
+until pnpm exec drizzle-kit migrate 2>&1 | tr '\r' '\n'; do
+  migrate_attempt=$((migrate_attempt + 1))
+  if [[ "$migrate_attempt" -ge "$migrate_max" ]]; then
+    echo "::error::drizzle-kit migrate failed after ${migrate_attempt} attempts"
+    exit 1
+  fi
+  echo "migrate failed (cold-start race?); retrying in 10s (${migrate_attempt}/${migrate_max})..."
+  sleep 10
+done
 echo "::endgroup::"
 
 echo "::group::Run seed SQL (triggers + grants)"
@@ -230,14 +253,26 @@ wait_for_ready() {
   # and return 0 (Vercel still finishes the build; the alias updates when ready).
   local id="$1"
   [[ -z "$id" ]] && return 0
-  local attempts=0 max=40 state   # ~6.7 min at 10s intervals
+  local attempts=0 max=40 json state   # ~6.7 min at 10s intervals
   while ((attempts < max)); do
-    state="$(curl -sS \
+    json="$(curl -sS \
       "https://api.vercel.com/v13/deployments/${id}?teamId=${VERCEL_ORG_ID}" \
-      -H "Authorization: Bearer ${VERCEL_TOKEN}" 2>/dev/null \
-      | jq -r '.readyState // .status // empty' || true)"
+      -H "Authorization: Bearer ${VERCEL_TOKEN}" 2>/dev/null || true)"
+    state="$(printf '%s' "$json" | jq -r '.readyState // .status // empty' 2>/dev/null || true)"
     case "$state" in
-      READY) echo "Deployment ${id} is READY"; return 0 ;;
+      READY)
+        echo "Deployment ${id} is READY"
+        # Capture the alias Vercel actually assigned — authoritative. Vercel
+        # hash-truncates a branch alias whose templated label would exceed the
+        # 63-char DNS limit, so reconstructing the hostname yields an unresolvable
+        # URL for long branch names (PP-9opq). Prefer a "-git-" branch alias from
+        # .alias[], else .meta.branchAlias. Read by the PREVIEW_URL block below.
+        ASSIGNED_ALIAS="$(printf '%s' "$json" \
+          | jq -r '(.alias // []) | map(select(test("-git-"))) | .[0] // empty' 2>/dev/null || true)"
+        if [[ -z "$ASSIGNED_ALIAS" ]]; then
+          ASSIGNED_ALIAS="$(printf '%s' "$json" | jq -r '.meta.branchAlias // empty' 2>/dev/null || true)"
+        fi
+        return 0 ;;
       ERROR | CANCELED) echo "::warning::deployment ${id} ended in ${state}"; return 0 ;;
     esac
     attempts=$((attempts + 1))
@@ -308,20 +343,25 @@ trigger_vercel_build() {
 
 inject_vercel_env
 DEPLOYMENT_URL=""
+ASSIGNED_ALIAS=""   # set by wait_for_ready from the Vercel API (PP-9opq)
 trigger_vercel_build
 
-# Stable git-branch preview alias assigned by Vercel to the branch-linked
-# deployment above: `<project>-git-<branch-slug>-<scope-slug>.vercel.app`.
-# Vercel lowercases the branch and replaces non-alphanumerics with hyphens.
-# Project/scope are overridable but default to this project's bespoke values.
-# (Caveat: very long branch names overflow the 63-char DNS label and Vercel
-# falls back to a hashed alias — keep preview branch names short.)
-PROJECT_NAME="${VERCEL_PROJECT_NAME:-pin-point}"
-TEAM_SLUG="${VERCEL_TEAM_SLUG:-advacar}"
-BRANCH_SLUG="$(echo "$GIT_BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')"
-PREVIEW_URL="https://${PROJECT_NAME}-git-${BRANCH_SLUG}-${TEAM_SLUG}.vercel.app"
-
-echo "Preview URL (git-branch alias): ${PREVIEW_URL}"
+# Preview URL: prefer the alias Vercel actually assigned (captured in
+# wait_for_ready), which is authoritative. Vercel hash-truncates a branch alias
+# whose templated `<project>-git-<branch-slug>-<scope>.vercel.app` label would
+# exceed the 63-char DNS limit, so string-templating the hostname produces an
+# unresolvable URL for long branch names (PP-9opq). Fall back to the template
+# only when the API alias is unavailable.
+if [[ -n "${ASSIGNED_ALIAS:-}" ]]; then
+  PREVIEW_URL="https://${ASSIGNED_ALIAS#https://}"
+  echo "Preview URL (Vercel-assigned alias): ${PREVIEW_URL}"
+else
+  PROJECT_NAME="${VERCEL_PROJECT_NAME:-pin-point}"
+  TEAM_SLUG="${VERCEL_TEAM_SLUG:-advacar}"
+  BRANCH_SLUG="$(echo "$GIT_BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')"
+  PREVIEW_URL="https://${PROJECT_NAME}-git-${BRANCH_SLUG}-${TEAM_SLUG}.vercel.app"
+  echo "::warning::Vercel alias unavailable from API; falling back to templated host (unresolvable if >63 chars): ${PREVIEW_URL}"
+fi
 
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   {
