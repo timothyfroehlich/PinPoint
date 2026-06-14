@@ -108,8 +108,20 @@ export function UnifiedReportForm({
   const [assignedTo, setAssignedTo] = useState("");
   const [watchIssue, setWatchIssue] = useState(true);
 
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
   const [turnstileToken, setTurnstileToken] = useState("");
+  // Idempotency key: a UUID generated ONCE per fresh form, stable across
+  // re-renders (lazy state initializer, never recomputed). Submitted as a
+  // hidden field so a retried submission (same key) is deduped server-side
+  // (PP-2053.7). Regenerated on every reset (success + Clear) so the next
+  // genuine report gets a distinct key and is not deduped against the last one.
+  const [idempotencyKey, setIdempotencyKey] = useState(() =>
+    crypto.randomUUID()
+  );
   // CAPTCHA is only required for anonymous reporters. Logged-in users skip it
   // both client-side (no widget rendered) and server-side (action checks
   // auth.getUser() before calling verifyTurnstileToken).
@@ -149,7 +161,9 @@ export function UnifiedReportForm({
 
     window.localStorage.removeItem("report_form_state");
 
-    // Native form reset — clears uncontrolled inputs (firstName/lastName/email/website)
+    // Native form reset — clears the website honeypot and any browser autofill
+    // that bypassed controlled inputs. firstName/lastName/email are now controlled
+    // and reset below via their state setters.
     formRef.current?.reset();
 
     // Controlled state — preserve machine when URL param drove the page,
@@ -178,8 +192,14 @@ export function UnifiedReportForm({
     setStatus("new");
     setAssignedTo("");
     setWatchIssue(true);
+    setFirstName("");
+    setLastName("");
+    setEmail("");
     setUploadedImages([]);
     setTurnstileToken("");
+    // Fresh idempotency key for the next report — the submitted one is now tied
+    // to a committed issue, so reusing it would dedup a genuine new submission.
+    setIdempotencyKey(crypto.randomUUID());
     // RichTextEditor and TurnstileWidget are uncontrolled internally —
     // bumping their keys remounts them so visible state matches the cleared
     // controlled state.
@@ -208,6 +228,11 @@ export function UnifiedReportForm({
         priority: IssuePriority | "";
         frequency: IssueFrequency | "";
         watchIssue: boolean;
+        firstName: string;
+        lastName: string;
+        email: string;
+        uploadedImages: ImageMetadata[];
+        idempotencyKey: string;
       }>;
 
       // If URL points to a different machine than the draft, treat this as a new report.
@@ -245,6 +270,40 @@ export function UnifiedReportForm({
       if (parsed.frequency) setFrequency(parsed.frequency);
       if (typeof parsed.watchIssue === "boolean")
         setWatchIssue(parsed.watchIssue);
+      if (parsed.firstName) setFirstName(parsed.firstName);
+      if (parsed.lastName) setLastName(parsed.lastName);
+      if (parsed.email) setEmail(parsed.email);
+      // Restore the idempotency key so a retry after a remount (a 504 + the
+      // report error boundary, a login redirect, or a manual reload) reuses the
+      // SAME key. Otherwise the resubmit mints a fresh key and createIssue
+      // creates a DUPLICATE — defeating PP-2053.7 for its primary retry path.
+      if (parsed.idempotencyKey) setIdempotencyKey(parsed.idempotencyKey);
+      if (
+        Array.isArray(parsed.uploadedImages) &&
+        parsed.uploadedImages.length > 0
+      ) {
+        // Restore the FULL image metadata. The hidden imagesMetadata input
+        // re-serialises this on every render and the submit action validates it
+        // against imagesMetadataArraySchema, which requires originalFilename,
+        // fileSizeBytes, and mimeType. Restoring placeholder values (""/0) would
+        // fail that parse — and the parse is swallowed by a non-blocking
+        // try/catch — silently dropping the user's photos. Keep only rows that
+        // carry the required fields so a malformed legacy draft can't poison
+        // submission. (PP-2053.6 review)
+        setUploadedImages(
+          parsed.uploadedImages.filter(
+            (img): img is ImageMetadata =>
+              typeof img.blobUrl === "string" &&
+              typeof img.blobPathname === "string" &&
+              typeof img.originalFilename === "string" &&
+              img.originalFilename.length > 0 &&
+              typeof img.fileSizeBytes === "number" &&
+              img.fileSizeBytes > 0 &&
+              typeof img.mimeType === "string" &&
+              img.mimeType.startsWith("image/")
+          )
+        );
+      }
     } catch {
       // Clear corrupted localStorage
       window.localStorage.removeItem("report_form_state");
@@ -263,6 +322,19 @@ export function UnifiedReportForm({
       priority,
       frequency,
       watchIssue,
+      firstName,
+      lastName,
+      email,
+      idempotencyKey,
+      // Persist the FULL image metadata (NOT the image bytes — those live in blob
+      // storage, referenced by blobUrl). originalFilename/fileSizeBytes/mimeType
+      // are tiny and MUST be kept: imagesMetadataArraySchema in actions.ts
+      // requires them (originalFilename.min(1), fileSizeBytes.positive(),
+      // mimeType.startsWith("image/")). Persisting only blobUrl+blobPathname
+      // would make a restored draft fail that parse — which is swallowed by a
+      // non-blocking try/catch — silently dropping the user's photos.
+      // (PP-2053.6 review)
+      uploadedImages,
     };
     window.localStorage.setItem(
       "report_form_state",
@@ -276,6 +348,11 @@ export function UnifiedReportForm({
     priority,
     frequency,
     watchIssue,
+    firstName,
+    lastName,
+    email,
+    idempotencyKey,
+    uploadedImages,
     state.success,
   ]);
 
@@ -374,6 +451,8 @@ export function UnifiedReportForm({
               tabIndex={-1}
               autoComplete="off"
             />
+            {/* Idempotency key — stable per fresh form; dedupes retries (PP-2053.7) */}
+            <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
             <div className="space-y-1.5">
               <Label htmlFor="machineId" className="text-foreground">
                 Machine *
@@ -607,6 +686,8 @@ export function UnifiedReportForm({
                         id="firstName"
                         name="firstName"
                         autoComplete="given-name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
                         className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
@@ -621,6 +702,8 @@ export function UnifiedReportForm({
                         id="lastName"
                         name="lastName"
                         autoComplete="family-name"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
                         className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
@@ -634,6 +717,8 @@ export function UnifiedReportForm({
                       name="email"
                       type="email"
                       autoComplete="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                     />
                     <p className="text-[10px] text-muted-foreground leading-none">
@@ -767,8 +852,13 @@ export function UnifiedReportForm({
                     setStatus("new");
                     setAssignedTo("");
                     setWatchIssue(true);
+                    setFirstName("");
+                    setLastName("");
+                    setEmail("");
                     setUploadedImages([]);
                     setTurnstileToken("");
+                    // Fresh idempotency key — Clear starts a brand-new report.
+                    setIdempotencyKey(crypto.randomUUID());
                     setEditorResetKey((k) => k + 1);
                     setTurnstileWidgetKey((k) => k + 1);
                     setIsClearOpen(false);

@@ -1,5 +1,5 @@
 import type React from "react";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
@@ -31,7 +31,7 @@ import {
   checkPermission,
   getAccessLevel,
 } from "~/lib/permissions/helpers";
-import { reportError } from "~/lib/observability/report-error";
+import { reportAuthError } from "~/lib/observability/report-error";
 
 /**
  * Issue Detail Page
@@ -58,7 +58,9 @@ export default async function IssueDetailPage({
   if (authError) {
     // Backend glitch: keep rendering (as unauthenticated) rather than crash,
     // but capture the error so the silent guest-downgrade is observable.
-    reportError(authError, {
+    // AuthSessionMissingError is the normal no-session response for logged-out
+    // visitors and is suppressed; only real token-validation failures reach Sentry.
+    reportAuthError(authError, {
       action: "issue-detail-page.auth.getUser",
       bestEffort: true,
     });
@@ -67,7 +69,7 @@ export default async function IssueDetailPage({
   const issueNum = parseInt(issueNumber, 10);
 
   if (isNaN(issueNum) || issueNum < 1) {
-    redirect(`/m/${initials}`);
+    notFound();
   }
 
   // CORE-PERF-003: parallelize what's safe before role is known; the roster
@@ -157,7 +159,7 @@ export default async function IssueDetailPage({
   ]);
 
   if (!issue) {
-    redirect(`/m/${initials}`);
+    notFound();
   }
 
   const issueWithRelations = issue as unknown as IssueWithAllRelations;

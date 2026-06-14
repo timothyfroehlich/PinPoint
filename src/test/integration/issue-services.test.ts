@@ -354,6 +354,99 @@ describe("Issue Service Functions (Integration)", () => {
     });
   });
 
+  describe("createIssue idempotency (PP-2053.7)", () => {
+    it("dedupes a retried submission: same key twice yields one row, returns the existing issue, no second dispatch", async () => {
+      const db = await getTestDb();
+      const idempotencyKey = "11111111-1111-4111-8111-111111111111";
+
+      const params = {
+        title: "Idempotent Issue",
+        description: plainTextToDoc("Submitted once, retried once"),
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reporterName: "Retry User",
+        reporterEmail: "retry@example.com",
+        idempotencyKey,
+      };
+
+      // First submission creates the row and plans a notification.
+      const { issue: first } = await createIssue(params);
+      expect(first.idempotencyKey).toBe(idempotencyKey);
+      const planCallsAfterFirst = vi.mocked(planNotification).mock.calls.length;
+      expect(planCallsAfterFirst).toBeGreaterThan(0);
+
+      // Capture the machine counter after the first insert — a retry must NOT
+      // advance it.
+      const machineAfterFirst = await db.query.machines.findFirst({
+        where: eq(machines.initials, testMachine.initials),
+        columns: { nextIssueNumber: true },
+      });
+
+      // Retry with the SAME key returns the existing issue.
+      const { issue: second, deliveryPlan } = await createIssue(params);
+      expect(second.id).toBe(first.id);
+      expect(second.issueNumber).toBe(first.issueNumber);
+
+      // No second counter increment.
+      const machineAfterSecond = await db.query.machines.findFirst({
+        where: eq(machines.initials, testMachine.initials),
+        columns: { nextIssueNumber: true },
+      });
+      expect(machineAfterSecond?.nextIssueNumber).toBe(
+        machineAfterFirst?.nextIssueNumber
+      );
+
+      // No second notification: planNotification not called again, empty plan.
+      expect(vi.mocked(planNotification).mock.calls.length).toBe(
+        planCallsAfterFirst
+      );
+      expect(deliveryPlan.deliveries).toHaveLength(0);
+
+      // Exactly one row carries the key.
+      const rows = await db.query.issues.findMany({
+        where: eq(issues.idempotencyKey, idempotencyKey),
+      });
+      expect(rows).toHaveLength(1);
+    });
+
+    it("distinct keys create distinct issues", async () => {
+      const a = await createIssue({
+        title: "Issue A",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reporterName: "User A",
+        idempotencyKey: "22222222-2222-4222-8222-222222222222",
+      });
+      const b = await createIssue({
+        title: "Issue B",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reporterName: "User B",
+        idempotencyKey: "33333333-3333-4333-8333-333333333333",
+      });
+      expect(b.issue.id).not.toBe(a.issue.id);
+      expect(b.issue.issueNumber).not.toBe(a.issue.issueNumber);
+    });
+
+    it("null key skips dedup: two submissions create two rows", async () => {
+      const a = await createIssue({
+        title: "No-key A",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reporterName: "Anon A",
+      });
+      const b = await createIssue({
+        title: "No-key B",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reporterName: "Anon B",
+      });
+      expect(a.issue.idempotencyKey).toBeNull();
+      expect(b.issue.idempotencyKey).toBeNull();
+      expect(b.issue.id).not.toBe(a.issue.id);
+    });
+  });
+
   describe("assignIssue", () => {
     let testUser2: any;
 

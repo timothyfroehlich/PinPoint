@@ -57,6 +57,13 @@ export interface CreateIssueParams {
   reporterEmail?: string | null;
   assignedTo?: string | null;
   autoWatchReporter?: boolean | undefined;
+  /**
+   * Client-generated UUID, stable across submission retries. When present and a
+   * row already carries this key, createIssue returns the existing issue
+   * verbatim — no second counter increment, no second notification plan — so a
+   * retried submission cannot create a duplicate. (PP-2053.7)
+   */
+  idempotencyKey?: string | null;
 }
 
 export interface UpdateIssueStatusParams {
@@ -151,11 +158,33 @@ export async function createIssue({
   reporterEmail,
   assignedTo,
   autoWatchReporter = true,
+  idempotencyKey,
 }: CreateIssueParams): Promise<{ issue: Issue; deliveryPlan: DeliveryPlan }> {
   // Resolve channels outside the transaction to avoid an HTTP round-trip
   // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
   const channels = await getChannels();
   return await db.transaction(async (tx) => {
+    // 0. Idempotency dedup (PP-2053.7). A retried submission carries the same
+    //    client-generated key. If a row already exists for it, return that row
+    //    verbatim with an empty delivery plan — no counter increment, no second
+    //    notification. The check runs first so a retry never advances the
+    //    machine's nextIssueNumber. (Rate-limit + CAPTCHA already ran in the
+    //    action, BEFORE this check — so a same-key retry DOES still consume a
+    //    rate-limit slot. Making retries slot-exempt would mean moving an
+    //    idempotency lookup ahead of the rate limiter; deferred as a follow-up.)
+    if (idempotencyKey) {
+      const existing = await tx.query.issues.findFirst({
+        where: eq(issues.idempotencyKey, idempotencyKey),
+      });
+      if (existing) {
+        log.info(
+          { issueId: existing.id, idempotencyKey, action: "createIssue" },
+          "Idempotent retry — returning existing issue, no new write"
+        );
+        return { issue: existing, deliveryPlan: { deliveries: [] } };
+      }
+    }
+
     // 1. Lock machine row and get next number (Atomic increment)
     const [updatedMachine] = await tx
       .update(machines)
@@ -175,7 +204,11 @@ export async function createIssue({
     // The number we just reserved is (nextIssueNumber - 1) because we incremented it
     const issueNumber = updatedMachine.nextIssueNumber - 1;
 
-    // 2. Insert Issue
+    // 2. Insert Issue. ON CONFLICT DO NOTHING on the idempotency_key unique
+    //    index closes the narrow race where two retries of the same key reach
+    //    the insert concurrently (the step-0 SELECT missed the in-flight row):
+    //    the loser's insert returns no row, and we fall back to the committed
+    //    one. (PP-2053.7)
     const [issue] = await tx
       .insert(issues)
       .values({
@@ -191,10 +224,36 @@ export async function createIssue({
         reporterEmail: reporterEmail ?? null,
         status: status ?? "new",
         assignedTo: assignedTo ?? null,
+        idempotencyKey: idempotencyKey ?? null,
+      })
+      .onConflictDoNothing({
+        target: issues.idempotencyKey,
+        // The unique index is PARTIAL (`WHERE idempotency_key IS NOT NULL`),
+        // so the ON CONFLICT arbiter must repeat that predicate or Postgres
+        // can't infer the index (error 42P10).
+        where: sql`${issues.idempotencyKey} IS NOT NULL`,
       })
       .returning();
 
-    if (!issue) throw new Error("Issue creation failed");
+    if (!issue) {
+      // Insert was a no-op due to an idempotency-key conflict. Return the row
+      // that won the race with an empty delivery plan — no duplicate, no second
+      // dispatch. (A genuine insert failure can't reach here: only the partial
+      // unique index triggers DO NOTHING, and it only exists for non-NULL keys.)
+      if (idempotencyKey) {
+        const winner = await tx.query.issues.findFirst({
+          where: eq(issues.idempotencyKey, idempotencyKey),
+        });
+        if (winner) {
+          log.info(
+            { issueId: winner.id, idempotencyKey, action: "createIssue" },
+            "Idempotency conflict on insert — returning race winner"
+          );
+          return { issue: winner, deliveryPlan: { deliveries: [] } };
+        }
+      }
+      throw new Error("Issue creation failed");
+    }
 
     log.info(
       {
