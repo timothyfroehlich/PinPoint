@@ -50,11 +50,13 @@ Future: `/c/tag/[slug]` etc. URLs may diverge per source type; they share the co
 
 Dense status table, one row per machine, **worst-first default sort**.
 
-Columns: status (dot/badge) · machine (name + initials, links to `/m/[initials]`) · open issues · worst severity · oldest open issue (age of the longest-outstanding open issue; ascending first-click so neglected machines surface) · last activity (relative time + latest timeline event type, e.g. "2h ago — issue reported") · presence.
+Columns (left to right): machine (name + initials, links to `/m/[initials]`) · status (dot/badge) · presence (grouped beside status — both are badges) · open issues · oldest issue (compact age of the longest-outstanding open issue, e.g. "2mo 5d"; ascending first-click so neglected machines surface) · last activity (relative time + latest timeline event type, e.g. "2h ago — issue reported"). All data columns are left-aligned (counts stay single-digit, so numeric right-align earns nothing).
+
+MVP scope note: **worst severity** and **last serviced** columns were cut for v1. Worst severity duplicated the signal already carried by open-count + status; last serviced relied on free-form service comments whose discipline is unproven — deferred until real usage justifies it (the `worstOpenSeverity` helper and service-tag plumbing can be revived additively).
 
 - **Sortable headers** on every column; `<th scope="col">` + `aria-sort` + accessible names (CORE-A11Y).
-- **Column picker** ("Columns" dropdown), persisted in **localStorage** (per-device is acceptable for a display preference; promoting to user prefs later is additive). Status + Machine are un-hideable.
-- **Responsive:** column-drop at narrow widths via the `use-table-responsive-columns` pattern (PP-rs9 exception). Drop order: presence, worst severity first; status, machine, open count, last activity survive longest.
+- **Column picker** ("Columns" dropdown), persisted in **localStorage** as `{hidden, pinned}` (per-device is acceptable for a display preference; promoting to user prefs later is additive). Machine + Status are un-hideable. **Explicit picker choices win over responsive auto-drop:** a column you check stays visible (the table scrolls horizontally rather than silently hiding it); only columns you never touched auto-drop.
+- **Responsive:** column-drop at narrow widths via the `use-table-responsive-columns` pattern (PP-rs9 exception). Drop order: presence first, then last activity; machine, status, open count, oldest backlog survive longest.
 - Page header (above tabs) carries the aggregate summary: "8 machines · 5 operational · 2 need service · 1 unplayable · 11 open issues".
 
 ### Issues

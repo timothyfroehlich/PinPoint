@@ -13,18 +13,14 @@ import {
 import { MachineStatusBadge } from "~/components/machines/MachineStatusBadge";
 import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge";
 import { RelativeTime } from "~/components/issues/RelativeTime";
+import { CompactAge } from "~/components/issues/CompactAge";
 import {
   useTableResponsiveColumns,
   type ColumnConfig,
 } from "~/hooks/use-table-responsive-columns";
-import {
-  MACHINE_STATUS_RANK,
-  SEVERITY_RANK,
-  type MachineStatus,
-} from "~/lib/machines/status";
+import { MACHINE_STATUS_RANK, type MachineStatus } from "~/lib/machines/status";
 import { getTagLabel, type TimelineTag } from "~/lib/timeline/machine-tags";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
-import type { IssueSeverity } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 export interface CollectionOverviewRow {
@@ -33,7 +29,6 @@ export interface CollectionOverviewRow {
   name: string;
   status: MachineStatus;
   openCount: number;
-  worstSeverity: IssueSeverity | null;
   lastActivity: { createdAt: Date; tag: TimelineTag } | null;
   /** Created date of the longest-outstanding OPEN issue, null when none. */
   oldestOpenAt: Date | null;
@@ -41,27 +36,24 @@ export interface CollectionOverviewRow {
 }
 
 type ColumnKey =
-  | "status"
   | "machine"
+  | "status"
   | "open"
-  | "severity"
   | "oldest"
   | "activity"
   | "presence";
 
 const HIDEABLE: readonly ColumnKey[] = [
   "open",
-  "severity",
   "oldest",
   "activity",
   "presence",
 ];
 const COLUMN_LABELS: Record<ColumnKey, string> = {
-  status: "Status",
   machine: "Machine",
+  status: "Status",
   open: "Open Issues",
-  severity: "Worst severity",
-  oldest: "Oldest open issue",
+  oldest: "Oldest issue",
   activity: "Last activity",
   presence: "Presence",
 };
@@ -78,10 +70,9 @@ interface SortState {
  * "worst/most/newest first".
  */
 const DEFAULT_DIR: Record<ColumnKey, "asc" | "desc"> = {
-  status: "desc",
   machine: "asc",
+  status: "desc",
   open: "desc",
-  severity: "desc",
   oldest: "asc", // oldest (most neglected) first
   activity: "desc",
   presence: "asc",
@@ -103,22 +94,18 @@ function compareRows(
       return a.name.localeCompare(b.name);
     case "open":
       return a.openCount - b.openCount;
-    case "severity": {
-      const ra = a.worstSeverity === null ? -1 : SEVERITY_RANK[a.worstSeverity];
-      const rb = b.worstSeverity === null ? -1 : SEVERITY_RANK[b.worstSeverity];
-      return ra - rb;
-    }
     case "activity": {
       const ta = a.lastActivity?.createdAt.getTime() ?? 0;
       const tb = b.lastActivity?.createdAt.getTime() ?? 0;
       return ta - tb;
     }
     case "oldest": {
-      // No open issues sorts as "newest" so ascending (oldest-first, the
-      // meaningful direction) puts machines with real backlogs on top.
-      const ta = a.oldestOpenAt?.getTime() ?? Number.POSITIVE_INFINITY;
-      const tb = b.oldestOpenAt?.getTime() ?? Number.POSITIVE_INFINITY;
-      return ta === tb ? 0 : ta < tb ? -1 : 1;
+      // Machines with no open issues are kept out of this ordering entirely
+      // (handled null-last in the sort wrapper, both directions), so here both
+      // values are real dates.
+      const ta = a.oldestOpenAt?.getTime() ?? 0;
+      const tb = b.oldestOpenAt?.getTime() ?? 0;
+      return ta - tb;
     }
     case "presence":
       return a.presence.localeCompare(b.presence);
@@ -130,11 +117,13 @@ function SortableHeader({
   sort,
   onSort,
   align = "left",
+  className,
 }: {
   column: ColumnKey;
   sort: SortState;
   onSort: (key: ColumnKey) => void;
   align?: "left" | "right";
+  className?: string;
 }): React.JSX.Element {
   return (
     <th
@@ -147,8 +136,9 @@ function SortableHeader({
           : "none"
       }
       className={cn(
-        "px-3 py-2 text-sm font-semibold text-muted-foreground",
-        align === "right" && "text-right"
+        "whitespace-nowrap px-3 py-2 text-sm font-semibold text-muted-foreground",
+        align === "right" && "text-right",
+        className
       )}
     >
       <button
@@ -170,6 +160,14 @@ function SortableHeader({
   );
 }
 
+/** Keep only valid hideable column keys from untrusted (localStorage) data. */
+function sanitizeKeys(value: unknown): ColumnKey[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((k): k is ColumnKey =>
+    (HIDEABLE as readonly string[]).includes(String(k))
+  );
+}
+
 export function CollectionOverviewTable({
   rows,
 }: {
@@ -182,7 +180,13 @@ export function CollectionOverviewTable({
     key: "status",
     dir: "desc",
   });
+  // Column visibility is two-layered: the user's explicit picker choices
+  // (`hidden` = unchecked, `pinned` = re-checked) always win; columns the
+  // user never touched fall back to responsive auto-dropping. Pinning means
+  // a narrow window scrolls horizontally instead of silently hiding a column
+  // the user asked for.
   const [hidden, setHidden] = React.useState<ColumnKey[]>([]);
+  const [pinned, setPinned] = React.useState<ColumnKey[]>([]);
 
   React.useEffect(() => {
     try {
@@ -190,11 +194,11 @@ export function CollectionOverviewTable({
       if (!raw) return;
       const parsed: unknown = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        setHidden(
-          parsed.filter((k): k is ColumnKey =>
-            (HIDEABLE as readonly string[]).includes(String(k))
-          )
-        );
+        // Legacy format: a bare array of hidden keys.
+        setHidden(sanitizeKeys(parsed));
+      } else if (typeof parsed === "object" && parsed !== null) {
+        setHidden(sanitizeKeys((parsed as Record<string, unknown>)["hidden"]));
+        setPinned(sanitizeKeys((parsed as Record<string, unknown>)["pinned"]));
       }
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
@@ -202,40 +206,62 @@ export function CollectionOverviewTable({
   }, []);
 
   const toggleColumn = (key: ColumnKey): void => {
-    setHidden((prev) => {
-      const next = prev.includes(key)
-        ? prev.filter((k) => k !== key)
-        : [...prev, key];
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
+    // Unchecking hides; re-checking pins (explicit choice beats auto-drop).
+    // One membership test drives both branches so they can't desync.
+    const isHidden = hidden.includes(key);
+    const nextHidden = isHidden
+      ? hidden.filter((k) => k !== key)
+      : [...hidden, key];
+    const nextPinned = isHidden
+      ? [...pinned.filter((k) => k !== key), key]
+      : pinned.filter((k) => k !== key);
+    setHidden(nextHidden);
+    setPinned(nextPinned);
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ hidden: nextHidden, pinned: nextPinned })
+    );
   };
 
-  // Responsive drop order (spec): presence and severity go first.
+  // Responsive auto-drop, least-important-first. Machine is a flex column
+  // that shrinks to its content, so the base reservation is small (~220) —
+  // columns only drop when the table is genuinely cramped (~700px), not while
+  // there is obvious empty space. Verbose "last activity" drops first; the
+  // open count survives longest; presence (paired with status) stays sticky.
+  // Explicitly pinned columns bypass this entirely (see isShown).
   const columnConfig = React.useMemo<(ColumnConfig & { key: ColumnKey })[]>(
     () => [
-      { key: "presence", minWidth: 110, priority: 1 },
-      { key: "severity", minWidth: 130, priority: 2 },
-      { key: "oldest", minWidth: 130, priority: 3 },
-      { key: "activity", minWidth: 180, priority: 4 },
-      { key: "open", minWidth: 100, priority: 5 },
+      { key: "activity", minWidth: 150, priority: 1 },
+      { key: "oldest", minWidth: 90, priority: 2 },
+      { key: "presence", minWidth: 100, priority: 3 },
+      { key: "open", minWidth: 90, priority: 4 },
     ],
     []
   );
   const { visibleColumns, containerRef } = useTableResponsiveColumns<ColumnKey>(
     columnConfig,
-    360 // base width consumed by the always-on Status + Machine columns
+    220 // base width consumed by the always-on Machine + Status columns
   );
 
   const isShown = (key: ColumnKey): boolean => {
     if (key === "status" || key === "machine") return true;
+    if (hidden.includes(key)) return false;
+    if (pinned.includes(key)) return true;
     // All remaining keys are in columnConfig, so the hook always has an entry.
-    return visibleColumns[key] && !hidden.includes(key);
+    return visibleColumns[key];
   };
 
   const sorted = React.useMemo(() => {
     const copy = [...rows];
     copy.sort((a, b) => {
+      // Machines with no open backlog have no "oldest issue" age; keep them at
+      // the bottom of the Oldest-issue sort in BOTH directions. The generic
+      // direction flip below would otherwise float them to the top on desc.
+      if (sort.key === "oldest") {
+        const aNull = a.oldestOpenAt === null;
+        const bNull = b.oldestOpenAt === null;
+        if (aNull || bNull) return aNull === bNull ? 0 : aNull ? 1 : -1;
+      }
       const base = compareRows(a, b, sort.key);
       return sort.dir === "desc" ? -base : base;
     });
@@ -278,26 +304,22 @@ export function CollectionOverviewTable({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/30 text-left">
-              <SortableHeader column="status" sort={sort} onSort={handleSort} />
               <SortableHeader
                 column="machine"
                 sort={sort}
                 onSort={handleSort}
+                className="w-full"
               />
-              {isShown("open") && (
+              <SortableHeader column="status" sort={sort} onSort={handleSort} />
+              {isShown("presence") && (
                 <SortableHeader
-                  column="open"
+                  column="presence"
                   sort={sort}
                   onSort={handleSort}
-                  align="right"
                 />
               )}
-              {isShown("severity") && (
-                <SortableHeader
-                  column="severity"
-                  sort={sort}
-                  onSort={handleSort}
-                />
+              {isShown("open") && (
+                <SortableHeader column="open" sort={sort} onSort={handleSort} />
               )}
               {isShown("oldest") && (
                 <SortableHeader
@@ -313,13 +335,6 @@ export function CollectionOverviewTable({
                   onSort={handleSort}
                 />
               )}
-              {isShown("presence") && (
-                <SortableHeader
-                  column="presence"
-                  sort={sort}
-                  onSort={handleSort}
-                />
-              )}
             </tr>
           </thead>
           <tbody data-testid="collection-overview-body">
@@ -329,10 +344,7 @@ export function CollectionOverviewTable({
                 data-initials={row.initials}
                 className="border-b border-border last:border-b-0"
               >
-                <td className="px-3 py-2.5">
-                  <MachineStatusBadge status={row.status} size="sm" />
-                </td>
-                <td className="px-3 py-2.5">
+                <td className="w-full whitespace-nowrap px-3 py-2.5">
                   <Link
                     href={`/m/${row.initials}`}
                     className="font-medium text-foreground hover:text-primary hover:underline"
@@ -343,27 +355,30 @@ export function CollectionOverviewTable({
                     {row.initials}
                   </span>
                 </td>
+                <td className="px-3 py-2.5">
+                  <MachineStatusBadge status={row.status} size="sm" />
+                </td>
+                {isShown("presence") && (
+                  <td className="px-3 py-2.5">
+                    <MachinePresenceBadge status={row.presence} size="sm" />
+                  </td>
+                )}
                 {isShown("open") && (
-                  <td className="px-3 py-2.5 text-right tabular-nums">
+                  <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">
                     {row.openCount}
                   </td>
                 )}
-                {isShown("severity") && (
-                  <td className="px-3 py-2.5 text-muted-foreground">
-                    {row.worstSeverity ?? "—"}
-                  </td>
-                )}
                 {isShown("oldest") && (
-                  <td className="px-3 py-2.5 text-muted-foreground">
+                  <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground tabular-nums">
                     {row.oldestOpenAt ? (
-                      <RelativeTime value={row.oldestOpenAt} />
+                      <CompactAge value={row.oldestOpenAt} />
                     ) : (
                       "—"
                     )}
                   </td>
                 )}
                 {isShown("activity") && (
-                  <td className="px-3 py-2.5 text-muted-foreground">
+                  <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">
                     {row.lastActivity ? (
                       <>
                         <RelativeTime value={row.lastActivity.createdAt} />
@@ -373,11 +388,6 @@ export function CollectionOverviewTable({
                     ) : (
                       "—"
                     )}
-                  </td>
-                )}
-                {isShown("presence") && (
-                  <td className="px-3 py-2.5">
-                    <MachinePresenceBadge status={row.presence} size="sm" />
                   </td>
                 )}
               </tr>

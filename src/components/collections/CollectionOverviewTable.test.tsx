@@ -44,7 +44,6 @@ function row(over: Partial<CollectionOverviewRow>): CollectionOverviewRow {
     name: "Machine",
     status: "operational",
     openCount: 0,
-    worstSeverity: null,
     lastActivity: null,
     oldestOpenAt: null,
     presence: "on_the_floor",
@@ -59,7 +58,6 @@ const ROWS: CollectionOverviewRow[] = [
     name: "Broken Game",
     status: "unplayable",
     openCount: 2,
-    worstSeverity: "unplayable",
     oldestOpenAt: new Date("2026-05-01T00:00:00Z"),
   }),
   row({
@@ -67,7 +65,6 @@ const ROWS: CollectionOverviewRow[] = [
     name: "Aching Game",
     status: "needs_service",
     openCount: 1,
-    worstSeverity: "major",
     oldestOpenAt: new Date("2026-01-01T00:00:00Z"), // oldest backlog
   }),
 ];
@@ -83,6 +80,15 @@ describe("CollectionOverviewTable", () => {
       .getAllByRole("row")
       .map((r) => r.getAttribute("data-initials"));
     expect(bodyRows).toEqual(["BAD", "MEH", "OK"]);
+  });
+
+  it("renders Machine as the first column", () => {
+    render(<CollectionOverviewTable rows={ROWS} />);
+    const headers = screen
+      .getAllByRole("columnheader")
+      .map((h) => h.textContent?.trim());
+    expect(headers[0]).toMatch(/machine/i);
+    expect(headers[1]).toMatch(/status/i);
   });
 
   it("marks the active sort column with aria-sort and toggles on click", async () => {
@@ -109,7 +115,7 @@ describe("CollectionOverviewTable", () => {
     const user = userEvent.setup();
     render(<CollectionOverviewTable rows={ROWS} />);
     const header = screen.getByRole("columnheader", {
-      name: /oldest open issue/i,
+      name: /oldest issue/i,
     });
     await user.click(within(header).getByRole("button"));
     expect(header).toHaveAttribute("aria-sort", "ascending");
@@ -130,12 +136,11 @@ describe("CollectionOverviewTable", () => {
     expect(
       screen.queryByRole("columnheader", { name: /presence/i })
     ).not.toBeInTheDocument();
-    expect(
-      JSON.parse(
-        window.localStorage.getItem("pinpoint_collection_overview_columns") ??
-          "[]"
-      )
-    ).toContain("presence");
+    const persisted = JSON.parse(
+      window.localStorage.getItem("pinpoint_collection_overview_columns") ??
+        "{}"
+    ) as { hidden: string[]; pinned: string[] };
+    expect(persisted.hidden).toContain("presence");
   });
 
   it("does not offer Status or Machine in the picker", async () => {

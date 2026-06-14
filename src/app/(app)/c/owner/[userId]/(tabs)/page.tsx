@@ -1,7 +1,7 @@
 import type React from "react";
 import { notFound } from "next/navigation";
 import { getLatestTimelineEventPerMachine } from "~/lib/collections/latest-activity";
-import { deriveMachineStatus, worstOpenSeverity } from "~/lib/machines/status";
+import { deriveMachineStatus } from "~/lib/machines/status";
 import { getOwnerCollectionForLayout } from "../_data";
 import {
   CollectionOverviewTable,
@@ -38,16 +38,12 @@ export default async function CollectionOverviewPage({
     name: m.name,
     status: deriveMachineStatus(m.issues),
     openCount: m.issues.length,
-    worstSeverity: worstOpenSeverity(m.issues),
     lastActivity: latest.get(m.id) ?? null,
     // `issues` is open-only (filtered in the resolver), so the minimum
     // createdAt is the longest-outstanding open issue.
     oldestOpenAt:
       m.issues.length > 0
-        ? m.issues.reduce(
-            (oldest, i) => (i.createdAt < oldest ? i.createdAt : oldest),
-            m.issues[0]?.createdAt ?? new Date()
-          )
+        ? new Date(Math.min(...m.issues.map((i) => i.createdAt.getTime())))
         : null,
     presence: m.presenceStatus,
   }));
