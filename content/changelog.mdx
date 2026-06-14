@@ -1,5 +1,18 @@
 {/* This file is auto-updated by the weekly changelog workflow. Newest entries at top. */}
 
+## June 8, 2026
+
+### Bug Fixes
+
+- Notification emails and Discord DMs are now reliably sent after an issue is saved — a bug could silently skip them if anything went wrong during the save process
+- Submitting an issue report now handles connection failures gracefully; retrying a failed submission no longer creates a duplicate issue
+- Images attached to a retried issue report are no longer duplicated or silently dropped
+- Notification emails are no longer sent twice when the delivery system retries after a hiccup
+- Navigating to an issue that no longer exists now shows a proper "page not found" message instead of silently redirecting you elsewhere
+- Opening the Settings page no longer causes an infinite redirect loop if your account profile is incomplete
+
+---
+
 ## June 1, 2026
 
 ### New Features
