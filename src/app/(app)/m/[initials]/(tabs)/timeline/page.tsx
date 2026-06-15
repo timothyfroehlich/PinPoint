@@ -10,7 +10,7 @@ import { MachineTimelineIssueRow } from "~/components/machines/timeline/MachineT
 import { MachineTimelineSystemRow } from "~/components/machines/timeline/MachineTimelineSystemRow";
 import { MachineTimelineTombstoneRow } from "~/components/machines/timeline/MachineTimelineTombstoneRow";
 import { TimelineBucketBanner } from "~/components/machines/timeline/TimelineBucketBanner";
-import { formatTimelineBucket, type TimelineBucket } from "~/lib/dates";
+import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
 import {
   type AccessLevel,
   checkPermission,
@@ -127,27 +127,8 @@ export default async function MachineTimelinePage({
   const rows = hasNextPage ? fetched.slice(0, PAGE_SIZE) : fetched;
   const hasPrevPage = currentPage > 1;
 
-  // Two-tier bucket assignment (PP-0x98 V2): last 7 days → per-day buckets
-  // with "Today" / "Yesterday" / weekday labels; older → per-month buckets
-  // ("May 2026") with each row inside leading with a small inline date
-  // chip ("May 14"). The bucket `key` is what we group on — using `label`
-  // would collide across distant weeks ("Tuesday" can be two different
-  // calendar days inside one rendered page).
   type Row = (typeof rows)[number];
-  interface RowWithBucket {
-    row: Row;
-    bucket: TimelineBucket;
-  }
-  const groups: { bucket: TimelineBucket; entries: RowWithBucket[] }[] = [];
-  for (const row of rows) {
-    const bucket = formatTimelineBucket(row.createdAt);
-    const last = groups[groups.length - 1];
-    if (last?.bucket.key === bucket.key) {
-      last.entries.push({ row, bucket });
-    } else {
-      groups.push({ bucket, entries: [{ row, bucket }] });
-    }
-  }
+  const groups = bucketTimelineRows(rows);
 
   function renderRow(
     row: Row,

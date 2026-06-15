@@ -11,7 +11,7 @@ import { MachineTimelineSystemRow } from "~/components/machines/timeline/Machine
 import { MachineTimelineTombstoneRow } from "~/components/machines/timeline/MachineTimelineTombstoneRow";
 import { TimelineBucketBanner } from "~/components/machines/timeline/TimelineBucketBanner";
 import type { MachineLabel } from "~/components/machines/timeline/MachineAttributionLine";
-import { formatTimelineBucket, type TimelineBucket } from "~/lib/dates";
+import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
 import { isMachineIssueEvent } from "~/lib/timeline/machine-event-types";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
 import {
@@ -115,24 +115,8 @@ export default async function CollectionTimelinePage({
     ])
   );
 
-  // Two-tier bucket assignment, copied from the per-machine page: last 7
-  // days → per-day buckets; older → per-month buckets with inline date chips.
-  // Group on bucket `key` (labels like "Tuesday" collide across weeks).
   type Row = (typeof rows)[number];
-  interface RowWithBucket {
-    row: Row;
-    bucket: TimelineBucket;
-  }
-  const groups: { bucket: TimelineBucket; entries: RowWithBucket[] }[] = [];
-  for (const row of rows) {
-    const bucket = formatTimelineBucket(row.createdAt);
-    const last = groups[groups.length - 1];
-    if (last?.bucket.key === bucket.key) {
-      last.entries.push({ row, bucket });
-    } else {
-      groups.push({ bucket, entries: [{ row, bucket }] });
-    }
-  }
+  const groups = bucketTimelineRows(rows);
 
   function renderRow(
     row: Row,
