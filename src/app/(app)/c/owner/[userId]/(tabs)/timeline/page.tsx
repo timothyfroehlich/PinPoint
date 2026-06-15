@@ -4,15 +4,10 @@ import { notFound } from "next/navigation";
 import { isToday } from "date-fns";
 
 import { CollectionMachineFilter } from "~/components/collections/CollectionMachineFilter";
-import { MachineTimelineCommentRow } from "~/components/machines/timeline/MachineTimelineCommentRow";
 import { MachineTimelineFilter } from "~/components/machines/timeline/MachineTimelineFilter";
-import { MachineTimelineIssueRow } from "~/components/machines/timeline/MachineTimelineIssueRow";
-import { MachineTimelineSystemRow } from "~/components/machines/timeline/MachineTimelineSystemRow";
-import { MachineTimelineTombstoneRow } from "~/components/machines/timeline/MachineTimelineTombstoneRow";
 import { TimelineBucketBanner } from "~/components/machines/timeline/TimelineBucketBanner";
-import type { MachineLabel } from "~/components/machines/timeline/MachineAttributionLine";
+import { TimelineRow } from "~/components/machines/timeline/TimelineRow";
 import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
-import { isMachineIssueEvent } from "~/lib/timeline/machine-event-types";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
 import {
   DEFAULT_TIMELINE_TAGS,
@@ -115,99 +110,7 @@ export default async function CollectionTimelinePage({
     ])
   );
 
-  type Row = (typeof rows)[number];
   const groups = bucketTimelineRows(rows);
-
-  function renderRow(
-    row: Row,
-    showRelativeTime: boolean,
-    rowDateLabel: string | undefined
-  ): React.JSX.Element | null {
-    const machineRef = row.machineId ? machineById.get(row.machineId) : null;
-    const machineLabel: MachineLabel | undefined = machineRef
-      ? { name: machineRef.name, href: machineRef.href }
-      : undefined;
-    const labelProp = machineLabel !== undefined ? { machineLabel } : {};
-
-    // Tombstone for any soft-deleted row (regardless of source type).
-    if (row.deletedAt) {
-      return (
-        <MachineTimelineTombstoneRow
-          key={row.id}
-          deletedByName={row.deletedByName}
-          deletedAt={row.deletedAt}
-          {...labelProp}
-        />
-      );
-    }
-
-    // User comment — read-only in the collection feed (v1, PP-slrd.2).
-    if (row.sourceType === "comment" && row.content) {
-      return (
-        <MachineTimelineCommentRow
-          key={row.id}
-          row={{
-            id: row.id,
-            createdAt: row.createdAt,
-            authorId: row.authorId,
-            authorName: row.authorName,
-            authorAvatarUrl: row.authorAvatarUrl,
-            editedAt: row.editedAt,
-            tag: row.tag,
-            content: row.content,
-          }}
-          canEdit={false}
-          canDelete={false}
-          showRelativeTime={showRelativeTime}
-          {...(rowDateLabel !== undefined ? { rowDateLabel } : {})}
-          {...labelProp}
-        />
-      );
-    }
-
-    // Issue-side events get the two-line treatment; lifecycle events keep
-    // the single-line system row. machineInitials comes from the row's
-    // machine (the per-machine page derives it from the route instead).
-    if (row.eventData) {
-      if (isMachineIssueEvent(row.eventData)) {
-        return (
-          <MachineTimelineIssueRow
-            key={row.id}
-            row={{
-              id: row.id,
-              createdAt: row.createdAt,
-              tag: row.tag,
-              authorName: row.authorName,
-              eventData: row.eventData,
-              people: row.people,
-              machineRefs: row.machineRefs,
-            }}
-            {...(machineRef ? { machineInitials: machineRef.initials } : {})}
-            showRelativeTime={showRelativeTime}
-            {...(rowDateLabel !== undefined ? { rowDateLabel } : {})}
-            {...labelProp}
-          />
-        );
-      }
-      return (
-        <MachineTimelineSystemRow
-          key={row.id}
-          row={{
-            id: row.id,
-            createdAt: row.createdAt,
-            tag: row.tag,
-            eventData: row.eventData,
-            people: row.people,
-          }}
-          showRelativeTime={showRelativeTime}
-          {...(rowDateLabel !== undefined ? { rowDateLabel } : {})}
-          {...labelProp}
-        />
-      );
-    }
-
-    return null;
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -246,13 +149,30 @@ export default async function CollectionTimelinePage({
               <section key={group.bucket.key} className="pt-6 first:pt-0">
                 <TimelineBucketBanner bucket={group.bucket} />
                 <div>
-                  {group.entries.map((entry) =>
-                    renderRow(
-                      entry.row,
-                      showRelativeTime,
-                      entry.bucket.rowDateLabel
-                    )
-                  )}
+                  {group.entries.map((entry) => {
+                    const machineRef = entry.row.machineId
+                      ? machineById.get(entry.row.machineId)
+                      : null;
+                    return (
+                      <TimelineRow
+                        key={entry.row.id}
+                        row={entry.row}
+                        showRelativeTime={showRelativeTime}
+                        rowDateLabel={entry.bucket.rowDateLabel}
+                        commentCanEdit={false}
+                        commentCanDelete={false}
+                        {...(machineRef
+                          ? {
+                              machineLabel: {
+                                name: machineRef.name,
+                                href: machineRef.href,
+                              },
+                              machineInitials: machineRef.initials,
+                            }
+                          : {})}
+                      />
+                    );
+                  })}
                 </div>
               </section>
             );

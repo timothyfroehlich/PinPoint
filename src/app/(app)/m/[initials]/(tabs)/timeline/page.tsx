@@ -5,11 +5,8 @@ import { eq } from "drizzle-orm";
 import { isToday } from "date-fns";
 
 import { MachineTimelineActionsRow } from "~/components/machines/timeline/MachineTimelineActionsRow";
-import { MachineTimelineCommentRow } from "~/components/machines/timeline/MachineTimelineCommentRow";
-import { MachineTimelineIssueRow } from "~/components/machines/timeline/MachineTimelineIssueRow";
-import { MachineTimelineSystemRow } from "~/components/machines/timeline/MachineTimelineSystemRow";
-import { MachineTimelineTombstoneRow } from "~/components/machines/timeline/MachineTimelineTombstoneRow";
 import { TimelineBucketBanner } from "~/components/machines/timeline/TimelineBucketBanner";
+import { TimelineRow } from "~/components/machines/timeline/TimelineRow";
 import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
 import {
   type AccessLevel,
@@ -17,7 +14,6 @@ import {
   getAccessLevel,
 } from "~/lib/permissions/index";
 import { createClient } from "~/lib/supabase/server";
-import { isMachineIssueEvent } from "~/lib/timeline/machine-event-types";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
 import {
   DEFAULT_TIMELINE_TAGS,
@@ -130,109 +126,31 @@ export default async function MachineTimelinePage({
   type Row = (typeof rows)[number];
   const groups = bucketTimelineRows(rows);
 
-  function renderRow(
-    row: Row,
-    showRelativeTime: boolean,
-    rowDateLabel: string | undefined
-  ): React.JSX.Element | null {
-    // Tombstone for any soft-deleted row (regardless of source type).
-    if (row.deletedAt) {
-      return (
-        <MachineTimelineTombstoneRow
-          key={row.id}
-          deletedByName={row.deletedByName}
-          deletedAt={row.deletedAt}
-        />
-      );
-    }
-
-    // User comment.
-    if (row.sourceType === "comment" && row.content) {
-      // Matrix-only permission checks (AGENTS.md rule 12). Edit uses `own`
-      // semantics (author only — even admin/owner can't put words in
-      // someone else's mouth); delete uses `own_or_owner` with an admin
-      // override.
-      const ownership = currentUserId
-        ? {
-            userId: currentUserId,
-            reporterId: row.authorId,
-            machineOwnerId,
-          }
+  // Comment edit/delete capability per row. Matrix-only permission checks
+  // (AGENTS.md rule 12): edit uses `own` semantics (author only — even
+  // admin/owner can't put words in someone else's mouth); delete uses
+  // `own_or_owner` with an admin override. Non-comment rows have no capability.
+  function commentCapabilities(row: Row): {
+    canEdit: boolean;
+    canDelete: boolean;
+  } {
+    const ownership =
+      currentUserId !== null && row.sourceType === "comment"
+        ? { userId: currentUserId, reporterId: row.authorId, machineOwnerId }
         : null;
-      const canEdit = ownership
-        ? checkPermission(
-            "machines.timeline.comment.edit",
-            accessLevel,
-            ownership
-          )
-        : false;
-      const canDelete = ownership
-        ? checkPermission(
-            "machines.timeline.comment.delete",
-            accessLevel,
-            ownership
-          )
-        : false;
-      return (
-        <MachineTimelineCommentRow
-          key={row.id}
-          row={{
-            id: row.id,
-            createdAt: row.createdAt,
-            authorId: row.authorId,
-            authorName: row.authorName,
-            authorAvatarUrl: row.authorAvatarUrl,
-            editedAt: row.editedAt,
-            tag: row.tag,
-            content: row.content,
-          }}
-          canEdit={canEdit}
-          canDelete={canDelete}
-          showRelativeTime={showRelativeTime}
-          {...(rowDateLabel !== undefined ? { rowDateLabel } : {})}
-        />
-      );
-    }
-
-    // Issue-side events get the two-line treatment (`AFM-03 Title` + badges).
-    // Lifecycle events keep the single-line system row.
-    if (row.eventData) {
-      if (isMachineIssueEvent(row.eventData)) {
-        return (
-          <MachineTimelineIssueRow
-            key={row.id}
-            row={{
-              id: row.id,
-              createdAt: row.createdAt,
-              tag: row.tag,
-              authorName: row.authorName,
-              eventData: row.eventData,
-              people: row.people,
-              machineRefs: row.machineRefs,
-            }}
-            machineInitials={machineInitials}
-            showRelativeTime={showRelativeTime}
-            {...(rowDateLabel !== undefined ? { rowDateLabel } : {})}
-          />
-        );
-      }
-      return (
-        <MachineTimelineSystemRow
-          key={row.id}
-          row={{
-            id: row.id,
-            createdAt: row.createdAt,
-            tag: row.tag,
-            eventData: row.eventData,
-            people: row.people,
-          }}
-          showRelativeTime={showRelativeTime}
-          {...(rowDateLabel !== undefined ? { rowDateLabel } : {})}
-        />
-      );
-    }
-
-    return null;
+    if (!ownership) return { canEdit: false, canDelete: false };
+    return {
+      canEdit: checkPermission(
+        "machines.timeline.comment.edit",
+        accessLevel,
+        ownership
+      ),
+      canDelete: checkPermission(
+        "machines.timeline.comment.delete",
+        accessLevel,
+        ownership
+      ),
+    };
   }
 
   return (
@@ -265,13 +183,22 @@ export default async function MachineTimelinePage({
               <section key={group.bucket.key} className="pt-6 first:pt-0">
                 <TimelineBucketBanner bucket={group.bucket} />
                 <div>
-                  {group.entries.map((entry) =>
-                    renderRow(
-                      entry.row,
-                      showRelativeTime,
-                      entry.bucket.rowDateLabel
-                    )
-                  )}
+                  {group.entries.map((entry) => {
+                    const { canEdit, canDelete } = commentCapabilities(
+                      entry.row
+                    );
+                    return (
+                      <TimelineRow
+                        key={entry.row.id}
+                        row={entry.row}
+                        showRelativeTime={showRelativeTime}
+                        rowDateLabel={entry.bucket.rowDateLabel}
+                        machineInitials={machineInitials}
+                        commentCanEdit={canEdit}
+                        commentCanDelete={canDelete}
+                      />
+                    );
+                  })}
                 </div>
               </section>
             );
