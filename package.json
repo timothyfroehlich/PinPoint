@@ -186,7 +186,7 @@
   },
   "pnpm": {
     "overrides": {
-      "esbuild": ">=0.25.0",
+      "esbuild": ">=0.28.1",
       "minimatch": ">=10.2.3",
       "rollup": ">=4.59.0",
       "serialize-javascript": ">=7.0.3",

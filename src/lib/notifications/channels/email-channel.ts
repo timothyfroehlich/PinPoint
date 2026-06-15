@@ -343,7 +343,14 @@ export const emailChannel: DeliveryChannel = {
       // retried post-commit dispatch (after() re-run, transient-failure replay)
       // produces the SAME key and Resend dedupes the second send rather than
       // double-emailing the recipient. (PP-2053.7)
-      const emailIdempotencyKey = `notif:${ctx.resourceType}:${ctx.resourceId}:${ctx.type}:${ctx.userId}`;
+      //
+      // eventId discriminates distinct events of the same type on the same
+      // resource (e.g. two separate comments → two distinct keys). Without it,
+      // Resend treats both as the same email and silently drops the second.
+      // (PP-pfyf)
+      const emailIdempotencyKey = ctx.eventId
+        ? `notif:${ctx.resourceType}:${ctx.resourceId}:${ctx.type}:${ctx.userId}:${ctx.eventId}`
+        : `notif:${ctx.resourceType}:${ctx.resourceId}:${ctx.type}:${ctx.userId}`;
 
       await sendEmail({
         to: ctx.email,
