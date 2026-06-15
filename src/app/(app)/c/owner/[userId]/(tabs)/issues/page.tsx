@@ -40,6 +40,15 @@ export default async function CollectionIssuesPage({
   // the set; they can never widen it. Empty scope -> no query (an empty
   // machine[] is dropped by buildWhereConditions, which would unscope).
   const collectionInitials = collection.machines.map((m) => m.initials);
+  if (collectionInitials.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        This collection has no machines yet.
+      </p>
+    );
+  }
+
+  // Requested machine filters narrow WITHIN the set; they can never widen it.
   const requested = filters.machine ?? [];
   const scoped =
     requested.length > 0
@@ -47,9 +56,13 @@ export default async function CollectionIssuesPage({
       : collectionInitials;
 
   if (scoped.length === 0) {
+    // The collection has machines, but the requested ?machine= filter selects
+    // none of them (a stale bookmark or hand-edited param — the filter UI only
+    // offers this collection's machines). Name the cause rather than implying
+    // the collection itself is empty.
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
-        No issues — this collection has no matching machines.
+        No issues match the selected machine filter.
       </p>
     );
   }
