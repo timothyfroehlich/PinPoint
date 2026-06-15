@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Button } from "~/components/ui/button";
+import { InlineEditableField } from "~/components/inline-editable-field";
 import { SettingsSetCard } from "~/components/machines/settings/SettingsSetCard";
 import { serializeSetForDirtyCheck } from "~/lib/machines/settings-dirty";
 import {
@@ -20,6 +21,7 @@ import {
   duplicateSettingsSetAction,
   saveSettingsSetAction,
   setPreferredSettingsSetAction,
+  updateMachineSettingsInstructionsAction,
 } from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
 
 // Collision-free client keys (render keys + section ids + temp set ids).
@@ -91,12 +93,16 @@ interface SettingsTabProps {
   canEdit: boolean;
   machineId: string;
   initialSets: SettingsSetData[];
+  /** Machine-level "How to change settings" (coin-door buttons, DIP locations,
+   *  menu navigation). Shared by every set; edited via its own inline save. */
+  settingsInstructions: ProseMirrorDoc | null;
 }
 
 export function SettingsTab({
   canEdit,
   machineId,
   initialSets,
+  settingsInstructions,
 }: SettingsTabProps): React.JSX.Element {
   const [sets, setSets] = useState<SettingsSetData[]>(initialSets);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() =>
@@ -434,7 +440,6 @@ export function SettingsTab({
             id: makeKey(),
             kind: "software",
             baseline: "Factory Install",
-            baselineNote: "",
             rows: [{ _key: makeKey(), id: "", name: "", value: "" }],
           };
         } else if (spec.kind === "table") {
@@ -495,16 +500,6 @@ export function SettingsTab({
   ): void {
     updateSection(setId, sectionId, (sec) =>
       sec.kind === "software" ? { ...sec, baseline } : sec
-    );
-  }
-
-  function updateBaselineNote(
-    setId: string,
-    sectionId: string,
-    baselineNote: string
-  ): void {
-    updateSection(setId, sectionId, (sec) =>
-      sec.kind === "software" ? { ...sec, baselineNote } : sec
     );
   }
 
@@ -647,6 +642,27 @@ export function SettingsTab({
 
   return (
     <div className="space-y-4 max-md:space-y-2.5">
+      {/* Machine-level access instructions, above the sets. Shared by every set
+          and saved independently (its own Save/Cancel), so it's outside the
+          per-set Edit→Done flow. Hides itself for read-only viewers when empty. */}
+      <InlineEditableField
+        label="How to change settings"
+        value={settingsInstructions}
+        machineId={machineId}
+        canEdit={canEdit}
+        placeholder="Help others know — how to change the settings, how to reset to default settings, where the DIP switches are, etc."
+        testId="machine-settings-instructions"
+        onSave={async (id, value) => {
+          const result = await updateMachineSettingsInstructionsAction({
+            machineId: id,
+            value,
+          });
+          return result.success
+            ? { ok: true }
+            : { ok: false, message: result.error };
+        }}
+      />
+
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-foreground">
           Game settings{" "}
@@ -720,9 +736,6 @@ export function SettingsTab({
               }}
               onUpdateBaseline={(sectionId, value) => {
                 updateBaseline(set.id, sectionId, value);
-              }}
-              onUpdateBaselineNote={(sectionId, value) => {
-                updateBaselineNote(set.id, sectionId, value);
               }}
               onAddSoftwareRow={(sectionId) =>
                 addSoftwareRow(set.id, sectionId)

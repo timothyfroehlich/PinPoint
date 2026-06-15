@@ -98,7 +98,6 @@ interface SettingsSetCardProps {
   onReorderSections: (activeId: string, overId: string) => void;
   // Software settings rows
   onUpdateBaseline: (sectionId: string, value: string) => void;
-  onUpdateBaselineNote: (sectionId: string, value: string) => void;
   onAddSoftwareRow: (sectionId: string) => string | undefined;
   onUpdateSoftwareRow: (
     sectionId: string,
@@ -254,7 +253,6 @@ export function SettingsSetCard({
   onDeleteSection,
   onReorderSections,
   onUpdateBaseline,
-  onUpdateBaselineNote,
   onAddSoftwareRow,
   onUpdateSoftwareRow,
   onDeleteSoftwareRow,
@@ -322,15 +320,11 @@ export function SettingsSetCard({
         return (
           <SoftwareSettingsSection
             baseline={section.baseline}
-            baselineNote={section.baselineNote}
             rows={section.rows}
             canEdit={contentEditable}
             reserveEditUi={reserveEditUi}
             onBaselineChange={(v) => {
               onUpdateBaseline(section.id, v);
-            }}
-            onBaselineNoteChange={(v) => {
-              onUpdateBaselineNote(section.id, v);
             }}
             onAddRow={() => onAddSoftwareRow(section.id)}
             onUpdateRow={(rowKey, field, value) => {

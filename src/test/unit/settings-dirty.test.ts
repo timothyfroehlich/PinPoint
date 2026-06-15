@@ -18,7 +18,6 @@ function sw(
     id: "sec-sw",
     kind: "software",
     baseline: "Competition Install",
-    baselineNote: "Coin door → A.1",
     rows,
   };
 }

@@ -28,7 +28,7 @@ import {
   type SettingsSection,
   settingsSetPayloadSchema,
 } from "~/lib/machines/settings-types";
-import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import { type ProseMirrorDoc, proseMirrorDocSchema } from "~/lib/tiptap/types";
 import { emitSettingsSetEvent } from "~/lib/timeline/machine-events";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
@@ -59,6 +59,10 @@ const idSchema = z.object({ id: z.uuid() });
 const setPreferredSchema = z.object({
   id: z.uuid(),
   isPreferred: z.boolean(),
+});
+const settingsInstructionsSchema = z.object({
+  machineId: z.uuid(),
+  value: proseMirrorDocSchema.nullable(),
 });
 
 /**
@@ -404,5 +408,43 @@ export async function setPreferredSettingsSetAction(
   }
 
   revalidateMachine(loaded.machine.initials);
+  return { success: true };
+}
+
+/**
+ * Update a machine's "How to change settings" instructions (machine-level, shared
+ * by every settings set; rendered at the top of the Settings tab). Gated by the
+ * same `machines.settings.manage` permission as the sets themselves. No timeline
+ * event — this is reference metadata, not a per-set change.
+ */
+export async function updateMachineSettingsInstructionsAction(
+  input: z.input<typeof settingsInstructionsSchema>
+): Promise<ActionResult> {
+  const parsed = settingsInstructionsSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid input",
+    };
+  }
+  const { machineId } = parsed.data;
+  // Validate-then-cast at the write boundary (same pattern as saveSettingsSet).
+  const value = parsed.data.value as ProseMirrorDoc | null;
+
+  const machine = await db.query.machines.findFirst({
+    where: eq(machines.id, machineId),
+    columns: { id: true, initials: true, ownerId: true },
+  });
+  if (!machine) return { success: false, error: "Machine not found" };
+
+  const auth = await authorizeManage(machine.ownerId);
+  if (!auth.ok) return { success: false, error: auth.error };
+
+  await db
+    .update(machines)
+    .set({ settingsInstructions: value, updatedAt: new Date() })
+    .where(eq(machines.id, machineId));
+
+  revalidateMachine(machine.initials);
   return { success: true };
 }

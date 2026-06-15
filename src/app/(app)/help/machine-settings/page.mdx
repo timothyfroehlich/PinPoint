@@ -6,6 +6,14 @@ export const metadata = {
 
 <HelpPage breadcrumb="Machine Settings" title="Machine Settings" description="Record a machine's configuration — software adjustments, DIP switches, post positions — as one or more named settings sets.">
 
+## How to Change Settings
+
+The tab opens with **How to change settings** — machine-level instructions for
+reaching this machine's adjustments: coin-door button meanings (back / value− /
+value+ / enter), where the DIP switches are, the launch-button sequence on a P3,
+and so on. It's shared by every settings set and edited inline by anyone who can
+edit settings (its own Save — separate from a set's Edit/Done).
+
 ## Settings Sets
 
 The **Settings** tab on a machine holds one or more **settings sets** — each a
@@ -32,8 +40,9 @@ section by its grip to reorder; the ⋮ on each section deletes it.
 
 - **Software settings** — the game's adjustments menu. Rows are **ID / Setting /
   Value** (e.g. `A.1 01` / `Balls Per Game` / `5`). Has a **baseline** picker for
-  the overall starting point (Factory, Competition, …) and a free-text line for
-  where to find the menu on the machine. One per set.
+  the overall starting point (Factory, Competition, …). One per set. _(How to
+  reach the menu is recorded once, machine-wide, in **How to change settings** at
+  the top of the tab.)_
 - **DIP switch bank** — physical switches on EMs and early solid-state games. Each
   row is a switch number, an **ON/OFF** toggle, and a setting description. Repeats
   — add one bank per physical bank. Rename the bank inline.

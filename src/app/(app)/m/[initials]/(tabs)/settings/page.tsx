@@ -53,6 +53,7 @@ export default async function MachineSettingsTab({
         canEdit={canEdit}
         machineId={machine.id}
         initialSets={sets}
+        settingsInstructions={machine.settingsInstructions ?? null}
       />
     </div>
   );

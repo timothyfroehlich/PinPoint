@@ -11,6 +11,7 @@ vi.mock("~/app/(app)/m/[initials]/(tabs)/settings/actions", () => ({
   deleteSettingsSetAction: vi.fn(),
   duplicateSettingsSetAction: vi.fn(),
   setPreferredSettingsSetAction: vi.fn(),
+  updateMachineSettingsInstructionsAction: vi.fn(),
 }));
 
 // useIsMobile reads window.matchMedia in an effect; jsdom doesn't implement it.
@@ -43,7 +44,6 @@ function oneSet(): SettingsSetData {
         id: "sec-sw",
         kind: "software",
         baseline: "Competition Install",
-        baselineNote: "Coin door → A.1",
         rows: [
           { _key: "k1", id: "A.1 01", name: "Balls Per Game", value: "3" },
         ],
@@ -54,7 +54,14 @@ function oneSet(): SettingsSetData {
 
 describe("SettingsTab — unsaved-changes marker", () => {
   it("appears only after a real change, and clears when the change is reverted", () => {
-    render(<SettingsTab canEdit machineId="m1" initialSets={[oneSet()]} />);
+    render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[oneSet()]}
+        settingsInstructions={null}
+      />
+    );
 
     // Resting view: no marker.
     expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();

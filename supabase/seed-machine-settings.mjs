@@ -75,7 +75,6 @@ function buildSets(afmId) {
           id: "afm-tournament-software",
           kind: "software",
           baseline: "3-ball",
-          baselineNote: "Coin-door menu → A.1 Standard Adjustments.",
           rows: [
             { id: "A.1 01", name: "Balls Per Game", value: "3" },
             { id: "A.1 26", name: "Tournament Play", value: "Yes" },
@@ -114,7 +113,6 @@ function buildSets(afmId) {
           id: "afm-full-software",
           kind: "software",
           baseline: "3-ball",
-          baselineNote: "Coin-door menu → A.1 Standard Adjustments.",
           rows: [
             { id: "A.1 01", name: "Balls Per Game", value: "3" },
             { id: "A.1 02", name: "Tilt Warnings", value: "2" },
@@ -234,6 +232,37 @@ async function run() {
     const author =
       userRows.find((u) => u.role === "admin")?.id ?? userRows[0]?.id ?? null;
 
+    // Machine-level "How to change settings" (shared by every set; rendered at
+    // the top of the Settings tab). AFM is a WPC-95 game with the standard
+    // four-button coin-door menu, so the demo shows that.
+    const accessInstructions = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "Open the coin door and use the four service buttons to reach the adjustments menu: Escape (back / exit), − (previous value), + (next value), and Enter (begin test / select). Press Enter to enter the menu, then navigate to A.1 Standard Adjustments.",
+            },
+          ],
+        },
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "This is a WPC-95 DMD game — there are no physical DIP switches; everything is set through the software menu.",
+            },
+          ],
+        },
+      ],
+    };
+    await sql`
+      UPDATE machines SET settings_instructions = ${sql.json(accessInstructions)}
+      WHERE id = ${afm.id}
+    `;
+
     const sets = buildSets(afm.id);
 
     // Deterministic: wipe AFM's existing sets, then insert this pair. Clearing
@@ -261,7 +290,7 @@ async function run() {
     }
 
     console.log(
-      `✅ Machine settings seeded: ${sets.length} sets on Attack from Mars (AFM).`
+      `✅ Machine settings seeded: ${sets.length} sets + access instructions on Attack from Mars (AFM).`
     );
   } finally {
     await sql.end();

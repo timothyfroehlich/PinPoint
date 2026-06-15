@@ -137,6 +137,13 @@ export const machines = pgTable(
     tournamentNotes: jsonb("tournament_notes").$type<ProseMirrorDoc>(),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
     ownerNotes: jsonb("owner_notes").$type<ProseMirrorDoc>(),
+    // Machine-level "How to change settings": how to reach/navigate this
+    // machine's settings (coin-door buttons, DIP-switch locations, the P3
+    // launch-button procedure, …). Shared by every settings set; rendered at
+    // the top of the Settings tab. Edited under `machines.settings.manage`.
+    settingsInstructions: jsonb(
+      "settings_instructions"
+    ).$type<ProseMirrorDoc>(),
     presenceStatus: text("presence_status", {
       enum: [
         "on_the_floor",

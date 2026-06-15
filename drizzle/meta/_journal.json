@@ -302,6 +302,13 @@
       "when": 1781392359866,
       "tag": "0042_magenta_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1781489373022,
+      "tag": "0043_ordinary_scalphunter",
+      "breakpoints": true
     }
   ]
 }

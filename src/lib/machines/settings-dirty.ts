@@ -35,7 +35,6 @@ function normalizeSection(section: SettingsSection): unknown {
         kind: section.kind,
         id: section.id,
         baseline: section.baseline,
-        baselineNote: section.baselineNote,
         rows: section.rows.map((r) => ({
           id: r.id,
           name: r.name,

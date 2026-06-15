@@ -88,7 +88,6 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
         id: "sec-soft",
         kind: "software",
         baseline: "Competition Install",
-        baselineNote: "Coin door, left bank",
         rows: [{ id: "S-001", name: "Replay score", value: "700,000,000" }],
       },
       {
@@ -620,5 +619,82 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
       expect(e.sourceType).toBe("lifecycle");
       expect(e.authorId).toBe(owner.id);
     }
+  });
+
+  // -- machine-level "How to change settings" -------------------------------
+
+  const instructionsDoc = {
+    type: "doc" as const,
+    content: [
+      {
+        type: "paragraph" as const,
+        content: [{ type: "text" as const, text: "Open the coin door." }],
+      },
+    ],
+  };
+
+  async function machineInstructions(machineId: string) {
+    const db = await getTestDb();
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machineId),
+      columns: { settingsInstructions: true },
+    });
+    return row?.settingsInstructions ?? null;
+  }
+
+  it("owner sets machine settings instructions → persisted", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(owner.id);
+    const { updateMachineSettingsInstructionsAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    const result = await updateMachineSettingsInstructionsAction({
+      machineId: machine.id,
+      value: instructionsDoc,
+    });
+    expect(result.success).toBe(true);
+    expect(await machineInstructions(machine.id)).toEqual(instructionsDoc);
+
+    // Clearing persists NULL.
+    const cleared = await updateMachineSettingsInstructionsAction({
+      machineId: machine.id,
+      value: null,
+    });
+    expect(cleared.success).toBe(true);
+    expect(await machineInstructions(machine.id)).toBeNull();
+  });
+
+  it("non-owner member cannot edit machine settings instructions", async () => {
+    const owner = await makeUser("member");
+    const stranger = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(stranger.id);
+    const { updateMachineSettingsInstructionsAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    const result = await updateMachineSettingsInstructionsAction({
+      machineId: machine.id,
+      value: instructionsDoc,
+    });
+    expect(result.success).toBe(false);
+    expect(await machineInstructions(machine.id)).toBeNull();
+  });
+
+  it("rejects machine settings instructions from an unauthenticated caller", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(null);
+    const { updateMachineSettingsInstructionsAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    const result = await updateMachineSettingsInstructionsAction({
+      machineId: machine.id,
+      value: instructionsDoc,
+    });
+    expect(result.success).toBe(false);
+    if (result.success === false)
+      expect(result.error).toBe("Not authenticated");
+    expect(await machineInstructions(machine.id)).toBeNull();
   });
 });
