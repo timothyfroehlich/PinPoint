@@ -83,6 +83,12 @@ export interface AddIssueCommentParams {
     fileSizeBytes: number;
     mimeType: string;
   }[];
+  /**
+   * Client-generated UUID, stable across submission retries. When present and
+   * a row already carries this key, addIssueComment returns the existing
+   * comment with an empty delivery plan — no second notification. (PP-e5th)
+   */
+  idempotencyKey?: string | null;
 }
 
 export interface AssignIssueParams {
@@ -567,6 +573,7 @@ export async function addIssueComment({
   content,
   userId,
   imagesMetadata = [],
+  idempotencyKey,
 }: AddIssueCommentParams): Promise<{
   comment: IssueComment;
   deliveryPlan: DeliveryPlan;
@@ -575,7 +582,25 @@ export async function addIssueComment({
   // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
   const channels = await getChannels();
   return await db.transaction(async (tx) => {
-    // 1. Insert Comment
+    // 0. Idempotency dedup (PP-e5th). A retried submission carries the same
+    //    client-generated key. If a row already exists for it, return that
+    //    row verbatim with an empty delivery plan — no second notification.
+    if (idempotencyKey) {
+      const existing = await tx.query.issueComments.findFirst({
+        where: eq(issueComments.idempotencyKey, idempotencyKey),
+      });
+      if (existing) {
+        log.info(
+          { commentId: existing.id, idempotencyKey, action: "addIssueComment" },
+          "Idempotent retry — returning existing comment, no new write"
+        );
+        return { comment: existing, deliveryPlan: { deliveries: [] } };
+      }
+    }
+
+    // 1. Insert Comment. ON CONFLICT DO NOTHING on the idempotency_key
+    //    unique index closes the narrow race where two retries of the same
+    //    key reach the insert concurrently. (PP-e5th)
     const [comment] = await tx
       .insert(issueComments)
       .values({
@@ -583,10 +608,35 @@ export async function addIssueComment({
         authorId: userId,
         content,
         isSystem: false,
+        idempotencyKey: idempotencyKey ?? null,
+      })
+      .onConflictDoNothing({
+        target: issueComments.idempotencyKey,
+        where: sql`${issueComments.idempotencyKey} IS NOT NULL`,
       })
       .returning();
 
-    if (!comment) throw new Error("Failed to create comment");
+    if (!comment) {
+      // Insert was a no-op due to an idempotency-key conflict. Return the
+      // race-winner row with an empty delivery plan. (PP-e5th)
+      if (idempotencyKey) {
+        const winner = await tx.query.issueComments.findFirst({
+          where: eq(issueComments.idempotencyKey, idempotencyKey),
+        });
+        if (winner) {
+          log.info(
+            {
+              commentId: winner.id,
+              idempotencyKey,
+              action: "addIssueComment",
+            },
+            "Idempotency conflict on insert — returning race winner"
+          );
+          return { comment: winner, deliveryPlan: { deliveries: [] } };
+        }
+      }
+      throw new Error("Failed to create comment");
+    }
 
     // 2. Link Images
     if (imagesMetadata.length > 0) {

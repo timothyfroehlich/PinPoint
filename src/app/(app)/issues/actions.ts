@@ -633,6 +633,7 @@ export async function addCommentAction(
     issueId: toOptionalString(formData.get("issueId")),
     comment: toOptionalString(formData.get("comment")),
     imagesMetadata: toOptionalString(formData.get("imagesMetadata")),
+    idempotencyKey: toOptionalString(formData.get("idempotencyKey")),
   });
 
   if (!validation.success) {
@@ -646,6 +647,7 @@ export async function addCommentAction(
     issueId,
     comment: commentJson,
     imagesMetadata: imagesMetadataStr,
+    idempotencyKey,
   } = validation.data;
 
   // Parse comment JSON
@@ -685,6 +687,7 @@ export async function addCommentAction(
       content: comment,
       userId: user.id,
       imagesMetadata,
+      idempotencyKey: idempotencyKey ?? null,
     });
     // Deliver post-commit, after the response (PP-2053.3).
     after(() => dispatchNotification(deliveryPlan));
