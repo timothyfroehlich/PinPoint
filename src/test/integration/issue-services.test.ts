@@ -998,6 +998,73 @@ describe("Issue Service Functions (Integration)", () => {
     });
   });
 
+  describe("addIssueComment idempotency (PP-e5th)", () => {
+    it("dedupes a retried comment: same key twice yields one row, returns the existing comment, no second dispatch", async () => {
+      const db = await getTestDb();
+      const idempotencyKey = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      const params = {
+        issueId: testIssue.id,
+        content: plainTextToDoc("Retried comment"),
+        userId: testUser.id,
+        idempotencyKey,
+      };
+
+      // First submission inserts the row and plans a notification.
+      const { comment: first } = await addIssueComment(params);
+      expect(first.idempotencyKey).toBe(idempotencyKey);
+      const planCallsAfterFirst = vi.mocked(planNotification).mock.calls.length;
+      expect(planCallsAfterFirst).toBeGreaterThan(0);
+
+      // Retry with the SAME key returns the existing comment, empty plan.
+      const { comment: second, deliveryPlan } = await addIssueComment(params);
+      expect(second.id).toBe(first.id);
+      expect(deliveryPlan.deliveries).toHaveLength(0);
+
+      // No second notification planned.
+      expect(vi.mocked(planNotification).mock.calls.length).toBe(
+        planCallsAfterFirst
+      );
+
+      // Exactly one row carries the key.
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.idempotencyKey, idempotencyKey),
+      });
+      expect(rows).toHaveLength(1);
+    });
+
+    it("distinct keys create distinct comments", async () => {
+      const a = await addIssueComment({
+        issueId: testIssue.id,
+        content: plainTextToDoc("Comment A"),
+        userId: testUser.id,
+        idempotencyKey: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      });
+      const b = await addIssueComment({
+        issueId: testIssue.id,
+        content: plainTextToDoc("Comment B"),
+        userId: testUser.id,
+        idempotencyKey: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      });
+      expect(b.comment.id).not.toBe(a.comment.id);
+    });
+
+    it("null key skips dedup: two submissions create two rows", async () => {
+      const a = await addIssueComment({
+        issueId: testIssue.id,
+        content: plainTextToDoc("No-key A"),
+        userId: testUser.id,
+      });
+      const b = await addIssueComment({
+        issueId: testIssue.id,
+        content: plainTextToDoc("No-key B"),
+        userId: testUser.id,
+      });
+      expect(a.comment.idempotencyKey).toBeNull();
+      expect(b.comment.idempotencyKey).toBeNull();
+      expect(b.comment.id).not.toBe(a.comment.id);
+    });
+  });
+
   // -----------------------------------------------------------------------
   // updateIssueStatus — closedAt + notification (block 8 from source)
   // no-op guard (block 9 from source)

@@ -42,6 +42,10 @@ const addSchema = z.object({
   machineId: z.string().uuid(),
   tag: userTagSchema,
   contentJson: z.string().min(1),
+  // Client-generated UUID for retry dedup. Optional: a JS-disabled or legacy
+  // caller may omit it, in which case the insert proceeds with no dedup (same
+  // contract as the issue-comment path). (PP-e5th)
+  idempotencyKey: z.string().uuid().nullish(),
 });
 
 const editSchema = z.object({
@@ -131,6 +135,7 @@ export async function addMachineCommentAction(
         content,
         tag: parsed.data.tag,
         authorId: profile.id,
+        idempotencyKey: parsed.data.idempotencyKey ?? null,
       },
       tx
     );

@@ -110,6 +110,10 @@ export const addCommentSchema = z.object({
     .min(1, "Comment cannot be empty")
     .max(20000, "Comment is too long"),
   imagesMetadata: z.string().nullish(), // JSON string from hidden input
+  // Client-generated UUID for retry deduplication. Optional: JS-disabled or
+  // legacy callers may omit it; when absent the insert proceeds as normal
+  // with no dedup protection (matching the issue path). (PP-e5th)
+  idempotencyKey: uuidish.nullish(),
 });
 
 /**

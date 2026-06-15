@@ -20,7 +20,7 @@
  * accept any `TimelineTag` and assume the caller has validated.
  */
 
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
@@ -73,6 +73,12 @@ export interface CreateMachineCommentArgs {
   content: ProseMirrorDoc;
   tag: TimelineTag;
   authorId: string;
+  /**
+   * Client-generated UUID, stable across submission retries. When present, an
+   * ON CONFLICT DO NOTHING on the idempotency-key unique index drops a retried
+   * submission so a 504-then-retry can't double-insert the comment. (PP-e5th)
+   */
+  idempotencyKey?: string | null;
 }
 
 export interface SoftDeleteArgs {
@@ -132,13 +138,26 @@ export async function createMachineComment(
   args: CreateMachineCommentArgs,
   tx: DbTransaction = db
 ): Promise<void> {
-  await tx.insert(timelineEvents).values({
-    machineId,
-    sourceType: "comment",
-    tag: args.tag,
-    content: args.content,
-    authorId: args.authorId,
-  });
+  // Idempotency dedup (PP-e5th). Unlike issue comments, a machine comment
+  // fires no notification and returns nothing, so a bare ON CONFLICT DO
+  // NOTHING on the partial unique index is sufficient — a retried submission
+  // (same client key) is silently dropped without a duplicate row. The
+  // `where` keeps the conflict target scoped to the partial index so legacy /
+  // system rows (NULL key) are never matched.
+  await tx
+    .insert(timelineEvents)
+    .values({
+      machineId,
+      sourceType: "comment",
+      tag: args.tag,
+      content: args.content,
+      authorId: args.authorId,
+      idempotencyKey: args.idempotencyKey ?? null,
+    })
+    .onConflictDoNothing({
+      target: timelineEvents.idempotencyKey,
+      where: sql`${timelineEvents.idempotencyKey} IS NOT NULL`,
+    });
 }
 
 /**
