@@ -266,7 +266,7 @@ export async function submitPublicIssueAction(
     "Submitting unified issue report..."
   );
   try {
-    const { issue, deliveryPlan } = await createIssue({
+    const { issue, deliveryPlan, deduped } = await createIssue({
       title,
       description: description ?? null,
       machineInitials: machine.initials,
@@ -296,54 +296,75 @@ export async function submitPublicIssueAction(
         const rawJson = JSON.parse(imagesMetadataStr) as unknown;
         const imagesMetadata = imagesMetadataArraySchema.parse(rawJson);
 
-        // Validate count respects limits (security measure against manual JSON editing)
-        const limit = reportedBy
-          ? BLOB_CONFIG.LIMITS.AUTHENTICATED_USER_MAX
-          : BLOB_CONFIG.LIMITS.PUBLIC_USER_MAX;
-
-        if (imagesMetadata.length > limit) {
-          log.warn(
-            { issueId: issue.id, count: imagesMetadata.length, limit },
-            "Blocked attempt to link too many images"
-          );
-          return {
-            error: `Too many images. Maximum ${limit} images allowed.`,
-          };
-        }
-
-        if (imagesMetadata.length > 0) {
-          log.info(
-            { issueId: issue.id, count: imagesMetadata.length },
-            "Linking images to issue..."
-          );
-          try {
-            await db.insert(issueImages).values(
-              imagesMetadata.map((img) => ({
-                issueId: issue.id,
-                uploadedBy: reportedBy,
-                fullImageUrl: img.blobUrl,
-                fullBlobPathname: img.blobPathname,
-                fileSizeBytes: img.fileSizeBytes,
-                mimeType: img.mimeType,
-                originalFilename: img.originalFilename,
-              }))
+        // On an idempotent retry the existing issue already has its images linked.
+        // The blobs uploaded for this retry attempt are redundant duplicates — clean
+        // them up and skip the DB insert to prevent duplicate issue_images rows.
+        // (PP-u0v1)
+        if (deduped) {
+          if (imagesMetadata.length > 0) {
+            log.info(
+              { issueId: issue.id, count: imagesMetadata.length },
+              "Idempotent retry — cleaning up redundant blobs, skipping image link"
             );
-          } catch (dbError) {
-            log.error(
-              {
-                err: dbError instanceof Error ? dbError.message : dbError,
-                issueId: issue.id,
-                orphanedBlobs: imagesMetadata.map((img) => img.blobPathname),
-              },
-              "Database failed to link images to issue. Cleaning up orphaned blobs."
-            );
-            // Immediate cleanup of orphaned blobs
             await Promise.allSettled(
               imagesMetadata.map((img) => deleteFromBlob(img.blobPathname))
             );
-            // Don't return error here - issue was already created successfully
-            // User will be redirected, but images won't appear on the issue
-            // TODO: Consider implementing a flash message system to show warning
+          }
+        } else {
+          // Validate count respects limits (security measure against manual JSON editing)
+          const limit = reportedBy
+            ? BLOB_CONFIG.LIMITS.AUTHENTICATED_USER_MAX
+            : BLOB_CONFIG.LIMITS.PUBLIC_USER_MAX;
+
+          if (imagesMetadata.length > limit) {
+            log.warn(
+              { issueId: issue.id, count: imagesMetadata.length, limit },
+              "Blocked attempt to link too many images"
+            );
+            return {
+              error: `Too many images. Maximum ${limit} images allowed.`,
+            };
+          }
+
+          if (imagesMetadata.length > 0) {
+            log.info(
+              { issueId: issue.id, count: imagesMetadata.length },
+              "Linking images to issue..."
+            );
+            try {
+              await db.insert(issueImages).values(
+                imagesMetadata.map((img) => ({
+                  issueId: issue.id,
+                  uploadedBy: reportedBy,
+                  fullImageUrl: img.blobUrl,
+                  fullBlobPathname: img.blobPathname,
+                  fileSizeBytes: img.fileSizeBytes,
+                  mimeType: img.mimeType,
+                  originalFilename: img.originalFilename,
+                }))
+              );
+            } catch (dbError) {
+              log.error(
+                {
+                  err: dbError instanceof Error ? dbError.message : dbError,
+                  issueId: issue.id,
+                  orphanedBlobs: imagesMetadata.map((img) => img.blobPathname),
+                },
+                "Database failed to link images to issue. Cleaning up orphaned blobs."
+              );
+              reportError(dbError, {
+                action: "linkIssueImages",
+                issueId: issue.id,
+                bestEffort: true,
+              });
+              // Immediate cleanup of orphaned blobs
+              await Promise.allSettled(
+                imagesMetadata.map((img) => deleteFromBlob(img.blobPathname))
+              );
+              // Don't return error here - issue was already created successfully
+              // User will be redirected, but images won't appear on the issue
+              // TODO: Consider implementing a flash message system to show warning
+            }
           }
         }
       } catch (parseError) {
@@ -354,6 +375,11 @@ export async function submitPublicIssueAction(
           },
           "Failed to parse images metadata"
         );
+        reportError(parseError, {
+          action: "parseIssueImagesMetadata",
+          issueId: issue.id,
+          bestEffort: true,
+        });
         // Non-blocking for the user
       }
     }

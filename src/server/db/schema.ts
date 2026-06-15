@@ -326,6 +326,11 @@ export const issueComments = pgTable(
     content: jsonb("content").$type<ProseMirrorDoc>(),
     isSystem: boolean("is_system").notNull().default(false),
     eventData: jsonb("event_data").$type<TimelineEventData>(),
+    // Client-generated UUID, stable across submission retries. Lets
+    // addIssueComment dedup a retried submission (no second notification)
+    // via INSERT ... ON CONFLICT DO NOTHING on the unique index below.
+    // Nullable: legacy rows and system comments have no key. (PP-e5th)
+    idempotencyKey: uuid("idempotency_key"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -343,6 +348,12 @@ export const issueComments = pgTable(
       "chk_system_event_data",
       sql`NOT ${t.isSystem} OR ${t.eventData} IS NOT NULL`
     ),
+    // Partial unique index — only enforced on non-NULL keys so legacy /
+    // system rows (NULL key) are unconstrained while a retried form
+    // submission collides and is deduped. (PP-e5th)
+    idempotencyKeyIdx: uniqueIndex("idx_issue_comments_idempotency_key")
+      .on(t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} IS NOT NULL`),
   })
 );
 
@@ -384,6 +395,11 @@ export const timelineEvents = pgTable(
     // Order by (created_at desc, sequence desc) for deterministic insertion
     // order — e.g. machine_added before owner_set.
     sequence: bigserial("sequence", { mode: "number" }).notNull(),
+    // Client-generated UUID, stable across submission retries. Lets
+    // createMachineComment dedup a retried submission via INSERT ... ON
+    // CONFLICT DO NOTHING on the unique index below. Only set for
+    // sourceType='comment' rows; system events never carry a key. (PP-e5th)
+    idempotencyKey: uuid("idempotency_key"),
   },
   (t) => ({
     machineCreatedIdx: index("idx_timeline_events_machine_created").on(
@@ -396,6 +412,12 @@ export const timelineEvents = pgTable(
     ),
     authorIdIdx: index("idx_timeline_events_author_id").on(t.authorId),
     deletedByIdx: index("idx_timeline_events_deleted_by").on(t.deletedBy),
+    // Partial unique index — only enforced on non-NULL keys so system events
+    // (NULL key) are unconstrained while a retried comment submission
+    // collides and is deduped. (PP-e5th)
+    idempotencyKeyIdx: uniqueIndex("idx_timeline_events_idempotency_key")
+      .on(t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} IS NOT NULL`),
   })
 ).enableRLS();
 

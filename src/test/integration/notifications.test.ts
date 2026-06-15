@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import {
-  createNotification,
   planNotification,
   dispatchNotification,
   type DeliveryPlan,
@@ -48,7 +47,7 @@ vi.mock("~/lib/observability/report-error", async (importOriginal) => {
   return { ...actual, reportError: vi.fn() };
 });
 
-describe("createNotification (Integration)", () => {
+describe("notification delivery (planNotification + dispatchNotification)", () => {
   setupTestDb();
 
   beforeEach(() => {
@@ -77,16 +76,18 @@ describe("createNotification (Integration)", () => {
       userId: actor.id,
     });
 
-    await createNotification(
-      {
-        type: "new_comment",
-        resourceId: issue.id,
-        resourceType: "issue",
-        actorId: actor.id,
-        includeActor: false, // Explicitly test actor exclusion
-        commentContent: "Test comment",
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: false, // Explicitly test actor exclusion
+          commentContent: "Test comment",
+        },
+        db
+      )
     );
 
     // Verify no notification created
@@ -124,15 +125,17 @@ describe("createNotification (Integration)", () => {
       inAppNotifyOnNewComment: true,
     });
     // Don't specify includeActor - should default to true
-    await createNotification(
-      {
-        type: "new_comment",
-        resourceId: issue.id,
-        resourceType: "issue",
-        actorId: actor.id,
-        commentContent: "Test comment",
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          commentContent: "Test comment",
+        },
+        db
+      )
     );
 
     // Verify actor receives notification (new default behavior)
@@ -187,16 +190,18 @@ describe("createNotification (Integration)", () => {
         },
       });
 
-    await createNotification(
-      {
-        type: "new_comment",
-        resourceId: issue.id,
-        resourceType: "issue",
-        actorId: actor.id,
-        includeActor: false, // Exclude actor to test recipient preferences
-        commentContent: "Test comment",
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: false, // Exclude actor to test recipient preferences
+          commentContent: "Test comment",
+        },
+        db
+      )
     );
 
     const result = await db.query.notifications.findMany();
@@ -247,16 +252,18 @@ describe("createNotification (Integration)", () => {
         },
       });
 
-    await createNotification(
-      {
-        type: "new_comment",
-        resourceId: issue.id,
-        resourceType: "issue",
-        actorId: actor.id,
-        includeActor: false, // Exclude actor to test recipient granular toggles
-        commentContent: "Test comment",
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: false, // Exclude actor to test recipient granular toggles
+          commentContent: "Test comment",
+        },
+        db
+      )
     );
 
     const result = await db.query.notifications.findMany();
@@ -307,15 +314,17 @@ describe("createNotification (Integration)", () => {
         },
       });
 
-    await createNotification(
-      {
-        type: "new_comment",
-        resourceId: issue.id,
-        resourceType: "issue",
-        actorId: actor.id,
-        commentContent: "Test comment",
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          commentContent: "Test comment",
+        },
+        db
+      )
     );
 
     // Verify in-app insert
@@ -363,18 +372,20 @@ describe("createNotification (Integration)", () => {
       { issueId: issue.id, userId: watcher.id },
     ]);
 
-    await createNotification(
-      {
-        type: "issue_assigned",
-        resourceId: issue.id,
-        resourceType: "issue",
-        actorId: actor.id,
-        includeActor: false,
-        additionalRecipientIds: [assignee.id],
-        issueTitle: "Test Issue",
-        machineName: machine.name,
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "issue_assigned",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: false,
+          additionalRecipientIds: [assignee.id],
+          issueTitle: "Test Issue",
+          machineName: machine.name,
+        },
+        db
+      )
     );
 
     // Only the assignee should be notified, not the watcher
@@ -411,18 +422,20 @@ describe("createNotification (Integration)", () => {
     });
 
     // Self-assignment: actor assigns to themselves
-    await createNotification(
-      {
-        type: "issue_assigned",
-        resourceId: issue.id,
-        resourceType: "issue",
-        actorId: actor.id,
-        includeActor: false,
-        additionalRecipientIds: [actor.id],
-        issueTitle: "Test Issue",
-        machineName: machine.name,
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "issue_assigned",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: false,
+          additionalRecipientIds: [actor.id],
+          issueTitle: "Test Issue",
+          machineName: machine.name,
+        },
+        db
+      )
     );
 
     // No notifications — actor is the only recipient and is excluded
@@ -464,16 +477,18 @@ describe("createNotification (Integration)", () => {
     });
 
     // Actor comments on issue they're watching — with includeActor: true (default)
-    await createNotification(
-      {
-        type: "new_comment",
-        resourceId: issue.id,
-        resourceType: "issue",
-        actorId: actor.id,
-        includeActor: true,
-        commentContent: "Test comment",
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: true,
+          commentContent: "Test comment",
+        },
+        db
+      )
     );
 
     // No notifications should be created — actor is suppressed
@@ -513,16 +528,18 @@ describe("createNotification (Integration)", () => {
       inAppNotifyOnNewComment: true,
     });
 
-    await createNotification(
-      {
-        type: "new_comment",
-        resourceId: issue.id,
-        resourceType: "issue",
-        actorId: actor.id,
-        includeActor: true,
-        commentContent: "Test comment",
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "new_comment",
+          resourceId: issue.id,
+          resourceType: "issue",
+          actorId: actor.id,
+          includeActor: true,
+          commentContent: "Test comment",
+        },
+        db
+      )
     );
 
     // Actor should receive notification since suppressOwnActions is false
@@ -565,15 +582,17 @@ describe("createNotification (Integration)", () => {
       .values(createTestIssue(machine.initials, { issueNumber: 1 }))
       .returning();
 
-    await createNotification(
-      {
-        type: "new_issue",
-        resourceId: issue.id,
-        resourceType: "issue",
-        issueTitle: "New Machine Issue",
-        machineName: machine.name,
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "new_issue",
+          resourceId: issue.id,
+          resourceType: "issue",
+          issueTitle: "New Machine Issue",
+          machineName: machine.name,
+        },
+        db
+      )
     );
 
     // Verify in-app insert
@@ -619,15 +638,17 @@ describe("createNotification (Integration)", () => {
       .values(createTestIssue(machine.initials, { issueNumber: 1 }))
       .returning();
 
-    await createNotification(
-      {
-        type: "new_issue",
-        resourceId: issue.id,
-        resourceType: "issue",
-        issueTitle: issue.title,
-        machineName: machine.name,
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "new_issue",
+          resourceId: issue.id,
+          resourceType: "issue",
+          issueTitle: issue.title,
+          machineName: machine.name,
+        },
+        db
+      )
     );
 
     const notificationsList = await db.query.notifications.findMany({
@@ -664,17 +685,19 @@ describe("createNotification (Integration)", () => {
       inAppEnabled: true,
     });
 
-    await createNotification(
-      {
-        type: "machine_ownership_changed",
-        resourceId: machine.id,
-        resourceType: "machine",
-        actorId: actor.id,
-        machineName: machine.name,
-        newStatus: "added",
-        additionalRecipientIds: [recipient.id],
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "machine_ownership_changed",
+          resourceId: machine.id,
+          resourceType: "machine",
+          actorId: actor.id,
+          machineName: machine.name,
+          newStatus: "added",
+          additionalRecipientIds: [recipient.id],
+        },
+        db
+      )
     );
 
     // Should still notify because ownership changes bypass granular toggles
@@ -719,18 +742,20 @@ describe("createNotification (Integration)", () => {
       inAppEnabled: true,
     });
 
-    await createNotification(
-      {
-        type: "machine_ownership_changed",
-        resourceId: machine.id,
-        resourceType: "machine",
-        actorId: admin.id,
-        includeActor: false,
-        machineName: machine.name,
-        newStatus: "added",
-        additionalRecipientIds: [newOwner.id],
-      },
-      db
+    await dispatchNotification(
+      await planNotification(
+        {
+          type: "machine_ownership_changed",
+          resourceId: machine.id,
+          resourceType: "machine",
+          actorId: admin.id,
+          includeActor: false,
+          machineName: machine.name,
+          newStatus: "added",
+          additionalRecipientIds: [newOwner.id],
+        },
+        db
+      )
     );
 
     // Only the new owner should be notified, not the admin
@@ -767,19 +792,21 @@ describe("createNotification (Integration)", () => {
       // Include the actor in additionalRecipientIds so that includeActor: false
       // is exercised — without this, the actor was never a candidate and the
       // exclusion branch was effectively untested.
-      await createNotification(
-        {
-          type: "mentioned",
-          resourceId: issue.id,
-          resourceType: "issue",
-          actorId: actor.id,
-          includeActor: false,
-          additionalRecipientIds: [actor.id, mentioned.id],
-          issueTitle: "Test issue",
-          machineName: machine.name,
-          formattedIssueId: "MN-01",
-        },
-        db
+      await dispatchNotification(
+        await planNotification(
+          {
+            type: "mentioned",
+            resourceId: issue.id,
+            resourceType: "issue",
+            actorId: actor.id,
+            includeActor: false,
+            additionalRecipientIds: [actor.id, mentioned.id],
+            issueTitle: "Test issue",
+            machineName: machine.name,
+            formattedIssueId: "MN-01",
+          },
+          db
+        )
       );
 
       const result = await db.query.notifications.findMany();
@@ -818,19 +845,21 @@ describe("createNotification (Integration)", () => {
         emailNotifyOnMentioned: true,
       });
 
-      await createNotification(
-        {
-          type: "mentioned",
-          resourceId: issue.id,
-          resourceType: "issue",
-          actorId: actor.id,
-          includeActor: false,
-          additionalRecipientIds: [mentioned.id],
-          issueTitle: "Test issue",
-          machineName: machine.name,
-          formattedIssueId: "MP-01",
-        },
-        db
+      await dispatchNotification(
+        await planNotification(
+          {
+            type: "mentioned",
+            resourceId: issue.id,
+            resourceType: "issue",
+            actorId: actor.id,
+            includeActor: false,
+            additionalRecipientIds: [mentioned.id],
+            issueTitle: "Test issue",
+            machineName: machine.name,
+            formattedIssueId: "MP-01",
+          },
+          db
+        )
       );
 
       const inApp = await db.query.notifications.findMany();
@@ -1007,6 +1036,147 @@ describe("createNotification (Integration)", () => {
       expect(log.warn).toHaveBeenCalledTimes(2);
       // A returned {ok:false} is an expected outcome, not a thrown bug.
       expect(reportError).not.toHaveBeenCalled();
+    });
+  });
+
+  // PP-pfyf: email idempotency key must include a per-event discriminator so
+  // that two distinct comments on the same issue produce distinct keys, while a
+  // genuine retry of the SAME comment keeps the same key (allowing Resend to
+  // dedup it). Without the discriminator, Resend drops the second email silently.
+  describe("email idempotency key (PP-pfyf)", () => {
+    it("two distinct comments on the same issue produce distinct idempotency keys", async () => {
+      const db = await getTestDb();
+
+      const [recipient] = await db
+        .insert(userProfiles)
+        .values(createTestUser({ email: "key-test@test.com" }))
+        .returning();
+      const [machine] = await db
+        .insert(machines)
+        .values(createTestMachine({ initials: "IK" }))
+        .returning();
+      const [issue] = await db
+        .insert(issues)
+        .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+        .returning();
+
+      await db.insert(issueWatchers).values({
+        issueId: issue.id,
+        userId: recipient.id,
+      });
+      await db.insert(notificationPreferences).values({
+        userId: recipient.id,
+        emailEnabled: true,
+        inAppEnabled: false,
+        emailNotifyOnNewComment: true,
+        inAppNotifyOnNewComment: false,
+      });
+
+      // First comment notification — distinct event id
+      await dispatchNotification(
+        await planNotification(
+          {
+            type: "new_comment",
+            resourceId: issue.id,
+            resourceType: "issue",
+            commentContent: "First comment",
+            eventId: "comment-uuid-aaa",
+          },
+          db
+        )
+      );
+
+      // Second comment notification — different event id (different logical event)
+      await dispatchNotification(
+        await planNotification(
+          {
+            type: "new_comment",
+            resourceId: issue.id,
+            resourceType: "issue",
+            commentContent: "Second comment",
+            eventId: "comment-uuid-bbb",
+          },
+          db
+        )
+      );
+
+      expect(sendEmail).toHaveBeenCalledTimes(2);
+      const [firstCall, secondCall] = (sendEmail as ReturnType<typeof vi.fn>)
+        .mock.calls as [
+        [{ idempotencyKey?: string }],
+        [{ idempotencyKey?: string }],
+      ];
+      const key1 = firstCall[0].idempotencyKey;
+      const key2 = secondCall[0].idempotencyKey;
+      expect(key1).toBeDefined();
+      expect(key2).toBeDefined();
+      expect(key1).not.toBe(key2);
+    });
+
+    it("a retry of the same comment event produces the same idempotency key", async () => {
+      const db = await getTestDb();
+
+      const [recipient] = await db
+        .insert(userProfiles)
+        .values(createTestUser({ email: "retry-key@test.com" }))
+        .returning();
+      const [machine] = await db
+        .insert(machines)
+        .values(createTestMachine({ initials: "RT" }))
+        .returning();
+      const [issue] = await db
+        .insert(issues)
+        .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+        .returning();
+
+      await db.insert(issueWatchers).values({
+        issueId: issue.id,
+        userId: recipient.id,
+      });
+      await db.insert(notificationPreferences).values({
+        userId: recipient.id,
+        emailEnabled: true,
+        inAppEnabled: false,
+        emailNotifyOnNewComment: true,
+        inAppNotifyOnNewComment: false,
+      });
+
+      const SAME_EVENT_ID = "comment-uuid-retry-test";
+
+      // Simulate two attempts to dispatch the same comment event (retry scenario)
+      await dispatchNotification(
+        await planNotification(
+          {
+            type: "new_comment",
+            resourceId: issue.id,
+            resourceType: "issue",
+            commentContent: "Same comment, first attempt",
+            eventId: SAME_EVENT_ID,
+          },
+          db
+        )
+      );
+      await dispatchNotification(
+        await planNotification(
+          {
+            type: "new_comment",
+            resourceId: issue.id,
+            resourceType: "issue",
+            commentContent: "Same comment, retry attempt",
+            eventId: SAME_EVENT_ID,
+          },
+          db
+        )
+      );
+
+      expect(sendEmail).toHaveBeenCalledTimes(2);
+      const [firstCall, secondCall] = (sendEmail as ReturnType<typeof vi.fn>)
+        .mock.calls as [
+        [{ idempotencyKey?: string }],
+        [{ idempotencyKey?: string }],
+      ];
+      // Both calls must produce the SAME key — Resend uses it to dedup the retry.
+      expect(firstCall[0].idempotencyKey).toBe(secondCall[0].idempotencyKey);
     });
   });
 });

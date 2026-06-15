@@ -1,1 +1,0 @@
-ALTER TABLE "machines" ADD COLUMN "settings_instructions" jsonb;

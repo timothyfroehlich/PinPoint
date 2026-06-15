@@ -370,8 +370,10 @@ describe("Issue Service Functions (Integration)", () => {
       };
 
       // First submission creates the row and plans a notification.
-      const { issue: first } = await createIssue(params);
+      const { issue: first, deduped: firstDeduped } = await createIssue(params);
       expect(first.idempotencyKey).toBe(idempotencyKey);
+      // Fresh insert: deduped must be false.
+      expect(firstDeduped).toBe(false);
       const planCallsAfterFirst = vi.mocked(planNotification).mock.calls.length;
       expect(planCallsAfterFirst).toBeGreaterThan(0);
 
@@ -383,9 +385,16 @@ describe("Issue Service Functions (Integration)", () => {
       });
 
       // Retry with the SAME key returns the existing issue.
-      const { issue: second, deliveryPlan } = await createIssue(params);
+      const {
+        issue: second,
+        deliveryPlan,
+        deduped,
+      } = await createIssue(params);
       expect(second.id).toBe(first.id);
       expect(second.issueNumber).toBe(first.issueNumber);
+
+      // deduped flag MUST be true on a retry so callers can skip side effects.
+      expect(deduped).toBe(true);
 
       // No second counter increment.
       const machineAfterSecond = await db.query.machines.findFirst({
@@ -986,6 +995,73 @@ describe("Issue Service Functions (Integration)", () => {
         expect.anything(),
         expect.anything()
       );
+    });
+  });
+
+  describe("addIssueComment idempotency (PP-e5th)", () => {
+    it("dedupes a retried comment: same key twice yields one row, returns the existing comment, no second dispatch", async () => {
+      const db = await getTestDb();
+      const idempotencyKey = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      const params = {
+        issueId: testIssue.id,
+        content: plainTextToDoc("Retried comment"),
+        userId: testUser.id,
+        idempotencyKey,
+      };
+
+      // First submission inserts the row and plans a notification.
+      const { comment: first } = await addIssueComment(params);
+      expect(first.idempotencyKey).toBe(idempotencyKey);
+      const planCallsAfterFirst = vi.mocked(planNotification).mock.calls.length;
+      expect(planCallsAfterFirst).toBeGreaterThan(0);
+
+      // Retry with the SAME key returns the existing comment, empty plan.
+      const { comment: second, deliveryPlan } = await addIssueComment(params);
+      expect(second.id).toBe(first.id);
+      expect(deliveryPlan.deliveries).toHaveLength(0);
+
+      // No second notification planned.
+      expect(vi.mocked(planNotification).mock.calls.length).toBe(
+        planCallsAfterFirst
+      );
+
+      // Exactly one row carries the key.
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.idempotencyKey, idempotencyKey),
+      });
+      expect(rows).toHaveLength(1);
+    });
+
+    it("distinct keys create distinct comments", async () => {
+      const a = await addIssueComment({
+        issueId: testIssue.id,
+        content: plainTextToDoc("Comment A"),
+        userId: testUser.id,
+        idempotencyKey: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      });
+      const b = await addIssueComment({
+        issueId: testIssue.id,
+        content: plainTextToDoc("Comment B"),
+        userId: testUser.id,
+        idempotencyKey: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      });
+      expect(b.comment.id).not.toBe(a.comment.id);
+    });
+
+    it("null key skips dedup: two submissions create two rows", async () => {
+      const a = await addIssueComment({
+        issueId: testIssue.id,
+        content: plainTextToDoc("No-key A"),
+        userId: testUser.id,
+      });
+      const b = await addIssueComment({
+        issueId: testIssue.id,
+        content: plainTextToDoc("No-key B"),
+        userId: testUser.id,
+      });
+      expect(a.comment.idempotencyKey).toBeNull();
+      expect(b.comment.idempotencyKey).toBeNull();
+      expect(b.comment.id).not.toBe(a.comment.id);
     });
   });
 

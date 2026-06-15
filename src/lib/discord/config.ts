@@ -118,6 +118,10 @@ export async function getDiscordTokenForAdmin(): Promise<string | null> {
  * so a misconfigured Discord integration can't break unrelated pages.
  */
 export async function isDiscordIntegrationEnabled(): Promise<boolean> {
+  // CORE-ARCH-011 tripwire: this function issues a Supabase HTTP round-trip and
+  // must not run inside a DB transaction. See getDiscordConfig() above for the
+  // same guard applied to the full Vault-decrypt path. (PP-lbqh)
+  assertNotInTransaction("isDiscordIntegrationEnabled");
   try {
     const supabase = createAdminClient();
     const { data, error } = await supabase

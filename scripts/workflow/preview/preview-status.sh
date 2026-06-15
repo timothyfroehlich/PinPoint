@@ -26,22 +26,22 @@ footer='Comment `/preview extend` for +48h · `/preview stop` to tear down.'
 case "$state" in
   active)
     branch="${2:?branch required}"
-    url="${3:?url required}"
+    # $3 (preview URL) is accepted for call-site compatibility but intentionally
+    # NOT shown: the deployment is protection-gated, so the bare alias is not
+    # shareable. The URL still appears in the workflow run log; reviewers are
+    # handed a Vercel shareable link (with its ?_vercel_share token) generated
+    # manually — that token must never land in a public PR comment.
     expires="${4:?expires required}"
-    printf '🔮 Preview active — %s\n' "$url"
+    printf '🔮 Preview active\n'
     printf 'DB: Supabase branch `%s` · Expires: %s\n' "$branch" "$expires"
     printf '%s\n' "$footer"
     ;;
 
   extended)
     branch="${2:?branch required}"
-    url="${3:-}"
+    # $3 (preview URL) accepted for compatibility but not shown — see `active`.
     expires="${4:?expires required}"
-    if [[ -n "$url" ]]; then
-      printf '🔮 Preview active — %s\n' "$url"
-    else
-      printf '🔮 Preview active\n'
-    fi
+    printf '🔮 Preview active\n'
     printf 'DB: Supabase branch `%s` · Expires: %s\n' "$branch" "$expires"
     printf '%s\n' "$footer"
     ;;

@@ -1,6 +1,6 @@
 {
-  "id": "bec1c116-c5c2-490e-9213-292666a16563",
-  "prevId": "6908f194-6fa9-4baf-8c53-e0b3dcf292fd",
+  "id": "cbfad037-5d6e-43ed-a6b2-fef374f46803",
+  "prevId": "3603f7f4-e12f-4f29-ac41-9d0839a9aa4f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -230,6 +230,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -278,6 +284,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_issue_comments_idempotency_key": {
+          "name": "idx_issue_comments_idempotency_key",
+          "columns": [
+            {
+              "expression": "idempotency_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"issue_comments\".\"idempotency_key\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1765,6 +1787,12 @@
           "type": "bigserial",
           "primaryKey": false,
           "notNull": true
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -1836,6 +1864,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_timeline_events_idempotency_key": {
+          "name": "idx_timeline_events_idempotency_key",
+          "columns": [
+            {
+              "expression": "idempotency_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"timeline_events\".\"idempotency_key\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

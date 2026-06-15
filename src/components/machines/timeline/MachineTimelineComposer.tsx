@@ -48,6 +48,13 @@ export function MachineTimelineComposer({
   const [fullMode, setFullMode] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Stable across retries: a 504-then-retry of the SAME post reuses this key so
+  // the server dedups it (PP-e5th). Regenerated only after a successful post so
+  // the next genuine note gets a distinct key. A failed post keeps the key, so
+  // the user's retry is recognised as the same submission.
+  const [idempotencyKey, setIdempotencyKey] = useState(() =>
+    crypto.randomUUID()
+  );
 
   const hasBody = docHasText(doc);
   const isDirty = hasBody || tag !== "note" || fullMode;
@@ -78,11 +85,14 @@ export function MachineTimelineComposer({
           machineId,
           tag: chosenTag,
           contentJson: JSON.stringify(doc),
+          idempotencyKey,
         });
         if (result.success) {
           setDoc({ type: "doc", content: [] });
           setTag("note");
           setFullMode(false);
+          // Fresh key — the next note is a new logical submission.
+          setIdempotencyKey(crypto.randomUUID());
           onPosted();
         } else {
           setError(result.error);

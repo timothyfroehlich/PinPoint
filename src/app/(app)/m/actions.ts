@@ -21,7 +21,11 @@ import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
-import { createNotification, getChannels } from "~/lib/notifications";
+import {
+  planNotification,
+  dispatchNotification,
+  getChannels,
+} from "~/lib/notifications";
 import {
   reportError,
   serverActionError,
@@ -320,19 +324,21 @@ export async function createMachineAction(
       if (targetActive) {
         try {
           const channels = await getChannels();
-          await createNotification(
-            {
-              type: "machine_ownership_changed",
-              resourceId: machine.id,
-              resourceType: "machine",
-              actorId: user.id,
-              includeActor: false,
-              machineName: machine.name,
-              newStatus: "added",
-              additionalRecipientIds: [forcePromoteUserId],
-            },
-            undefined,
-            channels
+          await dispatchNotification(
+            await planNotification(
+              {
+                type: "machine_ownership_changed",
+                resourceId: machine.id,
+                resourceType: "machine",
+                actorId: user.id,
+                includeActor: false,
+                machineName: machine.name,
+                newStatus: "added",
+                additionalRecipientIds: [forcePromoteUserId],
+              },
+              undefined,
+              channels
+            )
           );
         } catch (sideEffectError: unknown) {
           reportError(sideEffectError, {
@@ -705,37 +711,41 @@ export async function updateMachineAction(
                 eq(machineWatchers.userId, oldOwnerId)
               )
             );
-          await createNotification(
-            {
-              type: "machine_ownership_changed",
-              resourceId: machine.id,
-              resourceType: "machine",
-              actorId: user.id,
-              includeActor: false,
-              machineName: machine.name,
-              newStatus: "removed",
-              additionalRecipientIds: [oldOwnerId],
-            },
-            undefined,
-            channels
+          await dispatchNotification(
+            await planNotification(
+              {
+                type: "machine_ownership_changed",
+                resourceId: machine.id,
+                resourceType: "machine",
+                actorId: user.id,
+                includeActor: false,
+                machineName: machine.name,
+                newStatus: "removed",
+                additionalRecipientIds: [oldOwnerId],
+              },
+              undefined,
+              channels
+            )
           );
         }
 
         // Notify new owner
         if (machineOwnerId && machineOwnerId !== oldOwnerId) {
-          await createNotification(
-            {
-              type: "machine_ownership_changed",
-              resourceId: machine.id,
-              resourceType: "machine",
-              actorId: user.id,
-              includeActor: false,
-              machineName: machine.name,
-              newStatus: "added",
-              additionalRecipientIds: [machineOwnerId],
-            },
-            undefined,
-            channels
+          await dispatchNotification(
+            await planNotification(
+              {
+                type: "machine_ownership_changed",
+                resourceId: machine.id,
+                resourceType: "machine",
+                actorId: user.id,
+                includeActor: false,
+                machineName: machine.name,
+                newStatus: "added",
+                additionalRecipientIds: [machineOwnerId],
+              },
+              undefined,
+              channels
+            )
           );
         }
       } catch (sideEffectError: unknown) {
@@ -895,35 +905,39 @@ export async function updateMachineAction(
         const channels = await getChannels();
 
         if (oldOwnerId && oldOwnerId !== finalOwnerId) {
-          await createNotification(
-            {
-              type: "machine_ownership_changed",
-              resourceId: machine.id,
-              resourceType: "machine",
-              actorId: user.id,
-              includeActor: false,
-              machineName: machine.name,
-              newStatus: "removed",
-              additionalRecipientIds: [oldOwnerId],
-            },
-            undefined,
-            channels
+          await dispatchNotification(
+            await planNotification(
+              {
+                type: "machine_ownership_changed",
+                resourceId: machine.id,
+                resourceType: "machine",
+                actorId: user.id,
+                includeActor: false,
+                machineName: machine.name,
+                newStatus: "removed",
+                additionalRecipientIds: [oldOwnerId],
+              },
+              undefined,
+              channels
+            )
           );
         }
         if (finalOwnerId && finalOwnerId !== oldOwnerId) {
-          await createNotification(
-            {
-              type: "machine_ownership_changed",
-              resourceId: machine.id,
-              resourceType: "machine",
-              actorId: user.id,
-              includeActor: false,
-              machineName: machine.name,
-              newStatus: "added",
-              additionalRecipientIds: [finalOwnerId],
-            },
-            undefined,
-            channels
+          await dispatchNotification(
+            await planNotification(
+              {
+                type: "machine_ownership_changed",
+                resourceId: machine.id,
+                resourceType: "machine",
+                actorId: user.id,
+                includeActor: false,
+                machineName: machine.name,
+                newStatus: "added",
+                additionalRecipientIds: [finalOwnerId],
+              },
+              undefined,
+              channels
+            )
           );
         }
       } catch (sideEffectError: unknown) {

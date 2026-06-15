@@ -32,6 +32,20 @@ export interface ChannelContext {
   commentContent?: string | undefined;
   newStatus?: string | undefined;
   issueDescription?: string | undefined;
+  /**
+   * Stable per-event identifier that discriminates distinct occurrences of the
+   * same notification type on the same resource for the same recipient.
+   *
+   * Without it, two different comments on the same issue produce the same
+   * email idempotency key and Resend silently drops the second email (PP-pfyf).
+   *
+   * Pass the comment UUID for new_comment / mentioned events. For event types
+   * that are structurally unique per resource-state transition (new_issue,
+   * issue_status_changed, issue_assigned, machine_ownership_changed) this field
+   * is absent and the key remains discriminated by resourceId alone, which is
+   * correct for those cases.
+   */
+  eventId?: string | undefined;
 }
 
 /**

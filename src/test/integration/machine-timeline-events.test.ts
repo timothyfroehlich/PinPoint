@@ -114,6 +114,72 @@ describe("machine-events helpers (PGlite)", () => {
     });
   });
 
+  describe("createMachineComment idempotency (PP-e5th)", () => {
+    const doc: ProseMirrorDoc = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "Hi" }] }],
+    };
+
+    it("dedupes a retried comment: same key twice yields one row", async () => {
+      const { db, user, machine } = await seed();
+      const idempotencyKey = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+      const args = {
+        content: doc,
+        tag: "note" as const,
+        authorId: user.id,
+        idempotencyKey,
+      };
+
+      await createMachineComment(machine.id, args, db);
+      // Retry with the SAME key — ON CONFLICT DO NOTHING drops the second insert.
+      await createMachineComment(machine.id, args, db);
+
+      const rows = await db
+        .select()
+        .from(timelineEvents)
+        .where(eq(timelineEvents.idempotencyKey, idempotencyKey));
+      expect(rows).toHaveLength(1);
+    });
+
+    it("distinct keys create distinct rows", async () => {
+      const { db, user, machine } = await seed();
+      await createMachineComment(
+        machine.id,
+        {
+          content: doc,
+          tag: "note",
+          authorId: user.id,
+          idempotencyKey: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        },
+        db
+      );
+      await createMachineComment(
+        machine.id,
+        {
+          content: doc,
+          tag: "note",
+          authorId: user.id,
+          idempotencyKey: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        },
+        db
+      );
+
+      const rows = await db.select().from(timelineEvents);
+      expect(rows).toHaveLength(2);
+    });
+
+    it("null key skips dedup: two submissions create two rows", async () => {
+      const { db, user, machine } = await seed();
+      const args = { content: doc, tag: "note" as const, authorId: user.id };
+      await createMachineComment(machine.id, args, db);
+      await createMachineComment(machine.id, args, db);
+
+      const rows = await db.select().from(timelineEvents);
+      expect(rows).toHaveLength(2);
+      expect(rows.every((r) => r.idempotencyKey === null)).toBe(true);
+    });
+  });
+
   describe("updateMachineComment", () => {
     it("stamps editedAt and rewrites content + tag (null before edit)", async () => {
       const { db, user, machine } = await seed();

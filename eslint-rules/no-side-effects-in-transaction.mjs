@@ -53,7 +53,23 @@
 const TX_CALLBACK_PREFIX =
   'CallExpression[callee.type="MemberExpression"][callee.property.name="transaction"][callee.object.name=/^(db|tx)$/] > :matches(ArrowFunctionExpression, FunctionExpression)';
 
-/** Side-effect helpers banned by bare identifier when called inside a transaction. */
+/**
+ * Side-effect helpers banned by bare identifier when called inside a transaction.
+ *
+ * Two-layer enforcement (PP-lbqh):
+ *  1. Static  — this list (ESLint rule, catches direct inline calls at lint time).
+ *               Limitation: cannot follow aliased imports or indirect callbacks.
+ *  2. Runtime — `assertNotInTransaction()` in src/server/db/transaction-context.ts,
+ *               called at the top of each side-effecting wrapper. Backstops every
+ *               path the static rule can't see.
+ * When adding a new side-effect entry point, update BOTH layers:
+ *  • Add the function name here, AND
+ *  • Add `assertNotInTransaction("<name>")` at the top of the new function.
+ * `isDiscordIntegrationEnabled` is guarded at runtime but intentionally omitted
+ * here: it's not imported by name at typical call sites (the settings page uses
+ * it through the Discord module, not inline inside a transaction callback), so a
+ * static identifier match would add noise with negligible benefit.
+ */
 export const SIDE_EFFECT_CALLEES = [
   "sendEmail",
   "sendDm",

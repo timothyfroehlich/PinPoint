@@ -35,6 +35,13 @@ export function AddCommentForm({
   >(addCommentAction, undefined);
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
   const [comment, setComment] = useState<ProseMirrorDoc | null>(null);
+  // Stable across retries so a 504-then-retry of the same comment is deduped
+  // server-side (PP-e5th). `form.reset()` does not touch React state, so the
+  // key is regenerated explicitly on success — a failed submit keeps it, so the
+  // retry is recognised as the same submission.
+  const [idempotencyKey, setIdempotencyKey] = useState(() =>
+    crypto.randomUUID()
+  );
 
   useEffect(() => {
     if (state?.ok) {
@@ -43,6 +50,8 @@ export function AddCommentForm({
       setUploadedImages([]);
       setComment(null);
       editorRef.current?.clear();
+      // Fresh key — the next comment is a new logical submission.
+      setIdempotencyKey(crypto.randomUUID());
       // Container handles focus / sheet-close / next-action.
       onSubmitSuccess?.();
     }
@@ -55,6 +64,7 @@ export function AddCommentForm({
   return (
     <form action={formAction} ref={formRef} className="space-y-4">
       <input type="hidden" name="issueId" value={issueId} />
+      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       <input
         type="hidden"
         name="imagesMetadata"
