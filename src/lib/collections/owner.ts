@@ -38,23 +38,28 @@ export async function getOwnerCollection(
 ): Promise<OwnerCollection | null> {
   if (!uuidSchema.safeParse(userId).success) return null;
 
-  const owner = await tx.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, userId),
-    columns: { id: true, name: true },
-  });
-  if (!owner) return null;
-
-  const machineRows = await tx.query.machines.findMany({
-    where: eq(machines.ownerId, userId),
-    columns: { id: true, initials: true, name: true, presenceStatus: true },
-    with: {
-      issues: {
-        where: notInArray(issues.status, [...CLOSED_STATUSES]),
-        columns: { status: true, severity: true, createdAt: true },
+  // The machines query keys off ownerId, not the owner row, so the two have no
+  // data dependency — run them concurrently to save a round-trip on the common
+  // (owner-exists) path. A discarded machines query when the owner is missing
+  // is an acceptable cost for the rare not-found case.
+  const [owner, machineRows] = await Promise.all([
+    tx.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+      columns: { id: true, name: true },
+    }),
+    tx.query.machines.findMany({
+      where: eq(machines.ownerId, userId),
+      columns: { id: true, initials: true, name: true, presenceStatus: true },
+      with: {
+        issues: {
+          where: notInArray(issues.status, [...CLOSED_STATUSES]),
+          columns: { status: true, severity: true, createdAt: true },
+        },
       },
-    },
-    orderBy: [asc(machines.name)],
-  });
+      orderBy: [asc(machines.name)],
+    }),
+  ]);
+  if (!owner) return null;
 
   return { owner, machines: machineRows };
 }
