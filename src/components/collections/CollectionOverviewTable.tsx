@@ -20,7 +20,10 @@ import {
 } from "~/hooks/use-table-responsive-columns";
 import { MACHINE_STATUS_RANK, type MachineStatus } from "~/lib/machines/status";
 import { getTagLabel, type TimelineTag } from "~/lib/timeline/machine-tags";
-import type { MachinePresenceStatus } from "~/lib/machines/presence";
+import {
+  MACHINE_PRESENCE_RANK,
+  type MachinePresenceStatus,
+} from "~/lib/machines/presence";
 import { cn } from "~/lib/utils";
 
 export interface CollectionOverviewRow {
@@ -108,7 +111,10 @@ function compareRows(
       return ta - tb;
     }
     case "presence":
-      return a.presence.localeCompare(b.presence);
+      return (
+        MACHINE_PRESENCE_RANK[a.presence] - MACHINE_PRESENCE_RANK[b.presence] ||
+        a.name.localeCompare(b.name)
+      );
   }
 }
 
