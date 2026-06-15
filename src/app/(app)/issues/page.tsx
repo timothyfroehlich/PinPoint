@@ -27,9 +27,8 @@ export default async function IssuesPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 1. Parse filters from searchParams
   const rawParams = await searchParams;
-  // Convert Record to URLSearchParams (parseIssueFilters expects URLSearchParams)
+  // parseIssueFilters expects URLSearchParams, so flatten the raw record.
   const urlParams = new URLSearchParams();
   Object.entries(rawParams).forEach(([key, value]) => {
     if (Array.isArray(value)) {
