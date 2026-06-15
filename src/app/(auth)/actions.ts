@@ -378,6 +378,11 @@ export async function signupAction(
         },
         "Failed to record terms acceptance timestamp"
       );
+      reportError(termsError, {
+        action: "signup.termsAcceptance",
+        userId: data.user.id,
+        bestEffort: true,
+      });
     }
 
     // Check if email confirmation is required (user created but no session)

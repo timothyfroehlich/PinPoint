@@ -10,6 +10,7 @@ import {
 import { eq, and, isNull } from "drizzle-orm";
 import type { User } from "@supabase/supabase-js";
 import { log } from "~/lib/logger";
+import { reportError } from "~/lib/observability/report-error";
 import type { UserRole } from "~/lib/types";
 
 /**
@@ -162,6 +163,11 @@ export async function ensureUserProfile(user: User): Promise<void> {
       },
       "Failed to auto-heal user profile"
     );
+    reportError(error, {
+      action: "ensureUserProfile",
+      userId: user.id,
+      bestEffort: true,
+    });
     // We don't throw here to avoid crashing the page, but the subsequent queries might fail
     // or the user might see a degraded experience.
   }

@@ -82,6 +82,11 @@ export interface CreateNotificationProps {
   newStatus?: string | undefined;
   issueDescription?: string | undefined;
   additionalRecipientIds?: string[] | undefined;
+  /**
+   * Stable per-event identifier forwarded into ChannelContext.eventId.
+   * See ChannelContext for full rationale (PP-pfyf).
+   */
+  eventId?: string | undefined;
 }
 
 export async function planNotification(
@@ -98,6 +103,7 @@ export async function planNotification(
     newStatus,
     issueDescription,
     additionalRecipientIds,
+    eventId,
   }: CreateNotificationProps,
   tx: DbTransaction = db,
   preResolvedChannels?: readonly NotificationChannel[]
@@ -277,6 +283,7 @@ export async function planNotification(
       commentContent,
       newStatus,
       issueDescription,
+      eventId,
     };
 
     for (const channel of channels) {
