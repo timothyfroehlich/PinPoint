@@ -356,18 +356,22 @@ export async function dispatchNotification(plan: DeliveryPlan): Promise<void> {
 }
 
 /**
- * Backward-compatible one-shot: plan inside `tx`, then immediately dispatch.
- * Retained for callers not yet split into plan / post-commit-dispatch and for
- * tests. NOTE: when `tx` is a live transaction this still sends before commit —
- * transactional callers should instead call `planNotification` inside the
- * transaction and `dispatchNotification` after it resolves. (PP-2053.2)
+ * One-shot convenience: plan against the default DB handle, then immediately
+ * dispatch. Intended for post-commit call sites — there is no active transaction
+ * at the call point and no need to pass a specific DB handle.
+ *
+ * The former `tx` and `preResolvedChannels` parameters have been removed
+ * (PP-lbqh / CORE-ARCH-011). The `tx` parameter was a latent footgun: a caller
+ * passing a live transaction would have dispatched email / Discord BEFORE commit,
+ * re-introducing the Doodle Bug (PP-2053). Call sites that need to query from a
+ * specific DB handle (e.g. integration tests using PGlite, or the two-phase
+ * plan/dispatch split) should call `planNotification(props, db)` directly and
+ * then `dispatchNotification(plan)` after the transaction resolves.
  */
 export async function createNotification(
-  props: CreateNotificationProps,
-  tx: DbTransaction = db,
-  preResolvedChannels?: readonly NotificationChannel[]
+  props: CreateNotificationProps
 ): Promise<void> {
-  const plan = await planNotification(props, tx, preResolvedChannels);
+  const plan = await planNotification(props);
   await dispatchNotification(plan);
 }
 
