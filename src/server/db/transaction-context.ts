@@ -17,6 +17,19 @@ import { AsyncLocalStorage } from "node:async_hooks";
  * `assertNotInTransaction(...)` on entry; if the flag is set, they throw.
  * Any reintroduction of a pre-commit external call therefore fails loudly in
  * dev, test, and CI instead of silently shipping to production.
+ *
+ * Two-layer enforcement (PP-lbqh):
+ *  1. Static  — ESLint rule `pinpoint/no-side-effects-in-transaction` in
+ *               `eslint-rules/no-side-effects-in-transaction.mjs`. Catches
+ *               direct, inline calls by identifier at lint/CI time.
+ *               Limitation: cannot follow aliased imports or indirect callbacks.
+ *  2. Runtime — `assertNotInTransaction()` called at the top of each
+ *               side-effecting wrapper (sendEmail, sendDm, uploadToBlob,
+ *               deleteFromBlob, getDiscordConfig, isDiscordIntegrationEnabled).
+ *               Backstops every path the static rule can't see.
+ * Keep both layers in sync when adding a new side-effect entry point: add the
+ * function name to `SIDE_EFFECT_CALLEES` in the ESLint rule AND add an
+ * `assertNotInTransaction(...)` call inside the new function.
  */
 const transactionStorage = new AsyncLocalStorage<true>();
 

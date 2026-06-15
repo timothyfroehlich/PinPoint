@@ -199,7 +199,8 @@ describe("Database Queries (PGlite)", () => {
 
     it("should create notification using library function (integration)", async () => {
       const db = await getTestDb();
-      const { createNotification } = await import("~/lib/notifications");
+      const { planNotification, dispatchNotification } =
+        await import("~/lib/notifications");
 
       // Create user
       const user = {
@@ -230,19 +231,15 @@ describe("Database Queries (PGlite)", () => {
         .values(
           createTestIssue(testMachine.initials, {
             issueNumber: 1,
-            reportedBy: user.id, // Reported by same user, but global watch should still notify?
-            // Actually createNotification logic excludes actor unless includeActor is true.
-            // In this test call below, actorId is passed as user.id.
-            // But wait, if actorId == user.id, they are excluded.
-            // Let's make reportedBy someone else to avoid confusion, OR use includeActor: true if that's the intent.
-            // The test passes actorId: user.id.
+            // Actor is someone else so the global-watch user is not excluded
             assignedTo: null,
           })
         )
         .returning();
 
-      // Create notification
-      await createNotification(
+      // Plan notification against the test DB handle, then dispatch.
+      // (createNotification no longer accepts a tx arg — PP-lbqh / CORE-ARCH-011)
+      const plan = await planNotification(
         {
           type: "new_issue",
           resourceId: issue.id,
@@ -251,12 +248,10 @@ describe("Database Queries (PGlite)", () => {
           includeActor: false, // Exclude actor to test global watch behavior
           issueTitle: "Test Issue",
           machineName: "Test Machine",
-          issueContext: {
-            assignedToId: null,
-          },
         },
         db
       );
+      await dispatchNotification(plan);
 
       // Verify
       const results = await db.query.notifications.findMany({
