@@ -1073,27 +1073,31 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
       });
 
       // First comment notification — distinct event id
-      await createNotification(
-        {
-          type: "new_comment",
-          resourceId: issue.id,
-          resourceType: "issue",
-          commentContent: "First comment",
-          eventId: "comment-uuid-aaa",
-        },
-        db
+      await dispatchNotification(
+        await planNotification(
+          {
+            type: "new_comment",
+            resourceId: issue.id,
+            resourceType: "issue",
+            commentContent: "First comment",
+            eventId: "comment-uuid-aaa",
+          },
+          db
+        )
       );
 
       // Second comment notification — different event id (different logical event)
-      await createNotification(
-        {
-          type: "new_comment",
-          resourceId: issue.id,
-          resourceType: "issue",
-          commentContent: "Second comment",
-          eventId: "comment-uuid-bbb",
-        },
-        db
+      await dispatchNotification(
+        await planNotification(
+          {
+            type: "new_comment",
+            resourceId: issue.id,
+            resourceType: "issue",
+            commentContent: "Second comment",
+            eventId: "comment-uuid-bbb",
+          },
+          db
+        )
       );
 
       expect(sendEmail).toHaveBeenCalledTimes(2);
@@ -1140,25 +1144,29 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
       const SAME_EVENT_ID = "comment-uuid-retry-test";
 
       // Simulate two attempts to dispatch the same comment event (retry scenario)
-      await createNotification(
-        {
-          type: "new_comment",
-          resourceId: issue.id,
-          resourceType: "issue",
-          commentContent: "Same comment, first attempt",
-          eventId: SAME_EVENT_ID,
-        },
-        db
+      await dispatchNotification(
+        await planNotification(
+          {
+            type: "new_comment",
+            resourceId: issue.id,
+            resourceType: "issue",
+            commentContent: "Same comment, first attempt",
+            eventId: SAME_EVENT_ID,
+          },
+          db
+        )
       );
-      await createNotification(
-        {
-          type: "new_comment",
-          resourceId: issue.id,
-          resourceType: "issue",
-          commentContent: "Same comment, retry attempt",
-          eventId: SAME_EVENT_ID,
-        },
-        db
+      await dispatchNotification(
+        await planNotification(
+          {
+            type: "new_comment",
+            resourceId: issue.id,
+            resourceType: "issue",
+            commentContent: "Same comment, retry attempt",
+            eventId: SAME_EVENT_ID,
+          },
+          db
+        )
       );
 
       expect(sendEmail).toHaveBeenCalledTimes(2);
