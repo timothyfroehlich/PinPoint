@@ -1,19 +1,13 @@
 import type React from "react";
-import { and, count, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "~/server/db";
-import { issues, userProfiles } from "~/server/db/schema";
+import { userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
 import { parseIssueFilters } from "~/lib/issues/filters";
-import { ISSUE_LIST_COLUMNS } from "~/lib/issues/queries";
-import {
-  buildOrderBy,
-  buildWhereConditions,
-} from "~/lib/issues/filters-queries";
-import { getUnifiedUsers } from "~/lib/users/queries";
+import { loadIssueListPage } from "~/lib/issues/list-page";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueList } from "~/components/issues/IssueList";
-import type { IssueListItem } from "~/lib/types";
 import { getOwnerCollectionForLayout } from "~/app/(app)/c/owner/[userId]/_data";
 
 interface PageProps {
@@ -70,43 +64,8 @@ export default async function CollectionIssuesPage({
   const isAdmin = currentUserProfile?.role === "admin"; // permissions-audit-allow: SQL visibility flag, mirrors /issues page
 
   filters.currentUserId = user?.id;
-  const where = buildWhereConditions(filters, db, { isAdmin });
-  const orderBy = buildOrderBy(filters.sort);
-  const pageSize = filters.pageSize ?? 15;
-  const page = filters.page ?? 1;
-
-  const [allUsers, issuesListRaw, totalCountResult] = await Promise.all([
-    getUnifiedUsers(),
-    db.query.issues.findMany({
-      where: and(...where),
-      orderBy,
-      with: {
-        machine: { columns: { id: true, name: true } },
-        reportedByUser: { columns: { id: true, name: true } },
-        invitedReporter: { columns: { id: true, name: true } },
-        assignedToUser: { columns: { id: true, name: true } },
-      },
-      columns: ISSUE_LIST_COLUMNS,
-      limit: pageSize,
-      offset: (page - 1) * pageSize,
-    }),
-    db
-      .select({ value: count() })
-      .from(issues)
-      .where(and(...where)),
-  ]);
-
-  const totalCount = totalCountResult[0]?.value ?? 0;
-  const issuesList = issuesListRaw as IssueListItem[];
-
-  // CORE-SEC-006: minimal client shapes (mirrors /issues page)
-  const filterUsers = allUsers.map((u) => ({
-    id: u.id,
-    name: u.name,
-    machineCount: u.machineCount,
-    status: u.status,
-  }));
-  const assigneeUsers = allUsers.map((u) => ({ id: u.id, name: u.name }));
+  const { issuesList, totalCount, filterUsers, assigneeUsers, page, pageSize } =
+    await loadIssueListPage(filters, { isAdmin });
 
   return (
     <div className="space-y-6">
