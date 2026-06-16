@@ -371,7 +371,7 @@ export function EditMachineDialog({
             </p>
             <p className="text-sm text-muted-foreground">
               As a member they&apos;ll be able to edit the machine&apos;s
-              details, owner notes, tournament notes, and owner requirements.
+              details, owner notes, and owner requirements.
             </p>
             <Alert>
               <AlertDescription>
