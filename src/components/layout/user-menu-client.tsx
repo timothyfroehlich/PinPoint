@@ -1,7 +1,14 @@
 "use client";
 
 import React from "react";
-import { User, Settings, LogOut, ChevronDown, Shield } from "lucide-react";
+import {
+  User,
+  Settings,
+  LogOut,
+  ChevronDown,
+  Shield,
+  Gamepad2,
+} from "lucide-react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import {
   DropdownMenu,
@@ -20,6 +27,8 @@ interface UserMenuProps {
   testId?: string;
   /** User role — when "admin", shows the User Management and Integrations links in the dropdown. */
   role?: UserRole | undefined;
+  /** Authenticated user's id — enables the "My Machines" collection link. */
+  userId?: string | undefined;
 }
 
 /**
@@ -34,6 +43,7 @@ export function UserMenu({
   userName,
   testId = "user-menu-button",
   role,
+  userId,
 }: UserMenuProps): React.JSX.Element {
   // Get user initials for avatar fallback
   const initials = userName
@@ -86,6 +96,22 @@ export function UserMenu({
           <span>Profile</span>
           <span className="ml-auto text-xs">(Soon)</span>
         </DropdownMenuItem>
+
+        {/* My Machines — the user's own collection view (PP-slrd.1).
+            Always shown when authenticated; the collection page's empty
+            state covers non-owners. */}
+        {userId && (
+          <DropdownMenuItem asChild>
+            <a
+              href={`/c/owner/${userId}`}
+              className="flex items-center cursor-pointer"
+              data-testid="user-menu-my-machines"
+            >
+              <Gamepad2 className="mr-2 size-4" />
+              <span>My Machines</span>
+            </a>
+          </DropdownMenuItem>
+        )}
 
         {/* User Management — visible to admins only */}
         {checkPermission("admin.access", getAccessLevel(role)) && (

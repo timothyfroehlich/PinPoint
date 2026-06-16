@@ -1,19 +1,13 @@
 import type React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { isToday } from "date-fns";
 
-import { MachineTimelineActionsRow } from "~/components/machines/timeline/MachineTimelineActionsRow";
+import { CollectionMachineFilter } from "~/components/collections/CollectionMachineFilter";
+import { MachineTimelineFilter } from "~/components/machines/timeline/MachineTimelineFilter";
 import { TimelineBucketBanner } from "~/components/machines/timeline/TimelineBucketBanner";
 import { TimelineRow } from "~/components/machines/timeline/TimelineRow";
 import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
-import {
-  type AccessLevel,
-  checkPermission,
-  getAccessLevel,
-} from "~/lib/permissions/index";
-import { createClient } from "~/lib/supabase/server";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
 import {
   DEFAULT_TIMELINE_TAGS,
@@ -21,46 +15,46 @@ import {
   type TimelineTag,
 } from "~/lib/timeline/machine-tags";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { getOwnerCollectionForLayout } from "~/app/(app)/c/owner/[userId]/_data";
 
 interface PageProps {
-  params: Promise<{ initials: string }>;
-  searchParams: Promise<{ tag?: string; page?: string }>;
+  params: Promise<{ userId: string }>;
+  searchParams: Promise<{ tag?: string; page?: string; m?: string }>;
 }
 
 const PAGE_SIZE = 25;
 
 /**
- * Machine Timeline Tab (/m/[initials]/timeline)
+ * Collection Timeline Tab (/c/owner/[userId]/timeline)
  *
- * Server component that loads the machine, resolves the current user + access
- * level, runs the matrix-driven `getMachineTimeline` query, and dispatches
- * each row to the appropriate row renderer (comment, system, tombstone).
+ * Combined chronological feed across the collection's machine set, adapted
+ * from the per-machine timeline page (/m/[initials]/timeline). Deltas:
+ * - every row carries a B1 machine-attribution line (machineLabel prop)
+ * - read-only in v1: no composer, comment rows get canEdit/canDelete false
+ *   (the "New Note" + machine picker is PP-slrd.2)
+ * - a machine multi-select (?m=GZ,MM) narrows WITHIN the collection
  *
- * Permissions (AGENTS.md rule 12 — Matrix-Only):
- * - `canDelete` per row uses `checkPermission("machines.timeline.comment.delete", …)`
- *   with the matrix's `admin: true` + `member/technician: own_or_owner` semantics.
- * - The composer is gated by `checkPermission("machines.timeline.comment.add", …)`
- *   so guests never see it (the action enforces the same gate at write time).
+ * Bucketing stays a presentational pass over the fetched page so PP-ynff's
+ * day × machine grouped view can drop in as an alternate strategy.
  */
-export default async function MachineTimelinePage({
+export default async function CollectionTimelinePage({
   params,
   searchParams,
 }: PageProps): Promise<React.JSX.Element> {
-  const { initials } = await params;
-  const { tag: tagParam, page: pageParam } = await searchParams;
+  const { userId } = await params;
+  const collection = await getOwnerCollectionForLayout(userId);
+  if (!collection) notFound();
+
+  const {
+    tag: tagParam,
+    page: pageParam,
+    m: machineParam,
+  } = await searchParams;
 
   // `?page=N` (1-indexed). Anything not a positive integer collapses to page 1.
   const parsedPage = pageParam ? Number.parseInt(pageParam, 10) : 1;
   const currentPage =
     Number.isFinite(parsedPage) && parsedPage >= 1 ? parsedPage : 1;
-
-  // Load the machine (FK target for getMachineTimeline + initials for routes).
-  const machine = await db.query.machines.findFirst({
-    where: eq(machines.initials, initials),
-    columns: { id: true, initials: true, ownerId: true, name: true },
-  });
-  if (!machine) notFound();
 
   // Parse the CSV `?tag=a,b,c` query param into a validated TimelineTag[].
   // Any unknown values are silently dropped — empty list = "All".
@@ -73,48 +67,33 @@ export default async function MachineTimelinePage({
         .flatMap((r) => (r.success ? [r.data] : []))
     : [];
 
-  // Resolve current user + access level for canDelete + composer gating.
-  // AGENTS.md rule 5 (Supabase SSR): createClient() -> auth.getUser() with
-  // no logic between.
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const currentUserId = user?.id ?? null;
-
-  // Load access level only if authenticated — unauthenticated users can't
-  // delete or post anything.
-  let accessLevel: AccessLevel = "unauthenticated";
-  if (currentUserId) {
-    const profile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, currentUserId),
-      columns: { role: true },
-    });
-    accessLevel = getAccessLevel(profile?.role ?? null);
-  }
-
-  const canCompose = checkPermission(
-    "machines.timeline.comment.add",
-    accessLevel
+  // Machine scope: `?m=GZ,MM` narrows WITHIN the collection — initials
+  // outside the set are dropped, so the filter can never widen the scope.
+  const collectionByInitials = new Map(
+    collection.machines.map((m) => [m.initials, m])
   );
-
-  // Capture narrowed fields — `renderRow` below closes over them and TS
-  // doesn't narrow `machine` (undefined-stripped by `notFound`) across the
-  // inner-function boundary.
-  const machineId = machine.id;
-  const machineInitials = machine.initials;
-  const machineOwnerId = machine.ownerId;
-  const machineName = machine.name;
+  const requestedInitials = machineParam
+    ? machineParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => collectionByInitials.has(s))
+    : [];
+  const scopedMachines =
+    requestedInitials.length > 0
+      ? requestedInitials
+          .map((i) => collectionByInitials.get(i))
+          .filter((m): m is NonNullable<typeof m> => m !== undefined)
+      : collection.machines;
 
   // At the default (no ?tag=), apply the explicit default tag set rather than
-  // omitting the filter — the query seam PP-43q3 needs to default a tag OFF.
-  // Equal to the full tag list today, so results are byte-identical.
+  // omitting the filter — mirrors the per-machine page (PP-43q3 seam).
   const effectiveTags = tags.length > 0 ? tags : [...DEFAULT_TIMELINE_TAGS];
 
   // Fetch one extra row so we can detect whether a next page exists without
   // a separate COUNT(*) query. Trim it back to PAGE_SIZE before rendering.
+  // NOTE: getMachineTimeline's tx param has no default — pass db explicitly.
   const fetched = await getMachineTimeline(db, {
-    machineId,
+    machineId: scopedMachines.map((m) => m.id),
     tags: effectiveTags,
     limit: PAGE_SIZE + 1,
     offset: (currentPage - 1) * PAGE_SIZE,
@@ -123,49 +102,36 @@ export default async function MachineTimelinePage({
   const rows = hasNextPage ? fetched.slice(0, PAGE_SIZE) : fetched;
   const hasPrevPage = currentPage > 1;
 
-  type Row = (typeof rows)[number];
-  const groups = bucketTimelineRows(rows);
+  // machineId -> label for the B1 attribution line + per-row issue links.
+  const machineById = new Map(
+    collection.machines.map((m) => [
+      m.id,
+      { name: m.name, href: `/m/${m.initials}`, initials: m.initials },
+    ])
+  );
 
-  // Comment edit/delete capability per row. Matrix-only permission checks
-  // (AGENTS.md rule 12): edit uses `own` semantics (author only — even
-  // admin/owner can't put words in someone else's mouth); delete uses
-  // `own_or_owner` with an admin override. Non-comment rows have no capability.
-  function commentCapabilities(row: Row): {
-    canEdit: boolean;
-    canDelete: boolean;
-  } {
-    const ownership =
-      currentUserId !== null && row.sourceType === "comment"
-        ? { userId: currentUserId, reporterId: row.authorId, machineOwnerId }
-        : null;
-    if (!ownership) return { canEdit: false, canDelete: false };
-    return {
-      canEdit: checkPermission(
-        "machines.timeline.comment.edit",
-        accessLevel,
-        ownership
-      ),
-      canDelete: checkPermission(
-        "machines.timeline.comment.delete",
-        accessLevel,
-        ownership
-      ),
-    };
-  }
+  const groups = bucketTimelineRows(rows);
 
   return (
     <div className="flex flex-col gap-4">
-      <MachineTimelineActionsRow
-        machineId={machineId}
-        machineName={machineName}
-        currentTags={tags}
-        canCompose={canCompose}
-      />
+      <div className="flex flex-wrap gap-2">
+        <MachineTimelineFilter
+          currentTags={tags}
+          baseUrl={`/c/owner/${collection.owner.id}/timeline`}
+        />
+        <CollectionMachineFilter
+          machines={collection.machines.map((m) => ({
+            initials: m.initials,
+            name: m.name,
+          }))}
+          currentInitials={requestedInitials}
+        />
+      </div>
       {rows.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">
           {currentPage > 1
             ? "No more entries on this page."
-            : "No activity yet — this machine’s history will appear here as it is added, updated, and serviced."}
+            : "No timeline activity yet."}
         </p>
       ) : (
         <div className="flex flex-col">
@@ -184,18 +150,26 @@ export default async function MachineTimelinePage({
                 <TimelineBucketBanner bucket={group.bucket} />
                 <div>
                   {group.entries.map((entry) => {
-                    const { canEdit, canDelete } = commentCapabilities(
-                      entry.row
-                    );
+                    const machineRef = entry.row.machineId
+                      ? machineById.get(entry.row.machineId)
+                      : null;
                     return (
                       <TimelineRow
                         key={entry.row.id}
                         row={entry.row}
                         showRelativeTime={showRelativeTime}
                         rowDateLabel={entry.bucket.rowDateLabel}
-                        machineInitials={machineInitials}
-                        commentCanEdit={canEdit}
-                        commentCanDelete={canDelete}
+                        commentCanEdit={false}
+                        commentCanDelete={false}
+                        {...(machineRef
+                          ? {
+                              machineLabel: {
+                                name: machineRef.name,
+                                href: machineRef.href,
+                              },
+                              machineInitials: machineRef.initials,
+                            }
+                          : {})}
                       />
                     );
                   })}
@@ -211,7 +185,8 @@ export default async function MachineTimelinePage({
           hasPrevPage={hasPrevPage}
           hasNextPage={hasNextPage}
           tags={tags}
-          initials={machineInitials}
+          machineInitials={requestedInitials}
+          ownerId={collection.owner.id}
         />
       )}
     </div>
@@ -223,7 +198,9 @@ interface TimelinePaginationProps {
   hasPrevPage: boolean;
   hasNextPage: boolean;
   tags: TimelineTag[];
-  initials: string;
+  /** The validated `?m=` machine filter, preserved across page links. */
+  machineInitials: string[];
+  ownerId: string;
 }
 
 function TimelinePagination({
@@ -231,17 +208,20 @@ function TimelinePagination({
   hasPrevPage,
   hasNextPage,
   tags,
-  initials,
+  machineInitials,
+  ownerId,
 }: TimelinePaginationProps): React.JSX.Element {
-  const baseUrl = `/m/${initials}/timeline`;
-  // Build from the validated tags, not the raw `?tag=` string, so an invalid
-  // tag in the URL doesn't propagate into the Older/Newer links (PP-ii3u #12).
-  const tagQuery =
-    tags.length > 0 ? `tag=${encodeURIComponent(tags.join(","))}` : "";
+  const baseUrl = `/c/owner/${ownerId}/timeline`;
+  // Build from the validated tags/initials, not the raw query string, so an
+  // invalid value in the URL doesn't propagate into the Older/Newer links.
+  const queryParts: string[] = [];
+  if (tags.length > 0)
+    queryParts.push(`tag=${encodeURIComponent(tags.join(","))}`);
+  if (machineInitials.length > 0)
+    queryParts.push(`m=${encodeURIComponent(machineInitials.join(","))}`);
 
   const buildHref = (page: number): string => {
-    const parts: string[] = [];
-    if (tagQuery) parts.push(tagQuery);
+    const parts = [...queryParts];
     if (page > 1) parts.push(`page=${String(page)}`);
     return parts.length > 0 ? `${baseUrl}?${parts.join("&")}` : baseUrl;
   };

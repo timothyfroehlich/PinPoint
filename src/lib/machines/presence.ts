@@ -9,6 +9,19 @@ export const VALID_MACHINE_PRESENCE_STATUSES = [
 export type MachinePresenceStatus =
   (typeof VALID_MACHINE_PRESENCE_STATUSES)[number];
 
+/**
+ * Sort rank for machine presence — ascending is most-present → least-present,
+ * matching the declared order of {@link VALID_MACHINE_PRESENCE_STATUSES}.
+ * Mirrors `MACHINE_STATUS_RANK`. Keep the keys in sync with that array.
+ */
+export const MACHINE_PRESENCE_RANK: Record<MachinePresenceStatus, number> = {
+  on_the_floor: 0,
+  off_the_floor: 1,
+  on_loan: 2,
+  pending_arrival: 3,
+  removed: 4,
+};
+
 export function getMachinePresenceLabel(status: MachinePresenceStatus): string {
   const labels: Record<MachinePresenceStatus, string> = {
     on_the_floor: "On the Floor",

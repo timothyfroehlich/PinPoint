@@ -1,21 +1,13 @@
 import type React from "react";
 import { type Metadata } from "next";
-import { and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
-import { issues, userProfiles } from "~/server/db/schema";
+import { userProfiles } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
-import { getUnifiedUsers } from "~/lib/users/queries";
 import { IssueList } from "~/components/issues/IssueList";
 import { createClient } from "~/lib/supabase/server";
-import type { IssueListItem } from "~/lib/types";
-
 import { parseIssueFilters } from "~/lib/issues/filters";
-import { ISSUE_LIST_COLUMNS } from "~/lib/issues/queries";
-import {
-  buildWhereConditions,
-  buildOrderBy,
-} from "~/lib/issues/filters-queries";
-import { count, eq } from "drizzle-orm";
+import { loadIssueListPage } from "~/lib/issues/list-page";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 export const metadata: Metadata = {
@@ -35,9 +27,8 @@ export default async function IssuesPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 1. Parse filters from searchParams
   const rawParams = await searchParams;
-  // Convert Record to URLSearchParams (parseIssueFilters expects URLSearchParams)
+  // parseIssueFilters expects URLSearchParams, so flatten the raw record.
   const urlParams = new URLSearchParams();
   Object.entries(rawParams).forEach(([key, value]) => {
     if (Array.isArray(value)) {
@@ -61,19 +52,16 @@ export default async function IssuesPage({
 
   // Add currentUserId for watching filter (if authenticated)
   filters.currentUserId = user?.id;
-  const where = buildWhereConditions(filters, db, { isAdmin });
-  const orderBy = buildOrderBy(filters.sort);
-  const pageSize = filters.pageSize ?? 15;
-  const page = filters.page ?? 1;
 
-  // 2. Start independent queries immediately
+  // The all-machines list (filter dropdown) and owned-machine initials
+  // (My-machines toggle) are specific to this page; run them alongside the
+  // shared issues-list load so everything still resolves in parallel.
+  // Owned initials are computed server-side so no user IDs reach the client
+  // (CORE-SEC-006).
   const machinesPromise = db.query.machines.findMany({
     orderBy: (m, { asc }) => [asc(m.name)],
     columns: { initials: true, name: true },
   });
-
-  // Fetch owned machine initials for the "My machines" quick-select toggle.
-  // Computed server-side so no user IDs are sent to the client (CORE-SEC-006).
   const ownedMachineInitialsPromise = user?.id
     ? db.query.machines.findMany({
         where: (m, { eq }) => eq(m.ownerId, user.id),
@@ -82,77 +70,17 @@ export default async function IssuesPage({
       })
     : Promise.resolve([]);
 
-  const usersPromise = getUnifiedUsers();
-
-  const issuesPromise = db.query.issues.findMany({
-    where: and(...where),
-    orderBy: orderBy,
-    with: {
-      machine: {
-        columns: { id: true, name: true },
-      },
-      reportedByUser: {
-        columns: {
-          id: true,
-          name: true,
-        },
-      },
-      invitedReporter: {
-        columns: {
-          id: true,
-          name: true,
-        },
-      },
-      assignedToUser: {
-        columns: {
-          id: true,
-          name: true,
-        },
-      },
-    },
-    columns: ISSUE_LIST_COLUMNS,
-    limit: pageSize,
-    offset: (page - 1) * pageSize,
-  });
-
-  const totalCountPromise = db
-    .select({ value: count() })
-    .from(issues)
-    .where(and(...where));
-
-  // 3. Await all promises in parallel
   const [
+    { issuesList, totalCount, filterUsers, assigneeUsers, page, pageSize },
     allMachines,
-    allUsers,
-    issuesListRaw,
-    totalCountResult,
     ownedMachineRows,
   ] = await Promise.all([
+    loadIssueListPage(filters, { isAdmin }),
     machinesPromise,
-    usersPromise,
-    issuesPromise,
-    totalCountPromise,
     ownedMachineInitialsPromise,
   ]);
 
   const ownedMachineInitials = ownedMachineRows.map((m) => m.initials);
-
-  const totalCount = totalCountResult[0]?.value ?? 0;
-
-  const issuesList = issuesListRaw as IssueListItem[];
-
-  // CORE-SEC-006: Map to minimal shapes before passing to client components
-  const filterUsers = allUsers.map((u) => ({
-    id: u.id,
-    name: u.name,
-    machineCount: u.machineCount,
-    status: u.status,
-  }));
-
-  const assigneeUsers = allUsers.map((u) => ({
-    id: u.id,
-    name: u.name,
-  }));
 
   return (
     <PageContainer size="wide">

@@ -23,6 +23,8 @@ interface AppHeaderProps {
   isAuthenticated: boolean;
   userName?: string;
   role?: UserRole | undefined;
+  /** Authenticated user's id — passed through to the user menu's "My Machines" link. */
+  userId?: string | undefined;
   notifications: EnrichedNotification[];
   issuesPath: string;
   newChangelogCount: number;
@@ -39,6 +41,7 @@ export function AppHeader({
   isAuthenticated,
   userName,
   role,
+  userId,
   notifications,
   issuesPath,
   newChangelogCount,
@@ -144,7 +147,7 @@ export function AppHeader({
       {isAuthenticated ? (
         <div className="flex items-center gap-2">
           <NotificationList notifications={notifications} />
-          <UserMenu userName={userName ?? "User"} role={role} />
+          <UserMenu userName={userName ?? "User"} role={role} userId={userId} />
         </div>
       ) : (
         <div className="flex items-center gap-2">
