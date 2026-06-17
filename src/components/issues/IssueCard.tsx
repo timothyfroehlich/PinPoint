@@ -9,7 +9,6 @@ import { formatIssueId, resolveIssueReporter } from "~/lib/issues/utils";
 import { formatDate } from "~/lib/dates";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import type { Issue } from "~/lib/types";
-import { PersonHoverCard } from "~/components/people/PersonHoverCard";
 
 export type IssueCardIssue = Pick<
   Issue,
@@ -24,7 +23,7 @@ export type IssueCardIssue = Pick<
   | "createdAt"
   | "reporterName"
 > & {
-  reportedByUser?: { id?: string; name: string } | null;
+  reportedByUser?: { name: string } | null;
   invitedReporter?: { name: string } | null;
 };
 
@@ -95,12 +94,7 @@ export function IssueCard({
                 </span>
                 {showReporter && (
                   <span>
-                    Reported by{" "}
-                    <PersonHoverCard
-                      userId={issue.reportedByUser?.id ?? null}
-                      displayName={reporter.name}
-                    />{" "}
-                    • {formatDate(issue.createdAt)}
+                    Reported by {reporter.name} • {formatDate(issue.createdAt)}
                   </span>
                 )}
                 {!showReporter && <span>{formatDate(issue.createdAt)}</span>}
