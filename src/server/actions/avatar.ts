@@ -81,3 +81,13 @@ export async function uploadAvatarAction(
   revalidatePath("/", "layout");
   return ok({ avatarUrl: blobUrl });
 }
+
+/**
+ * PE-compatible wrapper used as the avatar <form action>.
+ * Discards the Result so the return type matches the form action signature.
+ */
+export async function uploadAvatarFormAction(
+  formData: FormData
+): Promise<void> {
+  await uploadAvatarAction(formData);
+}

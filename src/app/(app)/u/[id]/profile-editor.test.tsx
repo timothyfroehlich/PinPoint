@@ -3,7 +3,10 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("~/app/(app)/u/[id]/actions", () => ({ updateProfileAction: vi.fn() }));
-vi.mock("~/server/actions/avatar", () => ({ uploadAvatarAction: vi.fn() }));
+vi.mock("~/server/actions/avatar", () => ({
+  uploadAvatarAction: vi.fn(),
+  uploadAvatarFormAction: vi.fn(),
+}));
 
 import { ProfileEditor } from "./profile-editor";
 

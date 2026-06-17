@@ -3,10 +3,7 @@
 import * as React from "react";
 import { useActionState } from "react";
 import { updateProfileAction, type UpdateProfileResult } from "./actions";
-import {
-  uploadAvatarAction,
-  type UploadAvatarResult,
-} from "~/server/actions/avatar";
+import { uploadAvatarFormAction } from "~/server/actions/avatar";
 import { Input } from "~/components/ui/input";
 
 interface ProfileEditorProps {
@@ -27,24 +24,14 @@ export function ProfileEditor({
     FormData
   >(updateProfileAction, undefined);
 
-  const [avatarState, avatarAction] = useActionState<
-    UploadAvatarResult | undefined,
-    FormData
-  >((_prevState, formData) => uploadAvatarAction(formData), undefined);
-
   return (
     <div className="space-y-6">
       {/* Avatar upload — its own form, posts a File to the avatar action */}
       <form
-        action={avatarAction}
+        action={uploadAvatarFormAction}
         encType="multipart/form-data"
         className="space-y-2"
       >
-        {avatarState && !avatarState.ok ? (
-          <p role="alert" className="text-destructive text-sm">
-            Could not upload avatar. Check the file and try again.
-          </p>
-        ) : null}
         <label htmlFor="avatar" className="text-sm font-medium">
           Avatar
         </label>
