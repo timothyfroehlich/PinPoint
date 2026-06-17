@@ -57,10 +57,16 @@ EXISTING_NAME="$(echo "$EXISTING_JSON" \
     '.[] | select(.name == $n) | .name' \
   | head -n1)"
 
+# Reusing a live branch means its DB still holds the previous schema + seed, so
+# migrate+seed must reset first to pick up regenerated migrations / changed seed
+# (otherwise drizzle skips already-journaled migrations and seed skips existing
+# rows). A freshly-created branch is empty, so no reset is needed.
 if [[ -n "$EXISTING_NAME" ]]; then
   echo "Reusing existing Supabase branch: ${EXISTING_NAME}"
+  PREVIEW_RESET="1"
 else
   echo "Creating Supabase branch '${BRANCH_NAME}' (size: ${PREVIEW_BRANCH_SIZE:-micro})"
+  PREVIEW_RESET="0"
   # Explicit name = deterministic identity. --size keeps the branch DB small;
   # micro is enough to run migrate + seed for a fresh preview schema.
   supabase branches create "$BRANCH_NAME" \
@@ -140,50 +146,14 @@ done
 echo "Database is accepting connections"
 echo "::endgroup::"
 
-# --- Migrate + seed (lifted near-verbatim from supabase-branch-setup.yaml) ---
-
-echo "::group::Run Drizzle migrations"
-# drizzle-kit reads POSTGRES_URL_NON_POOLING as its (direct) migrate URL. The
-# branch's POSTGRES_URL is the :6543 TRANSACTION pooler, which does not reliably
-# support the DDL / prepared statements a migration run issues (see the warning
-# in drizzle.config.ts) — the suspected cause of "migrate exits 1 with no
-# surfaced Postgres error" (PP-l9qb). Use the SESSION-mode pooler instead: same
-# host, port 5432, IPv4-reachable from runners AND DDL-capable. (The *direct* db
-# host on :5432 is IPv6 and unreachable from runners — a different endpoint.)
-export DRIZZLE_FORCE_PRODUCTION="1"
-migrate_url="${POSTGRES_URL/:6543/:5432}"
-export POSTGRES_URL_NON_POOLING="$migrate_url"
-echo "migrate connection: $(printf '%s' "$migrate_url" | sed -E 's#://[^@]+@#://***@#')"
-# Cold-start race: a freshly-provisioned branch can fail the first migrate ~3s
-# in (no surfaced Postgres error) yet succeed on a warm retry against the SAME
-# endpoint (evidence: PR #1388 run 27481880209 cold-failed, run 27482214047
-# warm-passed on the identical :6543 url). The `select 1` readiness gate above
-# does not cover this, so retry migrate itself with a short backoff. Migrations
-# are journaled + per-migration transactional, so a retry re-applies cleanly.
-# Pipe through `tr '\r' '\n'` so drizzle-kit's spinner can't bury a real error
-# behind carriage-return overwrites; pipefail (set above) preserves its exit code.
-migrate_attempt=0
-migrate_max=4
-until pnpm exec drizzle-kit migrate 2>&1 | tr '\r' '\n'; do
-  migrate_attempt=$((migrate_attempt + 1))
-  if [[ "$migrate_attempt" -ge "$migrate_max" ]]; then
-    echo "::error::drizzle-kit migrate failed after ${migrate_attempt} attempts"
-    exit 1
-  fi
-  echo "migrate failed (cold-start race?); retrying in 10s (${migrate_attempt}/${migrate_max})..."
-  sleep 10
-done
-echo "::endgroup::"
-
-echo "::group::Run seed SQL (triggers + grants)"
-psql "$POSTGRES_URL" -f supabase/seed.sql
-echo "::endgroup::"
-
-echo "::group::Seed users and data"
-NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL" \
-SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
-  node supabase/seed-users.mjs
-echo "::endgroup::"
+# --- Reset (reused branch only) + migrate + seed ----------------------------
+# The shared script is the single source of truth for the DB-setup sequence, so
+# the `/preview` path here and the push-triggered resync path (preview-resync.sh)
+# can never drift. PREVIEW_RESET=1 (set above when reusing a live branch) makes
+# it drop + recreate the schema first; the branch creds are already exported.
+PREVIEW_RESET="$PREVIEW_RESET" \
+PROD_PROJECT_REF="$SUPABASE_PROJECT_ID" \
+  bash scripts/workflow/preview/preview-migrate-seed.sh
 
 # Machine-settings demo (AFM gets two showcase sets) so the Settings tab has
 # meaningful content in the preview. Reads POSTGRES_URL_NON_POOLING (the :5432
