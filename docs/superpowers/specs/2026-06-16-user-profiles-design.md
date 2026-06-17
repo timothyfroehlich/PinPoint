@@ -44,7 +44,7 @@ person is referenced across the app.
 6. **Light activity stats (option B):** issues reported, comments made, issues
    resolved. Counts, not a feed.
 7. **Person hover card** everywhere a person is referenced; real users get a card
-   - profile link, invited/deleted users degrade to plain text.
+   plus profile link, invited/deleted users degrade to plain text.
 8. **Hover-card data: lazy-fetch on open (option B)** — instant name/avatar from
    resolver data, richer bits (machine count) fetched on hover via a small route
    handler. List queries stay untouched (no N+1).
@@ -52,6 +52,12 @@ person is referenced across the app.
    for the "Owns N machines" line in the card.
 10. **Profile-edit auth is an ad-hoc ownership check**, not a matrix permission —
     it's identity equality (`you === this profile`), which no role grants.
+11. **Owned machines link into the existing collection view, not a rebuilt table.**
+    A v1 "collection" already _is_ an owner's machines, served at
+    `/c/owner/[userId]` (Overview / Issues / Timeline tabs). The profile shows a
+    compact list of machine names (each linking to its own `/m/[initials]` page),
+    **capped at 6**, with a "View all N →" / "View full collection →" link to
+    `/c/owner/[id]`. The hover card's "Owns N machines" line links there too.
 
 ## Data model
 
@@ -72,15 +78,22 @@ Responsibilities:
 
 - Load the `userProfiles` row by `id`; if it doesn't exist (or the id is an
   invited/deleted user with no profile), call `notFound()`.
-- Load owned machines via `eq(machines.ownerId, id)`; render the section only
-  when length > 0.
+- Load owned machines via `eq(machines.ownerId, id)` (machine name + initials,
+  capped — fetch 7 to know whether a 7th exists); render the section only when
+  count > 0.
 - Load three activity counts: issues reported, comments made, issues resolved.
 - Determine "is this my own profile" by comparing route `id` to
   `auth.getUser()`'s id.
 
 Layout (see mockup): avatar + name + pronouns + role badge + member-since header;
-bio block; activity-counts row; linked owned-machines list. The owner's own view
-shows an **Edit profile** affordance.
+bio block; activity-counts row; owned-machines list. The owner's own view shows
+an **Edit profile** affordance.
+
+**Owned-machines section** — a compact list of up to **6 machine names**, each a
+link to its own `/m/[initials]` page. When the owner has more than 6, show a
+"View all N →" link; otherwise show "View full collection →". Both point at
+`/c/owner/[id]` (the existing collection view — Overview / Issues / Timeline).
+We do **not** rebuild the collection's status table on the profile.
 
 Email is **never** rendered here (CORE-SEC-007).
 
@@ -116,7 +129,7 @@ so upload behavior is identical to today.
   profile directly; the card is the hover/focus enhancement on top. (We must not
   build the trigger as a non-focusable `<div>`.)
 - **Card content:** avatar, name, pronouns, role badge, "Owns N machines"
-  (hidden at zero), "View profile →".
+  (hidden at zero; links to `/c/owner/[id]`), "View profile →".
 - **Degraded states:** invited-but-not-signed-up and deleted ("Former user")
   render as plain text — no wrapper, no link, no card.
 - **Data strategy (option B):** name/avatar render instantly from
@@ -140,6 +153,7 @@ implementation):
 - Issue and machine timeline person rows
 - Machine owner display
 - Profile's own owned-machines list
+- Collection view (`/c/owner/[id]`) — owner-name header, timeline attribution
 - Admin users list
 - Assignee picker — **deliberately plain in v1** (interactive selection menu;
   hover card would fight the dropdown)
@@ -160,7 +174,7 @@ deliverable of the implementation plan.
 - **Integration (PGlite + direct action):**
   - `updateProfileAction` — auth, own-only enforcement, Zod validation.
   - The three activity-count queries.
-  - Owned-machines query.
+  - Owned-machines query — including the cap/overflow (fetch-7-show-6 boundary).
   - The hover-card route handler.
 - **RTL unit:**
   - Inline-edit form state.
