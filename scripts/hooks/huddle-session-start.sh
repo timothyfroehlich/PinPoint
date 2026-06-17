@@ -194,6 +194,12 @@ if [[ -n "$NAME" ]]; then
   printf '    bd comments add %s "Your update. —%s"\n\n' "$_TODAY_ID_REG" "$NAME"
   printf 'If a peer'\''s kickoff scrolls by and you have specific relevant context — a conflict,\n'
   printf 'a gotcha, a related in-flight branch/bead — reply with it; don'\''t ack-spam.\n\n'
+  # shellcheck disable=SC2016  # backticks are literal Markdown — bd comments command, not substitution
+  printf 'Before you post, READ the thread first (`bd comments %s`) and scan for claims on\n' "$_TODAY_ID_REG"
+  printf 'files you'\''re about to touch. The poll hook injects new comments on your prompts,\n'
+  printf 'NOT before your own posts — so the latest may not be in your context, and you can\n'
+  printf 'post into a channel you haven'\''t checked this turn. If a peer flagged a conflict\n'
+  printf 'with your area, surface the heads-up and address it BEFORE you merge.\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown
   printf 'Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`\n'
 else

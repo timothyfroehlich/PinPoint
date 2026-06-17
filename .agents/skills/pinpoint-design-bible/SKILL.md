@@ -771,3 +771,13 @@ npx -y modern-web-guidance@latest list                   # browse the catalog
 | Tables                             | `accessibility` § Tables                                                |
 
 Don't memorize the map — re-search per task. Plugin catalog updates more often than this document does.
+
+## 23. Presenting Mockups for Review
+
+When you build a mockup or prototype of a change for review, **show enough of the surrounding page that the reviewer can judge how the change fits** — not just the changed element in isolation.
+
+- **Include the context, not only the delta.** Render the change inside its containing page archetype (§5) — neighboring sections, the header/nav chrome, the elements above and below it — so proportion, spacing, and placement among existing content are visible. A cropped fragment can only be evaluated for its own internal look, not for fit.
+- **Err toward more context.** A too-wide mockup costs a few extra elements; a too-narrow one costs a review round because the reviewer can't tell whether it belongs. When unsure how much page to include, include more.
+- **Label what's changing vs. unchanged.** Make it obvious which parts are the actual proposal and which are existing context shown for placement (a caption, a highlight, or a short "everything outside the highlighted area is current UI, shown for context" note). This keeps the surrounding context from reading as new design decisions up for debate.
+
+This is a presentation rule for design _exploration_, not a constraint on the product UI itself.

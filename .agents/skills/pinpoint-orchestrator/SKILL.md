@@ -108,10 +108,10 @@ Agent(
 
 **Model**: omit `model` to inherit the session model (usually correct). Override only when confident a tier fits: a heavier model for judgment-heavy work, a lighter one for mechanical, well-specified changes.
 
-**Quality is self-enforced** — hooks don't fire for subagents. Every prompt MUST include:
+**Quality is self-enforced** — hooks don't fire for subagents. Keep the prompt **small** — the bead is the source of truth and the subagent can read it. Every prompt MUST include:
 
-1. Beads issue context (`bd show` output)
-2. Specific files to modify and what to change
+1. The bead ID + "First run `bd show <id>` && `bd update <id> --claim`, then work from the bead." The bead carries scope, files, line numbers, and acceptance criteria — do NOT restate them in the prompt (two places to drift).
+2. Only context that ISN'T already in the bead — cross-bead conflicts, a reference PR, sequencing constraints. Omit when there's nothing to add.
 3. Quality gate: "Run `pnpm run check` before returning."
 4. Full PR lifecycle: "Create PR, verify CI green."
 5. Structured return format: branch, PR#, CI status, blockers
@@ -119,17 +119,13 @@ Agent(
 **Prompt template:**
 
 ```markdown
-## Task: <issue title>
+## Task
 
-<beads issue ID and description>
+Work bead <ID>. First run `bd show <ID>` && `bd update <ID> --claim` — the bead is the spec. Implement exactly what it describes; don't expand scope.
 
-## Files to Modify
+## Context not in the bead
 
-<specific files and what to change>
-
-## Notes
-
-<any task-specific context>
+<only what the bead doesn't already say — cross-bead conflicts, reference PRs, sequencing. Omit this section entirely if there's nothing to add.>
 
 ## Quality Gates
 
@@ -146,6 +142,8 @@ Report back with:
 ```
 
 Full annotated version: `references/agent-prompt-template.md`.
+
+> **The bead must be complete — especially for mechanical refactors.** Because the agent executes the bead literally and you're no longer restating scope in the prompt, the bead has to carry it. A "convert/rename only X" bead MUST include an explicit **out-of-scope** list naming the look-alikes that are intentionally excluded, and why — otherwise the agent over-scopes. Casework: a "convert 2 catch blocks to the `err()` helper" bead ballooned to 6, Sentry-wrapping a rate-limit guard and a Zod-validation guard that are _expected user conditions, not server errors_ (PR #1247 → reverted in #1250). If the bead doesn't say "don't touch Y," the agent will.
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## 1. User & Mission
 
-**User**: Tim (timothyfroehlich). **Project**: PinPoint, a pinball issue tracker for Austin Pinball Collective. **Phase**: Beta with active users; MVP+ polish.
+**User**: Tim (timothyfroehlich). **Project**: PinPoint, a pinball issue tracker for Austin Pinball Collective. **Phase**: In active production use by 20+ members; MVP+ polish and hardening.
 **Style**: Explain pros/cons, teach. PR reviews are AI-generated — apply critical thinking.
 
 ## 2. Critical Non-Negotiables
@@ -30,10 +30,10 @@
 17. **Accessibility floor** (CORE-A11Y-001..006): skip-to-main link, `motion-reduce:` paired with animations, `<th scope="col">` + `aria-sort` + accessible name on data tables, real `<button>` (never `<div role="button">`), `title` is not a tooltip, `inert` on background regions when a modal opens.
 18. **No side effects inside DB transactions** (CORE-ARCH-011): external/non-transactional effects (HTTP, email, Discord, blob, Vault RPC) never run inside `db.transaction` — fetch inputs before it, deliver effects after commit (`after()` + `planNotification`/`dispatchNotification`). A runtime tripwire throws `SideEffectInTransactionError` if violated. (The Doodle Bug, PP-2053.)
 
-### 2.2 Workflow
+### 2.2 Process rules
 
 1. **Escape parentheses in paths**: `src/app/\(app\)/page.tsx`.
-2. **Run `pnpm run preflight` before committing.** Trivial doc/comment changes: `pnpm run check` is enough.
+2. **Run `pnpm run check` before committing** (~12s — the default floor). Reserve `pnpm run preflight` (the slower check + build + integration) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md` and `.agents/rules/AGY.md`. (PP-46z, PP-bg45.)
@@ -56,6 +56,7 @@ Load relevant skills for every task. If your tool doesn't support skills, read t
 | Workflow    | `pinpoint-briefing`       | Session-start health review                                             |
 | Workflow    | `pinpoint-pr-workflow`    | Full PR lifecycle: commit, push, CI, merge                              |
 | Workflow    | `pinpoint-orchestrator`   | Parallel subagent work in worktrees: dispatch, monitor, follow-up       |
+| Workflow    | `pinpoint-huddle`         | Inter-session coordination via daily/monthly beads (the huddle hooks)   |
 | Antigravity | `pinpoint-agy-triage`     | Grooming: evaluate whether a bead is agy-ready/agy-ui                   |
 | Antigravity | `pinpoint-agy-dispatch`   | Emit an Antigravity copy-paste prompt for a chosen bead                 |
 | Antigravity | `pinpoint-agy-execute`    | Runbook for Antigravity to execute an agy-ready bead end-to-end         |
@@ -100,19 +101,19 @@ Only stop services you started in this session, by specific PID or via worktree-
 
 ### Key commands
 
-| Command                               | What                                                                                                                                      |
-| :------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm run check`                      | Fast: types, lint, format, unit, yamllint, actionlint, ruff, shellcheck (~12s)                                                            |
-| `pnpm run preflight`                  | Full: check + build + integration. **Before commit.** Host-wide cap of 2 concurrent runs (via `sem`); use `preflight:unlocked` to bypass. |
-| `pnpm run smoke`                      | Smoke E2E (~60s)                                                                                                                          |
-| `pnpm run e2e:full`                   | Full E2E suite                                                                                                                            |
-| `pnpm run e2e:all`                    | Full + smoke + roots in separate Playwright invocations (~10–15 min)                                                                      |
-| `pnpm run db:migrate`                 | Apply schema changes locally                                                                                                              |
-| `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups`                                                                                               |
-| `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                                                                                |
-| `ruff check && ruff format`           | Python lint/format (no venv needed)                                                                                                       |
-| `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                   |
-| `FORCE_MEM_PRECHECK=skip <command>`   | Bypass the memory-pressure gate for one run (e.g. when you know pressure is transient or acceptable).                                     |
+| Command                               | What                                                                                                                                                                                                                             |
+| :------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm run check`                      | Fast: types, lint, format, unit, yamllint, actionlint, ruff, shellcheck (~12s)                                                                                                                                                   |
+| `pnpm run preflight`                  | Full: check + build + integration. **For non-trivial changes** (migrations, auth, server actions, middleware, DB schema) — not every commit. Host-wide cap of 2 concurrent runs (via `sem`); use `preflight:unlocked` to bypass. |
+| `pnpm run smoke`                      | Smoke E2E (~60s)                                                                                                                                                                                                                 |
+| `pnpm run e2e:full`                   | Full E2E suite — **CI only; don't run locally.**                                                                                                                                                                                 |
+| `pnpm run e2e:all`                    | Full + smoke + roots, separate Playwright invocations (~10–15 min) — **CI only; don't run locally.**                                                                                                                             |
+| `pnpm run db:migrate`                 | Apply schema changes locally                                                                                                                                                                                                     |
+| `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups`                                                                                                                                                                                      |
+| `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                                                                                                                                                                       |
+| `ruff check && ruff format`           | Python lint/format (no venv needed)                                                                                                                                                                                              |
+| `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                          |
+| `FORCE_MEM_PRECHECK=skip <command>`   | Bypass the memory-pressure gate for one run (e.g. when you know pressure is transient or acceptable).                                                                                                                            |
 
 ### Prototype mode (rapid iteration)
 
@@ -126,9 +127,9 @@ When the user explicitly asks for "prototype mode" / "rapid iteration" / "just e
 4. UI components / forms → `pnpm run smoke`
 5. Auth / permissions / middleware → `pnpm run smoke` + targeted specs
 6. DB schema / migrations → `pnpm run preflight`
-7. Final pre-review sweep → `pnpm run e2e:all`
+7. Final pre-review → push and let **CI** run the full suite; don't sweep locally.
 
-**Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state. **Never** run `e2e:full` during iteration (that's what CI is for). Always use `--project=chromium` for targeted runs; `--headed` to debug visually. Report flaky tests; don't retry in a loop.
+**Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state. **Never** run `e2e:full` / `e2e:all` locally — the full suite is CI's job. Always use `--project=chromium` for targeted runs; `--headed` to debug visually. Report flaky tests; don't retry in a loop.
 
 ### Reproducing CI failures locally
 
@@ -143,7 +144,7 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 
 - **Check for conflicts first**: `gh pr view <PR> --json mergeable,mergeStateStatus`. `DIRTY`/`CONFLICTING` means GitHub silently skips workflow runs until you resolve. `pnpm run check` includes a `check:behind-main` warning.
 - **Required check**: only `CI Gate` (ruleset `6326455`). Vercel is not required. `BLOCKED` while E2E is still running is normal.
-- **Vercel preview migrations**: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The on-demand `Preview Controller` workflow migrates + seeds the branch DB before building the preview (see §6 "Preview deployments"). Production deploys still migrate.
+- **Vercel preview migrations**: preview deployments skip `migrate:production` (branch DB user lacks `CREATE SCHEMA`). The on-demand `Preview Controller` workflow migrates + seeds the branch DB before building the preview (see §7 "Preview deployments"). Production deploys still migrate.
 
 ### Migration conflicts
 
@@ -172,12 +173,23 @@ Use worktree-isolated subagents for independent tasks. Tool-specific dispatch, h
 
 When a decision is **visual or hard to convey in prose** — color/contrast, spacing, layout, component variants, or a tradeoff with several plausible answers — build a small interactive playground for the user instead of describing options in text or guessing on their behalf. A playground is a single self-contained HTML file with live controls, a real rendered preview, and a copy-out decision; the user adjusts it, sees the actual result, and hands the choice back. (Claude Code provides this via a `playground` plugin skill — it is **not** a checked-in `.agents/skills/` skill, so in any tool you can simply write the single-file HTML directly.) Prefer this over a wall of bullet-pointed options whenever the user would benefit from _seeing_ the thing — e.g. a contrast change is far easier to judge as rendered swatches with live WCAG ratios than as numbers. Keep using `AskUserQuestion`-style prompts for non-visual forks; reach for a playground when sight is the deciding factor.
 
-### Safe command patterns
+## 6. Working style
 
-- Search: `rg --files | rg "pattern"`, `rg -l "content" --type js`
-- Discovery: `fd "*.js"`, `fd --type f --changed-within 1day`
+How Tim wants agents to behave. (§1 has the one-line version; this is the detail.)
 
-## 6. Deployment
+### Collaboration & decisions
+
+- **Don't make my calls for me.** (a) When you ask me a multi-option question, wait for my answer before acting on one — even in auto/autonomous mode; deciding before I reply makes the question performative and removes my choice. (b) Auto/autonomous mode authorizes _operational_ calls (continuing work, tool choices, cleanup, re-publishing after a restart), **not** taste decisions — layout, color, copy, IA, or scope tradeoffs I surfaced. When I'm the taste-maker, ask (`AskUserQuestion` or a visual playground). While waiting on an answer, only do genuinely non-blocking parallel work.
+- **PRs ready-by-default.** Open PRs as ready-for-review, not draft. CI runs the same on drafts, so draft gates nothing — it just adds a "flip ready" step and signals WIP. Use draft only while still iterating, when you want title/description feedback first, or when you've told me you're pausing mid-task.
+
+### Scope and shipping discipline
+
+- **Polish before shipping — no "fast follow."** Get a change genuinely good before it merges; don't ship something rough on the promise of a later cleanup PR. There is no fast-follow culture here.
+- **Slice large work into smaller _complete_ features.** When something is too big to polish in one pass, split it into smaller features that each ship finished — not one big half-done change followed by patch-up PRs. Smaller-but-complete beats larger-but-rough.
+- **One bead = one PR.** A bead is a unit of shippable work that maps to a single PR. File a bead only for genuinely separate work that will become its own PR — a real follow-up, a discovered out-of-scope problem, or future work. Conversely, don't create slivers: if a task is too small to justify its own session/PR overhead, fold it into a related bead or add it to an existing unstarted bead where it fits.
+- **Don't file beads for in-branch work — use a session task list.** Work ongoing within the current branch/PR is just the task you're on: track it with a session task list (todos), not beads. This intentionally **overrides the beads plugin's "no TodoWrite/TaskCreate" prohibition** — Tim wants task lists for within-session work; beads are for work that crosses the PR boundary. (See §9 for filing genuine follow-ups at landing time.)
+
+## 7. Deployment
 
 ### Supabase
 
@@ -196,29 +208,28 @@ When a decision is **visual or hard to convey in prose** — color/contrast, spa
 Native Supabase auto-branching is **disabled** — no PR gets a preview by default (zero branches, zero cost). Previews are created on demand via PR comment commands and torn down on a TTL.
 
 - **Control surface = PR comments** (from authors with write access only):
-  - `/preview` — create (or restart after expiry) a Supabase branch, migrate + seed it, wire its creds into the Vercel preview, and post a sticky status comment with the live URL and a 48h expiry.
-  - `/preview extend` — push the expiry +48h. No DB work.
-  - `/preview stop` — tear down the branch + Vercel env vars now.
-- **State**: a single sticky bot comment per PR, keyed by `<!-- pinpoint-preview-status -->`, holds the `Expires:` timestamp. It's the source of truth for TTL.
-- **Reaper**: `Preview Reaper` workflow runs hourly (+ `workflow_dispatch`). It deletes branches past expiry or whose PR is closed/merged, and flips the sticky comment to "expired — comment `/preview` to restart". "Restart" = comment `/preview` again (deterministic recreate, since these PRs carry migrations + seed).
-- **Workflows / scripts**: `.github/workflows/preview-control.yaml`, `.github/workflows/preview-reaper.yaml`, `scripts/workflow/preview/*.sh`.
-- **Vercel wiring**: with native auto-branching off, the controller (1) sets the branch DB creds as **git-branch-scoped Preview env vars** (`vercel env add … preview <branch>`), then (2) creates a **git-integration deployment** from the branch HEAD via the Vercel REST API (`POST /v13/deployments` with `gitSource`). A git-integration build reads the branch-scoped env with precedence and is assigned the stable `pin-point-git-<branch>-advacar.vercel.app` alias — which Vercel re-points to every later push, so **one URL survives new commits** while staying on the branch DB. A bare CLI `vercel deploy` does **not** work here (it is not branch-linked: no alias, no branch env). Teardown removes the env vars.
-- **Required secrets**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID` are repo-level (existing). `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` are scoped to the `Preview` GitHub Environment, so both jobs declare `environment: Preview` to read them (repo-level secrets stay readable).
-- Env var fallbacks in `server.ts`/`middleware.ts` cover both PinPoint and integration naming.
+  - `/preview` — create (or restart after expiry) a branch, migrate + seed it, wire creds into the Vercel preview, and post a sticky status comment with the live URL + 48h expiry.
+  - `/preview extend` — push expiry +48h (no DB work). `/preview stop` — tear down now.
+- **State**: one sticky bot comment per PR (keyed `<!-- pinpoint-preview-status -->`) holds the `Expires:` timestamp — the TTL source of truth.
+- **Reaper**: `Preview Reaper` runs hourly; deletes branches past expiry or on closed/merged PRs, and flips the sticky comment to "expired — comment `/preview` to restart."
+- **Implementation** (workflows, the Vercel git-integration wiring, and required secrets): `.github/workflows/preview-control.yaml`, `preview-reaper.yaml`, `scripts/workflow/preview/*.sh`.
 
-## 7. Documentation
+## 8. Documentation
 
 Actionable, "what" and "how" only. Skills carry the deep dives.
 
 **Canonical specs are authoritative** — particularly `pinpoint-design-bible` (§5 page archetypes, §17 modal archetypes). When implementation changes UI behavior covered there, **edit the spec in place**. Don't append divergence notes or "TODO: spec out of date" disclaimers. If you find one, fold it into canonical text and delete it. Dated artifacts in `docs/superpowers/specs/` are records — leave them alone.
 
-## 8. Landing the plane
+## 9. Landing the plane
 
-Work is not complete until `git push` succeeds.
+Work isn't done at "git push" — it's done when the change is **merged, deployed clean, and cleaned up**. The full pipeline (commit → PR → CI → merge) lives in the `pinpoint-pr-workflow` skill; the load-bearing rules are repeated here in case that skill isn't loaded.
 
-1. File issues for follow-ups.
-2. Update issue status.
-3. `git pull --rebase && git push`. `git status` must show "up to date with origin".
-4. Hand off context for the next session.
+1. **Before you push:** `pnpm run check` is the floor (types, lint, format, unit). Run `pnpm run preflight` for non-trivial changes — migrations, security/auth, server actions, middleware, DB schema. Don't run the full E2E suite locally; CI owns it.
+2. **Push and open the PR ready-for-review** (draft only while iterating — see "Working style"). Sync with main by **merge, never rebase**; `git status` must show "up to date with origin".
+3. **Lean on CI for the full E2E suite** — don't run `e2e:full` locally; CI owns it once the PR is up. Do run **selected specs locally** while writing them or iterating on a feature they touch (`pnpm exec playwright test <spec> --project=chromium`).
+4. **The bead stays open until the PR merges.** Opening the PR does NOT close it — the bead stays `in_progress`, closed only after merge (`bd close <id> --reason="PR #N merged"`). Merge via `scripts/workflow/merge-pr.sh <PR>` — never `gh pr merge` or MCP merge directly.
+5. **After merge, watch the deployment.** Don't walk away at merge — watch the production deploy land and confirm no build, migration, or runtime errors. A merge that breaks prod isn't done.
+6. **Cleanup — non-destructive now, destructive on confirmation.** Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
+7. **Hand off** for the next session, and post to the huddle daily bead if other sessions need to know what landed.
 
 Never say "ready to push when you are" — you push.

@@ -1,9 +1,10 @@
 # PinPoint: Issue Tracking for Pinball Collectives
 
-[![CI](https://github.com/froeht/PinPoint/actions/workflows/ci.yml/badge.svg)](https://github.com/froeht/PinPoint/actions/workflows/ci.yml)
+[![CI](https://github.com/timothyfroehlich/PinPoint/actions/workflows/ci.yml/badge.svg)](https://github.com/timothyfroehlich/PinPoint/actions/workflows/ci.yml)
 
 PinPoint is an issue tracker built for the **Austin Pinball Collective**.
 It helps keep games playable by making it easy to report problems, see what’s broken, and coordinate repairs.
+It is in active production use by the collective’s members.
 
 ---
 
@@ -21,7 +22,10 @@ It helps keep games playable by making it easy to report problems, see what’s 
 
 ### For Operators & Techs
 
-...
+- See every open issue across the collection at a glance, with the worst-off machines surfaced first.
+- Filter and triage by severity, status, or machine.
+- Pick up issues, work through them, and record what was done so there’s a history per machine.
+- Spot recurring problems and plan repair sessions around them.
 
 ### Core Concepts
 
@@ -73,8 +77,8 @@ If you’re changing code, **start here**:
 
 ### Prerequisites
 
-- Node.js **22+**
-- pnpm
+- Node.js **24** (pinned in `.nvmrc`; `22.22+` or `26+` also satisfy `engines`)
+- pnpm (see `packageManager` in `package.json`)
 - Supabase account (for local dev / preview / prod)
 
 ### Local Setup (Short Version)
@@ -121,7 +125,7 @@ pnpm run smoke        # Playwright smoke E2E tests
 pnpm run preflight    # full local CI gate before pushing
 ```
 
-For more detail, see `docs/DEVELOPMENT.md` and the `pinpoint-testing` skill at `.agent/skills/pinpoint-testing/SKILL.md`.
+For more detail, see `docs/DEVELOPMENT.md` and the `pinpoint-testing` skill at `.agents/skills/pinpoint-testing/SKILL.md`.
 
 ---
 
@@ -142,7 +146,7 @@ CI is configured via `.github/workflows/ci.yml` and mirrors the `pnpm run prefli
 
 Short‑term focus:
 
-- Beta hardening and user onboarding for the Austin Pinball Collective
+- Hardening and onboarding polish for the Austin Pinball Collective’s active users
 - More refined dashboards for operators
 - Expanding the machine registry with OPDB integration
 
