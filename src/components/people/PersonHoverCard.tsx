@@ -23,7 +23,6 @@ interface PersonCardPayload {
 
 export interface PersonHoverCardProps {
   userId: string | null;
-  invitedId?: string | null;
   displayName: string;
   className?: string;
 }

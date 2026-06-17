@@ -3,8 +3,8 @@
  *
  * Asserts the dispatcher branches:
  *  - real user (userId set)  → Link trigger with href="/u/<id>"
- *  - invited user (userId null, invitedId set) → plain text, no link
- *  - former user (userId null, no invitedId)   → plain text, no link
+ *  - invited user (userId null) → plain text, no link
+ *  - former user (userId null)  → plain text, no link
  *
  * Hover-reveal behaviour is NOT asserted (Radix portal + hover is flaky in
  * jsdom). The !userId branch never renders any Radix at all, making those
@@ -24,13 +24,7 @@ describe("PersonHoverCard", () => {
   });
 
   it("renders plain text (no link) for an invited user", () => {
-    render(
-      <PersonHoverCard
-        userId={null}
-        invitedId="inv1"
-        displayName="Invited Person"
-      />
-    );
+    render(<PersonHoverCard userId={null} displayName="Invited Person" />);
     expect(screen.queryByRole("link")).toBeNull();
     expect(screen.getByText("Invited Person")).toBeInTheDocument();
   });

@@ -1,5 +1,4 @@
 import type React from "react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { createClient } from "~/lib/supabase/server";
@@ -27,6 +26,7 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
+import { PersonHoverCard } from "~/components/people/PersonHoverCard";
 
 /**
  * Machine Info Tab (default route for /m/[initials]/)
@@ -143,12 +143,11 @@ export default async function MachineInfoTab({
                       (PP-slrd.1); invited owners have no userProfile, so
                       no collection page exists for them yet. */}
                   {machine.owner ? (
-                    <Link
-                      href={`/c/owner/${machine.owner.id}`}
+                    <PersonHoverCard
+                      userId={machine.owner.id}
+                      displayName={machine.owner.name}
                       className="text-sm font-medium text-foreground hover:text-primary hover:underline"
-                    >
-                      {machine.owner.name}
-                    </Link>
+                    />
                   ) : (
                     <p className="text-sm font-medium text-foreground">
                       {machine.invitedOwner?.name}

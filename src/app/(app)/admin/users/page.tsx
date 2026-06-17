@@ -19,6 +19,7 @@ import { ResendInviteButton } from "./resend-invite-button";
 import { RemoveInvitedUserButton } from "./remove-invited-user-button";
 import type { UnifiedUser } from "~/lib/types";
 import { formatDate } from "~/lib/dates";
+import { PersonHoverCard } from "~/components/people/PersonHoverCard";
 
 function UserRow({
   user,
@@ -35,9 +36,11 @@ function UserRow({
             <AvatarImage src={user.avatarUrl ?? undefined} alt={user.name} />
             <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
           </Avatar>
-          <span className="truncate font-medium" title={user.name}>
-            {user.name}
-          </span>
+          <PersonHoverCard
+            userId={user.status === "active" ? user.id : null}
+            displayName={user.name}
+            className="truncate font-medium"
+          />
         </div>
       </TableCell>
       <TableCell
