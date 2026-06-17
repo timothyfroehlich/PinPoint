@@ -1,7 +1,7 @@
 /**
  * Integration Tests for Machine Text Fields
  *
- * Tests the new text fields (description, tournamentNotes, ownerRequirements, ownerNotes)
+ * Tests the text fields (description, ownerRequirements, ownerNotes)
  * on the machines table.
  */
 
@@ -54,7 +54,6 @@ describe("Machine Text Fields (PGlite)", () => {
 
       expect(machine).toBeDefined();
       expect(machine?.description).toBeNull();
-      expect(machine?.tournamentNotes).toBeNull();
       expect(machine?.ownerRequirements).toBeNull();
       expect(machine?.ownerNotes).toBeNull();
     });
@@ -72,23 +71,6 @@ describe("Machine Text Fields (PGlite)", () => {
       });
 
       expect(updated?.description).toBe("A classic pinball machine from 1979");
-    });
-
-    it("should update tournamentNotes field", async () => {
-      const db = await getTestDb();
-
-      await db
-        .update(machines)
-        .set({ tournamentNotes: "Extra ball disabled for tournament play" })
-        .where(eq(machines.id, testMachine.id));
-
-      const updated = await db.query.machines.findFirst({
-        where: eq(machines.id, testMachine.id),
-      });
-
-      expect(updated?.tournamentNotes).toBe(
-        "Extra ball disabled for tournament play"
-      );
     });
 
     it("should update ownerRequirements field", async () => {
@@ -128,7 +110,6 @@ describe("Machine Text Fields (PGlite)", () => {
         .update(machines)
         .set({
           description: "Desc",
-          tournamentNotes: "Tournament",
           ownerRequirements: "Requirements",
           ownerNotes: "Notes",
         })
@@ -139,7 +120,6 @@ describe("Machine Text Fields (PGlite)", () => {
       });
 
       expect(updated?.description).toBe("Desc");
-      expect(updated?.tournamentNotes).toBe("Tournament");
       expect(updated?.ownerRequirements).toBe("Requirements");
       expect(updated?.ownerNotes).toBe("Notes");
     });

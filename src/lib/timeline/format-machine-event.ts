@@ -49,8 +49,6 @@ export function formatMachineEvent(
       return `Availability changed from ${PRESENCE_LABELS[event.from]} to ${PRESENCE_LABELS[event.to]}`;
     case "description_updated":
       return "Description updated";
-    case "tournament_notes_updated":
-      return "Tournament notes updated";
     case "owner_requirements_updated":
       return "Owner requirements updated";
     case "owner_notes_updated":

@@ -12,7 +12,12 @@ import {
   ensureLoggedIn,
   assertNoA11yViolations,
 } from "../support/actions.js";
-import { seededMachines, seededIssues } from "../support/constants.js";
+import {
+  seededMachines,
+  seededIssues,
+  seededMember,
+} from "../support/constants.js";
+import { getUserIdByEmail } from "../support/supabase-admin.js";
 
 // Build routes from seeded data so they don't break if seed data changes
 const machineInitials = seededMachines.addamsFamily.initials;
@@ -46,6 +51,25 @@ test.describe("Responsive: no horizontal overflow", () => {
         await assertNoA11yViolations(page);
       });
     }
+
+    // Collection routes (PP-slrd.1) are keyed by a seed-time-generated user
+    // uuid, so the owner id is resolved at runtime instead of hardcoded.
+    test.describe("collection pages", () => {
+      let collectionBase = "";
+      test.beforeAll(async () => {
+        const memberId = await getUserIdByEmail(seededMember.email);
+        collectionBase = `/c/owner/${memberId}`;
+      });
+
+      for (const suffix of ["", "/issues", "/timeline"]) {
+        test(`/c/owner/[member]${suffix}`, async ({ page }) => {
+          await page.goto(`${collectionBase}${suffix}`);
+          await page.waitForLoadState("load");
+          await assertNoHorizontalOverflow(page);
+          await assertNoA11yViolations(page);
+        });
+      }
+    });
   });
 
   test.describe("public pages", () => {

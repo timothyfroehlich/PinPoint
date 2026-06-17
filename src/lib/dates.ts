@@ -1,6 +1,7 @@
 import {
   differenceInCalendarDays,
   formatDistanceToNow,
+  intervalToDuration,
   isToday,
   isYesterday,
 } from "date-fns";
@@ -74,6 +75,40 @@ const MONTH_DAY_FORMATTER = new Intl.DateTimeFormat(undefined, {
 export function formatRelative(date: Date | string | number): string {
   const d = toDate(date);
   return formatDistanceToNow(d, { addSuffix: true });
+}
+
+/**
+ * Compact elapsed-age label for dense tables: "5d", "2mo 5d", "1y 3mo".
+ *
+ * Calendar-accurate (via date-fns `intervalToDuration`), not 30-day months.
+ * Granularity steps down as the age grows so the label stays ~5 chars:
+ *   - < 1 day            → "today"
+ *   - < 1 month          → "Nd"
+ *   - < 1 year           → "Xmo Yd"
+ *   - >= 1 year          → "Xy Zmo"
+ *
+ * `now` is injectable for testing; callers in client components should pass
+ * the shared ticker value so SSR and hydration agree (see {@link CompactAge}).
+ */
+export function formatCompactAge(
+  date: Date | string | number,
+  now: Date | number = new Date()
+): string {
+  const start = toDate(date);
+  const end = toDate(now);
+  if (start.getTime() > end.getTime()) return "today"; // future/clock skew
+  const {
+    years = 0,
+    months = 0,
+    days = 0,
+  } = intervalToDuration({
+    start,
+    end,
+  });
+  if (years > 0) return months > 0 ? `${years}y ${months}mo` : `${years}y`;
+  if (months > 0) return days > 0 ? `${months}mo ${days}d` : `${months}mo`;
+  if (days > 0) return `${days}d`;
+  return "today";
 }
 
 /**

@@ -386,8 +386,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
       {
         id: "machines.edit",
         label: "Edit machines",
-        description:
-          "Modify machine name, description, tournament notes, and owner requirements",
+        description: "Modify machine name, description, and owner requirements",
         access: {
           unauthenticated: false,
           guest: false,

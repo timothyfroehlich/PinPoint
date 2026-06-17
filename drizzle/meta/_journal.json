@@ -306,8 +306,15 @@
     {
       "idx": 43,
       "version": "7",
-      "when": 1781567820662,
-      "tag": "0043_spooky_stone_men",
+      "when": 1781623390324,
+      "tag": "0043_productive_cyclops",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1781665691535,
+      "tag": "0044_chunky_vermin",
       "breakpoints": true
     }
   ]

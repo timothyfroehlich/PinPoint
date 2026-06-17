@@ -1,4 +1,5 @@
 import type React from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { createClient } from "~/lib/supabase/server";
@@ -138,9 +139,21 @@ export default async function MachineInfoTab({
               </p>
               {machine.owner || machine.invitedOwner ? (
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-foreground">
-                    {machine.owner?.name ?? machine.invitedOwner?.name}
-                  </p>
+                  {/* Activated owners link to their collection view
+                      (PP-slrd.1); invited owners have no userProfile, so
+                      no collection page exists for them yet. */}
+                  {machine.owner ? (
+                    <Link
+                      href={`/c/owner/${machine.owner.id}`}
+                      className="text-sm font-medium text-foreground hover:text-primary hover:underline"
+                    >
+                      {machine.owner.name}
+                    </Link>
+                  ) : (
+                    <p className="text-sm font-medium text-foreground">
+                      {machine.invitedOwner?.name}
+                    </p>
+                  )}
                   {machine.invitedOwner && !machine.owner && (
                     <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                       (Invited)
@@ -241,7 +254,6 @@ export default async function MachineInfoTab({
           <MachineTextFields
             machineId={machine.id}
             description={machine.description}
-            tournamentNotes={machine.tournamentNotes}
             ownerRequirements={machine.ownerRequirements}
             ownerNotes={machine.ownerNotes}
             canEditGeneral={canEdit}

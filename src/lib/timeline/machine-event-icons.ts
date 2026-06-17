@@ -13,7 +13,6 @@ import {
   Star,
   StickyNote,
   Trash2,
-  Trophy,
   UserCheck,
   UserCog,
   UserMinus,
@@ -56,10 +55,6 @@ export const MACHINE_EVENT_ICONS: Record<
   name_changed: { Icon: Pencil, colorClass: "text-muted-foreground" },
   presence_changed: { Icon: Eye, colorClass: "text-muted-foreground" },
   description_updated: { Icon: FileText, colorClass: "text-muted-foreground" },
-  tournament_notes_updated: {
-    Icon: Trophy,
-    colorClass: "text-muted-foreground",
-  },
   owner_requirements_updated: {
     Icon: ClipboardList,
     colorClass: "text-muted-foreground",

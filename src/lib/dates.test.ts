@@ -1,7 +1,11 @@
 import { subDays, subMonths } from "date-fns";
 import { describe, expect, it } from "vitest";
 
-import { formatDayGroup, formatTimelineBucket } from "./dates";
+import {
+  formatCompactAge,
+  formatDayGroup,
+  formatTimelineBucket,
+} from "./dates";
 
 describe("formatDayGroup", () => {
   it("returns 'Today' for a same-day timestamp", () => {
@@ -103,5 +107,35 @@ describe("formatTimelineBucket", () => {
     expect(bucketA.key).toBe(bucketB.key);
     // But each row gets its own date chip.
     expect(bucketA.rowDateLabel).not.toBe(bucketB.rowDateLabel);
+  });
+});
+
+describe("formatCompactAge", () => {
+  const now = new Date("2026-06-09T12:00:00Z");
+
+  it("returns 'today' for same-day and future timestamps", () => {
+    expect(formatCompactAge(new Date("2026-06-09T01:00:00Z"), now)).toBe(
+      "today"
+    );
+    expect(formatCompactAge(new Date("2026-07-01T00:00:00Z"), now)).toBe(
+      "today"
+    );
+  });
+
+  it("returns days only when under a month old", () => {
+    expect(formatCompactAge(new Date("2026-06-04T12:00:00Z"), now)).toBe("5d");
+  });
+
+  it("returns months and days for multi-month ages", () => {
+    // Jan 1 → Jun 9 is 5 months, 8 days (calendar-accurate).
+    expect(formatCompactAge(new Date("2026-01-01T12:00:00Z"), now)).toBe(
+      "5mo 8d"
+    );
+  });
+
+  it("drops days once the age reaches a year", () => {
+    expect(formatCompactAge(new Date("2024-12-09T12:00:00Z"), now)).toBe(
+      "1y 6mo"
+    );
   });
 });

@@ -31,7 +31,6 @@ const mockDoc: ProseMirrorDoc = {
 const defaultProps = {
   machineId: "mach-123",
   description: mockDoc,
-  tournamentNotes: mockDoc,
   ownerRequirements: mockDoc,
   ownerNotes: mockDoc,
   canEditGeneral: true,
@@ -41,10 +40,9 @@ const defaultProps = {
 };
 
 describe("MachineTextFields", () => {
-  it("renders description and tournament notes based on existence, but general fields are always present in layout", () => {
+  it("renders description, which is always present in layout", () => {
     render(<MachineTextFields {...defaultProps} />);
     expect(screen.getByTestId("machine-description")).toBeInTheDocument();
-    expect(screen.getByTestId("machine-tournament-notes")).toBeInTheDocument();
   });
 
   it("renders owner requirements if canViewOwnerRequirements is true", () => {

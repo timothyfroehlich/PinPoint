@@ -134,7 +134,6 @@ export const machines = pgTable(
       .notNull()
       .defaultNow(),
     description: jsonb("description").$type<ProseMirrorDoc>(),
-    tournamentNotes: jsonb("tournament_notes").$type<ProseMirrorDoc>(),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
     ownerNotes: jsonb("owner_notes").$type<ProseMirrorDoc>(),
     // Machine-level "How to change settings": how to reach/navigate this

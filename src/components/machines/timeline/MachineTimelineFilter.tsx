@@ -18,6 +18,12 @@ import {
 
 interface Props {
   currentTags: TimelineTag[];
+  /**
+   * Target path for filter pushes. Defaults to the current pathname (the
+   * per-machine timeline). Collection feeds pass their own route so the
+   * component isn't tied to `/m/[initials]/timeline` (PP-slrd.1).
+   */
+  baseUrl?: string;
 }
 
 /**
@@ -45,6 +51,7 @@ const TAG_OPTIONS: Option[] = TIMELINE_TAGS.map((t) => {
 
 export function MachineTimelineFilter({
   currentTags,
+  baseUrl,
 }: Props): React.ReactElement {
   const router = useRouter();
   const pathname = usePathname();
@@ -66,7 +73,8 @@ export function MachineTimelineFilter({
     // previous filter would land on an empty/stale page (PP-ii3u #5).
     params.delete("page");
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    const target = baseUrl ?? pathname;
+    router.push(qs ? `${target}?${qs}` : target);
   };
 
   const handleChange = (next: string[]): void => {
