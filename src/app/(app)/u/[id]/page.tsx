@@ -8,13 +8,17 @@ import {
   getProfileActivityCounts,
   getCappedOwnedMachines,
 } from "~/lib/profiles/queries";
+import { ProfileEditor } from "./profile-editor";
 
 export default async function ProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ edit?: string }>;
 }): Promise<React.JSX.Element> {
   const { id } = await params;
+  const { edit } = await searchParams;
 
   const supabase = await createClient();
   const {
@@ -67,52 +71,68 @@ export default async function ProfilePage({
         ) : null}
       </header>
 
-      {profile.bio ? (
-        <p className="mt-4 whitespace-pre-line">{profile.bio}</p>
-      ) : null}
-
-      <section className="mt-6">
-        <h2 className="text-muted-foreground text-xs font-semibold uppercase">
-          Activity
-        </h2>
-        <div className="mt-2 flex gap-6">
-          <div>
-            <strong>{counts.reported}</strong>{" "}
-            <span className="text-muted-foreground text-sm">
-              issues reported
-            </span>
-          </div>
-          <div>
-            <strong>{counts.comments}</strong>{" "}
-            <span className="text-muted-foreground text-sm">comments</span>
-          </div>
+      {isOwn && edit ? (
+        <div className="mt-6">
+          <ProfileEditor
+            initial={{
+              firstName: profile.firstName,
+              lastName: profile.lastName,
+              pronouns: profile.pronouns,
+              bio: profile.bio,
+              avatarUrl: profile.avatarUrl,
+            }}
+          />
         </div>
-      </section>
+      ) : (
+        <>
+          {profile.bio ? (
+            <p className="mt-4 whitespace-pre-line">{profile.bio}</p>
+          ) : null}
 
-      {owned.total > 0 ? (
-        <section className="mt-6">
-          <h2 className="text-muted-foreground text-xs font-semibold uppercase">
-            Owned machines ({owned.total})
-          </h2>
-          <ul className="mt-2 space-y-1">
-            {owned.machines.map((m) => (
-              <li key={m.id}>
-                <Link href={`/m/${m.initials}`} className="hover:underline">
-                  {m.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <Link
-            href={`/c/owner/${id}`}
-            className="text-primary mt-2 inline-block text-sm hover:underline"
-          >
-            {owned.hasMore
-              ? `View all ${owned.total} →`
-              : "View full collection →"}
-          </Link>
-        </section>
-      ) : null}
+          <section className="mt-6">
+            <h2 className="text-muted-foreground text-xs font-semibold uppercase">
+              Activity
+            </h2>
+            <div className="mt-2 flex gap-6">
+              <div>
+                <strong>{counts.reported}</strong>{" "}
+                <span className="text-muted-foreground text-sm">
+                  issues reported
+                </span>
+              </div>
+              <div>
+                <strong>{counts.comments}</strong>{" "}
+                <span className="text-muted-foreground text-sm">comments</span>
+              </div>
+            </div>
+          </section>
+
+          {owned.total > 0 ? (
+            <section className="mt-6">
+              <h2 className="text-muted-foreground text-xs font-semibold uppercase">
+                Owned machines ({owned.total})
+              </h2>
+              <ul className="mt-2 space-y-1">
+                {owned.machines.map((m) => (
+                  <li key={m.id}>
+                    <Link href={`/m/${m.initials}`} className="hover:underline">
+                      {m.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href={`/c/owner/${id}`}
+                className="text-primary mt-2 inline-block text-sm hover:underline"
+              >
+                {owned.hasMore
+                  ? `View all ${owned.total} →`
+                  : "View full collection →"}
+              </Link>
+            </section>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
