@@ -155,7 +155,7 @@ interface AddSectionMenuProps {
 /**
  * The single "Add section" entry point for a set. Surfaces every kind of
  * content a set can hold. Single-instance kinds (software, the two presets)
- * drop off the menu once present; DIP banks and Other/Notes repeat, so the
+ * drop off the menu once present; DIP banks and "Other text" repeat, so the
  * menu is never empty.
  */
 function AddSectionMenu({
@@ -226,7 +226,7 @@ function AddSectionMenu({
               onAdd({ kind: "note", title: "", customTitle: true });
             }}
           >
-            Other / Notes…
+            Other text…
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

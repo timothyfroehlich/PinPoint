@@ -64,6 +64,10 @@ const settingsInstructionsSchema = z.object({
   machineId: z.uuid(),
   value: proseMirrorDocSchema.nullable(),
 });
+// The owner-requests field ("Before you change anything") shares the exact same
+// shape and permission gate as the instructions field — same machine-level jsonb
+// ProseMirror column, nullable, no timeline event.
+const settingsRequestsSchema = settingsInstructionsSchema;
 
 /**
  * Resolve the authed user and confirm they may manage settings on a machine
@@ -443,6 +447,48 @@ export async function updateMachineSettingsInstructionsAction(
   await db
     .update(machines)
     .set({ settingsInstructions: value, updatedAt: new Date() })
+    .where(eq(machines.id, machineId));
+
+  revalidateMachine(machine.initials);
+  return { success: true };
+}
+
+/**
+ * Update a machine's "Before you change anything" owner requests (machine-level,
+ * shared by every settings set; rendered FIRST at the top of the Settings tab).
+ * A near-clone of `updateMachineSettingsInstructionsAction` — same
+ * `machines.settings.manage` gate, same null-on-clear semantics, no timeline
+ * event — differing only in the column it writes (`settingsRequests`). The two
+ * are intentionally separate one-field actions rather than one merged write so
+ * each section's inline Save persists independently (the InlineEditableField
+ * contract is one `onSave(machineId, value)` per field).
+ */
+export async function updateMachineSettingsRequestsAction(
+  input: z.input<typeof settingsRequestsSchema>
+): Promise<ActionResult> {
+  const parsed = settingsRequestsSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid input",
+    };
+  }
+  const { machineId } = parsed.data;
+  // Validate-then-cast at the write boundary (same pattern as the sibling action).
+  const value = parsed.data.value as ProseMirrorDoc | null;
+
+  const machine = await db.query.machines.findFirst({
+    where: eq(machines.id, machineId),
+    columns: { id: true, initials: true, ownerId: true },
+  });
+  if (!machine) return { success: false, error: "Machine not found" };
+
+  const auth = await authorizeManage(machine.ownerId);
+  if (!auth.ok) return { success: false, error: auth.error };
+
+  await db
+    .update(machines)
+    .set({ settingsRequests: value, updatedAt: new Date() })
     .where(eq(machines.id, machineId));
 
   revalidateMachine(machine.initials);

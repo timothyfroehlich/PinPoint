@@ -27,6 +27,7 @@ import {
   saveSettingsSetAction,
   setPreferredSettingsSetAction,
   updateMachineSettingsInstructionsAction,
+  updateMachineSettingsRequestsAction,
 } from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
 
 // Collision-free client keys (render keys + section ids + temp set ids).
@@ -46,7 +47,14 @@ function isTempId(id: string): boolean {
 }
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Local calendar date — NOT toISOString() (UTC), which shows tomorrow's date
+  // for negative-UTC editors saving late in the evening until a reload corrects
+  // it from the server's own timestamp.
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 /** The set-header unit's id (set name + description share one Edit/Save). Every
@@ -188,6 +196,10 @@ interface SettingsTabProps {
   canEdit: boolean;
   machineId: string;
   initialSets: SettingsSetData[];
+  /** Machine-level "Before you change anything" — the owner's honor-system
+   *  requests for how people should handle this machine's settings. Free text,
+   *  no presets; rendered FIRST. Edited via its own inline save (PP-8a5r). */
+  settingsRequests: ProseMirrorDoc | null;
   /** Machine-level "How to change settings" (coin-door buttons, DIP locations,
    *  menu navigation). Shared by every set; edited via its own inline save. */
   settingsInstructions: ProseMirrorDoc | null;
@@ -197,6 +209,7 @@ export function SettingsTab({
   canEdit,
   machineId,
   initialSets,
+  settingsRequests,
   settingsInstructions,
 }: SettingsTabProps): React.JSX.Element {
   const [sets, setSets] = useState<SettingsSetData[]>(initialSets);
@@ -303,7 +316,31 @@ export function SettingsTab({
     }
     return false;
   })();
-  useUnsavedChangesGuard(canEdit && anyUnitDirty);
+
+  // The two always-open machine-level fields ("Before you change anything" /
+  // "How to change settings") hold their drafts inside InlineEditableField, not
+  // in `editingUnits`, so they report dirtiness up here to join the same guard.
+  const [machineFieldDirty, setMachineFieldDirty] = useState({
+    requests: false,
+    instructions: false,
+  });
+  const onRequestsDirty = useCallback((dirty: boolean): void => {
+    setMachineFieldDirty((p) =>
+      p.requests === dirty ? p : { ...p, requests: dirty }
+    );
+  }, []);
+  const onInstructionsDirty = useCallback((dirty: boolean): void => {
+    setMachineFieldDirty((p) =>
+      p.instructions === dirty ? p : { ...p, instructions: dirty }
+    );
+  }, []);
+
+  useUnsavedChangesGuard(
+    canEdit &&
+      (anyUnitDirty ||
+        machineFieldDirty.requests ||
+        machineFieldDirty.instructions)
+  );
 
   // The whole-row persist executor handed to the save queue. Sends the exact
   // payload `pendingPayloadsRef` holds for this set (prepared by a unit Save or a
@@ -337,11 +374,34 @@ export function SettingsTab({
       // payload we sent. (Keep the set's identity fields off the payload-derived
       // baseline by merging the live working copy's metadata onto the slice.)
       const realId = result.id;
-      pendingPayloadsRef.current.delete(setId);
+
+      // Clear ONLY the payload we actually sent. A concurrent unit Save during
+      // the await above may have staged a NEWER payload that the queue's
+      // coalesced rerun still has to send; deleting it unconditionally was the
+      // data-loss bug (the rerun then found nothing staged and silently no-op'd,
+      // so e.g. a section saved while a brand-new set's first insert was in
+      // flight never reached the DB).
+      const stagedNow = pendingPayloadsRef.current.get(setId);
+      const newerPending =
+        stagedNow && stagedNow !== payload ? stagedNow : null;
+      if (!newerPending) pendingPayloadsRef.current.delete(setId);
 
       if (isNew && realId !== setId) {
         // Record the swap so the unit's settle callback can find its live id.
         tempToRealRef.current.set(setId, realId);
+        // Carry any newer pending payload (staged under the TEMP id) over to the
+        // real id so the rerun persists it as an UPDATE against the just-inserted
+        // row. Force the name/description to what we just inserted: the newer
+        // slice was built before this set had a baseline, so its name/description
+        // are not authoritative and would otherwise clobber the inserted header.
+        if (newerPending) {
+          pendingPayloadsRef.current.delete(setId);
+          pendingPayloadsRef.current.set(realId, {
+            ...newerPending,
+            name: payload.name,
+            description: payload.description,
+          });
+        }
         // Swap temp id → server UUID across every id-keyed piece of state, and
         // stamp the fresh authorship/timestamp the insert just wrote.
         mutateSets((prev) =>
@@ -351,9 +411,21 @@ export function SettingsTab({
               : s
           )
         );
-        // Baseline the just-inserted set under its REAL id.
+        // Baseline the just-inserted set to EXACTLY the slice we sent (name +
+        // description; sections are [] for a header insert) — NOT the full
+        // working copy. The working copy may already hold unsaved sections the
+        // server doesn't have yet; baselining from it falsely marked those as
+        // committed (a phantom commit, lost on reload). Sections that still need
+        // saving therefore stay dirty against this baseline.
         const persisted = setsRef.current.find((s) => s.id === realId);
-        if (persisted) baselineRef.current.set(realId, cloneSet(persisted));
+        if (persisted) {
+          baselineRef.current.set(realId, {
+            ...persisted,
+            name: payload.name,
+            description: payload.description,
+            sections: payload.sections.map(cloneSectionDeep),
+          });
+        }
         setExpandedIds((prev) => {
           const next = new Set(prev);
           if (next.delete(setId)) next.add(realId);
@@ -986,18 +1058,49 @@ export function SettingsTab({
 
   return (
     <div className="space-y-4 max-md:space-y-2.5">
-      {/* Machine-level access instructions, above the sets. Shared by every set
-          and saved independently (its own Save/Cancel). Hides itself for
-          read-only viewers when empty. */}
+      {/* SECTION 1 — the owner's requests ("Before you change anything"), above
+          everything. Free text, NO presets, framed as a request not a rule
+          (PP-8a5r governance-neutrality). For a permitted user the empty state
+          is an already-open editor with the encouraging placeholder; a
+          read-only viewer sees nothing when empty. Saved independently (its own
+          explicit Save/Cancel, shown once the draft is dirty). */}
+      <InlineEditableField
+        label="Before you change anything"
+        value={settingsRequests}
+        machineId={machineId}
+        canEdit={canEdit}
+        placeholder="How would you like people to handle your machine's settings — who to ask, how to make changes, anything to avoid? Even one sentence protects the setup you've dialed in."
+        testId="machine-settings-requests"
+        openWhenEmpty
+        headingProminent
+        onDirtyChange={onRequestsDirty}
+        onSave={async (id, value) => {
+          const result = await updateMachineSettingsRequestsAction({
+            machineId: id,
+            value,
+          });
+          return result.success
+            ? { ok: true }
+            : { ok: false, message: result.error };
+        }}
+      />
+
+      {/* SECTION 2 — machine-level access instructions ("How to change
+          settings"). Free text + platform presets surfaced as a "Start from a
+          preset" control above the open editor. Shared by every set and saved
+          independently. Empty state for a permitted user = an open editor; a
+          read-only viewer sees nothing when empty. */}
       <InlineEditableField
         label="How to change settings"
         value={settingsInstructions}
         machineId={machineId}
         canEdit={canEdit}
-        placeholder="Help others know — how to change the settings, how to reset to default settings, where the DIP switches are, etc."
+        placeholder="How to change the settings on this machine — menus, button meanings, where the DIP switches are. Or start from a preset above."
         testId="machine-settings-instructions"
         presets={SETTINGS_INSTRUCTIONS_PRESETS}
-        addCtaLabel="Add settings instructions"
+        openWhenEmpty
+        headingProminent
+        onDirtyChange={onInstructionsDirty}
         onSave={async (id, value) => {
           const result = await updateMachineSettingsInstructionsAction({
             machineId: id,

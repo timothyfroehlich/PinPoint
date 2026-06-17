@@ -136,6 +136,15 @@ export const machines = pgTable(
     description: jsonb("description").$type<ProseMirrorDoc>(),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
     ownerNotes: jsonb("owner_notes").$type<ProseMirrorDoc>(),
+    // Machine-level "Before you change anything": the owner's honor-system
+    // requests for how people should handle THIS machine's settings ("ask me
+    // first", "change individually — don't standard-reset", "techs only"). NOT
+    // enforced (PinPoint can't gate a physical coin door); free text by design,
+    // framed as a request rather than a rule — see PP-8a5r for the governance-
+    // neutrality rationale (the structured/enforced variant is PP-kjob). Rendered
+    // FIRST at the top of the Settings tab, above "How to change settings".
+    // Edited under `machines.settings.manage`. Mirrors settingsInstructions.
+    settingsRequests: jsonb("settings_requests").$type<ProseMirrorDoc>(),
     // Machine-level "How to change settings": how to reach/navigate this
     // machine's settings (coin-door buttons, DIP-switch locations, the P3
     // launch-button procedure, …). Shared by every settings set; rendered at

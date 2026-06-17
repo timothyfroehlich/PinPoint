@@ -3,9 +3,9 @@
 import type React from "react";
 import { cn } from "~/lib/utils";
 import {
+  docIsEmpty,
   docToPlainText,
   type ProseMirrorDoc,
-  type ProseMirrorNode,
 } from "~/lib/tiptap/types";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
@@ -35,24 +35,6 @@ interface InlineMarkdownFieldProps {
   placeholder?: string;
   /** Smaller (xs, muted) rendering for the card-header description. */
   compact?: boolean;
-}
-
-/** Whether a ProseMirror doc is semantically empty (no text content). */
-function docIsEmpty(doc: ProseMirrorDoc | null): boolean {
-  // `content` is required on the ProseMirrorDoc *type* but optional in the
-  // persisted *schema*, so a stored bare `{ type: "doc" }` arrives with no
-  // `content`. Read it through an undefined-tolerant alias so the guards are
-  // real — a direct `.content[0]` would crash.
-  const docContent: ProseMirrorNode[] | undefined = doc?.content;
-  const firstNode = docContent?.[0];
-  const contentLength = docContent?.length ?? 0;
-  return (
-    !doc ||
-    contentLength === 0 ||
-    (contentLength === 1 &&
-      firstNode?.type === "paragraph" &&
-      !firstNode.content)
-  );
 }
 
 /** Normalize a draft for storage: a whitespace-only doc becomes null (matches

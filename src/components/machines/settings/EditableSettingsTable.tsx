@@ -242,10 +242,14 @@ export function EditableSettingsTable<T extends KeyedRow>({
           size="sm"
           className={cn(
             "mt-1 text-muted-foreground",
-            !canEdit && "invisible pointer-events-none max-md:hidden"
+            !canEdit && "invisible max-md:hidden"
           )}
           onClick={handleAdd}
-          {...(!canEdit ? { tabIndex: -1, "aria-hidden": true } : {})}
+          // Read-only viewers keep the button for layout reservation but it must
+          // be fully out of reach: `inert` removes it from focus order, pointer
+          // events, AND the a11y tree in one step (replaces the prior
+          // pointer-events-none + tabIndex=-1 + aria-hidden trio).
+          {...(!canEdit ? { inert: true } : {})}
         >
           <Plus aria-hidden="true" />
           {addLabel}

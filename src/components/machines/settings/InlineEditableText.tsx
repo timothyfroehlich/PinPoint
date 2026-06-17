@@ -56,6 +56,11 @@ export function InlineEditableText({
   const inputRef = useRef<HTMLInputElement>(null);
   const isEmptyRequired = required && draft.trim() === "";
   const showInvalid = isEmptyRequired && showRequiredError;
+  // Mark required fields up front (design-bible §683 asterisk convention,
+  // adapted for these label-less inline inputs): a trailing " *" in the
+  // placeholder plus aria-required, so the requirement is visible/announced
+  // before the user tries (and fails) to Save empty.
+  const editPlaceholder = required ? `${placeholder} *` : placeholder;
 
   // The freshest working-copy value, mirrored so the edit-transition effect can
   // seed the draft from it WITHOUT depending on `value` (which would re-run the
@@ -91,7 +96,11 @@ export function InlineEditableText({
     }
     // Push the committed value into the working copy only — no persist. The
     // unit's Save reads this working copy and writes it as one atomic row.
-    if (trimmed && trimmed !== value) {
+    // Compare on value alone (not `trimmed && …`): the required guard above
+    // already blocks empty for required fields, so for OPTIONAL fields a
+    // clear-to-empty is a real edit and must propagate (otherwise the old value
+    // silently sticks — e.g. an unnamed DIP bank could never be re-blanked).
+    if (trimmed !== value) {
       onValueChange(trimmed);
     }
   }
@@ -118,10 +127,11 @@ export function InlineEditableText({
       // clearly as an editable field — the set name in particular sits on the
       // tinted header band, where a translucent input vanishes. (PP-43q3)
       className={cn("h-7 bg-background", inputClassName)}
-      placeholder={placeholder}
+      placeholder={editPlaceholder}
       aria-label={
         showInvalid && ariaLabel ? `${ariaLabel} (required)` : ariaLabel
       }
+      aria-required={required || undefined}
       aria-invalid={showInvalid || undefined}
       // Commit-on-Enter single field: tell mobile keyboards the Enter key
       // finishes the field. Titles/names are prose, so leave spellcheck and

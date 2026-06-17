@@ -137,11 +137,13 @@ export function useSettingsSaveQueue(
       return;
     }
 
+    // Settle everyone waiting on this set with the final outcome. The entry
+    // stays in the map (every persist registers a waiter, so it's never empty
+    // here) and is reclaimed by `forget()` when the set is deleted; a lingering
+    // idle entry is just `{ inFlight: false, waiters: [] }` and is reused by the
+    // set's next save.
     const waiters = queue.waiters;
     queue.waiters = [];
-    if (waiters.length === 0) {
-      queues.current.delete(key);
-    }
     for (const resolve of waiters) resolve(result.outcome);
   }, []);
 

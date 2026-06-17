@@ -184,7 +184,10 @@ export function EditableCell({
       aria-label={ariaLabel}
     >
       {value || (
-        <span className="italic text-muted-foreground/60">{placeholder}</span>
+        // Full muted-foreground (not /60): this placeholder is the editor's only
+        // cue for what a blank cell expects (ID vs value vs switch #), so it must
+        // clear WCAG 1.4.3 (≥4.5:1) — /60 fell to ~2.8:1 on the dark surface.
+        <span className="italic text-muted-foreground">{placeholder}</span>
       )}
     </button>
   );

@@ -258,8 +258,28 @@ async function run() {
         },
       ],
     };
+    // Machine-level "Before you change anything" (PP-8a5r): the owner's honor-
+    // system requests, rendered FIRST. Kept short and deliberately NEUTRAL — it
+    // states a preference (ask first, document changes) without endorsing or
+    // forbidding a reset stance, matching the field's request-not-rule framing.
+    const ownerRequests = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "I've spent a while dialing this game in. If you need to change something for a tournament, that's fine — please just jot down what you changed (or ping me) so it can be put back afterward. Happy to walk anyone through it.",
+            },
+          ],
+        },
+      ],
+    };
     await sql`
-      UPDATE machines SET settings_instructions = ${sql.json(accessInstructions)}
+      UPDATE machines
+      SET settings_instructions = ${sql.json(accessInstructions)},
+          settings_requests = ${sql.json(ownerRequests)}
       WHERE id = ${afm.id}
     `;
 
@@ -290,7 +310,7 @@ async function run() {
     }
 
     console.log(
-      `✅ Machine settings seeded: ${sets.length} sets + access instructions on Attack from Mars (AFM).`
+      `✅ Machine settings seeded: ${sets.length} sets + owner requests + access instructions on Attack from Mars (AFM).`
     );
   } finally {
     await sql.end();

@@ -68,6 +68,38 @@ describe("InlineEditableText (editing)", () => {
     expect(onValueChange).toHaveBeenCalledWith("Casual");
   });
 
+  it("an OPTIONAL field can be cleared to empty (propagates the clear)", () => {
+    const onValueChange = vi.fn();
+    render(
+      <InlineEditableText
+        value="Bank A"
+        onValueChange={onValueChange}
+        canEdit
+        ariaLabel="bank name"
+      />
+    );
+    const input = screen.getByRole("textbox", { name: /bank name/i });
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.blur(input); // commit
+    expect(onValueChange).toHaveBeenCalledWith("");
+  });
+
+  it("a REQUIRED field shows the asterisk placeholder and is aria-required", () => {
+    render(
+      <InlineEditableText
+        value=""
+        onValueChange={vi.fn()}
+        canEdit
+        required
+        placeholder="Name this set"
+        ariaLabel="set name"
+      />
+    );
+    const input = screen.getByRole("textbox", { name: /set name/i });
+    expect(input).toHaveAttribute("aria-required", "true");
+    expect(input).toHaveAttribute("placeholder", "Name this set *");
+  });
+
   it("renders finished, non-interactive text when canEdit is false", () => {
     render(
       <InlineEditableText

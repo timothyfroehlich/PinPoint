@@ -57,7 +57,6 @@ export function ConfirmingDeleteButton({
       aria-label={
         armed ? `${ariaLabel} — activate again to confirm` : ariaLabel
       }
-      title={armed ? "Tap again to confirm" : undefined}
       onClick={(e) => {
         // The row may be wrapped in a click-to-open handler (mobile row sheet);
         // arming/confirming a delete must never bubble up and open that sheet.

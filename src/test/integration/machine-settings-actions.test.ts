@@ -783,4 +783,108 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
       expect(result.error).toBe("Not authenticated");
     expect(await machineInstructions(machine.id)).toBeNull();
   });
+
+  // -- machine-level "Before you change anything" (owner requests, PP-8a5r) --
+
+  const requestsDoc = {
+    type: "doc" as const,
+    content: [
+      {
+        type: "paragraph" as const,
+        content: [
+          {
+            type: "text" as const,
+            text: "Please ask me before changing anything.",
+          },
+        ],
+      },
+    ],
+  };
+
+  async function machineRequests(machineId: string) {
+    const db = await getTestDb();
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machineId),
+      columns: { settingsRequests: true },
+    });
+    return row?.settingsRequests ?? null;
+  }
+
+  it("owner sets machine settings requests → persisted, then clears to NULL", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(owner.id);
+    const { updateMachineSettingsRequestsAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    const result = await updateMachineSettingsRequestsAction({
+      machineId: machine.id,
+      value: requestsDoc,
+    });
+    expect(result.success).toBe(true);
+    expect(await machineRequests(machine.id)).toEqual(requestsDoc);
+
+    // Clearing persists NULL.
+    const cleared = await updateMachineSettingsRequestsAction({
+      machineId: machine.id,
+      value: null,
+    });
+    expect(cleared.success).toBe(true);
+    expect(await machineRequests(machine.id)).toBeNull();
+  });
+
+  it("settings requests and instructions are independent columns", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(owner.id);
+    const {
+      updateMachineSettingsRequestsAction,
+      updateMachineSettingsInstructionsAction,
+    } = await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    await updateMachineSettingsRequestsAction({
+      machineId: machine.id,
+      value: requestsDoc,
+    });
+    await updateMachineSettingsInstructionsAction({
+      machineId: machine.id,
+      value: instructionsDoc,
+    });
+    // Each landed in its own column; neither overwrote the other.
+    expect(await machineRequests(machine.id)).toEqual(requestsDoc);
+    expect(await machineInstructions(machine.id)).toEqual(instructionsDoc);
+  });
+
+  it("non-owner member cannot edit machine settings requests", async () => {
+    const owner = await makeUser("member");
+    const stranger = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(stranger.id);
+    const { updateMachineSettingsRequestsAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    const result = await updateMachineSettingsRequestsAction({
+      machineId: machine.id,
+      value: requestsDoc,
+    });
+    expect(result.success).toBe(false);
+    expect(await machineRequests(machine.id)).toBeNull();
+  });
+
+  it("rejects machine settings requests from an unauthenticated caller", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(null);
+    const { updateMachineSettingsRequestsAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    const result = await updateMachineSettingsRequestsAction({
+      machineId: machine.id,
+      value: requestsDoc,
+    });
+    expect(result.success).toBe(false);
+    if (result.success === false)
+      expect(result.error).toBe("Not authenticated");
+    expect(await machineRequests(machine.id)).toBeNull();
+  });
 });

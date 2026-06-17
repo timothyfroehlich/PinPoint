@@ -1,4 +1,10 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 
@@ -56,6 +62,7 @@ vi.mock("~/app/(app)/m/[initials]/(tabs)/settings/actions", () => ({
   duplicateSettingsSetAction: vi.fn(),
   setPreferredSettingsSetAction: vi.fn(),
   updateMachineSettingsInstructionsAction: vi.fn(),
+  updateMachineSettingsRequestsAction: vi.fn(),
 }));
 
 const saveMock = vi.mocked(saveSettingsSetAction);
@@ -140,6 +147,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[oneSet()]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -160,6 +168,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[oneSet()]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -187,6 +196,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[oneSet()]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -214,6 +224,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[oneSet()]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -248,6 +259,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit={false}
         machineId="m1"
         initialSets={[oneSet()]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -268,6 +280,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[twoNoteSet()]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -291,6 +304,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[twoNoteSet()]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -320,6 +334,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[twoNoteSet()]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -366,6 +381,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[twoNoteSet()]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -393,6 +409,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -420,6 +437,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[oneSet()]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -447,6 +465,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -472,6 +491,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[oneSet()]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -502,6 +522,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
           canEdit
           machineId="m1"
           initialSets={[oneSet()]}
+          settingsRequests={null}
           settingsInstructions={null}
         />
       );
@@ -545,6 +566,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
           canEdit
           machineId="m1"
           initialSets={[oneSet()]}
+          settingsRequests={null}
           settingsInstructions={null}
         />
       );
@@ -584,6 +606,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -613,6 +636,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -650,6 +674,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         canEdit
         machineId="m1"
         initialSets={[]}
+        settingsRequests={null}
         settingsInstructions={null}
       />
     );
@@ -669,5 +694,153 @@ describe("SettingsTab — atomic per-unit commit model", () => {
     const payload = saveMock.mock.calls[0]?.[0];
     expect(payload?.id).toBeUndefined();
     expect(payload?.name).toBe("Brand new");
+  });
+});
+
+/**
+ * A deferred promise helper — lets a test hold the new-set insert "in flight"
+ * and resolve it at a precise moment, so we can interleave a section Save while
+ * the insert is still pending. Mirrors the idiom in
+ * use-settings-save-queue.test.ts.
+ */
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+describe("SettingsTab — machine-level field nav guard (B1)", () => {
+  it("arms the unsaved-changes guard when a machine-level field becomes dirty", () => {
+    const addSpy = vi.spyOn(document, "addEventListener");
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
+
+      // The "Before you change anything" field is always-open for a permitted
+      // user; its mock editor exposes a button that streams a non-empty doc
+      // through onChange, making the draft dirty.
+      expect(
+        addSpy.mock.calls.some(
+          ([type, , options]) => type === "click" && options === true
+        )
+      ).toBe(false);
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "type-in-Before you change anything",
+        })
+      );
+
+      // A dirty machine-level field arms the same page-level guard the per-unit
+      // edits use (capturing click listener for soft-nav interception).
+      expect(
+        addSpy.mock.calls.some(
+          ([type, , options]) => type === "click" && options === true
+        )
+      ).toBe(true);
+    } finally {
+      addSpy.mockRestore();
+    }
+  });
+});
+
+describe("SettingsTab — atomic-commit data loss (A1, 🔴)", () => {
+  it("persists a section saved while a brand-new set's first insert is still in flight", async () => {
+    const user = userEvent.setup();
+    // Hold the FIRST save (the header insert) in flight; the coalesced rerun
+    // (the section, carried to the real id) resolves immediately.
+    const insertRun = deferred<{
+      success: true;
+      id: string;
+      changed: boolean;
+    }>();
+    let callCount = 0;
+    saveMock.mockImplementation(() => {
+      callCount += 1;
+      if (callCount === 1) return insertRun.promise;
+      return Promise.resolve({
+        success: true,
+        id: "server-uuid",
+        changed: true,
+      });
+    });
+
+    render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    // Create a new set and name it; Save the header → insert goes in flight.
+    fireEvent.click(screen.getByRole("button", { name: "New set" }));
+    const nameInput = screen.getByRole("textbox", { name: "set name" });
+    fireEvent.change(nameInput, { target: { value: "Brand new" } });
+    fireEvent.blur(nameInput);
+    fireEvent.click(screen.getByRole("button", { name: "Save set details" }));
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledTimes(1);
+    });
+    // The first call is the insert (no id field).
+    expect(saveMock.mock.calls[0]?.[0]?.id).toBeUndefined();
+
+    // While the insert is STILL pending, add a note section, type a body, and
+    // Save that section. Its persist coalesces onto the in-flight set.
+    await user.click(screen.getByRole("button", { name: /Add section/ }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Post positions" })
+    );
+    // The new set's header is still open (insert in flight), so its description
+    // editor is also mounted with the same "Edit text" aria-label; the note
+    // section's body editor is the last one rendered.
+    const bodyEditors = screen.getAllByRole("button", {
+      name: "type-in-Edit text",
+    });
+    const sectionBodyEditor = bodyEditors[bodyEditors.length - 1];
+    if (!sectionBodyEditor) throw new Error("section body editor not rendered");
+    fireEvent.click(sectionBodyEditor);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save the Post positions section" })
+    );
+    // Still only the in-flight insert has hit the server (the section is queued
+    // as a coalesced rerun, not a second concurrent call).
+    expect(saveMock).toHaveBeenCalledTimes(1);
+
+    // Resolve the insert → the queue reruns under the real id and MUST send the
+    // section that was staged while the insert was in flight (the data-loss bug
+    // dropped it: the rerun found nothing staged and silently no-op'd).
+    await act(async () => {
+      insertRun.resolve({ success: true, id: "server-uuid", changed: true });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledTimes(2);
+    });
+
+    // The second (rerun) call carries the section in its payload — it was NOT
+    // lost. It also runs as an UPDATE against the just-inserted row (real id).
+    const rerunPayload = saveMock.mock.calls[1]?.[0];
+    expect(rerunPayload?.id).toBe("server-uuid");
+    const secA = rerunPayload?.sections.find((s) => s.kind === "note");
+    expect(secA?.kind === "note" ? secA.body : null).toEqual(SAMPLE_DOC);
   });
 });
