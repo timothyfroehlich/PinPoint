@@ -48,7 +48,7 @@
     "db:reset-to-empty": "node --env-file=.env.local scripts/reset-to-empty.mjs",
     "check:config": "python3 scripts/check-config-drift.py > /dev/null",
     "check:migrations": "drizzle-kit check",
-    "check:linters": "yamllint .github/workflows/ && actionlint $(find .github/workflows \\( -name '*.yml' -o -name '*.yaml' \\) ! -name '*.lock.yml') && ruff check scripts/ && ruff format --check scripts/ && find scripts/ .devcontainer/ .claude/hooks/ -name '*.sh' -print0 | xargs -0 shellcheck && zizmor --min-severity low --format plain $(find .github/workflows \\( -name '*.yml' -o -name '*.yaml' \\) ! -name '*.lock.yml') && ratchet lint .github/workflows/ci.yml .github/workflows/preview-control.yaml .github/workflows/preview-reaper.yaml",
+    "check:linters": "yamllint .github/workflows/ && actionlint $(find .github/workflows \\( -name '*.yml' -o -name '*.yaml' \\) ! -name '*.lock.yml') && ruff check scripts/ && ruff format --check scripts/ && find scripts/ .devcontainer/ .claude/hooks/ -name '*.sh' -print0 | xargs -0 shellcheck && zizmor --min-severity low --format plain $(find .github/workflows \\( -name '*.yml' -o -name '*.yaml' \\) ! -name '*.lock.yml') && ratchet lint .github/workflows/ci.yml .github/workflows/preview-control.yaml .github/workflows/preview-reaper.yaml .github/workflows/preview-sync.yaml",
     "audit:role-checks": "bash scripts/audit/no-hardcoded-role-checks.sh",
     "audit:sm-structural": "bash scripts/audit/no-sm-structural-breakpoints.sh",
     "check:behind-main": "bash scripts/check-behind-main.sh",
@@ -138,7 +138,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
-    "@electric-sql/pglite": "^0.4.4",
+    "@electric-sql/pglite": "^0.5.1",
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
     "@eslint/eslintrc": "^3.3.5",
     "@eslint/js": "^10.0.1",
@@ -196,7 +196,9 @@
       "yaml": ">=2.8.3",
       "uuid": ">=14.0.0",
       "postcss": ">=8.5.10",
-      "shell-quote": ">=1.8.4"
+      "shell-quote": ">=1.8.4",
+      "ws": ">=8.21.0",
+      "vite": ">=8.0.16"
     }
   },
   "lint-staged": {

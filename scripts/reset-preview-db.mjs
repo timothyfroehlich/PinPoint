@@ -8,6 +8,19 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
+// Production safety guard. This script DROPs schemas and DELETEs auth users, so
+// it must never touch the production project. The preview workflows pass the
+// production project ref as PROD_PROJECT_REF (= SUPABASE_PROJECT_ID); a real
+// preview branch connects as postgres.<branch-ref>, so the prod ref must NOT
+// appear anywhere in the branch connection string.
+const prodRef = process.env.PROD_PROJECT_REF;
+if (prodRef && databaseUrl.includes(prodRef)) {
+  console.error(
+    `❌ Refusing to reset: POSTGRES_URL references the production project (${prodRef}).`,
+  );
+  process.exit(1);
+}
+
 async function resetPreviewDB() {
   console.log("🔄 Resetting preview database...");
 
@@ -26,6 +39,17 @@ async function resetPreviewDB() {
     console.log("🗑️  Dropping drizzle schema...");
     await client`DROP SCHEMA IF EXISTS drizzle CASCADE`;
     console.log("✅ Drizzle schema dropped");
+
+    // Clear seeded auth users. seed-users.mjs is skip-if-exists, and the
+    // profile-creation trigger only fires on auth-user INSERT — so without this
+    // a re-seed would skip the existing users and never recreate the
+    // user_profiles rows just dropped above, leaving broken login state. On a
+    // preview branch the only auth users are seed/test accounts, so clearing
+    // them all restores the same empty state a freshly-created branch has.
+    // CASCADE deletes dependent auth rows (identities, sessions, etc.).
+    console.log("🗑️  Clearing seeded auth users...");
+    await client`DELETE FROM auth.users`;
+    console.log("✅ Auth users cleared");
 
     console.log("✅ Preview database reset complete");
     console.log("ℹ️  Run migrations with: pnpm run migrate:production");

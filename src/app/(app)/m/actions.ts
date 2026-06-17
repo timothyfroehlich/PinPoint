@@ -48,12 +48,11 @@ import { type MachineTimelineEventKind } from "~/lib/timeline/machine-event-type
 /**
  * Maps a prose-field column name to its marker lifecycle event kind.
  *
- * Only owner-facing edits emit a timeline event — `description` and
- * `tournamentNotes` are intentionally absent because their edit cadence is
- * high enough that emitting on every save floods the timeline with low-
- * signal "description updated" rows (PP-0x98 V2 design pass). The fields
- * themselves are still editable; the change just doesn't get duplicated
- * into the activity feed.
+ * Only owner-facing edits emit a timeline event — `description` is
+ * intentionally absent because its edit cadence is high enough that
+ * emitting on every save floods the timeline with low-signal "description
+ * updated" rows (PP-0x98 V2 design pass). The field itself is still
+ * editable; the change just doesn't get duplicated into the activity feed.
  */
 /** Subset of {@link MachineTimelineEventKind} that this map ever produces.
  *  Pinning the value type to the literal-string union keeps the
@@ -64,7 +63,7 @@ type ProseFieldEventKind = "owner_requirements_updated" | "owner_notes_updated";
 
 const PROSE_FIELD_TO_EVENT_KIND: Partial<
   Record<
-    "description" | "tournamentNotes" | "ownerRequirements" | "ownerNotes",
+    "description" | "ownerRequirements" | "ownerNotes",
     ProseFieldEventKind
   >
 > = {
@@ -1037,18 +1036,6 @@ export async function updateMachineDescription(
 }
 
 /**
- * Update Machine Tournament Notes
- *
- * Editable by machine owner and admins.
- */
-export async function updateMachineTournamentNotes(
-  machineId: string,
-  value: ProseMirrorDoc | null
-): Promise<UpdateMachineFieldResult> {
-  return updateMachineTextField(machineId, value, "tournamentNotes");
-}
-
-/**
  * Update Machine Owner Requirements
  *
  * Editable by machine owner and admins.
@@ -1076,13 +1063,13 @@ export async function updateMachineOwnerNotes(
  * Internal helper for updating a machine text field.
  *
  * Permission logic:
- * - description, tournamentNotes, ownerRequirements: owner + tech + admins
+ * - description, ownerRequirements: owner + tech + admins
  * - ownerNotes: owner only (machines.edit.ownerNotes)
  */
 async function updateMachineTextField(
   machineId: string,
   value: ProseMirrorDoc | null,
-  field: "description" | "tournamentNotes" | "ownerRequirements" | "ownerNotes"
+  field: "description" | "ownerRequirements" | "ownerNotes"
 ): Promise<UpdateMachineFieldResult> {
   // Auth check (CORE-SEC-001)
   const supabase = await createClient();
@@ -1184,8 +1171,8 @@ async function updateMachineTextField(
         .where(eq(machines.id, machine.id));
 
       // Only emit when (a) the field actually changed and (b) the field
-      // has an event-kind mapping. `description` and `tournamentNotes` are
-      // intentionally omitted from the map (see PROSE_FIELD_TO_EVENT_KIND).
+      // has an event-kind mapping. `description` is intentionally omitted
+      // from the map (see PROSE_FIELD_TO_EVENT_KIND).
       const eventKind = PROSE_FIELD_TO_EVENT_KIND[field];
       if (changed && eventKind) {
         await createMachineTimelineEvent(

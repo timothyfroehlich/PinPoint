@@ -254,7 +254,6 @@ export default async function MachineInfoTab({
           <MachineTextFields
             machineId={machine.id}
             description={machine.description}
-            tournamentNotes={machine.tournamentNotes}
             ownerRequirements={machine.ownerRequirements}
             ownerNotes={machine.ownerNotes}
             canEditGeneral={canEdit}
