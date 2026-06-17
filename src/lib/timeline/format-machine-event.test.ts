@@ -87,9 +87,6 @@ describe("formatMachineEvent", () => {
     expect(formatMachineEvent({ kind: "description_updated" }, {})).toBe(
       "Description updated"
     );
-    expect(formatMachineEvent({ kind: "tournament_notes_updated" }, {})).toBe(
-      "Tournament notes updated"
-    );
     expect(formatMachineEvent({ kind: "owner_requirements_updated" }, {})).toBe(
       "Owner requirements updated"
     );

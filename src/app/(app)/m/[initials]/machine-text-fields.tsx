@@ -7,7 +7,6 @@ import {
 } from "~/components/inline-editable-field";
 import {
   updateMachineDescription,
-  updateMachineTournamentNotes,
   updateMachineOwnerRequirements,
   updateMachineOwnerNotes,
   type UpdateMachineFieldResult,
@@ -32,7 +31,6 @@ function wrapAction(
 interface MachineTextFieldsProps {
   machineId: string;
   description: ProseMirrorDoc | null;
-  tournamentNotes: ProseMirrorDoc | null;
   ownerRequirements: ProseMirrorDoc | null;
   ownerNotes: ProseMirrorDoc | null;
   canEditGeneral: boolean;
@@ -44,7 +42,6 @@ interface MachineTextFieldsProps {
 export function MachineTextFields({
   machineId,
   description,
-  tournamentNotes,
   ownerRequirements,
   ownerNotes,
   canEditGeneral,
@@ -62,16 +59,6 @@ export function MachineTextFields({
         canEdit={canEditGeneral}
         placeholder="Add a description for this machine..."
         testId="machine-description"
-      />
-
-      <InlineEditableField
-        label="Tournament Notes"
-        value={tournamentNotes}
-        onSave={wrapAction(updateMachineTournamentNotes)}
-        machineId={machineId}
-        canEdit={canEditGeneral}
-        placeholder="Add tournament notes..."
-        testId="machine-tournament-notes"
       />
 
       {canViewOwnerRequirements && (

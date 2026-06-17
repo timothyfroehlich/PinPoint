@@ -27,7 +27,6 @@ export type MachineTimelineEventData =
       to: MachinePresenceStatus;
     }
   | { kind: "description_updated" }
-  | { kind: "tournament_notes_updated" }
   | { kind: "owner_requirements_updated" }
   | { kind: "owner_notes_updated" }
   // === sourceType='issue' (duplicate-written from issue actions) ===

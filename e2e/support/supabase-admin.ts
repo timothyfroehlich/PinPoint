@@ -348,11 +348,7 @@ export function generateUnsubscribeTokenForTest(userId: string): string {
  */
 export async function clearMachineField(
   machineInitials: string,
-  field:
-    | "owner_requirements"
-    | "owner_notes"
-    | "description"
-    | "tournament_notes"
+  field: "owner_requirements" | "owner_notes" | "description"
 ) {
   const { error } = await supabaseAdmin
     .from("machines")
