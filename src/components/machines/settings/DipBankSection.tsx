@@ -51,6 +51,8 @@ export function DipBankSection({
       header: "Switch",
       kind: "text",
       mono: true,
+      // Switch designators ("DS-1", "SW3") are codes — no autocorrect/caps/spellcheck.
+      codeLike: true,
       read: (s) => s.switch,
       commit: (s, v) => {
         onUpdateSwitch(s._key, "switch", v);

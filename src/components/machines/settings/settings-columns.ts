@@ -21,6 +21,8 @@ export function idNameValueColumns(
       header: "ID",
       kind: "text",
       mono: true,
+      // ID strings ("S-12", "A1") are codes — keep autocorrect/caps/spellcheck off.
+      codeLike: true,
       read: (r) => r.id,
       commit: (r, v) => {
         onUpdate(r._key, "id", v);

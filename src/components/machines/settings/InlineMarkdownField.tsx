@@ -1,9 +1,6 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
-import { Pencil } from "lucide-react";
-import { Toggle } from "~/components/ui/toggle";
 import { cn } from "~/lib/utils";
 import {
   docToPlainText,
@@ -15,7 +12,24 @@ import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 
 interface InlineMarkdownFieldProps {
   value: ProseMirrorDoc | null;
-  canEdit: boolean;
+  /**
+   * Per-unit edit gate (PP-43q3 explicit edit model). The rich body has no
+   * click-to-open of its own anymore: the owning unit's Edit/Done drives this.
+   *  - true  → the editor is ALWAYS open (no separate Save/Cancel — the unit's
+   *            Done commits the draft, the unit's Cancel discards it). Each
+   *            keystroke flows up via `onValueChange` so the unit can persist the
+   *            current value on Done without reaching into this component.
+   *  - false → finished text via RichTextDisplay (or nothing when empty). No
+   *            pencil, no hover tint, no click target.
+   */
+  editing: boolean;
+  /**
+   * Push the live editor doc into the working copy on every change (normalized:
+   * a whitespace-only doc becomes null so an "invisible but saved" body never
+   * persists). The unit reads this working copy when its Save enqueues the
+   * whole-row write; SettingsTab snapshots the committed baseline so its Cancel
+   * can restore the slice and the navigation guard can detect dirtiness.
+   */
   onValueChange: (value: ProseMirrorDoc | null) => void;
   label?: string;
   placeholder?: string;
@@ -23,72 +37,97 @@ interface InlineMarkdownFieldProps {
   compact?: boolean;
 }
 
+/** Whether a ProseMirror doc is semantically empty (no text content). */
+function docIsEmpty(doc: ProseMirrorDoc | null): boolean {
+  // `content` is required on the ProseMirrorDoc *type* but optional in the
+  // persisted *schema*, so a stored bare `{ type: "doc" }` arrives with no
+  // `content`. Read it through an undefined-tolerant alias so the guards are
+  // real — a direct `.content[0]` would crash.
+  const docContent: ProseMirrorNode[] | undefined = doc?.content;
+  const firstNode = docContent?.[0];
+  const contentLength = docContent?.length ?? 0;
+  return (
+    !doc ||
+    contentLength === 0 ||
+    (contentLength === 1 &&
+      firstNode?.type === "paragraph" &&
+      !firstNode.content)
+  );
+}
+
+/** Normalize a draft for storage: a whitespace-only doc becomes null (matches
+ *  the timeline comment actions, which reject docToPlainText(...).trim()
+ *  empties) so clearing the body persists NULL, not an invisible blob. */
+function normalize(doc: ProseMirrorDoc | null): ProseMirrorDoc | null {
+  return doc && docToPlainText(doc).trim() ? doc : null;
+}
+
 /**
  * The single markdown-editing primitive for the Settings tab. Unifies the
- * header description and the Rubbers / Post positions / Notes sections.
+ * header description and the Rubbers / Post positions / Notes section bodies.
  *
- * Interaction model (matches EditableCell's blur-save):
- *  - Click anywhere on the rendered text to open the editor (links inside
- *    still navigate — they're not absorbed by the click-to-open handler).
- *  - The editor commits when focus leaves the whole widget (blur-out): the
- *    toolbar mousedown-prevents focus loss, so formatting clicks don't
- *    commit; only moving focus to another field / the Done button / outside
- *    does. Esc also commits-and-closes.
- *  - No per-field Save / Cancel buttons.
+ * Interaction model (PP-43q3 explicit per-unit edit — rich-on-Done commit):
+ *  - There is NO click-to-open and NO per-field Save/Cancel. The owning unit's
+ *    Edit/Save button drives `editing`. While editing, the editor is open and
+ *    every change streams up via `onValueChange`, keeping the working copy live
+ *    so the unit's Save can persist the current value. The unit's Cancel
+ *    restores the slice from the committed baseline (this component holds no
+ *    draft of its own to roll back).
+ *  - At rest the body is just finished text (RichTextDisplay) — no border, no
+ *    fill, no pencil. An empty body at rest renders nothing; the unit's visible
+ *    Edit button is the only affordance.
+ *  - The editor always opens in full mode (formatting toolbar shown). There is
+ *    no mini/full toggle — entering edit gives you the whole editor.
  */
 export function InlineMarkdownField({
   value,
-  canEdit,
+  editing,
   onValueChange,
   label,
   placeholder = "Add text…",
   compact = false,
 }: InlineMarkdownFieldProps): React.JSX.Element | null {
-  const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState<ProseMirrorDoc | null>(value);
-  // Mini→full editor (the timeline composer pattern): the editor opens mini —
-  // single-line height, no toolbar — and the "Aa" toggle expands it to the
-  // full editor with formatting controls. Resets to mini on every open.
-  const [fullMode, setFullMode] = useState(false);
-
-  // `content` is required on the ProseMirrorDoc *type* but optional in the
-  // persisted *schema* (proseMirrorDocSchema), so a stored bare `{ type: "doc" }`
-  // arrives with no `content` at runtime. Read it through an undefined-tolerant
-  // alias so the guards below are real — a direct `.content[0]` would crash.
-  const docContent: ProseMirrorNode[] | undefined = value?.content;
-  const firstNode = docContent?.[0];
-  const contentLength = docContent?.length ?? 0;
-  const isEmpty =
-    !value ||
-    contentLength === 0 ||
-    (contentLength === 1 &&
-      firstNode?.type === "paragraph" &&
-      !firstNode.content);
-
-  // In view mode an empty field renders nothing (including its label).
-  if (isEmpty && !canEdit) return null;
-
-  function open(target: HTMLElement): void {
-    // Let users click links in the rendered content without entering edit.
-    if (target.closest("a")) return;
-    setDraft(value);
-    setFullMode(false);
-    setIsEditing(true);
-  }
-
-  function commitAndClose(): void {
-    // Trim before the empty check so a whitespace-only doc persists as null
-    // rather than an "invisible but saved" description (matches the timeline
-    // comment actions, which reject docToPlainText(...).trim() empties).
-    const newValue = draft && docToPlainText(draft).trim() ? draft : null;
-    onValueChange(newValue);
-    setIsEditing(false);
-  }
+  const isEmpty = docIsEmpty(value);
 
   // Both modes render body text at the same size (14px) — "compact" only kills
   // prose's vertical rhythm so the field can sit flush with its container
   // (used by the card-header description).
   const textSize = "text-sm";
+
+  if (editing) {
+    return (
+      <div className={compact ? undefined : "space-y-1.5"}>
+        {label && (
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            {label}
+          </p>
+        )}
+        <RichTextEditor
+          content={value}
+          onChange={(doc) => {
+            // Stream the live doc into the working copy (normalized) so the
+            // unit's Done persists the current value and Cancel can restore.
+            onValueChange(normalize(doc));
+          }}
+          // Settings descriptions/notes are documentation, not conversation —
+          // @-mentions (which notify) make no sense here (PP-43q3).
+          mentionsEnabled={false}
+          placeholder={placeholder}
+          ariaLabel={label ?? "Edit text"}
+          // Always the full editor (toolbar shown) — no mini/full toggle. The
+          // unit's Save/Cancel own the commit; this editor has no controls of
+          // its own.
+          showToolbar
+          compact={false}
+          className={textSize}
+        />
+      </div>
+    );
+  }
+
+  // Not editing. An empty body renders nothing at all (the unit's Edit button is
+  // the affordance for adding one); a non-empty body renders as finished text.
+  if (isEmpty) return null;
 
   return (
     <div className={compact ? undefined : "space-y-1.5"}>
@@ -97,112 +136,22 @@ export function InlineMarkdownField({
           {label}
         </p>
       )}
-
-      {isEditing ? (
-        <div
-          onBlur={(e) => {
-            if (e.currentTarget.contains(e.relatedTarget)) {
-              return;
-            }
-            commitAndClose();
-          }}
-          onKeyDown={(e) => {
-            e.stopPropagation();
-            if (e.key === "Escape") {
-              e.preventDefault();
-              commitAndClose();
-            }
-          }}
-        >
-          <RichTextEditor
-            content={draft}
-            onChange={setDraft}
-            // Settings descriptions/notes are documentation, not conversation —
-            // @-mentions (which notify) make no sense here (PP-43q3).
-            mentionsEnabled={false}
-            placeholder={placeholder}
-            ariaLabel={label ?? "Edit text"}
-            showToolbar={fullMode}
-            compact={!fullMode}
-            className={textSize}
-          />
-          <Toggle
-            size="sm"
-            pressed={fullMode}
-            onPressedChange={setFullMode}
-            aria-label={fullMode ? "Hide formatting" : "Show formatting"}
-            title={fullMode ? "Hide formatting" : "Show formatting"}
-            className="mt-1 h-6 gap-1.5 px-1.5 text-muted-foreground data-[state=on]:text-foreground"
-          >
-            <span className="text-sm font-semibold leading-none tracking-tight">
-              Aa
-            </span>
-          </Toggle>
-        </div>
-      ) : isEmpty ? (
-        // Empty + editable: a real <button> (not a div[role=button]) so the
-        // click fires reliably across browsers — Safari in particular drops
-        // clicks on nested div[role=button], which made "add a description"
-        // appear dead (CORE-A11Y-004). Full-width so the whole row is a target.
-        <button
-          type="button"
-          aria-label={`Edit ${label ?? "text"}`}
-          className={cn(
-            "group/imf block w-full rounded text-left",
-            textSize,
-            "cursor-text transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none"
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            open(e.currentTarget);
-          }}
-        >
-          <span className="italic text-muted-foreground">{placeholder}</span>
-        </button>
-      ) : (
-        // Non-empty: a plain wrapper holds the rendered markdown (which can
-        // contain block elements + links, so it can't live inside a <button>).
-        // A transparent overlay <button> captures the click-to-edit so the
-        // open still fires reliably in Safari. Links sit above the overlay so
-        // they remain clickable.
-        <div className={cn("group/imf relative rounded", textSize)}>
-          {canEdit && (
-            <button
-              type="button"
-              aria-label={`Edit ${label ?? "text"}`}
-              className="absolute inset-0 z-0 cursor-text rounded transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none"
-              onClick={(e) => {
-                e.stopPropagation();
-                open(e.currentTarget);
-              }}
-            />
-          )}
-          <RichTextDisplay
-            content={value}
-            className={cn(
-              "relative z-[1] [&_a]:pointer-events-auto",
-              textSize,
-              // Compact kills prose's vertical rhythm (margins + 1.7 leading)
-              // so the description sits flush with its container while still
-              // rendering at the same 14px as the surrounding body fields.
-              compact &&
-                "text-muted-foreground [&_*]:!my-0 [&_*]:!text-sm [&_*]:!leading-snug",
-              // Non-compact (note/section bodies): tighten leading and shrink
-              // paragraph margins on mobile only for the density redesign;
-              // desktop keeps prose's default rhythm.
-              !compact &&
-                "max-md:leading-snug max-md:[&_p]:!my-1 max-md:[&_*]:!leading-snug",
-              canEdit && "pointer-events-none"
-            )}
-          />
-          {canEdit && (
-            <Pencil
-              className="pointer-events-none absolute right-1 top-1 z-[2] size-3 text-muted-foreground opacity-0 transition-opacity group-hover/imf:opacity-100 motion-reduce:transition-none"
-              aria-hidden="true"
-            />
-          )}
-        </div>
-      )}
+      <RichTextDisplay
+        content={value}
+        className={cn(
+          textSize,
+          // Compact kills prose's vertical rhythm (margins + 1.7 leading) so the
+          // description sits flush with its container while still rendering at
+          // the same 14px as the surrounding body fields.
+          compact &&
+            "text-muted-foreground [&_*]:!my-0 [&_*]:!text-sm [&_*]:!leading-snug",
+          // Non-compact (note/section bodies): tighten leading and shrink
+          // paragraph margins on mobile only for the density redesign; desktop
+          // keeps prose's default rhythm.
+          !compact &&
+            "max-md:leading-snug max-md:[&_p]:!my-1 max-md:[&_*]:!leading-snug"
+        )}
+      />
     </div>
   );
 }

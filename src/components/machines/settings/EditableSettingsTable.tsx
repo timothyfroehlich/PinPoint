@@ -40,6 +40,12 @@ export interface SettingsTableColumn<T extends KeyedRow> {
   commit: (row: T, value: string) => void;
   /** Render the value in a monospace font (IDs, switch numbers). */
   mono?: boolean;
+  /**
+   * Code-like value (setting ID, DIP switch number) — turns off autocorrect /
+   * autocapitalize / spellcheck in the editor so the code isn't rewritten.
+   * Prose columns (setting name/value) omit it and keep the defaults.
+   */
+  codeLike?: boolean;
   /** Placeholder shown in the empty editor (text columns only). */
   placeholder?: string;
   /** Accessible name for the cell control; a function when it needs the row. */
@@ -107,15 +113,21 @@ export function EditableSettingsTable<T extends KeyedRow>({
     items: rows,
     canEdit,
     onAdd: onAddRow,
+    // Add/delete row buffer into the working copy like any cell edit — the
+    // owning section unit's Save is the single persist boundary (PP-43q3).
     onDelete: onDeleteRow,
   });
 
   function handleSheetSave(values: Record<string, string>): void {
     if (!sheetRow) return;
+    // The mobile sheet commits a whole row at once, all into the working copy;
+    // the section unit's Save persists it (no per-row write here).
     for (const col of columns) {
       const raw = values[col.key] ?? "";
       const next = col.kind === "toggle" ? (raw === "ON" ? "ON" : "OFF") : raw;
-      if (next !== col.read(sheetRow)) col.commit(sheetRow, next);
+      if (next !== col.read(sheetRow)) {
+        col.commit(sheetRow, next);
+      }
     }
   }
 
@@ -175,6 +187,8 @@ export function EditableSettingsTable<T extends KeyedRow>({
                               !rowEditable && "pointer-events-none"
                             )}
                             onCheckedChange={(checked) => {
+                              // Buffer into the working copy; the section unit's
+                              // Save persists it with the rest of the slice.
                               col.commit(row, checked ? "ON" : "OFF");
                             }}
                             aria-label={ariaFor(col.ariaLabel, row)}
@@ -195,6 +209,7 @@ export function EditableSettingsTable<T extends KeyedRow>({
                           }
                           placeholder={col.placeholder ?? "—"}
                           ariaLabel={ariaFor(col.ariaLabel, row)}
+                          codeLike={col.codeLike ?? false}
                           inputClassName={col.mono ? "font-mono" : ""}
                         />
                       )}

@@ -10,39 +10,43 @@ import type { NoteSectionData } from "~/lib/machines/settings-types";
 
 interface NoteSectionProps {
   note: NoteSectionData;
-  canEdit: boolean;
+  /** This section unit's edit mode (PP-43q3). Gates the editable title input
+   *  and opens the body editor; at rest both render as finished text. */
+  editing: boolean;
   onTitleChange: (title: string) => void;
   onBodyChange: (body: ProseMirrorDoc | null) => void;
 }
 
 /**
  * One free-form titled note within a settings set. Presets render a fixed
- * heading; Other/Notes entries expose an editable title. Body is the shared
- * click-anywhere markdown field. Reordering and deletion are handled by the
- * surrounding SortableSection.
+ * heading; Other/Notes entries expose an editable title (when the section unit
+ * is editing). The body is the shared markdown field, opened by this section's
+ * Edit/Done. Reordering and deletion are handled by the surrounding
+ * SortableSection's grip + kebab.
  */
 export function NoteSection({
   note,
-  canEdit,
+  editing,
   onTitleChange,
   onBodyChange,
 }: NoteSectionProps): React.JSX.Element {
   return (
     <div className="py-2.5 max-md:py-1.5">
       {/* pr-14 in edit mode keeps the title input clear of SortableSection's
-          floating grip/delete cluster at the row's right end. */}
-      <div className={cn("mb-1.5", note.customTitle && canEdit && "pr-14")}>
-        {note.customTitle && canEdit ? (
-          <InlineEditableText
-            value={note.title}
-            onValueChange={onTitleChange}
-            canEdit
-            required
-            placeholder="Section title"
-            ariaLabel="section title"
-            className={SECTION_TITLE_CLASS}
-            inputClassName="h-7 text-sm font-semibold"
-          />
+          floating grip/kebab cluster at the row's right end. */}
+      <div className={cn("mb-1.5", note.customTitle && editing && "pr-14")}>
+        {note.customTitle ? (
+          <span className={SECTION_TITLE_CLASS}>
+            <InlineEditableText
+              value={note.title}
+              onValueChange={onTitleChange}
+              canEdit={editing}
+              required
+              placeholder="Section title"
+              ariaLabel="section title"
+              inputClassName="h-7 text-sm font-semibold"
+            />
+          </span>
         ) : (
           <p className={SECTION_TITLE_CLASS}>{note.title || "Untitled"}</p>
         )}
@@ -51,7 +55,7 @@ export function NoteSection({
       <div className="pl-2">
         <InlineMarkdownField
           value={note.body}
-          canEdit={canEdit}
+          editing={editing}
           placeholder={`Add ${(note.title || "notes").toLowerCase()}…`}
           onValueChange={onBodyChange}
         />

@@ -4,10 +4,29 @@
 import type React from "react";
 import { useState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
-import { Pencil } from "lucide-react";
+import { Pencil, Plus, ChevronDown } from "lucide-react";
 import { type ProseMirrorDoc, docToPlainText } from "~/lib/tiptap/types";
+import type { SettingsInstructionsPreset } from "~/lib/machines/settings-instructions-presets";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "~/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 
 export interface InlineEditSaveResult {
   ok: boolean;
@@ -32,6 +51,18 @@ interface InlineEditableFieldProps {
   placeholder?: string;
   /** data-testid for the component root */
   testId?: string;
+  /**
+   * Optional starting-template presets. When provided, an editor can apply one
+   * to populate the field (then edit it). Applying over existing content asks
+   * for confirmation first.
+   */
+  presets?: readonly SettingsInstructionsPreset[];
+  /**
+   * Optional label for the empty-state call-to-action button. When set (or when
+   * `presets` is provided), the empty state shows a button to start adding
+   * content instead of plain placeholder text.
+   */
+  addCtaLabel?: string;
 }
 
 export function InlineEditableField({
@@ -42,6 +73,8 @@ export function InlineEditableField({
   canEdit,
   placeholder,
   testId,
+  presets,
+  addCtaLabel,
 }: InlineEditableFieldProps): React.JSX.Element | null {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState<ProseMirrorDoc | null>(
@@ -49,6 +82,9 @@ export function InlineEditableField({
   );
   const [optimisticValue, setOptimisticValue] = useState(value);
   const [error, setError] = useState<string | null>(null);
+  const [pendingPreset, setPendingPreset] = useState<ProseMirrorDoc | null>(
+    null
+  );
   const [isPending, startTransition] = useTransition();
 
   const displayValue = optimisticValue ?? value;
@@ -70,6 +106,27 @@ export function InlineEditableField({
     setIsEditing(false);
     setEditValue(displayValue ?? null);
     setError(null);
+  }
+
+  // Apply a preset into the editor. If the editor already holds text, defer to
+  // a confirmation so a stray pick can't wipe a customized note.
+  function applyPreset(doc: ProseMirrorDoc): void {
+    if (docToPlainText(editValue)) {
+      setPendingPreset(doc);
+      return;
+    }
+    setEditValue(doc);
+    setError(null);
+    setIsEditing(true);
+  }
+
+  function confirmPreset(): void {
+    if (pendingPreset) {
+      setEditValue(pendingPreset);
+      setError(null);
+      setIsEditing(true);
+    }
+    setPendingPreset(null);
   }
 
   function handleSave(): void {
@@ -100,6 +157,45 @@ export function InlineEditableField({
     return null;
   }
 
+  function renderPresetMenu(): React.JSX.Element | null {
+    if (!presets || presets.length === 0) return null;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            data-testid={testId ? `${testId}-preset-trigger` : undefined}
+          >
+            Use a preset
+            <ChevronDown aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="max-w-[18rem]">
+          <DropdownMenuLabel>Start from a platform</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {presets.map((preset) => (
+            <DropdownMenuItem
+              key={preset.key}
+              onSelect={() => {
+                applyPreset(preset.doc);
+              }}
+              data-testid={
+                testId ? `${testId}-preset-${preset.key}` : undefined
+              }
+            >
+              {preset.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
+  const richEmptyState = isEmpty && (addCtaLabel != null || presets != null);
+  const presetMenu = renderPresetMenu();
+
   return (
     <div data-testid={testId} className="space-y-1.5">
       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -108,6 +204,7 @@ export function InlineEditableField({
 
       {isEditing ? (
         <div className="space-y-2">
+          {presetMenu && <div className="flex justify-end">{presetMenu}</div>}
           <RichTextEditor
             content={editValue}
             onChange={setEditValue}
@@ -143,32 +240,53 @@ export function InlineEditableField({
           </div>
         </div>
       ) : canEdit ? (
-        // RichTextDisplay can render <a> tags (mentions/urls). Nesting links
-        // inside a <button> is invalid HTML, so the content sits as a sibling
-        // of the Edit button rather than inside it. The Edit button is the
-        // only interactive control here — clicking the content itself does
-        // not enter edit mode.
-        <div
-          className="group relative min-h-[1.5rem] w-full rounded-md"
-          data-testid={testId ? `${testId}-display` : undefined}
-        >
-          {isEmpty ? (
-            <p className="py-1 text-sm italic text-muted-foreground">
-              {placeholder ?? `Add ${label.toLowerCase()}...`}
-            </p>
-          ) : (
-            <RichTextDisplay content={displayValue} className="py-1 pr-8" />
-          )}
-          <button
-            type="button"
-            aria-label={`Edit ${label}`}
-            onClick={handleEdit}
-            className="absolute right-1 top-1 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity duration-150 hover:bg-surface-variant/50 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
-            data-testid={testId ? `${testId}-edit` : undefined}
+        richEmptyState ? (
+          // Empty-state call to action: an explicit button to start, plus the
+          // preset picker, instead of passive placeholder text.
+          <div
+            className="flex flex-wrap items-center gap-2 py-1"
+            data-testid={testId ? `${testId}-display` : undefined}
           >
-            <Pencil className="size-3.5" aria-hidden="true" />
-          </button>
-        </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleEdit}
+              data-testid={testId ? `${testId}-add` : undefined}
+            >
+              <Plus aria-hidden="true" />
+              {addCtaLabel ?? `Add ${label.toLowerCase()}`}
+            </Button>
+            {presetMenu}
+          </div>
+        ) : (
+          // RichTextDisplay can render <a> tags (mentions/urls). Nesting links
+          // inside a <button> is invalid HTML, so the content sits as a sibling
+          // of the Edit button rather than inside it. The Edit button is the
+          // only interactive control here — clicking the content itself does
+          // not enter edit mode.
+          <div
+            className="group relative min-h-[1.5rem] w-full rounded-md"
+            data-testid={testId ? `${testId}-display` : undefined}
+          >
+            {isEmpty ? (
+              <p className="py-1 text-sm italic text-muted-foreground">
+                {placeholder ?? `Add ${label.toLowerCase()}...`}
+              </p>
+            ) : (
+              <RichTextDisplay content={displayValue} className="py-1 pr-8" />
+            )}
+            <button
+              type="button"
+              aria-label={`Edit ${label}`}
+              onClick={handleEdit}
+              className="absolute right-1 top-1 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity duration-150 hover:bg-surface-variant/50 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
+              data-testid={testId ? `${testId}-edit` : undefined}
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        )
       ) : (
         <div
           className="relative min-h-[1.5rem]"
@@ -179,6 +297,32 @@ export function InlineEditableField({
           )}
         </div>
       )}
+
+      <AlertDialog
+        open={pendingPreset !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingPreset(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace current text?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Applying this preset will overwrite what&apos;s currently in the{" "}
+              {label.toLowerCase()} editor. You can still edit it afterward.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmPreset}
+              data-testid={testId ? `${testId}-preset-confirm` : undefined}
+            >
+              Replace
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

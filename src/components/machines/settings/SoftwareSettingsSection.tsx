@@ -65,6 +65,8 @@ export function SoftwareSettingsSection({
               <BaselineCombobox
                 value={baseline}
                 onChange={(val) => {
+                  // Buffer into the working copy; the section unit's Save
+                  // persists it (PP-43q3 atomic per-unit commit).
                   onBaselineChange?.(val);
                 }}
               />
