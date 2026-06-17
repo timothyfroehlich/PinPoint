@@ -45,7 +45,6 @@ vi.mock("~/app/(app)/m/[initials]/machine-text-fields", () => ({
   MachineTextFields: (props: {
     machineId: string;
     description: string | null;
-    tournamentNotes: string | null;
     ownerRequirements: string | null;
     ownerNotes: string | null;
     canEditGeneral: boolean;

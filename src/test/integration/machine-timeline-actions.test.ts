@@ -535,9 +535,9 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
   // prose-field actions are authorized by the same test user.
   //
   // Only the owner-facing prose fields emit a marker timeline event. The
-  // public `description` and `tournamentNotes` fields are intentionally
-  // SILENT on edit (PP-0x98 V2 design pass) — high edit cadence floods the
-  // timeline with low-signal "description updated" rows.
+  // public `description` field is intentionally SILENT on edit (PP-0x98 V2
+  // design pass) — high edit cadence floods the timeline with low-signal
+  // "description updated" rows.
   const emittingCases = [
     {
       label: "ownerRequirements",
@@ -560,13 +560,6 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
       label: "description",
       load: () =>
         import("~/app/(app)/m/actions").then((m) => m.updateMachineDescription),
-    },
-    {
-      label: "tournamentNotes",
-      load: () =>
-        import("~/app/(app)/m/actions").then(
-          (m) => m.updateMachineTournamentNotes
-        ),
     },
   ];
 

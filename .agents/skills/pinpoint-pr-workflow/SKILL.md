@@ -31,15 +31,15 @@ Default to `pnpm run check` (~12s; covers type, lint, format, unit tests, yamlli
 
 ### 1.3 E2E selection
 
-Use this matrix based on `git diff --name-only --staged`:
+Use this matrix based on `git diff --name-only --staged`. **Never run `e2e:full` / `e2e:all` locally — the full suite is CI's job.** Locally, run only targeted specs (`pnpm exec playwright test <spec> --project=chromium`) while writing them or iterating on a feature they touch.
 
-| Changed file patterns                                                                                | Recommended                                   |
-| ---------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `src/app/**/page.tsx`, `src/app/**/layout.tsx`, `src/app/(auth)/**`                                  | `pnpm run e2e:full` (~3-5 min)                |
-| `src/components/issues/*`, `src/components/machines/*`, `src/server/actions/*`, `src/lib/supabase/*` | `pnpm run e2e:full`                           |
-| `supabase/migrations/*`, `src/server/db/schema.ts`                                                   | `pnpm run preflight` (includes smoke E2E)     |
-| `src/components/ui/*`, `src/lib/*` (non-supabase)                                                    | `pnpm run smoke` (~60s; already in preflight) |
-| `docs/**`, `*.test.ts`, `*.spec.ts`, `.agent/**`, `scripts/*`                                        | skip additional E2E                           |
+| Changed file patterns                                                                                | Recommended local check                                                        |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `src/app/**/page.tsx`, `src/app/**/layout.tsx`, `src/app/(auth)/**`                                  | Targeted spec(s) for the affected flow while iterating; CI runs the full suite |
+| `src/components/issues/*`, `src/components/machines/*`, `src/server/actions/*`, `src/lib/supabase/*` | Targeted spec(s) while iterating; CI runs the full suite                       |
+| `supabase/migrations/*`, `src/server/db/schema.ts`                                                   | `pnpm run preflight` (includes smoke E2E)                                      |
+| `src/components/ui/*`, `src/lib/*` (non-supabase)                                                    | `pnpm run smoke` (~60s; already in preflight)                                  |
+| `docs/**`, `*.test.ts`, `*.spec.ts`, `.agents/**`, `scripts/*`                                       | skip additional E2E                                                            |
 
 ### 1.4 Commit message
 
@@ -66,7 +66,7 @@ Prefer MCP `create_pull_request` for typed argument handling. Or use `gh pr crea
 MCP example:
 
 - Tool: `mcp__github__create_pull_request`
-- Args: `owner: "timothyfroehlich"`, `repo: "PinPoint"`, `title: "<title>"`, `body: "<description>"`, `head: "<branch>"`, `base: "main"`, `draft: <true|false>`
+- Args: `owner: "timothyfroehlich"`, `repo: "PinPoint"`, `title: "<title>"`, `body: "<description>"`, `head: "<branch>"`, `base: "main"`, `draft: false` (ready-for-review by default — see 2.3)
 
 ### 2.2 PR description template
 
@@ -86,7 +86,7 @@ Closes #N (if applicable)
 
 ### 2.3 Draft vs ready
 
-Open as draft if WIP. Mark ready when CI has been run at least once locally.
+**Default: open ready-for-review, not draft** — CI runs the same on drafts, so draft gates nothing. Use draft ONLY while you're still iterating, when you want title/description feedback first, or when you've said you're pausing mid-task. Don't reflexively open as draft.
 
 ---
 
