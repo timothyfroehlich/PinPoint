@@ -41,8 +41,9 @@ person is referenced across the app.
 4. **Public fields:** avatar, display name (first/last), pronouns, bio, role
    badge (read-only, admin-controlled), owned machines, member-since.
 5. **Pronouns included** (pinball community skews notably non-binary).
-6. **Light activity stats (option B):** issues reported, comments made, issues
-   resolved. Counts, not a feed.
+6. **Light activity stats:** issues reported, comments made. Counts, not a feed.
+   ("Issues resolved" was dropped — the schema has no `resolvedBy`, so resolution
+   isn't attributable to a user. Revisit if/when `resolvedBy` tracking is added.)
 7. **Person hover card** everywhere a person is referenced; real users get a card
    plus profile link, invited/deleted users degrade to plain text.
 8. **Hover-card data: lazy-fetch on open (option B)** — instant name/avatar from
@@ -81,7 +82,8 @@ Responsibilities:
 - Load owned machines via `eq(machines.ownerId, id)` (machine name + initials,
   capped — fetch 7 to know whether a 7th exists); render the section only when
   count > 0.
-- Load three activity counts: issues reported, comments made, issues resolved.
+- Load two activity counts: issues reported (`issues.reportedBy`), comments made
+  (`issueComments.authorId`).
 - Determine "is this my own profile" by comparing route `id` to
   `auth.getUser()`'s id.
 
@@ -104,16 +106,33 @@ A `"use client"` component that toggles the header/bio fields into a
 Editable: avatar, first/last name, pronouns, bio. Role, activity, and machines
 stay read-only.
 
-The **existing settings avatar-upload** is _moved_ here (relocated, not rebuilt)
-so upload behavior is identical to today.
+**Avatar upload is built fresh** (tracks **PinPoint-5r7**, retitled from
+"settings page" to "profile"). There is no existing avatar-upload UI to relocate
+— `avatarUrl` is only ever displayed today. We mirror the existing **issue-image
+Blob upload** pattern: client compresses + posts a `FormData` file to a dedicated
+server action, which validates, uploads via `uploadToBlob`, deletes the previous
+avatar via `deleteFromBlob`, and writes `userProfiles.avatarUrl`. See the Server
+action section.
 
-### Server action — `updateProfileAction`
+### Server actions
 
-- Re-reads `auth.getUser()` and enforces `user.id === id` (ad-hoc ownership
-  check; you can only edit your own profile).
-- Validates input with Zod.
-- Writes `firstName`, `lastName`, `pronouns`, `bio`, `avatarUrl` to
-  `userProfiles`.
+`updateProfileAction` (text fields):
+
+- Re-reads `auth.getUser()`; ownership is implicit (writes only the caller's own
+  row). You can only edit your own profile.
+- Validates input with Zod (`safeParse`), returns the project `Result` type.
+- Writes `firstName`, `lastName`, `pronouns`, `bio` to `userProfiles`.
+
+`uploadAvatarAction` (avatar file) — mirrors `uploadIssueImage`:
+
+- Auth via `createClient()` → `auth.getUser()`.
+- Receives `FormData` with an `avatar` `File`; validates with `validateImageFile`
+  (jpeg/png/webp, ≤10MB).
+- Uploads via `uploadToBlob(file, \`user-avatars/${userId}/${ts}-${name}\`)`.
+- Reads the caller's current `avatarUrl`; after a successful DB write, best-effort
+  `deleteFromBlob` the old one.
+- Writes `userProfiles.avatarUrl = blob.url`; `revalidatePath` the profile and
+  `("/", "layout")` (user-menu avatar).
 
 ### Settings page changes (the "proper split" payoff)
 
@@ -173,7 +192,8 @@ deliverable of the implementation plan.
 
 - **Integration (PGlite + direct action):**
   - `updateProfileAction` — auth, own-only enforcement, Zod validation.
-  - The three activity-count queries.
+  - `uploadAvatarAction` — auth, file validation reject, old-avatar cleanup.
+  - The two activity-count queries.
   - Owned-machines query — including the cap/overflow (fetch-7-show-6 boundary).
   - The hover-card route handler.
 - **RTL unit:**
