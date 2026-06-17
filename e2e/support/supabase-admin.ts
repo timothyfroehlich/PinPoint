@@ -137,6 +137,30 @@ export async function createTestMachine(ownerId: string, initials?: string) {
 }
 
 /**
+ * Seed a machine settings set (PP-43q3) directly in the database for E2E setup.
+ * `sections` is the persist-ready `SettingsSection[]` shape (no client `_key`).
+ * Returns the inserted set's id.
+ */
+export async function seedSettingsSet(
+  machineId: string,
+  name: string,
+  sections: unknown[]
+): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("machine_settings_sets")
+    .insert({
+      machine_id: machineId,
+      name,
+      sections,
+      is_preferred: false,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+/**
  * Create an invited user directly in the database
  */
 export async function createInvitedUser(
@@ -366,6 +390,22 @@ export async function getUserIdByEmail(email: string): Promise<string> {
   const user = users.users.find((u) => u.email === email);
   if (!user) throw new Error(`User not found: ${email}`);
   return user.id;
+}
+
+/**
+ * Get a user_profiles id by email via a direct DB read. Unlike
+ * `getUserIdByEmail` (which pages through the auth admin API and can miss users
+ * beyond the first page once the seed grows), this is an exact single-row query
+ * against the profiles table.
+ */
+export async function getProfileIdByEmail(email: string): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("user_profiles")
+    .select("id")
+    .eq("email", email)
+    .single();
+  if (error) throw error;
+  return data.id;
 }
 
 /**

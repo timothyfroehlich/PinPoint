@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 
 import { SettingsTab } from "~/components/machines/settings/SettingsTab";
-import { saveSettingsSetAction } from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
+import {
+  duplicateSettingsSetAction,
+  saveSettingsSetAction,
+  setPreferredSettingsSetAction,
+} from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
 import type { SettingsSetData } from "~/lib/machines/settings-types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
@@ -381,6 +385,258 @@ describe("SettingsTab — atomic per-unit commit model", () => {
     });
     const payload = saveMock.mock.calls[0]?.[0];
     expect(payload?.sections.map((s) => s.id)).toEqual(["sec-b", "sec-a"]);
+  });
+
+  it("Cancel discards a never-saved set (no save fired, card removed)", () => {
+    render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[]}
+        settingsInstructions={null}
+      />
+    );
+
+    // Create a brand-new set — its header opens in edit mode.
+    fireEvent.click(screen.getByRole("button", { name: "New set" }));
+    expect(
+      screen.getByRole("textbox", { name: "set name" })
+    ).toBeInTheDocument();
+
+    // Cancel the header unit of this never-saved set → the whole card is gone.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Cancel editing set details" })
+    );
+    expect(
+      screen.queryByRole("textbox", { name: "set name" })
+    ).not.toBeInTheDocument();
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("Cancel removes a brand-new draft section without firing a save", async () => {
+    const user = userEvent.setup();
+    render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[oneSet()]}
+        settingsInstructions={null}
+      />
+    );
+
+    // Add a brand-new note section (Rubbers preset) — it opens in edit mode.
+    await user.click(screen.getByRole("button", { name: /Add section/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Rubbers" }));
+    expect(
+      screen.getByRole("button", { name: "Save the Rubbers section" })
+    ).toBeInTheDocument();
+
+    // Cancel the never-saved draft section → it's removed; nothing persisted.
+    await user.click(
+      screen.getByRole("button", { name: "Cancel editing the Rubbers section" })
+    );
+    expect(
+      screen.queryByRole("button", { name: "Save the Rubbers section" })
+    ).not.toBeInTheDocument();
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("required-name guard: a blank set name blocks Save and keeps the unit open", () => {
+    render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[]}
+        settingsInstructions={null}
+      />
+    );
+
+    // A new set starts with an empty name in the working copy (the input refuses
+    // to commit a blank, so this is the genuine empty-name path the guard exists
+    // for). Saving without naming it is blocked.
+    fireEvent.click(screen.getByRole("button", { name: "New set" }));
+    expect(screen.getByRole("textbox", { name: "set name" })).toHaveValue("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save set details" }));
+    // The empty-name guard blocks the save; the unit stays open.
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Save set details" })
+    ).toBeInTheDocument();
+  });
+
+  it("required-title guard: a blank table title blocks the section Save", async () => {
+    const user = userEvent.setup();
+    render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[oneSet()]}
+        settingsInstructions={null}
+      />
+    );
+
+    // Add an "Other table…" section — it opens in edit mode with a blank title.
+    await user.click(screen.getByRole("button", { name: /Add section/ }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Other table…" })
+    );
+    // Its title is required and starts blank, so Save is guarded.
+    const save = screen.getByRole("button", {
+      name: "Save the untitled table",
+    });
+    fireEvent.click(save);
+    expect(saveMock).not.toHaveBeenCalled();
+    // The unit stays open (still showing its Save).
+    expect(
+      screen.getByRole("button", { name: "Save the untitled table" })
+    ).toBeInTheDocument();
+  });
+
+  it("nav guard arms a capturing click listener when dirty and disarms on Save", async () => {
+    const addSpy = vi.spyOn(document, "addEventListener");
+    const removeSpy = vi.spyOn(document, "removeEventListener");
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsInstructions={null}
+        />
+      );
+
+      // Open the header unit and make it dirty.
+      fireEvent.click(screen.getByRole("button", { name: "Edit set details" }));
+      const input = screen.getByRole("textbox", { name: "set name" });
+      fireEvent.change(input, { target: { value: "Casual" } });
+      fireEvent.blur(input);
+
+      // The guard adds a capturing click listener while a unit is dirty.
+      const addedCapturingClick = addSpy.mock.calls.some(
+        ([type, , options]) => type === "click" && options === true
+      );
+      expect(addedCapturingClick).toBe(true);
+
+      // Save successfully → the guard tears down its capturing click listener.
+      fireEvent.click(screen.getByRole("button", { name: "Save set details" }));
+      await waitFor(() => {
+        expect(saveMock).toHaveBeenCalledTimes(1);
+      });
+      await waitFor(() => {
+        const removedCapturingClick = removeSpy.mock.calls.some(
+          ([type, , options]) => type === "click" && options === true
+        );
+        expect(removedCapturingClick).toBe(true);
+      });
+    } finally {
+      addSpy.mockRestore();
+      removeSpy.mockRestore();
+    }
+  });
+
+  it("nav guard prompts confirm on an anchor click while dirty, but not when clean", () => {
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsInstructions={null}
+        />
+      );
+      // An in-app link the capturing guard can intercept.
+      const link = document.createElement("a");
+      link.setAttribute("href", "/somewhere");
+      link.textContent = "Go";
+      document.body.appendChild(link);
+
+      try {
+        // Clean (no open unit) → clicking the anchor does NOT prompt.
+        fireEvent.click(link);
+        expect(confirmSpy).not.toHaveBeenCalled();
+
+        // Make a unit dirty, then click the anchor → the guard prompts.
+        fireEvent.click(
+          screen.getByRole("button", { name: "Edit set details" })
+        );
+        const input = screen.getByRole("textbox", { name: "set name" });
+        fireEvent.change(input, { target: { value: "Casual" } });
+        fireEvent.blur(input);
+
+        fireEvent.click(link);
+        expect(confirmSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        link.remove();
+      }
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
+  it("Set preferred / Duplicate are disabled for an unsaved set", async () => {
+    const user = userEvent.setup();
+    render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[]}
+        settingsInstructions={null}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "New set" }));
+    await user.click(
+      screen.getByRole("button", { name: "More options for this set" })
+    );
+
+    const preferred = await screen.findByRole("menuitem", {
+      name: "Set preferred",
+    });
+    const duplicate = screen.getByRole("menuitem", { name: "Duplicate" });
+    expect(preferred).toHaveAttribute("aria-disabled", "true");
+    expect(duplicate).toHaveAttribute("aria-disabled", "true");
+
+    // Clicking a disabled item is a no-op — the mocked actions never fire.
+    await user.click(preferred);
+    expect(vi.mocked(setPreferredSettingsSetAction)).not.toHaveBeenCalled();
+    expect(vi.mocked(duplicateSettingsSetAction)).not.toHaveBeenCalled();
+  });
+
+  it("a structural op on a never-saved set is local-only (no save fires)", async () => {
+    const user = userEvent.setup();
+    render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[]}
+        settingsInstructions={null}
+      />
+    );
+
+    // New (never-saved) set; add two sections so Move down is enabled.
+    fireEvent.click(screen.getByRole("button", { name: "New set" }));
+    await user.click(screen.getByRole("button", { name: /Add section/ }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Post positions" })
+    );
+    await user.click(screen.getByRole("button", { name: /Add section/ }));
+    await user.click(await screen.findByRole("menuitem", { name: "Rubbers" }));
+
+    // Reorder via the kebab's Move down on the first section — for a never-saved
+    // set this only mutates the working copy (the `if (!baseline) return` guard).
+    await user.click(
+      screen.getByRole("button", {
+        name: "More options for the Post positions section",
+      })
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Move down" })
+    );
+    expect(saveMock).not.toHaveBeenCalled();
   });
 
   it("a new set's header opens in edit and inserts on its first Save", async () => {

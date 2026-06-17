@@ -20,6 +20,7 @@ import {
   userProfiles,
 } from "~/server/db/schema";
 import {
+  NAME_MAX,
   type SettingsSetPayload,
   settingsSetPayloadSchema,
 } from "~/lib/machines/settings-types";
@@ -344,6 +345,50 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
     expect(rows).toHaveLength(0);
   });
 
+  it("rejects a payload whose JSON exceeds the byte ceiling and writes nothing", async () => {
+    const db = await getTestDb();
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(owner.id);
+    const { saveSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    // Build a payload that PASSES the per-field/array Zod caps (each value ≤ 500
+    // chars, ≤ 200 rows/section) yet whose serialized `sections` JSON exceeds the
+    // action's PAYLOAD_BYTES_MAX (200_000) aggregate ceiling. Several full
+    // software sections of max-length rows clear the ceiling well within limits.
+    const bigValue = "v".repeat(500); // exactly the per-field cap
+    const fullSection = (sectionIndex: number) => ({
+      id: `sec-${String(sectionIndex)}`,
+      kind: "software" as const,
+      baseline: "Factory",
+      rows: Array.from({ length: 200 }, (_, rowIndex) => ({
+        id: `R-${String(sectionIndex)}-${String(rowIndex)}`,
+        name: `Row ${String(rowIndex)}`,
+        value: bigValue,
+      })),
+    });
+    const sections = Array.from({ length: 3 }, (_, i) =>
+      fullSection(i)
+    ) as unknown as SettingsSetPayload["sections"];
+
+    const result = await saveSettingsSetAction({
+      machineId: machine.id,
+      name: "Too big",
+      description: null,
+      sections,
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success === false)
+      expect(result.error).toBe("Settings are too large to save.");
+    const rows = await db
+      .select()
+      .from(machineSettingsSets)
+      .where(eq(machineSettingsSets.machineId, machine.id));
+    expect(rows).toHaveLength(0);
+  });
+
   // -- delete / duplicate ---------------------------------------------------
 
   it("deletes a set", async () => {
@@ -399,6 +444,47 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
     const copy = rows.find((r) => r.name === "Original (copy)");
     expect(copy).toBeDefined();
     expect(copy?.isPreferred).toBe(false);
+  });
+
+  it("truncates a max-length name when duplicating so the copy still fits NAME_MAX", async () => {
+    const db = await getTestDb();
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(owner.id);
+    const { duplicateSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    // A set whose name is exactly NAME_MAX (200) chars — appending " (copy)"
+    // verbatim would overflow the save schema, so the action must truncate the
+    // base first.
+    const longName = "n".repeat(NAME_MAX);
+    const [inserted] = await db
+      .insert(machineSettingsSets)
+      .values({ machineId: machine.id, name: longName, sections: [] })
+      .returning({ id: machineSettingsSets.id });
+    if (!inserted) throw new Error("setup insert failed");
+
+    const result = await duplicateSettingsSetAction({ id: inserted.id });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    const copy = await db.query.machineSettingsSets.findFirst({
+      where: eq(machineSettingsSets.id, result.id),
+      columns: { name: true },
+    });
+    const COPY_SUFFIX = " (copy)";
+    const expectedName = `${longName.slice(0, NAME_MAX - COPY_SUFFIX.length)}${COPY_SUFFIX}`;
+    expect(copy?.name).toBe(expectedName);
+    // Total length never exceeds the schema cap, and the copy is a valid save
+    // payload (so a later edit through saveSettingsSetAction won't be rejected).
+    expect(copy?.name.length).toBeLessThanOrEqual(NAME_MAX);
+    expect(copy?.name.endsWith(COPY_SUFFIX)).toBe(true);
+    const reparse = settingsSetPayloadSchema.safeParse({
+      name: copy?.name,
+      description: null,
+      sections: [],
+    });
+    expect(reparse.success).toBe(true);
   });
 
   // -- setPreferred exclusivity + partial unique index ----------------------
