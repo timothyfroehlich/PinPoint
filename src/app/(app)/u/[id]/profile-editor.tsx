@@ -35,7 +35,11 @@ export function ProfileEditor({
   return (
     <div className="space-y-6">
       {/* Avatar upload — its own form, posts a File to the avatar action */}
-      <form action={avatarAction} className="space-y-2">
+      <form
+        action={avatarAction}
+        encType="multipart/form-data"
+        className="space-y-2"
+      >
         {avatarState && !avatarState.ok ? (
           <p role="alert" className="text-destructive text-sm">
             Could not upload avatar. Check the file and try again.
