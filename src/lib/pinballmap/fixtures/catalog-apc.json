@@ -1,0 +1,810 @@
+[
+  {
+    "id": 4615,
+    "name": "Pokémon (Pro)",
+    "manufacturer": "Stern",
+    "year": 2026,
+    "opdb_id": "GV8wB-Mq12N",
+    "ipdb_id": null
+  },
+  {
+    "id": 1456,
+    "name": "Ali",
+    "manufacturer": "Stern Electronics",
+    "year": 1980,
+    "opdb_id": "G43kO-MQ50p",
+    "ipdb_id": 43
+  },
+  {
+    "id": 2647,
+    "name": "Torpedo Alley",
+    "manufacturer": "Data East",
+    "year": 1988,
+    "opdb_id": "G48on-ML8B9",
+    "ipdb_id": 2603
+  },
+  {
+    "id": 4622,
+    "name": "Houdini: Master of Mystery (100th Anniversary)",
+    "manufacturer": "American",
+    "year": 2026,
+    "opdb_id": "GvBQX-M0ody-A1kee",
+    "ipdb_id": null
+  },
+  {
+    "id": 3846,
+    "name": "John Wick (Premium)",
+    "manufacturer": "Stern",
+    "year": 2024,
+    "opdb_id": "GQK1P-Ml95Z-AOY43",
+    "ipdb_id": null
+  },
+  {
+    "id": 3877,
+    "name": "Round Up",
+    "manufacturer": "Gottlieb",
+    "year": 1948,
+    "opdb_id": "G6lYl-MdEwd",
+    "ipdb_id": 2027
+  },
+  {
+    "id": 2042,
+    "name": "Domino",
+    "manufacturer": "Gottlieb",
+    "year": 1968,
+    "opdb_id": "G4j8k-MJK5K",
+    "ipdb_id": 701
+  },
+  {
+    "id": 2349,
+    "name": "Diamond Lady",
+    "manufacturer": "Gottlieb",
+    "year": 1988,
+    "opdb_id": "G4jXW-MQdrN",
+    "ipdb_id": 678
+  },
+  {
+    "id": 1252,
+    "name": "The Lost World Jurassic Park",
+    "manufacturer": "Sega",
+    "year": 1997,
+    "opdb_id": "G4kBL-MLndo",
+    "ipdb_id": 4136
+  },
+  {
+    "id": 3738,
+    "name": "Venom (Pro)",
+    "manufacturer": "Stern",
+    "year": 2023,
+    "opdb_id": "G3EBl-Mq1zy",
+    "ipdb_id": 7064
+  },
+  {
+    "id": 2923,
+    "name": "Iron Maiden: Legacy of the Beast (Pro)",
+    "manufacturer": "Stern",
+    "year": 2018,
+    "opdb_id": "G4dOQ-MyNbb",
+    "ipdb_id": 6555
+  },
+  {
+    "id": 2116,
+    "name": "Secret Service",
+    "manufacturer": "Data East",
+    "year": 1988,
+    "opdb_id": "G4qqv-MDW0P",
+    "ipdb_id": 2090
+  },
+  {
+    "id": 1997,
+    "name": "Stingray",
+    "manufacturer": "Stern Electronics",
+    "year": 1977,
+    "opdb_id": "G57lj-MJwxY",
+    "ipdb_id": 2377
+  },
+  {
+    "id": 2565,
+    "name": "Spider-Man (Vault Edition)",
+    "manufacturer": "Stern",
+    "year": 2016,
+    "opdb_id": "G5D94-M3d5w",
+    "ipdb_id": 6328
+  },
+  {
+    "id": 2008,
+    "name": "Bone Busters Inc",
+    "manufacturer": "Gottlieb",
+    "year": 1989,
+    "opdb_id": "G5Lk0-MQjl3",
+    "ipdb_id": 347
+  },
+  {
+    "id": 1278,
+    "name": "Transporter the Rescue",
+    "manufacturer": "Bally",
+    "year": 1989,
+    "opdb_id": "G5n2D-MLn85",
+    "ipdb_id": 2630
+  },
+  {
+    "id": 2230,
+    "name": "Toledo",
+    "manufacturer": "Williams",
+    "year": 1975,
+    "opdb_id": "G5nj6-MyNEZ",
+    "ipdb_id": 2577
+  },
+  {
+    "id": 1582,
+    "name": "Top Score",
+    "manufacturer": "Gottlieb",
+    "year": 1975,
+    "opdb_id": "G5W1w-MQVkq",
+    "ipdb_id": 2589
+  },
+  {
+    "id": 2761,
+    "name": "A.G. Soccer-Ball",
+    "manufacturer": "Alvin G",
+    "year": 1991,
+    "opdb_id": "G5wxv-MQP9z",
+    "ipdb_id": 120
+  },
+  {
+    "id": 1927,
+    "name": "Flip Flop",
+    "manufacturer": "Bally",
+    "year": 1974,
+    "opdb_id": "Gr28v-Mp4Wr",
+    "ipdb_id": 889
+  },
+  {
+    "id": 785,
+    "name": "Kiss",
+    "manufacturer": "Bally",
+    "year": 1978,
+    "opdb_id": "G4jXr-MQ6kz",
+    "ipdb_id": 1386
+  },
+  {
+    "id": 1429,
+    "name": "Cheetah",
+    "manufacturer": "Stern Electronics",
+    "year": 1980,
+    "opdb_id": "GR6kW-Mo1W3",
+    "ipdb_id": 500
+  },
+  {
+    "id": 2441,
+    "name": "Game of Thrones (Pro)",
+    "manufacturer": "Stern",
+    "year": 2015,
+    "opdb_id": "G41d5-MKNwX",
+    "ipdb_id": 6307
+  },
+  {
+    "id": 1513,
+    "name": "Slick Chick",
+    "manufacturer": "Gottlieb",
+    "year": 1963,
+    "opdb_id": "Gre8z-MLeK2",
+    "ipdb_id": 2208
+  },
+  {
+    "id": 1158,
+    "name": "Hot Tip",
+    "manufacturer": "Williams",
+    "year": 1977,
+    "opdb_id": "Grep0-MQYN4",
+    "ipdb_id": 3163
+  },
+  {
+    "id": 1455,
+    "name": "Cleopatra",
+    "manufacturer": "Gottlieb",
+    "year": 1977,
+    "opdb_id": "GrknN-MQrdv",
+    "ipdb_id": 532
+  },
+  {
+    "id": 3022,
+    "name": "Deadpool (Pro)",
+    "manufacturer": "Stern",
+    "year": 2018,
+    "opdb_id": "G6lnq-Mq1kv",
+    "ipdb_id": 6558
+  },
+  {
+    "id": 4278,
+    "name": "Lucky Draw",
+    "manufacturer": "Mirco Games",
+    "year": 1978,
+    "opdb_id": "G4x0p-MDyyq",
+    "ipdb_id": 1486
+  },
+  {
+    "id": 3414,
+    "name": "Ultraman: Kaiju Rumble (Blood Sucker Edition)",
+    "manufacturer": "Spooky",
+    "year": 2021,
+    "opdb_id": "GBLLd-MdEON-A94po",
+    "ipdb_id": null
+  },
+  {
+    "id": 3267,
+    "name": "Avengers: Infinity Quest (Pro)",
+    "manufacturer": "Stern",
+    "year": 2020,
+    "opdb_id": "Gj66P-M3dxn",
+    "ipdb_id": 6754
+  },
+  {
+    "id": 3408,
+    "name": "Halloween (CE)",
+    "manufacturer": "Spooky",
+    "year": 2021,
+    "opdb_id": "Gj66Z-Mp4BN-A9Y6n",
+    "ipdb_id": null
+  },
+  {
+    "id": 3670,
+    "name": "Scooby-Doo (CE)",
+    "manufacturer": "Spooky",
+    "year": 2023,
+    "opdb_id": "GllPz-MBRrV-A9vWL",
+    "ipdb_id": null
+  },
+  {
+    "id": 3224,
+    "name": "Rick and Morty (SE)",
+    "manufacturer": "Spooky",
+    "year": 2019,
+    "opdb_id": "GQKb2-MYek0",
+    "ipdb_id": 6640
+  },
+  {
+    "id": 2433,
+    "name": "Mars God of War",
+    "manufacturer": "Gottlieb",
+    "year": 1981,
+    "opdb_id": "GrNpY-MJrZw",
+    "ipdb_id": 1549
+  },
+  {
+    "id": 2987,
+    "name": "Skyrocket",
+    "manufacturer": "Bally",
+    "year": 1971,
+    "opdb_id": "GrNZ7-MDOjq",
+    "ipdb_id": 2204
+  },
+  {
+    "id": 2367,
+    "name": "Doodle Bug",
+    "manufacturer": "Williams",
+    "year": 1971,
+    "opdb_id": "Grx1z-Mx02z",
+    "ipdb_id": 703
+  },
+  {
+    "id": 3328,
+    "name": "Sea Hunt",
+    "manufacturer": "Allied Leisure",
+    "year": 1972,
+    "opdb_id": "GRoN2-MRj30",
+    "ipdb_id": 2081
+  },
+  {
+    "id": 737,
+    "name": "The Machine: Bride of Pin-Bot",
+    "manufacturer": "Williams",
+    "year": 1991,
+    "opdb_id": "GRpee-MePdR",
+    "ipdb_id": 1502
+  },
+  {
+    "id": 931,
+    "name": "Spin Out",
+    "manufacturer": "Gottlieb",
+    "year": 1975,
+    "opdb_id": "GrPx2-M5RRk",
+    "ipdb_id": 2286
+  },
+  {
+    "id": 815,
+    "name": "Judge Dredd",
+    "manufacturer": "Bally",
+    "year": 1993,
+    "opdb_id": "GRoZw-MLW3j",
+    "ipdb_id": 1322
+  },
+  {
+    "id": 723,
+    "name": "PIN-BOT",
+    "manufacturer": "Williams",
+    "year": 1986,
+    "opdb_id": "G41Z8-MJKvP",
+    "ipdb_id": 1796
+  },
+  {
+    "id": 726,
+    "name": "Xenon",
+    "manufacturer": "Bally",
+    "year": 1979,
+    "opdb_id": "G42Pk-MZe2e",
+    "ipdb_id": 2821
+  },
+  {
+    "id": 908,
+    "name": "Space Invaders",
+    "manufacturer": "Bally",
+    "year": 1979,
+    "opdb_id": "G42PX-MyNXo",
+    "ipdb_id": 2252
+  },
+  {
+    "id": 698,
+    "name": "Monopoly",
+    "manufacturer": "Stern",
+    "year": 2001,
+    "opdb_id": "G48w3-Mq1Zk",
+    "ipdb_id": 4505
+  },
+  {
+    "id": 1048,
+    "name": "Satin Doll",
+    "manufacturer": "Williams",
+    "year": 1975,
+    "opdb_id": "G48YQ-MDxbK",
+    "ipdb_id": 2057
+  },
+  {
+    "id": 734,
+    "name": "Mata Hari (SS)",
+    "manufacturer": "Bally",
+    "year": 1978,
+    "opdb_id": "G417e-MDvXz",
+    "ipdb_id": 4501
+  },
+  {
+    "id": 650,
+    "name": "Tales of the Arabian Nights",
+    "manufacturer": "Williams",
+    "year": 1996,
+    "opdb_id": "G4llj-MQYb2",
+    "ipdb_id": 3824
+  },
+  {
+    "id": 730,
+    "name": "Big Game",
+    "manufacturer": "Stern Electronics",
+    "year": 1980,
+    "opdb_id": "G4jQw-MJ5rl",
+    "ipdb_id": 249
+  },
+  {
+    "id": 793,
+    "name": "Grand Prix",
+    "manufacturer": "Williams",
+    "year": 1976,
+    "opdb_id": "G4O1L-MDW47",
+    "ipdb_id": 1072
+  },
+  {
+    "id": 984,
+    "name": "Night Moves",
+    "manufacturer": "Gottlieb",
+    "year": 1989,
+    "opdb_id": "G4NY0-MDE29",
+    "ipdb_id": 3507
+  },
+  {
+    "id": 3732,
+    "name": "Vagabond",
+    "manufacturer": "Williams",
+    "year": 1962,
+    "opdb_id": "G4Pvp-MLBO0",
+    "ipdb_id": 2713
+  },
+  {
+    "id": 685,
+    "name": "Stargate",
+    "manufacturer": "Gottlieb",
+    "year": 1995,
+    "opdb_id": "G50pv-MdE6R",
+    "ipdb_id": 2847
+  },
+  {
+    "id": 851,
+    "name": "Meteor",
+    "manufacturer": "Stern Electronics",
+    "year": 1979,
+    "opdb_id": "G5b38-MDqkx",
+    "ipdb_id": 1580
+  },
+  {
+    "id": 678,
+    "name": "Revenge from Mars",
+    "manufacturer": "Bally",
+    "year": 1999,
+    "opdb_id": "G50Wr-MLeZP",
+    "ipdb_id": 4446
+  },
+  {
+    "id": 669,
+    "name": "Batman Forever",
+    "manufacturer": "Sega",
+    "year": 1995,
+    "opdb_id": "G59zN-MLy0N",
+    "ipdb_id": 3593
+  },
+  {
+    "id": 3829,
+    "name": "The 30's",
+    "manufacturer": "Playmatic",
+    "year": 1977,
+    "opdb_id": "G4Xdq-MLBlD",
+    "ipdb_id": 2532
+  },
+  {
+    "id": 703,
+    "name": "Funhouse",
+    "manufacturer": "Williams",
+    "year": 1990,
+    "opdb_id": "G5Dz7-Mq139",
+    "ipdb_id": 966
+  },
+  {
+    "id": 808,
+    "name": "Future Spa",
+    "manufacturer": "Bally",
+    "year": 1979,
+    "opdb_id": "G5Dbo-M3dv6",
+    "ipdb_id": 974
+  },
+  {
+    "id": 707,
+    "name": "World Cup Soccer",
+    "manufacturer": "Bally",
+    "year": 1994,
+    "opdb_id": "G42E2-MQP9e",
+    "ipdb_id": 2811
+  },
+  {
+    "id": 1079,
+    "name": "Genesis",
+    "manufacturer": "Gottlieb",
+    "year": 1986,
+    "opdb_id": "Gr2wz-MLBob",
+    "ipdb_id": 996
+  },
+  {
+    "id": 684,
+    "name": "Star Trek: The Next Generation",
+    "manufacturer": "Williams",
+    "year": 1993,
+    "opdb_id": "GR6d8-M1rZd",
+    "ipdb_id": 2357
+  },
+  {
+    "id": 4317,
+    "name": "Family Fun!",
+    "manufacturer": "Game Plan",
+    "year": 1979,
+    "opdb_id": "GRoW6-MQk81",
+    "ipdb_id": 817
+  },
+  {
+    "id": 721,
+    "name": "The Who's Tommy Pinball Wizard",
+    "manufacturer": "Data East",
+    "year": 1994,
+    "opdb_id": "GR6do-MLBq4",
+    "ipdb_id": 2579
+  },
+  {
+    "id": 3405,
+    "name": "Gaucho",
+    "manufacturer": "Gottlieb",
+    "year": 1963,
+    "opdb_id": "GrdqX-MLW81",
+    "ipdb_id": 988
+  },
+  {
+    "id": 1118,
+    "name": "TRON: Legacy",
+    "manufacturer": "Stern",
+    "year": 2011,
+    "opdb_id": "GrkL5-MLvrX",
+    "ipdb_id": 5682
+  },
+  {
+    "id": 708,
+    "name": "Star Wars Episode 1",
+    "manufacturer": "Williams",
+    "year": 1999,
+    "opdb_id": "GRL9r-MD34z",
+    "ipdb_id": 4458
+  },
+  {
+    "id": 766,
+    "name": "Playboy",
+    "manufacturer": "Bally",
+    "year": 1978,
+    "opdb_id": "GrkOB-MJVvl",
+    "ipdb_id": 1823
+  },
+  {
+    "id": 847,
+    "name": "Strikes and Spares",
+    "manufacturer": "Bally",
+    "year": 1977,
+    "opdb_id": "GrleW-MYeod",
+    "ipdb_id": 2406
+  },
+  {
+    "id": 990,
+    "name": "Al's Garage Band Goes On a World Tour",
+    "manufacturer": "Alvin G",
+    "year": 1992,
+    "opdb_id": "GRLz0-MeP4B",
+    "ipdb_id": 3513
+  },
+  {
+    "id": 715,
+    "name": "Congo",
+    "manufacturer": "Williams",
+    "year": 1995,
+    "opdb_id": "GrNd0-MJNW1",
+    "ipdb_id": 3780
+  },
+  {
+    "id": 834,
+    "name": "Harlem Globetrotters On Tour",
+    "manufacturer": "Bally",
+    "year": 1978,
+    "opdb_id": "GRnwQ-M9R5d",
+    "ipdb_id": 1125
+  },
+  {
+    "id": 791,
+    "name": "Space Mission",
+    "manufacturer": "Williams",
+    "year": 1976,
+    "opdb_id": "GRnX6-MQk8L",
+    "ipdb_id": 2253
+  },
+  {
+    "id": 689,
+    "name": "White Water",
+    "manufacturer": "Williams",
+    "year": 1993,
+    "opdb_id": "GRQKz-MyNXz",
+    "ipdb_id": 2768
+  },
+  {
+    "id": 662,
+    "name": "Lord of the Rings",
+    "manufacturer": "Stern",
+    "year": 2003,
+    "opdb_id": "GrqZX-MD15w",
+    "ipdb_id": 4858
+  },
+  {
+    "id": 682,
+    "name": "The Simpsons Pinball Party",
+    "manufacturer": "Stern",
+    "year": 2003,
+    "opdb_id": "GRvBL-MP3Ev",
+    "ipdb_id": 4674
+  },
+  {
+    "id": 1096,
+    "name": "Black Pyramid",
+    "manufacturer": "Bally",
+    "year": 1984,
+    "opdb_id": "GRVnY-MDz0l",
+    "ipdb_id": 312
+  },
+  {
+    "id": 794,
+    "name": "Hokus Pokus",
+    "manufacturer": "Bally",
+    "year": 1975,
+    "opdb_id": "GRwBN-MJ5ln",
+    "ipdb_id": 1206
+  },
+  {
+    "id": 728,
+    "name": "Spy Hunter",
+    "manufacturer": "Bally",
+    "year": 1984,
+    "opdb_id": "GRwl7-MJ45o",
+    "ipdb_id": 2328
+  },
+  {
+    "id": 1055,
+    "name": "Black Knight",
+    "manufacturer": "Williams",
+    "year": 1980,
+    "opdb_id": "GrO7w-M9R03",
+    "ipdb_id": 310
+  },
+  {
+    "id": 897,
+    "name": "Paragon",
+    "manufacturer": "Bally",
+    "year": 1979,
+    "opdb_id": "GrXy3-ML0Ey",
+    "ipdb_id": 1755
+  },
+  {
+    "id": 751,
+    "name": "F-14 Tomcat",
+    "manufacturer": "Williams",
+    "year": 1987,
+    "opdb_id": "GRY2O-MLWdy",
+    "ipdb_id": 804
+  },
+  {
+    "id": 795,
+    "name": "High Hand",
+    "manufacturer": "Gottlieb",
+    "year": 1973,
+    "opdb_id": "GRYbJ-MnKex",
+    "ipdb_id": 1173
+  },
+  {
+    "id": 875,
+    "name": "Flash",
+    "manufacturer": "Williams",
+    "year": 1979,
+    "opdb_id": "Grypn-MQdbe",
+    "ipdb_id": 871
+  },
+  {
+    "id": 4509,
+    "name": "Avatar: The Battle for Pandora (LE)",
+    "manufacturer": "Jersey Jack",
+    "year": 2024,
+    "opdb_id": "GbPxB-MkPol-A93vd",
+    "ipdb_id": null
+  },
+  {
+    "id": 3833,
+    "name": "The Princess Bride (CE)",
+    "manufacturer": "Multimorphic",
+    "year": 2024,
+    "opdb_id": "GkBnQ-MBRxV-A96qp",
+    "ipdb_id": null
+  },
+  {
+    "id": 4527,
+    "name": "Cactus Canyon (Lyman Upgrade)",
+    "manufacturer": "Chicago Gaming",
+    "year": 2025,
+    "opdb_id": "G4835-M2YPK-ARkb7",
+    "ipdb_id": null
+  },
+  {
+    "id": 4533,
+    "name": "King Kong: Myth of Terror Island (Pro)",
+    "manufacturer": "Stern",
+    "year": 2025,
+    "opdb_id": "GEL0V-MBRyb",
+    "ipdb_id": null
+  },
+  {
+    "id": 2837,
+    "name": "Memory Lane",
+    "manufacturer": "Stern Electronics",
+    "year": 1978,
+    "opdb_id": "Gry0Z-MP3zR",
+    "ipdb_id": 1570
+  },
+  {
+    "id": 944,
+    "name": "Split Second",
+    "manufacturer": "Stern Electronics",
+    "year": 1981,
+    "opdb_id": "GRLbz-MDnxo",
+    "ipdb_id": 2297
+  },
+  {
+    "id": 2713,
+    "name": "Star Gazer",
+    "manufacturer": "Stern Electronics",
+    "year": 1980,
+    "opdb_id": "GrZY2-ML0Rb",
+    "ipdb_id": 2346
+  },
+  {
+    "id": 937,
+    "name": "Flight 2000",
+    "manufacturer": "Stern Electronics",
+    "year": 1980,
+    "opdb_id": "G48kY-MDxRV",
+    "ipdb_id": 887
+  },
+  {
+    "id": 1335,
+    "name": "X-Men Wolverine (LE)",
+    "manufacturer": "Stern",
+    "year": 2012,
+    "opdb_id": "Grj6X-MJNV1-AO209",
+    "ipdb_id": 5824
+  },
+  {
+    "id": 3245,
+    "name": "Counterforce",
+    "manufacturer": "Gottlieb",
+    "year": 1980,
+    "opdb_id": "GRYPN-Mz2RE",
+    "ipdb_id": 570
+  },
+  {
+    "id": 1211,
+    "name": "Humpty Dumpty",
+    "manufacturer": "Gottlieb",
+    "year": 1947,
+    "opdb_id": "GyVVQ-MVKYX",
+    "ipdb_id": 1254
+  },
+  {
+    "id": 855,
+    "name": "Stars",
+    "manufacturer": "Stern Electronics",
+    "year": 1978,
+    "opdb_id": "GrXEW-MDEwr",
+    "ipdb_id": 2366
+  },
+  {
+    "id": 3784,
+    "name": "Jim Henson’s Labyrinth",
+    "manufacturer": "Barrels of Fun",
+    "year": 2023,
+    "opdb_id": "GvBn8-Mz291",
+    "ipdb_id": null
+  },
+  {
+    "id": 3416,
+    "name": "Godzilla (Premium)",
+    "manufacturer": "Stern",
+    "year": 2021,
+    "opdb_id": "GweeP-Ml9pZ-ARZoY",
+    "ipdb_id": 6842
+  },
+  {
+    "id": 3787,
+    "name": "Drained",
+    "manufacturer": "For Amusement Only Games",
+    "year": 2022,
+    "opdb_id": "GyVb1-MYeq1",
+    "ipdb_id": null
+  },
+  {
+    "id": 3419,
+    "name": "Jurassic Park (Home Edition)",
+    "manufacturer": "Stern",
+    "year": 2021,
+    "opdb_id": "GxvvB-MOEKX",
+    "ipdb_id": null
+  },
+  {
+    "id": 3836,
+    "name": "Ninja Eclipse (First Edition)",
+    "manufacturer": "Turner",
+    "year": 2024,
+    "opdb_id": "GZVXY-MyNOq-ARWE8",
+    "ipdb_id": null
+  },
+  {
+    "id": 3179,
+    "name": "Elvira's House of Horrors (Premium)",
+    "manufacturer": "Stern",
+    "year": 2019,
+    "opdb_id": "GZVOd-MwNxZ-AOLoy",
+    "ipdb_id": 6596
+  }
+]
