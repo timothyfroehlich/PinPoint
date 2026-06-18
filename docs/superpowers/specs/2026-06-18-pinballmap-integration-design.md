@@ -1,7 +1,8 @@
 # PinballMap Integration — Design
 
 **Date:** 2026-06-18
-**Status:** Design (brainstorm complete, pending review)
+**Status:** Approved — epic created
+**Epic:** PP-o355 (children PP-o355.1–.10 — see §6)
 **Branch:** `worktree-pinballmap`
 **Wireframes:** `docs/superpowers/specs/2026-06-07-pinballmap-wireframes.html` (PinPoint-styled, open in a browser)
 
@@ -189,6 +190,8 @@ Rationale: pages never block on or get rate-limited by an external API; the desy
 ## 6. Epic breakdown
 
 One bead = one PR. Each is a **vertical, individually-shippable slice** that leaves the app usable and carries its own migration where it needs one. Order respects dependencies; work is **not** lockstep.
+
+**Beads:** A = `PP-o355.1`, B = `.2`, C = `.3`, D = `.4`, E = `.5`, F = `.6`, G = `.7`, H = `.8`, I = `.9`; rollout checklist = `PP-o355.10`. Only A is unblocked initially.
 
 | Bead                                              | Ships (usable outcome)                                                                                                                                                                                                                                                                                                                                        | Depends on |
 | :------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------- |
