@@ -18,11 +18,11 @@ Core outcomes:
 3. **Require** a PBM catalog link (or an explicit "not on PinballMap" flag) on every machine, pulling model metadata (manufacturer, year, OPDB/IPDB ids) on link.
 4. **Tech/admin status page** showing bidirectional desync, a linking backlog, and map-side additions to import.
 5. **Sync PBM comments** into machine timelines, with a one-shot "convert to issue" action and watcher notifications.
-6. **Outbound writes to PBM** (add/remove, condition comments) — v1 via a single seeded operator token; per-user attribution deferred to a later phase.
+6. **Outbound writes to PBM** (add/remove, condition comments) — v1 in-app by Tim via a seeded operator token; **per-user account linking follows soon (bead F)** so members act as themselves (Tim's account is never used for others).
 7. **Admin integrations config** (generic Integrations page).
 8. **Respect PBM's `llms.txt`** API-conduct policy, with drift detection.
 
-Out of scope (v1): PBM high scores (`machine_score_xrefs`), normalized mirror tables, auto-posting comments on issue close (manual only; revisit later).
+Out of scope (v1): PBM high scores (`machine_score_xrefs`), mirroring the location's LMX/condition data (the hourly snapshot covers that — §4.3; note the machine **catalog** mirror for linking IS in scope, per PBM's "cache locally" guidance), auto-posting comments on issue close (manual only; revisit later).
 
 ---
 
@@ -37,6 +37,8 @@ Out of scope (v1): PBM high scores (`machine_score_xrefs`), normalized mirror ta
 - **`llms.txt` exists** and is an agent-conduct doc: "<10 calls at startup", "hundreds of requests = designed incorrectly", use bulk endpoints + filters, tiered rate limits (IP + per-endpoint), `no_details=1` to trim payloads.
 - **`robots.txt` blocks AI crawlers** (`ClaudeBot`, `anthropic-ai`, etc.), Crawl-delay 3. → The **API is the sanctioned channel; crawling the site is not.** Agents must use the documented API.
 - **Confirm endpoint:** `PUT /api/v1/locations/:id/confirm.json` — "this lineup is accurate as of today," no mutation.
+- **Token handling (their guidance):** _"Store it; do not re-fetch the token on every request… Fetch the token once, store it, reuse it."_ **No token expiry, rotation, or refresh mechanism is documented** — a token is stable until the account password changes.
+- **Caching is encouraged:** _"Fetch once at startup and cache locally"_; anti-pattern: _"Do not poll the API repeatedly… build your own sync schedule."_ A bulk `GET /api/v1/machines.json` (filters: `no_details`, `manufacturer`, `region_id`) returns the canonical machine catalog — suitable for a local mirror behind the linking picker.
 
 ---
 
@@ -49,18 +51,20 @@ Out of scope (v1): PBM high scores (`machine_score_xrefs`), normalized mirror ta
 
 ### Linking & metadata
 
-- **Machine _create_ requires** a PBM catalog link **or** an explicit `pinballmapExcluded` flag (for the one non-pinball machine). DB columns are nullable; enforcement is at the **create** form/action validation layer. **Editing is never blocked** — existing machines are never frozen.
-  - **Backfill is a prod Claude session:** when this ships to prod, Tim runs a Claude session to walk every existing game and link it (or mark it excluded) properly, using the status page "Unlinked" tab + catalog search. Not a UI-only bulk tool.
+- **Machine _create_ will require** a PBM catalog link **or** an explicit `pinballmapExcluded` flag (for the one non-pinball machine). DB columns are nullable; the validation lives at the **create** form/action layer, but **the hard requirement is gated behind a flag and only enabled at full rollout** (once per-user linking is generally available — §6.1). During build-out, linking is available but optional. **Editing is never blocked** — existing machines are never frozen.
+  - **Backfill is a prod Claude session:** at rollout, Tim runs a Claude session to walk every existing game and link it (or mark it excluded) properly, using the status page "Unlinked" tab + catalog search. Not a UI-only bulk tool.
 - On link, **pull and store** model metadata from the PBM catalog: `manufacturer`, `year`, `opdb_id`, `ipdb_id`, plus `pinballmapMachineId`.
 - **Manufacturer/year render in general machine info** (not a PBM-branded panel). **OPDB/IPDB are stored but never shown** in the GUI.
+- The **catalog picker searches a local mirror** (`pinballmap_catalog`, §4.2; refreshed weekly), not a live per-keystroke API call — faster, and PBM's recommended "cache locally" pattern.
 - The linked title can be **changed/re-linked** to correct a wrong model pick (via the machine Info card's edit modal).
 
 ### Surfaces
 
 - **Machine Info card is status-only:** a Listed/Not-listed pill + a small ⚠ shown _only when desynced_ + 2–3 action buttons (Post comment, View on PinballMap ↗, Edit…). No metadata table, no ids.
 - **All PBM-mutating edits funnel through one confirm modal** ("Edit…"): change linked title, toggle Insider Connected, mark excluded.
-- **Status page (tech/admin):** bidirectional desync table (we-changed vs map-changed), counters, tabs (Desynced / Unlinked / Import from map / All linked), snooze/acknowledge, "Sync now," and **"Confirm line-up"** (PBM `confirm.json`). Menu/nav home **TBD** (see Open Questions).
+- **Status page (tech/admin):** bidirectional desync table (we-changed vs map-changed), counters, tabs (Desynced / Unlinked / Import from map / All linked), snooze/acknowledge, "Sync now," and **"Confirm line-up"** — a button showing the **last-confirmed time** that, before pushing PBM's `confirm.json`, **requires the user to confirm each still-out-of-sync machine is actually correct** (no blind-confirming over open desyncs). Menu/nav home **TBD** (see Open Questions).
 - **Import map-side additions:** the "Import from map" tab lists machines on PBM unknown to PinPoint → "Create PinPoint machine" prefilled from PBM metadata, or "Ignore."
+- **Public "View on PinballMap" link:** anyone (including unauthenticated visitors) can find a machine on PBM from its PinPoint page. The deep link is public; only the _actions_ (post/edit) are permission-gated.
 
 ### Comments → timeline
 
@@ -71,25 +75,27 @@ Out of scope (v1): PBM high scores (`machine_score_xrefs`), normalized mirror ta
 
 ### Auth (outbound writes)
 
-- **No service account exists on PBM**, and PBM auth is per personal account (token from `auth_details`, reused). Reads are always anonymous.
-- **Initial rollout: a single manually-seeded operator token.** Tim's PBM `user_email` + `user_token` are inserted by hand into the `pinballmap_state` row. All outbound writes use it, so they appear on PBM as Tim's account. This **defers building any credential-handling UI** to a later phase.
-- Because every write is attributed to the one seeded account, **v1 outbound is restricted to technician + admin** (not owner self-service).
-- **Later phase (deferred, its own bead): per-user accounts.** Profile-settings linking with two paths in one task — log in (exchange password→token via `auth_details`, store the **token only**, discard the password) **or** paste an existing token; encrypted per-user storage; auth-failure surfacing ("PinballMap rejected your credentials"); opens outbound to machine owners. Replaces the shared token. Until then, unlinked-but-permitted users see a deep-link fallback ("Open on PinballMap ↗"). Not in the initial rollout.
+- **PBM has no service account / app registration** — auth is per personal account. Reads are always anonymous; writes append `user_email` + `user_token`. **Storing + reusing the token is exactly PBM's recommendation** (_"Fetch the token once, store it, reuse it"_); there is **no token expiry or rotation** mechanism (a token lives until the account password changes).
+- **Tim does not want others posting through his account.** So:
+  - **v1 in-app outbound = admin (Tim) only**, using a single **manually-seeded operator token** (`pinballmap_state.outboundEmail` / `outboundToken`). This defers credential UI without letting anyone else write as Tim.
+  - **Permitted-but-unlinked users** (owner/tech+ — see Permissions) get the **deep-link fallback** ("Open on PinballMap ↗") to act manually on PBM, until they can link their own account.
+- **Per-user account linking ships early (bead F), not last.** Once it lands, owner/tech+ perform in-app outbound with **their own** token — never the seeded one. Linking offers two paths in one task: log in (exchange password→token via `auth_details`, store the **token only**, discard the password) **or** paste an existing token.
+- **Token handling:** encrypt tokens at rest; provide **unlink/re-link** as the manual "rotation" (PBM has no rotation API); detect a rejected token and surface it distinctly ("PinballMap rejected your credentials"); never log tokens. The seeded operator token is retired (or kept as an admin fallback) once Tim links his own account.
 
 ### Outbound
 
-- **Manual condition-comment composer** only (tech+), reached from the Info card. No auto-post on issue close in v1.
+- **Manual condition-comment composer** only (no auto-post on issue close in v1), reached from the Info card. Open to **owner + technician + admin** — gated by usable creds (v1 in-app = Tim only; broadens after bead F).
 - **Stern Insider Connected** toggle is an action (in the edit modal); **no desync tracking** for it (no PinPoint source-of-truth to diff against).
 
 ### Sync mechanics
 
 - **Cadence:** hourly. **Reads are anonymous.** A manual "Sync now" button exists for tech+.
-- **Scheduler:** Vercel Cron (requires Vercel Pro). Documented fallback: Supabase `pg_cron` + `pg_net` (the sync route is identical either way — a `CRON_SECRET`-authenticated `GET`). The route is **scheduler-agnostic**: it ships with the manual "Sync now" trigger; the hourly schedule is wired during prod rollout once the Pro/cron decision is made, so the build doesn't block on it.
+- **Scheduler: Vercel Cron** (Pro plan — upgraded/confirmed). Fallback if ever needed: Supabase `pg_cron` + `pg_net`. The sync route is a `CRON_SECRET`-authenticated `GET` and **scheduler-agnostic** — it ships with the manual "Sync now" trigger; the hourly Vercel Cron schedule is wired at rollout.
 
 ### Permissions (matrix entries)
 
 - `machines.pinballmap.link` (set/change the catalog link, mark excluded) — follows machine-edit rules: member = `owner`, admin = true; else false.
-- `machines.pinballmap.push` (write to PBM: post comment, add/remove, IC toggle, confirm) — **v1 = technician + admin only** (all writes post as the shared seeded account). The per-user phase later opens this to machine owners.
+- `machines.pinballmap.push` (write to PBM: post comment, add/remove, IC toggle, confirm) — **owner + technician + admin**. _Permission_ says who's allowed; _execution_ additionally requires usable creds, so **v1 in-app = admin only** (seeded token); others use the deep-link fallback until they link an account (bead F).
 - `pinballmap.status.view` (status page): technician = true, admin = true; else false.
 - `pinballmap.admin` (integration config): admin only.
 - Convert-to-issue uses the existing issue-create permission.
@@ -109,8 +115,8 @@ interface PinballMapClient {
   removeMachine(lmxId)                           // write
   postCondition(lmxId, comment)                  // write
   confirmLineup(locationId)                      // write
-  searchCatalog(query): CatalogMachine[]         // anonymous read
-  authDetails(login, password): { token, username } // one-time token exchange
+  fetchCatalog(): CatalogMachine[]               // anonymous bulk read → populates local mirror
+  authDetails(login, password): { token, username } // token exchange (bead F)
 }
 ```
 
@@ -134,7 +140,12 @@ interface PinballMapClient {
 - **Outbound creds (v1):** `outboundEmail`, `outboundToken` — the single manually-seeded operator token. (Encryption deferred to the per-user phase.)
 - Config + snapshot + creds share one row (all singleton).
 
-**Deferred (per-user phase, not v1):** a `pinballmap_user_credentials` table (`userId`, `pbmUsername`, `pbmTokenEncrypted`, `linkedAt`, `lastAuthStatus`) replaces the shared token when per-user linking lands.
+**New table `pinballmap_catalog`** (local mirror of PBM's machine catalog, for the linking picker):
+
+- `pinballmapMachineId` (PK), `name`, `manufacturer`, `year`, `opdbId`, `ipdbId`, `refreshedAt`.
+- Populated by a bulk `GET /api/v1/machines.json` (with `no_details`), refreshed weekly. The picker searches this locally — PBM's recommended "cache locally" pattern, not live per-keystroke calls.
+
+**New table `pinballmap_user_credentials`** (bead F — ships early, not deferred): `userId`, `pbmUsername`, `pbmTokenEncrypted`, `linkedAt`, `lastAuthStatus`. Replaces the shared seeded token for everyone but Tim.
 
 **Migrations are per-bead** — each feature bead carries its own migration (machine columns; then `pinballmap_state`; then the timeline extension), rather than one upfront schema PR. Regenerate against latest `main` at implementation time (see §7).
 
@@ -153,7 +164,7 @@ Hourly (or manual): the cron route fetches the one location JSON via the live cl
 - **Comment ingestion** walks the snapshot's `machine_conditions`, skipping any PBM condition id already turned into a timeline event (GIN-indexed lookup), inserting the rest as `pbm_comment` events and firing watcher notifications.
 - **LMX ids are resolved from the snapshot at action time**, never cached (they're PBM-ephemeral).
 
-Rationale: pages never block on or get rate-limited by an external API; the desync view works offline with an honest "last synced N min ago"; one fetch serves all features; dedupe derives from data we already store. Rejected alternatives: normalized mirror tables (duplicates the timeline; YAGNI), live-fetch-on-render (fragile, leans on PBM uptime for the page you use when something's already wrong).
+Rationale: pages never block on or get rate-limited by an external API; the desync view works offline with an honest "last synced N min ago"; one fetch serves all features; dedupe derives from data we already store. Rejected for the _location's_ LMX/condition data: a normalized mirror (the snapshot already covers it; mirroring would duplicate the timeline — YAGNI) and live-fetch-on-render (fragile, leans on PBM uptime for the page you use when something's already wrong). **The machine _catalog_ mirror (§4.2) is the deliberate exception** — PBM explicitly recommends caching it locally, and it powers the linking picker.
 
 ### 4.4 API conduct & policy compliance
 
@@ -178,26 +189,28 @@ Rationale: pages never block on or get rate-limited by an external API; the desy
 
 One bead = one PR. Each is a **vertical, individually-shippable slice** that leaves the app usable and carries its own migration where it needs one. Order respects dependencies; work is **not** lockstep.
 
-| Bead                                         | Ships (usable outcome)                                                                                                                                                                                                                                                                   | Depends on |
-| :------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
-| **A. Client seam + dev harness + policy**    | `PinballMapClient` interface, live + mock impls, `PINBALLMAP_MODE`, captured fixtures, refresh script, vendored `docs/external/*`, API-conduct non-negotiable + AGENTS.md rule. _Foundation: testable, unblocks everything._                                                             | —          |
-| **B. Machine ↔ PBM linking**                 | _migration:_ machine columns + CHECK. Create-form catalog picker (search), **create-only** block validation, metadata autofill (mfg/year/opdb/ipdb), exclude flag, re-link on edit. _After: new machines capture PBM identity; mfg/year visible._                                        | A          |
-| **C. Snapshot sync + status card**           | _migration:_ `pinballmap_state`. Scheduler-agnostic sync route + snapshot fetch/store, manual "Sync now," status-only Info card (listed/not, last comment, desync ⚠, View on PinballMap). _After: per-machine PBM status, refreshable._                                                  | A, B       |
-| **D. Comments → timeline**                   | _migration:_ timeline `sourceType`/`eventData` + GIN index. Comment ingestion, attribution render, dedupe, orphan promotion, watcher notification category, **convert-to-issue**. _After: PBM comments flow into timelines + become issues._                                             | A, C       |
-| **E. Outbound writes (seeded token)**        | Seed `pinballmap_state` outbound creds; outbound client methods (add/remove/postCondition/confirm/IC); `machines.pinballmap.push` perm (tech+); wire Info-card comment composer + presence-change CTA (+ soft guidance) + edit modal. _After: push changes to PBM from machine context._ | A, B, C    |
-| **F. Status page**                           | Desync control room: bidirectional table, counters, tabs (Desynced/Unlinked/Import-from-map/All-linked), snooze/ack, Sync now, Confirm line-up, import-as-new — write actions use E. _After: full drift management._                                                                     | C, D, E    |
-| **G. Admin Integrations refactor**           | Discord page → generic Admin → Integrations page; add PBM section (enable, locationId, sync health, run/log, link to status page). _Independent slice._                                                                                                                                  | C          |
-| **H. Drift GHA**                             | Daily `llms.txt` diff → GitHub issue (no labels). _Independent slice._                                                                                                                                                                                                                   | A          |
-| **I. Per-user credentials (deferred phase)** | _migration:_ `pinballmap_user_credentials`. Profile-settings linking (login + paste-token), encrypted per-user storage, auth-failure surfacing, opens outbound to owners, replaces the shared token. _Not in initial rollout._                                                           | E          |
+| Bead                                              | Ships (usable outcome)                                                                                                                                                                                                                                                                                                                                 | Depends on |
+| :------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
+| **A. Client seam + dev harness + policy**         | `PinballMapClient` interface, live + mock impls, `PINBALLMAP_MODE`, captured fixtures, refresh script, vendored `docs/external/*`, API-conduct non-negotiable + AGENTS.md rule. _Foundation: testable, unblocks everything._                                                                                                                           | —          |
+| **B. Machine ↔ PBM linking**                      | _migration:_ machine columns + CHECK, `pinballmap_catalog` mirror. Weekly catalog fetch; create-form picker searching the **local mirror**; metadata autofill (mfg/year/opdb/ipdb); exclude flag; re-link on edit. Create-time requirement implemented **behind a flag, OFF until rollout**. _After: machines capture PBM identity; mfg/year visible._ | A          |
+| **C. Snapshot sync + status card**                | _migration:_ `pinballmap_state`. Scheduler-agnostic sync route + snapshot fetch/store, manual "Sync now," status-only Info card (listed/not, last comment, desync ⚠) + **public View-on-PinballMap deep link**. _After: per-machine PBM status, refreshable._                                                                                          | A, B       |
+| **D. Comments → timeline**                        | _migration:_ timeline `sourceType`/`eventData` + GIN index. Ingestion, attribution render, dedupe, orphan promotion, watcher notification category, **convert-to-issue**. _After: PBM comments flow into timelines + become issues._                                                                                                                   | A, C       |
+| **E. Outbound writes (seeded token, admin-only)** | Seed `pinballmap_state` creds; outbound client methods (add/remove/postCondition/confirm/IC); `machines.pinballmap.push` perm (owner+tech+admin); **v1 in-app execution admin-only** + deep-link fallback for others; wire Info-card composer + presence-change CTA (+ soft guidance) + edit modal. _After: Tim can push to PBM in-app._               | A, B, C    |
+| **F. Per-user account linking** _(moved up)_      | _migration:_ `pinballmap_user_credentials`. Profile-settings linking (login + paste-token), encrypted storage, unlink/re-link, auth-failure surfacing; opens in-app outbound to owner/tech+ via **their own** token. _After: members act as themselves on PBM._                                                                                        | A, E       |
+| **G. Status page**                                | Desync control room: bidirectional table, counters, tabs (Desynced/Unlinked/Import-from-map/All-linked), snooze/ack, Sync now, import-as-new, **Confirm line-up** (last-confirmed time + per-desync confirmation before push). _After: full drift management._                                                                                         | C, D, E    |
+| **H. Admin Integrations refactor**                | Discord page → generic Admin → Integrations page; add PBM section (enable, locationId, sync health, run/log, link to status page). _Independent slice._                                                                                                                                                                                                | C          |
+| **I. Drift GHA**                                  | Daily `llms.txt` diff → GitHub issue (no labels). _Independent slice._                                                                                                                                                                                                                                                                                 | A          |
 
 ### 6.1 Prod rollout (checklist, not a build bead)
 
 Tracked as a checklist at epic close, not a code PR:
 
-1. Decide Vercel Pro vs. `pg_cron` fallback; wire the hourly schedule onto the sync route.
+1. Wire the hourly **Vercel Cron** schedule onto the sync route (Pro confirmed).
 2. Insert Tim's PBM `outboundEmail` + `outboundToken` into the `pinballmap_state` row by hand.
 3. **Claude linking session:** walk all ~98 existing games, linking each to its PBM catalog title or marking it excluded.
-4. Enable the integration; confirm first sync + a test outbound write.
+4. **Enable the create-time linking requirement** (flag on).
+5. Enable the integration; confirm first sync + a test outbound write.
+6. Announce **per-user account linking** (bead F) so members can act as themselves instead of via the deep-link fallback.
 
 ---
 
@@ -214,7 +227,7 @@ Tracked as a checklist at epic close, not a code PR:
 2. **Convert-to-issue prefill** — title from comment snippet; severity blank. Confirm in-app.
 3. **Outbound on issue close** — kept manual-only for v1; revisit whether closing a notable issue should offer a prefilled composer.
 4. **Desync table density** — one bidirectional table vs. split "we changed" / "map changed." Decide once seen in-app.
-5. **Confirm-line-up auto-prompt** — offer after all desyncs cleared?
+5. **Catalog refresh cadence** — weekly assumed; confirm in-app (new titles appear within a week).
 
 ---
 
