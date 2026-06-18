@@ -49,8 +49,8 @@ Out of scope (v1): PBM high scores (`machine_score_xrefs`), normalized mirror ta
 
 ### Linking & metadata
 
-- **Machine create/edit requires** a PBM catalog link **or** an explicit `pinballmapExcluded` flag (for the one non-pinball machine). DB columns are nullable; enforcement is at the form/action validation layer.
-  - **Rollout sequencing:** create-time enforcement ships immediately; **edit-time enforcement is enabled only after the bulk linking session** clears the existing ~98 machines (via the status page "Unlinked" tab), so existing machines aren't frozen.
+- **Machine _create_ requires** a PBM catalog link **or** an explicit `pinballmapExcluded` flag (for the one non-pinball machine). DB columns are nullable; enforcement is at the **create** form/action validation layer. **Editing is never blocked** — existing machines are never frozen.
+  - **Backfill is a prod Claude session:** when this ships to prod, Tim runs a Claude session to walk every existing game and link it (or mark it excluded) properly, using the status page "Unlinked" tab + catalog search. Not a UI-only bulk tool.
 - On link, **pull and store** model metadata from the PBM catalog: `manufacturer`, `year`, `opdb_id`, `ipdb_id`, plus `pinballmapMachineId`.
 - **Manufacturer/year render in general machine info** (not a PBM-branded panel). **OPDB/IPDB are stored but never shown** in the GUI.
 - The linked title can be **changed/re-linked** to correct a wrong model pick (via the machine Info card's edit modal).
@@ -69,12 +69,12 @@ Out of scope (v1): PBM high scores (`machine_score_xrefs`), normalized mirror ta
 - A **new notification category** fires for machine watchers on imported PBM comments.
 - Each PBM comment item carries a **one-shot "Convert to issue"** action: prefills a new issue (title from the comment snippet; severity left to the human), records the conversion in `eventData` so the button disappears.
 
-### Auth (per-user)
+### Auth (outbound writes)
 
-- **No service account.** Each user links **their own** PBM account in profile settings. Two paths in **one task**: (a) log in — we exchange password→token via `auth_details`, store the **token only**, discard the password; (b) paste an existing token.
-- Tokens stored **server-side only, encrypted at rest**. Outbound CTAs require a linked account.
-- **Unlinked users** get a deep-link fallback ("Open on PinballMap ↗" + "Link your account for one-click"). Nothing is blocked.
-- **Stale/rejected tokens** are surfaced distinctly ("PinballMap rejected your credentials"), not as generic sync errors.
+- **No service account exists on PBM**, and PBM auth is per personal account (token from `auth_details`, reused). Reads are always anonymous.
+- **Initial rollout: a single manually-seeded operator token.** Tim's PBM `user_email` + `user_token` are inserted by hand into the `pinballmap_state` row. All outbound writes use it, so they appear on PBM as Tim's account. This **defers building any credential-handling UI** to a later phase.
+- Because every write is attributed to the one seeded account, **v1 outbound is restricted to technician + admin** (not owner self-service).
+- **Later phase (deferred, its own bead): per-user accounts.** Profile-settings linking with two paths in one task — log in (exchange password→token via `auth_details`, store the **token only**, discard the password) **or** paste an existing token; encrypted per-user storage; auth-failure surfacing ("PinballMap rejected your credentials"); opens outbound to machine owners. Replaces the shared token. Until then, unlinked-but-permitted users see a deep-link fallback ("Open on PinballMap ↗"). Not in the initial rollout.
 
 ### Outbound
 
@@ -84,11 +84,12 @@ Out of scope (v1): PBM high scores (`machine_score_xrefs`), normalized mirror ta
 ### Sync mechanics
 
 - **Cadence:** hourly. **Reads are anonymous.** A manual "Sync now" button exists for tech+.
-- **Scheduler:** Vercel Cron (requires Vercel Pro). Documented fallback: Supabase `pg_cron` + `pg_net` (the sync route is identical either way — a `CRON_SECRET`-authenticated `GET`).
+- **Scheduler:** Vercel Cron (requires Vercel Pro). Documented fallback: Supabase `pg_cron` + `pg_net` (the sync route is identical either way — a `CRON_SECRET`-authenticated `GET`). The route is **scheduler-agnostic**: it ships with the manual "Sync now" trigger; the hourly schedule is wired during prod rollout once the Pro/cron decision is made, so the build doesn't block on it.
 
 ### Permissions (matrix entries)
 
-- `machines.pinballmap.push` (post comment, add/remove, edit link, IC toggle): member = `owner` (owns the machine), technician = true, admin = true; else false. → "owners and tech+."
+- `machines.pinballmap.link` (set/change the catalog link, mark excluded) — follows machine-edit rules: member = `owner`, admin = true; else false.
+- `machines.pinballmap.push` (write to PBM: post comment, add/remove, IC toggle, confirm) — **v1 = technician + admin only** (all writes post as the shared seeded account). The per-user phase later opens this to machine owners.
 - `pinballmap.status.view` (status page): technician = true, admin = true; else false.
 - `pinballmap.admin` (integration config): admin only.
 - Convert-to-issue uses the existing issue-create permission.
@@ -130,11 +131,12 @@ interface PinballMapClient {
 
 - Config: `enabled`, `locationId`.
 - Snapshot: `snapshotJson` (raw location response), `lastSyncedAt`, `lastSyncStatus` (ok/error), `lastSyncError`.
-- Config + snapshot share one row (1:1, both singleton). **No service credentials** (per-user auth lives elsewhere).
+- **Outbound creds (v1):** `outboundEmail`, `outboundToken` — the single manually-seeded operator token. (Encryption deferred to the per-user phase.)
+- Config + snapshot + creds share one row (all singleton).
 
-**New table `pinballmap_user_credentials`** (per-user):
+**Deferred (per-user phase, not v1):** a `pinballmap_user_credentials` table (`userId`, `pbmUsername`, `pbmTokenEncrypted`, `linkedAt`, `lastAuthStatus`) replaces the shared token when per-user linking lands.
 
-- `userId` (FK), `pbmUsername`, `pbmTokenEncrypted`, `linkedAt`, `lastAuthStatus`.
+**Migrations are per-bead** — each feature bead carries its own migration (machine columns; then `pinballmap_state`; then the timeline extension), rather than one upfront schema PR. Regenerate against latest `main` at implementation time (see §7).
 
 **Timeline extension** (the 2026-05-17 timeline spec reserved this):
 
@@ -174,27 +176,34 @@ Rationale: pages never block on or get rate-limited by an external API; the desy
 
 ## 6. Epic breakdown
 
-One bead = one PR; each ships complete. Suggested order respects dependencies; work is **not** lockstep.
+One bead = one PR. Each is a **vertical, individually-shippable slice** that leaves the app usable and carries its own migration where it needs one. Order respects dependencies; work is **not** lockstep.
 
-| Bead                                          | Scope                                                                                                                                                                                                               | Depends on |
-| :-------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------- |
-| **A. Client boundary + dev harness + policy** | `PinballMapClient` interface, live+mock impls, `PINBALLMAP_MODE`, captured fixtures, refresh script, vendored `docs/external/*`, the API-conduct non-negotiable + AGENTS.md rule                                    | —          |
-| **B. Schema & migration**                     | machine columns (+ CHECK), `pinballmap_state`, `pinballmap_user_credentials`, timeline `sourceType`/`eventData` extension, GIN index                                                                                | —          |
-| **C. Sync engine**                            | cron route (`/api/cron/pinballmap-sync`, `CRON_SECRET`), snapshot fetch, comment→timeline ingestion (attribution render + **convert-to-issue**), orphan promotion, watcher notification category, manual "Sync now" | A, B       |
-| **D. Machine linking**                        | create/edit PBM catalog picker (search), block validation (create now / edit post-rollout), metadata autofill, exclude flag, re-link                                                                                | A, B       |
-| **E. Machine Info PBM card + edit modal**     | status-only card, desync ⚠, edit modal (change title, IC toggle, exclude), View on PinballMap                                                                                                                       | B, C, D    |
-| **F. Status page**                            | bidirectional desync, counters, tabs (Desynced/Unlinked/Import-from-map/All-linked), snooze/ack, Sync now, Confirm line-up, import-as-new, unlinked-linking surface                                                 | B, C, D    |
-| **G. Per-user account linking**               | profile settings: login (`auth_details`) + paste-token, encrypted token storage, auth-failure surfacing                                                                                                             | A          |
-| **H. Outbound actions**                       | presence-change CTA (+ soft guidance), manual comment composer, deep-link fallback, permission entries, timeline mirroring of outbound writes                                                                       | D, E, G    |
-| **I. Admin Integrations refactor**            | Discord page → generic Admin → Integrations page; add PBM section (enable, locationId, sync health, run/log, link to status page)                                                                                   | B          |
-| **J. Drift GHA**                              | daily `llms.txt` diff → GitHub issue (no labels)                                                                                                                                                                    | A          |
-| **K. Prod rollout**                           | Vercel Pro/cron decision, bulk linking session (clear the ~98), enable edit-time enforcement, per-user account setup guidance                                                                                       | all        |
+| Bead                                         | Ships (usable outcome)                                                                                                                                                                                                                                                                   | Depends on |
+| :------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------- |
+| **A. Client seam + dev harness + policy**    | `PinballMapClient` interface, live + mock impls, `PINBALLMAP_MODE`, captured fixtures, refresh script, vendored `docs/external/*`, API-conduct non-negotiable + AGENTS.md rule. _Foundation: testable, unblocks everything._                                                             | —          |
+| **B. Machine ↔ PBM linking**                 | _migration:_ machine columns + CHECK. Create-form catalog picker (search), **create-only** block validation, metadata autofill (mfg/year/opdb/ipdb), exclude flag, re-link on edit. _After: new machines capture PBM identity; mfg/year visible._                                        | A          |
+| **C. Snapshot sync + status card**           | _migration:_ `pinballmap_state`. Scheduler-agnostic sync route + snapshot fetch/store, manual "Sync now," status-only Info card (listed/not, last comment, desync ⚠, View on PinballMap). _After: per-machine PBM status, refreshable._                                                  | A, B       |
+| **D. Comments → timeline**                   | _migration:_ timeline `sourceType`/`eventData` + GIN index. Comment ingestion, attribution render, dedupe, orphan promotion, watcher notification category, **convert-to-issue**. _After: PBM comments flow into timelines + become issues._                                             | A, C       |
+| **E. Outbound writes (seeded token)**        | Seed `pinballmap_state` outbound creds; outbound client methods (add/remove/postCondition/confirm/IC); `machines.pinballmap.push` perm (tech+); wire Info-card comment composer + presence-change CTA (+ soft guidance) + edit modal. _After: push changes to PBM from machine context._ | A, B, C    |
+| **F. Status page**                           | Desync control room: bidirectional table, counters, tabs (Desynced/Unlinked/Import-from-map/All-linked), snooze/ack, Sync now, Confirm line-up, import-as-new — write actions use E. _After: full drift management._                                                                     | C, D, E    |
+| **G. Admin Integrations refactor**           | Discord page → generic Admin → Integrations page; add PBM section (enable, locationId, sync health, run/log, link to status page). _Independent slice._                                                                                                                                  | C          |
+| **H. Drift GHA**                             | Daily `llms.txt` diff → GitHub issue (no labels). _Independent slice._                                                                                                                                                                                                                   | A          |
+| **I. Per-user credentials (deferred phase)** | _migration:_ `pinballmap_user_credentials`. Profile-settings linking (login + paste-token), encrypted per-user storage, auth-failure surfacing, opens outbound to owners, replaces the shared token. _Not in initial rollout._                                                           | E          |
+
+### 6.1 Prod rollout (checklist, not a build bead)
+
+Tracked as a checklist at epic close, not a code PR:
+
+1. Decide Vercel Pro vs. `pg_cron` fallback; wire the hourly schedule onto the sync route.
+2. Insert Tim's PBM `outboundEmail` + `outboundToken` into the `pinballmap_state` row by hand.
+3. **Claude linking session:** walk all ~98 existing games, linking each to its PBM catalog title or marking it excluded.
+4. Enable the integration; confirm first sync + a test outbound write.
 
 ---
 
 ## 7. Coordination risks (in-flight neighbors)
 
-- **Machine Settings tab** (`feat/machine-settings-tab-scaffold-PP-43q3`, PR #1388, PP-5r0p/PP-8a5r): inserts a Settings tab → final order **Info → Settings → Service → Timeline** (Service URL slug stays `maintenance`); adds **migration 0045**; touches `MachineTabStrip.tsx`. Our PBM card lives in Info-tab _content_ (no tab-strip change), but **our migration must number after theirs** (main is at 0043; their 0045 is unmerged). Regenerate against latest main at implementation time.
+- **Machine Settings tab** (`feat/machine-settings-tab-scaffold-PP-43q3`, PR #1388, PP-5r0p/PP-8a5r): inserts a Settings tab → final order **Info → Settings → Service → Timeline** (Service URL slug stays `maintenance`); adds **migration 0045**; touches `MachineTabStrip.tsx`. Our PBM card lives in Info-tab _content_ (no tab-strip change), but **our per-bead migrations must number after whatever has merged** (main is at 0043; their 0045 is unmerged). Regenerate each migration against latest `main` at implementation time.
 - **Machine Info/Service redesign** (`worktree-machine-home-redo`, Claude-MachineTabsRedesign): redesigning the Info layout and leaving a slot for the compact PBM status card + general mfg/year fields. Our card must stay small and self-contained.
 
 ---
