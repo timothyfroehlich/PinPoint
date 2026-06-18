@@ -64,15 +64,24 @@ if [ -z "$POSTGRES_URL" ]; then
     exit 1
 fi
 
-# Safety check: Ensure we're connecting to localhost
-if [[ ! "$POSTGRES_URL" =~ (localhost|127\.0\.0\.1) ]]; then
-    echo -e "${RED}❌ POSTGRES_URL does not point to localhost or 127.0.0.1${NC}"
-    echo -e "${RED}   Refusing to reset non-local database: $POSTGRES_URL${NC}"
-    echo -e "${YELLOW}⚠️  This script should ONLY be used with local development databases.${NC}"
-    exit 1
-fi
+# Safety check: parse the host out of POSTGRES_URL and require a local loopback.
+# Substring matching (e.g. =~ localhost) would wrongly pass a remote host or a
+# password that merely contains "localhost".
+db_hostport=${POSTGRES_URL#*://} # strip scheme
+db_hostport=${db_hostport#*@}    # strip userinfo@ if present
+db_hostport=${db_hostport%%/*}   # strip /path
+db_host=${db_hostport%%:*}       # strip :port
+case "$db_host" in
+    localhost | 127.0.0.1) ;;
+    *)
+        echo -e "${RED}❌ POSTGRES_URL host is not local: ${db_host}${NC}"
+        echo -e "${RED}   Refusing to reset non-local database.${NC}"
+        echo -e "${YELLOW}⚠️  This script should ONLY be used with local development databases.${NC}"
+        exit 1
+        ;;
+esac
 
-echo -e "${GREEN}✓ Verified POSTGRES_URL points to local database${NC}"
+echo -e "${GREEN}✓ Verified POSTGRES_URL points to a local database (${db_host})${NC}"
 
 echo -e "${BLUE}🧹 Resetting local database schema...${NC}"
 # Use the project's existing reset logic (minus seeding)
