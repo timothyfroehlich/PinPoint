@@ -18,7 +18,7 @@ Core outcomes:
 3. **Require** a PBM catalog link (or an explicit "not on PinballMap" flag) on every machine, pulling model metadata (manufacturer, year, OPDB/IPDB ids) on link.
 4. **Tech/admin status page** showing bidirectional desync, a linking backlog, and map-side additions to import.
 5. **Sync PBM comments** into machine timelines, with a one-shot "convert to issue" action and watcher notifications.
-6. **Per-user PBM auth** so outbound writes are attributed to the real person.
+6. **Outbound writes to PBM** (add/remove, condition comments) — v1 via a single seeded operator token; per-user attribution deferred to a later phase.
 7. **Admin integrations config** (generic Integrations page).
 8. **Respect PBM's `llms.txt`** API-conduct policy, with drift detection.
 
