@@ -42,6 +42,34 @@ import {
   docToPlainText,
 } from "~/lib/tiptap/types";
 
+// --- Errors ---
+
+/**
+ * Thrown when a committed `createIssue` transaction cannot be read back on
+ * the shared `db` client immediately after the transaction callback returns.
+ *
+ * Background: the `:6543` Supabase transaction pooler has exhibited silent
+ * COMMIT loss — `db.transaction()` resolves successfully and the function
+ * returns 200, but NO row persists (the whole transaction, including the
+ * counter UPDATE, was rolled back without Postgres-js seeing an error).
+ * Because PinPoint uses a single primary with no read replica, a durably-
+ * committed row is immediately visible on any connection; a missing row
+ * post-return is therefore genuine commit loss, not replication lag.
+ *
+ * Incident: 2026-06-18 production. Root-cause connection fix: PP-d8l8.
+ * Stop-gap guard: PP-qk7s.
+ *
+ * The error carries only `machineInitials` and `issueId` — no PII, no email.
+ */
+export class IssueCommitVerificationError extends Error {
+  override readonly name = "IssueCommitVerificationError";
+  constructor(machineInitials: string, issueId: string) {
+    super(
+      `createIssue: committed row missing post-transaction read-back (machine=${machineInitials}, id=${issueId}). Possible silent COMMIT loss at the transaction pooler — see PP-qk7s / incident 2026-06-18.`
+    );
+  }
+}
+
 // --- Types ---
 
 export interface CreateIssueParams {
@@ -178,7 +206,7 @@ export async function createIssue({
   // Resolve channels outside the transaction to avoid an HTTP round-trip
   // (Supabase Vault RPC) inside the DB connection window (PP-rfc).
   const channels = await getChannels();
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     // 0. Idempotency dedup (PP-2053.7). A retried submission carries the same
     //    client-generated key. If a row already exists for it, return that row
     //    verbatim with an empty delivery plan — no counter increment, no second
@@ -409,6 +437,57 @@ export async function createIssue({
 
     return { issue, deliveryPlan: { deliveries }, deduped: false };
   });
+
+  // Post-commit read-back guard (PP-qk7s, incident 2026-06-18).
+  //
+  // The `:6543` Supabase transaction pooler has exhibited silent COMMIT loss:
+  // `db.transaction()` resolves successfully but NO row persists (the whole
+  // transaction, including the counter UPDATE, is silently rolled back).
+  // Because PinPoint runs on a single primary with NO read replica, a durably-
+  // committed row is immediately visible on any connection — a missing row
+  // here is genuine loss, not replication lag.
+  //
+  // We re-SELECT on the shared `db` client (NOT `tx`, which is closed) ONLY
+  // on the non-deduped path. The deduped path already confirmed row existence
+  // via the idempotency key look-up inside the transaction — no double-read.
+  //
+  // Root-cause connection fix (move write path to `:5432` session pooler)
+  // is owned by PP-d8l8 (`src/server/db/index.ts`). This guard makes commit
+  // loss impossible to be silent in the interim.
+  if (!result.deduped) {
+    await assertIssuePersisted(db, result.issue.id, machineInitials);
+  }
+
+  return result;
+}
+
+/**
+ * Verifies that an issue row committed by `createIssue` is visible on the
+ * provided reader immediately after the transaction returns.
+ *
+ * Extracted as a standalone helper so the throw path can be unit-tested
+ * deterministically (the real transaction always persists in PGlite, making
+ * the miss path unreachable in integration tests).
+ *
+ * Throws `IssueCommitVerificationError` when the row is absent — never
+ * swallows it. The caller's `catch` in `actions.ts` will `reportError` (Sentry,
+ * error-level) and return a retryable user-facing message; the `after()` email
+ * will not register because `createIssue` threw.
+ *
+ * @internal exported only for testing; treat as package-private otherwise.
+ */
+export async function assertIssuePersisted(
+  reader: Pick<typeof db, "query">,
+  id: string,
+  machineInitials: string
+): Promise<void> {
+  const row = await reader.query.issues.findFirst({
+    where: eq(issues.id, id),
+    columns: { id: true },
+  });
+  if (!row) {
+    throw new IssueCommitVerificationError(machineInitials, id);
+  }
 }
 
 /**
