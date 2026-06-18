@@ -40,6 +40,7 @@ Out of scope (v1): PBM high scores (`machine_score_xrefs`), mirroring the locati
 - **Confirm endpoint:** `PUT /api/v1/locations/:id/confirm.json` — "this lineup is accurate as of today," no mutation.
 - **Token handling (their guidance):** _"Store it; do not re-fetch the token on every request… Fetch the token once, store it, reuse it."_ **No token expiry, rotation, or refresh mechanism is documented** — a token is stable until the account password changes.
 - **Caching is encouraged:** _"Fetch once at startup and cache locally"_; anti-pattern: _"Do not poll the API repeatedly… build your own sync schedule."_ A bulk `GET /api/v1/machines.json` (filters: `no_details`, `manufacturer`, `region_id`) returns the canonical machine catalog — suitable for a local mirror behind the linking picker.
+- **PBM is open source — its RSpec suite is the contract.** `pinballmap/pbm` (`spec/requests/api/v1/*_controller_spec.rb`, actively maintained) documents exact request params, success bodies, and **every error path** — a better source than live probing (no auth, deterministic, covers failures). Two facts it pins down that the docs don't: (1) **failures come back as HTTP 200 + `{"errors":"…"}`**, not a 4xx (disabled account is the lone 401 + `{"error":"…"}` exception); (2) **`ic_toggle` is a toggle, not a setter** — it ignores params and flips state. The client seam is built against this contract; re-read it before changing integration code. (See `docs/external/README.md`.)
 
 ---
 
@@ -113,9 +114,10 @@ A single typed `PinballMapClient` interface wraps **all** PBM HTTP. Nothing else
 ```
 interface PinballMapClient {
   fetchLocation(id): LocationSnapshot          // anonymous read, full payload
-  addMachine(locationId, machineId, opts)       // write
+  addMachine(locationId, machineId)             // write → { lmxId } (find-or-create)
   removeMachine(lmxId)                           // write
   postCondition(lmxId, comment)                  // write
+  toggleInsiderConnected(lmxId): { icEnabled }   // write — toggle, not a setter (see below)
   confirmLineup(locationId)                      // write
   fetchCatalog(): CatalogMachine[]               // anonymous bulk read → populates local mirror
   authDetails(login, password): { token, username } // token exchange (bead F)
@@ -125,6 +127,12 @@ interface PinballMapClient {
 - **Live implementation:** real `fetch`, descriptive `User-Agent` identifying PinPoint + a contact URL, token reuse, backoff on `429`, serialized writes.
 - **Mock implementation:** in-memory fake seeded from a committed fixture; simulates state (add/remove/comment/drift) so the dev server exercises the full flow with no network and no creds.
 - Selected by `PINBALLMAP_MODE` env (`mock` default in dev, `live` opt-in).
+
+**Error model (verified against PBM's RSpec contract — see `docs/external/README.md`).** PBM signals logical failures with **HTTP 200 and an `errors` string in the body** (e.g. `{"errors":"Failed to find machine"}`), _not_ a 4xx. The lone status-based exception is a disabled account (`401` + `{"error":"account_disabled"}`). The live client therefore classifies success/failure from the **body**, never `res.ok` alone, and a read that returns an `errors` body throws so sync records it. Write results are a discriminated union with a reason (`rate_limited | unauthorized | not_found | rejected | transient`) plus PBM's verbatim `message` when present; `rejected` covers domain refusals (e.g. machine not Insider-Connected eligible, blank condition).
+
+**`addMachine` is find-or-create:** re-adding a machine already at the location updates its condition and returns the existing lmx (HTTP 200); a brand-new lmx returns HTTP 201; the lmx id is read from `{location_machine:{id}}`.
+
+**`toggleInsiderConnected` flips IC state — it is not a setter.** PBM's `ic_toggle` endpoint ignores any desired-state param and inverts the current value, returning the new state. Callers wanting a _specific_ state must read the snapshot's `icEnabled` and only toggle when it differs (the "Edit…" confirm modal does this). This is why the method takes no `enabled` argument.
 
 ### 4.2 Data model
 

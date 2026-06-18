@@ -68,31 +68,67 @@ export interface PbmCredentials {
 }
 
 /**
- * Result of a PBM write. Reasons map to actionable UI states:
- * - `rate_limited` — hit a 429 (see vendored llms.txt rate-limit table)
- * - `unauthorized` — token rejected (surface "PinballMap rejected your credentials")
- * - `not_found` — the target lmx/location no longer exists on PBM
- * - `transient` — network/5xx; safe to retry later
+ * Why a PBM write failed. Maps to actionable UI/retry states.
+ *
+ * IMPORTANT: PBM signals logical failures with HTTP 200 and an `errors` field
+ * in the body (not a 4xx status) — e.g. `{"errors":"Failed to find machine"}`.
+ * A disabled account is the lone exception (HTTP 401 + `{"error":"..."}`). The
+ * live client classifies on the body, so these reasons are derived from PBM's
+ * error message, not the status code. See the RSpec contract referenced in
+ * `docs/external/README.md`.
+ *
+ * - `rate_limited` — hit a 429 (see vendored llms.txt rate-limit table); retry later
+ * - `unauthorized` — auth required / token rejected / not the owner of the resource
+ * - `not_found` — the target lmx/location/machine no longer exists on PBM
+ * - `rejected` — PBM understood the request but refused it (e.g. machine not
+ *   Insider-Connected eligible, blank condition); not retryable, surface `message`
+ * - `transient` — network error or 5xx; safe to retry later
  */
-export type PbmWriteResult =
-  | { ok: true }
-  | {
-      ok: false;
-      reason: "rate_limited" | "unauthorized" | "not_found" | "transient";
-    };
+export type PbmWriteFailureReason =
+  | "rate_limited"
+  | "unauthorized"
+  | "not_found"
+  | "rejected"
+  | "transient";
 
-/** `addMachine` additionally returns the new lmx id on success. */
-export type PbmAddMachineResult =
-  | { ok: true; lmxId: number }
-  | {
-      ok: false;
-      reason: "rate_limited" | "unauthorized" | "not_found" | "transient";
-    };
+/** Shared failure shape; `message` carries PBM's own text when it supplied one. */
+export interface PbmWriteFailure {
+  ok: false;
+  reason: PbmWriteFailureReason;
+  message?: string;
+}
+
+export type PbmWriteResult = { ok: true } | PbmWriteFailure;
+
+/** `addMachine` additionally returns the lmx id on success. */
+export type PbmAddMachineResult = { ok: true; lmxId: number } | PbmWriteFailure;
+
+/**
+ * `toggleInsiderConnected` returns the *new* IC state PBM reports after the
+ * toggle. The endpoint flips state — it is not a setter — so callers that want a
+ * specific state must compare the snapshot's `icEnabled` and only toggle when it
+ * differs. `null` means PBM returned no IC state for the lmx.
+ */
+export type PbmToggleResult =
+  | { ok: true; icEnabled: boolean | null }
+  | PbmWriteFailure;
 
 /** Result of exchanging a login+password for an API token (bead F). */
+export type PbmAuthFailureReason =
+  | "invalid_credentials"
+  | "account_disabled"
+  | "rate_limited"
+  | "transient";
+
+export interface PbmAuthFailure {
+  ok: false;
+  reason: PbmAuthFailureReason;
+  message?: string;
+}
+
 export type PbmAuthResult =
   | { ok: true; token: string; username: string }
-  | { ok: false; reason: "invalid_credentials" | "rate_limited" | "transient" };
+  | PbmAuthFailure;
 
 /**
  * The single seam wrapping all PBM HTTP. Live and mock implementations both
@@ -122,12 +158,15 @@ export interface PinballMapClient {
     lmxId: number;
     comment: string;
   }): Promise<PbmWriteResult>;
-  /** Toggle Insider Connected for an lmx. */
-  setInsiderConnected(input: {
+  /**
+   * Toggle Insider Connected for an lmx and return the new state. PBM's endpoint
+   * flips state rather than setting it, so this takes no desired value; callers
+   * wanting a specific state compare the snapshot first.
+   */
+  toggleInsiderConnected(input: {
     credentials: PbmCredentials;
     lmxId: number;
-    enabled: boolean;
-  }): Promise<PbmWriteResult>;
+  }): Promise<PbmToggleResult>;
   /** Confirm the location's lineup is accurate as of today (no mutation). */
   confirmLineup(input: {
     credentials: PbmCredentials;

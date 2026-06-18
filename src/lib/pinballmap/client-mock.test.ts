@@ -55,7 +55,11 @@ describe("mock PinballMap client", () => {
       credentials: CREDS,
       lmxId: -1,
     });
-    expect(missing).toEqual({ ok: false, reason: "not_found" });
+    expect(missing).toEqual({
+      ok: false,
+      reason: "not_found",
+      message: "Failed to find machine",
+    });
   });
 
   it("postCondition appends a comment; unknown lmx is not_found", async () => {
@@ -82,22 +86,29 @@ describe("mock PinballMap client", () => {
       lmxId: -1,
       comment: "x",
     });
-    expect(missing).toEqual({ ok: false, reason: "not_found" });
+    expect(missing).toEqual({
+      ok: false,
+      reason: "not_found",
+      message: "Failed to find machine",
+    });
   });
 
-  it("setInsiderConnected toggles the flag", async () => {
+  it("toggleInsiderConnected flips the flag and returns the new state", async () => {
     const client = createMockClient();
     const snap = await client.fetchLocation(26454);
     const target = snap.lmxes[0];
     if (!target) throw new Error("fixture has no lmxes");
+    const before = target.icEnabled;
 
-    await client.setInsiderConnected({
+    const first = await client.toggleInsiderConnected({
       credentials: CREDS,
       lmxId: target.id,
-      enabled: true,
     });
+    expect(first.ok).toBe(true);
     const after = await client.fetchLocation(26454);
-    expect(after.lmxes.find((l) => l.id === target.id)?.icEnabled).toBe(true);
+    const newState = after.lmxes.find((l) => l.id === target.id)?.icEnabled;
+    expect(newState).not.toBe(before);
+    if (first.ok) expect(first.icEnabled).toBe(newState);
   });
 
   it("authDetails returns a token for creds and rejects empty input", async () => {

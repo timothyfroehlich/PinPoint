@@ -8,6 +8,7 @@ import type {
   PbmAddMachineResult,
   PbmAuthResult,
   PbmCondition,
+  PbmToggleResult,
   PbmWriteResult,
   PinballMapClient,
 } from "./types";
@@ -91,6 +92,10 @@ export function createMockClient(): PinballMapClient {
     },
 
     addMachine({ machineId }): Promise<PbmAddMachineResult> {
+      // PBM's create is find-or-create: re-adding a machine already at the
+      // location returns the existing lmx rather than a duplicate.
+      const existing = lmxes.find((l) => l.machineId === machineId);
+      if (existing) return Promise.resolve({ ok: true, lmxId: existing.id });
       const id = nextLmxId;
       nextLmxId += 1;
       lmxes.push({
@@ -105,15 +110,26 @@ export function createMockClient(): PinballMapClient {
 
     removeMachine({ lmxId }): Promise<PbmWriteResult> {
       const idx = lmxes.findIndex((l) => l.id === lmxId);
-      if (idx === -1)
-        return Promise.resolve({ ok: false, reason: "not_found" });
+      if (idx === -1) {
+        return Promise.resolve({
+          ok: false,
+          reason: "not_found",
+          message: "Failed to find machine",
+        });
+      }
       lmxes.splice(idx, 1);
       return Promise.resolve({ ok: true });
     },
 
     postCondition({ lmxId, comment }): Promise<PbmWriteResult> {
       const lmx = lmxes.find((l) => l.id === lmxId);
-      if (!lmx) return Promise.resolve({ ok: false, reason: "not_found" });
+      if (!lmx) {
+        return Promise.resolve({
+          ok: false,
+          reason: "not_found",
+          message: "Failed to find machine",
+        });
+      }
       const conditionId = nextConditionId;
       nextConditionId += 1;
       lmx.conditions.push({
@@ -125,11 +141,18 @@ export function createMockClient(): PinballMapClient {
       return Promise.resolve({ ok: true });
     },
 
-    setInsiderConnected({ lmxId, enabled }): Promise<PbmWriteResult> {
+    toggleInsiderConnected({ lmxId }): Promise<PbmToggleResult> {
       const lmx = lmxes.find((l) => l.id === lmxId);
-      if (!lmx) return Promise.resolve({ ok: false, reason: "not_found" });
-      lmx.icEnabled = enabled;
-      return Promise.resolve({ ok: true });
+      if (!lmx) {
+        return Promise.resolve({
+          ok: false,
+          reason: "not_found",
+          message: "Failed to find machine",
+        });
+      }
+      // PBM flips state; null (never set) becomes enabled.
+      lmx.icEnabled = lmx.icEnabled === true ? false : true;
+      return Promise.resolve({ ok: true, icEnabled: lmx.icEnabled });
     },
 
     confirmLineup(): Promise<PbmWriteResult> {

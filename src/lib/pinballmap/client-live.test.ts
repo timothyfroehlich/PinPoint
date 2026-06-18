@@ -88,6 +88,14 @@ describe("live client — reads", () => {
     );
   });
 
+  it("fetchLocation throws on a 200 that carries an errors body", async () => {
+    // PBM reports a bad id as HTTP 200 + {errors}, not a 404.
+    installFetchMock(() => json({ errors: "Failed to find location" }));
+    await expect(createLiveClient().fetchLocation(999)).rejects.toThrow(
+      /Failed to find location/
+    );
+  });
+
   it("fetchCatalog requests the full machines payload (no no_details)", async () => {
     const calls = installFetchMock(() =>
       json([
@@ -120,18 +128,33 @@ describe("live client — auth", () => {
     expect(res).toEqual({ ok: true, token: "abc", username: "tim" });
   });
 
-  it("authDetails maps 401 to invalid_credentials", async () => {
-    installFetchMock(() => new Response(null, { status: 401 }));
-    expect(await createLiveClient().authDetails("x", "y")).toEqual({
+  it("authDetails maps a 200 errors body to invalid_credentials + message", async () => {
+    // Wrong password / unknown user come back as HTTP 200 + {errors}.
+    installFetchMock(() => json({ errors: "Incorrect password" }));
+    expect(await createLiveClient().authDetails("tim", "nope")).toEqual({
       ok: false,
       reason: "invalid_credentials",
+      message: "Incorrect password",
+    });
+  });
+
+  it("authDetails maps the 401 account_disabled body to account_disabled", async () => {
+    // The one status-based case: disabled accounts return 401 + {error}.
+    installFetchMock(() => json({ error: "account_disabled" }, 401));
+    expect(await createLiveClient().authDetails("x", "y")).toEqual({
+      ok: false,
+      reason: "account_disabled",
+      message: "account_disabled",
     });
   });
 });
 
 describe("live client — writes", () => {
-  it("addMachine POSTs with credentials + ids in the query and returns the new lmx id", async () => {
-    const calls = installFetchMock(() => json({ id: 555 }, 200));
+  it("addMachine POSTs with credentials + ids and reads the wrapped lmx id", async () => {
+    // Success wraps the lmx: {location_machine: {id}}, status 201 for new.
+    const calls = installFetchMock(() =>
+      json({ location_machine: { id: 555 } }, 201)
+    );
     const res = await createLiveClient().addMachine({
       credentials: CREDS,
       locationId: 26454,
@@ -147,8 +170,24 @@ describe("live client — writes", () => {
     expect(url.searchParams.get("machine_id")).toBe("10");
   });
 
+  it("addMachine treats a 200 errors body as not_found, never success", async () => {
+    // A bad machine id is HTTP 200 + {errors} — must not look like success.
+    installFetchMock(() => json({ errors: "Failed to find machine" }));
+    expect(
+      await createLiveClient().addMachine({
+        credentials: CREDS,
+        locationId: 26454,
+        machineId: -1,
+      })
+    ).toEqual({
+      ok: false,
+      reason: "not_found",
+      message: "Failed to find machine",
+    });
+  });
+
   it("postCondition PUTs the condition to the lmx endpoint", async () => {
-    const calls = installFetchMock(() => json({}, 200));
+    const calls = installFetchMock(() => json({ location_machine: {} }, 200));
     const res = await createLiveClient().postCondition({
       credentials: CREDS,
       lmxId: 42,
@@ -161,8 +200,40 @@ describe("live client — writes", () => {
     expect(url.searchParams.get("condition")).toBe("fixed flippers");
   });
 
+  it("toggleInsiderConnected PUTs ic_toggle and returns the new state", async () => {
+    const calls = installFetchMock(() =>
+      json({ location_machine: { ic_enabled: true } }, 200)
+    );
+    const res = await createLiveClient().toggleInsiderConnected({
+      credentials: CREDS,
+      lmxId: 7,
+    });
+    expect(res).toEqual({ ok: true, icEnabled: true });
+    const url = new URL(calls[0]?.url ?? "");
+    expect(calls[0]?.init?.method).toBe("PUT");
+    expect(url.pathname).toContain("/location_machine_xrefs/7/ic_toggle.json");
+    // It's a toggle, not a setter — we send no desired-state param.
+    expect(url.searchParams.has("ic_enabled")).toBe(false);
+  });
+
+  it("toggleInsiderConnected maps an ineligible-machine errors body to rejected", async () => {
+    installFetchMock(() =>
+      json({ errors: "Could not update Insider Connected for this machine" })
+    );
+    expect(
+      await createLiveClient().toggleInsiderConnected({
+        credentials: CREDS,
+        lmxId: 7,
+      })
+    ).toEqual({
+      ok: false,
+      reason: "rejected",
+      message: "Could not update Insider Connected for this machine",
+    });
+  });
+
   it("confirmLineup PUTs the confirm endpoint", async () => {
-    const calls = installFetchMock(() => json({}, 200));
+    const calls = installFetchMock(() => json({ msg: "Thanks!" }, 200));
     await createLiveClient().confirmLineup({
       credentials: CREDS,
       locationId: 26454,
@@ -172,16 +243,36 @@ describe("live client — writes", () => {
     );
   });
 
-  it("classifies write failures: 401->unauthorized, 404->not_found", async () => {
-    installFetchMock(() => new Response(null, { status: 401 }));
+  it("classifies write failures from the 200 errors body, not the status", async () => {
+    // not found
+    installFetchMock(() => json({ errors: "Failed to find machine" }));
     expect(
       await createLiveClient().removeMachine({ credentials: CREDS, lmxId: 1 })
-    ).toEqual({ ok: false, reason: "unauthorized" });
+    ).toEqual({
+      ok: false,
+      reason: "not_found",
+      message: "Failed to find machine",
+    });
 
-    installFetchMock(() => new Response(null, { status: 404 }));
+    // auth required → unauthorized
+    installFetchMock(() =>
+      json({ errors: "Authentication is required for this action." })
+    );
     expect(
       await createLiveClient().removeMachine({ credentials: CREDS, lmxId: 1 })
-    ).toEqual({ ok: false, reason: "not_found" });
+    ).toEqual({
+      ok: false,
+      reason: "unauthorized",
+      message: "Authentication is required for this action.",
+    });
+
+    // network error → transient
+    installFetchMock(() => {
+      throw new Error("ECONNREFUSED");
+    });
+    expect(
+      await createLiveClient().removeMachine({ credentials: CREDS, lmxId: 1 })
+    ).toEqual({ ok: false, reason: "transient" });
   });
 
   it("retries a write once after a 429 within budget", async () => {

@@ -9,6 +9,9 @@ import type {
   PbmAddMachineResult,
   PbmAuthResult,
   PbmCredentials,
+  PbmToggleResult,
+  PbmWriteFailure,
+  PbmWriteFailureReason,
   PbmWriteResult,
   PinballMapClient,
 } from "./types";
@@ -22,13 +25,19 @@ import type {
  * - back off on 429 within a small budget, then report `rate_limited`
  * - serialize writes so we never fire concurrent mutations at PBM
  *
+ * ERROR MODEL: PBM reports logical failures with HTTP 200 and an `errors` string
+ * in the JSON body (e.g. `{"errors":"Failed to find machine"}`), NOT a 4xx — the
+ * sole status-based exception is a disabled account (401 + `{"error":"..."}`).
+ * So we classify success/failure from the body, never from `res.ok` alone.
+ * Contract source: pinballmap/pbm spec (see docs/external/README.md).
+ *
  * SECURITY: write/auth URLs carry credentials in the query string, so we never
  * log the full URL — only a redacted path label.
  */
 
 const MAX_RETRY_AFTER_SECONDS = 5;
 
-type WriteReason = "rate_limited" | "unauthorized" | "not_found" | "transient";
+type WriteReason = PbmWriteFailureReason;
 
 function buildUrl(path: string, query?: Record<string, string>): string {
   const url = new URL(`${PBM_API_BASE}${path}`);
@@ -82,11 +91,48 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 }
 
-function classifyWrite(status: number): WriteReason {
-  if (status === 429) return "rate_limited";
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/** Parse a JSON body without throwing; null when absent or malformed. */
+async function readBody(
+  res: Response
+): Promise<Record<string, unknown> | null> {
+  try {
+    return asRecord(await res.json());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * PBM puts logical-failure text in `errors` (HTTP 200) or `error` (the disabled
+ * account 401). Returns that message, or null when the response is a success.
+ */
+function pbmErrorMessage(body: Record<string, unknown> | null): string | null {
+  if (!body) return null;
+  const raw = body["errors"] ?? body["error"];
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
+/** Map a PBM error message (+status) to a write-failure reason. */
+function writeReasonFor(status: number, message: string): WriteReason {
+  const m = message.toLowerCase();
+  if (m.includes("failed to find")) return "not_found";
   if (status === 401 || status === 403) return "unauthorized";
-  if (status === 404) return "not_found";
-  return "transient";
+  if (m.includes("authentication is required") || m.includes("you can only")) {
+    return "unauthorized";
+  }
+  return "rejected";
+}
+
+function writeFailure(reason: WriteReason, message?: string): PbmWriteFailure {
+  return message === undefined
+    ? { ok: false, reason }
+    : { ok: false, reason, message };
 }
 
 // Module-level write chain: serialize all mutations so we never race PBM state
@@ -102,12 +148,19 @@ function serializeWrite<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
-/** Issue a write, honoring one 429 retry within budget. */
+type WriteOutcome =
+  | { ok: true; body: Record<string, unknown> | null }
+  | PbmWriteFailure;
+
+/**
+ * Issue a write and classify the result from the body. Honors one 429 retry
+ * within budget. A 200/201 with an `errors` field is a failure, not a success.
+ */
 async function writeRequest(
   method: "POST" | "PUT" | "DELETE",
   url: string,
   label: string
-): Promise<{ ok: true; res: Response } | { ok: false; reason: WriteReason }> {
+): Promise<WriteOutcome> {
   let res = await safeFetch(url, { method }, label);
   if (res.status === 429) {
     const retryAfter = parseRetryAfter(res);
@@ -116,13 +169,33 @@ async function writeRequest(
         { retryAfter, label, action: "pinballmap.rateLimit" },
         "PinballMap retry-after exceeds inline budget"
       );
-      return { ok: false, reason: "rate_limited" };
+      return writeFailure("rate_limited");
     }
     await sleep(retryAfter * 1000);
     res = await safeFetch(url, { method }, label);
+    if (res.status === 429) return writeFailure("rate_limited");
   }
-  if (res.ok) return { ok: true, res };
-  return { ok: false, reason: classifyWrite(res.status) };
+  // Network error (599) or server error: retry later.
+  if (res.status === 599 || res.status >= 500) return writeFailure("transient");
+
+  const body = await readBody(res);
+  const message = pbmErrorMessage(body);
+  if (message)
+    return writeFailure(writeReasonFor(res.status, message), message);
+
+  // Defensive: a 4xx that didn't carry a PBM error body.
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      return writeFailure("unauthorized");
+    }
+    if (res.status === 404) return writeFailure("not_found");
+    return writeFailure("transient");
+  }
+  return { ok: true, body };
+}
+
+function toWriteResult(outcome: WriteOutcome): PbmWriteResult {
+  return outcome.ok ? { ok: true } : outcome;
 }
 
 async function readJson(path: string, label: string): Promise<unknown> {
@@ -130,7 +203,12 @@ async function readJson(path: string, label: string): Promise<unknown> {
   if (!res.ok) {
     throw new Error(`PinballMap ${label} failed: HTTP ${res.status}`);
   }
-  return res.json();
+  const data: unknown = await res.json();
+  const message = pbmErrorMessage(asRecord(data));
+  if (message) {
+    throw new Error(`PinballMap ${label} failed: ${message}`);
+  }
+  return data;
 }
 
 export function createLiveClient(): PinballMapClient {
@@ -158,21 +236,31 @@ export function createLiveClient(): PinballMapClient {
       const url = buildUrl(`/users/auth_details.json`, { login, password });
       const res = await safeFetch(url, { method: "GET" }, "authDetails");
       if (res.status === 429) return { ok: false, reason: "rate_limited" };
-      if (res.status === 401 || res.status === 403 || res.status === 422) {
-        return { ok: false, reason: "invalid_credentials" };
+      if (res.status === 599 || res.status >= 500) {
+        return { ok: false, reason: "transient" };
       }
-      if (!res.ok) return { ok: false, reason: "transient" };
-      const body = (await res.json().catch(() => null)) as {
-        authentication_token?: unknown;
-        username?: unknown;
-      } | null;
+      const body = await readBody(res);
+      const message = pbmErrorMessage(body);
+      // Disabled account is the one status-based case: 401 + {"error":"..."}.
+      if (res.status === 401) {
+        return {
+          ok: false,
+          reason: "account_disabled",
+          message: message ?? "account_disabled",
+        };
+      }
+      // Everything else PBM rejects (wrong password, unknown user, unconfirmed)
+      // comes back as HTTP 200 + {"errors":"..."}.
+      if (message) {
+        return { ok: false, reason: "invalid_credentials", message };
+      }
       const token =
-        typeof body?.authentication_token === "string"
-          ? body.authentication_token
+        typeof body?.["authentication_token"] === "string"
+          ? body["authentication_token"]
           : null;
       if (!token) return { ok: false, reason: "transient" };
       const username =
-        typeof body?.username === "string" ? body.username : login;
+        typeof body?.["username"] === "string" ? body["username"] : login;
       return { ok: true, token, username };
     },
 
@@ -190,19 +278,17 @@ export function createLiveClient(): PinballMapClient {
             machine_id: String(machineId),
           })
         );
-        const result = await writeRequest("POST", url, "addMachine");
-        if (!result.ok) return { ok: false, reason: result.reason };
-        const body = (await result.res.json().catch(() => null)) as {
-          id?: unknown;
-          location_machine?: { id?: unknown };
-        } | null;
+        const outcome = await writeRequest("POST", url, "addMachine");
+        if (!outcome.ok) return outcome;
+        // Success body wraps the lmx: {"location_machine": {"id": ...}}.
+        const lmx = asRecord(outcome.body?.["location_machine"]);
         const lmxId =
-          typeof body?.id === "number"
-            ? body.id
-            : typeof body?.location_machine?.id === "number"
-              ? body.location_machine.id
+          typeof lmx?.["id"] === "number"
+            ? lmx["id"]
+            : typeof outcome.body?.["id"] === "number"
+              ? outcome.body["id"]
               : null;
-        if (lmxId === null) return { ok: false, reason: "transient" };
+        if (lmxId === null) return writeFailure("transient");
         return { ok: true, lmxId };
       });
     },
@@ -214,8 +300,9 @@ export function createLiveClient(): PinballMapClient {
           `/location_machine_xrefs/${lmxId}.json`,
           credsQuery(credentials)
         );
-        const result = await writeRequest("DELETE", url, "removeMachine");
-        return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+        return toWriteResult(
+          await writeRequest("DELETE", url, "removeMachine")
+        );
       });
     },
 
@@ -226,24 +313,27 @@ export function createLiveClient(): PinballMapClient {
           `/location_machine_xrefs/${lmxId}.json`,
           credsQuery(credentials, { condition: comment })
         );
-        const result = await writeRequest("PUT", url, "postCondition");
-        return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+        return toWriteResult(await writeRequest("PUT", url, "postCondition"));
       });
     },
 
-    setInsiderConnected({
-      credentials,
-      lmxId,
-      enabled,
-    }): Promise<PbmWriteResult> {
-      assertNotInTransaction("pinballmap.setInsiderConnected");
+    toggleInsiderConnected({ credentials, lmxId }): Promise<PbmToggleResult> {
+      assertNotInTransaction("pinballmap.toggleInsiderConnected");
       return serializeWrite(async () => {
         const url = buildUrl(
           `/location_machine_xrefs/${lmxId}/ic_toggle.json`,
-          credsQuery(credentials, { ic_enabled: enabled ? "true" : "false" })
+          credsQuery(credentials)
         );
-        const result = await writeRequest("PUT", url, "setInsiderConnected");
-        return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+        const outcome = await writeRequest(
+          "PUT",
+          url,
+          "toggleInsiderConnected"
+        );
+        if (!outcome.ok) return outcome;
+        const lmx = asRecord(outcome.body?.["location_machine"]);
+        const icEnabled =
+          typeof lmx?.["ic_enabled"] === "boolean" ? lmx["ic_enabled"] : null;
+        return { ok: true, icEnabled };
       });
     },
 
@@ -254,8 +344,7 @@ export function createLiveClient(): PinballMapClient {
           `/locations/${locationId}/confirm.json`,
           credsQuery(credentials)
         );
-        const result = await writeRequest("PUT", url, "confirmLineup");
-        return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+        return toWriteResult(await writeRequest("PUT", url, "confirmLineup"));
       });
     },
   };
