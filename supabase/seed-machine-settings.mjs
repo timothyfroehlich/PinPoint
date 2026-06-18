@@ -37,11 +37,15 @@
 
 import postgres from "postgres";
 
-const databaseUrl =
-  process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+// Use the pooled POSTGRES_URL (port :6543, IPv4) like seed-users.mjs — NOT
+// POSTGRES_URL_NON_POOLING (:5432), which resolves to IPv6 and is unreachable
+// from CI / the preview pipeline runners (AGENTS.md §7). The preview "Seed
+// machine settings demo" step crashed with ENETUNREACH against the :5432 host
+// before this was switched.
+const databaseUrl = process.env.POSTGRES_URL;
 
 if (!databaseUrl) {
-  console.error("❌ POSTGRES_URL or POSTGRES_URL_NON_POOLING is not defined");
+  console.error("❌ POSTGRES_URL is not defined");
   process.exit(1);
 }
 
