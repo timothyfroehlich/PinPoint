@@ -10,6 +10,18 @@
 
 > **Revised 2026-06-19 after a 3-reviewer adversarial pass** (architecture/data-loss, spec-coverage, codebase-accuracy). Material changes baked in below: payload is staged at the call site to preserve mid-save change detection (C1); the three structural-op call sites are enumerated (H1); rich-text auto-save is **debounce-only** — `RichTextEditor` has no `onBlur` (H2); the bug-#6 fix is a **`key` bump** — no imperative `setContent` exists (C2); the nav guard merges machine-level-field state through one `saveStatus` (H3); `beforeunload` flush reframed as best-effort, the nav guard is the real protection (H4); **auto-retry** added (spec §C.2); `--project` flags on all test commands; added viewer-state/affordance tests.
 
+> **Revision 2 — 2026-06-19 PM, research-driven durability refactor.** Tasks 1–7 are DONE and committed (SHAs in the Progress section). A web-research pass on the canonical auto-save + unsaved-changes pattern (Next.js 16 `onNavigate`/`popstate`/`beforeunload`; production save-state machines that track **dirty** separately from in-flight; TipTap's built-in `onBlur`) showed the committed pivot has three real gaps and a structural smell. Gaps: (1) `hasUnsaved = pending || failed` **omits dirty**, so the nav guard cannot see edits typed-but-not-yet-flushed — the rich-text/blank-section in-app-nav-within-800ms silent-loss path (H2 fallout); (2) `useAutoSave` **cancels** pending timers on unmount, dropping those edits; (3) rich text has no blur flush even though TipTap supports `onBlur`. Structural smell: ~12 mutation handlers each hand-repeat `mutateSets → stagePayload → schedule|flush` (a Rule-of-Three violation, CORE-ARCH-010) and the structural ops manually pre-advance `baselineRef` — the exact divergence that caused the H1 bug. **New Tasks 8 (consolidate the edit pipeline + reactive dirty signal) and 9 (flush-on-nav/unmount + TipTap onBlur + guard rework)** fix this at the root; the old mobile-sheet / machine-fields / final tasks renumber to **10 / 11 / 12** and now build on `editSet` + the shared dirty status. No new dependency — TanStack Query / react-hook-form / next-stay were evaluated and rejected (the library-worthy part, per-set coalescing + temp→real rekey, is already built and audited in `useSettingsSaveQueue`).
+
+## Progress (as executed)
+
+- **Task 1** glow-editable affordance — DONE `c7f1a147` (both review stages passed).
+- **Task 2** debounced `useAutoSave` — DONE `0449470c` + follow-ups `4a781b10` (cancel-independence test, drop-on-unmount JSDoc).
+- **Task 3** `useSaveStatus` + `SaveFailureBanner` (failure-only) — DONE `8dd8ca3f`.
+- **Task 4** action audit — DONE (no code change; `saveSettingsSetAction` confirmed auto-save-safe, no-op short-circuits at `actions.ts:202`).
+- **Task 5** `pruneEmptyRows` — DONE `a6142351`.
+- **Task 6** THE PIVOT — DONE `d12aec58` + review fixes `f3981ad2` (dead `UnitSaveState` removed, retry-timer double-settle closed). Both review stages passed; spec review flagged the dirty/debounce-window gap that Revision 2 now closes.
+- **Task 7** delete affordance — DONE `66daf07b` + fixes `29ca1492` (desktop 2× armed, mobile confirm dialog).
+
 ## Global Constraints
 
 These apply to **every** task. Copied from the design doc (`docs/superpowers/specs/2026-06-19-machine-settings-affordance-autosave-design.md`) and AGENTS.md §2.
@@ -39,14 +51,13 @@ So the work is **one coherent feature** ("Machine Settings auto-save redesign"),
 **Task dependency shape:**
 
 ```
-T1 affordance utility ─┐
-T2 debounce helper ────┼─► T6 THE PIVOT ─► T7 delete ─► T8 empty-row ─► T9 mobile sheet ─► T10 machine fields+bug#6 ─► T11 final
-T3 failure banner ─────┘        (atomic)
-T4 leaf affordance  ───► folded into T6 (they must compile together)
-T5 (removed — folded)
+T1 affordance ─┐                                         ┌─► T8 consolidate pipeline + dirty signal ─┐
+T2 debounce ───┼─► T5 prune ─► T6 THE PIVOT (atomic) ─────┤                                           ├─► T10 mobile sheet ─► T11 machine fields+bug#6 ─► T12 final
+T3 banner ─────┘                       ▲                  └─► T9 durability (flush/onBlur/guard) ──────┘
+T4 (folded into T6)   T7 delete (independent, done) ──────┘
 ```
 
-T1–T3 are independent, additive, and compile on their own (new code, not yet wired). T6 is the atomic pivot that wires them in and removes the old engine. T7–T10 layer on top, each independently testable.
+T1–T5 are independent/additive (done). T6 is the atomic pivot (done). **T8 then T9 are the Revision-2 durability refactor** — T8 consolidates the edit pipeline and adds the dirty signal; T9 reworks the guard + flush + TipTap onBlur on top of it. T10–T12 layer on the finished pipeline (mobile sheet and machine fields both route through `editSet` + the shared dirty status). T7 (delete) is independent and already done.
 
 ---
 
@@ -832,7 +843,7 @@ Every working-copy mutation (`renameSet`, `updateDescription`, `updateSoftwareRo
 - [ ] **Step 10: Empty-row prune on blur/flush.** Before staging a payload on a flush, run each section through `pruneEmptyRows` (Task 5) so fully-empty rows never persist. A brand-new set with an empty name still must not insert (keep the existing `execute` guard: `isNew && payload.name.trim() === ""` → no-op). (Minor, accepted: the empty-name no-op still flips pending→saved — a harmless status flash, no extra handling needed.)
 
 - [ ] **Step 11: Merge the nav guard (H3) + render the banner (H4 framing).**
-  - **The guard must cover BOTH save systems.** The two machine-level `InlineEditableField`s save via their own path, not the set queue. Task 9 brings them into the SAME `saveStatus` (they call `markPending/markSaved/markFailed` under stable ids `"machine:requests"`/`"machine:instructions"`), so the guard becomes simply `useUnsavedChangesGuard(canEdit && saveStatus.hasUnsaved)` — **delete** the old `machineFieldDirty` state + `onRequestsDirty`/`onInstructionsDirty`/`onDirtyChange` plumbing entirely. (Do NOT leave the guard keyed only on the set queue — that was the H3 wiring bug: machine-field edits would escape it.)
+  - **The guard must cover BOTH save systems.** The two machine-level `InlineEditableField`s save via their own path, not the set queue. **Task 11** brings them into the SAME `saveStatus` (they call `markDirty`/`markPending`/`markSaved`/`markClean`/`markFailed` under stable ids `"machine:requests"`/`"machine:instructions"`), so the guard stays keyed on `saveStatus.hasUnsaved` — **delete** the old `machineFieldDirty` state + `onRequestsDirty`/`onInstructionsDirty`/`onDirtyChange` plumbing entirely. (Do NOT leave the guard keyed only on the set queue — that was the H3 wiring bug: machine-field edits would escape it.) (Task 6 shipped this guard keyed on `saveStatus.hasUnsaved`; Task 9 reworks the guard's _behavior_, Task 8 adds the dirty dimension to `hasUnsaved`.)
   - **`beforeunload` is best-effort, NOT the protection.** The real protection is the nav guard blocking in-app navigation while `saveStatus.hasUnsaved`. On `beforeunload`, call `autoSave.flushAll()` (fires pending writes) AND `e.preventDefault()` for the native "Leave?" dialog — but do NOT assume the async writes complete after the user confirms leaving (the JS context is torn down). Frame/comment it that way; don't claim the flush persists on close.
   - Render `<SaveFailureBanner failedCount={saveStatus.failedIds.size} onRetry={() => { for (const id of saveStatus.failedIds) runSave(id); }} />` at the top of the tab (manual Retry routes through `runSave`, same path as auto-retry). Update the `SettingsSetCard` JSX to drop all the removed props.
 
@@ -891,7 +902,288 @@ git commit -m "feat(machine-settings): discoverable delete — desktop 2x armed,
 
 ---
 
-## Task 8: Mobile `RowEditSheet` — auto-save + keyboard occlusion fix
+## Task 8: Consolidate the per-set edit pipeline + reactive dirty signal
+
+**Why:** After the pivot, ~12 mutation handlers in `SettingsTab.tsx` each hand-repeat the same three lines — `mutateSets(...)` → `stagePayload(id)` → `autoSave.schedule(id)` (or `.flush(id)`). That triplication is a Rule-of-Three violation (CORE-ARCH-010) and is precisely what produced the H1 bug (the three structural ops staged from a different source than the field handlers). Worse, there is **no `dirty` concept**: `useSaveStatus.hasUnsaved` is `pending || failed`, so between a keystroke and the first flush/debounce-fire the nav guard is blind. Mature auto-save (Google Docs, Notion, Linear) tracks **dirty** (working copy diverged from last-saved baseline) _separately_ from in-flight; "unsaved" = `dirty || saving || error`. This task introduces that dirty dimension and routes every edit through one `editSet` chokepoint, so staging-from-the-working-copy is guaranteed by construction and the guard can see unflushed edits.
+
+**Files:**
+
+- Modify: `src/components/machines/settings/use-save-status.ts`
+- Test: `src/test/unit/components/machines/use-save-status.test.ts`
+- Modify: `src/components/machines/settings/SettingsTab.tsx`
+- Test: `src/test/unit/components/machines/SettingsTabDirty.test.tsx`
+
+**Interfaces:**
+
+- Produces (extends): `useSaveStatus(): { dirtyIds: Set<string>; failedIds: Set<string>; pending: boolean; markDirty(id): void; markClean(id): void; markPending(id): void; markSaved(id): void; markFailed(id): void; hasUnsaved: boolean }` where `hasUnsaved = dirtyIds.size > 0 || pending || failedIds.size > 0`.
+- Produces: `editSet(setId, mutate, opts?)` inside `SettingsTab` — the single per-set edit chokepoint. Consumed by every mutation handler and by Tasks 10/11.
+
+**Semantics (read carefully — this is the state machine):**
+
+- `markDirty(id)` — a working-copy edit landed; the set diverges from baseline. Adds to `dirtyIds`.
+- `markPending(id)` — a save is now in flight for this set (still dirty until it lands clean).
+- `markFailed(id)` — the save failed: clears pending, adds to `failedIds`; **leaves `dirtyIds` alone** (the edit is still unsaved).
+- `markSaved(id)` — clears `pending` and `failedIds` for the set. Does NOT clear `dirtyIds` on its own.
+- `markClean(id)` — clears `dirtyIds` for the set. Called by `execute` ONLY on a successful save where the identity-based `newerPending` check is false (i.e. the working copy still equals what was just persisted). If a newer edit landed mid-save, `markClean` is NOT called and `dirtyIds` stays set, so the guard keeps protecting the newer edit.
+
+- [ ] **Step 1: Extend the `use-save-status` test (TDD)**
+
+Add to `src/test/unit/components/machines/use-save-status.test.ts`:
+
+```ts
+it("tracks dirty independently of pending/failed", () => {
+  const { result } = renderHook(() => useSaveStatus());
+  act(() => result.current.markDirty("a"));
+  expect(result.current.dirtyIds.has("a")).toBe(true);
+  expect(result.current.pending).toBe(false);
+  expect(result.current.hasUnsaved).toBe(true);
+
+  act(() => result.current.markPending("a"));
+  expect(result.current.dirtyIds.has("a")).toBe(true); // still dirty while saving
+
+  act(() => result.current.markClean("a"));
+  expect(result.current.dirtyIds.has("a")).toBe(false);
+});
+
+it("markFailed keeps the set dirty (edit is still unsaved)", () => {
+  const { result } = renderHook(() => useSaveStatus());
+  act(() => {
+    result.current.markDirty("a");
+    result.current.markPending("a");
+    result.current.markFailed("a");
+  });
+  expect(result.current.failedIds.has("a")).toBe(true);
+  expect(result.current.dirtyIds.has("a")).toBe(true);
+  expect(result.current.hasUnsaved).toBe(true);
+});
+
+it("markSaved clears pending/failed but not dirty; markClean clears dirty", () => {
+  const { result } = renderHook(() => useSaveStatus());
+  act(() => {
+    result.current.markDirty("a");
+    result.current.markPending("a");
+    result.current.markSaved("a");
+  });
+  expect(result.current.pending).toBe(false);
+  expect(result.current.dirtyIds.has("a")).toBe(true); // newer edit could exist
+  act(() => result.current.markClean("a"));
+  expect(result.current.dirtyIds.has("a")).toBe(false);
+  expect(result.current.hasUnsaved).toBe(false);
+});
+```
+
+- [ ] **Step 2: Run red**
+
+Run: `pnpm vitest run --project unit src/test/unit/components/machines/use-save-status.test.ts`
+Expected: FAIL (`markDirty`/`markClean`/`dirtyIds` undefined).
+
+- [ ] **Step 3: Extend `use-save-status.ts`**
+
+Add a `dirtyIds` state Set and the two methods; fold `dirtyIds` into `hasUnsaved` and the memo deps. Keep the existing `removeFrom` helper.
+
+```ts
+const [dirtyIds, setDirtyIds] = useState<Set<string>>(() => new Set());
+
+const markDirty = useCallback((id: string): void => {
+  setDirtyIds((p) => (p.has(id) ? p : new Set(p).add(id)));
+}, []);
+
+const markClean = useCallback((id: string): void => {
+  setDirtyIds((p) => removeFrom(p, id));
+}, []);
+```
+
+`markSaved`/`markFailed` are unchanged (they still only touch pending/failed — they do NOT clear `dirtyIds`). Update:
+
+```ts
+const hasUnsaved = pending || failedIds.size > 0 || dirtyIds.size > 0;
+```
+
+and add `dirtyIds`, `markDirty`, `markClean` to the returned object + the `useMemo` deps. Update the hook's return type and JSDoc (it now tracks dirty too — "unsaved = dirty OR in-flight OR failed").
+
+- [ ] **Step 4: Run green**
+
+Run: `pnpm vitest run --project unit src/test/unit/components/machines/use-save-status.test.ts`
+Expected: PASS.
+
+- [ ] **Step 5: Add the `editSet` chokepoint to `SettingsTab.tsx`**
+
+Define it next to `stagePayload` (which it now calls). It is the ONLY place field handlers mutate a set:
+
+```ts
+// The single per-set edit pipeline (PP-43q3): mutate the working copy, mark it
+// dirty, stage the whole-row payload (C1), then schedule (debounced) or flush
+// (immediate). Every field/structural handler goes through this — so dirty
+// tracking can't drift and staging always reads the just-mutated working copy.
+function editSet(
+  setId: string,
+  mutate: (set: SettingsSetData) => SettingsSetData,
+  opts?: { flush?: boolean }
+): void {
+  mutateSets((prev) => prev.map((s) => (s.id === setId ? mutate(s) : s)));
+  saveStatus.markDirty(setId);
+  stagePayload(setId);
+  if (opts?.flush === true) autoSave.flush(setId);
+  else autoSave.schedule(setId);
+}
+```
+
+- [ ] **Step 6: Route every mutation handler through `editSet`**
+
+Convert each handler to a one-liner. Field edits (debounced): `updateDescription`, `updateBaseline`, `updateSoftwareRow`, `updateTableTitle`, `renameDipBank`, `updateDipSwitch`, plus the note-title/note-body handlers and `renameSet`. Blur/toggle/delete-row/structural (immediate flush): `deleteSoftwareRow`, `deleteDipSwitch`, and the three structural ops. Examples:
+
+```ts
+function renameSet(id: string, name: string): void {
+  editSet(id, (s) => ({ ...s, name }));
+}
+
+function updateDescription(id: string, value: ProseMirrorDoc | null): void {
+  editSet(id, (s) => ({ ...s, description: value }));
+}
+
+function updateSoftwareRow(
+  setId: string,
+  sectionId: string,
+  rowKey: string,
+  patch: Partial<Pick<SoftwareSetting, "id" | "name" | "value">>
+): void {
+  editSet(setId, (s) => ({
+    ...s,
+    sections: s.sections.map((sec) =>
+      sec.id === sectionId && (sec.kind === "software" || sec.kind === "table")
+        ? {
+            ...sec,
+            rows: sec.rows.map((r) =>
+              r._key === rowKey ? { ...r, ...patch } : r
+            ),
+          }
+        : sec
+    ),
+  }));
+}
+```
+
+(Use the existing `mapSections`/`updateSection` helpers inside the mutator where they already exist — keep the section-mapping logic, just move the `mutateSets`/`stagePayload`/`autoSave` triplet into `editSet`.)
+
+- [ ] **Step 7: Convert the three structural ops to `editSet` with `{ flush: true }` and DELETE the manual baseline pre-advance**
+
+`deleteSection`, `reorderSections`, `moveSection` currently compute a `nextBaseline` and call `baselineRef.current.set(setId, nextBaseline)`. **Remove that** — baseline advances only in `execute` on a successful save, exactly like every field edit (the manual pre-advance was the H1 hazard and would also wrongly clear a derived-dirty signal). Each becomes:
+
+```ts
+function deleteSection(setId: string, sectionId: string): void {
+  editSet(
+    setId,
+    (s) => ({
+      ...s,
+      sections: s.sections.filter((sec) => sec.id !== sectionId),
+    }),
+    { flush: true }
+  );
+}
+```
+
+(Apply the same shape to `reorderSections` and `moveSection`, keeping their reorder/swap logic inside the mutator.)
+
+- [ ] **Step 8: Clear dirty on a clean save in `execute`**
+
+In `execute`'s success path (where it currently advances the baseline and calls `markSaved`), call `saveStatus.markClean(realId)` **only when `newerPending` is false** (the identity check already computed there). On a save where a newer edit landed during the await, do NOT clear dirty — the rerun will handle it. `markFailed` already leaves dirty set.
+
+- [ ] **Step 9: Update `SettingsTabDirty.test.tsx` for the dirty signal**
+
+- Typing into any field (text or, with fake timers, before the 800 ms debounce fires) makes the tab report unsaved immediately — assert the nav-guard prompt now fires on an in-app link click right after a keystroke, _before_ any blur/flush. (This is the behavior change: the guard arms on the first keystroke.)
+- A successful save clears dirty (guard no longer fires).
+- A failed save keeps the tab dirty AND failed.
+- Keep all existing viewer-state / no-Save-button / autocomplete / bug-#7 assertions green.
+
+- [ ] **Step 10: Green-gate and commit**
+
+Run: `pnpm run check` (prefix `FORCE_MEM_PRECHECK=skip` if host memory pressure flakes the full run; confirm your targeted unit specs pass in isolation).
+
+```bash
+git add src/components/machines/settings/use-save-status.ts src/components/machines/settings/SettingsTab.tsx src/test/unit/components/machines/use-save-status.test.ts src/test/unit/components/machines/SettingsTabDirty.test.tsx
+git commit -m "refactor(machine-settings): consolidate edit pipeline + reactive dirty signal (PP-43q3)"
+```
+
+Append (blank line before):
+
+```
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018a51xUNaQmXWkTjaoMNvsz
+```
+
+---
+
+## Task 9: Auto-save durability — flush on nav/unmount + TipTap `onBlur` + guard rework
+
+**Why:** With Task 8's dirty signal the tab now _knows_ about unflushed edits. This task makes leaving the page actually durable, grounded in the researched pattern: flush pending saves on unmount and on in-app navigation (so a nav mid-debounce persists silently — no nag), prompt **only** when a save has genuinely FAILED (the one unrecoverable case), cover browser back/forward via `popstate`, and give the TipTap rich-text fields a real `onBlur` flush so description/notes behave like the plain-text inputs.
+
+**Files:**
+
+- Modify: `src/components/machines/settings/SettingsTab.tsx` (`useUnsavedChangesGuard` + a flush-on-unmount effect)
+- Modify: `src/components/editor/RichTextEditor.tsx` (add an optional `onBlur` prop, backward-compatible)
+- Modify: `src/components/machines/settings/InlineMarkdownField.tsx` (forward a blur-flush callback)
+- Test: `src/test/unit/components/machines/SettingsTabDirty.test.tsx` (guard behavior) and `src/test/unit/components/machines/inline-editable-text.test.tsx` (or the markdown-field test) for the onBlur flush
+
+**Interfaces:**
+
+- Consumes: `useSaveStatus` from Task 8 (`dirtyIds`, `failedIds`, `pending`, `hasUnsaved`), `useAutoSave` (`flushAll`), `editSet`.
+- `RichTextEditor` gains `onBlur?: () => void` (optional — existing callers unaffected). `InlineMarkdownField` gains an `onBlur?: () => void` it forwards.
+
+- [ ] **Step 1: Flush pending saves on unmount**
+
+Add an effect in `SettingsTab` whose cleanup flushes (does NOT cancel) pending debounced saves. Register it AFTER the `useAutoSave(runSave)` call so its cleanup runs before `useAutoSave`'s own timer-cancel cleanup (effect cleanups run in reverse registration order):
+
+```ts
+// Flush — don't drop — pending debounced saves when the tab unmounts (in-app
+// navigation). The server action completes even after unmount; React 19 makes
+// the post-unmount markPending a silent no-op. This is the always-live contract:
+// every edit persists. (Replaces useAutoSave's cancel-on-unmount as the real
+// protection for the debounce window.)
+useEffect(() => () => autoSave.flushAll(), [autoSave]);
+```
+
+- [ ] **Step 2: Rework `useUnsavedChangesGuard` — flush on dirty/pending nav, prompt only on failed, add popstate**
+
+Change the hook to take the pieces it needs and act per the researched pattern. Pseudocode of the new body (keep the existing modifier-key / `_blank` / `#`-href filtering on the click path):
+
+- Compute `hasFailed = failedIds.size > 0`, `hasUnsaved = dirty || pending || failed`.
+- **Capturing `click` on an in-app `<a>`:** if `hasFailed` → `window.confirm("A settings change failed to save. Leave and lose it?")`; on cancel, `preventDefault()` + `stopPropagation()`. Else if `hasUnsaved` → call `flushAll()` (fire the pending saves) and let navigation proceed (NO prompt). Else proceed.
+  - **NO-DELAY REQUIREMENT (ratified by Tim):** `flushAll()` on the nav path is **fire-and-forget** — it kicks off the save(s) and returns immediately; navigation proceeds in the same tick. NEVER `await` the flush, NEVER hold navigation pending the save result, NEVER show a blocking/spinner state on the nav path. In-app soft navigation only unmounts the tab, not the page, so the in-flight server action survives and completes in the background. The user perceives zero added delay when leaving with unsaved edits — if navigation awaits a save, that's a defect.
+- **`popstate`** (browser back/forward): same logic — `flushAll()` on unsaved; there is no reliable synchronous block for popstate, so flush is the protection (note this in a comment).
+- **`beforeunload`** (tab close / reload): if `hasUnsaved`, `e.preventDefault()` (native prompt) and call `flushAll()` best-effort.
+
+Signature becomes `useUnsavedChangesGuard({ enabled, failedCount, hasUnsaved, flushAll })` (or pass the `saveStatus` + `autoSave` directly). Update the call site `useUnsavedChangesGuard(canEdit && saveStatus.hasUnsaved)` accordingly. Note in a comment why we keep the **global capturing listener** rather than per-`<Link>` `onNavigate`: the guard must catch every navigation out of the tab, and we can't wrap every `<Link>` in the app — `onNavigate` (Next 15.3+) is per-Link, so the global capture + `popstate` + `beforeunload` trio is the comprehensive choice here.
+
+- [ ] **Step 3: Add `onBlur` to `RichTextEditor`**
+
+`@tiptap/react` 3.x supports a blur hook. Add an optional `onBlur?: () => void` to `RichTextEditorProps` and wire it via the editor's blur event (TipTap `useEditor({ onBlur: () => props.onBlur?.() })`, or `editor.on("blur", ...)` in an effect with cleanup). Backward-compatible: existing callers that don't pass `onBlur` are unaffected. Confirm against the installed TipTap version before wiring (read the current `RichTextEditor.tsx` to match its `useEditor` setup).
+
+- [ ] **Step 4: Forward a blur flush through `InlineMarkdownField`**
+
+Add `onBlur?: () => void` to `InlineMarkdownField` and pass it to `RichTextEditor`. At the two rich-text call sites in `SettingsSetCard` (description) and the note-body sections, wire `onBlur` to flush that set: the card already gets an `onSectionBlurFlush`/`onNameBlur`-style callback — add the analogous flush for the rich body so it calls `autoSave.flush(setId)` via a thin handler in `SettingsTab`. Rich text keeps its debounce (Task 6 Step 3) AND now also flushes on blur — symmetric with plain-text fields.
+
+- [ ] **Step 5: Tests**
+
+- Guard: with a FAILED save, an in-app `<a>` click triggers `window.confirm` (mock it) and cancel blocks nav; with only dirty/pending, the click does NOT prompt but DOES call `flushAll` (spy on it); `popstate` with unsaved calls `flushAll`.
+- Unmount: unmounting the tab with a pending debounce calls `flushAll` (assert the persist fires).
+- Rich-text onBlur: blurring the description editor flushes that set (spy `autoSave.flush` / the persist).
+
+- [ ] **Step 6: Green-gate and commit**
+
+Run: `pnpm run check`, then `FORCE_MEM_PRECHECK=skip pnpm run preflight` (touches the save/nav wiring).
+
+```bash
+git add src/components/machines/settings/SettingsTab.tsx src/components/editor/RichTextEditor.tsx src/components/machines/settings/InlineMarkdownField.tsx src/test/unit/components/machines/
+git commit -m "feat(machine-settings): durable auto-save — flush on nav/unmount, TipTap onBlur, guard rework (PP-43q3)"
+```
+
+Append the two trailer lines (blank line before) as above.
+
+**Accepted residual:** if a save is FIRED on nav and then fails after the user has already left (network dies mid-navigation), that edit is lost with no banner (the tab unmounted). This is the same irreducible edge every auto-save app has; we mitigate by prompting on _already-failed_ saves before leaving. Do not try to block navigation pending an async save result.
+
+---
+
+## Task 10: Mobile `RowEditSheet` — auto-save + keyboard occlusion fix
 
 **Files:**
 
@@ -918,7 +1210,9 @@ git commit -m "feat(machine-settings): mobile sheet auto-saves + keyboard-aware 
 
 ---
 
-## Task 9: Machine-level fields — auto-save + fix preset-replace (bug #6)
+## Task 11: Machine-level fields — auto-save + fix preset-replace (bug #6)
+
+> **Revision 2 update:** "route into the shared `saveStatus`" below now means route into the Task 8 state machine — each machine-level field calls `markDirty` on edit, `markPending`/`markSaved`/`markClean`/`markFailed` around its save (stable ids `"machine:requests"` / `"machine:instructions"`), so the single nav guard (Task 9) covers them with the same flush-on-nav + prompt-on-failed behavior. Rich-text machine fields also get the Task 9 `onBlur` flush.
 
 **Files:**
 
@@ -954,7 +1248,7 @@ git commit -m "fix(machine-settings): machine-level fields auto-save + preset re
 
 ---
 
-## Task 10: Final integration pass + verification checklist
+## Task 12: Final integration pass + verification checklist
 
 **Files:**
 
@@ -968,7 +1262,8 @@ git commit -m "fix(machine-settings): machine-level fields auto-save + preset re
   - #3 collapsed-set Edit edits only title → no Edit button; expanding shows all fields editable.
   - #5 Tab needs Enter → cells are real inputs; Tab lands ready to type.
   - #7 Save renders in title → gone with the Save buttons; NoteSection title/body render clean.
-  - #2/#4a/#4b/#6 → Tasks 8/7/5+6/9.
+  - #2/#4a/#4b/#6 → Tasks 10/7/5+6/11.
+  - Durability (rich-text/blank-section in-app-nav silent loss) → Tasks 8+9. Confirm: typing then clicking an in-app link no longer drops the edit (it flushes); a failed save prompts before leaving.
 
 - [ ] **Step 2: `pnpm run preflight`** (full: check + build + integration).
       Expected: green.
@@ -991,13 +1286,14 @@ git commit -m "fix(machine-settings): machine-level fields auto-save + preset re
 
 **Spec coverage** (design doc §A–§F + bug map):
 
-- §A always-live/auto-save → Tasks 2, 6. §B affordance → Tasks 1, 6, 9. §C auto-save mechanics (debounce/blur/toggle, failure-only banner, nav block, no Cancel) → Tasks 2, 3, 6. §D mobile sheet → Task 8. §E delete → Task 7. §F empty rows → Tasks 5, 6. Bug #6 → Task 9. #7 + header alignment → Task 6. Design-bible amendment → Task 1. PP-8a5r owner-requests field → Task 9. ✓ All covered.
+- §A always-live/auto-save → Tasks 2, 6. §B affordance → Tasks 1, 6, 11. §C auto-save mechanics (debounce/blur/toggle, failure-only banner, nav block, no Cancel) → Tasks 2, 3, 6, **8 (dirty signal), 9 (flush-on-nav/unmount + onBlur + guard rework)**. §D mobile sheet → Task 10. §E delete → Task 7. §F empty rows → Tasks 5, 6. Bug #6 → Task 11. #7 + header alignment → Task 6. Design-bible amendment → Task 1. PP-8a5r owner-requests field → Task 11. ✓ All covered.
 
 **Known gaps / risks called out (not placeholders — real unknowns to resolve in-task):**
 
-1. **`RichTextEditor` API — RESOLVED by review (no longer an assumption).** Verified against the real component: no `onBlur` prop → rich-text auto-save is debounce-only (Task 6 Step 3); no `setContent` on the handle → bug-#6 fix is a `key` bump (Task 9 Step 3). Both are now specified, not guessed.
+1. **`RichTextEditor` API — UPDATED by Revision-2 research.** Task 6 shipped rich text as debounce-only on the belief that `RichTextEditor` had no `onBlur`. The research found TipTap (`@tiptap/react` 3.x) _does_ support a blur hook — **Task 9 Step 3 adds an optional `onBlur` prop** so rich text flushes on blur like plain text. The handle still has no `setContent`, so the bug-#6 fix remains a `key` bump (Task 11 Step 3).
 2. **Task 6 is large and atomic** by necessity (the prop-semantics change spans leaf→card→tab and won't compile partway). The fallback note forbids committing a non-compiling tree.
-3. **Mobile keyboard occlusion (Task 8) is not unit-testable** — device verification on the preview is the gate (PP-jn45 covers the E2E-coverage follow-up).
-4. **Affordance CSS is locked but visual** — Task 10's manual check is the real sign-off, not the render tests.
+3. **Mobile keyboard occlusion (Task 10) is not unit-testable** — device verification on the preview is the gate (PP-jn45 covers the E2E-coverage follow-up).
+4. **Affordance CSS is locked but visual** — Task 12's manual check is the real sign-off, not the render tests.
+5. **Durability flush-on-unmount relies on React 19 + a live server action** — the post-unmount `markPending` is a silent no-op in React 19, and the fired `persist` completes server-side. Task 9 Step 1's effect-ordering note (flush effect registered after `useAutoSave`) is load-bearing — the reviewer must confirm the flush runs before `useAutoSave` cancels its timers.
 
 **Type consistency:** `EDITABLE_FIELD_CLASS`/`EDITABLE_TEXT_CLASS` (Task 1) consumed verbatim in 6/9; `useAutoSave`/`useSaveStatus`/`SaveFailureBanner`/`pruneEmptyRows` signatures defined in 2/3/5 match their Task 6 call sites. `saveSettingsSetAction` contract unchanged (Task 4 confirms).
