@@ -182,6 +182,11 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 - **Don't make my calls for me.** (a) When you ask me a multi-option question, wait for my answer before acting on one — even in auto/autonomous mode; deciding before I reply makes the question performative and removes my choice. (b) Auto/autonomous mode authorizes _operational_ calls (continuing work, tool choices, cleanup, re-publishing after a restart), **not** taste decisions — layout, color, copy, IA, or scope tradeoffs I surfaced. When I'm the taste-maker, ask (`AskUserQuestion` or a visual playground). While waiting on an answer, only do genuinely non-blocking parallel work.
 - **PRs ready-by-default.** Open PRs as ready-for-review, not draft. CI runs the same on drafts, so draft gates nothing — it just adds a "flip ready" step and signals WIP. Use draft only while still iterating, when you want title/description feedback first, or when you've told me you're pausing mid-task.
+- **Link markdown files by absolute path.** When you point me at a markdown file to read or review (a plan, spec, handoff doc, report), always give the full absolute path (e.g. `/Users/froeht/Code/PinPoint/docs/...`), never a relative one. Absolute paths open directly in a cmux pane.
+
+### Commits
+
+- **Commit freely and often.** Small, frequent commits on your working branch are encouraged — there is no "conservative commit" gate here. You don't need to ask before committing to a feature branch; just commit as you go. This **overrides the beads "conservative by default — don't commit/sync/push without explicit authority" profile** (injected by the `bd prime` hook): in this repo, committing to your own branch is always authorized. The §2.2 guardrails still hold — never push to `main`, never `gh pr merge` or `--no-verify` without explicit approval, and run `pnpm run check` before committing.
 
 ### Scope and shipping discipline
 
