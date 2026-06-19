@@ -570,6 +570,64 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     expect(payload?.name).toBe("Brand new");
   });
 
+  it("(dirty) new set's insert clears dirty under the temp id — guard disarms (no temp-id leak)", async () => {
+    saveMock.mockResolvedValue({
+      success: true,
+      id: "server-uuid",
+      changed: true,
+    });
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
+
+      const link = document.createElement("a");
+      link.setAttribute("href", "/somewhere");
+      link.textContent = "Go";
+      document.body.appendChild(link);
+
+      try {
+        // Create a new set, name it, blur to flush the INSERT immediately.
+        fireEvent.click(screen.getByRole("button", { name: "New set" }));
+        const nameInput = screen.getByRole("textbox", { name: "set name" });
+        fireEvent.change(nameInput, { target: { value: "Brand new" } });
+        fireEvent.blur(nameInput);
+
+        await waitFor(() => {
+          expect(saveMock).toHaveBeenCalledTimes(1);
+        });
+        // Drain the markSaved + markClean/markDirty state updates.
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        // Reset the spy so guard-armed clicks during the insert don't
+        // contaminate the post-save assertion.
+        confirmSpy.mockClear();
+
+        // After the new set's insert resolves cleanly, the dirty signal keyed
+        // under the temp id must be cleared (rekeyed temp→real), so the guard
+        // is DISARMED. A leak of the temp id keeps hasUnsaved=true forever.
+        fireEvent.click(link);
+        expect(confirmSpy).not.toHaveBeenCalled();
+      } finally {
+        link.remove();
+      }
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
   it("a blank new-set name does NOT trigger a save (required guard in execute)", async () => {
     vi.useFakeTimers();
     try {

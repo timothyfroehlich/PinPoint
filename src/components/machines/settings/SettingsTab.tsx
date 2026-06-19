@@ -293,9 +293,12 @@ export function SettingsTab({
         });
         // Rekey the save-status maps from temp id to real id.
         saveStatus.markSaved(setId);
-        // If no newer edit landed during the insert, the working copy under
-        // the real id matches what we just persisted — mark it clean.
-        if (!newerPending) saveStatus.markClean(realId);
+        // dirtyIds was keyed under the temp id; rekey it. markClean(realId)
+        // alone would miss the temp id and leak it forever (permanently arming
+        // the nav guard). Clear the temp id, then re-dirty under the real id
+        // only if a newer edit landed mid-insert.
+        saveStatus.markClean(setId);
+        if (newerPending) saveStatus.markDirty(realId);
         return { outcome: { ok: true }, rekeyTo: realId };
       }
 
