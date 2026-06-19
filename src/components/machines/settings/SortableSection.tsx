@@ -4,13 +4,7 @@ import type React from "react";
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  Check,
-  GripVertical,
-  Loader2,
-  MoreVertical,
-  Pencil,
-} from "lucide-react";
+import { GripVertical, MoreVertical } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,28 +27,15 @@ import { cn } from "~/lib/utils";
 
 interface SortableSectionProps {
   id: string;
-  /** Whether THIS section unit is in edit mode (PP-43q3). Swaps its Edit button
-   *  for a primary Save + a Cancel. Independent per section. */
-  editing: boolean;
-  /** Permission to edit at all. Governs whether the whole control cluster (grip,
-   *  kebab, Edit) renders; read-only viewers see none of it. */
+  /** Permission to edit at all. Governs whether the whole control cluster
+   *  (grip, kebab) renders; read-only viewers see none of it. */
   canEdit: boolean;
-  /** This section unit's Save is awaiting the server (PP-43q3 atomic commit) —
-   *  disables Save/Cancel and shows a "Saving…" spinner on the Save button. */
-  saving: boolean;
-  /** Last save error for this unit, or null. Shown inline; the unit stays open
-   *  with the typed values intact and the Save button doubles as Retry. */
-  saveError: string | null;
   /** Disable "Move up" on the first section / "Move down" on the last. */
   isFirst: boolean;
   isLast: boolean;
-  /** Human label for the section, used to disambiguate the several "Edit" /
-   *  kebab controls for AT (e.g. "Software settings section"). */
+  /** Human label for the section, used to disambiguate the several kebab
+   *  controls for AT (e.g. "Software settings section"). */
   describe: string;
-  onEdit: () => void;
-  /** Commit this section unit's slice onto the committed baseline (atomic). */
-  onSave: () => void;
-  onCancel: () => void;
   onDelete: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -62,34 +43,30 @@ interface SortableSectionProps {
 }
 
 /**
- * One reorderable section inside a settings set. Owns the section-header control
- * cluster so the kind-specific section components (software / DIP / note / table)
- * don't repeat it:
- *  - a per-section Edit / Save+Cancel toggle (the unit's atomic commit boundary
- *    for its title + body + table edits — see SettingsTab);
- *  - a kebab (⋮): Delete section (confirmed), Move up, Move down — the non-drag
- *    reorder path that satisfies WCAG 2.2 SC 2.5.7 and is the only reorder path
- *    on mobile;
+ * One reorderable section inside a settings set. Owns the section-header
+ * control cluster so the kind-specific section components (software / DIP /
+ * note / table) don't repeat it:
+ *  - a kebab (⋮): Delete section (confirmed), Move up, Move down — the non-
+ *    drag reorder path that satisfies WCAG 2.2 SC 2.5.7 and is the only
+ *    reorder path on mobile;
  *  - a persistent (no hover) drag grip (⋮⋮) for pointer reorder, hidden on
  *    mobile via CSS (`max-md:hidden`) — never JS width;
  *  - the faint top hairline that separates sections (the first section's
  *    hairline doubles as the header/body divider).
  *
- * The cluster is absolutely positioned over the heading row's (empty) right end,
- * so the section body never reflows between view and edit.
+ * The cluster is absolutely positioned over the heading row's (empty) right
+ * end, so the section body never reflows.
+ *
+ * Note: in the always-live auto-save model (PP-43q3 pivot) there are NO
+ * per-section Edit/Save/Cancel buttons — fields are always editable for
+ * permitted users and auto-save handles persistence.
  */
 export function SortableSection({
   id,
-  editing,
   canEdit,
-  saving,
-  saveError,
   isFirst,
   isLast,
   describe,
-  onEdit,
-  onSave,
-  onCancel,
   onDelete,
   onMoveUp,
   onMoveDown,
@@ -123,8 +100,8 @@ export function SortableSection({
         isDragging && "relative z-10 rounded-md bg-card shadow-lg"
       )}
     >
-      {/* The grip + kebab + Edit cluster floats over the heading row's right end,
-          so content never reflows between view and edit. */}
+      {/* The grip + kebab cluster floats over the heading row's right end,
+          so content never reflows. */}
       <div className="relative">
         {canEdit && (
           <div className="absolute right-0 top-2 z-[1] flex items-center gap-1">
@@ -140,66 +117,6 @@ export function SortableSection({
             >
               <GripVertical className="size-4" aria-hidden="true" />
             </button>
-
-            {editing ? (
-              <div className="flex flex-col items-end">
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    className="h-7"
-                    aria-label={`Save ${describe}`}
-                    disabled={saving}
-                    onClick={onSave}
-                  >
-                    {saving ? (
-                      <Loader2
-                        aria-hidden="true"
-                        className="animate-spin motion-reduce:animate-none"
-                      />
-                    ) : (
-                      <Check aria-hidden="true" />
-                    )}
-                    {saving ? "Saving…" : "Save"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7"
-                    aria-label={`Cancel editing ${describe}`}
-                    disabled={saving}
-                    onClick={onCancel}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-                {/* On failure the unit stays open with the typed values intact;
-                    the Save button itself is the Retry. */}
-                {saveError !== null && (
-                  <span role="alert" className="mt-1 text-xs text-destructive">
-                    {saveError}
-                  </span>
-                )}
-              </div>
-            ) : (
-              // Sections use a small icon-only pencil (the full labelled Edit
-              // button is reserved for the set-header unit, so the header reads
-              // as the primary edit affordance and sections stay quiet). Default
-              // foreground keeps it a notch more present than the muted ⋮ beside
-              // it. (PP-43q3)
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                aria-label={`Edit ${describe}`}
-                onClick={onEdit}
-              >
-                <Pencil className="size-4" aria-hidden="true" />
-              </Button>
-            )}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -241,7 +158,7 @@ export function SortableSection({
             <AlertDialogHeader>
               <AlertDialogTitle>Delete {describe}?</AlertDialogTitle>
               <AlertDialogDescription>
-                This removes the section and everything in it. This can’t be
+                This removes the section and everything in it. This can't be
                 undone.
               </AlertDialogDescription>
             </AlertDialogHeader>

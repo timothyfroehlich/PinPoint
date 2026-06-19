@@ -32,7 +32,7 @@ export interface SettingsTableColumn<T extends KeyedRow> {
   /** Column header text, reused as the sheet field label. */
   header: string;
   /**
-   * "text" → click-to-edit cell (desktop) / sheet text input (mobile).
+   * "text" → always-live input cell (desktop) / sheet text input (mobile).
    * "toggle" → in-table Switch storing the literal strings "ON"/"OFF".
    */
   kind: "text" | "toggle";
@@ -58,12 +58,11 @@ interface EditableSettingsTableProps<T extends KeyedRow> {
   rows: T[];
   columns: SettingsTableColumn<T>[];
   canEdit: boolean;
-  /** Editor viewing this set (has permission, not currently editing): reserve
-   *  the edit affordances' space at desktop widths so entering edit doesn't
-   *  reflow the page. No effect for read-only viewers or on mobile. */
-  reserveEditUi?: boolean;
   onAddRow?: (() => string | undefined) | undefined;
   onDeleteRow?: ((key: string) => void) | undefined;
+  /** Called after any text cell blurs so the parent can flush the auto-save
+   *  debounce (plain-text blur path — Task 6 Step 9). */
+  onBlurFlush?: (() => void) | undefined;
   tableAriaLabel: string;
   addLabel: string;
   deleteAriaLabel: (row: T) => string;
@@ -80,18 +79,18 @@ function ariaFor<T>(label: string | ((row: T) => string), row: T): string {
 /**
  * The shared editable table behind every Machine Settings table (Software,
  * generic, DIP bank). Columns describe the schema; this component owns the
- * common affordances: inline cell editing on desktop, a per-row bottom sheet on
- * mobile (tap a row to open it), autofocus into a freshly-added row, focus
- * recovery after delete, and the "+ Add" control. A section only supplies its
- * heading and a column spec.
+ * common affordances: always-live cell inputs (desktop), a per-row bottom
+ * sheet on mobile (tap a row to open it), autofocus into a freshly-added row,
+ * focus recovery after delete, and the "+ Add" control. A section only
+ * supplies its heading and a column spec.
  */
 export function EditableSettingsTable<T extends KeyedRow>({
   rows,
   columns,
   canEdit,
-  reserveEditUi = false,
   onAddRow,
   onDeleteRow,
+  onBlurFlush,
   tableAriaLabel,
   addLabel,
   deleteAriaLabel,
@@ -114,14 +113,14 @@ export function EditableSettingsTable<T extends KeyedRow>({
     canEdit,
     onAdd: onAddRow,
     // Add/delete row buffer into the working copy like any cell edit — the
-    // owning section unit's Save is the single persist boundary (PP-43q3).
+    // auto-save debounce is the single persist boundary (PP-43q3).
     onDelete: onDeleteRow,
   });
 
   function handleSheetSave(values: Record<string, string>): void {
     if (!sheetRow) return;
     // The mobile sheet commits a whole row at once, all into the working copy;
-    // the section unit's Save persists it (no per-row write here).
+    // auto-save debounce persists it (no per-row write here).
     for (const col of columns) {
       const raw = values[col.key] ?? "";
       const next = col.kind === "toggle" ? (raw === "ON" ? "ON" : "OFF") : raw;
@@ -129,6 +128,7 @@ export function EditableSettingsTable<T extends KeyedRow>({
         col.commit(sheetRow, next);
       }
     }
+    onBlurFlush?.();
   }
 
   return (
@@ -164,14 +164,10 @@ export function EditableSettingsTable<T extends KeyedRow>({
                       className={cn(
                         col.cellClassName,
                         // The row delete is an overlay in the last cell — no
-                        // separate column, so the data columns never shift when
-                        // edit mode turns on. Reserve its room with right
-                        // padding: always while editing, and at desktop widths
-                        // when an editor is merely viewing (so Edit doesn't
-                        // re-wrap the value column).
+                        // separate column, so the data columns never shift.
+                        // Reserve its room with right padding while editing.
                         isLast && "relative",
-                        isLast && canEdit && "pr-8",
-                        isLast && !canEdit && reserveEditUi && "md:pr-8"
+                        isLast && canEdit && "pr-8"
                       )}
                     >
                       {col.kind === "toggle" ? (
@@ -187,9 +183,10 @@ export function EditableSettingsTable<T extends KeyedRow>({
                               !rowEditable && "pointer-events-none"
                             )}
                             onCheckedChange={(checked) => {
-                              // Buffer into the working copy; the section unit's
-                              // Save persists it with the rest of the slice.
+                              // Buffer into the working copy and flush debounce
+                              // immediately (toggles don't have a blur event).
                               col.commit(row, checked ? "ON" : "OFF");
+                              onBlurFlush?.();
                             }}
                             aria-label={ariaFor(col.ariaLabel, row)}
                           />
@@ -204,6 +201,7 @@ export function EditableSettingsTable<T extends KeyedRow>({
                           onCommit={(v) => {
                             col.commit(row, v);
                           }}
+                          onCommitBlur={onBlurFlush}
                           autoFocusOnMount={
                             colIndex === 0 && row._key === autoFocusKey
                           }
@@ -231,25 +229,13 @@ export function EditableSettingsTable<T extends KeyedRow>({
         </Table>
       )}
 
-      {(canEdit || reserveEditUi) && (
-        // When an editor is only viewing, the button is held invisible at
-        // desktop widths so its row is reserved — clicking Edit then reveals it
-        // in place instead of pushing the rest of the card down. Hidden on
-        // mobile (no reservation there) and absent entirely for read-only users.
+      {canEdit && (
         <Button
           ref={addButtonRef}
           variant="ghost"
           size="sm"
-          className={cn(
-            "mt-1 text-muted-foreground",
-            !canEdit && "invisible max-md:hidden"
-          )}
+          className="mt-1 text-muted-foreground"
           onClick={handleAdd}
-          // Read-only viewers keep the button for layout reservation but it must
-          // be fully out of reach: `inert` removes it from focus order, pointer
-          // events, AND the a11y tree in one step (replaces the prior
-          // pointer-events-none + tabIndex=-1 + aria-hidden trio).
-          {...(!canEdit ? { inert: true } : {})}
         >
           <Plus aria-hidden="true" />
           {addLabel}

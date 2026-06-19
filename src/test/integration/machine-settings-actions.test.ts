@@ -185,6 +185,74 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
     expect(section.rows[0]._key).toBeTruthy();
   });
 
+  /**
+   * PP-43q3 auto-save model: the action must persist a field edit (row add +
+   * cell value update) WITHOUT any prior "Save" gate — the auto-save debounce
+   * calls it directly. Verifies that a single `saveSettingsSetAction` call
+   * against an EXISTING set persists both the new row AND the updated cell,
+   * reproducing exactly what the auto-save flush sends.
+   */
+  it("auto-save: a row-add + field edit persists in a single action call (no explicit Save needed)", async () => {
+    const db = await getTestDb();
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(owner.id);
+    const { saveSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+    const { getMachineSettingsSets } =
+      await import("~/lib/machines/settings-queries");
+
+    // Insert the set with one row so it has a server-assigned id.
+    const initial = await saveSettingsSetAction({
+      machineId: machine.id,
+      name: "Auto-save test",
+      description: null,
+      sections: [
+        {
+          id: "sec-sw",
+          kind: "software",
+          baseline: "Factory Install",
+          rows: [{ id: "A.1 01", name: "Balls Per Game", value: "3" }],
+        },
+      ],
+    });
+    expect(initial.success).toBe(true);
+    if (!initial.success) return;
+
+    // Simulate what the auto-save flush sends: the working copy after the user
+    // typed "5" into the first row AND added a second row — one call, no Save
+    // button. This is the exact payload `execute` sends in the new model.
+    const updated = await saveSettingsSetAction({
+      machineId: machine.id,
+      id: initial.id,
+      name: "Auto-save test",
+      description: null,
+      sections: [
+        {
+          id: "sec-sw",
+          kind: "software",
+          baseline: "Factory Install",
+          rows: [
+            { id: "A.1 01", name: "Balls Per Game", value: "5" }, // edited
+            { id: "A.1 02", name: "Extra Ball Score", value: "1000000" }, // added
+          ],
+        },
+      ],
+    });
+    expect(updated.success).toBe(true);
+    expect(updated.changed).toBe(true);
+
+    // The persisted state reflects both changes from the single auto-save call.
+    const sets = await getMachineSettingsSets(db, machine.id);
+    expect(sets).toHaveLength(1);
+    const section = sets[0].sections[0];
+    expect(section.kind).toBe("software");
+    if (section.kind !== "software") return;
+    expect(section.rows).toHaveLength(2);
+    expect(section.rows[0].value).toBe("5"); // typed value persisted
+    expect(section.rows[1].name).toBe("Extra Ball Score"); // added row persisted
+  });
+
   // -- save: insert ---------------------------------------------------------
 
   it("inserts a new set, returning its id and stamping authorship", async () => {

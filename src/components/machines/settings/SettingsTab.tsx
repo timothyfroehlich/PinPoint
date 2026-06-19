@@ -9,18 +9,21 @@ import { Button } from "~/components/ui/button";
 import { InlineEditableField } from "~/components/inline-editable-field";
 import { SETTINGS_INSTRUCTIONS_PRESETS } from "~/lib/machines/settings-instructions-presets";
 import { SettingsSetCard } from "~/components/machines/settings/SettingsSetCard";
+import { SaveFailureBanner } from "~/components/machines/settings/SaveFailureBanner";
 import {
   type SaveOutcome,
-  type UnitSaveState,
   useSettingsSaveQueue,
 } from "~/components/machines/settings/use-settings-save-queue";
+import { useAutoSave } from "~/components/machines/settings/use-auto-save";
+import { useSaveStatus } from "~/components/machines/settings/use-save-status";
+import { pruneEmptyRows } from "~/components/machines/settings/prune-empty-rows";
 import {
   type AddSectionSpec,
   NAME_MAX,
   type SettingsSection,
   type SettingsSetData,
 } from "~/lib/machines/settings-types";
-import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
+import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   deleteSettingsSetAction,
   duplicateSettingsSetAction,
@@ -31,9 +34,6 @@ import {
 } from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
 
 // Collision-free client keys (render keys + section ids + temp set ids).
-// `crypto.randomUUID()` is available in every browser PinPoint targets and on
-// localhost (a secure context); the timestamp+small-random scheme it replaces
-// could collide when several keys were minted in the same millisecond.
 function makeKey(): string {
   return globalThis.crypto.randomUUID();
 }
@@ -47,9 +47,6 @@ function isTempId(id: string): boolean {
 }
 
 function today(): string {
-  // Local calendar date — NOT toISOString() (UTC), which shows tomorrow's date
-  // for negative-UTC editors saving late in the evening until a reload corrects
-  // it from the server's own timestamp.
   const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -57,23 +54,12 @@ function today(): string {
   return `${y}-${m}-${day}`;
 }
 
-/** The set-header unit's id (set name + description share one Edit/Save). Every
- *  other unit is keyed by its section id, so this just needs to be a value no
- *  section id can collide with. */
-const HEADER_UNIT = "header";
-
-/** A per-unit edit key, namespaced by set so several cards' units coexist in the
- *  one editing/saving/error map without colliding. */
-function unitKey(setId: string, unitId: string): string {
-  return `${setId}:${unitId}`;
-}
-
 /**
  * The persist-ready payload for one set (no client `_key`s are stripped here —
  * the action's Zod schema drops them; this is just the working/baseline content).
  * Carried in `pendingPayloadsRef` so the save queue's executor sends EXACTLY the
- * payload a unit's Save (baseline + that unit's slice) or a structural op
- * (computed from baseline) prepared — never a re-read of the whole working copy.
+ * payload staged right before `persist` — never a re-read of the whole working
+ * copy.
  */
 interface SetPayload {
   name: string;
@@ -102,62 +88,20 @@ function cloneSectionDeep(section: SettingsSection): SettingsSection {
 }
 
 /**
- * Structural equality of a single unit's slice, used for dirty detection. The
- * rich body (header description / note body) is compared on plain text (matching
- * what actually persists — a whitespace-only draft normalizes to null); every
- * other field is compared by a stable JSON serialization. `a`/`b` are the SAME
- * unit's slice from the working copy and the committed baseline.
- */
-function headerSliceDirty(
-  working: SettingsSetData,
-  baseline: SettingsSetData | undefined
-): boolean {
-  if (!baseline) return true; // never-saved set: the header is always "dirty"
-  return (
-    working.name !== baseline.name ||
-    docToPlainText(working.description).trim() !==
-      docToPlainText(baseline.description).trim()
-  );
-}
-
-function sectionSliceDirty(
-  working: SettingsSetData,
-  baseline: SettingsSetData | undefined,
-  sectionId: string
-): boolean {
-  const wSec = working.sections.find((s) => s.id === sectionId);
-  const bSec = baseline?.sections.find((s) => s.id === sectionId);
-  if (!wSec) return false; // section gone from the working copy — nothing dirty
-  if (!bSec) return true; // brand-new draft section not in baseline yet
-  if (wSec.kind === "note" && bSec.kind === "note") {
-    // Compare the rich body on plain text; everything else structurally.
-    return (
-      wSec.title !== bSec.title ||
-      wSec.customTitle !== bSec.customTitle ||
-      docToPlainText(wSec.body).trim() !== docToPlainText(bSec.body).trim()
-    );
-  }
-  return JSON.stringify(wSec) !== JSON.stringify(bSec);
-}
-
-/**
- * Navigation guard for the atomic per-unit settings editor (PP-43q3). Edits
- * buffer in the working copy until the owning unit's Save, so an open unit can
- * hold uncommitted changes (single-line OR rich). This warns before refresh /
- * tab-close (`beforeunload`) and in-app soft navigation (a capturing click
- * listener — App Router has no stable blocker) whenever ANY unit is in edit mode
- * with a dirty slice. A merely-collapsed set keeps its draft in memory and does
- * NOT arm the guard.
+ * Navigation guard for the auto-save settings editor (PP-43q3). Warns before
+ * refresh / tab-close (`beforeunload`) and in-app soft navigation (a capturing
+ * click listener) whenever there are unsaved (pending or failed) saves.
  */
 function useUnsavedChangesGuard(enabled: boolean): void {
   useEffect(() => {
     if (!enabled) return;
 
     const onBeforeUnload = (e: BeforeUnloadEvent): void => {
-      // Modern browsers (incl. current Safari) show the native prompt on
-      // preventDefault alone. The legacy `returnValue` is deprecated, so we
-      // deliberately don't set it.
+      // Modern browsers show the native prompt on preventDefault alone.
       e.preventDefault();
+      // Note: flushAll() is called separately in the beforeunload handler in
+      // SettingsTab; async writes may not complete on unload — the nav guard
+      // is the real protection.
     };
     const onClickCapture = (e: MouseEvent): void => {
       if (
@@ -217,21 +161,19 @@ export function SettingsTab({
     initialSets[0] ? new Set([initialSets[0].id]) : new Set()
   );
   // Sets created this session that haven't been persisted yet (temp id). The
-  // first whole-row save inserts them and swaps the temp id for the server UUID.
+  // first auto-save inserts them and swaps the temp id for the server UUID.
   // Preferred/Duplicate target a persisted row, so they're gated on this.
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
 
-  // -- The two parallel copies (PP-43q3 atomic per-unit commit) ---------------
-  // setsRef = the WORKING COPY: every field edit (title, cells, DIP, rich body)
-  //   mutates this freely while a unit is in edit mode. Mirrored into `sets`
-  //   state for rendering; mutated synchronously through `mutateSets` so a save
-  //   enqueued in the same tick reads the just-typed value.
-  // baselineRef = the COMMITTED BASELINE: the last server-persisted state of each
-  //   set, keyed by set id. A unit's Save sends `baseline + that unit's slice`,
-  //   so OTHER open units' uncommitted edits are never written — that isolation
-  //   is the whole point. On a successful Save (or immediate structural op) the
-  //   baseline is advanced to exactly what was sent. A never-saved (temp-id) set
-  //   has NO baseline entry until its first Save.
+  // -- The two parallel copies (PP-43q3 always-live auto-save) ----------------
+  // setsRef = the WORKING COPY: every field edit mutates this freely and
+  //   triggers an auto-save. Mirrored into `sets` state for rendering; mutated
+  //   synchronously through `mutateSets` so a save enqueued in the same tick
+  //   reads the just-typed value.
+  // baselineRef = the COMMITTED BASELINE: the last server-persisted state of
+  //   each set, keyed by set id. Advanced to exactly what was sent on each
+  //   successful save. A never-saved (temp-id) set has NO baseline entry until
+  //   its first successful auto-save.
   const setsRef = useRef(sets);
   const baselineRef = useRef<Map<string, SettingsSetData>>(
     new Map(
@@ -248,112 +190,35 @@ export function SettingsTab({
     []
   );
 
-  // Where the next queued save for a set will read its payload from. A unit's
-  // Save and the structural ops each write the exact full-set payload here right
-  // before enqueuing, so the queue's executor sends THAT (never a re-read of the
-  // whole working copy, which would leak other open units' drafts).
+  // Where the next queued save for a set will read its payload from. Each
+  // auto-save trigger writes the FULL working copy here right before enqueuing,
+  // so the queue's executor sends THAT payload — not a re-read inside execute.
+  // This is the C1 (Critical) staging discipline: stage THEN schedule/flush,
+  // so the identity-based newerPending check in execute works correctly.
   const pendingPayloadsRef = useRef<Map<string, SetPayload>>(new Map());
 
   // Temp-id → server-UUID swaps recorded by `execute` on a new set's first
-  // insert. `saveUnit`'s settle callback reads this to find the unit's LIVE id
-  // (the queue + `execute` already rekeyed their own state under the real id).
+  // insert. (The queue + `execute` already rekeyed their own state under the
+  // real id before this is consulted.)
   const tempToRealRef = useRef<Map<string, string>>(new Map());
 
-  // -- Per-unit edit + save UI state -----------------------------------------
-  // editingUnits = which units are open (Set of `${setId}:${unitId}`). Several
-  //   may be open at once.
-  // savingUnits / unitErrors = the per-unit Save's in-flight + last-error state,
-  //   surfaced on that unit's Save button (disabled "Saving…" / inline error).
-  const [editingUnits, setEditingUnits] = useState<Set<string>>(() => {
-    // New sets (created this session, temp id) open with their header unit in
-    // edit mode so the required name lands focused without an extra click.
-    const init = new Set<string>();
-    for (const s of initialSets) {
-      if (isTempId(s.id)) init.add(unitKey(s.id, HEADER_UNIT));
-    }
-    return init;
-  });
-  const [savingUnits, setSavingUnits] = useState<Set<string>>(() => new Set());
-  const [unitErrors, setUnitErrors] = useState<Map<string, string>>(
-    () => new Map()
-  );
+  // -- Save status (failure-only, no "Saved ✓") --------------------------------
+  const saveStatus = useSaveStatus();
 
-  const isUnitEditing = useCallback(
-    (setId: string, unitId: string): boolean =>
-      editingUnits.has(unitKey(setId, unitId)),
-    [editingUnits]
-  );
+  // One-shot auto-retry: each set id gets at most one automatic retry after a
+  // failure (5 s delay); after that the user must click Retry in the banner.
+  const autoRetried = useRef(new Set<string>());
+  const retryTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  // Use a ref for runSave so the setTimeout callback always calls the latest
+  // version (avoids stale-closure over saveStatus/saveQueue).
+  const runSaveRef = useRef<(id: string) => void>(() => undefined);
 
-  const unitSaveState = useCallback(
-    (setId: string, unitId: string): UnitSaveState => {
-      const key = unitKey(setId, unitId);
-      return {
-        saving: savingUnits.has(key),
-        error: unitErrors.get(key) ?? null,
-      };
-    },
-    [savingUnits, unitErrors]
-  );
-
-  // -- Unsaved-changes guard --------------------------------------------------
-  // Arm when ANY open unit's slice differs from its baseline. Computed from the
-  // working copy + baseline, so it covers single-line AND rich edits without any
-  // child needing to report dirtiness up. `sets` is a dep so the flag re-derives
-  // as the user types (the working copy is mirrored into it).
-  const anyUnitDirty = (() => {
-    for (const key of editingUnits) {
-      const sep = key.indexOf(":");
-      const setId = key.slice(0, sep);
-      const unitId = key.slice(sep + 1);
-      const working = sets.find((s) => s.id === setId);
-      if (!working) continue;
-      const baseline = baselineRef.current.get(setId);
-      const dirty =
-        unitId === HEADER_UNIT
-          ? headerSliceDirty(working, baseline)
-          : sectionSliceDirty(working, baseline, unitId);
-      if (dirty) return true;
-    }
-    return false;
-  })();
-
-  // The two always-open machine-level fields ("Before you change anything" /
-  // "How to change settings") hold their drafts inside InlineEditableField, not
-  // in `editingUnits`, so they report dirtiness up here to join the same guard.
-  const [machineFieldDirty, setMachineFieldDirty] = useState({
-    requests: false,
-    instructions: false,
-  });
-  const onRequestsDirty = useCallback((dirty: boolean): void => {
-    setMachineFieldDirty((p) =>
-      p.requests === dirty ? p : { ...p, requests: dirty }
-    );
-  }, []);
-  const onInstructionsDirty = useCallback((dirty: boolean): void => {
-    setMachineFieldDirty((p) =>
-      p.instructions === dirty ? p : { ...p, instructions: dirty }
-    );
-  }, []);
-
-  useUnsavedChangesGuard(
-    canEdit &&
-      (anyUnitDirty ||
-        machineFieldDirty.requests ||
-        machineFieldDirty.instructions)
-  );
-
-  // The whole-row persist executor handed to the save queue. Sends the exact
-  // payload `pendingPayloadsRef` holds for this set (prepared by a unit Save or a
-  // structural op), upserts via the existing action (jsonb whole-row — schema
-  // unchanged), and on a new set's first insert returns the temp→real id swap so
-  // the queue keeps draining under the real id.
+  // -- The whole-row persist executor handed to the save queue -----------------
   const execute = useCallback(
     async (
       setId: string
     ): Promise<{ outcome: SaveOutcome; rekeyTo?: string }> => {
       const payload = pendingPayloadsRef.current.get(setId);
-      // No payload staged (the set was deleted, or its id already swapped) —
-      // nothing to send.
       if (!payload) return { outcome: { ok: true } };
 
       const isNew = isTempId(setId);
@@ -370,30 +235,25 @@ export function SettingsTab({
       if (!result.success)
         return { outcome: { ok: false, error: result.error } };
 
-      // Persist succeeded → advance this set's committed baseline to exactly the
-      // payload we sent. (Keep the set's identity fields off the payload-derived
-      // baseline by merging the live working copy's metadata onto the slice.)
       const realId = result.id;
 
-      // Clear ONLY the payload we actually sent. A concurrent unit Save during
-      // the await above may have staged a NEWER payload that the queue's
-      // coalesced rerun still has to send; deleting it unconditionally was the
-      // data-loss bug (the rerun then found nothing staged and silently no-op'd,
-      // so e.g. a section saved while a brand-new set's first insert was in
-      // flight never reached the DB).
+      // Clear ONLY the payload we actually sent. A concurrent edit during the
+      // await may have staged a NEWER payload that the queue's coalesced rerun
+      // still has to send; deleting it unconditionally was the data-loss bug
+      // (the rerun then found nothing staged and silently no-op'd).
       const stagedNow = pendingPayloadsRef.current.get(setId);
       const newerPending =
         stagedNow && stagedNow !== payload ? stagedNow : null;
       if (!newerPending) pendingPayloadsRef.current.delete(setId);
 
       if (isNew && realId !== setId) {
-        // Record the swap so the unit's settle callback can find its live id.
+        // Record the swap so the settle callback can find the live id.
         tempToRealRef.current.set(setId, realId);
-        // Carry any newer pending payload (staged under the TEMP id) over to the
-        // real id so the rerun persists it as an UPDATE against the just-inserted
-        // row. Force the name/description to what we just inserted: the newer
-        // slice was built before this set had a baseline, so its name/description
-        // are not authoritative and would otherwise clobber the inserted header.
+        // Carry any newer pending payload (staged under the TEMP id) over to
+        // the real id so the rerun persists it as an UPDATE against the just-
+        // inserted row. Force the name/description to what we just inserted:
+        // the newer slice was built before this set had a baseline, so its
+        // name/description are not authoritative.
         if (newerPending) {
           pendingPayloadsRef.current.delete(setId);
           pendingPayloadsRef.current.set(realId, {
@@ -411,12 +271,7 @@ export function SettingsTab({
               : s
           )
         );
-        // Baseline the just-inserted set to EXACTLY the slice we sent (name +
-        // description; sections are [] for a header insert) — NOT the full
-        // working copy. The working copy may already hold unsaved sections the
-        // server doesn't have yet; baselining from it falsely marked those as
-        // committed (a phantom commit, lost on reload). Sections that still need
-        // saving therefore stay dirty against this baseline.
+        // Baseline the just-inserted set to EXACTLY the slice we sent.
         const persisted = setsRef.current.find((s) => s.id === realId);
         if (persisted) {
           baselineRef.current.set(realId, {
@@ -436,11 +291,8 @@ export function SettingsTab({
           next.delete(setId);
           return next;
         });
-        // Re-prefix this set's per-unit edit/saving/error state from the temp id
-        // to the real one (only the `${setId}:` prefix changes) so an open unit
-        // stays open after the first save.
-        rekeyUnitPrefixed(setId, realId, setEditingUnits, setSavingUnits);
-        rekeyErrorMap(setId, realId, setUnitErrors);
+        // Rekey the save-status maps from temp id to real id.
+        saveStatus.markSaved(setId);
         return { outcome: { ok: true }, rekeyTo: realId };
       }
 
@@ -455,10 +307,6 @@ export function SettingsTab({
       }
       const persisted = setsRef.current.find((s) => s.id === setId);
       if (persisted) {
-        // Baseline = the metadata-stamped working copy but with this set's
-        // content replaced by exactly what we sent (so a concurrent edit to
-        // ANOTHER unit, made while this save was in flight, does NOT leak into
-        // the baseline — only the sent slice advances).
         baselineRef.current.set(setId, {
           ...persisted,
           name: payload.name,
@@ -468,13 +316,81 @@ export function SettingsTab({
       }
       return { outcome: { ok: true } };
     },
-    [machineId, mutateSets]
+    [machineId, mutateSets, saveStatus]
   );
 
   const saveQueue = useSettingsSaveQueue(execute);
 
+  // -- runSave: the single point where persist is called and status tracked ----
+  const runSave = useCallback(
+    (id: string): void => {
+      saveStatus.markPending(id);
+      void saveQueue.persist(id).then((o) => {
+        if (o.ok) {
+          saveStatus.markSaved(id);
+          autoRetried.current.delete(id);
+          return;
+        }
+        saveStatus.markFailed(id);
+        if (!autoRetried.current.has(id)) {
+          autoRetried.current.add(id);
+          retryTimers.current.set(
+            id,
+            setTimeout(() => {
+              retryTimers.current.delete(id);
+              runSaveRef.current(id); // ONE automatic retry; then manual only
+            }, 5000)
+          );
+        }
+      });
+    },
+    [saveStatus, saveQueue]
+  );
+  runSaveRef.current = runSave;
+
+  // Clear all retry timers on unmount.
+  useEffect(
+    () => () => {
+      for (const t of retryTimers.current.values()) clearTimeout(t);
+      retryTimers.current.clear();
+    },
+    []
+  );
+
+  // -- Auto-save debounce (800 ms) --------------------------------------------
+  const autoSave = useAutoSave(runSave);
+
+  // -- Stage the working copy as the pending payload (C1 discipline) -----------
+  // Every auto-save trigger does: stagePayload(setId) THEN autoSave.schedule/flush.
+  // `execute` reads pendingPayloadsRef — DO NOT self-snapshot inside execute.
+  function stagePayload(setId: string): void {
+    const set = setsRef.current.find((s) => s.id === setId);
+    if (!set) return;
+    // Prune fully-empty rows from each section before staging so they don't
+    // persist (Step 10 — empty-row prune on flush).
+    const sections = set.sections.map(pruneEmptyRows);
+    pendingPayloadsRef.current.set(setId, {
+      name: set.name,
+      description: set.description,
+      sections: sections.map(cloneSectionDeep),
+    });
+  }
+
+  // -- Nav guard: arm on pending or failed saves ------------------------------
+  useUnsavedChangesGuard(canEdit && saveStatus.hasUnsaved);
+
+  // beforeunload: attempt to flush pending debounces (async writes may not
+  // complete on unload — the nav guard is the real protection).
+  useEffect(() => {
+    const handler = (): void => {
+      autoSave.flushAll();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [autoSave]);
+
   // The preferred set is always pinned to the top. A stable sort preserves the
-  // insertion order of everything else (new sets, etc.).
+  // insertion order of everything else.
   const orderedSets = [...sets].sort(
     (a, b) => Number(b.isPreferred) - Number(a.isPreferred)
   );
@@ -483,6 +399,7 @@ export function SettingsTab({
     mutateSets((prev) => prev.filter((s) => s.id !== id));
     baselineRef.current.delete(id);
     pendingPayloadsRef.current.delete(id);
+    autoSave.cancel(id);
     setExpandedIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -493,9 +410,6 @@ export function SettingsTab({
       next.delete(id);
       return next;
     });
-    // Drop every editing/saving/error entry for this set's units.
-    dropUnitPrefixed(id, setEditingUnits, setSavingUnits);
-    dropErrorPrefixed(id, setUnitErrors);
     saveQueue.forget(id);
   }
 
@@ -512,7 +426,7 @@ export function SettingsTab({
   }
 
   async function togglePreferred(id: string): Promise<void> {
-    if (newIds.has(id)) return; // can't prefer an unsaved set
+    if (newIds.has(id)) return;
     const set = sets.find((s) => s.id === id);
     if (!set) return;
     const next = !set.isPreferred;
@@ -524,13 +438,11 @@ export function SettingsTab({
       toast.error(result.error);
       return;
     }
-    // Preferred is a row flag, not a unit slice — update both working copy and
-    // baseline so it never reads as a pending edit.
+    // Preferred is a row flag, not an auto-save slice — update both working
+    // copy and baseline so it never reads as a pending edit.
     const apply = (s: SettingsSetData): SettingsSetData => ({
       ...s,
       isPreferred: s.id === id ? next : next ? false : s.isPreferred,
-      // The server bumps updatedBy/updatedAt only on the promoted set; mirror
-      // that locally so its "updated by …" line isn't stale until reload.
       ...(s.id === id && next ? { updatedBy: "You", updatedAt: today() } : {}),
     });
     mutateSets((prev) => prev.map(apply));
@@ -544,7 +456,7 @@ export function SettingsTab({
   }
 
   async function duplicateSet(id: string): Promise<void> {
-    if (newIds.has(id)) return; // save the original before copying it
+    if (newIds.has(id)) return;
     const original = sets.find((s) => s.id === id);
     if (!original) return;
     const result = await duplicateSettingsSetAction({ id });
@@ -552,10 +464,6 @@ export function SettingsTab({
       toast.error(result.error);
       return;
     }
-    // Reconstruct the copy locally using the server-returned id so subsequent
-    // ops target the real row.
-    // Match the server's name capping (NAME_MAX) so the optimistic copy name
-    // is byte-identical to what was persisted.
     const COPY_SUFFIX = " (copy)";
     const copy: SettingsSetData = {
       ...original,
@@ -572,13 +480,12 @@ export function SettingsTab({
       next.splice(idx + 1, 0, copy);
       return next;
     });
-    // The copy is already persisted server-side → baseline it immediately.
     baselineRef.current.set(copy.id, cloneSet(copy));
   }
 
   async function deleteSet(id: string): Promise<void> {
     if (newIds.has(id)) {
-      removeLocal(id); // unsaved — nothing to delete server-side
+      removeLocal(id);
       return;
     }
     const result = await deleteSettingsSetAction({ id });
@@ -593,9 +500,6 @@ export function SettingsTab({
     const id = makeTempSetId();
     const newSet: SettingsSetData = {
       id,
-      // Intentionally blank — the header unit opens in edit mode (below) so the
-      // name field is focused and required; the set is INSERTED on its first
-      // Save (which swaps in the server UUID). A never-saved set has no baseline.
       name: "",
       isPreferred: false,
       updatedBy: "You",
@@ -606,17 +510,17 @@ export function SettingsTab({
     mutateSets((prev) => [newSet, ...prev]);
     setExpandedIds((prev) => new Set(prev).add(id));
     setNewIds((prev) => new Set(prev).add(id));
-    // Open the header unit in edit mode so the required name lands focused.
-    setEditingUnits((prev) => new Set(prev).add(unitKey(id, HEADER_UNIT)));
   }
 
   function updateDescription(id: string, value: ProseMirrorDoc | null): void {
     mutateSets((prev) =>
       prev.map((s) => (s.id === id ? { ...s, description: value } : s))
     );
+    stagePayload(id);
+    autoSave.schedule(id);
   }
 
-  // -- Section-level working-copy mutations (buffer only) --------------------
+  // -- Section-level working-copy mutations ------------------------------------
   function mapSections(
     setId: string,
     fn: (sections: SettingsSection[]) => SettingsSection[]
@@ -637,11 +541,6 @@ export function SettingsTab({
   }
 
   function addSection(setId: string, spec: AddSectionSpec): void {
-    // Mint the section id up front so the freshly added section can open in edit
-    // mode immediately. Add-as-DRAFT (PP-43q3): the new section lives in the
-    // working copy only and is NOT persisted until its own Save — so it has no
-    // baseline slice yet (sectionSliceDirty treats a missing baseline slice as
-    // dirty, which is correct: a brand-new draft is always "unsaved").
     const sectionId = makeKey();
     mutateSets((prev) =>
       prev.map((s) => {
@@ -683,39 +582,31 @@ export function SettingsTab({
         return { ...s, sections: [...s.sections, section] };
       })
     );
-    // Drop the user straight into the new section's edit mode (it commits on its
-    // own Save; Cancel on this never-saved section removes it — see cancelUnit).
-    setEditingUnits((prev) => new Set(prev).add(unitKey(setId, sectionId)));
+    // A new section is immediately in the working copy — no separate edit mode.
+    // The auto-save will include it when the user types into it.
   }
 
-  // -- Immediate structural ops (delete section / reorder) -------------------
-  // These persist RIGHT AWAY, computed from the committed BASELINE so an open
-  // unit's uncommitted edits are never written. They reorder/remove by section
-  // id in BOTH the working copy AND the baseline, so a different unit's in-
-  // progress draft (which lives only in the working copy) is preserved through
-  // the operation. For a NEVER-SAVED set (no baseline), the op is local only.
+  // -- Immediate structural ops (delete section / reorder) --------------------
+  // These persist RIGHT AWAY from the WORKING COPY (Step 8b / H1).
+  // All three ops: apply to working copy, stage from working copy, flush.
 
   function deleteSection(setId: string, sectionId: string): void {
-    // Working copy: drop the section (preserving other sections' drafts).
+    // Working copy: drop the section.
     mapSections(setId, (sections) =>
       sections.filter((sec) => sec.id !== sectionId)
     );
-    // Drop any edit/saving/error state for the removed section.
-    const key = unitKey(setId, sectionId);
-    setEditingUnits((prev) => removeFromSet(prev, key));
-    setSavingUnits((prev) => removeFromSet(prev, key));
-    setUnitErrors((prev) => removeFromMap(prev, key));
-
     const baseline = baselineRef.current.get(setId);
     if (!baseline) return; // never-saved set: nothing to persist
-    // Baseline: remove the same section, then persist baseline-as-payload.
+    // Update the baseline to match (remove the same section).
     const nextBaseline: SettingsSetData = {
       ...baseline,
       sections: baseline.sections.filter((sec) => sec.id !== sectionId),
     };
     baselineRef.current.set(setId, nextBaseline);
-    stagePayload(setId, nextBaseline);
-    void saveQueue.persist(setId);
+    // Stage from the working copy (which already has the section removed), then
+    // flush immediately.
+    stagePayload(setId);
+    autoSave.flush(setId);
   }
 
   function reorderSections(
@@ -729,23 +620,23 @@ export function SettingsTab({
       if (oldIndex < 0 || newIndex < 0) return sections;
       return arrayMove(sections, oldIndex, newIndex);
     };
-    // Working copy: reorder (preserving every section's draft content).
+    // Apply reorder to working copy.
     mapSections(setId, reorder);
 
     const baseline = baselineRef.current.get(setId);
-    if (!baseline) return; // never-saved set: order is local until first Save
+    if (!baseline) return; // never-saved set: order is local until first save
+    // Update the baseline order too.
     const nextBaseline: SettingsSetData = {
       ...baseline,
       sections: reorder(baseline.sections),
     };
     baselineRef.current.set(setId, nextBaseline);
-    stagePayload(setId, nextBaseline);
-    void saveQueue.persist(setId);
+    // Stage from the working copy (with reordered sections) and flush.
+    stagePayload(setId);
+    autoSave.flush(setId);
   }
 
-  // Keyboard / mobile reorder path (WCAG 2.2 SC 2.5.7 — a non-drag alternative
-  // to the desktop grip). Swaps a section with its neighbor; persists from the
-  // baseline like the drag path, preserving other units' drafts.
+  // Keyboard / mobile reorder path (WCAG 2.2 SC 2.5.7).
   function moveSection(
     setId: string,
     sectionId: string,
@@ -767,11 +658,12 @@ export function SettingsTab({
       sections: swap(baseline.sections),
     };
     baselineRef.current.set(setId, nextBaseline);
-    stagePayload(setId, nextBaseline);
-    void saveQueue.persist(setId);
+    // Stage from the working copy and flush.
+    stagePayload(setId);
+    autoSave.flush(setId);
   }
 
-  // -- Software / table row working-copy mutations (buffer only) -------------
+  // -- Software / table row working-copy mutations ----------------------------
   function updateBaseline(
     setId: string,
     sectionId: string,
@@ -780,6 +672,8 @@ export function SettingsTab({
     updateSection(setId, sectionId, (sec) =>
       sec.kind === "software" ? { ...sec, baseline } : sec
     );
+    stagePayload(setId);
+    autoSave.schedule(setId);
   }
 
   function addSoftwareRow(setId: string, sectionId: string): string {
@@ -812,6 +706,8 @@ export function SettingsTab({
           }
         : sec
     );
+    stagePayload(setId);
+    autoSave.schedule(setId);
   }
 
   function deleteSoftwareRow(
@@ -824,6 +720,8 @@ export function SettingsTab({
         ? { ...sec, rows: sec.rows.filter((r) => r._key !== rowKey) }
         : sec
     );
+    stagePayload(setId);
+    autoSave.flush(setId);
   }
 
   function updateTableTitle(
@@ -834,13 +732,17 @@ export function SettingsTab({
     updateSection(setId, sectionId, (sec) =>
       sec.kind === "table" ? { ...sec, title } : sec
     );
+    stagePayload(setId);
+    autoSave.schedule(setId);
   }
 
-  // -- DIP switch working-copy mutations (buffer only) -----------------------
+  // -- DIP switch working-copy mutations --------------------------------------
   function renameDipBank(setId: string, sectionId: string, name: string): void {
     updateSection(setId, sectionId, (sec) =>
       sec.kind === "dip" ? { ...sec, name } : sec
     );
+    stagePayload(setId);
+    autoSave.schedule(setId);
   }
 
   function addDipSwitch(setId: string, sectionId: string): string {
@@ -876,6 +778,8 @@ export function SettingsTab({
           }
         : sec
     );
+    stagePayload(setId);
+    autoSave.schedule(setId);
   }
 
   function deleteDipSwitch(
@@ -891,9 +795,11 @@ export function SettingsTab({
           }
         : sec
     );
+    stagePayload(setId);
+    autoSave.flush(setId);
   }
 
-  // -- Note section working-copy mutations (buffer only) ---------------------
+  // -- Note section working-copy mutations ------------------------------------
   function updateNoteTitle(
     setId: string,
     sectionId: string,
@@ -902,6 +808,8 @@ export function SettingsTab({
     updateSection(setId, sectionId, (sec) =>
       sec.kind === "note" ? { ...sec, title } : sec
     );
+    stagePayload(setId);
+    autoSave.schedule(setId);
   }
 
   function updateNoteBody(
@@ -912,158 +820,33 @@ export function SettingsTab({
     updateSection(setId, sectionId, (sec) =>
       sec.kind === "note" ? { ...sec, body } : sec
     );
+    stagePayload(setId);
+    // Rich-text is DEBOUNCE-ONLY: no blur-flush path (RichTextEditor has no
+    // onBlur). The 800 ms schedule is the only save trigger for note bodies.
+    autoSave.schedule(setId);
   }
 
-  // -- Unit Edit / Save / Cancel ---------------------------------------------
-  function editUnit(setId: string, unitId: string): void {
-    setEditingUnits((prev) => new Set(prev).add(unitKey(setId, unitId)));
-  }
-
-  // Stage `pendingPayloadsRef[setId]` from a full set (baseline or working copy).
-  function stagePayload(setId: string, source: SettingsSetData): void {
-    pendingPayloadsRef.current.set(setId, {
-      name: source.name,
-      description: source.description,
-      sections: source.sections.map(cloneSectionDeep),
-    });
-  }
-
-  /**
-   * Build the atomic Save payload for one unit: start from the committed
-   * BASELINE (or, for a never-saved set, an empty shell), then overlay ONLY this
-   * unit's slice from the working copy. Any OTHER open unit's uncommitted edits
-   * are intentionally excluded — that isolation is the atomicity guarantee.
-   */
-  function buildUnitPayload(setId: string, unitId: string): SetPayload | null {
-    const working = setsRef.current.find((s) => s.id === setId);
-    if (!working) return null;
-    const baseline = baselineRef.current.get(setId);
-
-    if (unitId === HEADER_UNIT) {
-      // Header slice = { name, description } from the working copy; sections come
-      // from the baseline (empty for a never-saved set).
-      return {
-        name: working.name,
-        description: working.description,
-        sections: (baseline?.sections ?? []).map(cloneSectionDeep),
-      };
-    }
-
-    // Section slice: baseline's name/description, baseline's sections but with
-    // THIS section replaced (or appended, for a brand-new draft section) by the
-    // working copy's version.
-    const workingSection = working.sections.find((s) => s.id === unitId);
-    if (!workingSection) return null;
-    const baseName = baseline?.name ?? working.name;
-    const baseDescription = baseline?.description ?? null;
-    const baseSections = (baseline?.sections ?? []).map(cloneSectionDeep);
-    const idx = baseSections.findIndex((s) => s.id === unitId);
-    if (idx >= 0) {
-      baseSections[idx] = cloneSectionDeep(workingSection);
-    } else {
-      // A brand-new draft section: append it in the working copy's position.
-      // (Position relative to other baseline sections is preserved on the next
-      // structural op; appending is correct for the common "add at the end".)
-      baseSections.push(cloneSectionDeep(workingSection));
-    }
-    return {
-      name: baseName,
-      description: baseDescription,
-      sections: baseSections,
-    };
-  }
-
-  // Save: commit ONLY this unit's slice onto the baseline, atomically. Required-
-  // title units (set name, table title, custom note title) block an empty Save.
-  function saveUnit(setId: string, unitId: string): void {
-    const payload = buildUnitPayload(setId, unitId);
-    if (!payload) return;
-
-    // Required-name guard: a never-named set / required-title section can't be
-    // saved empty. (The fields surface the inline "(required)" state on commit.)
-    if (unitId === HEADER_UNIT) {
-      if (payload.name.trim() === "") return;
-    } else {
-      const sec = payload.sections.find((s) => s.id === unitId);
-      if (sec?.kind === "table" && sec.title.trim() === "") return;
-      if (sec?.kind === "note" && sec.customTitle && sec.title.trim() === "")
-        return;
-    }
-
-    pendingPayloadsRef.current.set(setId, payload);
-    const key = unitKey(setId, unitId);
-    setSavingUnits((prev) => new Set(prev).add(key));
-    setUnitErrors((prev) => removeFromMap(prev, key));
-
-    void saveQueue.persist(setId).then((outcome) => {
-      // The set's id may have swapped (temp→real) during the insert; the queue
-      // rekeys its own entry, and `execute` rekeyed our unit-state maps, so read
-      // the live id back (via the recorded swap) to settle the right unit.
-      const liveSetId = tempToRealRef.current.get(setId) ?? setId;
-      const liveKey = unitKey(liveSetId, unitId);
-      setSavingUnits((prev) => removeFromSet(prev, liveKey));
-      if (outcome.ok) {
-        // Success: close the unit.
-        setEditingUnits((prev) => removeFromSet(prev, liveKey));
-      } else {
-        // Failure: keep the unit open with the typed values; show the error and
-        // let the Save button act as Retry.
-        setUnitErrors((prev) => new Map(prev).set(liveKey, outcome.error));
-      }
-    });
-  }
-
-  // Cancel: discard this unit's draft by copying its slice from the committed
-  // baseline back into the working copy, then close the unit. A brand-new draft
-  // (no baseline slice) is removed entirely; a never-saved SET cancelled from
-  // its header is discarded wholesale.
-  function cancelUnit(setId: string, unitId: string): void {
-    const key = unitKey(setId, unitId);
-    const baseline = baselineRef.current.get(setId);
-
-    if (unitId === HEADER_UNIT) {
-      if (!baseline) {
-        // Never-saved set: Cancel discards the whole set.
-        removeLocal(setId);
-        return;
-      }
-      // Restore name + description from the baseline.
-      mutateSets((prev) =>
-        prev.map((s) =>
-          s.id === setId
-            ? { ...s, name: baseline.name, description: baseline.description }
-            : s
-        )
-      );
-    } else {
-      const baseSection = baseline?.sections.find((s) => s.id === unitId);
-      if (!baseSection) {
-        // Brand-new draft section (never saved): Cancel removes it.
-        mapSections(setId, (sections) =>
-          sections.filter((sec) => sec.id !== unitId)
-        );
-      } else {
-        // Restore the section's slice from the baseline.
-        mapSections(setId, (sections) =>
-          sections.map((sec) =>
-            sec.id === unitId ? cloneSectionDeep(baseSection) : sec
-          )
-        );
-      }
-    }
-
-    setEditingUnits((prev) => removeFromSet(prev, key));
-    setUnitErrors((prev) => removeFromMap(prev, key));
+  // onSectionBlurFlush: called from a section's blur callback (plain-text
+  // fields only) to flush the debounce immediately on focus-leave.
+  function onSectionBlurFlush(setId: string, _sectionId: string): void {
+    stagePayload(setId);
+    autoSave.flush(setId);
   }
 
   return (
     <div className="space-y-4 max-md:space-y-2.5">
-      {/* SECTION 1 — the owner's requests ("Before you change anything"), above
-          everything. Free text, NO presets, framed as a request not a rule
-          (PP-8a5r governance-neutrality). For a permitted user the empty state
-          is an already-open editor with the encouraging placeholder; a
-          read-only viewer sees nothing when empty. Saved independently (its own
-          explicit Save/Cancel, shown once the draft is dirty). */}
+      {/* Failure-only banner. Retry re-enqueues all failed sets. */}
+      <SaveFailureBanner
+        failedCount={saveStatus.failedIds.size}
+        onRetry={() => {
+          for (const id of saveStatus.failedIds) {
+            stagePayload(id);
+            runSave(id);
+          }
+        }}
+      />
+
+      {/* SECTION 1 — the owner's requests ("Before you change anything"). */}
       <InlineEditableField
         label="Before you change anything"
         value={settingsRequests}
@@ -1073,7 +856,6 @@ export function SettingsTab({
         testId="machine-settings-requests"
         openWhenEmpty
         headingProminent
-        onDirtyChange={onRequestsDirty}
         onSave={async (id, value) => {
           const result = await updateMachineSettingsRequestsAction({
             machineId: id,
@@ -1085,11 +867,7 @@ export function SettingsTab({
         }}
       />
 
-      {/* SECTION 2 — machine-level access instructions ("How to change
-          settings"). Free text + platform presets surfaced as a "Start from a
-          preset" control above the open editor. Shared by every set and saved
-          independently. Empty state for a permitted user = an open editor; a
-          read-only viewer sees nothing when empty. */}
+      {/* SECTION 2 — machine-level access instructions ("How to change settings"). */}
       <InlineEditableField
         label="How to change settings"
         value={settingsInstructions}
@@ -1100,7 +878,6 @@ export function SettingsTab({
         presets={SETTINGS_INSTRUCTIONS_PRESETS}
         openWhenEmpty
         headingProminent
-        onDirtyChange={onInstructionsDirty}
         onSave={async (id, value) => {
           const result = await updateMachineSettingsInstructionsAction({
             machineId: id,
@@ -1139,8 +916,6 @@ export function SettingsTab({
           )}
         </p>
       ) : (
-        // Mobile: an 8px slice of page background between sets — with the
-        // header band + divider it gives each set a card-like silhouette.
         <div className="space-y-3 max-md:space-y-2">
           {orderedSets.map((set) => (
             <SettingsSetCard
@@ -1149,17 +924,9 @@ export function SettingsTab({
               isExpanded={expandedIds.has(set.id)}
               canEdit={canEdit}
               isNew={newIds.has(set.id)}
-              headerUnitId={HEADER_UNIT}
-              isUnitEditing={(unitId) => isUnitEditing(set.id, unitId)}
-              unitSaveState={(unitId) => unitSaveState(set.id, unitId)}
-              onEditUnit={(unitId) => {
-                editUnit(set.id, unitId);
-              }}
-              onSaveUnit={(unitId) => {
-                saveUnit(set.id, unitId);
-              }}
-              onCancelUnit={(unitId) => {
-                cancelUnit(set.id, unitId);
+              onNameBlur={() => {
+                stagePayload(set.id);
+                autoSave.flush(set.id);
               }}
               onMoveSection={(sectionId, direction) => {
                 moveSection(set.id, sectionId, direction);
@@ -1172,6 +939,8 @@ export function SettingsTab({
               }}
               onRename={(name) => {
                 renameSet(set.id, name);
+                stagePayload(set.id);
+                autoSave.schedule(set.id);
               }}
               onDuplicate={() => {
                 void duplicateSet(set.id);
@@ -1222,117 +991,15 @@ export function SettingsTab({
               onUpdateNoteBody={(sectionId, body) => {
                 updateNoteBody(set.id, sectionId, body);
               }}
+              onSectionBlurFlush={(sectionId) => {
+                onSectionBlurFlush(set.id, sectionId);
+              }}
             />
           ))}
         </div>
       )}
     </div>
   );
-}
-
-// -- Small immutable Set/Map helpers (no mutation of the previous value) -----
-function removeFromSet(prev: Set<string>, key: string): Set<string> {
-  if (!prev.has(key)) return prev;
-  const next = new Set(prev);
-  next.delete(key);
-  return next;
-}
-
-function removeFromMap(
-  prev: Map<string, string>,
-  key: string
-): Map<string, string> {
-  if (!prev.has(key)) return prev;
-  const next = new Map(prev);
-  next.delete(key);
-  return next;
-}
-
-/** Re-prefix every `${fromId}:`-keyed entry of two string-Set states to
- *  `${toId}:` (used on a new set's temp→real id swap). */
-function rekeyUnitPrefixed(
-  fromId: string,
-  toId: string,
-  setEditing: React.Dispatch<React.SetStateAction<Set<string>>>,
-  setSaving: React.Dispatch<React.SetStateAction<Set<string>>>
-): void {
-  const rekey = (prev: Set<string>): Set<string> => {
-    const fromPrefix = `${fromId}:`;
-    let changed = false;
-    const next = new Set<string>();
-    for (const k of prev) {
-      if (k.startsWith(fromPrefix)) {
-        next.add(`${toId}:${k.slice(fromPrefix.length)}`);
-        changed = true;
-      } else {
-        next.add(k);
-      }
-    }
-    return changed ? next : prev;
-  };
-  setEditing(rekey);
-  setSaving(rekey);
-}
-
-function rekeyErrorMap(
-  fromId: string,
-  toId: string,
-  setErrors: React.Dispatch<React.SetStateAction<Map<string, string>>>
-): void {
-  setErrors((prev) => {
-    const fromPrefix = `${fromId}:`;
-    let changed = false;
-    const next = new Map<string, string>();
-    for (const [k, v] of prev) {
-      if (k.startsWith(fromPrefix)) {
-        next.set(`${toId}:${k.slice(fromPrefix.length)}`, v);
-        changed = true;
-      } else {
-        next.set(k, v);
-      }
-    }
-    return changed ? next : prev;
-  });
-}
-
-/** Drop every `${setId}:`-prefixed entry from two string-Set states (on delete). */
-function dropUnitPrefixed(
-  setId: string,
-  setEditing: React.Dispatch<React.SetStateAction<Set<string>>>,
-  setSaving: React.Dispatch<React.SetStateAction<Set<string>>>
-): void {
-  const drop = (prev: Set<string>): Set<string> => {
-    const prefix = `${setId}:`;
-    let changed = false;
-    const next = new Set(prev);
-    for (const k of prev) {
-      if (k.startsWith(prefix)) {
-        next.delete(k);
-        changed = true;
-      }
-    }
-    return changed ? next : prev;
-  };
-  setEditing(drop);
-  setSaving(drop);
-}
-
-function dropErrorPrefixed(
-  setId: string,
-  setErrors: React.Dispatch<React.SetStateAction<Map<string, string>>>
-): void {
-  setErrors((prev) => {
-    const prefix = `${setId}:`;
-    let changed = false;
-    const next = new Map(prev);
-    for (const k of prev.keys()) {
-      if (k.startsWith(prefix)) {
-        next.delete(k);
-        changed = true;
-      }
-    }
-    return changed ? next : prev;
-  });
 }
 
 /** Deep-clone one section, regenerating every key/id so the copy is isolated

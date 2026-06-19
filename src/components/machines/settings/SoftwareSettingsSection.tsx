@@ -12,7 +12,6 @@ interface SoftwareSettingsSectionProps {
   baseline: string;
   rows: SoftwareSetting[];
   canEdit: boolean;
-  reserveEditUi?: boolean;
   onBaselineChange?: (newValue: string) => void;
   onAddRow?: () => string | undefined;
   onUpdateRow?: (
@@ -21,17 +20,19 @@ interface SoftwareSettingsSectionProps {
     value: string
   ) => void;
   onDeleteRow?: (rowKey: string) => void;
+  /** Called after a row-cell blur so the parent can flush the auto-save debounce. */
+  onBlurFlush?: (() => void) | undefined;
 }
 
 export function SoftwareSettingsSection({
   baseline,
   rows,
   canEdit,
-  reserveEditUi = false,
   onBaselineChange,
   onAddRow,
   onUpdateRow,
   onDeleteRow,
+  onBlurFlush,
 }: SoftwareSettingsSectionProps): React.JSX.Element {
   const columns = idNameValueColumns(
     (key, field, value) => {
@@ -45,19 +46,12 @@ export function SoftwareSettingsSection({
       <p className={cn("mb-1.5", SECTION_TITLE_CLASS)}>Software settings</p>
       {/* Section content hangs indented under the heading so headings read as the structural landmarks. */}
       <div className="pl-2">
-        {/* Baseline strip: the starting-point preset. View and edit share one
-          structure (same label font, same row metrics) so toggling Edit doesn't
-          reflow. Editors viewing reserve the combobox height at desktop
-          (reserveEditUi); the read-only player view stays compact. (How to reach
-          the machine's menu now lives in the set-level "How to change settings"
-          block at the top of the tab, not per software section.) */}
+        {/* Baseline strip: the starting-point preset. */}
         <div className="mb-3 text-sm max-md:mb-2 max-md:text-[13px]">
-          {/* Label + baseline. min-h-8 matches the combobox so the row keeps its
-              height whether the value is plain text or the picker. */}
           <div
             className={cn(
               "flex flex-wrap items-center gap-x-2 gap-y-1",
-              canEdit ? "min-h-8" : reserveEditUi && "md:min-h-8"
+              canEdit && "min-h-8"
             )}
           >
             <span className="text-muted-foreground">Initial install:</span>
@@ -65,8 +59,6 @@ export function SoftwareSettingsSection({
               <BaselineCombobox
                 value={baseline}
                 onChange={(val) => {
-                  // Buffer into the working copy; the section unit's Save
-                  // persists it (PP-43q3 atomic per-unit commit).
                   onBaselineChange?.(val);
                 }}
               />
@@ -82,9 +74,9 @@ export function SoftwareSettingsSection({
           rows={rows}
           columns={columns}
           canEdit={canEdit}
-          reserveEditUi={reserveEditUi}
           onAddRow={onAddRow}
           onDeleteRow={onDeleteRow}
+          onBlurFlush={onBlurFlush}
           tableAriaLabel="Software settings"
           addLabel="Add row"
           deleteAriaLabel={(row) =>

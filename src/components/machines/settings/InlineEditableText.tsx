@@ -4,18 +4,19 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/utils";
+import {
+  EDITABLE_FIELD_CLASS,
+  EDITABLE_TEXT_CLASS,
+} from "~/components/machines/settings/affordance";
 
 interface InlineEditableTextProps {
   value: string;
   onValueChange: (newValue: string) => void;
   /**
-   * Per-unit edit gate (PP-43q3 atomic per-unit commit model). True means "this
-   * unit is in edit mode" — the field renders as an always-open <input> whose
-   * commits update the WORKING COPY ONLY (no persistence here). The owning unit's
-   * Save is the sole persist boundary; this field never writes to the server.
-   * False renders finished, non-interactive text with NO hover affordance.
-   * Editability is exactly (canEdit AND the owning unit is editing), folded into
-   * this single flag by the parent.
+   * Permission to edit (PP-43q3 always-live model). True → always render an
+   * <input> with the editable-field affordance; the field is live at all times
+   * for permitted users with no explicit Edit/Save mode.
+   * False → finished, non-interactive text with NO hover affordance.
    */
   canEdit?: boolean;
   /** Field can't be left empty: shows invalid styling while blank and marks the
@@ -25,19 +26,27 @@ interface InlineEditableTextProps {
   className?: string;
   inputClassName?: string;
   ariaLabel?: string;
+  /** autocomplete token for the input (e.g. "off" for the always-on set name). */
+  autoComplete?: string;
+  /**
+   * Called on blur so the parent can flush the auto-save debounce immediately
+   * (plain-text blur path — Task 6 Step 9).
+   */
+  onBlurCommit?: (() => void) | undefined;
 }
 
 /**
- * Single-line settings field. Under the atomic per-unit commit model (PP-43q3)
- * this has two flat states with no hover behavior between them:
- *  - NOT editing (`canEdit` false): finished, non-interactive text — just the
- *    value (or an italic placeholder). No pencil, no hover tint, no click
- *    target. A field at rest is indistinguishable from static copy.
- *  - editing (`canEdit` true): an always-open <input>. Commit on blur/Enter
- *    pushes the typed value into the WORKING COPY via `onValueChange` — it does
- *    NOT persist. Persistence is the unit's Save (see SettingsTab); buffering
- *    all field edits until that one atomic write is the whole point of the
- *    model. Esc reverts the draft to the working copy.
+ * Single-line settings field in the always-live auto-save model (PP-43q3
+ * pivot). Two flat states with no hover mode between them:
+ *  - NOT permitted (`canEdit` false): finished, non-interactive text — just
+ *    the value (or an italic placeholder). No pencil, no hover tint, no click
+ *    target. Indistinguishable from static copy.
+ *  - Permitted (`canEdit` true): an always-open <input> with the black-fill /
+ *    border / glow affordance. Each keystroke pushes the working copy via
+ *    `onValueChange`; blur / Enter flushes the auto-save debounce via
+ *    `onBlurCommit`. Esc reverts the draft to the current working-copy value.
+ *    Required-field validation stays: `:user-invalid` / `aria-invalid` on
+ *    blur; the unit's empty-name guard remains in SettingsTab.
  */
 export function InlineEditableText({
   value,
@@ -48,65 +57,42 @@ export function InlineEditableText({
   className,
   inputClassName,
   ariaLabel,
+  autoComplete,
+  onBlurCommit,
 }: InlineEditableTextProps): React.JSX.Element {
   const [draft, setDraft] = useState(value);
   // Required-field errors stay silent until the user actually tries to leave
   // the field empty — a freshly-opened blank field shows no red flair.
   const [showRequiredError, setShowRequiredError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isFocused = useRef(false);
+
   const isEmptyRequired = required && draft.trim() === "";
   const showInvalid = isEmptyRequired && showRequiredError;
-  // Mark required fields up front (design-bible §683 asterisk convention,
-  // adapted for these label-less inline inputs): a trailing " *" in the
-  // placeholder plus aria-required, so the requirement is visible/announced
-  // before the user tries (and fails) to Save empty.
+  // Mark required fields up front (design-bible §683 asterisk convention):
+  // a trailing " *" in the placeholder plus aria-required.
   const editPlaceholder = required ? `${placeholder} *` : placeholder;
 
-  // The freshest working-copy value, mirrored so the edit-transition effect can
-  // seed the draft from it WITHOUT depending on `value` (which would re-run the
-  // effect on every external change and clobber an in-progress draft).
-  const valueRef = useRef(value);
-  valueRef.current = value;
-
-  // Keep the draft in sync with the working copy whenever the field is NOT in
-  // edit mode (e.g. a duplicate/preferred mutation, or a Cancel that restored
-  // the baseline slice, rewrote it). While editing, the input owns the draft.
+  // Keep the draft in sync with the working copy whenever the field is NOT
+  // focused (e.g. a duplicate/preferred mutation or a Cancel-restore rewrote
+  // the working copy). While focused, the input owns the draft.
   useEffect(() => {
-    if (!canEdit) setDraft(value);
-  }, [value, canEdit]);
-
-  // The edit transition: when this field becomes editable, seed the input from
-  // the current value and focus + select it so the owner lands on it without an
-  // extra click. Keyed on `canEdit` alone (value comes from the ref).
-  useEffect(() => {
-    if (canEdit) {
-      setDraft(valueRef.current);
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [canEdit]);
+    if (!isFocused.current) setDraft(value);
+  }, [value]);
 
   function commit(): void {
     const trimmed = draft.trim();
     if (required && trimmed === "") {
-      // Tried to leave a required field blank: reveal the error. The input stays
-      // open (the unit is still editing), so the user can fix it.
+      // Tried to leave a required field blank: reveal the error. The input
+      // stays open (permitted users are always editing), so they can fix it.
       setShowRequiredError(true);
       return;
     }
-    // Push the committed value into the working copy only — no persist. The
-    // unit's Save reads this working copy and writes it as one atomic row.
-    // Compare on value alone (not `trimmed && …`): the required guard above
-    // already blocks empty for required fields, so for OPTIONAL fields a
-    // clear-to-empty is a real edit and must propagate (otherwise the old value
-    // silently sticks — e.g. an unnamed DIP bank could never be re-blanked).
-    if (trimmed !== value) {
-      onValueChange(trimmed);
-    }
+    setShowRequiredError(false);
+    if (trimmed !== value) onValueChange(trimmed);
   }
 
-  // View mode (not editing, or no permission): finished text. No pencil, no
-  // hover tint, no interactivity — a resting field reads as plain copy.
+  // View mode (no permission): finished text. No pencil, no hover tint.
   if (!canEdit) {
     return (
       <span className={className}>
@@ -117,16 +103,17 @@ export function InlineEditableText({
     );
   }
 
-  // Editing: the always-open input. Commit on blur or Enter buffers the value
-  // into the working copy; Esc reverts the draft to the working copy.
+  // Permitted: the always-open input with the editable-field affordance.
   return (
     <Input
       ref={inputRef}
       value={draft}
-      // Opaque fill (not the default translucent bg-input/30) so the box reads
-      // clearly as an editable field — the set name in particular sits on the
-      // tinted header band, where a translucent input vanishes. (PP-43q3)
-      className={cn("h-7 bg-background", inputClassName)}
+      className={cn(
+        "h-7",
+        EDITABLE_FIELD_CLASS,
+        EDITABLE_TEXT_CLASS,
+        inputClassName
+      )}
       placeholder={editPlaceholder}
       aria-label={
         showInvalid && ariaLabel ? `${ariaLabel} (required)` : ariaLabel
@@ -134,26 +121,46 @@ export function InlineEditableText({
       aria-required={required || undefined}
       aria-invalid={showInvalid || undefined}
       // Commit-on-Enter single field: tell mobile keyboards the Enter key
-      // finishes the field. Titles/names are prose, so leave spellcheck and
-      // sentence-case capitalization at their (on) defaults.
+      // finishes the field. Titles/names are prose, so spellcheck and
+      // sentence-case stay at their (on) defaults.
       enterKeyHint="done"
+      autoComplete={autoComplete}
+      onFocus={() => {
+        isFocused.current = true;
+      }}
       onClick={(e) => {
         e.stopPropagation();
       }}
       onChange={(e) => {
-        setDraft(e.target.value);
+        const raw = e.target.value;
+        setDraft(raw);
+        const trimmed = raw.trim();
+        // Push into the working copy immediately so the auto-save timer sees
+        // the latest text. For required fields, skip propagating blank (the
+        // required guard on blur/Enter is the canonical empty block).
+        if (!(required && trimmed === "") && trimmed !== value) {
+          onValueChange(trimmed);
+        }
       }}
       onBlur={() => {
+        isFocused.current = false;
         commit();
+        onBlurCommit?.();
       }}
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === "Enter") {
           e.preventDefault();
           commit();
+          onBlurCommit?.();
         } else if (e.key === "Escape") {
           e.preventDefault();
+          // Revert the draft display AND restore the working copy to the
+          // current external value (undoes any partial edit that was pushed
+          // via onChange above).
           setDraft(value);
+          setShowRequiredError(false);
+          if (draft.trim() !== value) onValueChange(value);
         }
       }}
     />

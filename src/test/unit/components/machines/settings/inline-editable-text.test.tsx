@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import { EditableCell } from "~/components/machines/settings/EditableCell";
 import { InlineEditableText } from "~/components/machines/settings/InlineEditableText";
 
-describe("InlineEditableText (editing)", () => {
+describe("InlineEditableText (always-live model, PP-43q3 pivot)", () => {
   it("renders the input with enterKeyHint='done'", () => {
     render(
       <InlineEditableText
@@ -18,7 +18,7 @@ describe("InlineEditableText (editing)", () => {
     expect(input).toHaveAttribute("enterkeyhint", "done");
   });
 
-  it("Esc reverts the draft to the external value WITHOUT calling onValueChange", () => {
+  it("typing pushes to working copy immediately via onValueChange", () => {
     const onValueChange = vi.fn();
     render(
       <InlineEditableText
@@ -30,14 +30,34 @@ describe("InlineEditableText (editing)", () => {
     );
     const input = screen.getByRole("textbox", { name: "set name" });
     fireEvent.change(input, { target: { value: "Casual" } });
-    fireEvent.keyDown(input, { key: "Escape" });
-
-    // Draft snaps back to the external value; nothing is committed.
-    expect(input).toHaveValue("Tournament");
-    expect(onValueChange).not.toHaveBeenCalled();
+    // The working copy is updated on every change — no explicit Save needed.
+    expect(onValueChange).toHaveBeenCalledWith("Casual");
   });
 
-  it("shows a required error on blur-while-blank and clears it on a non-blank commit", () => {
+  it("Esc reverts the draft display and restores the working copy", () => {
+    const onValueChange = vi.fn();
+    render(
+      <InlineEditableText
+        value="Tournament"
+        onValueChange={onValueChange}
+        canEdit
+        ariaLabel="set name"
+      />
+    );
+    const input = screen.getByRole("textbox", { name: "set name" });
+    fireEvent.change(input, { target: { value: "Casual" } });
+    // onChange pushed "Casual" into the working copy.
+    expect(onValueChange).toHaveBeenCalledWith("Casual");
+    onValueChange.mockClear();
+
+    fireEvent.keyDown(input, { key: "Escape" });
+    // Draft snaps back to the external value in the input.
+    expect(input).toHaveValue("Tournament");
+    // Esc restores the working copy to the external value.
+    expect(onValueChange).toHaveBeenCalledWith("Tournament");
+  });
+
+  it("shows a required error on blur-while-blank; blank is NOT propagated for required fields", () => {
     const onValueChange = vi.fn();
     render(
       <InlineEditableText
@@ -50,8 +70,10 @@ describe("InlineEditableText (editing)", () => {
     );
     const input = screen.getByRole("textbox", { name: "set name" });
 
-    // Clear and blur → the required error surfaces (the accessible name gains
-    // "(required)" and aria-invalid is set); the blank value is NOT committed.
+    // Clear and blur → the required error surfaces (accessible name gains
+    // "(required)" and aria-invalid is set); the blank value is NOT committed
+    // to the working copy because onChange skips propagating blank for required
+    // fields.
     fireEvent.change(input, { target: { value: "" } });
     fireEvent.blur(input);
     const invalid = screen.getByRole("textbox", {
@@ -116,7 +138,7 @@ describe("InlineEditableText (editing)", () => {
   });
 });
 
-describe("EditableCell", () => {
+describe("EditableCell (always-live model, PP-43q3 pivot)", () => {
   it("codeLike=true: input opts out of autocorrect / autocapitalize / spellcheck", () => {
     render(
       <EditableCell
@@ -154,7 +176,7 @@ describe("EditableCell", () => {
     expect(input.getAttribute("spellcheck")).not.toBe("false");
   });
 
-  it("Enter commits the trimmed value via onCommit", () => {
+  it("typing pushes the trimmed value to the working copy via onCommit", () => {
     const onCommit = vi.fn();
     render(
       <EditableCell
@@ -167,30 +189,46 @@ describe("EditableCell", () => {
     );
     const input = screen.getByRole("textbox", { name: "Row ID" });
     fireEvent.change(input, { target: { value: "  DS-1  " } });
-    fireEvent.keyDown(input, { key: "Enter" });
+    // onChange fires onCommit with the trimmed value on every change.
     expect(onCommit).toHaveBeenCalledWith("DS-1");
-    // Collapses back to the display button after a keyboard commit.
-    expect(screen.getByRole("button", { name: "Row ID" })).toBeInTheDocument();
+    // The input stays always-live — no collapse to display button.
+    expect(screen.getByRole("textbox", { name: "Row ID" })).toBeInTheDocument();
   });
 
-  it("Esc reverts without committing", () => {
+  it("Enter commits and fires onCommitBlur", () => {
     const onCommit = vi.fn();
+    const onCommitBlur = vi.fn();
     render(
       <EditableCell
-        value="original"
+        value=""
         canEdit
         onCommit={onCommit}
+        onCommitBlur={onCommitBlur}
         autoFocusOnMount
         ariaLabel="Row ID"
       />
     );
     const input = screen.getByRole("textbox", { name: "Row ID" });
-    fireEvent.change(input, { target: { value: "changed" } });
-    fireEvent.keyDown(input, { key: "Escape" });
-    expect(onCommit).not.toHaveBeenCalled();
-    // Back in display mode showing the original value.
-    expect(screen.getByRole("button", { name: "Row ID" })).toHaveTextContent(
-      "original"
+    fireEvent.change(input, { target: { value: "DS-1" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onCommit).toHaveBeenCalledWith("DS-1");
+    expect(onCommitBlur).toHaveBeenCalledTimes(1);
+    // The input remains in the DOM (always-live).
+    expect(screen.getByRole("textbox", { name: "Row ID" })).toBeInTheDocument();
+  });
+
+  it("read-only viewer sees a plain span, not an input", () => {
+    render(
+      <EditableCell
+        value="original"
+        canEdit={false}
+        onCommit={vi.fn()}
+        ariaLabel="Row ID"
+      />
     );
+    expect(
+      screen.queryByRole("textbox", { name: "Row ID" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("original")).toBeInTheDocument();
   });
 });

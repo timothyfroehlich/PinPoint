@@ -16,7 +16,6 @@ import type {
 interface DipBankSectionProps {
   bank: DipSwitchBank;
   canEdit: boolean;
-  reserveEditUi?: boolean;
   onRenameBank: (name: string) => void;
   onAddSwitch: () => string | undefined;
   onUpdateSwitch: (
@@ -25,21 +24,23 @@ interface DipBankSectionProps {
     value: string
   ) => void;
   onDeleteSwitch: (switchKey: string) => void;
+  /** Called after a row-cell blur so the parent can flush the auto-save debounce. */
+  onBlurFlush?: (() => void) | undefined;
 }
 
 /**
  * One DIP-switch bank, rendered as a single reorderable section. Bank deletion
  * is handled by the surrounding SortableSection; this component owns the
- * editable bank name and the per-switch table.
+ * always-live editable bank name and the per-switch table.
  */
 export function DipBankSection({
   bank,
   canEdit,
-  reserveEditUi = false,
   onRenameBank,
   onAddSwitch,
   onUpdateSwitch,
   onDeleteSwitch,
+  onBlurFlush,
 }: DipBankSectionProps): React.JSX.Element {
   // Column roles mirror the ID / Setting / Value tables so stacked sections
   // read consistently: Switch↔ID (left), the note field shown as "Setting"
@@ -96,8 +97,8 @@ export function DipBankSection({
 
   return (
     <div className="py-2.5 max-md:py-1.5">
-      {/* pr-14 in edit mode keeps the title input clear of SortableSection's
-          floating grip/delete cluster at the row's right end. */}
+      {/* pr-14 keeps the title input clear of SortableSection's floating
+          grip/kebab cluster at the row's right end. */}
       <div className={cn("mb-1.5", canEdit && "pr-14")}>
         <span className={SECTION_TITLE_CLASS}>
           <InlineEditableText
@@ -107,18 +108,19 @@ export function DipBankSection({
             placeholder="Bank name"
             ariaLabel="bank name"
             inputClassName="h-7 text-sm font-semibold"
+            onBlurCommit={onBlurFlush}
           />
         </span>
       </div>
-      {/* Section content hangs indented under the heading so headings read as the structural landmarks. */}
+      {/* Section content hangs indented under the heading. */}
       <div className="pl-2">
         <EditableSettingsTable
           rows={bank.switches}
           columns={columns}
           canEdit={canEdit}
-          reserveEditUi={reserveEditUi}
           onAddRow={onAddSwitch}
           onDeleteRow={onDeleteSwitch}
+          onBlurFlush={onBlurFlush}
           tableAriaLabel={`Switches for ${bank.name || "DIP"} bank`}
           addLabel="Add switch"
           deleteAriaLabel={(s) => `Delete switch ${s.switch || "row"}`}

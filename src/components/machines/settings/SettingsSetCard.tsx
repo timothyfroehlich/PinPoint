@@ -2,15 +2,7 @@
 
 import type React from "react";
 import { useState } from "react";
-import {
-  ChevronRight,
-  ChevronDown,
-  MoreVertical,
-  Plus,
-  Pencil,
-  Check,
-  Loader2,
-} from "lucide-react";
+import { ChevronRight, ChevronDown, MoreVertical, Plus } from "lucide-react";
 import {
   DndContext,
   KeyboardSensor,
@@ -62,7 +54,6 @@ import { NoteSection } from "~/components/machines/settings/NoteSection";
 import { SoftwareSettingsSection } from "~/components/machines/settings/SoftwareSettingsSection";
 import { TableSection } from "~/components/machines/settings/TableSection";
 import { DipBankSection } from "~/components/machines/settings/DipBankSection";
-import type { UnitSaveState } from "~/components/machines/settings/use-settings-save-queue";
 import {
   type AddSectionSpec,
   type SettingsSection,
@@ -72,37 +63,20 @@ import {
 interface SettingsSetCardProps {
   set: SettingsSetData;
   isExpanded: boolean;
-  /** Permission to edit at all (owner/tech+). Governs whether the per-unit Edit
-   *  buttons, section kebabs/grips, the set kebab, and "Add section" render at
-   *  all. Read-only viewers see none of it. */
+  /** Permission to edit at all (owner/tech+). Governs whether always-live
+   *  field inputs, section kebabs/grips, the set kebab, and "Add section"
+   *  render at all. Read-only viewers see none of it. */
   canEdit: boolean;
-  /** Unsaved set (temp id). Preferred/Duplicate target a persisted row, so they
-   *  are disabled until the first save. */
+  /** Unsaved set (temp id). Preferred/Duplicate target a persisted row, so
+   *  they are disabled until the first save. */
   isNew: boolean;
-  /**
-   * The set-header unit's id (set name + description share one Edit/Save). All
-   * other units are keyed by section id. Passed down so the card and SettingsTab
-   * agree on the header key without hard-coding it in two places.
-   */
-  headerUnitId: string;
-  /** Whether the given unit (HEADER_UNIT or a section id) is in edit mode. */
-  isUnitEditing: (unitId: string) => boolean;
-  /**
-   * The in-flight save state of a unit (PP-43q3 atomic per-unit commit): whether
-   * its Save is awaiting the server, and the last error (kept so the unit stays
-   * open with a Retry that never drops the typed values).
-   */
-  unitSaveState: (unitId: string) => UnitSaveState;
-  /** Enter / commit / discard edit mode for a unit (PP-43q3 atomic commit).
-   *  `onSaveUnit` writes ONLY this unit's slice onto the committed baseline. */
-  onEditUnit: (unitId: string) => void;
-  onSaveUnit: (unitId: string) => void;
-  onCancelUnit: (unitId: string) => void;
-  /** Non-drag reorder (kebab Move up/down) — the mobile + a11y reorder path. */
   onMoveSection: (sectionId: string, direction: "up" | "down") => void;
   onToggleExpand: () => void;
   onTogglePreferred: () => void;
   onRename: (newName: string) => void;
+  /** Called after the set-name blur so the parent can flush the auto-save
+   *  debounce (plain-text blur path — Task 6 Step 9). */
+  onNameBlur: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onUpdateDescription: (value: ProseMirrorDoc | null) => void;
@@ -135,6 +109,9 @@ interface SettingsSetCardProps {
   // Free-form note sections
   onUpdateNoteTitle: (sectionId: string, title: string) => void;
   onUpdateNoteBody: (sectionId: string, body: ProseMirrorDoc | null) => void;
+  /** Called after any section-field blur (name, cell) so the parent can flush
+   *  the auto-save debounce for this set. */
+  onSectionBlurFlush: (sectionId: string) => void;
 }
 
 function formatShortDate(iso: string): string {
@@ -221,8 +198,6 @@ function AddSectionMenu({
           )}
           <DropdownMenuItem
             onSelect={() => {
-              // Blank title → the new section opens with its title field
-              // focused so the user names it, rather than defaulting to "Notes".
               onAdd({ kind: "note", title: "", customTitle: true });
             }}
           >
@@ -252,16 +227,11 @@ export function SettingsSetCard({
   isExpanded,
   canEdit,
   isNew,
-  headerUnitId,
-  isUnitEditing,
-  unitSaveState,
-  onEditUnit,
-  onSaveUnit,
-  onCancelUnit,
   onMoveSection,
   onToggleExpand,
   onTogglePreferred,
   onRename,
+  onNameBlur,
   onDuplicate,
   onDelete,
   onUpdateDescription,
@@ -279,22 +249,17 @@ export function SettingsSetCard({
   onDeleteDipSwitch,
   onUpdateNoteTitle,
   onUpdateNoteBody,
+  onSectionBlurFlush,
 }: SettingsSetCardProps): React.JSX.Element {
   const ChevronIcon = isExpanded ? ChevronDown : ChevronRight;
 
-  // The set-header unit (PP-43q3 explicit edit model): set name + description
-  // share ONE Edit/Done. While editing, the name renders as an input and the
-  // description editor opens; at rest both are finished text with no hover
-  // affordance. There is no permission-alone editability anymore.
-  const headerEditing = canEdit && isUnitEditing(headerUnitId);
-
-  // The description block sits flush under the header as a subtitle. At rest an
-  // empty description renders nothing (InlineMarkdownField returns null), so we
-  // only reserve the wrapper when the header is editing OR there's content to
-  // show — keeping description-less cards free of trailing dead space.
+  // The description block sits flush under the header as a subtitle. At rest
+  // an empty description renders nothing (InlineMarkdownField returns null),
+  // so we only reserve the wrapper when the user can edit OR there's content
+  // to show — keeping description-less cards free of trailing dead space.
   const descriptionIsEmpty =
     !set.description || docToPlainText(set.description).trim() === "";
-  const showDescription = headerEditing || !descriptionIsEmpty;
+  const showDescription = canEdit || !descriptionIsEmpty;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -309,26 +274,19 @@ export function SettingsSetCard({
     }
   }
 
-  // Set-level delete confirms via AlertDialog (design bible §17) — the most
-  // destructive action on the page gets the most explicit confirmation.
+  // Set-level delete confirms via AlertDialog (design bible §17).
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  // Section delete is confirmed via the kebab's AlertDialog (SortableSection),
-  // mirroring the set-level delete confirm.
-
-  // Render one section's body. `editing` is THIS section unit's edit mode — it
-  // gates the section's editable title + table cells and opens its note body.
-  function renderSection(
-    section: SettingsSection,
-    editing: boolean
-  ): React.JSX.Element {
+  // Render one section's body. `canEdit` is passed through — all fields are
+  // always-live for permitted users (PP-43q3 pivot).
+  function renderSection(section: SettingsSection): React.JSX.Element {
     switch (section.kind) {
       case "software":
         return (
           <SoftwareSettingsSection
             baseline={section.baseline}
             rows={section.rows}
-            canEdit={editing}
+            canEdit={canEdit}
             onBaselineChange={(v) => {
               onUpdateBaseline(section.id, v);
             }}
@@ -339,6 +297,7 @@ export function SettingsSetCard({
             onDeleteRow={(rowKey) => {
               onDeleteSoftwareRow(section.id, rowKey);
             }}
+            onBlurFlush={() => onSectionBlurFlush(section.id)}
           />
         );
       case "table":
@@ -346,7 +305,7 @@ export function SettingsSetCard({
           <TableSection
             title={section.title}
             rows={section.rows}
-            canEdit={editing}
+            canEdit={canEdit}
             onTitleChange={(title) => {
               onUpdateTableTitle(section.id, title);
             }}
@@ -357,13 +316,14 @@ export function SettingsSetCard({
             onDeleteRow={(rowKey) => {
               onDeleteSoftwareRow(section.id, rowKey);
             }}
+            onBlurFlush={() => onSectionBlurFlush(section.id)}
           />
         );
       case "dip":
         return (
           <DipBankSection
             bank={section}
-            canEdit={editing}
+            canEdit={canEdit}
             onRenameBank={(name) => {
               onRenameDipBank(section.id, name);
             }}
@@ -374,29 +334,27 @@ export function SettingsSetCard({
             onDeleteSwitch={(switchKey) => {
               onDeleteDipSwitch(section.id, switchKey);
             }}
+            onBlurFlush={() => onSectionBlurFlush(section.id)}
           />
         );
       case "note":
-        // The note title + body are gated on THIS section unit's edit mode. The
-        // unsaved-changes guard is computed centrally in SettingsTab (baseline
-        // vs working copy), so this no longer reports dirtiness up.
         return (
           <NoteSection
             note={section}
-            editing={editing}
+            canEdit={canEdit}
             onTitleChange={(title) => {
               onUpdateNoteTitle(section.id, title);
             }}
             onBodyChange={(body) => {
               onUpdateNoteBody(section.id, body);
             }}
+            onTitleBlur={() => onSectionBlurFlush(section.id)}
           />
         );
     }
   }
 
-  // Preferred badge leads the title (after the chevron) so it lives on the
-  // name's line instead of wrapping with the controls block.
+  // Preferred badge leads the title (after the chevron).
   const preferredBadge = set.isPreferred && (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -416,19 +374,15 @@ export function SettingsSetCard({
     </Tooltip>
   );
 
-  // Name + meta, shared by both header modes. The name is an input only while
-  // the header unit is editing; at rest it's plain text (safe to nest inside the
-  // disclosure <button>). Its edits buffer into the working copy — the header
-  // unit's Save persists them as one atomic row (PP-43q3).
-  const headerSave = unitSaveState(headerUnitId);
+  // The set name — always-live input for permitted users, plain text for
+  // viewers. Edits buffer into the working copy via onRename; auto-save debounce
+  // handles persistence. The input is always present for permitted users so
+  // the chevron column is always separate (no "is button" branching).
   const headerTitle = (
-    // Spans (not divs) so this can live inside the view-mode <button> without
-    // invalid <div>-in-<button> nesting.
+    // Spans (not divs) so this can live inside a <button> without invalid
+    // <div>-in-<button> nesting when the user is a viewer.
     <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
       <span className="min-w-0 text-sm font-semibold text-foreground [overflow-wrap:anywhere]">
-        {/* Badge joins the name's inline flow in BOTH modes — identical layout
-            so the name never nudges sideways. A long name wraps under the star
-            rather than dropping whole to a new line. */}
         {preferredBadge && (
           <span className="mr-2 inline-flex align-middle">
             {preferredBadge}
@@ -437,65 +391,38 @@ export function SettingsSetCard({
         <InlineEditableText
           value={set.name}
           onValueChange={onRename}
-          canEdit={headerEditing}
+          canEdit={canEdit}
           required
           placeholder="Name this set"
           ariaLabel="set name"
           inputClassName="h-7 text-sm font-semibold"
+          autoComplete="off"
+          onBlurCommit={onNameBlur}
         />
       </span>
     </span>
   );
 
-  // While the header is editing, the name is an input, so the header row can't
-  // be one big disclosure <button> (it would swallow the input's focus/clicks).
-  // At rest the name is plain text, so the whole row can be the toggle.
-  const headerIsButton = !headerEditing;
-
   return (
     <Card
       className={cn(
-        // gap-0 overrides shadcn's default gap-6: the header, description, and
-        // body stack with their own paddings instead of a 24px gutter between
-        // each, which was the source of the dead space in the header area.
         "gap-0 overflow-hidden transition-colors duration-150 motion-reduce:transition-none",
-        // Mobile: strip the card chrome (border/bg/shadow/rounding) so sets read
-        // as a flat divided list; the parent supplies the dividers between them.
         "max-md:rounded-none max-md:border-0 max-md:bg-transparent max-md:shadow-none max-md:-mx-4 sm:max-md:-mx-8",
         set.isPreferred
           ? "border-warning/40 ring-1 ring-warning/30 max-md:ring-0"
           : "border-outline-variant",
-        // Last so it wins over border-0 and the preferred border color: on
-        // mobile every set carries a strong 2px top rule — the divider between
-        // sets (and between the tab header and the first set).
         "max-md:border-t-2 max-md:border-t-outline-variant"
       )}
     >
       {/* Header band: title + description + audit line share a faint tinted
           surface so the header reads as one zone on every breakpoint. */}
       <div className="bg-muted max-md:px-4 sm:max-md:px-8">
-        {/* Header block — always visible */}
+        {/* Header block — always visible. For permitted users the name is always
+            an input, so the chevron lives in its own column (left). For viewers
+            the entire row is a single disclosure button. */}
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 px-4 py-3 max-md:px-0 max-md:py-2">
-          {headerIsButton ? (
-            // Read-only viewer: the whole title row is the disclosure trigger
-            // (CORE-A11Y-004).
-            <button
-              type="button"
-              onClick={onToggleExpand}
-              aria-expanded={isExpanded}
-              aria-label={`${set.name || "Unnamed"} settings set`}
-              className="-mx-1 flex max-w-full grow items-center gap-2.5 rounded px-1 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:shrink-0 md:flex-1 motion-reduce:transition-none"
-            >
-              <ChevronIcon
-                className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none"
-                aria-hidden="true"
-              />
-              {headerTitle}
-            </button>
-          ) : (
-            // Permitted user: the inline name editor lives on this row, so the
-            // row can't be one big <button>. A dedicated chevron button handles
-            // disclosure; the name handles its own click-to-edit.
+          {canEdit ? (
+            // Permitted: chevron is its own button; name input in the title span.
             <>
               <button
                 type="button"
@@ -511,79 +438,26 @@ export function SettingsSetCard({
               </button>
               {headerTitle}
             </>
+          ) : (
+            // Viewer: entire title row is the disclosure trigger.
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              aria-expanded={isExpanded}
+              aria-label={`${set.name || "Unnamed"} settings set`}
+              className="-mx-1 flex max-w-full grow items-center gap-2.5 rounded px-1 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-md:shrink-0 md:flex-1 motion-reduce:transition-none"
+            >
+              <ChevronIcon
+                className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none"
+                aria-hidden="true"
+              />
+              {headerTitle}
+            </button>
           )}
 
-          {/* The header unit's Edit/Done/Cancel rides the title row's right end,
-              alongside the set-level ⋮. The ★ badge lives on the title line. */}
-          <span className="ml-auto flex shrink-0 items-center gap-2.5">
-            {canEdit &&
-              (headerEditing ? (
-                <span className="flex items-center gap-1.5">
-                  <span className="flex flex-col items-end">
-                    <span className="flex items-center gap-1.5">
-                      <Button
-                        type="button"
-                        variant="default"
-                        size="sm"
-                        className="h-7"
-                        aria-label="Save set details"
-                        disabled={headerSave.saving}
-                        onClick={() => {
-                          onSaveUnit(headerUnitId);
-                        }}
-                      >
-                        {headerSave.saving ? (
-                          <Loader2
-                            aria-hidden="true"
-                            className="animate-spin motion-reduce:animate-none"
-                          />
-                        ) : (
-                          <Check aria-hidden="true" />
-                        )}
-                        {headerSave.saving ? "Saving…" : "Save"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7"
-                        aria-label="Cancel editing set details"
-                        disabled={headerSave.saving}
-                        onClick={() => {
-                          onCancelUnit(headerUnitId);
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </span>
-                    {/* On failure the unit stays open with the typed values
-                        intact; the Save button itself is the Retry. */}
-                    {headerSave.error !== null && (
-                      <span
-                        role="alert"
-                        className="mt-1 text-xs text-destructive"
-                      >
-                        {headerSave.error}
-                      </span>
-                    )}
-                  </span>
-                </span>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7"
-                  aria-label="Edit set details"
-                  onClick={() => {
-                    onEditUnit(headerUnitId);
-                  }}
-                >
-                  <Pencil aria-hidden="true" />
-                  Edit
-                </Button>
-              ))}
-            {canEdit && (
+          {/* Set-level ⋮ menu — permitted users only. */}
+          {canEdit && (
+            <span className="ml-auto flex shrink-0 items-center">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -597,7 +471,7 @@ export function SettingsSetCard({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {/* Preferred + Duplicate act on a persisted row, so they're
-                  disabled until an unsaved (temp-id) set is first saved. */}
+                      disabled until an unsaved (temp-id) set is first saved. */}
                   <DropdownMenuItem
                     disabled={isNew}
                     onSelect={onTogglePreferred}
@@ -617,8 +491,8 @@ export function SettingsSetCard({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-          </span>
+            </span>
+          )}
         </div>
 
         {canEdit && (
@@ -629,11 +503,11 @@ export function SettingsSetCard({
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>
-                  Delete “{set.name || "this set"}”?
+                  Delete "{set.name || "this set"}"?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                   This deletes the whole settings set and everything in it. This
-                  can’t be undone.
+                  can't be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -646,15 +520,14 @@ export function SettingsSetCard({
           </AlertDialog>
         )}
 
-        {/* Description — part of the set-header unit, so it opens with the
-          header's Edit and commits on its Save (the editor streams keystrokes
-          into the working copy; Save persists, Cancel restores from baseline).
-          pl-11 aligns it under the set name (past the chevron). */}
+        {/* Description — always-live for permitted users; at rest renders
+            as finished text (or nothing when empty). pl-11 aligns under the
+            set name (past the chevron). */}
         {showDescription && (
           <div className="-mt-1 pb-1 pl-11 pr-4 max-md:px-0">
             <InlineMarkdownField
               value={set.description}
-              editing={headerEditing}
+              canEdit={canEdit}
               placeholder="Add a short description…"
               compact
               onValueChange={onUpdateDescription}
@@ -663,8 +536,7 @@ export function SettingsSetCard({
         )}
 
         {/* Audit line — sits under the description (or directly under the header
-          when there is none). The per-unit Edit controls now live on the title
-          row and per section, so this row is just the audit text. */}
+            when there is none). */}
         <div className="flex items-center gap-2 pb-3 pl-11 pr-4 max-md:px-0 max-md:pb-2">
           <p className="min-w-0 text-xs text-muted-foreground">
             updated by {set.updatedBy} {formatShortDate(set.updatedAt)}
@@ -685,43 +557,27 @@ export function SettingsSetCard({
               items={sectionIds}
               strategy={verticalListSortingStrategy}
             >
-              {set.sections.map((section, index) => {
-                const sectionEditing = canEdit && isUnitEditing(section.id);
-                const sectionSave = unitSaveState(section.id);
-                return (
-                  <SortableSection
-                    key={section.id}
-                    id={section.id}
-                    editing={sectionEditing}
-                    canEdit={canEdit}
-                    saving={sectionSave.saving}
-                    saveError={sectionSave.error}
-                    isFirst={index === 0}
-                    isLast={index === set.sections.length - 1}
-                    describe={describeSection(section)}
-                    onEdit={() => {
-                      onEditUnit(section.id);
-                    }}
-                    onSave={() => {
-                      onSaveUnit(section.id);
-                    }}
-                    onCancel={() => {
-                      onCancelUnit(section.id);
-                    }}
-                    onDelete={() => {
-                      onDeleteSection(section.id);
-                    }}
-                    onMoveUp={() => {
-                      onMoveSection(section.id, "up");
-                    }}
-                    onMoveDown={() => {
-                      onMoveSection(section.id, "down");
-                    }}
-                  >
-                    {renderSection(section, sectionEditing)}
-                  </SortableSection>
-                );
-              })}
+              {set.sections.map((section, index) => (
+                <SortableSection
+                  key={section.id}
+                  id={section.id}
+                  canEdit={canEdit}
+                  isFirst={index === 0}
+                  isLast={index === set.sections.length - 1}
+                  describe={describeSection(section)}
+                  onDelete={() => {
+                    onDeleteSection(section.id);
+                  }}
+                  onMoveUp={() => {
+                    onMoveSection(section.id, "up");
+                  }}
+                  onMoveDown={() => {
+                    onMoveSection(section.id, "down");
+                  }}
+                >
+                  {renderSection(section)}
+                </SortableSection>
+              ))}
             </SortableContext>
           </DndContext>
 
@@ -732,8 +588,7 @@ export function SettingsSetCard({
           )}
 
           {/* "+ Add section" is persistent for permitted users — NOT gated
-              behind any edit mode (its job is structural, separate from the
-              per-unit Edit/Done). Read-only viewers never see it. */}
+              behind any edit mode. Read-only viewers never see it. */}
           {canEdit && (
             <AddSectionMenu
               hasSoftware={set.sections.some((s) => s.kind === "software")}

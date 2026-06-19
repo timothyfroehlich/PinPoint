@@ -1,3 +1,14 @@
+/**
+ * SettingsTab — always-live auto-save model (PP-43q3 pivot).
+ *
+ * Key invariants tested here:
+ *   (a) permitted users see always-live inputs — no "Edit" button gating them
+ *   (b) typing schedules a debounced save; blur flushes it immediately
+ *   (c) read-only viewers see clean static text and NO inputs anywhere
+ *   (d) the always-on set-name input carries autocomplete="off" (CORE-FORM)
+ *   (e) customTitle NoteSection renders editable title + body with NO Save button
+ *       (regression guard for PP-43q3 bug #7)
+ */
 import {
   render,
   screen,
@@ -17,11 +28,13 @@ import {
 import type { SettingsSetData } from "~/lib/machines/settings-types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
-// Stub the rich-text editor/display so the per-unit edit wiring is tested
-// without Tiptap (the dynamic editor doesn't render synchronously in jsdom).
-// The mock editor exposes a real <textbox> labelled by `ariaLabel` and a button
-// that pushes a non-empty doc through `onChange`, letting us drive a dirty draft
-// + Save commit deterministically.
+// Stub the rich-text editor/display so the auto-save wiring is testable without
+// Tiptap (the dynamic editor doesn't render synchronously in jsdom).
+// - RichTextEditor: exposes a <textarea> with the ariaLabel and a button that
+//   pushes a non-empty doc through onChange, letting us trigger a working-copy
+//   update deterministically.
+// - RichTextDisplay: renders a sentinel div so we can verify it's used (not an
+//   editor) in viewer mode.
 const SAMPLE_DOC: ProseMirrorDoc = {
   type: "doc",
   content: [
@@ -53,9 +66,6 @@ vi.mock("~/components/editor/RichTextDisplay", () => ({
   RichTextDisplay: () => <div data-testid="mock-display" />,
 }));
 
-// Mock the server actions module — these tests exercise the client edit/atomic-
-// commit wiring (per-unit Edit/Save → one whole-row persist of that unit's slice
-// onto the committed baseline), not persistence itself.
 vi.mock("~/app/(app)/m/[initials]/(tabs)/settings/actions", () => ({
   saveSettingsSetAction: vi.fn(),
   deleteSettingsSetAction: vi.fn(),
@@ -86,9 +96,17 @@ beforeAll(() => {
 
 beforeEach(() => {
   saveMock.mockReset();
-  // Default: a successful UPDATE of the existing set.
+  // Default: a successful update of the existing set.
   saveMock.mockResolvedValue({ success: true, id: "set-1", changed: true });
+  // Note: individual tests that need fake timers call vi.useFakeTimers()
+  // themselves and restore via vi.useRealTimers() in a finally / afterEach.
+  // Global fake timers break waitFor + findByRole (they use setTimeout
+  // internally). Tests that don't need timer control use real timers.
 });
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
 
 function oneSet(): SettingsSetData {
   return {
@@ -111,8 +129,6 @@ function oneSet(): SettingsSetData {
   };
 }
 
-// A set with two note sections so we can exercise Move up/down reordering and
-// the rich-body-on-Save commit + cross-unit isolation.
 function twoNoteSet(): SettingsSetData {
   return {
     id: "set-1",
@@ -140,8 +156,31 @@ function twoNoteSet(): SettingsSetData {
   };
 }
 
-describe("SettingsTab — atomic per-unit commit model", () => {
-  it("a permitted user sees the set's Edit button but NO editable name until they click it", () => {
+function dipSet(): SettingsSetData {
+  return {
+    id: "set-1",
+    name: "Tournament",
+    isPreferred: false,
+    updatedBy: "You",
+    updatedAt: "2026-06-09",
+    description: null,
+    sections: [
+      {
+        id: "sec-dip",
+        kind: "dip",
+        name: "Bank A",
+        switches: [{ _key: "sw1", switch: "DS-1", position: "OFF", note: "" }],
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// (a) Permitted user: always-live inputs, no "Edit" gating
+// ---------------------------------------------------------------------------
+
+describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
+  it("(a) a permitted user sees the set-name input immediately — no Edit button", () => {
     render(
       <SettingsTab
         canEdit
@@ -152,17 +191,16 @@ describe("SettingsTab — atomic per-unit commit model", () => {
       />
     );
 
-    // At rest the set-header unit shows a visible "Edit set details" button and
-    // the name is plain text — there is no name input.
+    // The name is always-live: an input is present, no "Edit set details" button.
     expect(
-      screen.getByRole("button", { name: "Edit set details" })
+      screen.getByRole("textbox", { name: "set name" })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("textbox", { name: "set name" })
+      screen.queryByRole("button", { name: "Edit set details" })
     ).not.toBeInTheDocument();
   });
 
-  it("editing the name BUFFERS — no save fires on blur; the unit's Save persists it", async () => {
+  it("(a) software-settings table cells are always-live inputs for permitted users", () => {
     render(
       <SettingsTab
         canEdit
@@ -173,87 +211,88 @@ describe("SettingsTab — atomic per-unit commit model", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit set details" }));
+    // The pre-existing row cells are always open.
+    expect(
+      screen.getByRole("textbox", { name: "Setting name" })
+    ).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // (b) Typing schedules a debounced save; blur flushes immediately
+  // ---------------------------------------------------------------------------
+
+  it("(b) typing a new set name schedules a debounced save", async () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
+
+      const input = screen.getByRole("textbox", { name: "set name" });
+      fireEvent.change(input, { target: { value: "Casual" } });
+
+      // Save is debounced — nothing fires yet.
+      expect(saveMock).not.toHaveBeenCalled();
+
+      // Advance fake timers past the 800 ms debounce.
+      act(() => {
+        vi.advanceTimersByTime(900);
+      });
+
+      // Drain the promise queue before asserting.
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(saveMock).toHaveBeenCalledTimes(1);
+      expect(saveMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          machineId: "m1",
+          id: "set-1",
+          name: "Casual",
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("(b) blurring the set-name input flushes the save immediately (no 800 ms wait)", async () => {
+    render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[oneSet()]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
     const input = screen.getByRole("textbox", { name: "set name" });
     fireEvent.change(input, { target: { value: "Casual" } });
-    // Blur commits the value into the WORKING COPY only — no persistence yet.
-    fireEvent.blur(input);
-    expect(saveMock).not.toHaveBeenCalled();
 
-    // The header unit's Save persists exactly this unit's slice.
-    fireEvent.click(screen.getByRole("button", { name: "Save set details" }));
+    // Blur triggers immediate flush.
+    fireEvent.blur(input);
+
     await waitFor(() => {
       expect(saveMock).toHaveBeenCalledTimes(1);
     });
     expect(saveMock).toHaveBeenCalledWith(
-      expect.objectContaining({ machineId: "m1", id: "set-1", name: "Casual" })
-    );
-  });
-
-  it("Cancel reverts the buffered name draft and closes the unit", () => {
-    render(
-      <SettingsTab
-        canEdit
-        machineId="m1"
-        initialSets={[oneSet()]}
-        settingsRequests={null}
-        settingsInstructions={null}
-      />
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Edit set details" }));
-    const input = screen.getByRole("textbox", { name: "set name" });
-    fireEvent.change(input, { target: { value: "Throwaway" } });
-    fireEvent.blur(input);
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Cancel editing set details" })
-    );
-    // Nothing persisted, the unit closed, and the original name is shown.
-    expect(saveMock).not.toHaveBeenCalled();
-    expect(
-      screen.queryByRole("textbox", { name: "set name" })
-    ).not.toBeInTheDocument();
-    expect(screen.getByText("Tournament")).toBeInTheDocument();
-  });
-
-  it("surfaces an inline error on failure without losing the typed value; Save retries", async () => {
-    saveMock.mockResolvedValue({ success: false, error: "Network error" });
-    render(
-      <SettingsTab
-        canEdit
-        machineId="m1"
-        initialSets={[oneSet()]}
-        settingsRequests={null}
-        settingsInstructions={null}
-      />
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Edit set details" }));
-    const input = screen.getByRole("textbox", { name: "set name" });
-    fireEvent.change(input, { target: { value: "Casual" } });
-    fireEvent.blur(input);
-    fireEvent.click(screen.getByRole("button", { name: "Save set details" }));
-
-    // The failed save shows an inline error; the unit stays open with the typed
-    // value ("Casual") preserved in the input.
-    await screen.findByText("Network error");
-    expect(screen.getByRole("textbox", { name: "set name" })).toHaveValue(
-      "Casual"
-    );
-
-    // Save again = Retry. Make it succeed this time.
-    saveMock.mockResolvedValue({ success: true, id: "set-1", changed: true });
-    fireEvent.click(screen.getByRole("button", { name: "Save set details" }));
-    await waitFor(() => {
-      expect(saveMock).toHaveBeenCalledTimes(2);
-    });
-    expect(saveMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ name: "Casual" })
     );
   });
 
-  it("shows no edit affordances at all to read-only viewers", () => {
+  // ---------------------------------------------------------------------------
+  // (c) Read-only viewer: clean static text, NO inputs anywhere
+  // ---------------------------------------------------------------------------
+
+  it("(c) read-only viewer sees plain text for set name — no input", () => {
     render(
       <SettingsTab
         canEdit={false}
@@ -263,118 +302,177 @@ describe("SettingsTab — atomic per-unit commit model", () => {
         settingsInstructions={null}
       />
     );
+
+    // No inputs for the set name.
+    expect(
+      screen.queryByRole("textbox", { name: "set name" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Tournament")).toBeInTheDocument();
+  });
+
+  it("(c) read-only viewer sees no table-cell inputs — only plain spans", () => {
+    render(
+      <SettingsTab
+        canEdit={false}
+        machineId="m1"
+        initialSets={[oneSet()]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    // No text inputs for the settings rows.
+    expect(
+      screen.queryByRole("textbox", { name: "Setting name" })
+    ).not.toBeInTheDocument();
+    // The value is shown as text.
+    expect(screen.getByText("Balls Per Game")).toBeInTheDocument();
+  });
+
+  it("(c) read-only viewer sees RichTextDisplay, not RichTextEditor, for description", () => {
+    const setWithDesc: SettingsSetData = {
+      ...oneSet(),
+      description: SAMPLE_DOC,
+    };
+    render(
+      <SettingsTab
+        canEdit={false}
+        machineId="m1"
+        initialSets={[setWithDesc]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    // RichTextDisplay mock is used, not the editor textarea.
+    expect(screen.getByTestId("mock-display")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("(c) read-only viewer sees no DIP-bank-name input", () => {
+    render(
+      <SettingsTab
+        canEdit={false}
+        machineId="m1"
+        initialSets={[dipSet()]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    expect(
+      screen.queryByRole("textbox", { name: "bank name" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Bank A")).toBeInTheDocument();
+  });
+
+  it("(c) read-only viewer sees no Edit/Save/Cancel buttons and no Add section", () => {
+    render(
+      <SettingsTab
+        canEdit={false}
+        machineId="m1"
+        initialSets={[oneSet()]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
     expect(
       screen.queryByRole("button", { name: /^Edit/ })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "More options for this set" })
+      screen.queryByRole("button", { name: /^Save/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Cancel/ })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Add section/ })
     ).not.toBeInTheDocument();
   });
 
-  it("a section's rich body is editable only AFTER clicking that section's Edit", () => {
+  // ---------------------------------------------------------------------------
+  // (d) autocomplete="off" on the always-on set-name input
+  // ---------------------------------------------------------------------------
+
+  it("(d) the always-on set-name input has autocomplete='off'", () => {
     render(
       <SettingsTab
         canEdit
         machineId="m1"
-        initialSets={[twoNoteSet()]}
+        initialSets={[oneSet()]}
         settingsRequests={null}
         settingsInstructions={null}
       />
     );
 
-    // At rest, an empty note body renders nothing and no rich editor is mounted.
+    const nameInput = screen.getByRole("textbox", { name: "set name" });
+    expect(nameInput).toHaveAttribute("autocomplete", "off");
+  });
+
+  // ---------------------------------------------------------------------------
+  // (e) customTitle NoteSection: editable title + body, NO Save button (bug #7)
+  // ---------------------------------------------------------------------------
+
+  it("(e) customTitle note section renders editable title and body with no Save button", async () => {
+    const user = userEvent.setup();
+    render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[
+          {
+            ...oneSet(),
+            sections: [
+              {
+                id: "sec-note",
+                kind: "note",
+                title: "Special instructions",
+                body: null,
+                customTitle: true,
+              },
+            ],
+          },
+        ]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    // The section title is an always-live input (customTitle=true).
+    const titleInput = screen.getByRole("textbox", { name: "section title" });
+    expect(titleInput).toBeInTheDocument();
+
+    // NO Save/Edit/Cancel buttons for the section.
     expect(
-      screen.queryByRole("textbox", { name: "Edit text" })
+      screen.queryByRole("button", {
+        name: /Save the Special instructions section/,
+      })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: /Edit the Special instructions section/,
+      })
     ).not.toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Edit the Post positions section" })
-    );
-    expect(
-      screen.getByRole("textbox", { name: "Edit text" })
-    ).toBeInTheDocument();
-  });
+    // Editing the title schedules an auto-save.
+    await user.clear(titleInput);
+    await user.type(titleInput, "Edited title");
+    fireEvent.blur(titleInput);
 
-  it("buffers the rich body until the section's Save (one whole-row write)", async () => {
-    render(
-      <SettingsTab
-        canEdit
-        machineId="m1"
-        initialSets={[twoNoteSet()]}
-        settingsRequests={null}
-        settingsInstructions={null}
-      />
-    );
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Edit the Post positions section" })
-    );
-    // Typing into the body streams into the working copy but does NOT persist.
-    fireEvent.click(screen.getByRole("button", { name: "type-in-Edit text" }));
-    expect(saveMock).not.toHaveBeenCalled();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Save the Post positions section" })
-    );
     await waitFor(() => {
       expect(saveMock).toHaveBeenCalledTimes(1);
     });
-    // The persisted slice carries the edited body for sec-a.
     const payload = saveMock.mock.calls[0]?.[0];
-    const secA = payload?.sections.find((s) => s.id === "sec-a");
-    expect(secA?.kind === "note" ? secA.body : null).toEqual(SAMPLE_DOC);
+    const section = payload?.sections.find((s) => s.id === "sec-note");
+    expect(section?.kind === "note" ? section.title : "").toBe("Edited title");
   });
 
-  it("saving one section does NOT persist another open section's edits (atomicity)", async () => {
-    render(
-      <SettingsTab
-        canEdit
-        machineId="m1"
-        initialSets={[twoNoteSet()]}
-        settingsRequests={null}
-        settingsInstructions={null}
-      />
-    );
+  // ---------------------------------------------------------------------------
+  // Section reorder (structural op) persists from working copy
+  // ---------------------------------------------------------------------------
 
-    // Open BOTH sections and type a draft body into each.
-    fireEvent.click(
-      screen.getByRole("button", { name: "Edit the Post positions section" })
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Edit the Rubbers section" })
-    );
-    const typeButtons = screen.getAllByRole("button", {
-      name: "type-in-Edit text",
-    });
-    // Two editors are open; type into both working copies.
-    for (const btn of typeButtons) fireEvent.click(btn);
-
-    // Save ONLY the Post positions section.
-    fireEvent.click(
-      screen.getByRole("button", { name: "Save the Post positions section" })
-    );
-    await waitFor(() => {
-      expect(saveMock).toHaveBeenCalledTimes(1);
-    });
-
-    const payload = saveMock.mock.calls[0]?.[0];
-    const secA = payload?.sections.find((s) => s.id === "sec-a");
-    const secB = payload?.sections.find((s) => s.id === "sec-b");
-    // sec-a's slice committed; sec-b's open draft is EXCLUDED (still baseline
-    // null) — the merge starts from baseline and overlays only sec-a.
-    expect(secA?.kind === "note" ? secA.body : "x").toEqual(SAMPLE_DOC);
-    expect(secB?.kind === "note" ? secB.body : "x").toBeNull();
-
-    // The Rubbers section stays open (unsaved).
-    expect(
-      screen.getByRole("button", { name: "Save the Rubbers section" })
-    ).toBeInTheDocument();
-  });
-
-  it("reorders a section with the kebab's Move down and persists immediately from baseline", async () => {
+  it("Move down persists immediately from the working copy (H1)", async () => {
     const user = userEvent.setup();
     render(
       <SettingsTab
@@ -395,7 +493,7 @@ describe("SettingsTab — atomic per-unit commit model", () => {
       await screen.findByRole("menuitem", { name: "Move down" })
     );
 
-    // The order change persists a whole-row save with Rubbers now first.
+    // A structural op flushes immediately — no debounce needed.
     await waitFor(() => {
       expect(saveMock).toHaveBeenCalledTimes(1);
     });
@@ -403,7 +501,8 @@ describe("SettingsTab — atomic per-unit commit model", () => {
     expect(payload?.sections.map((s) => s.id)).toEqual(["sec-b", "sec-a"]);
   });
 
-  it("Cancel discards a never-saved set (no save fired, card removed)", () => {
+  it("structural op on a never-saved set is local-only (no save fires)", async () => {
+    const user = userEvent.setup();
     render(
       <SettingsTab
         canEdit
@@ -414,52 +513,38 @@ describe("SettingsTab — atomic per-unit commit model", () => {
       />
     );
 
-    // Create a brand-new set — its header opens in edit mode.
+    // New (never-saved) set; add two sections so Move down is enabled.
     fireEvent.click(screen.getByRole("button", { name: "New set" }));
-    expect(
-      screen.getByRole("textbox", { name: "set name" })
-    ).toBeInTheDocument();
-
-    // Cancel the header unit of this never-saved set → the whole card is gone.
-    fireEvent.click(
-      screen.getByRole("button", { name: "Cancel editing set details" })
+    await user.click(screen.getByRole("button", { name: /Add section/ }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Post positions" })
     );
-    expect(
-      screen.queryByRole("textbox", { name: "set name" })
-    ).not.toBeInTheDocument();
-    expect(saveMock).not.toHaveBeenCalled();
-  });
-
-  it("Cancel removes a brand-new draft section without firing a save", async () => {
-    const user = userEvent.setup();
-    render(
-      <SettingsTab
-        canEdit
-        machineId="m1"
-        initialSets={[oneSet()]}
-        settingsRequests={null}
-        settingsInstructions={null}
-      />
-    );
-
-    // Add a brand-new note section (Rubbers preset) — it opens in edit mode.
     await user.click(screen.getByRole("button", { name: /Add section/ }));
     await user.click(await screen.findByRole("menuitem", { name: "Rubbers" }));
-    expect(
-      screen.getByRole("button", { name: "Save the Rubbers section" })
-    ).toBeInTheDocument();
 
-    // Cancel the never-saved draft section → it's removed; nothing persisted.
     await user.click(
-      screen.getByRole("button", { name: "Cancel editing the Rubbers section" })
+      screen.getByRole("button", {
+        name: "More options for the Post positions section",
+      })
     );
-    expect(
-      screen.queryByRole("button", { name: "Save the Rubbers section" })
-    ).not.toBeInTheDocument();
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Move down" })
+    );
+
+    // Never-saved: the `if (!baseline) return` guard short-circuits persist.
     expect(saveMock).not.toHaveBeenCalled();
   });
 
-  it("required-name guard: a blank set name blocks Save and keeps the unit open", () => {
+  // ---------------------------------------------------------------------------
+  // New set: first auto-save inserts (no id field)
+  // ---------------------------------------------------------------------------
+
+  it("a new set's first auto-save is an INSERT (no id field)", async () => {
+    saveMock.mockResolvedValue({
+      success: true,
+      id: "server-uuid",
+      changed: true,
+    });
     render(
       <SettingsTab
         canEdit
@@ -470,136 +555,59 @@ describe("SettingsTab — atomic per-unit commit model", () => {
       />
     );
 
-    // A new set starts with an empty name in the working copy (the input refuses
-    // to commit a blank, so this is the genuine empty-name path the guard exists
-    // for). Saving without naming it is blocked.
     fireEvent.click(screen.getByRole("button", { name: "New set" }));
-    expect(screen.getByRole("textbox", { name: "set name" })).toHaveValue("");
+    const nameInput = screen.getByRole("textbox", { name: "set name" });
+    fireEvent.change(nameInput, { target: { value: "Brand new" } });
+    // Blur flushes the debounce immediately.
+    fireEvent.blur(nameInput);
 
-    fireEvent.click(screen.getByRole("button", { name: "Save set details" }));
-    // The empty-name guard blocks the save; the unit stays open.
-    expect(saveMock).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: "Save set details" })
-    ).toBeInTheDocument();
-  });
-
-  it("required-title guard: a blank table title blocks the section Save", async () => {
-    const user = userEvent.setup();
-    render(
-      <SettingsTab
-        canEdit
-        machineId="m1"
-        initialSets={[oneSet()]}
-        settingsRequests={null}
-        settingsInstructions={null}
-      />
-    );
-
-    // Add an "Other table…" section — it opens in edit mode with a blank title.
-    await user.click(screen.getByRole("button", { name: /Add section/ }));
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Other table…" })
-    );
-    // Its title is required and starts blank, so Save is guarded.
-    const save = screen.getByRole("button", {
-      name: "Save the untitled table",
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledTimes(1);
     });
-    fireEvent.click(save);
-    expect(saveMock).not.toHaveBeenCalled();
-    // The unit stays open (still showing its Save).
-    expect(
-      screen.getByRole("button", { name: "Save the untitled table" })
-    ).toBeInTheDocument();
+    // Insert: no `id` field; name is sent.
+    const payload = saveMock.mock.calls[0]?.[0];
+    expect(payload?.id).toBeUndefined();
+    expect(payload?.name).toBe("Brand new");
   });
 
-  it("nav guard arms a capturing click listener when dirty and disarms on Save", async () => {
-    const addSpy = vi.spyOn(document, "addEventListener");
-    const removeSpy = vi.spyOn(document, "removeEventListener");
+  it("a blank new-set name does NOT trigger a save (required guard in execute)", async () => {
+    vi.useFakeTimers();
     try {
       render(
         <SettingsTab
           canEdit
           machineId="m1"
-          initialSets={[oneSet()]}
+          initialSets={[]}
           settingsRequests={null}
           settingsInstructions={null}
         />
       );
 
-      // Open the header unit and make it dirty.
-      fireEvent.click(screen.getByRole("button", { name: "Edit set details" }));
-      const input = screen.getByRole("textbox", { name: "set name" });
-      fireEvent.change(input, { target: { value: "Casual" } });
-      fireEvent.blur(input);
+      fireEvent.click(screen.getByRole("button", { name: "New set" }));
+      // The name input starts blank; blur without typing.
+      const nameInput = screen.getByRole("textbox", { name: "set name" });
+      fireEvent.blur(nameInput);
 
-      // The guard adds a capturing click listener while a unit is dirty.
-      const addedCapturingClick = addSpy.mock.calls.some(
-        ([type, , options]) => type === "click" && options === true
-      );
-      expect(addedCapturingClick).toBe(true);
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
 
-      // Save successfully → the guard tears down its capturing click listener.
-      fireEvent.click(screen.getByRole("button", { name: "Save set details" }));
-      await waitFor(() => {
-        expect(saveMock).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await Promise.resolve();
       });
-      await waitFor(() => {
-        const removedCapturingClick = removeSpy.mock.calls.some(
-          ([type, , options]) => type === "click" && options === true
-        );
-        expect(removedCapturingClick).toBe(true);
-      });
+
+      // Empty name blocked: the execute guard sees isNew && name.trim() === "".
+      expect(saveMock).not.toHaveBeenCalled();
     } finally {
-      addSpy.mockRestore();
-      removeSpy.mockRestore();
+      vi.useRealTimers();
     }
   });
 
-  it("nav guard prompts confirm on an anchor click while dirty, but not when clean", () => {
-    const confirmSpy = vi
-      .spyOn(window, "confirm")
-      .mockImplementation(() => false);
-    try {
-      render(
-        <SettingsTab
-          canEdit
-          machineId="m1"
-          initialSets={[oneSet()]}
-          settingsRequests={null}
-          settingsInstructions={null}
-        />
-      );
-      // An in-app link the capturing guard can intercept.
-      const link = document.createElement("a");
-      link.setAttribute("href", "/somewhere");
-      link.textContent = "Go";
-      document.body.appendChild(link);
+  // ---------------------------------------------------------------------------
+  // Set preferred / Duplicate disabled for unsaved set
+  // ---------------------------------------------------------------------------
 
-      try {
-        // Clean (no open unit) → clicking the anchor does NOT prompt.
-        fireEvent.click(link);
-        expect(confirmSpy).not.toHaveBeenCalled();
-
-        // Make a unit dirty, then click the anchor → the guard prompts.
-        fireEvent.click(
-          screen.getByRole("button", { name: "Edit set details" })
-        );
-        const input = screen.getByRole("textbox", { name: "set name" });
-        fireEvent.change(input, { target: { value: "Casual" } });
-        fireEvent.blur(input);
-
-        fireEvent.click(link);
-        expect(confirmSpy).toHaveBeenCalledTimes(1);
-      } finally {
-        link.remove();
-      }
-    } finally {
-      confirmSpy.mockRestore();
-    }
-  });
-
-  it("Set preferred / Duplicate are disabled for an unsaved set", async () => {
+  it("Set preferred / Duplicate are disabled for an unsaved (temp-id) set", async () => {
     const user = userEvent.setup();
     render(
       <SettingsTab
@@ -623,86 +631,109 @@ describe("SettingsTab — atomic per-unit commit model", () => {
     expect(preferred).toHaveAttribute("aria-disabled", "true");
     expect(duplicate).toHaveAttribute("aria-disabled", "true");
 
-    // Clicking a disabled item is a no-op — the mocked actions never fire.
     await user.click(preferred);
     expect(vi.mocked(setPreferredSettingsSetAction)).not.toHaveBeenCalled();
     expect(vi.mocked(duplicateSettingsSetAction)).not.toHaveBeenCalled();
   });
 
-  it("a structural op on a never-saved set is local-only (no save fires)", async () => {
-    const user = userEvent.setup();
-    render(
-      <SettingsTab
-        canEdit
-        machineId="m1"
-        initialSets={[]}
-        settingsRequests={null}
-        settingsInstructions={null}
-      />
-    );
+  // ---------------------------------------------------------------------------
+  // Nav guard: arms/disarms with hasUnsaved
+  // ---------------------------------------------------------------------------
 
-    // New (never-saved) set; add two sections so Move down is enabled.
-    fireEvent.click(screen.getByRole("button", { name: "New set" }));
-    await user.click(screen.getByRole("button", { name: /Add section/ }));
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Post positions" })
-    );
-    await user.click(screen.getByRole("button", { name: /Add section/ }));
-    await user.click(await screen.findByRole("menuitem", { name: "Rubbers" }));
+  it("nav guard arms a capturing click listener when a save is in flight", async () => {
+    const addSpy = vi.spyOn(document, "addEventListener");
+    const removeSpy = vi.spyOn(document, "removeEventListener");
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
 
-    // Reorder via the kebab's Move down on the first section — for a never-saved
-    // set this only mutates the working copy (the `if (!baseline) return` guard).
-    await user.click(
-      screen.getByRole("button", {
-        name: "More options for the Post positions section",
-      })
-    );
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Move down" })
-    );
-    expect(saveMock).not.toHaveBeenCalled();
+      // Dirty the name and blur immediately to flush the save (runSave →
+      // markPending → hasUnsaved = true → guard arms).
+      const input = screen.getByRole("textbox", { name: "set name" });
+      fireEvent.change(input, { target: { value: "Casual" } });
+      fireEvent.blur(input);
+
+      // After flush, the guard should have added its capturing click listener.
+      await waitFor(() => {
+        const addedCapturingClick = addSpy.mock.calls.some(
+          ([type, , options]) => type === "click" && options === true
+        );
+        expect(addedCapturingClick).toBe(true);
+      });
+
+      // Let the save resolve successfully → guard disarms.
+      await waitFor(() => {
+        expect(saveMock).toHaveBeenCalledTimes(1);
+      });
+      await waitFor(() => {
+        const removedCapturingClick = removeSpy.mock.calls.some(
+          ([type, , options]) => type === "click" && options === true
+        );
+        expect(removedCapturingClick).toBe(true);
+      });
+    } finally {
+      addSpy.mockRestore();
+      removeSpy.mockRestore();
+    }
   });
 
-  it("a new set's header opens in edit and inserts on its first Save", async () => {
-    saveMock.mockResolvedValue({
-      success: true,
-      id: "server-uuid",
-      changed: true,
-    });
-    render(
-      <SettingsTab
-        canEdit
-        machineId="m1"
-        initialSets={[]}
-        settingsRequests={null}
-        settingsInstructions={null}
-      />
-    );
+  it("nav guard prompts confirm on an anchor click while a save is in flight, not when clean", async () => {
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
 
-    fireEvent.click(screen.getByRole("button", { name: "New set" }));
-    const input = screen.getByRole("textbox", { name: "set name" });
-    fireEvent.change(input, { target: { value: "Brand new" } });
-    fireEvent.blur(input);
-    // Buffered, not yet inserted.
-    expect(saveMock).not.toHaveBeenCalled();
+      const link = document.createElement("a");
+      link.setAttribute("href", "/somewhere");
+      link.textContent = "Go";
+      document.body.appendChild(link);
 
-    fireEvent.click(screen.getByRole("button", { name: "Save set details" }));
-    await waitFor(() => {
-      expect(saveMock).toHaveBeenCalledTimes(1);
-    });
-    // An insert has no id field; the name is sent.
-    const payload = saveMock.mock.calls[0]?.[0];
-    expect(payload?.id).toBeUndefined();
-    expect(payload?.name).toBe("Brand new");
+      try {
+        // Clean → clicking the anchor does NOT prompt.
+        fireEvent.click(link);
+        expect(confirmSpy).not.toHaveBeenCalled();
+
+        // Dirty the name and blur to flush → runSave → markPending → guard arms.
+        const input = screen.getByRole("textbox", { name: "set name" });
+        fireEvent.change(input, { target: { value: "Casual" } });
+        fireEvent.blur(input);
+
+        // Wait for markPending to run (guard arms on the next render cycle).
+        await waitFor(() => {
+          // Clicking the link now should prompt.
+          fireEvent.click(link);
+          expect(confirmSpy).toHaveBeenCalledTimes(1);
+        });
+      } finally {
+        link.remove();
+      }
+    } finally {
+      confirmSpy.mockRestore();
+    }
   });
 });
 
-/**
- * A deferred promise helper — lets a test hold the new-set insert "in flight"
- * and resolve it at a precise moment, so we can interleave a section Save while
- * the insert is still pending. Mirrors the idiom in
- * use-settings-save-queue.test.ts.
- */
+// ---------------------------------------------------------------------------
+// Atomic-commit data-loss regression (A1, from the old model — still applies
+// to the new model's per-set serial queue with temp-id carry-over).
+// ---------------------------------------------------------------------------
+
 function deferred<T>(): {
   promise: Promise<T>;
   resolve: (value: T) => void;
@@ -717,53 +748,10 @@ function deferred<T>(): {
   return { promise, resolve, reject };
 }
 
-describe("SettingsTab — machine-level field nav guard (B1)", () => {
-  it("arms the unsaved-changes guard when a machine-level field becomes dirty", () => {
-    const addSpy = vi.spyOn(document, "addEventListener");
-    try {
-      render(
-        <SettingsTab
-          canEdit
-          machineId="m1"
-          initialSets={[]}
-          settingsRequests={null}
-          settingsInstructions={null}
-        />
-      );
-
-      // The "Before you change anything" field is always-open for a permitted
-      // user; its mock editor exposes a button that streams a non-empty doc
-      // through onChange, making the draft dirty.
-      expect(
-        addSpy.mock.calls.some(
-          ([type, , options]) => type === "click" && options === true
-        )
-      ).toBe(false);
-
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: "type-in-Before you change anything",
-        })
-      );
-
-      // A dirty machine-level field arms the same page-level guard the per-unit
-      // edits use (capturing click listener for soft-nav interception).
-      expect(
-        addSpy.mock.calls.some(
-          ([type, , options]) => type === "click" && options === true
-        )
-      ).toBe(true);
-    } finally {
-      addSpy.mockRestore();
-    }
-  });
-});
-
-describe("SettingsTab — atomic-commit data loss (A1, 🔴)", () => {
-  it("persists a section saved while a brand-new set's first insert is still in flight", async () => {
+describe("SettingsTab — data-loss regression (A1, 🔴)", () => {
+  it("persists a section edited while the new-set insert is still in flight", async () => {
     const user = userEvent.setup();
-    // Hold the FIRST save (the header insert) in flight; the coalesced rerun
-    // (the section, carried to the real id) resolves immediately.
+
     const insertRun = deferred<{
       success: true;
       id: string;
@@ -790,43 +778,41 @@ describe("SettingsTab — atomic-commit data loss (A1, 🔴)", () => {
       />
     );
 
-    // Create a new set and name it; Save the header → insert goes in flight.
+    // Create a new set and name it; blur flushes to insert immediately (no
+    // fake timers needed — blur triggers autoSave.flush which calls runSave).
     fireEvent.click(screen.getByRole("button", { name: "New set" }));
     const nameInput = screen.getByRole("textbox", { name: "set name" });
     fireEvent.change(nameInput, { target: { value: "Brand new" } });
     fireEvent.blur(nameInput);
-    fireEvent.click(screen.getByRole("button", { name: "Save set details" }));
+
     await waitFor(() => {
       expect(saveMock).toHaveBeenCalledTimes(1);
     });
-    // The first call is the insert (no id field).
+    // First call is the insert (no id field).
     expect(saveMock.mock.calls[0]?.[0]?.id).toBeUndefined();
 
-    // While the insert is STILL pending, add a note section, type a body, and
-    // Save that section. Its persist coalesces onto the in-flight set.
+    // While the insert is still in flight, add a note section and type a body.
     await user.click(screen.getByRole("button", { name: /Add section/ }));
     await user.click(
       await screen.findByRole("menuitem", { name: "Post positions" })
     );
-    // The new set's header is still open (insert in flight), so its description
-    // editor is also mounted with the same "Edit text" aria-label; the note
-    // section's body editor is the last one rendered.
+    // Trigger the mock editor's onChange for the note body (rich text →
+    // debounce-only). Blur the name input again to flush as a proxy (the
+    // set-name blur is a save flush for this set).
     const bodyEditors = screen.getAllByRole("button", {
       name: "type-in-Edit text",
     });
     const sectionBodyEditor = bodyEditors[bodyEditors.length - 1];
     if (!sectionBodyEditor) throw new Error("section body editor not rendered");
     fireEvent.click(sectionBodyEditor);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Save the Post positions section" })
-    );
-    // Still only the in-flight insert has hit the server (the section is queued
-    // as a coalesced rerun, not a second concurrent call).
+    // Blur the set name to flush the pending debounce immediately (same setId).
+    fireEvent.blur(nameInput);
+
+    // Still only the in-flight insert has hit the server (section is coalesced).
     expect(saveMock).toHaveBeenCalledTimes(1);
 
-    // Resolve the insert → the queue reruns under the real id and MUST send the
-    // section that was staged while the insert was in flight (the data-loss bug
-    // dropped it: the rerun found nothing staged and silently no-op'd).
+    // Resolve the insert → queue reruns under the real id and MUST carry the
+    // section (the data-loss bug dropped it).
     await act(async () => {
       insertRun.resolve({ success: true, id: "server-uuid", changed: true });
       await Promise.resolve();
@@ -836,8 +822,7 @@ describe("SettingsTab — atomic-commit data loss (A1, 🔴)", () => {
       expect(saveMock).toHaveBeenCalledTimes(2);
     });
 
-    // The second (rerun) call carries the section in its payload — it was NOT
-    // lost. It also runs as an UPDATE against the just-inserted row (real id).
+    // The second call is an UPDATE against the real id with the section's body.
     const rerunPayload = saveMock.mock.calls[1]?.[0];
     expect(rerunPayload?.id).toBe("server-uuid");
     const secA = rerunPayload?.sections.find((s) => s.kind === "note");

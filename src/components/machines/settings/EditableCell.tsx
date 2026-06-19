@@ -4,16 +4,25 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/utils";
+import {
+  EDITABLE_FIELD_CLASS,
+  EDITABLE_TEXT_CLASS,
+} from "~/components/machines/settings/affordance";
 
 interface EditableCellProps {
   value: string;
   canEdit: boolean;
   /**
-   * Commit the cell's edit into the WORKING COPY (PP-43q3 atomic per-unit
-   * commit). It does NOT persist — the owning section unit's Save is the sole
-   * write boundary, so every cell edit buffers until then.
+   * Push the trimmed value into the WORKING COPY (PP-43q3 always-live auto-save
+   * model). Fires on every change so the working copy stays current; auto-save
+   * debounce handles the actual persistence.
    */
   onCommit: (newValue: string) => void;
+  /**
+   * Fired on blur (and Enter) so the parent can flush the auto-save debounce
+   * immediately (plain-text blur path — Task 6 Step 9).
+   */
+  onCommitBlur?: (() => void) | undefined;
   placeholder?: string;
   inputClassName?: string;
   textClassName?: string;
@@ -27,29 +36,26 @@ interface EditableCellProps {
    */
   codeLike?: boolean;
   /**
-   * When true, mount directly in edit mode with the input focused. Used by
-   * "+ Add row" handlers to drop the user straight into the first cell of a
-   * newly created row.
+   * When true, focus this input on mount. Used by "+ Add row" handlers to drop
+   * the user straight into the first cell of a newly created row.
    */
   autoFocusOnMount?: boolean;
 }
 
 /**
- * Click-to-edit table cell with blur-save semantics.
- *  - Click the value or Tab to it → press Enter to enter edit mode
- *  - Type, then blur OR Enter to commit (calls onCommit only on change)
- *  - Esc reverts to the previous value
+ * Always-live table cell input for the auto-save Machine Settings editor
+ * (PP-43q3 pivot). Permitted users get an always-open <Input> with the
+ * editable-field affordance (black fill + border + glow). Read-only viewers
+ * get a plain span. There is no click-to-edit mode, no display button, no
+ * Save/Cancel — auto-save debounce in SettingsTab handles persistence.
  *
- * "Commit" here means "buffer into the working copy" — there is no persistence;
- * the section unit's Save writes the whole row atomically (PP-43q3).
- *
- * Pairs with shadcn <TableCell> as its parent. The cell renders a borderless
- * <button> in display mode and a normal Input in edit mode.
+ * Pairs with shadcn <TableCell> as its parent.
  */
 export function EditableCell({
   value,
   canEdit,
   onCommit,
+  onCommitBlur,
   placeholder = "—",
   inputClassName,
   textClassName,
@@ -57,102 +63,31 @@ export function EditableCell({
   codeLike = false,
   autoFocusOnMount = false,
 }: EditableCellProps): React.JSX.Element {
-  const [isEditing, setIsEditing] = useState(autoFocusOnMount);
+  // Local draft buffers raw typed characters (pre-trim) while the working copy
+  // holds the trimmed committed value.  Kept in sync with `value` when not
+  // focused so that an external working-copy update (structural-op restore) is
+  // reflected in the displayed text.
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  // A keyboard commit/cancel collapses the input back to the display button;
-  // the unmounting <input> would otherwise drop focus to <body>, stranding
-  // keyboard users mid-table. Flag the close so the effect restores focus to
-  // the trigger and Tab order is preserved. Blur closes leave this false so we
-  // don't yank focus back from wherever the user clicked/tabbed next.
-  const restoreFocusOnClose = useRef(false);
+  const isFocused = useRef(false);
+  // Set to true when Enter or Esc triggers a programmatic blur, so the onBlur
+  // handler doesn't double-fire onCommitBlur.
+  const committedByKeyRef = useRef(false);
 
-  // Focus + select-all when entering edit mode; restore focus to the trigger
-  // when a keyboard close collapses the input.
+  // Sync draft with the working copy whenever the input isn't held by the user.
   useEffect(() => {
-    if (isEditing && inputRef.current) {
+    if (!isFocused.current) setDraft(value);
+  }, [value]);
+
+  // Focus the input on mount when requested (freshly-added row, first cell).
+  useEffect(() => {
+    if (autoFocusOnMount && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
-    } else if (!isEditing && restoreFocusOnClose.current) {
-      restoreFocusOnClose.current = false;
-      triggerRef.current?.focus();
     }
-  }, [isEditing]);
+  }, [autoFocusOnMount]);
 
-  // Sync draft with external value changes when not actively editing
-  useEffect(() => {
-    if (!isEditing) {
-      setDraft(value);
-    }
-  }, [value, isEditing]);
-
-  function startEdit(): void {
-    if (!canEdit) return;
-    setDraft(value);
-    setIsEditing(true);
-  }
-
-  function commit(fromKeyboard = false): void {
-    const trimmed = draft.trim();
-    // Buffer the change into the working copy only — the unit's Save persists.
-    if (trimmed !== value) {
-      onCommit(trimmed);
-    }
-    restoreFocusOnClose.current = fromKeyboard;
-    setIsEditing(false);
-  }
-
-  function cancel(fromKeyboard = false): void {
-    setDraft(value);
-    restoreFocusOnClose.current = fromKeyboard;
-    setIsEditing(false);
-  }
-
-  if (isEditing) {
-    return (
-      <Input
-        ref={inputRef}
-        value={draft}
-        className={cn("h-7 px-1.5 py-0 max-md:text-[13px]", inputClassName)}
-        placeholder={placeholder}
-        aria-label={ariaLabel}
-        // Commit-on-Enter single cell → the mobile Enter key reads "done".
-        enterKeyHint="done"
-        // Code-like cells (IDs, switch numbers) opt out of the autocorrect /
-        // autocapitalize / spellcheck machinery so "DS-1" survives intact.
-        {...(codeLike
-          ? {
-              autoCorrect: "off",
-              autoCapitalize: "off",
-              spellCheck: false,
-            }
-          : {})}
-        onChange={(e) => {
-          setDraft(e.target.value);
-        }}
-        onBlur={() => {
-          commit();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            commit(true);
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            cancel(true);
-          }
-        }}
-      />
-    );
-  }
-
-  // Read-only: a plain span, not a disabled <button> (a disabled interactive
-  // element is needless noise in the AT tree for a value that can't change).
-  // No padding: the editable trigger re-pads with p-2 after a -m-2, so its text
-  // sits at the cell's content edge — exactly where this span sits.
-  // Empty values render an em-dash, not the editing placeholder — "S-…" is an
-  // input hint and reads as noise to viewers who can't edit.
+  // Read-only: a plain span, not a disabled <button>.
   if (!canEdit) {
     return (
       <span className={textClassName}>
@@ -161,34 +96,70 @@ export function EditableCell({
     );
   }
 
+  // Permitted user: always-live input with the editable-field affordance.
   return (
-    <button
-      ref={triggerRef}
-      type="button"
-      // Fill the whole cell, not just the text: a -m-2 cancels the TableCell's
-      // p-2 and a calc width spans both side paddings, with p-2 re-added inside so
-      // the text stays at the content edge. The entire cell (and its hover/focus
-      // highlight) is now the click target. Desktop only — mobile rows edit in
-      // the sheet and never render this button (rowEditable = canEdit && !mobile).
+    <Input
+      ref={inputRef}
+      value={draft}
       className={cn(
-        "-m-2 block min-w-0 w-[calc(100%+1rem)] cursor-text rounded p-2 text-left hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        textClassName
+        "h-7 px-1.5 py-0 max-md:text-[13px]",
+        EDITABLE_FIELD_CLASS,
+        EDITABLE_TEXT_CLASS,
+        inputClassName
       )}
-      onClick={startEdit}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      // Commit-on-Enter single cell → the mobile Enter key reads "done".
+      enterKeyHint="done"
+      // Code-like cells (IDs, switch numbers) opt out of the autocorrect /
+      // autocapitalize / spellcheck machinery so "DS-1" survives intact.
+      {...(codeLike
+        ? {
+            autoCorrect: "off",
+            autoCapitalize: "off",
+            spellCheck: false,
+          }
+        : {})}
+      onFocus={() => {
+        isFocused.current = true;
+      }}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setDraft(raw);
+        const trimmed = raw.trim();
+        if (trimmed !== value) onCommit(trimmed);
+      }}
+      onBlur={(e) => {
+        isFocused.current = false;
+        const trimmed = e.target.value.trim();
+        setDraft(trimmed); // normalize display on blur
+        if (trimmed !== value) onCommit(trimmed);
+        // Skip onCommitBlur if the blur was triggered programmatically by
+        // Enter/Esc — those already called it directly.
+        if (!committedByKeyRef.current) onCommitBlur?.();
+        committedByKeyRef.current = false;
+      }}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
+        if (e.key === "Enter") {
           e.preventDefault();
-          startEdit();
+          const trimmed = (e.target as HTMLInputElement).value.trim();
+          setDraft(trimmed);
+          if (trimmed !== value) onCommit(trimmed);
+          committedByKeyRef.current = true;
+          onCommitBlur?.();
+          (e.target as HTMLInputElement).blur();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          // Revert the draft display AND restore the working copy to the
+          // current external value (undoes any onChange push made during this
+          // edit session).
+          setDraft(value);
+          if (draft.trim() !== value) onCommit(value);
+          committedByKeyRef.current = true;
+          isFocused.current = false;
+          (e.target as HTMLInputElement).blur();
         }
       }}
-      aria-label={ariaLabel}
-    >
-      {value || (
-        // Full muted-foreground (not /60): this placeholder is the editor's only
-        // cue for what a blank cell expects (ID vs value vs switch #), so it must
-        // clear WCAG 1.4.3 (≥4.5:1) — /60 fell to ~2.8:1 on the dark surface.
-        <span className="italic text-muted-foreground">{placeholder}</span>
-      )}
-    </button>
+    />
   );
 }
