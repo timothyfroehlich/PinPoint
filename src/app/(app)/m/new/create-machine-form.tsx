@@ -17,6 +17,7 @@ import {
   OwnerSelect,
   type OwnerSelectUser,
 } from "~/components/machines/OwnerSelect";
+import { PinballMapLinkField } from "~/components/machines/PinballMapLinkField";
 import {
   Dialog,
   DialogContent,
@@ -302,6 +303,9 @@ export function CreateMachineForm({
             onValueChange={setOwnerIdValue}
           />
         )}
+
+        {/* PinballMap catalog link (bead B / PP-o355.2) */}
+        <PinballMapLinkField />
 
         {/* Actions */}
         <div className="flex flex-wrap gap-3 pt-4">

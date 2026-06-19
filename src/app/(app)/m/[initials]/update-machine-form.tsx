@@ -25,6 +25,7 @@ import {
 } from "~/app/(app)/m/actions";
 import { cn } from "~/lib/utils";
 import { OwnerSelect } from "~/components/machines/OwnerSelect";
+import { PinballMapLinkField } from "~/components/machines/PinballMapLinkField";
 import {
   VALID_MACHINE_PRESENCE_STATUSES,
   getMachinePresenceLabel,
@@ -69,10 +70,20 @@ interface EditMachineDialogProps {
     // unused server data never crosses the client boundary (CORE-SEC-006).
     owner?: { name: string } | null;
     invitedOwner?: { name: string } | null;
+    // PinballMap link state (bead B / PP-o355.2).
+    pinballmapMachineId: number | null;
+    pinballmapExcluded: boolean;
+    pinballmapExcludedReason: string | null;
+    manufacturer: string | null;
+    year: number | null;
+    /** Linked catalog title's display name, resolved server-side from the mirror. */
+    pinballmapTitleName: string | null;
   };
   allUsers: OwnerSelectUser[];
   canEditAnyMachine: boolean;
   isOwner: boolean;
+  /** Whether the viewer may set/change the PinballMap link (machines.pinballmap.link). */
+  canLink: boolean;
 }
 
 export function EditMachineDialog({
@@ -80,6 +91,7 @@ export function EditMachineDialog({
   allUsers,
   canEditAnyMachine,
   isOwner,
+  canLink,
 }: EditMachineDialogProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
@@ -327,6 +339,18 @@ export function EditMachineDialog({
                   machine.
                 </p>
               </div>
+            )}
+
+            {/* PinballMap catalog link (bead B / PP-o355.2) */}
+            {canLink && (
+              <PinballMapLinkField
+                defaultMachineId={machine.pinballmapMachineId}
+                defaultName={machine.pinballmapTitleName}
+                defaultManufacturer={machine.manufacturer}
+                defaultYear={machine.year}
+                defaultExcluded={machine.pinballmapExcluded}
+                defaultExcludedReason={machine.pinballmapExcludedReason}
+              />
             )}
 
             <DialogFooter>

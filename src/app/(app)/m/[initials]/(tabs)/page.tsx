@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { Calendar } from "lucide-react";
 import { deriveMachineStatus } from "~/lib/machines/status";
@@ -103,6 +103,26 @@ export default async function MachineInfoTab({
     accessLevel
   );
 
+  // PinballMap linking (bead B / PP-o355.2): the edit dialog exposes the picker
+  // only to users who may link, and needs the linked title's display name (the
+  // machine row stores only the PBM id + metadata, not the catalog name).
+  const canLink = checkPermission(
+    "machines.pinballmap.link",
+    accessLevel,
+    ownershipContext
+  );
+  let pinballmapTitleName: string | null = null;
+  if (canLink && machine.pinballmapMachineId !== null) {
+    const linkedTitle = await db.query.pinballmapCatalog.findFirst({
+      where: eq(
+        pinballmapCatalog.pinballmapMachineId,
+        machine.pinballmapMachineId
+      ),
+      columns: { name: true },
+    });
+    pinballmapTitleName = linkedTitle?.name ?? null;
+  }
+
   const allUsersRaw = canEdit
     ? await getUnifiedUsers({ includeEmails: false })
     : [];
@@ -179,6 +199,28 @@ export default async function MachineInfoTab({
               </div>
             </div>
 
+            {machine.manufacturer && (
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Manufacturer
+                </p>
+                <p className="text-sm font-medium text-foreground">
+                  {machine.manufacturer}
+                </p>
+              </div>
+            )}
+
+            {machine.year !== null && (
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Year
+                </p>
+                <p className="text-sm font-medium text-foreground">
+                  {machine.year}
+                </p>
+              </div>
+            )}
+
             <div>
               <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Availability
@@ -233,10 +275,17 @@ export default async function MachineInfoTab({
                   invitedOwner: machine.invitedOwner
                     ? { name: machine.invitedOwner.name }
                     : null,
+                  pinballmapMachineId: machine.pinballmapMachineId,
+                  pinballmapExcluded: machine.pinballmapExcluded,
+                  pinballmapExcludedReason: machine.pinballmapExcludedReason,
+                  manufacturer: machine.manufacturer,
+                  year: machine.year,
+                  pinballmapTitleName,
                 }}
                 allUsers={allUsers}
                 canEditAnyMachine={canEditAnyMachine}
                 isOwner={isOwner}
+                canLink={canLink}
               />
             ) : user && editDeniedReason !== null ? (
               <EditButtonWithTooltip reason={editDeniedReason} />
