@@ -231,8 +231,12 @@ export async function softDeleteMachineComment(
 }
 
 export interface GetMachineTimelineArgs {
-  /** One machine id, or a list for combined (collection) feeds. */
-  machineId: string | string[];
+  /** One machine id, or a list for combined (collection) feeds. Optional when
+   *  scoping by author instead (profile activity feed). */
+  machineId?: string | string[];
+  /** Author scope — events authored by this user, across any machine
+   *  (profile activity feed). At least one of machineId / authorId required. */
+  authorId?: string;
   /**
    * Tag filter. Omitted/empty array = no filter (all tags). A non-empty array
    * matches rows whose `tag` is in the set (multi-select sticky-All UI on the
@@ -298,9 +302,18 @@ export async function getMachineTimeline(
   tx: DbTransaction,
   args: GetMachineTimelineArgs
 ): Promise<MachineTimelineRow[]> {
-  if (Array.isArray(args.machineId) && args.machineId.length === 0) {
-    return [];
-  }
+  // Empty machine list = no scope from that axis.
+  const hasMachineScope = Array.isArray(args.machineId)
+    ? args.machineId.length > 0
+    : args.machineId !== undefined;
+  const hasAuthorScope = args.authorId !== undefined;
+  if (!hasMachineScope && !hasAuthorScope) return [];
+
+  const machinePredicate = hasMachineScope
+    ? Array.isArray(args.machineId)
+      ? inArray(timelineEvents.machineId, args.machineId)
+      : eq(timelineEvents.machineId, args.machineId!)
+    : undefined;
 
   const author = alias(userProfiles, "author");
   const deleter = alias(userProfiles, "deleter");
@@ -328,9 +341,10 @@ export async function getMachineTimeline(
     .leftJoin(deleter, eq(timelineEvents.deletedBy, deleter.id))
     .where(
       and(
-        Array.isArray(args.machineId)
-          ? inArray(timelineEvents.machineId, args.machineId)
-          : eq(timelineEvents.machineId, args.machineId),
+        machinePredicate,
+        hasAuthorScope
+          ? eq(timelineEvents.authorId, args.authorId!)
+          : undefined,
         args.tags && args.tags.length > 0
           ? inArray(timelineEvents.tag, args.tags)
           : undefined
