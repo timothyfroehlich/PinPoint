@@ -117,18 +117,18 @@ export function EditableSettingsTable<T extends KeyedRow>({
     onDelete: onDeleteRow,
   });
 
-  function handleSheetSave(values: Record<string, string>): void {
+  function handleSheetFieldChange(key: string, value: string): void {
     if (!sheetRow) return;
-    // The mobile sheet commits a whole row at once, all into the working copy;
-    // auto-save debounce persists it (no per-row write here).
-    for (const col of columns) {
-      const raw = values[col.key] ?? "";
-      const next = col.kind === "toggle" ? (raw === "ON" ? "ON" : "OFF") : raw;
-      if (next !== col.read(sheetRow)) {
-        col.commit(sheetRow, next);
-      }
-    }
-    onBlurFlush?.();
+    const col = columns.find((c) => c.key === key);
+    if (!col) return;
+    // Mobile sheet edits route through the SAME per-field commit the desktop
+    // inline cells use — one persistence path (the working copy → the tab's
+    // auto-save debounce). Toggles have no blur, so flush them eagerly; text
+    // edits ride the debounce until the sheet closes (handleSheetClose flush).
+    const next =
+      col.kind === "toggle" ? (value === "ON" ? "ON" : "OFF") : value;
+    col.commit(sheetRow, next);
+    if (col.kind === "toggle") onBlurFlush?.();
   }
 
   return (
@@ -261,7 +261,9 @@ export function EditableSettingsTable<T extends KeyedRow>({
               }))
             : []
         }
-        onSave={handleSheetSave}
+        onFieldChange={handleSheetFieldChange}
+        // Flush any still-debounced text edit when the sheet dismisses.
+        onClose={onBlurFlush}
       />
     </>
   );
