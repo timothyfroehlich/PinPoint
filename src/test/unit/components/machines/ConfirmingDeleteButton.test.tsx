@@ -9,7 +9,7 @@
  *   (c) Both branches: e.stopPropagation() prevents bubbling to a parent
  *       click handler (e.g. the row's sheet-open handler).
  */
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { ConfirmingDeleteButton } from "~/components/machines/settings/ConfirmingDeleteButton";
@@ -187,15 +187,10 @@ describe("ConfirmingDeleteButton", () => {
       fireEvent.click(
         screen.getByRole("button", { name: "Delete switch S31" })
       );
-      // Click the destructive action button inside the dialog.
-      const deleteButtons = screen.getAllByRole("button", { name: /delete/i });
-      // The dialog action is the one that's not the trigger (trigger is closed now)
-      // After dialog opens there's a Delete action button inside alertdialog.
-      const dialogDeleteBtn = deleteButtons.find(
-        (btn) => btn.closest('[role="alertdialog"]') !== null
-      );
-      expect(dialogDeleteBtn).toBeDefined();
-      fireEvent.click(dialogDeleteBtn!);
+      // Scope the Delete button query to the dialog so a missing button fails
+      // with a clear message rather than a runtime TypeError on `!`.
+      const dialog = screen.getByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: /delete/i }));
       expect(onConfirmedDelete).toHaveBeenCalledTimes(1);
     });
 

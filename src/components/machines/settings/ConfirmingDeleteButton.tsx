@@ -118,7 +118,7 @@ export function ConfirmingDeleteButton({
       variant="ghost"
       size={armed ? "sm" : "icon"}
       className={cn(
-        "transition-[width,colors] focus-visible:opacity-100 motion-reduce:transition-none",
+        "transition-[width] focus-visible:opacity-100 motion-reduce:transition-none",
         armed
           ? "w-auto px-2 h-6 bg-destructive/15 text-destructive hover:bg-destructive/25 hover:text-destructive"
           : "size-6 text-muted-foreground hover:text-destructive",
