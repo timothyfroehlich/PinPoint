@@ -87,7 +87,7 @@ function PersonHoverCardLink({
               ) : null}
             </div>
             {data ? (
-              <span className="mt-0.5 inline-flex items-center rounded-full bg-primary-container px-2 py-0.5 text-[11px] font-semibold capitalize text-primary">
+              <span className="mt-0.5 inline-flex items-center rounded-full bg-primary-container px-2.5 py-0.5 text-xs font-semibold capitalize text-primary">
                 {data.role}
               </span>
             ) : null}

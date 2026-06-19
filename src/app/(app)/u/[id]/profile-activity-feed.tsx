@@ -23,7 +23,7 @@ export async function ProfileActivityFeed({
     <section aria-labelledby="profile-activity-heading">
       <h2
         id="profile-activity-heading"
-        className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+        className="text-xs font-bold uppercase tracking-wider text-muted-foreground"
       >
         Recent activity
       </h2>
