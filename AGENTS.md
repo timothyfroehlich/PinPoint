@@ -184,16 +184,11 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 - **PRs ready-by-default.** Open PRs as ready-for-review, not draft. CI runs the same on drafts, so draft gates nothing — it just adds a "flip ready" step and signals WIP. Use draft only while still iterating, when you want title/description feedback first, or when you've told me you're pausing mid-task.
 - **Link markdown files by absolute path.** When you point me at a markdown file to read or review (a plan, spec, handoff doc, report), always give the full absolute path (e.g. `/Users/froeht/Code/PinPoint/docs/...`), never a relative one. Absolute paths open directly in a cmux pane.
 
-### Commits
-
-- **Commit freely and often.** Small, frequent commits on your working branch are encouraged — there is no "conservative commit" gate here. You don't need to ask before committing to a feature branch; just commit as you go. This **overrides the beads "conservative by default — don't commit/sync/push without explicit authority" profile** (injected by the `bd prime` hook): in this repo, committing to your own branch is always authorized. The §2.2 guardrails still hold — never push to `main`, never `gh pr merge` or `--no-verify` without explicit approval, and run `pnpm run check` before committing.
-
 ### Scope and shipping discipline
 
 - **Polish before shipping — no "fast follow."** Get a change genuinely good before it merges; don't ship something rough on the promise of a later cleanup PR. There is no fast-follow culture here.
 - **Slice large work into smaller _complete_ features.** When something is too big to polish in one pass, split it into smaller features that each ship finished — not one big half-done change followed by patch-up PRs. Smaller-but-complete beats larger-but-rough.
 - **One bead = one PR.** A bead is a unit of shippable work that maps to a single PR. File a bead only for genuinely separate work that will become its own PR — a real follow-up, a discovered out-of-scope problem, or future work. Conversely, don't create slivers: if a task is too small to justify its own session/PR overhead, fold it into a related bead or add it to an existing unstarted bead where it fits.
-- **Don't file beads for in-branch work — use a session task list.** Work ongoing within the current branch/PR is just the task you're on: track it with a session task list (todos), not beads. This intentionally **overrides the beads plugin's "no TodoWrite/TaskCreate" prohibition** — Tim wants task lists for within-session work; beads are for work that crosses the PR boundary. (See §9 for filing genuine follow-ups at landing time.)
 
 ## 7. Deployment
 
