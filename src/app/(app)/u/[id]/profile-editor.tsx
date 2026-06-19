@@ -4,6 +4,7 @@ import * as React from "react";
 import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import * as Sentry from "@sentry/nextjs";
 import { toast } from "sonner";
 import { ImageIcon, Loader2 } from "lucide-react";
 import { updateProfileAction, type UpdateProfileResult } from "./actions";
@@ -73,8 +74,15 @@ export function ProfileEditor({
       }
     } catch (error) {
       setPreview(initial.avatarUrl);
+      Sentry.captureException(error, {
+        contexts: {
+          pinpoint: { action: "ProfileEditor.handleFileChange" },
+        },
+      });
       toast.error(getUploadErrorMessage(error));
     } finally {
+      // preview has been moved off the blob URL in every branch above,
+      // so revoking here frees it without leaving a live <img> pointing at it
       setIsUploading(false);
       URL.revokeObjectURL(localPreview);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -84,7 +92,10 @@ export function ProfileEditor({
   return (
     <div className="space-y-6">
       {/* Avatar upload — client-driven (validate → compress → upload), matching ImageUploadButton */}
-      <div className="flex flex-col gap-4 rounded-xl border border-outline-variant bg-card p-4 @lg:flex-row @lg:items-center">
+      <div
+        className="flex flex-col gap-4 rounded-xl border border-outline-variant bg-card p-4 @lg:flex-row @lg:items-center"
+        aria-busy={isUploading}
+      >
         <Avatar className="size-16 ring-2 ring-primary/25">
           {preview ? <AvatarImage src={preview} alt="" /> : null}
           <AvatarFallback className="bg-primary text-lg font-bold text-on-primary">
@@ -92,7 +103,9 @@ export function ProfileEditor({
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 space-y-2">
-          <p className="text-sm font-medium">Profile photo</p>
+          <label htmlFor="avatar" className="block text-sm font-medium">
+            Profile photo
+          </label>
           <Button
             type="button"
             variant="outline"
@@ -101,7 +114,10 @@ export function ProfileEditor({
             onClick={() => fileInputRef.current?.click()}
           >
             {isUploading ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              <Loader2
+                className="size-4 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
             ) : (
               <ImageIcon className="size-4" aria-hidden="true" />
             )}
@@ -110,14 +126,20 @@ export function ProfileEditor({
           <p className="text-xs text-muted-foreground">
             JPEG, PNG, or WebP, up to 10&nbsp;MB.
           </p>
+          {/* sr-only, not display:none — keeps programmatic .click() working on
+              iOS Safari; tabIndex=-1 leaves the Button as the single tab stop */}
           <input
             ref={fileInputRef}
+            id="avatar"
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            aria-label="Profile photo"
+            className="sr-only"
+            tabIndex={-1}
             onChange={handleFileChange}
           />
+          <span className="sr-only" aria-live="polite">
+            {isUploading ? "Uploading profile photo" : ""}
+          </span>
         </div>
       </div>
 
