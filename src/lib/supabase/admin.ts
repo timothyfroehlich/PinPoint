@@ -18,11 +18,13 @@ export function createAdminClient(): SupabaseClient {
   const url =
     process.env["SUPABASE_URL"] ?? process.env["NEXT_PUBLIC_SUPABASE_URL"];
 
-  const serviceRoleKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  const serviceRoleKey =
+    process.env["SUPABASE_SERVICE_ROLE_KEY"] ??
+    process.env["SUPABASE_SECRET_KEY"];
 
   if (!url || !serviceRoleKey) {
     throw new Error(
-      "Missing Supabase admin env vars: set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY."
+      "Missing Supabase admin env vars: set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY)."
     );
   }
 

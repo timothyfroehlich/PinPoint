@@ -55,24 +55,35 @@ fi
 # Extract POSTGRES_URL line and strip key + optional surrounding quotes
 POSTGRES_URL_LINE=$(grep -m1 "^POSTGRES_URL=" "$ENV_FILE" || echo "")
 POSTGRES_URL=${POSTGRES_URL_LINE#POSTGRES_URL=}
-# Remove surrounding double quotes if present
+# Remove surrounding quotes if present (double or single)
 POSTGRES_URL=${POSTGRES_URL#\"}
 POSTGRES_URL=${POSTGRES_URL%\"}
+POSTGRES_URL=${POSTGRES_URL#\'}
+POSTGRES_URL=${POSTGRES_URL%\'}
 
 if [ -z "$POSTGRES_URL" ]; then
     echo -e "${RED}❌ POSTGRES_URL not found in $ENV_FILE${NC}"
     exit 1
 fi
 
-# Safety check: Ensure we're connecting to localhost
-if [[ ! "$POSTGRES_URL" =~ (localhost|127\.0\.0\.1) ]]; then
-    echo -e "${RED}❌ POSTGRES_URL does not point to localhost or 127.0.0.1${NC}"
-    echo -e "${RED}   Refusing to reset non-local database: $POSTGRES_URL${NC}"
-    echo -e "${YELLOW}⚠️  This script should ONLY be used with local development databases.${NC}"
-    exit 1
-fi
+# Safety check: parse the host out of POSTGRES_URL and require a local loopback.
+# Substring matching (e.g. =~ localhost) would wrongly pass a remote host or a
+# password that merely contains "localhost".
+db_hostport=${POSTGRES_URL#*://} # strip scheme
+db_hostport=${db_hostport##*@}   # strip userinfo@ (greedy: host follows the last @)
+db_hostport=${db_hostport%%/*}   # strip /path
+db_host=${db_hostport%%:*}       # strip :port
+case "$db_host" in
+    localhost | 127.0.0.1) ;;
+    *)
+        echo -e "${RED}❌ POSTGRES_URL host is not local: ${db_host}${NC}"
+        echo -e "${RED}   Refusing to reset non-local database.${NC}"
+        echo -e "${YELLOW}⚠️  This script should ONLY be used with local development databases.${NC}"
+        exit 1
+        ;;
+esac
 
-echo -e "${GREEN}✓ Verified POSTGRES_URL points to local database${NC}"
+echo -e "${GREEN}✓ Verified POSTGRES_URL points to a local database (${db_host})${NC}"
 
 echo -e "${BLUE}🧹 Resetting local database schema...${NC}"
 # Use the project's existing reset logic (minus seeding)

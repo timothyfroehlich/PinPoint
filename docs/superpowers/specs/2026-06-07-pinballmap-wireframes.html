@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PinballMap Integration — Wireframes (PinPoint-styled)</title>
+<style>
+  /* ===== PinPoint design tokens (mirrored from src/app/globals.css) ===== */
+  :root {
+    --background: #0f0f11;
+    --foreground: #f8fafc;
+    --card: #18151b;
+    --muted: #27272a;
+    --muted-foreground: #a1a1aa;
+    --primary: #4ade80;            /* APC neon green */
+    --primary-foreground: #022c22;
+    --secondary: #2dd4bf;          /* teal */
+    --secondary-foreground: #042f2e;
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+    --border: #27272a;
+    --input: #27272a;
+    --success: #22c55e;
+    --success-container: #14532d;
+    --on-success-container: #dcfce7;
+    --warning: #eab308;
+    --warning-container: #713f12;
+    --on-warning-container: #fef9c3;
+    --error-container: #7f1d1d;
+    --on-error-container: #fee2e2;
+    --surface-container: #1c181f;
+    --surface-container-high: #211d25;
+    --surface-container-highest: #2a2630;
+    --outline: #3f3f46;
+    --outline-variant: #52525b;
+    --tertiary-container: #115e59;
+    --on-tertiary-container: #ccfbf1;
+    --secondary-container: #115e59;
+    --on-secondary-container: #ccfbf1;
+    --radius: 0.5rem;
+    --pbm: #f97316;                /* orange — used ONLY as a small external-brand marker */
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { overflow-x: hidden; }
+  body {
+    margin: 0; background: var(--background); color: var(--foreground);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px; line-height: 1.6;
+  }
+
+  /* ===== explorer shell ===== */
+  .app { display: grid; grid-template-columns: 256px 1fr; min-height: 100vh; }
+  nav { background: #0b0a0d; border-right: 1px solid var(--border); padding: 16px 10px; position: sticky; top: 0; height: 100vh; overflow: auto; }
+  nav h1 { font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted-foreground); margin: 0 8px 4px; font-weight: 700; }
+  nav .sub { font-size: 11px; color: #6b6b72; margin: 0 8px 14px; }
+  nav a { display: block; padding: 7px 10px; border-radius: var(--radius); color: var(--foreground); text-decoration: none; font-size: 13px; cursor: pointer; }
+  nav a:hover { background: var(--card); }
+  nav a.active { background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary); font-weight: 600; }
+  nav .grouplbl { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #6b6b72; margin: 16px 8px 4px; font-weight: 600; }
+  main { padding: 28px 36px 90px; max-width: 1120px; }
+  .surface { display: none; }
+  .surface.active { display: block; animation: fade .15s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px);} to {opacity:1; transform:none;} }
+  .surface > h2 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin: 0 0 4px; }
+  .surface > .annot { color: var(--muted-foreground); margin: 0 0 22px; font-size: 13.5px; max-width: 74ch; }
+
+  .note { background: var(--surface-container); border: 1px solid var(--border); border-left: 3px solid var(--secondary); border-radius: 6px; padding: 9px 13px; color: var(--muted-foreground); font-size: 12.5px; margin: 12px 0; }
+  .note b { color: var(--foreground); }
+  .q { background: color-mix(in srgb, var(--warning) 8%, var(--background)); border: 1px solid color-mix(in srgb, var(--warning) 25%, transparent); border-left: 3px solid var(--warning); border-radius: 6px; padding: 9px 13px; color: var(--on-warning-container); font-size: 12.5px; margin: 14px 0; }
+  .q b { color: var(--warning); }
+
+  /* ===== mock app chrome ===== */
+  .frame { background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin: 8px 0 6px; box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+  .appbar { display:flex; align-items:center; gap:12px; padding: 11px 16px; border-bottom: 1px solid var(--border); background: #0b0a0d; font-size: 13px; }
+  .appbar .logo { width: 18px; height: 18px; border-radius: 5px; background: var(--primary); box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 50%, transparent); }
+  .appbar .brand { font-weight: 700; letter-spacing: -.01em; }
+  .appbar .crumb { color: var(--muted-foreground); }
+  .appbar .crumb b { color: var(--foreground); font-weight: 600; }
+  .appbar .spacer { flex: 1; }
+  .pad { padding: 20px; }
+  .pad-lg { padding: 24px 26px; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+  .card + .card { margin-top: 16px; }
+  .card > h3 { margin: 0 0 12px; font-size: 16px; font-weight: 700; letter-spacing: -.01em; display:flex; align-items:center; gap: 8px; }
+  .card .sectlbl { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); font-weight: 600; margin: 0 0 10px; }
+
+  .row { display: flex; gap: 18px; }
+  .col { flex: 1; min-width: 0; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  /* ===== badges (mirror badge.tsx: rounded-full border px-2 py-0.5 text-xs font-medium) ===== */
+  .badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; border: 1px solid transparent; padding: 2px 9px; font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+  .badge.sm { font-size: 10.5px; padding: 1px 7px; }
+  .b-primary { background: var(--primary); color: var(--primary-foreground); }
+  .b-success { background: var(--success-container); color: var(--on-success-container); border-color: var(--success); }
+  .b-warning { background: var(--warning-container); color: var(--on-warning-container); border-color: var(--warning); }
+  .b-destructive { background: color-mix(in srgb, var(--destructive) 60%, transparent); color: #fff; }
+  .b-muted { background: var(--surface-container-highest); color: var(--muted-foreground); border-color: var(--outline-variant); }
+  .b-outline { color: var(--foreground); border-color: var(--outline); }
+  .b-pbm { background: color-mix(in srgb, var(--pbm) 16%, transparent); color: var(--pbm); border-color: color-mix(in srgb, var(--pbm) 45%, transparent); }
+
+  /* ===== buttons (mirror button.tsx) ===== */
+  .btn { display:inline-flex; align-items:center; gap:6px; height: 36px; padding: 0 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+  .btn.sm { height: 32px; padding: 0 12px; font-size: 12.5px; gap: 5px; }
+  .btn-primary { background: var(--primary); color: var(--primary-foreground); box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 35%, transparent); }
+  .btn-primary:hover { background: color-mix(in srgb, var(--primary) 90%, black); }
+  .btn-outline { border-color: var(--input); background: color-mix(in srgb, var(--input) 30%, transparent); color: var(--foreground); }
+  .btn-outline:hover { background: color-mix(in srgb, var(--input) 55%, transparent); }
+  .btn-secondary { background: var(--secondary); color: var(--secondary-foreground); }
+  .btn-ghost { background: transparent; color: var(--foreground); }
+  .btn-ghost:hover { background: color-mix(in srgb, var(--muted) 50%, transparent); }
+  .btn-destructive { background: color-mix(in srgb, var(--destructive) 60%, transparent); color: #fff; }
+  .btn-destructive:hover { background: color-mix(in srgb, var(--destructive) 90%, transparent); }
+  .btn-link { background: none; border: none; color: var(--primary); padding: 0; height: auto; text-decoration: underline; text-underline-offset: 4px; }
+
+  /* ===== initials chip (mirror MachineDetailHeader) ===== */
+  .chip { display:inline-flex; align-items:center; border: 1px solid var(--outline-variant); background: var(--surface-container); border-radius: 6px; padding: 2px 8px; font-size: 12px; font-family: var(--mono); color: var(--muted-foreground); }
+
+  /* ===== tab strip (mirror MachineTabStrip) ===== */
+  .tabstrip { display:flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 16px 0 0; }
+  .tabstrip .t { padding: 10px 16px; font-size: 14px; font-weight: 500; color: var(--muted-foreground); border-bottom: 2px solid transparent; cursor: pointer; display:flex; align-items:center; gap:7px; }
+  .tabstrip .t.on { color: var(--foreground); border-bottom-color: var(--primary); }
+  .tabstrip .t .cnt { background: var(--surface-container-highest); color: var(--muted-foreground); border-radius: 999px; font-size: 11px; padding: 0 7px; }
+
+  .subtabs { display:flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+  .subtabs .t { padding: 9px 14px; font-size: 13px; color: var(--muted-foreground); border-bottom: 2px solid transparent; cursor: pointer; }
+  .subtabs .t.on { color: var(--foreground); border-bottom-color: var(--primary); }
+
+  .kv { display: grid; grid-template-columns: 150px 1fr; row-gap: 9px; column-gap: 12px; font-size: 13px; margin: 0; }
+  .kv dt { color: var(--muted-foreground); }
+  .kv dd { margin: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted-foreground); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  .muted { color: var(--muted-foreground); }
+  .tiny { font-size: 11.5px; }
+  .mono { font-family: var(--mono); font-size: 12px; }
+
+  /* form fields (mirror Input/Label) */
+  label.fld { display:block; margin: 0 0 16px; }
+  label.fld > span { display:block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+  .inp { width: 100%; background: color-mix(in srgb, var(--input) 30%, transparent); border: 1px solid var(--input); border-radius: 6px; color: var(--foreground); padding: 8px 11px; font-size: 13px; font-family: inherit; }
+  .inp::placeholder { color: #6b6b72; }
+  select.inp { appearance: none; }
+  .hint { font-size: 11.5px; color: #6b6b72; margin-top: 5px; }
+
+  /* switch */
+  .switch { display:inline-flex; background: var(--surface-container); border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 3px; }
+  .switch span { padding: 5px 14px; border-radius: 6px; font-size: 12.5px; color: var(--muted-foreground); cursor: pointer; }
+  .switch span.on { background: var(--primary); color: var(--primary-foreground); }
+
+  /* timeline (mirror MachineRecentActivity rows) */
+  .tl { display:flex; flex-direction: column; gap: 2px; }
+  .tlrow { display:flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .tlrow:last-child { border-bottom: none; }
+  .tldot { width: 28px; height: 28px; border-radius: 50%; background: var(--surface-container-highest); display:flex; align-items:center; justify-content:center; font-size: 13px; flex-shrink: 0; color: var(--muted-foreground); }
+  .tldot.pbm { background: color-mix(in srgb, var(--pbm) 18%, transparent); color: var(--pbm); }
+  .tlmain { flex: 1; min-width: 0; }
+  .tlwhen { font-size: 11.5px; color: #6b6b72; margin-top: 2px; }
+  .pbmquote { background: var(--surface-container); border: 1px solid var(--border); border-left: 3px solid var(--pbm); border-radius: 6px; padding: 10px 12px; margin: 8px 0; }
+
+  /* modal (mirror Dialog) */
+  .modalwrap { background: rgba(0,0,0,.6); border-radius: var(--radius); padding: 44px; display:flex; justify-content:center; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; width: 470px; box-shadow: 0 24px 70px rgba(0,0,0,.6); }
+  .modal .mhead { padding: 18px 20px 4px; font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
+  .modal .mdesc { padding: 0 20px; color: var(--muted-foreground); font-size: 13px; }
+  .modal .mbody { padding: 16px 20px; }
+  .modal .mfoot { padding: 14px 20px; border-top: 1px solid var(--border); display:flex; justify-content: flex-end; gap: 8px; align-items:center; }
+
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .stat .n { font-size: 28px; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+  .stat .l { font-size: 12px; color: var(--muted-foreground); margin-top: 6px; }
+
+  .legend { display:flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--muted-foreground); margin: 4px 0 14px; }
+  .swatch { display:inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: middle; margin-right: 6px; }
+  .pbm-glyph { color: var(--pbm); }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav>
+    <h1>PinballMap</h1>
+    <div class="sub">Integration wireframes · PinPoint-styled · 2026-06-07</div>
+
+    <div class="grouplbl">Everyday surfaces</div>
+    <a data-s="machine" class="active">Machine Info — PBM card</a>
+    <a data-s="cta">Presence-change CTA</a>
+    <a data-s="timeline">Timeline: PBM comment</a>
+    <a data-s="compose">Outbound comment composer</a>
+
+    <div class="grouplbl">Tech / admin</div>
+    <a data-s="status">PBM status page ★</a>
+    <a data-s="link">Machine create/edit + linking</a>
+    <a data-s="settings">Admin → Integrations</a>
+
+    <div class="grouplbl">Per-user</div>
+    <a data-s="account">Link my PBM account</a>
+
+    <div class="grouplbl">Reference</div>
+    <a data-s="map">Where it all lives</a>
+  </nav>
+
+  <main>
+    <!-- ===================== MACHINE INFO PBM CARD ===================== -->
+    <section class="surface active" data-s="machine">
+      <h2>Machine Info page — PinballMap card</h2>
+      <p class="annot">New card on the <b>Info</b> tab of <span class="mono">/m/&lt;initials&gt;</span>, alongside the existing rich-text sections. Status-only: the listed pill plus a small ⚠ that appears only when desynced. All PBM-mutating edits funnel through one confirm modal.</p>
+
+      <div class="frame">
+        <div class="appbar"><span class="logo"></span><span class="brand">PinPoint</span><span class="crumb">/ Machines / <b>Godzilla (Premium)</b></span><span class="spacer"></span><span class="badge b-success sm">● Operational</span></div>
+        <div class="pad">
+          <!-- machine header: initials chip + name (mirror MachineDetailHeader) -->
+          <div style="display:flex; align-items:center; gap:10px">
+            <span class="chip">GZ</span>
+            <span style="font-size:24px; font-weight:700; letter-spacing:-.01em">Godzilla (Premium)</span>
+          </div>
+          <div class="tabstrip">
+            <div class="t on">Info</div>
+            <div class="t">Maintenance <span class="cnt">2</span></div>
+          </div>
+
+          <div class="row" style="margin-top:18px">
+            <div class="col" style="flex:1.8">
+              <div class="card"><div class="sectlbl">Description</div><p style="margin:0" class="muted">Stern’s 2021 Godzilla, Premium edition. Near the front window.</p></div>
+              <div class="card"><div class="sectlbl">Recent activity</div><p style="margin:0" class="muted tiny">presence changed · PBM comment imported · issue opened …</p></div>
+            </div>
+            <div class="col">
+              <!-- THE NEW CARD -->
+              <div class="card">
+                <h3><span class="pbm-glyph">◆</span> PinballMap <span class="spacer" style="flex:1"></span>
+                  <span class="badge b-success sm">● Listed</span>
+                  <span class="badge b-warning sm" title="PinPoint says off-floor but still on the map">⚠</span>
+                </h3>
+                <p class="tiny muted" style="margin:0 0 14px">Linked on PinballMap · last comment Feb 24</p>
+                <div style="display:flex; gap:8px; flex-wrap:wrap">
+                  <button class="btn sm btn-primary">Post comment</button>
+                  <button class="btn sm btn-outline">View on PinballMap ↗</button>
+                  <button class="btn sm btn-ghost">Edit…</button>
+                </div>
+              </div>
+              <div class="note"><b>Status only.</b> Listed/Not-listed pill + a small <span class="badge b-warning sm">⚠</span> shown <i>only when desynced</i>. No metadata table, no IDs (manufacturer/year render elsewhere; OPDB/IPDB stored in DB, never shown).</div>
+              <div class="note"><b>“Edit…” = one confirm modal</b> → change linked title (fix a wrong model pick), toggle Insider Connected, or mark “not on PinballMap”.</div>
+              <div class="note tiny"><b>Durability:</b> imported comments live in our timeline forever — even after a game is removed from PBM (which deletes the PBM-side comment history).</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="q"><b>Holes to poke:</b> Right rail vs full-width strip under the header? Should the ⚠ deep-link to the status-page row? Does “View on PinballMap” open the machine or the location anchored to it?</div>
+    </section>
+
+    <!-- ===================== PRESENCE CTA ===================== -->
+    <section class="surface" data-s="cta">
+      <h2>Presence-change CTA</h2>
+      <p class="annot">When a tech/owner moves a machine away from <b>On the Floor</b>, we surface a follow-up. Not lockstep — dismissible. Soft guidance for temporary moves.</p>
+
+      <div class="frame">
+        <div class="modalwrap">
+          <div class="modal">
+            <div class="mhead"><span class="pbm-glyph">◆</span> Also update PinballMap?</div>
+            <div class="mdesc">You moved <b>Godzilla (Premium)</b> from <span class="badge b-success sm">On the Floor</span> to <span class="badge b-muted sm">Off the Floor</span>.</div>
+            <div class="mbody">
+              <p style="margin:0 0 16px" class="muted tiny">It’s currently listed on PinballMap. Consider leaving it listed if the game is expected to return within a week — frequent add/remove churn is noisy for map users.</p>
+              <div style="display:flex; flex-direction:column; gap:9px">
+                <button class="btn btn-destructive" style="justify-content:flex-start">Remove from PinballMap now</button>
+                <button class="btn btn-outline" style="justify-content:flex-start">Leave listed, post a condition comment…</button>
+                <button class="btn btn-ghost" style="justify-content:flex-start">Leave it — deal with it later</button>
+              </div>
+            </div>
+            <div class="mfoot"><span class="tiny muted" style="margin-right:auto">Acts as <b>you</b> on PinballMap</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note"><b>Unlinked-account variant:</b> if the user hasn’t linked a PBM account, the actions become “Open on PinballMap ↗” (deep link) + “Link your account for one-click.” Nothing is blocked.</div>
+      <div class="q"><b>Holes:</b> Modal vs inline toast with actions? Should the permanent <span class="badge b-muted sm">Removed</span> presence skip the soft guidance and default to Remove? Does the reverse (off→on) prompt “add back to PinballMap”?</div>
+    </section>
+
+    <!-- ===================== TIMELINE ITEM ===================== -->
+    <section class="surface" data-s="timeline">
+      <h2>Timeline item — imported PBM comment</h2>
+      <p class="annot">Inbound PBM conditions become timeline events with attribution + link-back (PBM’s terms). A new notification category fires for watchers. Each carries a one-shot <b>Convert to issue</b> action. Styled to match the real <span class="mono">MachineRecentActivity</span> rows.</p>
+
+      <div class="frame"><div class="pad">
+        <div class="sectlbl" style="margin-bottom:6px">Recent activity</div>
+        <div class="tl">
+          <div class="tlrow">
+            <div class="tldot">↪</div>
+            <div class="tlmain"><div><b>Tim</b> changed presence <span class="muted">On the Floor → Off the Floor</span></div><div class="tlwhen">Today · 9:14 AM</div></div>
+          </div>
+          <div class="tlrow">
+            <div class="tldot pbm">◆</div>
+            <div class="tlmain">
+              <div style="display:flex; align-items:center; gap:8px"><span>PinballMap comment</span> <span class="badge b-pbm sm">via PinballMap</span></div>
+              <div class="pbmquote">“Module is temporarily (2 weeks) replaced with Heist in the Multimorphic P3”</div>
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                <button class="btn sm btn-primary">Convert to issue</button>
+                <button class="btn sm btn-outline">View on PinballMap ↗</button>
+                <span class="tiny muted" style="margin-left:auto">by <b>qixx</b> (Super Mapper) · Feb 24</span>
+              </div>
+            </div>
+          </div>
+          <div class="tlrow">
+            <div class="tldot">💬</div>
+            <div class="tlmain"><div><b>Sarah</b> commented: “cleared the coin mech”</div><div class="tlwhen">Feb 20</div></div>
+          </div>
+        </div>
+      </div></div>
+
+      <div class="note"><b>After conversion:</b> the row shows <span class="badge b-muted sm">→ converted to #142</span> and the button disappears (one-shot, recorded in eventData).</div>
+      <div class="q"><b>Holes:</b> Distinct enough from native comments, or too distinct? Collapse a flurry of PBM comments? Convert-to-issue: prefill severity/title from the text, or leave blank for the human?</div>
+    </section>
+
+    <!-- ===================== COMPOSE ===================== -->
+    <section class="surface" data-s="compose">
+      <h2>Outbound condition-comment composer</h2>
+      <p class="annot">Manual only (tech+), reached from the machine PBM card. Posts to PBM as the linked user; mirrors into our timeline as an outbound event.</p>
+      <div class="frame"><div class="modalwrap"><div class="modal">
+        <div class="mhead"><span class="pbm-glyph">◆</span> Post condition comment</div>
+        <div class="mdesc">Godzilla (Premium) · posts publicly to PinballMap as <b>tim_apc</b></div>
+        <div class="mbody">
+          <label class="fld"><span>Comment</span><input class="inp" value="Flippers rebuilt, playing great again."></label>
+          <div class="tiny muted">PinballMap uses condition comments as a maintenance log — keep it player-facing.</div>
+        </div>
+        <div class="mfoot"><button class="btn btn-ghost">Cancel</button><button class="btn btn-primary">Post to PinballMap</button></div>
+      </div></div></div>
+      <div class="q"><b>Holes:</b> Should closing a notable issue offer a prefilled composer (“just fixed: …”) despite manual-only? Char limit / preview? Append a “— via PinPoint” suffix?</div>
+    </section>
+
+    <!-- ===================== STATUS PAGE ===================== -->
+    <section class="surface" data-s="status">
+      <h2>PinballMap status page ★ <span class="tiny muted" style="font-weight:400">(tech / admin)</span></h2>
+      <p class="annot">The control room: bidirectional desync detection, the linking backlog, map-side additions to import, and sync controls. Menu home still TBD.</p>
+
+      <div class="frame">
+        <div class="appbar"><span class="logo"></span><span class="brand">PinPoint</span><span class="crumb">/ <b>PinballMap status</b></span><span class="spacer"></span><span class="tiny muted">Synced 23 min ago</span> <button class="btn sm btn-primary" title="PUT /locations/:id/confirm.json">✓ Confirm line-up</button> <button class="btn sm btn-outline">↻ Sync now</button></div>
+        <div class="pad-lg">
+
+          <div class="grid3" style="margin-bottom:20px">
+            <div class="stat"><div class="n">3</div><div class="l">Desynced</div></div>
+            <div class="stat"><div class="n" style="color:var(--warning)">5</div><div class="l">Unlinked games</div></div>
+            <div class="stat"><div class="n" style="color:var(--secondary)">2</div><div class="l">On map, not in PinPoint</div></div>
+          </div>
+
+          <div class="subtabs">
+            <div class="t on">Desynced (3)</div>
+            <div class="t">Unlinked (5)</div>
+            <div class="t">Import from map (2)</div>
+            <div class="t">All linked (91)</div>
+          </div>
+
+          <div class="legend">
+            <span><span class="swatch" style="background:var(--destructive)"></span>We changed it (PinPoint ahead)</span>
+            <span><span class="swatch" style="background:var(--secondary)"></span>Map changed it (someone edited PBM)</span>
+          </div>
+
+          <div class="card" style="padding:0">
+          <table>
+            <thead><tr><th>Machine</th><th>PinPoint</th><th>PinballMap</th><th>Drift</th><th></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Attack from Mars</b></td>
+                <td><span class="badge b-muted sm">Off the Floor</span></td>
+                <td><span class="badge b-success sm">Listed</span></td>
+                <td><span class="tiny" style="color:#f0a">▲ we pulled it; still on map</span></td>
+                <td style="white-space:nowrap; text-align:right"><button class="btn sm btn-destructive">Remove from map</button> <button class="btn sm btn-ghost">Snooze</button></td>
+              </tr>
+              <tr>
+                <td><b>Cactus Canyon</b></td>
+                <td><span class="badge b-success sm">On the Floor</span></td>
+                <td><span class="badge b-destructive sm">Not listed</span></td>
+                <td><span class="tiny" style="color:var(--secondary)">▼ removed on map by <b>stranger92</b></span></td>
+                <td style="white-space:nowrap; text-align:right"><button class="btn sm btn-primary">Re-add to map</button> <button class="btn sm btn-ghost">Snooze</button></td>
+              </tr>
+              <tr>
+                <td><b>The Addams Family</b></td>
+                <td><span class="badge b-muted sm">Removed</span></td>
+                <td><span class="badge b-success sm">Listed</span></td>
+                <td><span class="tiny" style="color:#f0a">▲ retired here; still on map</span></td>
+                <td style="white-space:nowrap; text-align:right"><button class="btn sm btn-destructive">Remove from map</button> <button class="btn sm btn-ghost">Snooze</button></td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+
+          <div class="note" style="margin-top:18px"><b>✓ Confirm line-up</b> (top bar) hits PBM’s <span class="mono">confirm.json</span> — a one-click “our lineup is accurate as of today,” refreshing the location’s last-confirmed date without changing anything.</div>
+          <div class="note"><b>“Import from map” tab:</b> machines on PBM unknown to PinPoint (e.g. <span class="mono">stranger92</span> added one) → “Create PinPoint machine” prefilled from PBM metadata, or “Ignore.”</div>
+          <div class="note"><b>“Unlinked” tab:</b> the rollout backlog — PinPoint games with no PBM id and not excluded → search/pick a PBM title or mark “not on PinballMap.” This is the manual linking-session surface.</div>
+          <div class="q"><b>★ Menu placement — to consider:</b> tech needs this page, but there’s no obvious nav home. Tech tools? Admin? A machine-list header action? Undecided.</div>
+        </div>
+      </div>
+
+      <div class="q"><b>Holes:</b> Bidirectional drift in one table too dense — split “we changed” vs “map changed”? Snooze duration UI? Bulk actions for the rollout session? (Stern IC dropped from desync — no PinPoint source-of-truth to diff against, unlike availability.)</div>
+    </section>
+
+    <!-- ===================== LINKING / CREATE ===================== -->
+    <section class="surface" data-s="link">
+      <h2>Machine create / edit — PBM linking (blocking)</h2>
+      <p class="annot">The form requires a PBM title <i>or</i> the “not on PinballMap” checkbox before saving. Picking a title autofills model metadata.</p>
+
+      <div class="frame">
+        <div class="appbar"><span class="logo"></span><span class="brand">PinPoint</span><span class="crumb">/ Machines / <b>New machine</b></span></div>
+        <div class="pad-lg">
+        <div class="row">
+          <div class="col">
+            <label class="fld"><span>Machine name</span><input class="inp" value="Godzilla (Premium)"></label>
+            <label class="fld"><span>Initials</span><input class="inp" value="GZ"></label>
+          </div>
+          <div class="col">
+            <div class="card">
+              <h3><span class="pbm-glyph">◆</span> PinballMap link <span class="badge b-destructive sm" style="margin-left:auto">Required</span></h3>
+              <label class="fld"><span>Find the PinballMap title</span><input class="inp" placeholder="Search PBM catalog… e.g. Godzilla"></label>
+              <div style="background:var(--background); border:1px solid var(--border); border-radius:6px; margin-top:-8px; overflow:hidden">
+                <div style="padding:9px 11px; border-bottom:1px solid var(--border); background:color-mix(in srgb, var(--primary) 12%, transparent)">Godzilla (Premium) — Stern, 2021</div>
+                <div style="padding:9px 11px; border-bottom:1px solid var(--border)">Godzilla (Pro) — Stern, 2021</div>
+                <div style="padding:9px 11px">Godzilla (LE) — Stern, 2021</div>
+              </div>
+              <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--border)">
+                <label style="display:flex; gap:9px; align-items:flex-start; cursor:pointer"><input type="checkbox" style="margin-top:3px"> <span class="tiny">This machine is <b>not on PinballMap</b> (e.g. not counted as pinball)<input class="inp" style="margin-top:7px" placeholder="reason (optional)"></span></label>
+              </div>
+            </div>
+            <div class="note tiny" style="margin-top:10px"><b>On pick:</b> autofills manufacturer, year, OPDB/IPDB into the record. PinPoint name stays independent of the PBM title.</div>
+          </div>
+        </div>
+        <div style="margin-top:6px; display:flex; gap:10px; align-items:center"><button class="btn btn-primary">Save machine</button><span class="tiny muted">Save disabled until linked or excluded</span></div>
+        </div>
+      </div>
+      <div class="q"><b>Holes:</b> Blocking <i>edit</i> of 91 existing unlinked games would freeze editing until linked — grandfather existing, block only new? Should name autofill from PBM or stay manual? What if the title isn’t in PBM’s catalog at all?</div>
+    </section>
+
+    <!-- ===================== SETTINGS ===================== -->
+    <section class="surface" data-s="settings">
+      <h2>Admin → Integrations (generic page)</h2>
+      <p class="annot">Per your call: convert the single-purpose Discord page into <b>one generic Integrations page</b> with a section per integration. PinballMap joins as a second section. Slimmed — no service creds (per-user auth lives in profile settings).</p>
+      <div class="frame">
+        <div class="appbar"><span class="logo"></span><span class="brand">PinPoint</span><span class="crumb">/ Admin / <b>Integrations</b></span></div>
+        <div class="pad-lg">
+
+          <div class="card">
+            <h3>💬 Discord <span class="spacer" style="flex:1"></span><span class="badge b-success sm">On</span></h3>
+            <dl class="kv"><dt>Guild</dt><dd>Austin Pinball Collective</dd><dt>Bot token</dt><dd class="muted">•••• set</dd></dl>
+            <div style="margin-top:12px"><button class="btn sm btn-outline">Configure</button></div>
+          </div>
+
+          <div class="card">
+            <h3><span class="pbm-glyph">◆</span> PinballMap <span class="spacer" style="flex:1"></span><span class="badge b-success sm">On</span></h3>
+            <label class="fld"><span>Enabled</span><div class="switch"><span class="on">On</span><span>Off</span></div></label>
+            <label class="fld"><span>PinballMap location ID</span><input class="inp" value="26454"><div class="hint">Austin Pinball Collective (Austin, TX) — verified ✓</div></label>
+            <dl class="kv" style="margin-top:4px">
+              <dt>Last sync</dt><dd>23 min ago · <span class="badge b-success sm">OK</span></dd>
+              <dt>On map</dt><dd>98 machines</dd>
+              <dt>Comments imported (30d)</dt><dd>14</dd>
+              <dt>Open desyncs</dt><dd>3 · <button class="btn-link">view status page →</button></dd>
+            </dl>
+            <div style="margin-top:14px"><button class="btn sm btn-outline">↻ Run sync now</button> <button class="btn sm btn-ghost">View sync log</button></div>
+          </div>
+
+          <div class="note tiny">Future integrations (OPDB direct, iScored…) drop in as additional sections.</div>
+        </div>
+      </div>
+      <div class="q"><b>Holes:</b> Does config-heavy PinballMap belong inline here, or should the section just summarize + link to the dedicated status page? Cadence configurable or hardcoded hourly? Renaming <span class="mono">/admin/integrations/discord</span> → <span class="mono">/admin/integrations</span> is its own small refactor.</div>
+    </section>
+
+    <!-- ===================== ACCOUNT LINK ===================== -->
+    <section class="surface" data-s="account">
+      <h2>Link my PinballMap account (per-user)</h2>
+      <p class="annot">In the user’s own profile settings. Two paths in one task: log in (we exchange password→token via <span class="mono">auth_details</span>, store token only) or paste an existing token. Required before a user can push outbound from CTAs.</p>
+      <div class="frame">
+        <div class="appbar"><span class="logo"></span><span class="brand">PinPoint</span><span class="crumb">/ Settings / <b>Connections</b></span></div>
+        <div class="pad-lg">
+        <div class="card" style="max-width:540px">
+          <h3><span class="pbm-glyph">◆</span> PinballMap account <span class="badge b-muted sm" style="margin-left:auto">Not linked</span></h3>
+          <div class="switch" style="margin:4px 0 18px"><span class="on">Log in</span><span>Paste token</span></div>
+          <label class="fld"><span>PinballMap email or username</span><input class="inp" placeholder="you@example.com"></label>
+          <label class="fld"><span>PinballMap password</span><input class="inp" type="password" placeholder="••••••••"><div class="hint">Used once to fetch your API token, then discarded. We never store your password.</div></label>
+          <button class="btn btn-primary">Link account</button>
+          <div class="note tiny" style="margin-top:18px"><b>Paste-token tab:</b> a single token field + “where do I find my token?” link, for users who don’t want to type their password into PinPoint.</div>
+          <div class="note tiny"><b>When linked:</b> shows the PBM username + <span class="badge b-success sm">Linked</span> + an Unlink button; outbound CTAs light up.</div>
+        </div>
+        </div>
+      </div>
+      <div class="q"><b>Holes:</b> Encrypt token at rest vs plain column? Show the PBM username so people catch a wrong-account link? How to surface a stale/rejected token?</div>
+    </section>
+
+    <!-- ===================== MAP ===================== -->
+    <section class="surface" data-s="map">
+      <h2>Where it all lives</h2>
+      <p class="annot">Index of every new/changed surface and its home — a scope sanity-check.</p>
+      <div class="frame"><div class="card" style="border:none; border-radius:0">
+        <table>
+          <thead><tr><th>Surface</th><th>Location</th><th>Who</th><th>Direction</th></tr></thead>
+          <tbody>
+            <tr><td>PBM card</td><td class="mono">/m/&lt;initials&gt; · Info tab</td><td>all view; tech+ act</td><td>read + out</td></tr>
+            <tr><td>Presence CTA</td><td>after presence save</td><td>owner, tech+</td><td>out</td></tr>
+            <tr><td>PBM comment + convert</td><td>machine timeline</td><td>all view; tech+ convert</td><td>in</td></tr>
+            <tr><td>Comment composer</td><td>from PBM card</td><td>tech+</td><td>out</td></tr>
+            <tr><td>Status page ★</td><td class="mono">menu home TBD</td><td>tech/admin</td><td>both</td></tr>
+            <tr><td>Confirm line-up</td><td>status page top bar</td><td>tech+</td><td>out</td></tr>
+            <tr><td>Linking + re-link</td><td>machine form / edit modal</td><td>owner, tech+</td><td>—</td></tr>
+            <tr><td>Admin settings</td><td class="mono">/admin/integrations</td><td>admin</td><td>config</td></tr>
+            <tr><td>Account link</td><td>profile settings</td><td>each user</td><td>auth</td></tr>
+            <tr><td>Sync job</td><td class="mono">/api/cron/pinballmap-sync</td><td>system</td><td>in</td></tr>
+            <tr><td>Watcher notif category</td><td>notifications</td><td>watchers</td><td>in</td></tr>
+          </tbody>
+        </table>
+      </div></div>
+      <div class="q"><b>Open structural question:</b> Is the status page a child of <span class="mono">/admin/integrations</span> (admin-only) or a tech-facing top-level route? Tech needs it but it’s integration-shaped.</div>
+    </section>
+
+  </main>
+</div>
+<script>
+  const links = document.querySelectorAll('nav a');
+  const surfaces = document.querySelectorAll('.surface');
+  links.forEach(a => a.addEventListener('click', () => {
+    const s = a.dataset.s;
+    links.forEach(x => x.classList.toggle('active', x === a));
+    surfaces.forEach(x => x.classList.toggle('active', x.dataset.s === s));
+    window.scrollTo(0,0);
+  }));
+  document.querySelectorAll('.subtabs, .tabstrip').forEach(tabs => {
+    tabs.querySelectorAll('.t').forEach(t => t.addEventListener('click', () => {
+      tabs.querySelectorAll('.t').forEach(x => x.classList.remove('on')); t.classList.add('on');
+    }));
+  });
+  document.querySelectorAll('.switch').forEach(sw => {
+    sw.querySelectorAll('span').forEach(s => s.addEventListener('click', () => {
+      sw.querySelectorAll('span').forEach(x => x.classList.remove('on')); s.classList.add('on');
+    }));
+  });
+</script>
+</body>
+</html>
