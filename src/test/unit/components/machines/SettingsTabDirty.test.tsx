@@ -727,6 +727,152 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
       confirmSpy.mockRestore();
     }
   });
+  // ---------------------------------------------------------------------------
+  // Task 8: reactive dirty signal — guard arms on first keystroke (PP-43q3)
+  // ---------------------------------------------------------------------------
+
+  it("(dirty) nav-guard prompt fires on a link click right after a keystroke, before any blur/flush", async () => {
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+    vi.useFakeTimers();
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
+
+      const link = document.createElement("a");
+      link.setAttribute("href", "/somewhere");
+      link.textContent = "Go";
+      document.body.appendChild(link);
+
+      try {
+        // Type a single character — editSet calls markDirty, so hasUnsaved is
+        // true immediately, BEFORE any blur/flush.
+        const input = screen.getByRole("textbox", { name: "set name" });
+        fireEvent.change(input, { target: { value: "C" } });
+
+        // No blur, no debounce advance. The guard should be armed already.
+        // Use act to let the markDirty state update settle.
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        fireEvent.click(link);
+        expect(confirmSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        link.remove();
+      }
+    } finally {
+      vi.useRealTimers();
+      confirmSpy.mockRestore();
+    }
+  });
+
+  it("(dirty) guard disarms after a successful save clears dirty", async () => {
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
+
+      const link = document.createElement("a");
+      link.setAttribute("href", "/somewhere");
+      link.textContent = "Go";
+      document.body.appendChild(link);
+
+      try {
+        // Type and blur → editSet marks dirty; blur flushes → save fires.
+        const input = screen.getByRole("textbox", { name: "set name" });
+        fireEvent.change(input, { target: { value: "Casual" } });
+        fireEvent.blur(input);
+
+        // Wait for the save to complete (markSaved + markClean → hasUnsaved=false).
+        await waitFor(() => {
+          expect(saveMock).toHaveBeenCalledTimes(1);
+        });
+        // Let React drain the markSaved + markClean state updates.
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        // Reset the spy call count so any guard-armed clicks during the save
+        // don't contaminate the post-save assertion.
+        confirmSpy.mockClear();
+
+        // After the save resolves cleanly, the guard should have disarmed.
+        fireEvent.click(link);
+        expect(confirmSpy).not.toHaveBeenCalled();
+      } finally {
+        link.remove();
+      }
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
+  it("(dirty) guard stays armed after a failed save — tab is dirty AND failed", async () => {
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+    saveMock.mockResolvedValue({
+      success: false,
+      error: "Network error",
+    });
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
+
+      const link = document.createElement("a");
+      link.setAttribute("href", "/somewhere");
+      link.textContent = "Go";
+      document.body.appendChild(link);
+
+      try {
+        const input = screen.getByRole("textbox", { name: "set name" });
+        fireEvent.change(input, { target: { value: "Casual" } });
+        fireEvent.blur(input);
+
+        // Wait for the failed save to settle (markFailed fires).
+        await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        // The guard should still be armed (dirty + failed). The auto-retry
+        // timer is still running, but hasUnsaved is true regardless.
+        fireEvent.click(link);
+        expect(confirmSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        link.remove();
+      }
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

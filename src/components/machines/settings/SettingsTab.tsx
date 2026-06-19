@@ -293,6 +293,9 @@ export function SettingsTab({
         });
         // Rekey the save-status maps from temp id to real id.
         saveStatus.markSaved(setId);
+        // If no newer edit landed during the insert, the working copy under
+        // the real id matches what we just persisted — mark it clean.
+        if (!newerPending) saveStatus.markClean(realId);
         return { outcome: { ok: true }, rekeyTo: realId };
       }
 
@@ -314,6 +317,9 @@ export function SettingsTab({
           sections: payload.sections.map(cloneSectionDeep),
         });
       }
+      // If no newer edit landed during the await, the working copy still
+      // matches the persisted payload — mark it clean so the guard disarms.
+      if (!newerPending) saveStatus.markClean(setId);
       return { outcome: { ok: true } };
     },
     [machineId, mutateSets, saveStatus]
@@ -381,6 +387,21 @@ export function SettingsTab({
       description: set.description,
       sections: sections.map(cloneSectionDeep),
     });
+  }
+
+  // -- The single per-set edit pipeline (PP-43q3 Task 8) ----------------------
+  // The ONLY place field handlers mutate a set. Ensures dirty tracking can't
+  // drift and staging always reads the just-mutated working copy (C1 discipline).
+  function editSet(
+    setId: string,
+    mutate: (set: SettingsSetData) => SettingsSetData,
+    opts?: { flush?: boolean }
+  ): void {
+    mutateSets((prev) => prev.map((s) => (s.id === setId ? mutate(s) : s)));
+    saveStatus.markDirty(setId);
+    stagePayload(setId);
+    if (opts?.flush === true) autoSave.flush(setId);
+    else autoSave.schedule(setId);
   }
 
   // -- Nav guard: arm on pending or failed saves ------------------------------
@@ -459,7 +480,7 @@ export function SettingsTab({
   }
 
   function renameSet(id: string, name: string): void {
-    mutateSets((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
+    editSet(id, (s) => ({ ...s, name }));
   }
 
   async function duplicateSet(id: string): Promise<void> {
@@ -520,11 +541,7 @@ export function SettingsTab({
   }
 
   function updateDescription(id: string, value: ProseMirrorDoc | null): void {
-    mutateSets((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, description: value } : s))
-    );
-    stagePayload(id);
-    autoSave.schedule(id);
+    editSet(id, (s) => ({ ...s, description: value }));
   }
 
   // -- Section-level working-copy mutations ------------------------------------
@@ -598,22 +615,19 @@ export function SettingsTab({
   // All three ops: apply to working copy, stage from working copy, flush.
 
   function deleteSection(setId: string, sectionId: string): void {
-    // Working copy: drop the section.
-    mapSections(setId, (sections) =>
-      sections.filter((sec) => sec.id !== sectionId)
-    );
     const baseline = baselineRef.current.get(setId);
     if (!baseline) return; // never-saved set: nothing to persist
-    // Update the baseline to match (remove the same section).
-    const nextBaseline: SettingsSetData = {
-      ...baseline,
-      sections: baseline.sections.filter((sec) => sec.id !== sectionId),
-    };
-    baselineRef.current.set(setId, nextBaseline);
-    // Stage from the working copy (which already has the section removed), then
-    // flush immediately.
-    stagePayload(setId);
-    autoSave.flush(setId);
+    // editSet mutates the working copy, marks dirty, stages from the working
+    // copy (C1), and flushes immediately. Baseline advances only in execute on
+    // a successful save — no manual pre-advance (H1 fix).
+    editSet(
+      setId,
+      (s) => ({
+        ...s,
+        sections: s.sections.filter((sec) => sec.id !== sectionId),
+      }),
+      { flush: true }
+    );
   }
 
   function reorderSections(
@@ -621,26 +635,21 @@ export function SettingsTab({
     activeId: string,
     overId: string
   ): void {
-    const reorder = (sections: SettingsSection[]): SettingsSection[] => {
-      const oldIndex = sections.findIndex((sec) => sec.id === activeId);
-      const newIndex = sections.findIndex((sec) => sec.id === overId);
-      if (oldIndex < 0 || newIndex < 0) return sections;
-      return arrayMove(sections, oldIndex, newIndex);
-    };
-    // Apply reorder to working copy.
-    mapSections(setId, reorder);
-
     const baseline = baselineRef.current.get(setId);
     if (!baseline) return; // never-saved set: order is local until first save
-    // Update the baseline order too.
-    const nextBaseline: SettingsSetData = {
-      ...baseline,
-      sections: reorder(baseline.sections),
-    };
-    baselineRef.current.set(setId, nextBaseline);
-    // Stage from the working copy (with reordered sections) and flush.
-    stagePayload(setId);
-    autoSave.flush(setId);
+    // editSet mutates the working copy, marks dirty, stages from the working
+    // copy (C1), and flushes immediately. Baseline advances only in execute on
+    // a successful save — no manual pre-advance (H1 fix).
+    editSet(
+      setId,
+      (s) => {
+        const oldIndex = s.sections.findIndex((sec) => sec.id === activeId);
+        const newIndex = s.sections.findIndex((sec) => sec.id === overId);
+        if (oldIndex < 0 || newIndex < 0) return s;
+        return { ...s, sections: arrayMove(s.sections, oldIndex, newIndex) };
+      },
+      { flush: true }
+    );
   }
 
   // Keyboard / mobile reorder path (WCAG 2.2 SC 2.5.7).
@@ -649,38 +658,38 @@ export function SettingsTab({
     sectionId: string,
     direction: "up" | "down"
   ): void {
-    const swap = (sections: SettingsSection[]): SettingsSection[] => {
-      const index = sections.findIndex((sec) => sec.id === sectionId);
-      if (index < 0) return sections;
-      const target = direction === "up" ? index - 1 : index + 1;
-      if (target < 0 || target >= sections.length) return sections;
-      return arrayMove(sections, index, target);
-    };
-    mapSections(setId, swap);
-
     const baseline = baselineRef.current.get(setId);
     if (!baseline) return;
-    const nextBaseline: SettingsSetData = {
-      ...baseline,
-      sections: swap(baseline.sections),
-    };
-    baselineRef.current.set(setId, nextBaseline);
-    // Stage from the working copy and flush.
-    stagePayload(setId);
-    autoSave.flush(setId);
+    // editSet mutates the working copy, marks dirty, stages from the working
+    // copy (C1), and flushes immediately. Baseline advances only in execute on
+    // a successful save — no manual pre-advance (H1 fix).
+    editSet(
+      setId,
+      (s) => {
+        const index = s.sections.findIndex((sec) => sec.id === sectionId);
+        if (index < 0) return s;
+        const target = direction === "up" ? index - 1 : index + 1;
+        if (target < 0 || target >= s.sections.length) return s;
+        return { ...s, sections: arrayMove(s.sections, index, target) };
+      },
+      { flush: true }
+    );
   }
 
   // -- Software / table row working-copy mutations ----------------------------
   function updateBaseline(
     setId: string,
     sectionId: string,
-    baseline: string
+    newBaseline: string
   ): void {
-    updateSection(setId, sectionId, (sec) =>
-      sec.kind === "software" ? { ...sec, baseline } : sec
-    );
-    stagePayload(setId);
-    autoSave.schedule(setId);
+    editSet(setId, (s) => ({
+      ...s,
+      sections: s.sections.map((sec) =>
+        sec.id === sectionId && sec.kind === "software"
+          ? { ...sec, baseline: newBaseline }
+          : sec
+      ),
+    }));
   }
 
   function addSoftwareRow(setId: string, sectionId: string): string {
@@ -703,18 +712,20 @@ export function SettingsTab({
     field: "id" | "name" | "value",
     value: string
   ): void {
-    updateSection(setId, sectionId, (sec) =>
-      sec.kind === "software" || sec.kind === "table"
-        ? {
-            ...sec,
-            rows: sec.rows.map((r) =>
-              r._key === rowKey ? { ...r, [field]: value } : r
-            ),
-          }
-        : sec
-    );
-    stagePayload(setId);
-    autoSave.schedule(setId);
+    editSet(setId, (s) => ({
+      ...s,
+      sections: s.sections.map((sec) =>
+        sec.id === sectionId &&
+        (sec.kind === "software" || sec.kind === "table")
+          ? {
+              ...sec,
+              rows: sec.rows.map((r) =>
+                r._key === rowKey ? { ...r, [field]: value } : r
+              ),
+            }
+          : sec
+      ),
+    }));
   }
 
   function deleteSoftwareRow(
@@ -722,13 +733,19 @@ export function SettingsTab({
     sectionId: string,
     rowKey: string
   ): void {
-    updateSection(setId, sectionId, (sec) =>
-      sec.kind === "software" || sec.kind === "table"
-        ? { ...sec, rows: sec.rows.filter((r) => r._key !== rowKey) }
-        : sec
+    editSet(
+      setId,
+      (s) => ({
+        ...s,
+        sections: s.sections.map((sec) =>
+          sec.id === sectionId &&
+          (sec.kind === "software" || sec.kind === "table")
+            ? { ...sec, rows: sec.rows.filter((r) => r._key !== rowKey) }
+            : sec
+        ),
+      }),
+      { flush: true }
     );
-    stagePayload(setId);
-    autoSave.flush(setId);
   }
 
   function updateTableTitle(
@@ -736,20 +753,22 @@ export function SettingsTab({
     sectionId: string,
     title: string
   ): void {
-    updateSection(setId, sectionId, (sec) =>
-      sec.kind === "table" ? { ...sec, title } : sec
-    );
-    stagePayload(setId);
-    autoSave.schedule(setId);
+    editSet(setId, (s) => ({
+      ...s,
+      sections: s.sections.map((sec) =>
+        sec.id === sectionId && sec.kind === "table" ? { ...sec, title } : sec
+      ),
+    }));
   }
 
   // -- DIP switch working-copy mutations --------------------------------------
   function renameDipBank(setId: string, sectionId: string, name: string): void {
-    updateSection(setId, sectionId, (sec) =>
-      sec.kind === "dip" ? { ...sec, name } : sec
-    );
-    stagePayload(setId);
-    autoSave.schedule(setId);
+    editSet(setId, (s) => ({
+      ...s,
+      sections: s.sections.map((sec) =>
+        sec.id === sectionId && sec.kind === "dip" ? { ...sec, name } : sec
+      ),
+    }));
   }
 
   function addDipSwitch(setId: string, sectionId: string): string {
@@ -775,18 +794,19 @@ export function SettingsTab({
     field: "switch" | "position" | "note",
     value: string
   ): void {
-    updateSection(setId, sectionId, (sec) =>
-      sec.kind === "dip"
-        ? {
-            ...sec,
-            switches: sec.switches.map((sw) =>
-              sw._key === switchKey ? { ...sw, [field]: value } : sw
-            ),
-          }
-        : sec
-    );
-    stagePayload(setId);
-    autoSave.schedule(setId);
+    editSet(setId, (s) => ({
+      ...s,
+      sections: s.sections.map((sec) =>
+        sec.id === sectionId && sec.kind === "dip"
+          ? {
+              ...sec,
+              switches: sec.switches.map((sw) =>
+                sw._key === switchKey ? { ...sw, [field]: value } : sw
+              ),
+            }
+          : sec
+      ),
+    }));
   }
 
   function deleteDipSwitch(
@@ -794,16 +814,21 @@ export function SettingsTab({
     sectionId: string,
     switchKey: string
   ): void {
-    updateSection(setId, sectionId, (sec) =>
-      sec.kind === "dip"
-        ? {
-            ...sec,
-            switches: sec.switches.filter((sw) => sw._key !== switchKey),
-          }
-        : sec
+    editSet(
+      setId,
+      (s) => ({
+        ...s,
+        sections: s.sections.map((sec) =>
+          sec.id === sectionId && sec.kind === "dip"
+            ? {
+                ...sec,
+                switches: sec.switches.filter((sw) => sw._key !== switchKey),
+              }
+            : sec
+        ),
+      }),
+      { flush: true }
     );
-    stagePayload(setId);
-    autoSave.flush(setId);
   }
 
   // -- Note section working-copy mutations ------------------------------------
@@ -812,11 +837,12 @@ export function SettingsTab({
     sectionId: string,
     title: string
   ): void {
-    updateSection(setId, sectionId, (sec) =>
-      sec.kind === "note" ? { ...sec, title } : sec
-    );
-    stagePayload(setId);
-    autoSave.schedule(setId);
+    editSet(setId, (s) => ({
+      ...s,
+      sections: s.sections.map((sec) =>
+        sec.id === sectionId && sec.kind === "note" ? { ...sec, title } : sec
+      ),
+    }));
   }
 
   function updateNoteBody(
@@ -824,13 +850,14 @@ export function SettingsTab({
     sectionId: string,
     body: ProseMirrorDoc | null
   ): void {
-    updateSection(setId, sectionId, (sec) =>
-      sec.kind === "note" ? { ...sec, body } : sec
-    );
-    stagePayload(setId);
     // Rich-text is DEBOUNCE-ONLY: no blur-flush path (RichTextEditor has no
     // onBlur). The 800 ms schedule is the only save trigger for note bodies.
-    autoSave.schedule(setId);
+    editSet(setId, (s) => ({
+      ...s,
+      sections: s.sections.map((sec) =>
+        sec.id === sectionId && sec.kind === "note" ? { ...sec, body } : sec
+      ),
+    }));
   }
 
   // onSectionBlurFlush: called from a section's blur callback (plain-text
@@ -946,8 +973,6 @@ export function SettingsTab({
               }}
               onRename={(name) => {
                 renameSet(set.id, name);
-                stagePayload(set.id);
-                autoSave.schedule(set.id);
               }}
               onDuplicate={() => {
                 void duplicateSet(set.id);
