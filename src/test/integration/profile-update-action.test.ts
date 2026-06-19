@@ -46,20 +46,23 @@ describe("updateProfileAction", () => {
     );
   });
 
-  it("updates the caller's own profile fields", async () => {
+  it("updates the caller's own profile fields and redirects to the read view", async () => {
     const db = await getTestDb();
     const { updateProfileAction } = await import("~/app/(app)/u/[id]/actions");
 
-    const res = await updateProfileAction(
-      undefined,
-      fd({
-        firstName: "New",
-        lastName: "Person",
-        pronouns: "she/her",
-        bio: "hi",
-      })
-    );
-    expect(res.ok).toBe(true);
+    // On success the action calls redirect(), which throws NEXT_REDIRECT by
+    // design (Next.js control flow) instead of returning a Result.
+    await expect(
+      updateProfileAction(
+        undefined,
+        fd({
+          firstName: "New",
+          lastName: "Person",
+          pronouns: "she/her",
+          bio: "hi",
+        })
+      )
+    ).rejects.toThrow("NEXT_REDIRECT");
 
     const row = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, ME),
