@@ -1019,6 +1019,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run pnpm audit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # PR head commit on pull_request events (github.sha is the ephemeral
+          # merge commit there); the pushed commit on push events.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           registry_errors="ERR_PNPM_AUDIT_BAD_RESPONSE"
           registry_errors+="|ERR_PNPM_AUDIT_REGISTRY"
@@ -1030,6 +1036,16 @@ jobs:
               exit 0
             fi
             echo "$output"
+            # Per-PR escape hatch: a maintainer may bypass this gate for the
+            # current commit via `/audit-override <reason>` (see
+            # .github/workflows/audit-override.yaml). The override is a commit
+            # status bound to HEAD_SHA, so it never carries to a new commit —
+            # a newly-introduced advisory is never silently masked.
+            if bash scripts/workflow/audit-override/gate.sh check "$HEAD_SHA"; then
+              echo "::warning::pnpm audit bypassed by an active /audit-override on ${HEAD_SHA}. See the audit-override sticky comment for who/why."
+              exit 0
+            fi
+            echo "::error::pnpm audit found advisories at or above 'high'. Fix them, or a maintainer can bypass for this PR with '/audit-override <reason>'."
             exit 1
           }
           echo "$output"
