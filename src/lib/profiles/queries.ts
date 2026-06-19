@@ -1,4 +1,4 @@
-import { eq, count, asc } from "drizzle-orm";
+import { eq, count, asc, inArray } from "drizzle-orm";
 import { db } from "~/server/db";
 import {
   userProfiles,
@@ -6,6 +6,10 @@ import {
   issues,
   issueComments,
 } from "~/server/db/schema";
+import {
+  getMachineTimeline,
+  type MachineTimelineRow,
+} from "~/lib/timeline/machine-events";
 
 export const PROFILE_MACHINE_CAP = 6;
 
@@ -84,4 +88,53 @@ export async function getCappedOwnedMachines(userId: string): Promise<{
     total,
     hasMore: rows.length > PROFILE_MACHINE_CAP,
   };
+}
+
+export const PROFILE_FEED_LIMIT = 8;
+
+/** Recent timeline events authored by this user, across any machine. */
+export async function getUserTimeline(
+  userId: string,
+  opts?: { limit?: number }
+): Promise<MachineTimelineRow[]> {
+  return getMachineTimeline(db, {
+    authorId: userId,
+    limit: opts?.limit ?? PROFILE_FEED_LIMIT,
+  });
+}
+
+export interface FeedMachineLabel {
+  name: string;
+  href: string;
+  initials: string;
+}
+
+/** Resolve the machine name/initials/href for the distinct machineIds present
+ *  in a feed page, for each row's attribution line. One query, not N. */
+export async function resolveFeedMachineLabels(
+  rows: MachineTimelineRow[]
+): Promise<Map<string, FeedMachineLabel>> {
+  const ids = [
+    ...new Set(
+      rows.map((r) => r.machineId).filter((id): id is string => id !== null)
+    ),
+  ];
+  const map = new Map<string, FeedMachineLabel>();
+  if (ids.length === 0) return map;
+  const labelRows = await db
+    .select({
+      id: machines.id,
+      name: machines.name,
+      initials: machines.initials,
+    })
+    .from(machines)
+    .where(inArray(machines.id, ids));
+  for (const m of labelRows) {
+    map.set(m.id, {
+      name: m.name,
+      href: `/m/${m.initials}`,
+      initials: m.initials,
+    });
+  }
+  return map;
 }
