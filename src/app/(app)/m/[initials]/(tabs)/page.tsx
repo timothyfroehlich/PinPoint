@@ -278,8 +278,6 @@ export default async function MachineInfoTab({
                   pinballmapMachineId: machine.pinballmapMachineId,
                   pinballmapExcluded: machine.pinballmapExcluded,
                   pinballmapExcludedReason: machine.pinballmapExcludedReason,
-                  manufacturer: machine.manufacturer,
-                  year: machine.year,
                   pinballmapTitleName,
                 }}
                 allUsers={allUsers}

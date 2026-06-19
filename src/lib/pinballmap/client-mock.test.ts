@@ -22,6 +22,21 @@ describe("mock PinballMap client", () => {
     expect(catalog.every((m) => m.name.length > 0)).toBe(true);
   });
 
+  it("exposes machine groups and grouped editions", async () => {
+    const client = createMockClient();
+    const groups = await client.fetchMachineGroups();
+    expect(groups.length).toBeGreaterThan(0);
+    expect(groups.every((g) => g.name.length > 0)).toBe(true);
+
+    const catalog = await client.fetchCatalog();
+    const firstGroup = groups[0];
+    if (!firstGroup) throw new Error("no machine groups in fixture");
+    const editions = catalog.filter(
+      (m) => m.machineGroupId === firstGroup.machineGroupId
+    );
+    expect(editions.length).toBeGreaterThan(1);
+  });
+
   it("addMachine appears in the next snapshot and returns a new lmx id", async () => {
     const client = createMockClient();
     const before = await client.fetchLocation(26454);

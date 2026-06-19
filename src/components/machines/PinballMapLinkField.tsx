@@ -20,26 +20,43 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import {
-  searchPinballMapCatalogAction,
-  type CatalogPick,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import {
+  searchPinballMapFamiliesAction,
+  listPinballMapEditionsAction,
+  resolvePinballMapLinkAction,
+  type CatalogEdition,
+  type CatalogFamily,
 } from "~/app/(app)/m/pinballmap-actions";
 
 /**
  * PinballMapLinkField — create/edit control for linking a machine to its
  * PinballMap catalog title, or marking it "not on PinballMap".
  *
- * ## Pattern
- * Popover + Command (cmdk) like {@link OwnerSelect}, but the options come from a
- * debounced SERVER search of the local catalog mirror (the catalog is too large
- * to ship to the client). Picking a title autofills nothing client-side beyond
- * display — the server re-derives manufacturer/year/OPDB/IPDB from the catalog
- * on save, never trusting the client.
+ * ## Two-step picker (family → edition)
+ * PBM groups editions of one title (Godzilla Pro/Premium/LE) under a machine
+ * group; standalone titles have none. Step 1 is a debounced SERVER search of the
+ * local catalog mirror for a FAMILY (a group, or a standalone title). Step 2 — an
+ * EDITION dropdown — appears ONLY when the chosen family has more than one
+ * edition; it starts unset and is required, so an ambiguous family can't be
+ * linked without choosing the exact edition. A single-edition family resolves
+ * immediately and skips step 2.
+ *
+ * The server re-derives manufacturer/year/OPDB/IPDB from the catalog on save,
+ * never trusting the client.
  *
  * ## Submission (native form, progressive enhancement)
  * - `pbmLinkPresent=1` — marks that this form manages the link, so the action
  *   treats the submitted state as authoritative (and never wipes the link from
  *   other edit surfaces that omit the marker).
- * - `pinballmapMachineId` — selected catalog id, or empty when unlinked.
+ * - `pinballmapMachineId` — the resolved edition's id, or empty when unlinked.
+ *   When the edition step is shown it IS the `<select>` (so `required` is
+ *   enforced natively); otherwise it is a hidden input.
  * - `pinballmapExcluded=on` + `pinballmapExcludedReason` — the "not on
  *   PinballMap" flag and its optional reason.
  *
@@ -51,8 +68,6 @@ interface PinballMapLinkFieldProps {
   defaultMachineId?: number | null;
   /** Display name of the currently-linked title (resolved from the mirror), if any. */
   defaultName?: string | null;
-  defaultManufacturer?: string | null;
-  defaultYear?: number | null;
   defaultExcluded?: boolean;
   defaultExcludedReason?: string | null;
   disabled?: boolean;
@@ -67,31 +82,45 @@ function formatMeta(manufacturer: string | null, year: number | null): string {
 export function PinballMapLinkField({
   defaultMachineId = null,
   defaultName = null,
-  defaultManufacturer = null,
-  defaultYear = null,
   defaultExcluded = false,
   defaultExcludedReason = null,
   disabled = false,
 }: PinballMapLinkFieldProps): React.JSX.Element {
   const excludedId = useId();
+  const triggerId = useId();
+  const editionId = useId();
 
-  const [selected, setSelected] = useState<CatalogPick | null>(
-    defaultMachineId !== null
-      ? {
-          pinballmapMachineId: defaultMachineId,
-          name: defaultName ?? `PinballMap #${defaultMachineId}`,
-          manufacturer: defaultManufacturer,
-          year: defaultYear,
-        }
-      : null
+  const [family, setFamily] = useState<CatalogFamily | null>(null);
+  const [editions, setEditions] = useState<CatalogEdition[]>([]);
+  const [selectedEditionId, setSelectedEditionId] = useState<number | null>(
+    null
   );
+  const [editionsLoading, setEditionsLoading] = useState(false);
+
   const [excluded, setExcluded] = useState(defaultExcluded);
   const [reason, setReason] = useState(defaultExcludedReason ?? "");
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<CatalogPick[]>([]);
+  const [results, setResults] = useState<CatalogFamily[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Edit preselect: resolve an existing link id back to its family + editions.
+  // `defaultName` shows immediately while the round-trip is in flight.
+  useEffect(() => {
+    if (defaultMachineId === null) return;
+    let active = true;
+    void resolvePinballMapLinkAction(defaultMachineId).then((resolved) => {
+      if (active && resolved) {
+        setFamily(resolved.family);
+        setEditions(resolved.editions);
+        setSelectedEditionId(resolved.pinballmapMachineId);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [defaultMachineId]);
 
   // Debounced server search of the local catalog mirror; `active` guards against
   // out-of-order responses when the query changes mid-flight.
@@ -106,7 +135,7 @@ export function PinballMapLinkField({
     setLoading(true);
     const handle = window.setTimeout(() => {
       void (async () => {
-        const rows = await searchPinballMapCatalogAction(trimmed);
+        const rows = await searchPinballMapFamiliesAction(trimmed);
         if (active) {
           setResults(rows);
           setLoading(false);
@@ -119,42 +148,91 @@ export function PinballMapLinkField({
     };
   }, [query]);
 
-  const handlePick = (pick: CatalogPick): void => {
-    setSelected(pick);
+  const handlePickFamily = (pick: CatalogFamily): void => {
+    setFamily(pick);
     setExcluded(false); // mutual exclusion
     setOpen(false);
     setQuery("");
+
+    if (pick.pinballmapMachineId !== null) {
+      // Single-edition family (standalone or a one-edition group): resolved.
+      setEditions([]);
+      setSelectedEditionId(pick.pinballmapMachineId);
+      return;
+    }
+
+    // Multi-edition family: load editions for the required second step.
+    setEditions([]);
+    setSelectedEditionId(null);
+    if (pick.machineGroupId === null) return;
+    const groupId = pick.machineGroupId;
+    setEditionsLoading(true);
+    void (async () => {
+      const rows = await listPinballMapEditionsAction(groupId);
+      setEditions(rows);
+      setEditionsLoading(false);
+    })();
   };
 
   const handleClear = (): void => {
-    setSelected(null);
+    setFamily(null);
+    setEditions([]);
+    setSelectedEditionId(null);
     setQuery("");
   };
 
   const handleExcludedChange = (checked: boolean): void => {
     setExcluded(checked);
-    if (checked) setSelected(null); // mutual exclusion
+    if (checked) {
+      // mutual exclusion
+      setFamily(null);
+      setEditions([]);
+      setSelectedEditionId(null);
+    }
   };
 
-  const selectedMeta = selected
-    ? formatMeta(selected.manufacturer, selected.year)
-    : "";
+  // The edition step is shown only for an ambiguous (multi-edition) family.
+  const needsEdition =
+    family !== null &&
+    family.pinballmapMachineId === null &&
+    family.editionCount > 1;
+
+  // Resolved id: a single-edition family's id, or the chosen edition.
+  const resolvedId = family
+    ? (family.pinballmapMachineId ?? selectedEditionId)
+    : null;
+
+  const familyMeta = family ? formatMeta(family.manufacturer, family.year) : "";
+  const triggerLabel = family
+    ? family.name
+    : defaultMachineId !== null && defaultName
+      ? defaultName
+      : "Search PinballMap catalog…";
 
   return (
     <div className="space-y-2">
       <input type="hidden" name="pbmLinkPresent" value="1" />
-      <input
-        type="hidden"
-        name="pinballmapMachineId"
-        value={selected ? String(selected.pinballmapMachineId) : ""}
-      />
+      {excluded && <input type="hidden" name="pinballmapExcluded" value="on" />}
+      {/* When the edition step is shown, the <select> below carries
+          pinballmapMachineId (with native `required`); otherwise this hidden
+          input does. */}
+      {!needsEdition && (
+        <input
+          type="hidden"
+          name="pinballmapMachineId"
+          value={resolvedId !== null ? String(resolvedId) : ""}
+        />
+      )}
 
-      <Label className="text-foreground">PinballMap link</Label>
+      <Label htmlFor={triggerId} className="text-foreground">
+        PinballMap link
+      </Label>
 
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             type="button"
+            id={triggerId}
             variant="outline"
             role="combobox"
             aria-expanded={open}
@@ -163,11 +241,10 @@ export function PinballMapLinkField({
             className="w-full justify-between border-outline bg-surface text-foreground font-normal"
           >
             <span
-              className={selected ? "text-foreground" : "text-muted-foreground"}
+              className={family ? "text-foreground" : "text-muted-foreground"}
             >
-              {selected
-                ? `${selected.name}${selectedMeta ? ` · ${selectedMeta}` : ""}`
-                : "Search PinballMap catalog…"}
+              {triggerLabel}
+              {family && familyMeta ? ` · ${familyMeta}` : ""}
             </span>
             <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
           </Button>
@@ -185,7 +262,10 @@ export function PinballMapLinkField({
             />
             <CommandList>
               {loading ? (
-                <div className="px-3 py-4 text-xs text-muted-foreground">
+                <div
+                  role="status"
+                  className="px-3 py-4 text-xs text-muted-foreground"
+                >
                   Searching…
                 </div>
               ) : (
@@ -199,14 +279,25 @@ export function PinballMapLinkField({
                     <CommandGroup>
                       {results.map((r) => {
                         const meta = formatMeta(r.manufacturer, r.year);
+                        const key =
+                          r.machineGroupId !== null
+                            ? `g${r.machineGroupId}`
+                            : `m${r.pinballmapMachineId}`;
                         return (
                           <CommandItem
-                            key={r.pinballmapMachineId}
-                            value={String(r.pinballmapMachineId)}
-                            onSelect={() => handlePick(r)}
+                            key={key}
+                            value={key}
+                            onSelect={() => handlePickFamily(r)}
                           >
                             <div className="flex flex-col">
-                              <span>{r.name}</span>
+                              <span>
+                                {r.name}
+                                {r.editionCount > 1 && (
+                                  <span className="ml-1.5 text-[10px] text-muted-foreground">
+                                    {r.editionCount} editions
+                                  </span>
+                                )}
+                              </span>
                               {meta.length > 0 && (
                                 <span className="text-[10px] text-muted-foreground">
                                   {meta}
@@ -225,7 +316,54 @@ export function PinballMapLinkField({
         </PopoverContent>
       </Popover>
 
-      {selected && !disabled && (
+      {/* Edition step — only for an ambiguous (multi-edition) family. The select
+          IS the pinballmapMachineId field so `required` is enforced natively. */}
+      {needsEdition && !excluded && (
+        <div className="space-y-1.5">
+          <Label htmlFor={editionId} className="text-xs text-muted-foreground">
+            Edition <span className="text-destructive">*</span>
+          </Label>
+          <Select
+            name="pinballmapMachineId"
+            required
+            disabled={disabled || editionsLoading}
+            // Omit `value` entirely (not value={undefined}) when unset so the
+            // placeholder shows — exactOptionalPropertyTypes forbids undefined.
+            {...(selectedEditionId !== null
+              ? { value: String(selectedEditionId) }
+              : {})}
+            onValueChange={(v) => setSelectedEditionId(Number(v))}
+          >
+            <SelectTrigger
+              id={editionId}
+              data-testid="pinballmap-edition-select"
+              className="border-outline bg-surface text-foreground"
+            >
+              <SelectValue
+                placeholder={
+                  editionsLoading ? "Loading editions…" : "Select an edition"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {editions.map((e) => {
+                const meta = formatMeta(e.manufacturer, e.year);
+                return (
+                  <SelectItem
+                    key={e.pinballmapMachineId}
+                    value={String(e.pinballmapMachineId)}
+                  >
+                    {e.name}
+                    {meta.length > 0 ? ` · ${meta}` : ""}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {family && !disabled && (
         <Button
           type="button"
           variant="ghost"
@@ -244,11 +382,8 @@ export function PinballMapLinkField({
           checked={excluded}
           disabled={disabled}
           onCheckedChange={(checked) => handleExcludedChange(checked === true)}
-          className="mt-0.5"
+          className="mt-0.5 border-outline"
         />
-        {excluded && (
-          <input type="hidden" name="pinballmapExcluded" value="on" />
-        )}
         <div className="flex-1 space-y-2">
           <label
             htmlFor={excludedId}

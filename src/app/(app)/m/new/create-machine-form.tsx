@@ -245,7 +245,7 @@ export function CreateMachineForm({
           };
         }}
         id="create-machine-form"
-        className="space-y-6"
+        className="space-y-4"
       >
         {/* Machine Name */}
         <div className="space-y-2">
@@ -308,7 +308,7 @@ export function CreateMachineForm({
         <PinballMapLinkField />
 
         {/* Actions */}
-        <div className="flex flex-wrap gap-3 pt-4">
+        <div className="flex flex-wrap gap-3 pt-2">
           <Button
             type="submit"
             className="flex-1 min-w-[160px] bg-primary text-on-primary hover:bg-primary/90"

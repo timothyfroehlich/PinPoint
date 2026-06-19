@@ -90,3 +90,12 @@ echo "::endgroup::"
 #     node supabase/seed-machine-settings.mjs
 #     echo "::endgroup::"
 #   }
+
+# PinballMap catalog mirror (PP-o355.2): the refresh cron is prod-only, so
+# preview branches need the mirror seeded from offline fixtures for the linking
+# picker to work. No network — reads src/lib/pinballmap/fixtures (CORE-PBM-001).
+[[ -f supabase/seed-pinballmap-catalog.mjs ]] && {
+  echo "::group::Seed PinballMap catalog mirror"
+  node supabase/seed-pinballmap-catalog.mjs
+  echo "::endgroup::"
+}

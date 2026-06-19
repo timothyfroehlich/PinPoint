@@ -195,6 +195,12 @@ export const pinballmapCatalog = pgTable(
     year: integer("year"),
     opdbId: text("opdb_id"),
     ipdbId: integer("ipdb_id"),
+    // PBM groups editions of one title (e.g. Godzilla Pro/Premium/LE) under a
+    // machine_group_id; the group's display name lives in a separate endpoint,
+    // so we denormalize it here to power the family→edition picker without a
+    // join. Null for standalone/ungrouped titles (most older machines).
+    machineGroupId: integer("machine_group_id"),
+    groupName: text("group_name"),
     refreshedAt: timestamp("refreshed_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -204,6 +210,8 @@ export const pinballmapCatalog = pgTable(
     // (~10k titles), so an ILIKE '%q%' contains-scan is fine; upgrade to a
     // pg_trgm GIN index here if it ever grows enough to matter.
     nameIdx: index("idx_pinballmap_catalog_name").on(t.name),
+    // Edition lookup for a selected family.
+    groupIdx: index("idx_pinballmap_catalog_group").on(t.machineGroupId),
   })
 );
 

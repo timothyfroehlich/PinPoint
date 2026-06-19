@@ -74,8 +74,6 @@ interface EditMachineDialogProps {
     pinballmapMachineId: number | null;
     pinballmapExcluded: boolean;
     pinballmapExcludedReason: string | null;
-    manufacturer: string | null;
-    year: number | null;
     /** Linked catalog title's display name, resolved server-side from the mirror. */
     pinballmapTitleName: string | null;
   };
@@ -346,8 +344,6 @@ export function EditMachineDialog({
               <PinballMapLinkField
                 defaultMachineId={machine.pinballmapMachineId}
                 defaultName={machine.pinballmapTitleName}
-                defaultManufacturer={machine.manufacturer}
-                defaultYear={machine.year}
                 defaultExcluded={machine.pinballmapExcluded}
                 defaultExcludedReason={machine.pinballmapExcludedReason}
               />

@@ -78,6 +78,8 @@ async function seedCatalogEntry(overrides: {
   year?: number | null;
   opdbId?: string | null;
   ipdbId?: number | null;
+  machineGroupId?: number | null;
+  groupName?: string | null;
 }): Promise<void> {
   const db = await getTestDb();
   await db.insert(pinballmapCatalog).values({
@@ -87,13 +89,15 @@ async function seedCatalogEntry(overrides: {
     year: overrides.year ?? null,
     opdbId: overrides.opdbId ?? null,
     ipdbId: overrides.ipdbId ?? null,
+    machineGroupId: overrides.machineGroupId ?? null,
+    groupName: overrides.groupName ?? null,
   });
 }
 
 describe("PinballMap catalog mirror (PGlite)", () => {
   setupTestDb();
 
-  it("refreshCatalog upserts the mock catalog into the mirror", async () => {
+  it("refreshCatalog upserts the mock catalog and denormalizes group names", async () => {
     const db = await getTestDb();
     const { refreshCatalog } = await import("~/lib/pinballmap/catalog");
 
@@ -104,6 +108,12 @@ describe("PinballMap catalog mirror (PGlite)", () => {
     expect(rows.length).toBe(count);
     expect(rows.every((r) => r.name.length > 0)).toBe(true);
 
+    // Grouped editions get the family name denormalized onto each row from the
+    // machine_groups endpoint; standalone titles stay null.
+    const grouped = rows.filter((r) => r.machineGroupId !== null);
+    expect(grouped.length).toBeGreaterThan(0);
+    expect(grouped.every((r) => (r.groupName ?? "").length > 0)).toBe(true);
+
     // Re-running upserts (no duplicates, refreshedAt advances).
     const second = await refreshCatalog();
     const rowsAfter = await db.select().from(pinballmapCatalog);
@@ -111,40 +121,98 @@ describe("PinballMap catalog mirror (PGlite)", () => {
     expect(rowsAfter.length).toBe(rows.length);
   });
 
-  it("searchCatalog matches by substring, ranks prefixes first, and is blank-safe", async () => {
-    const { searchCatalog } = await import("~/lib/pinballmap/catalog");
+  it("searchCatalogFamilies collapses editions into families and resolves singles", async () => {
+    const { searchCatalogFamilies } = await import("~/lib/pinballmap/catalog");
+    // A 3-edition family.
     await seedCatalogEntry({
       pinballmapMachineId: 1,
-      name: "Godzilla (Premium)",
+      name: "Godzilla (Pro)",
+      machineGroupId: 100,
+      groupName: "Godzilla",
     });
-    await seedCatalogEntry({ pinballmapMachineId: 2, name: "Mega Godzilla" });
+    await seedCatalogEntry({
+      pinballmapMachineId: 2,
+      name: "Godzilla (Premium)",
+      machineGroupId: 100,
+      groupName: "Godzilla",
+    });
     await seedCatalogEntry({
       pinballmapMachineId: 3,
+      name: "Godzilla (LE)",
+      machineGroupId: 100,
+      groupName: "Godzilla",
+    });
+    // A standalone title that also matches "godz".
+    await seedCatalogEntry({ pinballmapMachineId: 4, name: "Mega Godzilla" });
+    await seedCatalogEntry({
+      pinballmapMachineId: 5,
       name: "Medieval Madness",
     });
 
-    const results = await searchCatalog("godz");
-    const ids = results.map((r) => r.pinballmapMachineId);
-    expect(ids).toContain(1);
-    expect(ids).toContain(2);
-    expect(ids).not.toContain(3);
-    // "Godzilla …" (prefix) ranks above "Mega Godzilla" (mid-string).
-    expect(ids[0]).toBe(1);
+    const families = await searchCatalogFamilies("godz");
+    // One row for the whole group, one for the standalone — not four.
+    expect(families.length).toBe(2);
+    expect(families.some((f) => f.name === "Medieval Madness")).toBe(false);
 
-    expect(await searchCatalog("   ")).toEqual([]);
+    const group = families.find((f) => f.machineGroupId === 100);
+    expect(group?.editionCount).toBe(3);
+    // Multi-edition family has no single id — the picker must ask for an edition.
+    expect(group?.pinballmapMachineId).toBeNull();
+
+    const standalone = families.find((f) => f.machineGroupId === null);
+    expect(standalone?.editionCount).toBe(1);
+    expect(standalone?.pinballmapMachineId).toBe(4);
+
+    expect(await searchCatalogFamilies("   ")).toEqual([]);
   });
 
-  it("searchCatalog treats % and _ as literals (no wildcard injection)", async () => {
-    const { searchCatalog } = await import("~/lib/pinballmap/catalog");
+  it("searchCatalogFamilies ranks prefix matches first and escapes wildcards", async () => {
+    const { searchCatalogFamilies } = await import("~/lib/pinballmap/catalog");
+    await seedCatalogEntry({ pinballmapMachineId: 1, name: "Godzilla" });
+    await seedCatalogEntry({ pinballmapMachineId: 2, name: "Mega Godzilla" });
+    const ranked = await searchCatalogFamilies("godz");
+    // "Godzilla" (prefix) ranks above "Mega Godzilla" (mid-string).
+    expect(ranked[0]?.name).toBe("Godzilla");
+
     await seedCatalogEntry({ pinballmapMachineId: 10, name: "Plain Title" });
     await seedCatalogEntry({
       pinballmapMachineId: 11,
       name: "50% Off Pinball",
     });
+    // A bare "%" would match everything if not escaped; it matches the literal.
+    const escaped = await searchCatalogFamilies("%");
+    expect(escaped.map((f) => f.pinballmapMachineId)).toEqual([11]);
+  });
 
-    // A bare "%" would match everything if not escaped; it should match only the literal.
-    const results = await searchCatalog("%");
-    expect(results.map((r) => r.pinballmapMachineId)).toEqual([11]);
+  it("listGroupEditions returns a family's editions; getCatalogEntry resolves by id", async () => {
+    const { listGroupEditions, getCatalogEntry } =
+      await import("~/lib/pinballmap/catalog");
+    await seedCatalogEntry({
+      pinballmapMachineId: 1,
+      name: "Godzilla (Pro)",
+      manufacturer: "Stern",
+      year: 2021,
+      machineGroupId: 100,
+      groupName: "Godzilla",
+    });
+    await seedCatalogEntry({
+      pinballmapMachineId: 2,
+      name: "Godzilla (Premium)",
+      machineGroupId: 100,
+      groupName: "Godzilla",
+    });
+    await seedCatalogEntry({ pinballmapMachineId: 9, name: "Loner" });
+
+    const editions = await listGroupEditions(100);
+    expect(editions.map((e) => e.pinballmapMachineId).sort()).toEqual([1, 2]);
+    expect(
+      editions.find((e) => e.pinballmapMachineId === 1)?.manufacturer
+    ).toBe("Stern");
+
+    const entry = await getCatalogEntry(1);
+    expect(entry?.machineGroupId).toBe(100);
+    expect(entry?.groupName).toBe("Godzilla");
+    expect(await getCatalogEntry(999999)).toBeNull();
   });
 });
 

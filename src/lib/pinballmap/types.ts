@@ -59,6 +59,18 @@ export interface CatalogMachine {
   year: number | null;
   opdbId: string | null;
   ipdbId: number | null;
+  /**
+   * PBM groups editions of one title (Pro/Premium/LE) under a machine_group_id;
+   * null for standalone titles. The group's display name comes from a separate
+   * endpoint (`fetchMachineGroups`), not this record.
+   */
+  machineGroupId: number | null;
+}
+
+/** A PBM machine group — a "family" name shared by editions of one title. */
+export interface MachineGroup {
+  machineGroupId: number;
+  name: string;
 }
 
 /** Per-user PBM credentials appended to write requests as query params. */
@@ -139,6 +151,8 @@ export interface PinballMapClient {
   fetchLocation(locationId: number): Promise<LocationSnapshot>;
   /** Anonymous bulk read: the canonical machine catalog (for the local mirror). */
   fetchCatalog(): Promise<CatalogMachine[]>;
+  /** Anonymous bulk read: machine groups (family names) for the linking picker. */
+  fetchMachineGroups(): Promise<MachineGroup[]>;
   /** Exchange login+password for a long-lived API token. */
   authDetails(login: string, password: string): Promise<PbmAuthResult>;
   /** Add a machine to the location. */
