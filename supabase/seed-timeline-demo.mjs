@@ -16,29 +16,19 @@
  * at a localhost/127.0.0.1 host.
  */
 
-import postgres from "postgres";
+import {
+  createScriptClient,
+  resolveScriptDatabaseUrl,
+} from "../scripts/lib/pg-client.mjs";
+import { assertLocalDatabase } from "../scripts/assert-local-db.mjs";
 
-const databaseUrl =
-  process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
-
-if (!databaseUrl) {
-  console.error("❌ POSTGRES_URL or POSTGRES_URL_NON_POOLING is not defined");
-  process.exit(1);
-}
+const databaseUrl = resolveScriptDatabaseUrl();
 
 // Hard refusal on non-local URLs (rule 3 / db safety: never seed prod).
-{
-  const url = new URL(databaseUrl);
-  if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") {
-    console.error(
-      `❌ seed-timeline-demo refuses to run against non-local DB (${url.hostname})`
-    );
-    process.exit(1);
-  }
-}
+assertLocalDatabase(databaseUrl);
 
 async function run() {
-  const sql = postgres(databaseUrl);
+  const sql = createScriptClient(databaseUrl);
 
   try {
     const machineRows = await sql`
