@@ -20,9 +20,7 @@ describe("IssueNotFound", () => {
       screen.getByRole("heading", { name: /issue not found/i })
     ).toBeInTheDocument();
 
-    expect(
-      screen.getByText(/report may not have been saved/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/may have been removed/i)).toBeInTheDocument();
 
     const reportLink = screen.getByRole("link", { name: /report an issue/i });
     expect(reportLink).toBeInTheDocument();

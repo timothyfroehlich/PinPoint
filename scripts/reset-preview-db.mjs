@@ -1,6 +1,7 @@
-import postgres from "postgres";
+import { createScriptClient } from "./lib/pg-client.mjs";
 
-// Use POSTGRES_URL (session pooler with IPv4 support) instead of POSTGRES_URL_NON_POOLING (IPv6)
+// Use POSTGRES_URL (transaction pooler, :6543, IPv4) — NOT POSTGRES_URL_NON_POOLING
+// (the IPv6 direct host, unreachable from CI/preview runners). See AGENTS.md §6.
 const databaseUrl = process.env.POSTGRES_URL;
 
 if (!databaseUrl) {
@@ -24,7 +25,7 @@ if (prodRef && databaseUrl.includes(prodRef)) {
 async function resetPreviewDB() {
   console.log("🔄 Resetting preview database...");
 
-  const client = postgres(databaseUrl, { max: 1 });
+  const client = createScriptClient(databaseUrl, { max: 1 });
 
   try {
     // Drop all tables in public schema (separate statements for pooler compatibility)

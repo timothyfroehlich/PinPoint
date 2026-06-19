@@ -196,8 +196,20 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 - **`pinpoint-prod`** (Live, Pro plan): **real user data — strict safety.** Daily backups, 7-day retention.
 - **Local**: `db:reset` OK. **Prod: NEVER `db:reset`. Only `db:migrate`.**
-- **Connection**: use `POSTGRES_URL` (port `:6543`, session pooler, IPv4). `POSTGRES_URL_NON_POOLING` (`:5432`) is IPv6 and often unreachable.
+- **Connection**: app + scripts use `POSTGRES_URL` — the Supavisor **transaction** pooler (`…pooler.supabase.com:6543`, IPv4). `POSTGRES_URL_NON_POOLING` is the **direct** connection (`db.<ref>.supabase.co:5432`, IPv6 unless the IPv4 add-on is on — prod's is **off**), so it is unreachable from CI/preview/Vercel. For migrations from those IPv4-only runners, use the IPv4 **session** pooler (`…pooler.supabase.com:5432`).
   Format: `postgresql://postgres.[ref]:password@aws-0-us-east-2.pooler.supabase.com:6543/postgres`
+
+  **Canonical endpoint reference** (Supabase docs, verified 2026-06-18):
+
+  | Endpoint                    | Mode                       | IP                      | Prepared statements           | Use for                                      |
+  | --------------------------- | -------------------------- | ----------------------- | ----------------------------- | -------------------------------------------- |
+  | `…pooler.supabase.com:6543` | Supavisor **transaction**  | IPv4 (always)           | **disable** (`prepare:false`) | reads, serverless, one-shot scripts          |
+  | `…pooler.supabase.com:5432` | Supavisor **session**      | IPv4 (always)           | supported                     | migrations / DDL / write transactions (IPv4) |
+  | `db.<ref>.supabase.co:5432` | **direct**                 | IPv6 (IPv4 with add-on) | supported                     | migrations from IPv6-capable hosts           |
+  | `db.<ref>.supabase.co:6543` | Dedicated PgBouncer (paid) | IPv6 (IPv4 with add-on) | no                            | high-perf app traffic                        |
+  - The shared Supavisor pooler is **already IPv4** on both ports, free, every tier — there is nothing to "enable". The paid **IPv4 add-on** is a separate thing that makes the _direct_ connection IPv4; PinPoint does not need it (the session pooler already gives an IPv4, prepared-statement-capable endpoint).
+  - **Transaction pooler (`:6543`) does not support prepared statements** — set `prepare:false` on any one-shot porsager client there (`scripts/lib/pg-client.mjs` does this).
+  - ⚠️ **Write/transaction hazard:** multi-statement write transactions over the `:6543` transaction pooler with prepared statements have caused **silent commit loss** in prod (the driver sees COMMIT succeed; nothing persists — PP-d8l8). The runtime write path must move to the **session pooler (`:5432`)** and/or `prepare:false`. Do **not** treat app-runtime prepared statements over `:6543` as "safe".
 
 ### Vercel
 

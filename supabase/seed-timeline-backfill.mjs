@@ -32,15 +32,12 @@
  *   Re-runs are no-ops.
  */
 
-import postgres from "postgres";
+import {
+  createScriptClient,
+  resolveScriptDatabaseUrl,
+} from "../scripts/lib/pg-client.mjs";
 
-const databaseUrl =
-  process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
-
-if (!databaseUrl) {
-  console.error("❌ POSTGRES_URL or POSTGRES_URL_NON_POOLING is not defined");
-  process.exit(1);
-}
+const databaseUrl = resolveScriptDatabaseUrl();
 
 // Production safety guard: refuse to run against non-local hosts unless the
 // caller has explicitly opted in. This mirrors seed-timeline-demo's guard.
@@ -59,7 +56,7 @@ if (!databaseUrl) {
 }
 
 async function backfill() {
-  const sql = postgres(databaseUrl);
+  const sql = createScriptClient(databaseUrl);
   const counts = {
     machineAdded: 0,
     issueOpened: 0,

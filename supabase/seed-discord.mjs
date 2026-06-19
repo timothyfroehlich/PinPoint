@@ -17,7 +17,7 @@
  * Loaded by Node's --env-file flag in the package.json script invocation.
  */
 
-import postgres from "postgres";
+import { createScriptClient } from "../scripts/lib/pg-client.mjs";
 
 const POSTGRES_URL = process.env.POSTGRES_URL;
 
@@ -37,7 +37,7 @@ if (!envBotToken) {
   process.exit(0);
 }
 
-const sql = postgres(POSTGRES_URL);
+const sql = createScriptClient(POSTGRES_URL);
 
 // Wrap the whole flow in an IIFE so we can `return` early without skipping
 // the connection-cleanup block at the end. `process.exit()` inside the try
