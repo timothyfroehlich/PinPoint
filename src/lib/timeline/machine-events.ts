@@ -302,18 +302,21 @@ export async function getMachineTimeline(
   tx: DbTransaction,
   args: GetMachineTimelineArgs
 ): Promise<MachineTimelineRow[]> {
-  // Empty machine list = no scope from that axis.
-  const hasMachineScope = Array.isArray(args.machineId)
-    ? args.machineId.length > 0
-    : args.machineId !== undefined;
-  const hasAuthorScope = args.authorId !== undefined;
-  if (!hasMachineScope && !hasAuthorScope) return [];
-
-  const machinePredicate = hasMachineScope
-    ? Array.isArray(args.machineId)
-      ? inArray(timelineEvents.machineId, args.machineId)
-      : eq(timelineEvents.machineId, args.machineId!)
-    : undefined;
+  // Narrow each scope into a local so TypeScript tracks the non-undefined
+  // proof without `!`/`as` (CORE-TS-007). An empty machine list = no scope.
+  const { machineId, authorId } = args;
+  const machinePredicate =
+    machineId === undefined
+      ? undefined
+      : Array.isArray(machineId)
+        ? machineId.length > 0
+          ? inArray(timelineEvents.machineId, machineId)
+          : undefined
+        : eq(timelineEvents.machineId, machineId);
+  const authorPredicate =
+    authorId === undefined ? undefined : eq(timelineEvents.authorId, authorId);
+  if (machinePredicate === undefined && authorPredicate === undefined)
+    return [];
 
   const author = alias(userProfiles, "author");
   const deleter = alias(userProfiles, "deleter");
@@ -342,9 +345,7 @@ export async function getMachineTimeline(
     .where(
       and(
         machinePredicate,
-        hasAuthorScope
-          ? eq(timelineEvents.authorId, args.authorId!)
-          : undefined,
+        authorPredicate,
         args.tags && args.tags.length > 0
           ? inArray(timelineEvents.tag, args.tags)
           : undefined
