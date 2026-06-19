@@ -37,12 +37,20 @@ async function main(): Promise<void> {
   // 1. Location snapshot — written verbatim so future refreshes diff cleanly.
   const locationText = await getText(`/locations/${APC_LOCATION_ID}.json`);
   writeFileSync(join(FIXTURES, "location-26454.json"), locationText);
-  const location = JSON.parse(locationText) as {
-    location_machine_xrefs?: { machine_id?: number }[];
-  };
+  const locationParsed: unknown = JSON.parse(locationText);
+  const locationRecord =
+    typeof locationParsed === "object" && locationParsed !== null
+      ? (locationParsed as Record<string, unknown>)
+      : null;
+  const xrefsRaw = locationRecord?.["location_machine_xrefs"];
+  const xrefs: unknown[] = Array.isArray(xrefsRaw) ? xrefsRaw : [];
   const machineIds = new Set(
-    (location.location_machine_xrefs ?? [])
-      .map((l) => l.machine_id)
+    xrefs
+      .map((x) =>
+        typeof x === "object" && x !== null
+          ? (x as Record<string, unknown>)["machine_id"]
+          : null
+      )
       .filter((id): id is number => typeof id === "number")
   );
 

@@ -47,8 +47,11 @@ function parseCondition(raw: unknown): PbmCondition | null {
 function parseLmx(raw: unknown): PbmLmx | null {
   const r = asRecord(raw);
   if (!r) return null;
-  // Skip soft-deleted entries — they are not part of the live lineup.
-  if (asString(r["deleted_at"]) !== null) return null;
+  // Skip soft-deleted entries — they are not part of the live lineup. PBM sends
+  // an ISO timestamp here when deleted and null otherwise; treat any non-null
+  // value as deleted so a non-string `deleted_at` can't slip a dead machine in.
+  const deletedAt = r["deleted_at"];
+  if (deletedAt !== null && deletedAt !== undefined) return null;
   const id = asNumber(r["id"]);
   const machineId = asNumber(r["machine_id"]);
   if (id === null || machineId === null) return null;

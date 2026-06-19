@@ -203,7 +203,14 @@ async function readJson(path: string, label: string): Promise<unknown> {
   if (!res.ok) {
     throw new Error(`PinballMap ${label} failed: HTTP ${res.status}`);
   }
-  const data: unknown = await res.json();
+  // A 200 with a non-JSON body (e.g. an HTML maintenance/edge page during an
+  // outage) is a read failure, not a crash — surface it as a structured error.
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`PinballMap ${label} failed: response was not valid JSON`);
+  }
   const message = pbmErrorMessage(asRecord(data));
   if (message) {
     throw new Error(`PinballMap ${label} failed: ${message}`);
