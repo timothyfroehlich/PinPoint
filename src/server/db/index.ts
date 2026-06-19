@@ -22,7 +22,14 @@ const globalForDb = globalThis as unknown as {
   conn: postgres.Sql | undefined;
 };
 
-const conn = globalForDb.conn ?? postgres(databaseUrl);
+// `prepare: false` is REQUIRED on the Supabase transaction pooler (POSTGRES_URL,
+// `…pooler.supabase.com:6543`): it does not support prepared statements, and
+// postgres-js's default (`prepare: true`) caused silent COMMIT loss in prod —
+// whole write transactions resolved as committed yet never persisted (PP-d8l8,
+// incident 2026-06-18). This is the canonical Drizzle + postgres-js + Supabase
+// serverless setting; scripts/lib/pg-client.mjs sets it for the same reason.
+// See AGENTS.md §7 (canonical endpoint table).
+const conn = globalForDb.conn ?? postgres(databaseUrl, { prepare: false });
 if (process.env.NODE_ENV !== "production") globalForDb.conn = conn;
 
 const baseDb = drizzle(conn, { schema });
