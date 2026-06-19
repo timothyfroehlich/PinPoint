@@ -41,6 +41,7 @@ const {
   getProfileActivityCounts,
   getCappedOwnedMachines,
   PROFILE_MACHINE_CAP,
+  getOpenIssueCountsByInitials,
 } = await import("~/lib/profiles/queries");
 
 // ---------------------------------------------------------------------------
@@ -140,5 +141,33 @@ describe("profile queries", () => {
     expect(res.machines).toHaveLength(PROFILE_MACHINE_CAP);
     expect(res.hasMore).toBe(true);
     expect(res.total).toBe(8);
+  });
+
+  it("getProfileActivityCounts counts issues fixed by the user", async () => {
+    const db = await getTestDb();
+    // A system status_changed -> fixed comment authored by USER on the OWN1 issue.
+    const [iss] = await db
+      .insert(issues)
+      .values(
+        createTestIssue("OWN1", { issueNumber: 2, title: "F", status: "fixed" })
+      )
+      .returning({ id: issues.id });
+    await db.insert(issueComments).values(
+      createTestComment(iss.id, {
+        authorId: USER,
+        isSystem: true,
+        content: null,
+        eventData: { type: "status_changed", from: "new", to: "fixed" },
+      })
+    );
+    const counts = await getProfileActivityCounts(USER);
+    expect(counts.fixed).toBe(1);
+  });
+
+  it("getOpenIssueCountsByInitials counts only open-status issues", async () => {
+    const db = await getTestDb();
+    // OWN0 already has 2 reported issues (status 'new' = open from the base seed).
+    const map = await getOpenIssueCountsByInitials(["OWN0", "OWN1"]);
+    expect(map.get("OWN0")).toBe(2);
   });
 });

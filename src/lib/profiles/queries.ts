@@ -1,4 +1,4 @@
-import { eq, count, asc, inArray } from "drizzle-orm";
+import { eq, count, asc, inArray, and, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import {
   userProfiles,
@@ -10,6 +10,7 @@ import {
   getMachineTimeline,
   type MachineTimelineRow,
 } from "~/lib/timeline/machine-events";
+import { CLOSED_STATUSES, OPEN_STATUSES } from "~/lib/issues/status";
 
 export const PROFILE_MACHINE_CAP = 6;
 
@@ -47,18 +48,57 @@ export async function getProfileById(
 
 export async function getProfileActivityCounts(
   userId: string
-): Promise<{ reported: number; comments: number }> {
-  const [reportedRows, commentRows] = await Promise.all([
+): Promise<{ reported: number; comments: number; fixed: number }> {
+  const [reportedRows, commentRows, fixedRows] = await Promise.all([
     db.select({ c: count() }).from(issues).where(eq(issues.reportedBy, userId)),
     db
       .select({ c: count() })
       .from(issueComments)
-      .where(eq(issueComments.authorId, userId)),
+      .where(
+        and(
+          eq(issueComments.authorId, userId),
+          eq(issueComments.isSystem, false)
+        )
+      ),
+    // Distinct issues this user moved to a closed/resolved status, from system
+    // status_changed rows. Closed set from status.ts (no hardcoded strings).
+    db
+      .select({ c: sql<number>`count(distinct ${issueComments.issueId})` })
+      .from(issueComments)
+      .where(
+        and(
+          eq(issueComments.authorId, userId),
+          eq(issueComments.isSystem, true),
+          sql`${issueComments.eventData}->>'type' = 'status_changed'`,
+          sql`${issueComments.eventData}->>'to' = ANY(${sql.raw(`ARRAY[${[...CLOSED_STATUSES].map((s) => `'${s}'`).join(",")}]`)})`
+        )
+      ),
   ]);
   return {
     reported: reportedRows[0]?.c ?? 0,
     comments: commentRows[0]?.c ?? 0,
+    fixed: Number(fixedRows[0]?.c ?? 0),
   };
+}
+
+/** Open-issue count per machine initials (open = new/in-progress groups). */
+export async function getOpenIssueCountsByInitials(
+  initials: string[]
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (initials.length === 0) return map;
+  const rows = await db
+    .select({ initials: issues.machineInitials, c: count() })
+    .from(issues)
+    .where(
+      and(
+        inArray(issues.machineInitials, initials),
+        inArray(issues.status, [...OPEN_STATUSES])
+      )
+    )
+    .groupBy(issues.machineInitials);
+  for (const r of rows) map.set(r.initials, r.c);
+  return map;
 }
 
 export async function getCappedOwnedMachines(userId: string): Promise<{
