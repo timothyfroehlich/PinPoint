@@ -11,6 +11,12 @@ const DEBOUNCE_MS = 800;
  * toggles `flush()` immediately. Per-id timers so editing two sets at once
  * doesn't cross-cancel. Timers live in a ref (no render output) and are cleared
  * on unmount.
+ *
+ * Unmount intentionally cancels pending timers WITHOUT flushing — pending edits
+ * are not auto-persisted on teardown. This is by design: the SettingsTab nav
+ * guard blocks in-app navigation while saves are unsaved, and `beforeunload`
+ * calls `flushAll()` (both wired in Task 6), so the caller is responsible for
+ * flushing before unmounting.
  */
 export function useAutoSave(persist: (id: string) => void): {
   schedule: (id: string) => void;
@@ -21,7 +27,7 @@ export function useAutoSave(persist: (id: string) => void): {
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   // Hold persist in a ref so the returned callbacks stay referentially stable.
   const persistRef = useRef(persist);
-  persistRef.current = persist;
+  persistRef.current = persist; // keep ref current each render without breaking callback stability
 
   const cancel = useCallback((id: string): void => {
     const t = timers.current.get(id);

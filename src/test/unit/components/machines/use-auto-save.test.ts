@@ -53,4 +53,17 @@ describe("useAutoSave", () => {
     });
     expect(persist).toHaveBeenCalledTimes(2);
   });
+
+  it("cancel() drops one id without affecting the other", () => {
+    const persist = vi.fn();
+    const { result } = renderHook(() => useAutoSave(persist));
+    act(() => {
+      result.current.schedule("a");
+      result.current.schedule("b");
+      result.current.cancel("a");
+      vi.advanceTimersByTime(800);
+    });
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledWith("b");
+  });
 });
