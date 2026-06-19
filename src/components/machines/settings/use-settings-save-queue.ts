@@ -3,22 +3,11 @@
 import { useCallback, useRef } from "react";
 
 /**
- * Outcome of a persist, handed back to the caller (a unit's Save, or a
- * structural op) so it can settle its saving / error UI without knowing anything
- * about the whole-row persist underneath.
+ * Outcome of a persist, handed back to the caller (auto-save flush, or a
+ * structural op) so it can settle its save-status tracking without knowing
+ * anything about the whole-row persist underneath.
  */
 export type SaveOutcome = { ok: true } | { ok: false; error: string };
-
-/**
- * The in-flight save state of one edit UNIT (PP-43q3 atomic per-unit commit),
- * surfaced next to that unit's Save button. `saving` flips on while its atomic
- * write awaits the server; `error` holds the last failure (the unit stays open
- * with the typed values intact, and the Save button doubles as Retry).
- */
-export interface UnitSaveState {
-  saving: boolean;
-  error: string | null;
-}
 
 /**
  * Result of one whole-row persist. `rekeyTo` is set only when a brand-new set's
@@ -72,21 +61,25 @@ interface UseSettingsSaveQueueResult {
 }
 
 /**
- * Per-set serial save queue for the Machine Settings editor.
+ * Per-set serial save queue for the Machine Settings editor (PP-43q3
+ * always-live auto-save model).
  *
- * Under the atomic per-unit commit model (PP-43q3) a set is persisted by a
- * unit's Save (the committed baseline with that unit's slice merged in) or by an
- * immediate structural op (delete section / reorder, computed from baseline).
- * Both go through this queue. Every persist writes the whole row (the jsonb
- * schema is unchanged — see settings/actions.ts). Two concerns the queue still
- * guards: a slow save landing AFTER a newer one and reverting it, and a burst of
- * saves firing a stampede of redundant whole-row writes. It holds at most one
- * in-flight save per set and, when saves pile up, collapses them into exactly
- * one follow-up run that sends the latest snapshot.
+ * Every auto-save flush (debounced 800 ms or immediate on blur/structural op)
+ * calls `persist(setId)`, which writes the whole row via `saveSettingsSetAction`
+ * (the jsonb schema is unchanged — see settings/actions.ts). The queue enforces
+ * two invariants: (1) at most one in-flight save per set at any time, preventing
+ * a slow write from landing after a newer one and reverting it; (2) concurrent
+ * calls collapse into exactly one follow-up run that sends the latest staged
+ * snapshot, so a burst of rapid edits never produces a stampede.
+ *
+ * On a new set's first persist, `execute` returns `rekeyTo` with the
+ * server-assigned UUID; the queue moves the entry from the temp id to the real
+ * id and keeps draining under the real id, so coalesced follow-up edits UPDATE
+ * the correct row.
  *
  * State lives in a ref (not React state) on purpose: the queue is pure control
- * flow with no render output of its own — the per-field status lives in each
- * field, driven by the promise this hook returns.
+ * flow with no render output of its own — save-status feedback lives in
+ * `useSaveStatus`, driven by the promise this hook returns.
  */
 export function useSettingsSaveQueue(
   execute: SaveExecutor

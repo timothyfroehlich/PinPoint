@@ -324,6 +324,13 @@ export function SettingsTab({
   // -- runSave: the single point where persist is called and status tracked ----
   const runSave = useCallback(
     (id: string): void => {
+      // Cancel any queued auto-retry for this id so an explicit banner Retry (or
+      // a fresh debounce flush) supersedes the 5 s timer and never double-settles.
+      const pending = retryTimers.current.get(id);
+      if (pending !== undefined) {
+        clearTimeout(pending);
+        retryTimers.current.delete(id);
+      }
       saveStatus.markPending(id);
       void saveQueue.persist(id).then((o) => {
         if (o.ok) {
