@@ -55,9 +55,11 @@ fi
 # Extract POSTGRES_URL line and strip key + optional surrounding quotes
 POSTGRES_URL_LINE=$(grep -m1 "^POSTGRES_URL=" "$ENV_FILE" || echo "")
 POSTGRES_URL=${POSTGRES_URL_LINE#POSTGRES_URL=}
-# Remove surrounding double quotes if present
+# Remove surrounding quotes if present (double or single)
 POSTGRES_URL=${POSTGRES_URL#\"}
 POSTGRES_URL=${POSTGRES_URL%\"}
+POSTGRES_URL=${POSTGRES_URL#\'}
+POSTGRES_URL=${POSTGRES_URL%\'}
 
 if [ -z "$POSTGRES_URL" ]; then
     echo -e "${RED}❌ POSTGRES_URL not found in $ENV_FILE${NC}"
@@ -68,7 +70,7 @@ fi
 # Substring matching (e.g. =~ localhost) would wrongly pass a remote host or a
 # password that merely contains "localhost".
 db_hostport=${POSTGRES_URL#*://} # strip scheme
-db_hostport=${db_hostport#*@}    # strip userinfo@ if present
+db_hostport=${db_hostport##*@}   # strip userinfo@ (greedy: host follows the last @)
 db_hostport=${db_hostport%%/*}   # strip /path
 db_host=${db_hostport%%:*}       # strip :port
 case "$db_host" in

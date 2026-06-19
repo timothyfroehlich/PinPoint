@@ -26,6 +26,8 @@ export function resolveScriptDatabaseUrl() {
  * `prepare: false` because the transaction pooler (:6543) does not support
  * prepared statements (Supabase docs); one-shot scripts gain nothing from
  * statement caching. Pass `options` to extend (e.g. `{ max: 1 }` for DDL).
+ * `prepare: false` is applied last so callers cannot accidentally re-enable
+ * prepared statements (which would reintroduce the transaction-pooler hazard).
  * See AGENTS.md §6.
  *
  * @param {string} [databaseUrl]
@@ -36,5 +38,5 @@ export function createScriptClient(
   databaseUrl = resolveScriptDatabaseUrl(),
   options = {},
 ) {
-  return postgres(databaseUrl, { prepare: false, ...options });
+  return postgres(databaseUrl, { ...options, prepare: false });
 }
