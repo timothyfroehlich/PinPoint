@@ -74,6 +74,7 @@ export default async function ProfilePage({
       {isOwn && edit ? (
         <div className="mt-6">
           <ProfileEditor
+            profileId={id}
             initial={{
               firstName: profile.firstName,
               lastName: profile.lastName,

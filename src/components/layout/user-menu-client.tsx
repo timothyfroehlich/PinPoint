@@ -35,8 +35,9 @@ interface UserMenuProps {
  * User Menu Component (Client Component)
  *
  * Dropdown menu with user avatar and menu items:
- * - Profile (future)
- * - Settings (future)
+ * - Profile (public profile page)
+ * - My Machines
+ * - Settings
  * - Sign Out
  */
 export function UserMenu({
@@ -87,15 +88,19 @@ export function UserMenu({
         </div>
         <DropdownMenuSeparator className="bg-outline-variant" />
 
-        {/* Profile - future implementation */}
-        <DropdownMenuItem
-          disabled
-          className="cursor-not-allowed opacity-50 text-muted-foreground"
-        >
-          <User className="mr-2 size-4" />
-          <span>Profile</span>
-          <span className="ml-auto text-xs">(Soon)</span>
-        </DropdownMenuItem>
+        {/* Profile — the user's own public profile page (PinPoint-5r7). */}
+        {userId && (
+          <DropdownMenuItem asChild>
+            <a
+              href={`/u/${userId}`}
+              className="flex items-center cursor-pointer"
+              data-testid="user-menu-profile"
+            >
+              <User className="mr-2 size-4" />
+              <span>Profile</span>
+            </a>
+          </DropdownMenuItem>
+        )}
 
         {/* My Machines — the user's own collection view (PP-slrd.1).
             Always shown when authenticated; the collection page's empty

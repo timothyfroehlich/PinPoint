@@ -2,11 +2,12 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
-import { type Result, ok, err } from "~/lib/result";
+import { type Result, err } from "~/lib/result";
 import { serverActionError } from "~/lib/observability/report-error";
 
 const updateProfileSchema = z.object({
@@ -52,10 +53,12 @@ export async function updateProfileAction(
       .where(eq(userProfiles.id, user.id));
     revalidatePath(`/u/${user.id}`);
     revalidatePath("/", "layout");
-    return ok({ success: true });
   } catch (error) {
     return serverActionError(error, "SERVER", "Failed to update profile", {
       action: "updateProfileAction",
     });
   }
+
+  // Leave edit mode on success by returning to the read view (drops ?edit).
+  redirect(`/u/${user.id}`);
 }

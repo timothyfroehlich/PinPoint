@@ -2,11 +2,14 @@
 
 import * as React from "react";
 import { useActionState } from "react";
+import Link from "next/link";
 import { updateProfileAction, type UpdateProfileResult } from "./actions";
 import { uploadAvatarFormAction } from "~/server/actions/avatar";
 import { Input } from "~/components/ui/input";
 
 interface ProfileEditorProps {
+  /** The profile owner's id — used to return to the read view on cancel. */
+  profileId: string;
   initial: {
     firstName: string;
     lastName: string;
@@ -17,6 +20,7 @@ interface ProfileEditorProps {
 }
 
 export function ProfileEditor({
+  profileId,
   initial,
 }: ProfileEditorProps): React.JSX.Element {
   const [profileState, profileAction] = useActionState<
@@ -101,12 +105,20 @@ export function ProfileEditor({
             rows={3}
           />
         </div>
-        <button
-          type="submit"
-          className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-sm"
-        >
-          Save
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-sm"
+          >
+            Save
+          </button>
+          <Link
+            href={`/u/${profileId}`}
+            className="text-muted-foreground text-sm hover:underline"
+          >
+            Cancel
+          </Link>
+        </div>
       </form>
     </div>
   );

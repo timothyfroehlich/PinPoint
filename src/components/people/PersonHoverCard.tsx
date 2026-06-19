@@ -102,12 +102,6 @@ function PersonHoverCardLink({
             {data.machineCount === 1 ? "" : "s"}
           </Link>
         ) : null}
-        <Link
-          href={`/u/${userId}`}
-          className="text-primary mt-2 block text-sm hover:underline"
-        >
-          View profile →
-        </Link>
       </HoverCardContent>
     </HoverCard>
   );
