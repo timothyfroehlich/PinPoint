@@ -77,19 +77,19 @@ function PersonHoverCardLink({
             ) : null}
             <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
           </Avatar>
-          <div>
-            <div className="font-semibold">
+          <div className="min-w-0">
+            <div className="truncate font-semibold">
               {data?.name ?? displayName}
               {data?.pronouns ? (
-                <span className="text-muted-foreground ml-1 text-xs font-normal">
-                  ({data.pronouns})
+                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                  {data.pronouns}
                 </span>
               ) : null}
             </div>
             {data ? (
-              <div className="text-muted-foreground text-xs capitalize">
+              <span className="mt-0.5 inline-flex items-center rounded-full bg-primary-container px-2 py-0.5 text-[11px] font-semibold capitalize text-primary">
                 {data.role}
-              </div>
+              </span>
             ) : null}
           </div>
         </div>
