@@ -25,75 +25,152 @@ const APC_LOCATION_ID = 26454;
 const FIXTURES = join(process.cwd(), "src/lib/pinballmap/fixtures");
 
 /**
- * Hand-authored demo families re-appended on every refresh.
+ * Real multi-edition families re-appended on every refresh.
  *
- * PinballMap models editions of one title (Pro/Premium/LE) as separate machines
- * sharing a `machine_group_id`; the family display name lives in
- * /machine_groups.json. The real APC slice is almost entirely single-edition
+ * PinballMap models editions of one title (Pro/Premium/LE, original/remake) as
+ * separate machines sharing a `machine_group_id`; the family display name lives
+ * in /machine_groups.json. The APC slice is almost entirely single-edition
  * machines, so without these the family→edition picker's two-step path would
- * never appear in dev/preview or be exercised by the mock. These are realistic
- * (real Stern titles/years/OPDB ids) but use synthetic high ids (90xxx / 90xx)
- * that cannot collide with real PBM ids. Keeping them HERE means a live refresh
- * preserves them instead of silently dropping the demo.
+ * never appear in dev/preview or be exercised by the mock.
+ *
+ * These are REAL PBM records (ids, groups, OPDB/IPDB ids fetched live), so the
+ * picker demo matches reality — Medieval Madness (Williams original + Chicago
+ * Gaming remakes, group 18), Jurassic Park (group 78), Godzilla (group 88). The
+ * writers below dedupe by id, so any of these that APC actually stocks is not
+ * duplicated. Keeping them HERE means a live refresh preserves the full families
+ * (the trimmed APC slice alone would only carry the editions APC owns).
  */
 const DEMO_GROUPS = [
-  { id: 9001, name: "Godzilla" },
-  { id: 9002, name: "Jurassic Park" },
+  { id: 18, name: "Medieval Madness" },
+  { id: 78, name: "Jurassic Park" },
+  { id: 88, name: "Godzilla" },
 ];
 const DEMO_FAMILY_MACHINES = [
   {
-    id: 90011,
-    name: "Godzilla (Pro)",
-    manufacturer: "Stern",
-    year: 2021,
-    opdb_id: "G50r-MLeqP",
-    ipdb_id: 6845,
-    machine_group_id: 9001,
+    id: 642,
+    name: "Medieval Madness",
+    manufacturer: "Williams",
+    year: 1997,
+    opdb_id: "G5pe4-MePZv",
+    ipdb_id: 4032,
+    machine_group_id: 18,
   },
   {
-    id: 90012,
-    name: "Godzilla (Premium)",
-    manufacturer: "Stern",
-    year: 2021,
-    opdb_id: "G50r-MLqLz",
-    ipdb_id: 6845,
-    machine_group_id: 9001,
+    id: 2306,
+    name: "Medieval Madness (Remake)",
+    manufacturer: "Chicago Gaming",
+    year: 2016,
+    opdb_id: "G5pe4-MyNkp",
+    ipdb_id: 6263,
+    machine_group_id: 18,
   },
   {
-    id: 90013,
-    name: "Godzilla (Limited Edition)",
-    manufacturer: "Stern",
-    year: 2021,
-    opdb_id: "G50r-MLxkP",
-    ipdb_id: 6845,
-    machine_group_id: 9001,
+    id: 2966,
+    name: "Medieval Madness (Remake Royal Edition)",
+    manufacturer: "Chicago Gaming",
+    year: 2015,
+    opdb_id: "G5pe4-MkPRV",
+    ipdb_id: 6264,
+    machine_group_id: 18,
   },
   {
-    id: 90021,
+    id: 3259,
+    name: "Medieval Madness (Remake Special Edition)",
+    manufacturer: "Chicago Gaming",
+    year: 2016,
+    opdb_id: "G5pe4-MrR1B",
+    ipdb_id: null,
+    machine_group_id: 18,
+  },
+  {
+    id: 3507,
+    name: "Medieval Madness (Remake LE)",
+    manufacturer: "Chicago Gaming",
+    year: 2015,
+    opdb_id: "G5pe4-M61y6",
+    ipdb_id: null,
+    machine_group_id: 18,
+  },
+  {
+    id: 4550,
+    name: "Medieval Madness (Remake Merlin Edition)",
+    manufacturer: "Chicago Gaming",
+    year: 2025,
+    opdb_id: "G5pe4-MrRrv",
+    ipdb_id: null,
+    machine_group_id: 18,
+  },
+  {
+    id: 3167,
     name: "Jurassic Park (Pro)",
     manufacturer: "Stern",
     year: 2019,
-    opdb_id: "GrqZP-MQk6e",
-    ipdb_id: 6593,
-    machine_group_id: 9002,
+    opdb_id: "GK17D-MdEqz",
+    ipdb_id: 6573,
+    machine_group_id: 78,
   },
   {
-    id: 90022,
+    id: 3168,
+    name: "Jurassic Park (LE)",
+    manufacturer: "Stern",
+    year: 2019,
+    opdb_id: "GK17D-MKNKd-AOyKv",
+    ipdb_id: 6575,
+    machine_group_id: 78,
+  },
+  {
+    id: 3169,
     name: "Jurassic Park (Premium)",
     manufacturer: "Stern",
     year: 2019,
-    opdb_id: "GrqZP-MQ5dN",
-    ipdb_id: 6593,
-    machine_group_id: 9002,
+    opdb_id: "GK17D-MKNKd-A15Yn",
+    ipdb_id: 6574,
+    machine_group_id: 78,
   },
   {
-    id: 90023,
-    name: "Jurassic Park (Limited Edition)",
+    id: 3780,
+    name: "Jurassic Park (30th Anniversary)",
     manufacturer: "Stern",
-    year: 2019,
-    opdb_id: "GrqZP-MQ9xW",
-    ipdb_id: 6593,
-    machine_group_id: 9002,
+    year: 2023,
+    opdb_id: "GK17D-MKNKd-AOxoz",
+    ipdb_id: null,
+    machine_group_id: 78,
+  },
+  {
+    id: 3415,
+    name: "Godzilla (Pro)",
+    manufacturer: "Stern",
+    year: 2021,
+    opdb_id: "GweeP-MW95j",
+    ipdb_id: 6841,
+    machine_group_id: 88,
+  },
+  {
+    id: 3416,
+    name: "Godzilla (Premium)",
+    manufacturer: "Stern",
+    year: 2021,
+    opdb_id: "GweeP-Ml9pZ-ARZoY",
+    ipdb_id: 6842,
+    machine_group_id: 88,
+  },
+  {
+    id: 3417,
+    name: "Godzilla (LE)",
+    manufacturer: "Stern",
+    year: 2021,
+    opdb_id: "GweeP-Ml9pZ-A9vXB",
+    ipdb_id: 6843,
+    machine_group_id: 88,
+  },
+  {
+    id: 4500,
+    name: "Godzilla (70th Anniversary)",
+    manufacturer: "Stern",
+    year: 2024,
+    opdb_id: "GweeP-Ml9pZ-AOvNL",
+    ipdb_id: null,
+    machine_group_id: 88,
   },
 ];
 
@@ -161,8 +238,15 @@ async function main(): Promise<void> {
       ipdb_id: m["ipdb_id"] ?? null,
       machine_group_id: m["machine_group_id"] ?? null,
     }));
-  // Demo families last so the two-step picker always has multi-edition data.
-  const trimmed = [...real, ...DEMO_FAMILY_MACHINES];
+  // Demo families last so the two-step picker always has multi-edition data,
+  // deduped by id so an APC machine that's also a demo edition appears once
+  // (a duplicate id would later break the upsert's ON CONFLICT).
+  const seenMachineIds = new Set<unknown>();
+  const trimmed = [...real, ...DEMO_FAMILY_MACHINES].filter((m) => {
+    if (seenMachineIds.has(m.id)) return false;
+    seenMachineIds.add(m.id);
+    return true;
+  });
   writeFileSync(
     join(FIXTURES, "catalog-apc.json"),
     `${JSON.stringify(trimmed, null, 2)}\n`
@@ -199,7 +283,13 @@ async function main(): Promise<void> {
       return typeof id === "number" && referencedGroupIds.has(id);
     })
     .map((g) => ({ id: g["id"], name: g["name"] ?? null }));
-  const groups = [...realGroups, ...DEMO_GROUPS];
+  // Dedupe by id: a real referenced group can also be a demo group (18/78/88).
+  const seenGroupIds = new Set<unknown>();
+  const groups = [...realGroups, ...DEMO_GROUPS].filter((g) => {
+    if (seenGroupIds.has(g.id)) return false;
+    seenGroupIds.add(g.id);
+    return true;
+  });
   writeFileSync(
     join(FIXTURES, "machine-groups.json"),
     `${JSON.stringify(groups, null, 2)}\n`

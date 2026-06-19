@@ -268,6 +268,11 @@ export function CreateMachineForm({
           </p>
         </div>
 
+        {/* Model — links the machine to its PinballMap catalog model/edition.
+            Sits right after the name: capturing the model is fundamental, not an
+            afterthought (bead B / PP-o355.2). */}
+        <PinballMapLinkField />
+
         {/* Machine Initials */}
         <div className="space-y-2">
           <Label htmlFor="initials" className="text-foreground">
@@ -303,9 +308,6 @@ export function CreateMachineForm({
             onValueChange={setOwnerIdValue}
           />
         )}
-
-        {/* PinballMap catalog link (bead B / PP-o355.2) */}
-        <PinballMapLinkField />
 
         {/* Actions */}
         <div className="flex flex-wrap gap-3 pt-2">

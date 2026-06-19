@@ -5,7 +5,8 @@
     "manufacturer": "Stern",
     "year": 2026,
     "opdb_id": "GV8wB-Mq12N",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": 130
   },
   {
     "id": 1456,
@@ -13,7 +14,8 @@
     "manufacturer": "Stern Electronics",
     "year": 1980,
     "opdb_id": "G43kO-MQ50p",
-    "ipdb_id": 43
+    "ipdb_id": 43,
+    "machine_group_id": null
   },
   {
     "id": 2647,
@@ -21,7 +23,8 @@
     "manufacturer": "Data East",
     "year": 1988,
     "opdb_id": "G48on-ML8B9",
-    "ipdb_id": 2603
+    "ipdb_id": 2603,
+    "machine_group_id": null
   },
   {
     "id": 4622,
@@ -29,7 +32,8 @@
     "manufacturer": "American",
     "year": 2026,
     "opdb_id": "GvBQX-M0ody-A1kee",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": 127
   },
   {
     "id": 3846,
@@ -37,7 +41,8 @@
     "manufacturer": "Stern",
     "year": 2024,
     "opdb_id": "GQK1P-Ml95Z-AOY43",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": 115
   },
   {
     "id": 3877,
@@ -45,7 +50,8 @@
     "manufacturer": "Gottlieb",
     "year": 1948,
     "opdb_id": "G6lYl-MdEwd",
-    "ipdb_id": 2027
+    "ipdb_id": 2027,
+    "machine_group_id": null
   },
   {
     "id": 2042,
@@ -53,7 +59,8 @@
     "manufacturer": "Gottlieb",
     "year": 1968,
     "opdb_id": "G4j8k-MJK5K",
-    "ipdb_id": 701
+    "ipdb_id": 701,
+    "machine_group_id": null
   },
   {
     "id": 2349,
@@ -61,7 +68,8 @@
     "manufacturer": "Gottlieb",
     "year": 1988,
     "opdb_id": "G4jXW-MQdrN",
-    "ipdb_id": 678
+    "ipdb_id": 678,
+    "machine_group_id": null
   },
   {
     "id": 1252,
@@ -69,7 +77,8 @@
     "manufacturer": "Sega",
     "year": 1997,
     "opdb_id": "G4kBL-MLndo",
-    "ipdb_id": 4136
+    "ipdb_id": 4136,
+    "machine_group_id": null
   },
   {
     "id": 3738,
@@ -77,7 +86,8 @@
     "manufacturer": "Stern",
     "year": 2023,
     "opdb_id": "G3EBl-Mq1zy",
-    "ipdb_id": 7064
+    "ipdb_id": 7064,
+    "machine_group_id": 104
   },
   {
     "id": 2923,
@@ -85,7 +95,8 @@
     "manufacturer": "Stern",
     "year": 2018,
     "opdb_id": "G4dOQ-MyNbb",
-    "ipdb_id": 6555
+    "ipdb_id": 6555,
+    "machine_group_id": 66
   },
   {
     "id": 2116,
@@ -93,7 +104,8 @@
     "manufacturer": "Data East",
     "year": 1988,
     "opdb_id": "G4qqv-MDW0P",
-    "ipdb_id": 2090
+    "ipdb_id": 2090,
+    "machine_group_id": null
   },
   {
     "id": 1997,
@@ -101,7 +113,8 @@
     "manufacturer": "Stern Electronics",
     "year": 1977,
     "opdb_id": "G57lj-MJwxY",
-    "ipdb_id": 2377
+    "ipdb_id": 2377,
+    "machine_group_id": null
   },
   {
     "id": 2565,
@@ -109,7 +122,8 @@
     "manufacturer": "Stern",
     "year": 2016,
     "opdb_id": "G5D94-M3d5w",
-    "ipdb_id": 6328
+    "ipdb_id": 6328,
+    "machine_group_id": 8
   },
   {
     "id": 2008,
@@ -117,7 +131,8 @@
     "manufacturer": "Gottlieb",
     "year": 1989,
     "opdb_id": "G5Lk0-MQjl3",
-    "ipdb_id": 347
+    "ipdb_id": 347,
+    "machine_group_id": null
   },
   {
     "id": 1278,
@@ -125,7 +140,8 @@
     "manufacturer": "Bally",
     "year": 1989,
     "opdb_id": "G5n2D-MLn85",
-    "ipdb_id": 2630
+    "ipdb_id": 2630,
+    "machine_group_id": null
   },
   {
     "id": 2230,
@@ -133,7 +149,8 @@
     "manufacturer": "Williams",
     "year": 1975,
     "opdb_id": "G5nj6-MyNEZ",
-    "ipdb_id": 2577
+    "ipdb_id": 2577,
+    "machine_group_id": null
   },
   {
     "id": 1582,
@@ -141,7 +158,8 @@
     "manufacturer": "Gottlieb",
     "year": 1975,
     "opdb_id": "G5W1w-MQVkq",
-    "ipdb_id": 2589
+    "ipdb_id": 2589,
+    "machine_group_id": null
   },
   {
     "id": 2761,
@@ -149,7 +167,8 @@
     "manufacturer": "Alvin G",
     "year": 1991,
     "opdb_id": "G5wxv-MQP9z",
-    "ipdb_id": 120
+    "ipdb_id": 120,
+    "machine_group_id": 117
   },
   {
     "id": 1927,
@@ -157,7 +176,8 @@
     "manufacturer": "Bally",
     "year": 1974,
     "opdb_id": "Gr28v-Mp4Wr",
-    "ipdb_id": 889
+    "ipdb_id": 889,
+    "machine_group_id": null
   },
   {
     "id": 785,
@@ -165,7 +185,8 @@
     "manufacturer": "Bally",
     "year": 1978,
     "opdb_id": "G4jXr-MQ6kz",
-    "ipdb_id": 1386
+    "ipdb_id": 1386,
+    "machine_group_id": null
   },
   {
     "id": 1429,
@@ -173,7 +194,8 @@
     "manufacturer": "Stern Electronics",
     "year": 1980,
     "opdb_id": "GR6kW-Mo1W3",
-    "ipdb_id": 500
+    "ipdb_id": 500,
+    "machine_group_id": null
   },
   {
     "id": 2441,
@@ -181,7 +203,8 @@
     "manufacturer": "Stern",
     "year": 2015,
     "opdb_id": "G41d5-MKNwX",
-    "ipdb_id": 6307
+    "ipdb_id": 6307,
+    "machine_group_id": 22
   },
   {
     "id": 1513,
@@ -189,7 +212,8 @@
     "manufacturer": "Gottlieb",
     "year": 1963,
     "opdb_id": "Gre8z-MLeK2",
-    "ipdb_id": 2208
+    "ipdb_id": 2208,
+    "machine_group_id": null
   },
   {
     "id": 1158,
@@ -197,7 +221,8 @@
     "manufacturer": "Williams",
     "year": 1977,
     "opdb_id": "Grep0-MQYN4",
-    "ipdb_id": 3163
+    "ipdb_id": 3163,
+    "machine_group_id": null
   },
   {
     "id": 1455,
@@ -205,7 +230,8 @@
     "manufacturer": "Gottlieb",
     "year": 1977,
     "opdb_id": "GrknN-MQrdv",
-    "ipdb_id": 532
+    "ipdb_id": 532,
+    "machine_group_id": null
   },
   {
     "id": 3022,
@@ -213,7 +239,8 @@
     "manufacturer": "Stern",
     "year": 2018,
     "opdb_id": "G6lnq-Mq1kv",
-    "ipdb_id": 6558
+    "ipdb_id": 6558,
+    "machine_group_id": 70
   },
   {
     "id": 4278,
@@ -221,7 +248,8 @@
     "manufacturer": "Mirco Games",
     "year": 1978,
     "opdb_id": "G4x0p-MDyyq",
-    "ipdb_id": 1486
+    "ipdb_id": 1486,
+    "machine_group_id": null
   },
   {
     "id": 3414,
@@ -229,7 +257,8 @@
     "manufacturer": "Spooky",
     "year": 2021,
     "opdb_id": "GBLLd-MdEON-A94po",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": 87
   },
   {
     "id": 3267,
@@ -237,7 +266,8 @@
     "manufacturer": "Stern",
     "year": 2020,
     "opdb_id": "Gj66P-M3dxn",
-    "ipdb_id": 6754
+    "ipdb_id": 6754,
+    "machine_group_id": 82
   },
   {
     "id": 3408,
@@ -245,7 +275,8 @@
     "manufacturer": "Spooky",
     "year": 2021,
     "opdb_id": "Gj66Z-Mp4BN-A9Y6n",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": 86
   },
   {
     "id": 3670,
@@ -253,7 +284,8 @@
     "manufacturer": "Spooky",
     "year": 2023,
     "opdb_id": "GllPz-MBRrV-A9vWL",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": 97
   },
   {
     "id": 3224,
@@ -261,7 +293,8 @@
     "manufacturer": "Spooky",
     "year": 2019,
     "opdb_id": "GQKb2-MYek0",
-    "ipdb_id": 6640
+    "ipdb_id": 6640,
+    "machine_group_id": 114
   },
   {
     "id": 2433,
@@ -269,7 +302,8 @@
     "manufacturer": "Gottlieb",
     "year": 1981,
     "opdb_id": "GrNpY-MJrZw",
-    "ipdb_id": 1549
+    "ipdb_id": 1549,
+    "machine_group_id": null
   },
   {
     "id": 2987,
@@ -277,7 +311,8 @@
     "manufacturer": "Bally",
     "year": 1971,
     "opdb_id": "GrNZ7-MDOjq",
-    "ipdb_id": 2204
+    "ipdb_id": 2204,
+    "machine_group_id": null
   },
   {
     "id": 2367,
@@ -285,7 +320,8 @@
     "manufacturer": "Williams",
     "year": 1971,
     "opdb_id": "Grx1z-Mx02z",
-    "ipdb_id": 703
+    "ipdb_id": 703,
+    "machine_group_id": null
   },
   {
     "id": 3328,
@@ -293,7 +329,8 @@
     "manufacturer": "Allied Leisure",
     "year": 1972,
     "opdb_id": "GRoN2-MRj30",
-    "ipdb_id": 2081
+    "ipdb_id": 2081,
+    "machine_group_id": null
   },
   {
     "id": 737,
@@ -301,7 +338,8 @@
     "manufacturer": "Williams",
     "year": 1991,
     "opdb_id": "GRpee-MePdR",
-    "ipdb_id": 1502
+    "ipdb_id": 1502,
+    "machine_group_id": 60
   },
   {
     "id": 931,
@@ -309,7 +347,8 @@
     "manufacturer": "Gottlieb",
     "year": 1975,
     "opdb_id": "GrPx2-M5RRk",
-    "ipdb_id": 2286
+    "ipdb_id": 2286,
+    "machine_group_id": null
   },
   {
     "id": 815,
@@ -317,7 +356,8 @@
     "manufacturer": "Bally",
     "year": 1993,
     "opdb_id": "GRoZw-MLW3j",
-    "ipdb_id": 1322
+    "ipdb_id": 1322,
+    "machine_group_id": null
   },
   {
     "id": 723,
@@ -325,7 +365,8 @@
     "manufacturer": "Williams",
     "year": 1986,
     "opdb_id": "G41Z8-MJKvP",
-    "ipdb_id": 1796
+    "ipdb_id": 1796,
+    "machine_group_id": null
   },
   {
     "id": 726,
@@ -333,7 +374,8 @@
     "manufacturer": "Bally",
     "year": 1979,
     "opdb_id": "G42Pk-MZe2e",
-    "ipdb_id": 2821
+    "ipdb_id": 2821,
+    "machine_group_id": null
   },
   {
     "id": 908,
@@ -341,7 +383,8 @@
     "manufacturer": "Bally",
     "year": 1979,
     "opdb_id": "G42PX-MyNXo",
-    "ipdb_id": 2252
+    "ipdb_id": 2252,
+    "machine_group_id": null
   },
   {
     "id": 698,
@@ -349,7 +392,8 @@
     "manufacturer": "Stern",
     "year": 2001,
     "opdb_id": "G48w3-Mq1Zk",
-    "ipdb_id": 4505
+    "ipdb_id": 4505,
+    "machine_group_id": null
   },
   {
     "id": 1048,
@@ -357,7 +401,8 @@
     "manufacturer": "Williams",
     "year": 1975,
     "opdb_id": "G48YQ-MDxbK",
-    "ipdb_id": 2057
+    "ipdb_id": 2057,
+    "machine_group_id": null
   },
   {
     "id": 734,
@@ -365,7 +410,8 @@
     "manufacturer": "Bally",
     "year": 1978,
     "opdb_id": "G417e-MDvXz",
-    "ipdb_id": 4501
+    "ipdb_id": 4501,
+    "machine_group_id": 67
   },
   {
     "id": 650,
@@ -373,7 +419,8 @@
     "manufacturer": "Williams",
     "year": 1996,
     "opdb_id": "G4llj-MQYb2",
-    "ipdb_id": 3824
+    "ipdb_id": 3824,
+    "machine_group_id": 134
   },
   {
     "id": 730,
@@ -381,7 +428,8 @@
     "manufacturer": "Stern Electronics",
     "year": 1980,
     "opdb_id": "G4jQw-MJ5rl",
-    "ipdb_id": 249
+    "ipdb_id": 249,
+    "machine_group_id": null
   },
   {
     "id": 793,
@@ -389,7 +437,8 @@
     "manufacturer": "Williams",
     "year": 1976,
     "opdb_id": "G4O1L-MDW47",
-    "ipdb_id": 1072
+    "ipdb_id": 1072,
+    "machine_group_id": null
   },
   {
     "id": 984,
@@ -397,7 +446,8 @@
     "manufacturer": "Gottlieb",
     "year": 1989,
     "opdb_id": "G4NY0-MDE29",
-    "ipdb_id": 3507
+    "ipdb_id": 3507,
+    "machine_group_id": null
   },
   {
     "id": 3732,
@@ -405,7 +455,8 @@
     "manufacturer": "Williams",
     "year": 1962,
     "opdb_id": "G4Pvp-MLBO0",
-    "ipdb_id": 2713
+    "ipdb_id": 2713,
+    "machine_group_id": null
   },
   {
     "id": 685,
@@ -413,7 +464,8 @@
     "manufacturer": "Gottlieb",
     "year": 1995,
     "opdb_id": "G50pv-MdE6R",
-    "ipdb_id": 2847
+    "ipdb_id": 2847,
+    "machine_group_id": null
   },
   {
     "id": 851,
@@ -421,7 +473,8 @@
     "manufacturer": "Stern Electronics",
     "year": 1979,
     "opdb_id": "G5b38-MDqkx",
-    "ipdb_id": 1580
+    "ipdb_id": 1580,
+    "machine_group_id": null
   },
   {
     "id": 678,
@@ -429,7 +482,8 @@
     "manufacturer": "Bally",
     "year": 1999,
     "opdb_id": "G50Wr-MLeZP",
-    "ipdb_id": 4446
+    "ipdb_id": 4446,
+    "machine_group_id": null
   },
   {
     "id": 669,
@@ -437,7 +491,8 @@
     "manufacturer": "Sega",
     "year": 1995,
     "opdb_id": "G59zN-MLy0N",
-    "ipdb_id": 3593
+    "ipdb_id": 3593,
+    "machine_group_id": null
   },
   {
     "id": 3829,
@@ -445,7 +500,8 @@
     "manufacturer": "Playmatic",
     "year": 1977,
     "opdb_id": "G4Xdq-MLBlD",
-    "ipdb_id": 2532
+    "ipdb_id": 2532,
+    "machine_group_id": null
   },
   {
     "id": 703,
@@ -453,7 +509,8 @@
     "manufacturer": "Williams",
     "year": 1990,
     "opdb_id": "G5Dz7-Mq139",
-    "ipdb_id": 966
+    "ipdb_id": 966,
+    "machine_group_id": null
   },
   {
     "id": 808,
@@ -461,7 +518,8 @@
     "manufacturer": "Bally",
     "year": 1979,
     "opdb_id": "G5Dbo-M3dv6",
-    "ipdb_id": 974
+    "ipdb_id": 974,
+    "machine_group_id": null
   },
   {
     "id": 707,
@@ -469,7 +527,8 @@
     "manufacturer": "Bally",
     "year": 1994,
     "opdb_id": "G42E2-MQP9e",
-    "ipdb_id": 2811
+    "ipdb_id": 2811,
+    "machine_group_id": null
   },
   {
     "id": 1079,
@@ -477,7 +536,8 @@
     "manufacturer": "Gottlieb",
     "year": 1986,
     "opdb_id": "Gr2wz-MLBob",
-    "ipdb_id": 996
+    "ipdb_id": 996,
+    "machine_group_id": null
   },
   {
     "id": 684,
@@ -485,7 +545,8 @@
     "manufacturer": "Williams",
     "year": 1993,
     "opdb_id": "GR6d8-M1rZd",
-    "ipdb_id": 2357
+    "ipdb_id": 2357,
+    "machine_group_id": null
   },
   {
     "id": 4317,
@@ -493,7 +554,8 @@
     "manufacturer": "Game Plan",
     "year": 1979,
     "opdb_id": "GRoW6-MQk81",
-    "ipdb_id": 817
+    "ipdb_id": 817,
+    "machine_group_id": null
   },
   {
     "id": 721,
@@ -501,7 +563,8 @@
     "manufacturer": "Data East",
     "year": 1994,
     "opdb_id": "GR6do-MLBq4",
-    "ipdb_id": 2579
+    "ipdb_id": 2579,
+    "machine_group_id": null
   },
   {
     "id": 3405,
@@ -509,7 +572,8 @@
     "manufacturer": "Gottlieb",
     "year": 1963,
     "opdb_id": "GrdqX-MLW81",
-    "ipdb_id": 988
+    "ipdb_id": 988,
+    "machine_group_id": null
   },
   {
     "id": 1118,
@@ -517,7 +581,8 @@
     "manufacturer": "Stern",
     "year": 2011,
     "opdb_id": "GrkL5-MLvrX",
-    "ipdb_id": 5682
+    "ipdb_id": 5682,
+    "machine_group_id": 9
   },
   {
     "id": 708,
@@ -525,7 +590,8 @@
     "manufacturer": "Williams",
     "year": 1999,
     "opdb_id": "GRL9r-MD34z",
-    "ipdb_id": 4458
+    "ipdb_id": 4458,
+    "machine_group_id": null
   },
   {
     "id": 766,
@@ -533,7 +599,8 @@
     "manufacturer": "Bally",
     "year": 1978,
     "opdb_id": "GrkOB-MJVvl",
-    "ipdb_id": 1823
+    "ipdb_id": 1823,
+    "machine_group_id": null
   },
   {
     "id": 847,
@@ -541,7 +608,8 @@
     "manufacturer": "Bally",
     "year": 1977,
     "opdb_id": "GrleW-MYeod",
-    "ipdb_id": 2406
+    "ipdb_id": 2406,
+    "machine_group_id": null
   },
   {
     "id": 990,
@@ -549,7 +617,8 @@
     "manufacturer": "Alvin G",
     "year": 1992,
     "opdb_id": "GRLz0-MeP4B",
-    "ipdb_id": 3513
+    "ipdb_id": 3513,
+    "machine_group_id": null
   },
   {
     "id": 715,
@@ -557,7 +626,8 @@
     "manufacturer": "Williams",
     "year": 1995,
     "opdb_id": "GrNd0-MJNW1",
-    "ipdb_id": 3780
+    "ipdb_id": 3780,
+    "machine_group_id": null
   },
   {
     "id": 834,
@@ -565,7 +635,8 @@
     "manufacturer": "Bally",
     "year": 1978,
     "opdb_id": "GRnwQ-M9R5d",
-    "ipdb_id": 1125
+    "ipdb_id": 1125,
+    "machine_group_id": null
   },
   {
     "id": 791,
@@ -573,7 +644,8 @@
     "manufacturer": "Williams",
     "year": 1976,
     "opdb_id": "GRnX6-MQk8L",
-    "ipdb_id": 2253
+    "ipdb_id": 2253,
+    "machine_group_id": null
   },
   {
     "id": 689,
@@ -581,7 +653,8 @@
     "manufacturer": "Williams",
     "year": 1993,
     "opdb_id": "GRQKz-MyNXz",
-    "ipdb_id": 2768
+    "ipdb_id": 2768,
+    "machine_group_id": null
   },
   {
     "id": 662,
@@ -589,7 +662,8 @@
     "manufacturer": "Stern",
     "year": 2003,
     "opdb_id": "GrqZX-MD15w",
-    "ipdb_id": 4858
+    "ipdb_id": 4858,
+    "machine_group_id": 13
   },
   {
     "id": 682,
@@ -597,7 +671,8 @@
     "manufacturer": "Stern",
     "year": 2003,
     "opdb_id": "GRvBL-MP3Ev",
-    "ipdb_id": 4674
+    "ipdb_id": 4674,
+    "machine_group_id": null
   },
   {
     "id": 1096,
@@ -605,7 +680,8 @@
     "manufacturer": "Bally",
     "year": 1984,
     "opdb_id": "GRVnY-MDz0l",
-    "ipdb_id": 312
+    "ipdb_id": 312,
+    "machine_group_id": null
   },
   {
     "id": 794,
@@ -613,7 +689,8 @@
     "manufacturer": "Bally",
     "year": 1975,
     "opdb_id": "GRwBN-MJ5ln",
-    "ipdb_id": 1206
+    "ipdb_id": 1206,
+    "machine_group_id": null
   },
   {
     "id": 728,
@@ -621,7 +698,8 @@
     "manufacturer": "Bally",
     "year": 1984,
     "opdb_id": "GRwl7-MJ45o",
-    "ipdb_id": 2328
+    "ipdb_id": 2328,
+    "machine_group_id": null
   },
   {
     "id": 1055,
@@ -629,7 +707,8 @@
     "manufacturer": "Williams",
     "year": 1980,
     "opdb_id": "GrO7w-M9R03",
-    "ipdb_id": 310
+    "ipdb_id": 310,
+    "machine_group_id": 20
   },
   {
     "id": 897,
@@ -637,7 +716,8 @@
     "manufacturer": "Bally",
     "year": 1979,
     "opdb_id": "GrXy3-ML0Ey",
-    "ipdb_id": 1755
+    "ipdb_id": 1755,
+    "machine_group_id": null
   },
   {
     "id": 751,
@@ -645,7 +725,8 @@
     "manufacturer": "Williams",
     "year": 1987,
     "opdb_id": "GRY2O-MLWdy",
-    "ipdb_id": 804
+    "ipdb_id": 804,
+    "machine_group_id": null
   },
   {
     "id": 795,
@@ -653,7 +734,8 @@
     "manufacturer": "Gottlieb",
     "year": 1973,
     "opdb_id": "GRYbJ-MnKex",
-    "ipdb_id": 1173
+    "ipdb_id": 1173,
+    "machine_group_id": null
   },
   {
     "id": 875,
@@ -661,7 +743,8 @@
     "manufacturer": "Williams",
     "year": 1979,
     "opdb_id": "Grypn-MQdbe",
-    "ipdb_id": 871
+    "ipdb_id": 871,
+    "machine_group_id": null
   },
   {
     "id": 4509,
@@ -669,7 +752,8 @@
     "manufacturer": "Jersey Jack",
     "year": 2024,
     "opdb_id": "GbPxB-MkPol-A93vd",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": 118
   },
   {
     "id": 3833,
@@ -677,7 +761,8 @@
     "manufacturer": "Multimorphic",
     "year": 2024,
     "opdb_id": "GkBnQ-MBRxV-A96qp",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": 137
   },
   {
     "id": 4527,
@@ -685,7 +770,8 @@
     "manufacturer": "Chicago Gaming",
     "year": 2025,
     "opdb_id": "G4835-M2YPK-ARkb7",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": 90
   },
   {
     "id": 4533,
@@ -693,7 +779,8 @@
     "manufacturer": "Stern",
     "year": 2025,
     "opdb_id": "GEL0V-MBRyb",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": 125
   },
   {
     "id": 2837,
@@ -701,7 +788,8 @@
     "manufacturer": "Stern Electronics",
     "year": 1978,
     "opdb_id": "Gry0Z-MP3zR",
-    "ipdb_id": 1570
+    "ipdb_id": 1570,
+    "machine_group_id": null
   },
   {
     "id": 944,
@@ -709,7 +797,8 @@
     "manufacturer": "Stern Electronics",
     "year": 1981,
     "opdb_id": "GRLbz-MDnxo",
-    "ipdb_id": 2297
+    "ipdb_id": 2297,
+    "machine_group_id": null
   },
   {
     "id": 2713,
@@ -717,7 +806,8 @@
     "manufacturer": "Stern Electronics",
     "year": 1980,
     "opdb_id": "GrZY2-ML0Rb",
-    "ipdb_id": 2346
+    "ipdb_id": 2346,
+    "machine_group_id": null
   },
   {
     "id": 937,
@@ -725,7 +815,8 @@
     "manufacturer": "Stern Electronics",
     "year": 1980,
     "opdb_id": "G48kY-MDxRV",
-    "ipdb_id": 887
+    "ipdb_id": 887,
+    "machine_group_id": null
   },
   {
     "id": 1335,
@@ -733,7 +824,8 @@
     "manufacturer": "Stern",
     "year": 2012,
     "opdb_id": "Grj6X-MJNV1-AO209",
-    "ipdb_id": 5824
+    "ipdb_id": 5824,
+    "machine_group_id": 11
   },
   {
     "id": 3245,
@@ -741,7 +833,8 @@
     "manufacturer": "Gottlieb",
     "year": 1980,
     "opdb_id": "GRYPN-Mz2RE",
-    "ipdb_id": 570
+    "ipdb_id": 570,
+    "machine_group_id": null
   },
   {
     "id": 1211,
@@ -749,7 +842,8 @@
     "manufacturer": "Gottlieb",
     "year": 1947,
     "opdb_id": "GyVVQ-MVKYX",
-    "ipdb_id": 1254
+    "ipdb_id": 1254,
+    "machine_group_id": null
   },
   {
     "id": 855,
@@ -757,7 +851,8 @@
     "manufacturer": "Stern Electronics",
     "year": 1978,
     "opdb_id": "GrXEW-MDEwr",
-    "ipdb_id": 2366
+    "ipdb_id": 2366,
+    "machine_group_id": null
   },
   {
     "id": 3784,
@@ -765,7 +860,8 @@
     "manufacturer": "Barrels of Fun",
     "year": 2023,
     "opdb_id": "GvBn8-Mz291",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": null
   },
   {
     "id": 3416,
@@ -773,7 +869,8 @@
     "manufacturer": "Stern",
     "year": 2021,
     "opdb_id": "GweeP-Ml9pZ-ARZoY",
-    "ipdb_id": 6842
+    "ipdb_id": 6842,
+    "machine_group_id": 88
   },
   {
     "id": 3787,
@@ -781,7 +878,8 @@
     "manufacturer": "For Amusement Only Games",
     "year": 2022,
     "opdb_id": "GyVb1-MYeq1",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": null
   },
   {
     "id": 3419,
@@ -789,7 +887,8 @@
     "manufacturer": "Stern",
     "year": 2021,
     "opdb_id": "GxvvB-MOEKX",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": null
   },
   {
     "id": 3836,
@@ -797,7 +896,8 @@
     "manufacturer": "Turner",
     "year": 2024,
     "opdb_id": "GZVXY-MyNOq-ARWE8",
-    "ipdb_id": null
+    "ipdb_id": null,
+    "machine_group_id": 112
   },
   {
     "id": 3179,
@@ -805,60 +905,124 @@
     "manufacturer": "Stern",
     "year": 2019,
     "opdb_id": "GZVOd-MwNxZ-AOLoy",
-    "ipdb_id": 6596
+    "ipdb_id": 6596,
+    "machine_group_id": 79
   },
   {
-    "id": 90011,
-    "name": "Godzilla (Pro)",
-    "manufacturer": "Stern",
-    "year": 2021,
-    "opdb_id": "G50r-MLeqP",
-    "ipdb_id": 6845,
-    "machine_group_id": 9001
+    "id": 642,
+    "name": "Medieval Madness",
+    "manufacturer": "Williams",
+    "year": 1997,
+    "opdb_id": "G5pe4-MePZv",
+    "ipdb_id": 4032,
+    "machine_group_id": 18
   },
   {
-    "id": 90012,
-    "name": "Godzilla (Premium)",
-    "manufacturer": "Stern",
-    "year": 2021,
-    "opdb_id": "G50r-MLqLz",
-    "ipdb_id": 6845,
-    "machine_group_id": 9001
+    "id": 2306,
+    "name": "Medieval Madness (Remake)",
+    "manufacturer": "Chicago Gaming",
+    "year": 2016,
+    "opdb_id": "G5pe4-MyNkp",
+    "ipdb_id": 6263,
+    "machine_group_id": 18
   },
   {
-    "id": 90013,
-    "name": "Godzilla (Limited Edition)",
-    "manufacturer": "Stern",
-    "year": 2021,
-    "opdb_id": "G50r-MLxkP",
-    "ipdb_id": 6845,
-    "machine_group_id": 9001
+    "id": 2966,
+    "name": "Medieval Madness (Remake Royal Edition)",
+    "manufacturer": "Chicago Gaming",
+    "year": 2015,
+    "opdb_id": "G5pe4-MkPRV",
+    "ipdb_id": 6264,
+    "machine_group_id": 18
   },
   {
-    "id": 90021,
+    "id": 3259,
+    "name": "Medieval Madness (Remake Special Edition)",
+    "manufacturer": "Chicago Gaming",
+    "year": 2016,
+    "opdb_id": "G5pe4-MrR1B",
+    "ipdb_id": null,
+    "machine_group_id": 18
+  },
+  {
+    "id": 3507,
+    "name": "Medieval Madness (Remake LE)",
+    "manufacturer": "Chicago Gaming",
+    "year": 2015,
+    "opdb_id": "G5pe4-M61y6",
+    "ipdb_id": null,
+    "machine_group_id": 18
+  },
+  {
+    "id": 4550,
+    "name": "Medieval Madness (Remake Merlin Edition)",
+    "manufacturer": "Chicago Gaming",
+    "year": 2025,
+    "opdb_id": "G5pe4-MrRrv",
+    "ipdb_id": null,
+    "machine_group_id": 18
+  },
+  {
+    "id": 3167,
     "name": "Jurassic Park (Pro)",
     "manufacturer": "Stern",
     "year": 2019,
-    "opdb_id": "GrqZP-MQk6e",
-    "ipdb_id": 6593,
-    "machine_group_id": 9002
+    "opdb_id": "GK17D-MdEqz",
+    "ipdb_id": 6573,
+    "machine_group_id": 78
   },
   {
-    "id": 90022,
+    "id": 3168,
+    "name": "Jurassic Park (LE)",
+    "manufacturer": "Stern",
+    "year": 2019,
+    "opdb_id": "GK17D-MKNKd-AOyKv",
+    "ipdb_id": 6575,
+    "machine_group_id": 78
+  },
+  {
+    "id": 3169,
     "name": "Jurassic Park (Premium)",
     "manufacturer": "Stern",
     "year": 2019,
-    "opdb_id": "GrqZP-MQ5dN",
-    "ipdb_id": 6593,
-    "machine_group_id": 9002
+    "opdb_id": "GK17D-MKNKd-A15Yn",
+    "ipdb_id": 6574,
+    "machine_group_id": 78
   },
   {
-    "id": 90023,
-    "name": "Jurassic Park (Limited Edition)",
+    "id": 3780,
+    "name": "Jurassic Park (30th Anniversary)",
     "manufacturer": "Stern",
-    "year": 2019,
-    "opdb_id": "GrqZP-MQ9xW",
-    "ipdb_id": 6593,
-    "machine_group_id": 9002
+    "year": 2023,
+    "opdb_id": "GK17D-MKNKd-AOxoz",
+    "ipdb_id": null,
+    "machine_group_id": 78
+  },
+  {
+    "id": 3415,
+    "name": "Godzilla (Pro)",
+    "manufacturer": "Stern",
+    "year": 2021,
+    "opdb_id": "GweeP-MW95j",
+    "ipdb_id": 6841,
+    "machine_group_id": 88
+  },
+  {
+    "id": 3417,
+    "name": "Godzilla (LE)",
+    "manufacturer": "Stern",
+    "year": 2021,
+    "opdb_id": "GweeP-Ml9pZ-A9vXB",
+    "ipdb_id": 6843,
+    "machine_group_id": 88
+  },
+  {
+    "id": 4500,
+    "name": "Godzilla (70th Anniversary)",
+    "manufacturer": "Stern",
+    "year": 2024,
+    "opdb_id": "GweeP-Ml9pZ-AOvNL",
+    "ipdb_id": null,
+    "machine_group_id": 88
   }
 ]

@@ -274,6 +274,17 @@ export function EditMachineDialog({
               </p>
             </div>
 
+            {/* Model — PinballMap catalog model/edition, right after the name
+                (bead B / PP-o355.2). */}
+            {canLink && (
+              <PinballMapLinkField
+                defaultMachineId={machine.pinballmapMachineId}
+                defaultName={machine.pinballmapTitleName}
+                defaultExcluded={machine.pinballmapExcluded}
+                defaultExcludedReason={machine.pinballmapExcludedReason}
+              />
+            )}
+
             {/* Availability */}
             <div className="space-y-2">
               <Label htmlFor="edit-presence" className="text-foreground">
@@ -337,16 +348,6 @@ export function EditMachineDialog({
                   machine.
                 </p>
               </div>
-            )}
-
-            {/* PinballMap catalog link (bead B / PP-o355.2) */}
-            {canLink && (
-              <PinballMapLinkField
-                defaultMachineId={machine.pinballmapMachineId}
-                defaultName={machine.pinballmapTitleName}
-                defaultExcluded={machine.pinballmapExcluded}
-                defaultExcludedReason={machine.pinballmapExcludedReason}
-              />
             )}
 
             <DialogFooter>

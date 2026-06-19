@@ -203,11 +203,11 @@ export function PinballMapLinkField({
     : null;
 
   const familyMeta = family ? formatMeta(family.manufacturer, family.year) : "";
-  const triggerLabel = family
-    ? family.name
-    : defaultMachineId !== null && defaultName
+  // While an existing link resolves on edit, show its known name; otherwise prompt.
+  const placeholderLabel =
+    defaultMachineId !== null && defaultName
       ? defaultName
-      : "Search PinballMap catalog…";
+      : "Search for a model…";
 
   return (
     <div className="space-y-2">
@@ -225,8 +225,11 @@ export function PinballMapLinkField({
       )}
 
       <Label htmlFor={triggerId} className="text-foreground">
-        PinballMap link
+        Model
       </Label>
+      <p className="text-xs text-muted-foreground">
+        The machine&apos;s model, from the PinballMap catalog.
+      </p>
 
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
@@ -243,8 +246,9 @@ export function PinballMapLinkField({
             <span
               className={family ? "text-foreground" : "text-muted-foreground"}
             >
-              {triggerLabel}
-              {family && familyMeta ? ` · ${familyMeta}` : ""}
+              {family
+                ? `${family.name}${familyMeta ? ` · ${familyMeta}` : ""}`
+                : placeholderLabel}
             </span>
             <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
           </Button>
@@ -256,7 +260,7 @@ export function PinballMapLinkField({
           {/* shouldFilter={false}: results are already filtered server-side. */}
           <Command shouldFilter={false}>
             <CommandInput
-              placeholder="e.g. Godzilla"
+              placeholder="e.g. Medieval Madness"
               value={query}
               onValueChange={setQuery}
             />

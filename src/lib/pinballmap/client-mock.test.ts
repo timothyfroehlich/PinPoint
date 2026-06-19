@@ -22,17 +22,19 @@ describe("mock PinballMap client", () => {
     expect(catalog.every((m) => m.name.length > 0)).toBe(true);
   });
 
-  it("exposes machine groups and grouped editions", async () => {
+  it("exposes machine groups and multi-edition families", async () => {
     const client = createMockClient();
     const groups = await client.fetchMachineGroups();
     expect(groups.length).toBeGreaterThan(0);
     expect(groups.every((g) => g.name.length > 0)).toBe(true);
 
+    // The fixtures carry Medieval Madness (group 18) as a real multi-edition
+    // family — the picker's canonical two-step example.
+    const mm = groups.find((g) => g.name === "Medieval Madness");
+    expect(mm).toBeDefined();
     const catalog = await client.fetchCatalog();
-    const firstGroup = groups[0];
-    if (!firstGroup) throw new Error("no machine groups in fixture");
     const editions = catalog.filter(
-      (m) => m.machineGroupId === firstGroup.machineGroupId
+      (m) => m.machineGroupId === mm?.machineGroupId
     );
     expect(editions.length).toBeGreaterThan(1);
   });

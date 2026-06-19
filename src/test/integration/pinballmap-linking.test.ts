@@ -2,7 +2,8 @@
  * Integration Test: PinballMap machine linking + catalog mirror (PP-o355.2)
  *
  * Covers the bead-B server surface against PGlite:
- *  - catalog mirror: refreshCatalog() upsert + searchCatalog() ranking/escaping
+ *  - catalog mirror: refreshCatalog() upsert + group denormalization;
+ *    searchCatalogFamilies() family collapse/ranking/escaping; editions + lookup
  *  - createMachineAction: link autofills metadata FROM the catalog (not the
  *    client), excluded flag + reason, mutual-exclusion rejection, unknown-id
  *  - updateMachineAction: re-link by owner, and that an edit without the picker
