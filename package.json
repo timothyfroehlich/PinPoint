@@ -48,7 +48,7 @@
     "db:reset-to-empty": "node --env-file=.env.local scripts/reset-to-empty.mjs",
     "check:config": "python3 scripts/check-config-drift.py > /dev/null",
     "check:migrations": "drizzle-kit check",
-    "check:linters": "yamllint .github/workflows/ && actionlint $(find .github/workflows \\( -name '*.yml' -o -name '*.yaml' \\) ! -name '*.lock.yml') && ruff check scripts/ && ruff format --check scripts/ && find scripts/ .devcontainer/ .claude/hooks/ -name '*.sh' -print0 | xargs -0 shellcheck && zizmor --min-severity low --format plain $(find .github/workflows \\( -name '*.yml' -o -name '*.yaml' \\) ! -name '*.lock.yml') && ratchet lint .github/workflows/ci.yml .github/workflows/preview-control.yaml .github/workflows/preview-reaper.yaml .github/workflows/preview-sync.yaml",
+    "check:linters": "yamllint .github/workflows/ && actionlint $(find .github/workflows \\( -name '*.yml' -o -name '*.yaml' \\) ! -name '*.lock.yml') && ruff check scripts/ && ruff format --check scripts/ && find scripts/ .devcontainer/ .claude/hooks/ -name '*.sh' -print0 | xargs -0 shellcheck && zizmor --min-severity low --format plain $(find .github/workflows \\( -name '*.yml' -o -name '*.yaml' \\) ! -name '*.lock.yml') && ratchet lint .github/workflows/ci.yml .github/workflows/preview-control.yaml .github/workflows/preview-reaper.yaml .github/workflows/preview-sync.yaml .github/workflows/audit-override.yaml",
     "audit:role-checks": "bash scripts/audit/no-hardcoded-role-checks.sh",
     "audit:sm-structural": "bash scripts/audit/no-sm-structural-breakpoints.sh",
     "check:behind-main": "bash scripts/check-behind-main.sh",
