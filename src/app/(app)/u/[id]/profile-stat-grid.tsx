@@ -33,7 +33,9 @@ function Stat({
         : "text-foreground";
   return (
     <>
-      <div className={`text-2xl font-bold ${numClass}`}>{value}</div>
+      <div className={`text-3xl font-extrabold tabular-nums ${numClass}`}>
+        {value}
+      </div>
       <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
         {icon}
         {label}

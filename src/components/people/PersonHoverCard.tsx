@@ -75,7 +75,9 @@ function PersonHoverCardLink({
             {data?.avatarUrl ? (
               <AvatarImage src={data.avatarUrl} alt="" />
             ) : null}
-            <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
+            <AvatarFallback className="bg-primary font-semibold text-on-primary">
+              {displayName.charAt(0)}
+            </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
             <div className="truncate font-semibold">
@@ -87,7 +89,11 @@ function PersonHoverCardLink({
               ) : null}
             </div>
             {data ? (
-              <span className="mt-0.5 inline-flex items-center rounded-full bg-primary-container px-2.5 py-0.5 text-xs font-semibold capitalize text-primary">
+              <span className="mt-0.5 inline-flex items-center gap-1.5 rounded-full border border-primary/35 bg-primary-container px-2.5 py-0.5 text-xs font-semibold capitalize text-primary">
+                <span
+                  className="size-1.5 rounded-full bg-primary"
+                  aria-hidden="true"
+                />
                 {data.role}
               </span>
             ) : null}
