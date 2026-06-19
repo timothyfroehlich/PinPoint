@@ -94,8 +94,9 @@ interface UnsavedChangesGuardArgs {
   hasFailed: boolean;
   /** Any unflushed/pending/failed state — flush-on-nav protects these. */
   hasUnsaved: boolean;
-  /** Fire-and-forget flush of every pending debounced save. */
-  flushAll: () => void;
+  /** Fire-and-forget persist of every not-yet-cleanly-saved set (status-driven,
+   *  so it covers failed sets that have no live debounce timer). */
+  flushUnsaved: () => void;
 }
 
 /**
@@ -120,15 +121,15 @@ interface UnsavedChangesGuardArgs {
  * out of the tab, and we can't wrap every `<Link>` in the app. `onNavigate` is
  * per-Link, so global capture is the only comprehensive choice.
  *
- * NO-DELAY CONTRACT (ratified by Tim): `flushAll()` on the nav/popstate path is
- * fire-and-forget — it kicks off the save(s) and returns in the same tick.
+ * NO-DELAY CONTRACT (ratified by Tim): `flushUnsaved()` on the nav/popstate path
+ * is fire-and-forget — it kicks off the save(s) and returns in the same tick.
  * NEVER await the flush or hold navigation pending a save result.
  */
 function useUnsavedChangesGuard({
   enabled,
   hasFailed,
   hasUnsaved,
-  flushAll,
+  flushUnsaved,
 }: UnsavedChangesGuardArgs): void {
   useEffect(() => {
     if (!enabled) return;
@@ -138,13 +139,13 @@ function useUnsavedChangesGuard({
       // Modern browsers show the native prompt on preventDefault alone.
       e.preventDefault();
       // Best-effort: async writes may not complete on unload.
-      flushAll();
+      flushUnsaved();
     };
 
     const onPopState = (): void => {
       // No reliable synchronous block for popstate exists — flush is the
       // protection. The navigation proceeds regardless (fire-and-forget).
-      if (hasUnsaved) flushAll();
+      if (hasUnsaved) flushUnsaved();
     };
 
     const onClickCapture = (e: MouseEvent): void => {
@@ -176,7 +177,7 @@ function useUnsavedChangesGuard({
       }
       if (hasUnsaved) {
         // Pending/dirty (but not failed): flush and leave silently — NO prompt.
-        flushAll();
+        flushUnsaved();
       }
     };
 
@@ -188,7 +189,7 @@ function useUnsavedChangesGuard({
       window.removeEventListener("popstate", onPopState);
       document.removeEventListener("click", onClickCapture, true);
     };
-  }, [enabled, hasFailed, hasUnsaved, flushAll]);
+  }, [enabled, hasFailed, hasUnsaved, flushUnsaved]);
 }
 
 interface SettingsTabProps {
@@ -429,13 +430,41 @@ export function SettingsTab({
   );
 
   // -- Auto-save debounce (800 ms) --------------------------------------------
-  // useAutoSave FLUSHES pending debounced saves on unmount (durability — Task 9),
-  // so an in-app navigation mid-debounce still persists silently; the fired
-  // server action survives the tab unmount and completes in the background.
+  // useAutoSave owns ONLY debounce timing (it cancels its timers on unmount).
+  // Durability (flushing on every leaving path) is owned here by the
+  // save-status-driven `flushUnsaved` below — not by the timer map, which
+  // misses a set whose debounce already fired and whose save then FAILED.
   const autoSave = useAutoSave(runSave);
-  // Stable flush handle for the nav guard (the `autoSave` object is a fresh
-  // literal each render; `flushAll` is referentially stable).
-  const { flushAll } = autoSave;
+
+  // -- Leaving-flush: persist every NOT-yet-cleanly-saved set ------------------
+  // Driven by save-status, NOT the debounce timer map. `dirtyIds` is the
+  // complete superset of unsaved sets: markDirty adds on every edit, markClean
+  // removes ONLY on a successful save, and markFailed leaves dirty intact — so a
+  // failed set (which has no live timer) is still covered. We union failedIds
+  // defensively. `autoSave.flush(id)` cancels any pending timer THEN persists,
+  // so each id fires exactly once (no double-fire with the debounce).
+  //
+  // Held in a ref so the unmount effect (below) reads the CURRENT id sets with
+  // no stale closure, and so the handle passed to the nav guard stays stable.
+  //
+  // NO-DELAY CONTRACT (Tim): fire-and-forget — kicks off the saves and returns
+  // in the same tick. The fired server actions survive the tab unmount.
+  const flushUnsavedRef = useRef<() => void>(() => undefined);
+  flushUnsavedRef.current = (): void => {
+    const ids = new Set<string>([
+      ...saveStatus.dirtyIds,
+      ...saveStatus.failedIds,
+    ]);
+    for (const id of ids) autoSave.flush(id);
+  };
+  const flushUnsaved = useCallback((): void => flushUnsavedRef.current(), []);
+
+  // Flush — don't drop — every unsaved set when the tab unmounts (in-app
+  // navigation that doesn't go through an <a>, e.g. switching machine tabs).
+  // Runs once on unmount; reads current ids via the ref. Ordering vs
+  // useAutoSave's own timer-clear cleanup does NOT matter: flushUnsaved persists
+  // by STATUS (calling runSave per dirty id), independent of timer survival.
+  useEffect(() => () => flushUnsavedRef.current(), []);
 
   // -- Stage the working copy as the pending payload (C1 discipline) -----------
   // Every auto-save trigger does: stagePayload(setId) THEN autoSave.schedule/flush.
@@ -471,11 +500,14 @@ export function SettingsTab({
   // -- Nav guard: flush on dirty/pending nav, prompt only on a FAILED save ----
   // The single coherent beforeunload + popstate + capturing-click handler lives
   // inside the hook (consolidated — no duplicate beforeunload listener here).
+  // The leaving-flush is `flushUnsaved` (save-status-driven), NOT flushAll
+  // (timer-only) — so a failed set with no live timer still re-persists on the
+  // popstate / beforeunload / not-failed-click paths.
   useUnsavedChangesGuard({
     enabled: canEdit,
     hasFailed: saveStatus.failedIds.size > 0,
     hasUnsaved: saveStatus.hasUnsaved,
-    flushAll,
+    flushUnsaved,
   });
 
   // The preferred set is always pinned to the top. A stable sort preserves the

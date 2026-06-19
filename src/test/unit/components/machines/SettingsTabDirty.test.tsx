@@ -1082,6 +1082,95 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     const payload = saveMock.mock.calls[0]?.[0];
     expect(payload?.description).toEqual(SAMPLE_DOC);
   });
+
+  it("(failed + popstate) a FAILED save is re-persisted on popstate (no timer, no prompt)", async () => {
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+    // First save FAILS (puts the set into failedIds, no live timer).
+    saveMock.mockResolvedValueOnce({ success: false, error: "Network error" });
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
+
+      // Edit + blur → flush → save fires → fails. The debounce timer is gone
+      // (flush cancelled it), so the set sits in failedIds/dirtyIds with NO
+      // timer — exactly the case flushAll() (timer-only) would have missed.
+      const input = screen.getByRole("textbox", { name: "set name" });
+      fireEvent.change(input, { target: { value: "Casual" } });
+      fireEvent.blur(input);
+
+      await waitFor(() => {
+        expect(saveMock).toHaveBeenCalledTimes(1);
+      });
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // popstate (back/forward) must re-persist the failed set from save-status,
+      // not from the (empty) timer map — and must NOT prompt.
+      act(() => {
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+
+      await waitFor(() => {
+        expect(saveMock).toHaveBeenCalledTimes(2);
+      });
+      expect(saveMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ name: "Casual" })
+      );
+      expect(confirmSpy).not.toHaveBeenCalled();
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
+  it("(failed + unmount) a FAILED save is re-persisted on unmount (no timer)", async () => {
+    saveMock.mockResolvedValueOnce({ success: false, error: "Network error" });
+    const { unmount } = render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[oneSet()]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    const input = screen.getByRole("textbox", { name: "set name" });
+    fireEvent.change(input, { target: { value: "Casual" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledTimes(1);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Non-anchor unmount (e.g. switching machine tabs — the capturing click
+    // listener only catches <a>). The leaving-flush must re-persist the failed
+    // set from save-status even though it has no live debounce timer.
+    act(() => {
+      unmount();
+    });
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledTimes(2);
+    });
+    expect(saveMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: "Casual" })
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

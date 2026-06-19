@@ -12,14 +12,12 @@ const DEBOUNCE_MS = 800;
  * doesn't cross-cancel. Timers live in a ref (no render output) and are cleared
  * on unmount.
  *
- * Unmount FLUSHES pending timers (PP-43q3 Task 9 durability): a debounced edit
- * that hasn't fired yet must still persist when the tab unmounts on in-app
- * navigation. The fired server action survives the unmount and completes in the
- * background (React 19 makes the post-unmount status update a silent no-op).
- * This is the always-live contract: every edit persists. (Flushing here rather
- * than in a SettingsTab effect avoids a fragile dependency on effect-cleanup
- * ordering — React runs cleanups top-to-bottom, so a parent effect registered
- * after this hook cannot reliably flush before this hook clears its own timers.)
+ * This hook owns ONLY debounce timing. On unmount it CANCELS its pending timers
+ * (single responsibility — it does not persist on teardown). Durability is owned
+ * by SettingsTab's save-status-driven leaving-flush (`flushUnsaved`), which
+ * persists every not-yet-cleanly-saved set on nav/popstate/unmount — including a
+ * set whose debounce already fired and whose save then FAILED (it has no live
+ * timer, so a timer-only flush would miss it). PP-43q3 Task 9.
  */
 export function useAutoSave(persist: (id: string) => void): {
   schedule: (id: string) => void;
@@ -66,9 +64,15 @@ export function useAutoSave(persist: (id: string) => void): {
     for (const id of [...timers.current.keys()]) flush(id);
   }, [flush]);
 
-  // Flush (don't drop) any pending debounced saves on unmount — see header.
-  // `flushAll` is stable; the empty-dep effect runs its cleanup once on unmount.
-  useEffect(() => () => flushAll(), [flushAll]);
+  // Cancel (don't persist) any pending debounce timers on unmount — durability
+  // is owned by SettingsTab's leaving-flush (see header). Clears the timer map.
+  useEffect(
+    () => () => {
+      for (const t of timers.current.values()) clearTimeout(t);
+      timers.current.clear();
+    },
+    []
+  );
 
   return { schedule, flush, flushAll, cancel };
 }

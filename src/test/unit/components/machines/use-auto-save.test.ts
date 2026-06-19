@@ -67,19 +67,22 @@ describe("useAutoSave", () => {
     expect(persist).toHaveBeenCalledWith("b");
   });
 
-  it("FLUSHES (does not drop) pending debounced saves on unmount (durability)", () => {
+  it("CANCELS (does not persist) pending debounce timers on unmount", () => {
+    // This hook owns only debounce timing; on unmount it cancels its timers.
+    // Durability (persisting unsaved sets on teardown) is owned by SettingsTab's
+    // save-status-driven leaving-flush, not by this hook.
     const persist = vi.fn();
     const { result, unmount } = renderHook(() => useAutoSave(persist));
     act(() => {
       result.current.schedule("a");
       result.current.schedule("b");
     });
-    // Debounce hasn't fired yet.
     expect(persist).not.toHaveBeenCalled();
-    // Unmount must flush both pending saves rather than cancelling them.
+    // Unmount cancels the timers — no persist fires from the hook itself.
     act(() => unmount());
-    expect(persist).toHaveBeenCalledTimes(2);
-    expect(persist).toHaveBeenCalledWith("a");
-    expect(persist).toHaveBeenCalledWith("b");
+    expect(persist).not.toHaveBeenCalled();
+    // And the cancelled timers never fire afterward.
+    act(() => vi.advanceTimersByTime(800));
+    expect(persist).not.toHaveBeenCalled();
   });
 });
