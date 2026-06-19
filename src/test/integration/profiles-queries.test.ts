@@ -164,6 +164,56 @@ describe("profile queries", () => {
     expect(counts.fixed).toBe(1);
   });
 
+  it("getProfileActivityCounts excludes non-resolved transitions and other users from fixed", async () => {
+    const db = await getTestDb();
+    // (1) A non-resolved transition (new -> in_progress) by USER must NOT count:
+    // exercises the ANY(CLOSED_STATUSES) status filter negatively.
+    const [nonResolved] = await db
+      .insert(issues)
+      .values(
+        createTestIssue("OWN2", { issueNumber: 1, title: "NR", status: "new" })
+      )
+      .returning({ id: issues.id });
+    await db.insert(issueComments).values(
+      createTestComment(nonResolved.id, {
+        authorId: USER,
+        isSystem: true,
+        content: null,
+        eventData: { type: "status_changed", from: "new", to: "in_progress" },
+      })
+    );
+
+    // (2) A status_changed -> fixed transition authored by a DIFFERENT user must
+    // NOT count toward USER's fixed total.
+    const OTHER = "00000000-0000-0000-0000-0000000000b2";
+    await db.insert(userProfiles).values(
+      createTestUser({
+        id: OTHER,
+        email: "other@example.com",
+        firstName: "Other",
+        lastName: "Person",
+      })
+    );
+    const [otherIssue] = await db
+      .insert(issues)
+      .values(
+        createTestIssue("OWN3", { issueNumber: 1, title: "O", status: "fixed" })
+      )
+      .returning({ id: issues.id });
+    await db.insert(issueComments).values(
+      createTestComment(otherIssue.id, {
+        authorId: OTHER,
+        isSystem: true,
+        content: null,
+        eventData: { type: "status_changed", from: "new", to: "fixed" },
+      })
+    );
+
+    // USER has no genuine fixed transition in this test's seed → 0.
+    const counts = await getProfileActivityCounts(USER);
+    expect(counts.fixed).toBe(0);
+  });
+
   it("getOpenIssueCountsByInitials counts only open-status issues", async () => {
     const db = await getTestDb();
     // OWN0 already has 2 reported issues (status 'new' = open from the base seed).

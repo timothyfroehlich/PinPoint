@@ -70,6 +70,11 @@ export async function getProfileActivityCounts(
           eq(issueComments.authorId, userId),
           eq(issueComments.isSystem, true),
           sql`${issueComments.eventData}->>'type' = 'status_changed'`,
+          // sql.raw is safe here: values are compile-time members of
+          // CLOSED_STATUSES (no user input), inlined as a literal ARRAY[...].
+          // Param-bound `ANY(${array})` is avoided — PGlite/Postgres emit it as a
+          // row constructor `ANY(($1,$2,...))`, rejected with "op ANY/ALL (array)
+          // requires array on right side". Do not "simplify" to the param form.
           sql`${issueComments.eventData}->>'to' = ANY(${sql.raw(`ARRAY[${[...CLOSED_STATUSES].map((s) => `'${s}'`).join(",")}]`)})`
         )
       ),
