@@ -45,12 +45,19 @@ vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
   RichTextEditor: ({
     ariaLabel,
     onChange,
+    onBlur,
   }: {
     ariaLabel?: string;
     onChange?: (doc: ProseMirrorDoc) => void;
+    onBlur?: () => void;
   }) => (
     <div>
-      <textarea aria-label={ariaLabel} />
+      <textarea
+        aria-label={ariaLabel}
+        onBlur={() => {
+          onBlur?.();
+        }}
+      />
       <button
         type="button"
         onClick={() => {
@@ -742,7 +749,14 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     }
   });
 
-  it("nav guard prompts confirm on an anchor click while a save is in flight, not when clean", async () => {
+  it("nav guard does NOT prompt on an anchor click while a save is merely in flight (pending, not failed) — it flushes silently", async () => {
+    // Hold the save open so the set stays in the PENDING state across the click.
+    const inflight = deferred<{
+      success: true;
+      id: string;
+      changed: boolean;
+    }>();
+    saveMock.mockReturnValue(inflight.promise);
     const confirmSpy = vi
       .spyOn(window, "confirm")
       .mockImplementation(() => false);
@@ -767,19 +781,26 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         fireEvent.click(link);
         expect(confirmSpy).not.toHaveBeenCalled();
 
-        // Dirty the name and blur to flush → runSave → markPending → guard arms.
+        // Dirty the name and blur to flush → runSave → markPending → pending.
         const input = screen.getByRole("textbox", { name: "set name" });
         fireEvent.change(input, { target: { value: "Casual" } });
         fireEvent.blur(input);
 
-        // Wait for markPending to run (guard arms on the next render cycle).
+        // The save is in flight (held open). Pending — NOT failed.
         await waitFor(() => {
-          // Clicking the link now should prompt.
-          fireEvent.click(link);
-          expect(confirmSpy).toHaveBeenCalledTimes(1);
+          expect(saveMock).toHaveBeenCalledTimes(1);
         });
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Clicking the link now must NOT prompt (pending is recoverable: the
+        // in-flight server action completes after the tab unmounts).
+        fireEvent.click(link);
+        expect(confirmSpy).not.toHaveBeenCalled();
       } finally {
         link.remove();
+        inflight.resolve({ success: true, id: "set-1", changed: true });
       }
     } finally {
       confirmSpy.mockRestore();
@@ -789,11 +810,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   // Task 8: reactive dirty signal — guard arms on first keystroke (PP-43q3)
   // ---------------------------------------------------------------------------
 
-  it("(dirty) nav-guard prompt fires on a link click right after a keystroke, before any blur/flush", async () => {
+  it("(dirty) a link click right after a keystroke (dirty, no failure) does NOT prompt but flushes the pending save", async () => {
     const confirmSpy = vi
       .spyOn(window, "confirm")
       .mockImplementation(() => false);
-    vi.useFakeTimers();
     try {
       render(
         <SettingsTab
@@ -812,23 +832,32 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
 
       try {
         // Type a single character — editSet calls markDirty, so hasUnsaved is
-        // true immediately, BEFORE any blur/flush.
+        // true immediately, BEFORE any blur/flush. The 800 ms debounce has NOT
+        // fired, so nothing has hit the server yet.
         const input = screen.getByRole("textbox", { name: "set name" });
         fireEvent.change(input, { target: { value: "C" } });
+        expect(saveMock).not.toHaveBeenCalled();
 
-        // No blur, no debounce advance. The guard should be armed already.
-        // Use act to let the markDirty state update settle.
+        // Let the markDirty state update settle.
         await act(async () => {
           await Promise.resolve();
         });
 
+        // Clicking the link must NOT prompt (dirty, not failed) and must FLUSH
+        // the pending debounce so the edit persists silently on the way out.
         fireEvent.click(link);
-        expect(confirmSpy).toHaveBeenCalledTimes(1);
+        expect(confirmSpy).not.toHaveBeenCalled();
+
+        await waitFor(() => {
+          expect(saveMock).toHaveBeenCalledTimes(1);
+        });
+        expect(saveMock).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "C" })
+        );
       } finally {
         link.remove();
       }
     } finally {
-      vi.useRealTimers();
       confirmSpy.mockRestore();
     }
   });
@@ -884,7 +913,7 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     }
   });
 
-  it("(dirty) guard stays armed after a failed save — tab is dirty AND failed", async () => {
+  it("(failed) guard PROMPTS on a link click after a save FAILED, and cancel blocks navigation", async () => {
     const confirmSpy = vi
       .spyOn(window, "confirm")
       .mockImplementation(() => false);
@@ -920,16 +949,138 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           await Promise.resolve();
         });
 
-        // The guard should still be armed (dirty + failed). The auto-retry
-        // timer is still running, but hasUnsaved is true regardless.
-        fireEvent.click(link);
+        // A FAILED save is the one prompt case: clicking a link must call
+        // window.confirm with the failed-save copy, and (cancel → false) must
+        // block navigation by preventing the click default.
+        const blocked = fireEvent.click(link);
         expect(confirmSpy).toHaveBeenCalledTimes(1);
+        expect(confirmSpy).toHaveBeenCalledWith(
+          "A settings change failed to save. Leave and lose it?"
+        );
+        // fireEvent.click returns false when a handler called preventDefault.
+        expect(blocked).toBe(false);
       } finally {
         link.remove();
       }
     } finally {
       confirmSpy.mockRestore();
     }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Task 9: durability — flush on nav/popstate/unmount; rich-text onBlur flush
+  // ---------------------------------------------------------------------------
+
+  it("(popstate) browser back/forward with unsaved edits flushes the pending save (no prompt)", async () => {
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
+
+      // Dirty the name (markDirty → hasUnsaved). Debounce has NOT fired yet.
+      const input = screen.getByRole("textbox", { name: "set name" });
+      fireEvent.change(input, { target: { value: "Casual" } });
+      expect(saveMock).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // A popstate (back/forward) must flush the pending debounce, with no
+      // prompt — there is no synchronous way to block popstate, so flush is the
+      // protection.
+      act(() => {
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+
+      await waitFor(() => {
+        expect(saveMock).toHaveBeenCalledTimes(1);
+      });
+      expect(saveMock).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Casual" })
+      );
+      expect(confirmSpy).not.toHaveBeenCalled();
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
+  it("(unmount) unmounting the tab with a pending debounce flushes it (the edit persists)", async () => {
+    const { unmount } = render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[oneSet()]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    // Dirty the name; the 800 ms debounce is still pending (not fired).
+    const input = screen.getByRole("textbox", { name: "set name" });
+    fireEvent.change(input, { target: { value: "Casual" } });
+    expect(saveMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Unmount (in-app soft navigation away from the tab). The flush-on-unmount
+    // effect must flush the pending debounce so the edit is not dropped.
+    act(() => {
+      unmount();
+    });
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledTimes(1);
+    });
+    expect(saveMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Casual" })
+    );
+  });
+
+  it("(rich-text onBlur) blurring the description editor flushes that set's save", async () => {
+    const setWithDescOpen: SettingsSetData = { ...oneSet() };
+    render(
+      <SettingsTab
+        canEdit
+        machineId="m1"
+        initialSets={[setWithDescOpen]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    // Edit the description via the mock editor's onChange (markDirty + schedule,
+    // debounce pending). Then blur the editor → onBlur → flush.
+    const descEditors = screen.getAllByRole("button", {
+      name: "type-in-Edit text",
+    });
+    const descEditor = descEditors[0];
+    if (!descEditor) throw new Error("description editor not rendered");
+    fireEvent.click(descEditor);
+    expect(saveMock).not.toHaveBeenCalled();
+
+    // Blur the description editor's textarea → onBlur fires → autoSave.flush.
+    const textareas = screen.getAllByRole("textbox", { name: "Edit text" });
+    const descTextarea = textareas[0];
+    if (!descTextarea) throw new Error("description textarea not rendered");
+    fireEvent.blur(descTextarea);
+
+    await waitFor(() => {
+      expect(saveMock).toHaveBeenCalledTimes(1);
+    });
+    const payload = saveMock.mock.calls[0]?.[0];
+    expect(payload?.description).toEqual(SAMPLE_DOC);
   });
 });
 

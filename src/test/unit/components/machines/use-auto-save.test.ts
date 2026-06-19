@@ -66,4 +66,20 @@ describe("useAutoSave", () => {
     expect(persist).toHaveBeenCalledTimes(1);
     expect(persist).toHaveBeenCalledWith("b");
   });
+
+  it("FLUSHES (does not drop) pending debounced saves on unmount (durability)", () => {
+    const persist = vi.fn();
+    const { result, unmount } = renderHook(() => useAutoSave(persist));
+    act(() => {
+      result.current.schedule("a");
+      result.current.schedule("b");
+    });
+    // Debounce hasn't fired yet.
+    expect(persist).not.toHaveBeenCalled();
+    // Unmount must flush both pending saves rather than cancelling them.
+    act(() => unmount());
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(persist).toHaveBeenCalledWith("a");
+    expect(persist).toHaveBeenCalledWith("b");
+  });
 });

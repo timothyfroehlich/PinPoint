@@ -17,6 +17,9 @@ interface NoteSectionProps {
   onBodyChange: (body: ProseMirrorDoc | null) => void;
   /** Called on title blur so the parent can flush the auto-save debounce. */
   onTitleBlur?: (() => void) | undefined;
+  /** Called on body (rich-text) blur so the parent can flush the auto-save
+   *  debounce — symmetric with the title and plain-text fields (Task 9). */
+  onBodyBlur?: (() => void) | undefined;
 }
 
 /**
@@ -31,6 +34,7 @@ export function NoteSection({
   onTitleChange,
   onBodyChange,
   onTitleBlur,
+  onBodyBlur,
 }: NoteSectionProps): React.JSX.Element {
   return (
     <div className="py-2.5 max-md:py-1.5">
@@ -61,6 +65,7 @@ export function NoteSection({
           canEdit={canEdit}
           placeholder={`Add ${(note.title || "notes").toLowerCase()}…`}
           onValueChange={onBodyChange}
+          onBlur={onBodyBlur}
         />
       </div>
     </div>

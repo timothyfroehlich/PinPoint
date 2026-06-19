@@ -12,11 +12,14 @@ const DEBOUNCE_MS = 800;
  * doesn't cross-cancel. Timers live in a ref (no render output) and are cleared
  * on unmount.
  *
- * Unmount intentionally cancels pending timers WITHOUT flushing — pending edits
- * are not auto-persisted on teardown. This is by design: the SettingsTab nav
- * guard blocks in-app navigation while saves are unsaved, and `beforeunload`
- * calls `flushAll()` (both wired in Task 6), so the caller is responsible for
- * flushing before unmounting.
+ * Unmount FLUSHES pending timers (PP-43q3 Task 9 durability): a debounced edit
+ * that hasn't fired yet must still persist when the tab unmounts on in-app
+ * navigation. The fired server action survives the unmount and completes in the
+ * background (React 19 makes the post-unmount status update a silent no-op).
+ * This is the always-live contract: every edit persists. (Flushing here rather
+ * than in a SettingsTab effect avoids a fragile dependency on effect-cleanup
+ * ordering — React runs cleanups top-to-bottom, so a parent effect registered
+ * after this hook cannot reliably flush before this hook clears its own timers.)
  */
 export function useAutoSave(persist: (id: string) => void): {
   schedule: (id: string) => void;
@@ -63,13 +66,9 @@ export function useAutoSave(persist: (id: string) => void): {
     for (const id of [...timers.current.keys()]) flush(id);
   }, [flush]);
 
-  useEffect(
-    () => () => {
-      for (const t of timers.current.values()) clearTimeout(t);
-      timers.current.clear();
-    },
-    []
-  );
+  // Flush (don't drop) any pending debounced saves on unmount — see header.
+  // `flushAll` is stable; the empty-dep effect runs its cleanup once on unmount.
+  useEffect(() => () => flushAll(), [flushAll]);
 
   return { schedule, flush, flushAll, cancel };
 }

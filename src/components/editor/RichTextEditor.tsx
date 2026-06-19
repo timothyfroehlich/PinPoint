@@ -32,6 +32,12 @@ export interface RichTextEditorHandle {
 interface RichTextEditorProps {
   content: ProseMirrorDoc | null;
   onChange: (doc: ProseMirrorDoc) => void;
+  /**
+   * Fired when the editor loses focus. The Settings tab uses this to flush its
+   * auto-save debounce on blur (symmetric with its plain-text inputs). Optional
+   * and backward-compatible — existing callers are unaffected.
+   */
+  onBlur?: (() => void) | undefined;
   mentionsEnabled?: boolean | undefined;
   placeholder?: string | undefined;
   compact?: boolean | undefined;
@@ -56,6 +62,7 @@ export const RichTextEditor = forwardRef<
   {
     content,
     onChange,
+    onBlur,
     mentionsEnabled = false,
     placeholder = "Write something...",
     compact = false,
@@ -163,6 +170,9 @@ export const RichTextEditor = forwardRef<
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getJSON() as ProseMirrorDoc);
+    },
+    onBlur: () => {
+      onBlur?.();
     },
     editorProps: {
       attributes: {

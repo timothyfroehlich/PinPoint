@@ -20,8 +20,9 @@ interface InlineMarkdownFieldProps {
    * (or null when empty). There is no explicit Edit/Save/Cancel — auto-save
    * debounce is the only write boundary.
    *
-   * Rich-text is DEBOUNCE-ONLY: RichTextEditor exposes no `onBlur`, so there
-   * is no blur-flush path for this field. The debounce (800 ms) handles it.
+   * Rich text keeps its 800 ms debounce AND now flushes on blur (via `onBlur`),
+   * symmetric with the plain-text inputs — leaving the editor persists
+   * immediately instead of waiting out the debounce.
    */
   canEdit: boolean;
   /**
@@ -30,6 +31,11 @@ interface InlineMarkdownFieldProps {
    * persists). The auto-save timer in SettingsTab persists it.
    */
   onValueChange: (value: ProseMirrorDoc | null) => void;
+  /**
+   * Called when the editor loses focus, so the parent can flush this set's
+   * auto-save debounce immediately (the blur-flush path). Optional.
+   */
+  onBlur?: (() => void) | undefined;
   label?: string;
   placeholder?: string;
   /** Smaller (xs, muted) rendering for the card-header description. */
@@ -57,6 +63,7 @@ export function InlineMarkdownField({
   value,
   canEdit,
   onValueChange,
+  onBlur,
   label,
   placeholder = "Add text…",
   compact = false,
@@ -86,6 +93,7 @@ export function InlineMarkdownField({
             onChange={(doc) => {
               onValueChange(normalize(doc));
             }}
+            onBlur={onBlur}
             // Settings descriptions/notes are documentation, not
             // conversation — @-mentions (which notify) make no sense here.
             mentionsEnabled={false}

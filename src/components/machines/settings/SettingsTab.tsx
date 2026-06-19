@@ -87,22 +87,66 @@ function cloneSectionDeep(section: SettingsSection): SettingsSection {
   }
 }
 
+interface UnsavedChangesGuardArgs {
+  /** Permission to edit — when false the guard does nothing. */
+  enabled: boolean;
+  /** A save has genuinely failed (the one unrecoverable case → prompt). */
+  hasFailed: boolean;
+  /** Any unflushed/pending/failed state — flush-on-nav protects these. */
+  hasUnsaved: boolean;
+  /** Fire-and-forget flush of every pending debounced save. */
+  flushAll: () => void;
+}
+
 /**
- * Navigation guard for the auto-save settings editor (PP-43q3). Warns before
- * refresh / tab-close (`beforeunload`) and in-app soft navigation (a capturing
- * click listener) whenever there are unsaved (pending or failed) saves.
+ * Navigation guard for the auto-save settings editor (PP-43q3). Makes leaving
+ * the page durable per the researched pattern:
+ *
+ *  - In-app soft navigation (a capturing document `click` on an in-app `<a>`):
+ *    if a save has FAILED, prompt before leaving (the one case where leaving
+ *    loses data we can't silently recover). Otherwise, when there are unsaved
+ *    edits, FLUSH them (fire-and-forget) and let navigation proceed with NO
+ *    prompt — soft navigation only unmounts the tab, so the in-flight server
+ *    action survives and completes in the background.
+ *  - `popstate` (browser back/forward): same logic. There is no reliable
+ *    synchronous way to block a popstate, so a fire-and-forget flush is the
+ *    only protection we can offer there.
+ *  - `beforeunload` (tab close / hard reload): native prompt when unsaved, plus
+ *    a best-effort flush (async writes may not complete on unload — this is the
+ *    weakest path; the flush-on-nav + popstate handlers are the real coverage).
+ *
+ * Why a GLOBAL capturing listener (+ popstate + beforeunload) rather than a
+ * per-`<Link>` `onNavigate` (Next 15.3+): the guard must catch EVERY navigation
+ * out of the tab, and we can't wrap every `<Link>` in the app. `onNavigate` is
+ * per-Link, so global capture is the only comprehensive choice.
+ *
+ * NO-DELAY CONTRACT (ratified by Tim): `flushAll()` on the nav/popstate path is
+ * fire-and-forget — it kicks off the save(s) and returns in the same tick.
+ * NEVER await the flush or hold navigation pending a save result.
  */
-function useUnsavedChangesGuard(enabled: boolean): void {
+function useUnsavedChangesGuard({
+  enabled,
+  hasFailed,
+  hasUnsaved,
+  flushAll,
+}: UnsavedChangesGuardArgs): void {
   useEffect(() => {
     if (!enabled) return;
 
     const onBeforeUnload = (e: BeforeUnloadEvent): void => {
+      if (!hasUnsaved) return;
       // Modern browsers show the native prompt on preventDefault alone.
       e.preventDefault();
-      // Note: flushAll() is called separately in the beforeunload handler in
-      // SettingsTab; async writes may not complete on unload — the nav guard
-      // is the real protection.
+      // Best-effort: async writes may not complete on unload.
+      flushAll();
     };
+
+    const onPopState = (): void => {
+      // No reliable synchronous block for popstate exists — flush is the
+      // protection. The navigation proceeds regardless (fire-and-forget).
+      if (hasUnsaved) flushAll();
+    };
+
     const onClickCapture = (e: MouseEvent): void => {
       if (
         e.defaultPrevented ||
@@ -118,22 +162,33 @@ function useUnsavedChangesGuard(enabled: boolean): void {
       if (!anchor) return;
       const href = anchor.getAttribute("href");
       if (!href || href.startsWith("#") || anchor.target === "_blank") return;
-      const ok = window.confirm(
-        "You have unsaved settings still open. Leave without saving them?"
-      );
-      if (!ok) {
-        e.preventDefault();
-        e.stopPropagation();
+
+      if (hasFailed) {
+        // The one prompt case: a save already FAILED, so leaving loses it.
+        const ok = window.confirm(
+          "A settings change failed to save. Leave and lose it?"
+        );
+        if (!ok) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        return;
+      }
+      if (hasUnsaved) {
+        // Pending/dirty (but not failed): flush and leave silently — NO prompt.
+        flushAll();
       }
     };
 
     window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("popstate", onPopState);
     document.addEventListener("click", onClickCapture, true);
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("popstate", onPopState);
       document.removeEventListener("click", onClickCapture, true);
     };
-  }, [enabled]);
+  }, [enabled, hasFailed, hasUnsaved, flushAll]);
 }
 
 interface SettingsTabProps {
@@ -374,7 +429,13 @@ export function SettingsTab({
   );
 
   // -- Auto-save debounce (800 ms) --------------------------------------------
+  // useAutoSave FLUSHES pending debounced saves on unmount (durability — Task 9),
+  // so an in-app navigation mid-debounce still persists silently; the fired
+  // server action survives the tab unmount and completes in the background.
   const autoSave = useAutoSave(runSave);
+  // Stable flush handle for the nav guard (the `autoSave` object is a fresh
+  // literal each render; `flushAll` is referentially stable).
+  const { flushAll } = autoSave;
 
   // -- Stage the working copy as the pending payload (C1 discipline) -----------
   // Every auto-save trigger does: stagePayload(setId) THEN autoSave.schedule/flush.
@@ -407,18 +468,15 @@ export function SettingsTab({
     else autoSave.schedule(setId);
   }
 
-  // -- Nav guard: arm on pending or failed saves ------------------------------
-  useUnsavedChangesGuard(canEdit && saveStatus.hasUnsaved);
-
-  // beforeunload: attempt to flush pending debounces (async writes may not
-  // complete on unload — the nav guard is the real protection).
-  useEffect(() => {
-    const handler = (): void => {
-      autoSave.flushAll();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [autoSave]);
+  // -- Nav guard: flush on dirty/pending nav, prompt only on a FAILED save ----
+  // The single coherent beforeunload + popstate + capturing-click handler lives
+  // inside the hook (consolidated — no duplicate beforeunload listener here).
+  useUnsavedChangesGuard({
+    enabled: canEdit,
+    hasFailed: saveStatus.failedIds.size > 0,
+    hasUnsaved: saveStatus.hasUnsaved,
+    flushAll,
+  });
 
   // The preferred set is always pinned to the top. A stable sort preserves the
   // insertion order of everything else.
@@ -863,9 +921,18 @@ export function SettingsTab({
     }));
   }
 
-  // onSectionBlurFlush: called from a section's blur callback (plain-text
-  // fields only) to flush the debounce immediately on focus-leave.
+  // onSectionBlurFlush: called from a section's blur callback (plain-text fields
+  // AND now rich-text bodies via RichTextEditor's onBlur) to flush the debounce
+  // immediately on focus-leave.
   function onSectionBlurFlush(setId: string, _sectionId: string): void {
+    stagePayload(setId);
+    autoSave.flush(setId);
+  }
+
+  // onSetBlurFlush: flush this set's debounce immediately on focus-leave. Used
+  // by the header description's rich-text onBlur (symmetric with plain-text
+  // fields, which flush on blur) — rich text KEEPS its debounce AND flushes.
+  function onSetBlurFlush(setId: string): void {
     stagePayload(setId);
     autoSave.flush(setId);
   }
@@ -985,6 +1052,9 @@ export function SettingsTab({
               }}
               onUpdateDescription={(value) => {
                 updateDescription(set.id, value);
+              }}
+              onDescriptionBlur={() => {
+                onSetBlurFlush(set.id);
               }}
               onAddSection={(spec) => {
                 addSection(set.id, spec);

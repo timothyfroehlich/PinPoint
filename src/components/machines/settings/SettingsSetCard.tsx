@@ -80,6 +80,9 @@ interface SettingsSetCardProps {
   onDuplicate: () => void;
   onDelete: () => void;
   onUpdateDescription: (value: ProseMirrorDoc | null) => void;
+  /** Called when the header description editor blurs, so the parent can flush
+   *  the auto-save debounce for this set (rich-text blur path — Task 9). */
+  onDescriptionBlur: () => void;
   // Section-level operations (keyed by section id)
   onAddSection: (spec: AddSectionSpec) => void;
   onDeleteSection: (sectionId: string) => void;
@@ -235,6 +238,7 @@ export function SettingsSetCard({
   onDuplicate,
   onDelete,
   onUpdateDescription,
+  onDescriptionBlur,
   onAddSection,
   onDeleteSection,
   onReorderSections,
@@ -349,6 +353,7 @@ export function SettingsSetCard({
               onUpdateNoteBody(section.id, body);
             }}
             onTitleBlur={() => onSectionBlurFlush(section.id)}
+            onBodyBlur={() => onSectionBlurFlush(section.id)}
           />
         );
     }
@@ -531,6 +536,7 @@ export function SettingsSetCard({
               placeholder="Add a short description…"
               compact
               onValueChange={onUpdateDescription}
+              onBlur={onDescriptionBlur}
             />
           </div>
         )}
