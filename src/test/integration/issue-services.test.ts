@@ -31,8 +31,6 @@ import {
   addIssueComment,
   reassignIssueMachine,
   updateIssueTitle,
-  assertIssuePersisted,
-  IssueCommitVerificationError,
 } from "~/services/issues";
 import { planNotification } from "~/lib/notifications";
 import { plainTextToDoc, type ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -1347,17 +1345,13 @@ describe("Issue Service Functions (Integration)", () => {
   });
 
   // -----------------------------------------------------------------------
-  // createIssue post-commit read-back guard (PP-qk7s, incident 2026-06-18)
-  //
-  // Integration path: verify the happy-path restructure is intact — the row
-  // is committed and findable by id after createIssue returns.
-  //
-  // Unit path: assertIssuePersisted is extracted so the throw path can be
-  // tested deterministically (PGlite transactions always persist, making the
-  // "row missing" outcome unreachable through createIssue in integration tests).
+  // createIssue post-commit read-back guard (PP-qk7s, incident 2026-06-18).
+  // Integration coverage: the happy-path restructure is intact — the row is
+  // committed and findable by id after createIssue returns. The throw-path
+  // unit tests for assertIssuePersisted live in src/services/issues.readback.test.ts.
   // -----------------------------------------------------------------------
   describe("createIssue read-back guard (PP-qk7s)", () => {
-    it("integration: createIssue persists the row and returns it findable by id (happy path)", async () => {
+    it("createIssue persists the row and returns it findable by id (happy path)", async () => {
       const db = await getTestDb();
 
       const { issue, deliveryPlan, deduped } = await createIssue({
@@ -1382,54 +1376,6 @@ describe("Issue Service Functions (Integration)", () => {
 
       // Delivery plan is present (notifications were planned).
       expect(deliveryPlan).toBeDefined();
-    });
-
-    // Unit tests for assertIssuePersisted — the extracted helper that owns
-    // the throw path. Using a minimal reader stub keeps these free of PGlite
-    // setup overhead while covering both outcomes deterministically.
-
-    it("unit: assertIssuePersisted resolves when the row exists", async () => {
-      const reader = {
-        query: {
-          issues: {
-            findFirst: () => Promise.resolve({ id: "some-uuid" }),
-          },
-        },
-      };
-      // Must not throw when the row is present.
-      await expect(
-        assertIssuePersisted(
-          reader as Parameters<typeof assertIssuePersisted>[0],
-          "some-uuid",
-          "STM"
-        )
-      ).resolves.toBeUndefined();
-    });
-
-    it("unit: assertIssuePersisted throws IssueCommitVerificationError when the row is absent", async () => {
-      const reader = {
-        query: {
-          issues: {
-            findFirst: () => Promise.resolve(undefined),
-          },
-        },
-      };
-      await expect(
-        assertIssuePersisted(
-          reader as Parameters<typeof assertIssuePersisted>[0],
-          "missing-uuid",
-          "STM"
-        )
-      ).rejects.toThrow(IssueCommitVerificationError);
-    });
-
-    it("unit: IssueCommitVerificationError message includes machineInitials and id but not PII", () => {
-      const err = new IssueCommitVerificationError("TAF", "test-id-123");
-      expect(err.name).toBe("IssueCommitVerificationError");
-      expect(err.message).toContain("TAF");
-      expect(err.message).toContain("test-id-123");
-      // Must not contain anything that looks like an email address.
-      expect(err.message).not.toMatch(/@/);
     });
   });
 });

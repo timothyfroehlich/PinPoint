@@ -1,4 +1,4 @@
-import { eq, and, type InferSelectModel, sql } from "drizzle-orm";
+import { eq, and, type InferSelectModel, type SQL, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import {
   issues,
@@ -454,11 +454,35 @@ export async function createIssue({
   // Root-cause connection fix (move write path to `:5432` session pooler)
   // is owned by PP-d8l8 (`src/server/db/index.ts`). This guard makes commit
   // loss impossible to be silent in the interim.
+  //
+  // REMOVAL TRIGGER: this is a stop-gap, not permanent. It adds an
+  // unconditional extra round-trip to every non-deduped createIssue. Once
+  // PP-d8l8 routes the write path off the `:6543` transaction pooler and that
+  // fix is verified in production, delete this guard (and `assertIssuePersisted`
+  // + `IssueCommitVerificationError` below) — the round-trip is pure overhead
+  // once the pooler can no longer silently drop a COMMIT.
   if (!result.deduped) {
     await assertIssuePersisted(db, result.issue.id, machineInitials);
   }
 
   return result;
+}
+
+/**
+ * Minimal read surface used by {@link assertIssuePersisted}: just the
+ * issue-existence look-up by id. Narrowed from the full `db` client so the
+ * helper's sole dependency is explicit and unit tests can supply a typed stub
+ * without an unsafe cast. The production `db` client satisfies this shape.
+ */
+export interface IssueExistenceReader {
+  query: {
+    issues: {
+      findFirst: (config: {
+        where?: SQL | undefined;
+        columns: { id: true };
+      }) => PromiseLike<{ id: string } | undefined>;
+    };
+  };
 }
 
 /**
@@ -477,7 +501,7 @@ export async function createIssue({
  * @internal exported only for testing; treat as package-private otherwise.
  */
 export async function assertIssuePersisted(
-  reader: Pick<typeof db, "query">,
+  reader: IssueExistenceReader,
   id: string,
   machineInitials: string
 ): Promise<void> {
