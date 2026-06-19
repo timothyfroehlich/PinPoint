@@ -21,6 +21,13 @@ export interface RowEditField {
   /** Render the input/value in a monospace font. */
   mono?: boolean;
   /**
+   * Code-like value (setting ID, DIP switch number). Turns off autocorrect /
+   * autocapitalize / spellcheck on the text input so a code like "DS-1" isn't
+   * silently rewritten on mobile. Mirrors EditableCell's `codeLike` exactly so
+   * desktop inline cells and the mobile sheet behave identically.
+   */
+  codeLike?: boolean;
+  /**
    * "text" → a labeled text Input. "toggle" → the shadcn Switch + ON/OFF text,
    * storing the literal strings "ON"/"OFF" so callers can round-trip the value.
    */
@@ -156,6 +163,19 @@ export function RowEditSheet({
                   id={fieldId}
                   value={value}
                   className={cn("text-base", field.mono && "font-mono")}
+                  // Single-field commit → the mobile Enter key reads "done".
+                  // Mirrors EditableCell so desktop and mobile match.
+                  enterKeyHint="done"
+                  // Code-like fields (IDs, switch numbers) opt out of the
+                  // autocorrect / autocapitalize / spellcheck machinery so a
+                  // value like "DS-1" survives intact on a phone.
+                  {...(field.codeLike
+                    ? {
+                        autoCorrect: "off",
+                        autoCapitalize: "off",
+                        spellCheck: false,
+                      }
+                    : {})}
                   onFocus={handleFocus}
                   onChange={(e) => {
                     onFieldChange(field.key, e.target.value);

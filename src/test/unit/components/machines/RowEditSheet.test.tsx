@@ -26,7 +26,14 @@ import {
 } from "~/components/machines/settings/RowEditSheet";
 
 const TEXT_FIELDS: RowEditField[] = [
-  { key: "id", label: "Setting ID", value: "A1", kind: "text", mono: true },
+  {
+    key: "id",
+    label: "Setting ID",
+    value: "A1",
+    kind: "text",
+    mono: true,
+    codeLike: true,
+  },
   { key: "value", label: "Value", value: "5 balls", kind: "text" },
 ];
 
@@ -82,6 +89,27 @@ describe("RowEditSheet (auto-save)", () => {
     });
     fireEvent.click(toggle);
     expect(onFieldChange).toHaveBeenCalledWith("free", "ON");
+  });
+
+  it("applies enterKeyHint + codeLike opt-outs to mobile text inputs", () => {
+    renderSheet();
+    // codeLike field (setting ID) mirrors EditableCell: autocapitalize/
+    // autocorrect/spellcheck off so a code like "A1"/"DS-1" isn't rewritten on
+    // a phone. enterKeyHint="done" on both text fields.
+    const idInput = screen.getByLabelText("Setting ID");
+    expect(idInput).toHaveAttribute("enterkeyhint", "done");
+    expect(idInput).toHaveAttribute("autocapitalize", "off");
+    expect(idInput).toHaveAttribute("autocorrect", "off");
+    expect(idInput).toHaveAttribute("spellcheck", "false");
+
+    // Non-codeLike prose field keeps the platform defaults (no opt-outs) but
+    // still gets enterKeyHint.
+    const valueInput = screen.getByLabelText("Value");
+    expect(valueInput).toHaveAttribute("enterkeyhint", "done");
+    expect(valueInput).not.toHaveAttribute("autocapitalize");
+    expect(valueInput).not.toHaveAttribute("autocorrect");
+    // Default spellcheck is not the explicit "false" opt-out.
+    expect(valueInput).not.toHaveAttribute("spellcheck", "false");
   });
 
   it("flushes on close (onClose fired when the sheet dismisses)", () => {

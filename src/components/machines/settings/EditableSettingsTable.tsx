@@ -124,7 +124,7 @@ export function EditableSettingsTable<T extends KeyedRow>({
     // Mobile sheet edits route through the SAME per-field commit the desktop
     // inline cells use — one persistence path (the working copy → the tab's
     // auto-save debounce). Toggles have no blur, so flush them eagerly; text
-    // edits ride the debounce until the sheet closes (handleSheetClose flush).
+    // edits ride the debounce until the sheet closes (onClose={onBlurFlush}).
     const next =
       col.kind === "toggle" ? (value === "ON" ? "ON" : "OFF") : value;
     col.commit(sheetRow, next);
@@ -257,6 +257,7 @@ export function EditableSettingsTable<T extends KeyedRow>({
                 label: col.header,
                 value: col.read(sheetRow),
                 mono: col.mono ?? false,
+                codeLike: col.codeLike ?? false,
                 kind: col.kind,
               }))
             : []
