@@ -33,9 +33,32 @@ if (process.env["VERCEL_ENV"] === "preview") {
   process.exit(0);
 }
 
-// Prefer non-pooled connections for DDL
-const connectionString =
-  process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
+// Resolve the migration endpoint. DDL must go over a connection that is (a)
+// reachable from the IPv4-only Vercel build runner and (b) able to run the
+// migrator's transactions.
+//
+// In production the Supabase↔Vercel integration injects POSTGRES_URL_NON_POOLING
+// as the IPv4 SESSION pooler (`…pooler.supabase.com:5432`) — verified: prod's
+// DIRECT host (`db.<ref>.supabase.co:5432`) is IPv6-only (no IPv4 add-on) and so
+// is unreachable from Vercel, yet prod migrations connect cleanly, which is only
+// possible over the IPv4 session pooler. We therefore REQUIRE NON_POOLING in
+// production and refuse to silently fall back to POSTGRES_URL, the `:6543`
+// TRANSACTION pooler: it does not support prepared statements (the PP-d8l8
+// hazard class) and is the wrong endpoint for DDL. See AGENTS.md §7.
+const isVercelProduction = process.env["VERCEL_ENV"] === "production";
+const nonPooling = process.env["POSTGRES_URL_NON_POOLING"];
+
+if (isVercelProduction && !nonPooling) {
+  console.error(
+    "❌ POSTGRES_URL_NON_POOLING is required in production but is unset.\n" +
+      "   Refusing to fall back to the :6543 transaction pooler (POSTGRES_URL) for DDL."
+  );
+  process.exit(1);
+}
+
+// Outside Vercel production (local / other), POSTGRES_URL is the local stack —
+// fall back to it so `pnpm run migrate:production` works locally.
+const connectionString = nonPooling ?? process.env["POSTGRES_URL"];
 
 if (!connectionString) {
   console.error(
@@ -44,10 +67,12 @@ if (!connectionString) {
   process.exit(1);
 }
 
-// Connection for migration must not use connection pooling if possible,
-// but Supabase transaction poolers (port 6543) don't support prepared statements anyway.
-// Ideally use the direct connection (port 5432).
-const sql = postgres(connectionString, { max: 1 });
+// `prepare: false`: the session pooler (:5432) supports prepared statements, but
+// disabling them is harmless for one-shot DDL and is REQUIRED if this ever
+// connects over the `:6543` transaction pooler. Mirrors src/server/db/index.ts
+// and scripts/lib/pg-client.mjs (the canonical PP-d8l8 setting). `max: 1` keeps
+// the migrator on a single connection so its transactions stay coherent.
+const sql = postgres(connectionString, { max: 1, prepare: false });
 const db = drizzle(sql);
 
 async function main() {
