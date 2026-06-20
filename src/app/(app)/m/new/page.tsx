@@ -5,7 +5,6 @@ import { getLoginUrl } from "~/lib/url";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { CreateMachineForm } from "./create-machine-form";
 import { PageContainer } from "~/components/layout/PageContainer";
-import { PageHeader } from "~/components/layout/PageHeader";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -58,17 +57,12 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   }));
 
   return (
-    <PageContainer size="standard">
-      <PageHeader title="New Machine" />
-
-      {/* Form */}
-      <Card className="max-w-2xl border-outline-variant">
-        <CardHeader>
-          <CardTitle className="text-2xl text-foreground">
-            Machine Details
-          </CardTitle>
+    <PageContainer size="standard" className="pt-4 pb-8">
+      <Card className="max-w-2xl gap-3 border-outline-variant">
+        <CardHeader className="px-4 pt-4 pb-0 sm:px-6">
+          <CardTitle className="text-xl text-foreground">New Machine</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4 sm:px-6">
           <CreateMachineForm
             allUsers={allUsers}
             canSelectOwner={canCreateMachine}

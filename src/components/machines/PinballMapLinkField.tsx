@@ -210,7 +210,7 @@ export function PinballMapLinkField({
       : "Search for a model…";
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <input type="hidden" name="pbmLinkPresent" value="1" />
       {excluded && <input type="hidden" name="pinballmapExcluded" value="on" />}
       {/* When the edition step is shown, the <select> below carries
@@ -228,7 +228,7 @@ export function PinballMapLinkField({
         Model
       </Label>
       <p className="text-xs text-muted-foreground">
-        The machine&apos;s model, from the PinballMap catalog.
+        From the PinballMap catalog.
       </p>
 
       <Popover open={open} onOpenChange={setOpen}>

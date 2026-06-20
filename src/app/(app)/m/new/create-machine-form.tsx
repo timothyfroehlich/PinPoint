@@ -26,16 +26,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 
 interface CreateMachineFormProps {
@@ -68,9 +58,6 @@ export function CreateMachineForm({
     AssigneeNotMemberMeta["assignee"] | null
   >(null);
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
-
-  // Clear-button confirmation
-  const [isClearOpen, setIsClearOpen] = useState(false);
 
   // Snapshot of the form's field values captured at first submission time,
   // so the promote-confirm re-submission has the correct data even if the
@@ -142,9 +129,6 @@ export function CreateMachineForm({
     setPromoteAssignee(null);
   };
 
-  const hasAnyValue =
-    nameValue.length > 0 || initialsValue.length > 0 || ownerIdValue.length > 0;
-
   return (
     <>
       {/* Flash message (non-ASSIGNEE_NOT_MEMBER errors) */}
@@ -208,30 +192,6 @@ export function CreateMachineForm({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isClearOpen} onOpenChange={setIsClearOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Clear all fields?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove everything you&apos;ve entered. You can&apos;t
-              undo this.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => {
-                resetForm();
-                setIsClearOpen(false);
-              }}
-            >
-              Clear fields
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <form
         action={formAction}
         ref={formRef}
@@ -248,10 +208,13 @@ export function CreateMachineForm({
         className="space-y-4"
       >
         {/* Machine Name */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label htmlFor="name" className="text-foreground">
             Machine Name *
           </Label>
+          <p className="text-xs text-muted-foreground">
+            Full name of the game.
+          </p>
           <Input
             id="name"
             name="name"
@@ -263,9 +226,6 @@ export function CreateMachineForm({
             value={nameValue}
             onChange={(e) => setNameValue(e.target.value)}
           />
-          <p className="text-xs text-muted-foreground">
-            Enter the full name of the pinball machine
-          </p>
         </div>
 
         {/* Model — links the machine to its PinballMap catalog model/edition.
@@ -274,10 +234,13 @@ export function CreateMachineForm({
         <PinballMapLinkField />
 
         {/* Machine Initials */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label htmlFor="initials" className="text-foreground">
             Initials *
           </Label>
+          <p className="text-xs text-muted-foreground">
+            2–6 characters, permanent.
+          </p>
           <Input
             id="initials"
             name="initials"
@@ -294,9 +257,6 @@ export function CreateMachineForm({
               );
             }}
           />
-          <p className="text-xs text-muted-foreground">
-            2-6 characters. Permanent unique identifier.
-          </p>
         </div>
 
         {/* Owner Select (Admin/Technician Only) */}
@@ -306,36 +266,28 @@ export function CreateMachineForm({
             users={users}
             onUsersChange={setUsers}
             onValueChange={setOwnerIdValue}
+            showHelpText={false}
           />
         )}
 
         {/* Actions */}
-        <div className="flex flex-wrap gap-3 pt-2">
-          <Button
-            type="submit"
-            className="flex-1 min-w-[160px] bg-primary text-on-primary hover:bg-primary/90"
-            loading={isPending}
-          >
-            Create Machine
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!hasAnyValue || isPending}
-            onClick={() => setIsClearOpen(true)}
-            className="border-outline text-foreground hover:bg-surface-variant"
-          >
-            Clear
-          </Button>
-          <Link href="/m" className="flex-1 min-w-[120px]">
+        <div className="flex justify-end gap-3 pt-2">
+          <Link href="/m">
             <Button
               type="button"
               variant="outline"
-              className="w-full border-outline text-foreground hover:bg-surface-variant"
+              className="border-outline text-foreground hover:bg-surface-variant"
             >
               Cancel
             </Button>
           </Link>
+          <Button
+            type="submit"
+            className="bg-primary text-on-primary hover:bg-primary/90"
+            loading={isPending}
+          >
+            Create Machine
+          </Button>
         </div>
       </form>
     </>
