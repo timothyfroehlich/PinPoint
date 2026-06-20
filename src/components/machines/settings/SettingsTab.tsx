@@ -94,6 +94,13 @@ interface UnsavedChangesGuardArgs {
   hasFailed: boolean;
   /** Any unflushed/pending/failed state — flush-on-nav protects these. */
   hasUnsaved: boolean;
+  /**
+   * An EXPLICIT-save machine-level field (the two PP-8a5r InlineEditableField
+   * sections) holds a dirty, uncommitted draft. Unlike the auto-save sets there
+   * is nothing to flush — leaving silently loses the draft — so this PROMPTS
+   * (like `hasFailed`) rather than flushing.
+   */
+  hasUnsavedDraft: boolean;
   /** Fire-and-forget persist of every not-yet-cleanly-saved set (status-driven,
    *  so it covers failed sets that have no live debounce timer). */
   flushUnsaved: () => void;
@@ -129,22 +136,28 @@ function useUnsavedChangesGuard({
   enabled,
   hasFailed,
   hasUnsaved,
+  hasUnsavedDraft,
   flushUnsaved,
 }: UnsavedChangesGuardArgs): void {
   useEffect(() => {
     if (!enabled) return;
 
     const onBeforeUnload = (e: BeforeUnloadEvent): void => {
-      if (!hasUnsaved) return;
+      // Stay for either an unsaved auto-save set OR a dirty explicit-save draft.
+      if (!hasUnsaved && !hasUnsavedDraft) return;
       // Modern browsers show the native prompt on preventDefault alone.
       e.preventDefault();
-      // Best-effort: async writes may not complete on unload.
+      // Best-effort flush of the auto-save sets; the explicit draft has nothing
+      // to flush (its loss is what the native prompt warns about).
       flushUnsaved();
     };
 
     const onPopState = (): void => {
       // No reliable synchronous block for popstate exists — flush is the
-      // protection. The navigation proceeds regardless (fire-and-forget).
+      // protection. The navigation proceeds regardless (fire-and-forget). A
+      // dirty explicit-save draft can't be blocked synchronously here and has
+      // nothing to flush, so that loss is irreducible (same accepted class as
+      // the auto-save popstate residual).
       if (hasUnsaved) flushUnsaved();
     };
 
@@ -164,11 +177,15 @@ function useUnsavedChangesGuard({
       const href = anchor.getAttribute("href");
       if (!href || href.startsWith("#") || anchor.target === "_blank") return;
 
-      if (hasFailed) {
-        // The one prompt case: a save already FAILED, so leaving loses it.
-        const ok = window.confirm(
-          "A settings change failed to save. Leave and lose it?"
-        );
+      if (hasFailed || hasUnsavedDraft) {
+        // The prompt cases: a save already FAILED (leaving loses it), OR an
+        // explicit-save machine-field draft is dirty (nothing to flush — leaving
+        // loses it). hasFailed keeps its specific copy; a draft-only situation
+        // uses the generic unsaved-changes message.
+        const message = hasFailed
+          ? "A settings change failed to save. Leave and lose it?"
+          : "You have unsaved changes. Leave without saving?";
+        const ok = window.confirm(message);
         if (!ok) {
           e.preventDefault();
           e.stopPropagation();
@@ -189,7 +206,7 @@ function useUnsavedChangesGuard({
       window.removeEventListener("popstate", onPopState);
       document.removeEventListener("click", onClickCapture, true);
     };
-  }, [enabled, hasFailed, hasUnsaved, flushUnsaved]);
+  }, [enabled, hasFailed, hasUnsaved, hasUnsavedDraft, flushUnsaved]);
 }
 
 interface SettingsTabProps {
@@ -220,6 +237,44 @@ export function SettingsTab({
   // first auto-save inserts them and swaps the temp id for the server UUID.
   // Preferred/Duplicate target a persisted row, so they're gated on this.
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
+
+  // -- Dirty explicit-save machine-level drafts (PP-8a5r) ----------------------
+  // The two machine-level InlineEditableField sections ("Before you change
+  // anything" / "How to change settings") use EXPLICIT Save/Cancel — not the
+  // auto-save machinery — so each holds its own dirty draft inside the component.
+  // We mirror their dirtiness here (by field id) so the nav guard can PROMPT
+  // before leaving with an uncommitted draft (there's nothing to flush). The
+  // updater is referentially stable so the field's onDirtyChange effect (deps
+  // include the callback) doesn't re-run in a loop.
+  const [dirtyDraftIds, setDirtyDraftIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const setDraftDirty = useCallback((id: string, dirty: boolean): void => {
+    setDirtyDraftIds((prev) => {
+      const has = prev.has(id);
+      if (dirty === has) return prev; // no change → keep the same Set reference
+      const next = new Set(prev);
+      if (dirty) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+  // Stable per-field callbacks: the InlineEditableField onDirtyChange effect has
+  // the callback in its dep array, so an inline closure would re-run it every
+  // render. useCallback pins one identity per field.
+  const onRequestsDirty = useCallback(
+    (dirty: boolean): void => {
+      setDraftDirty("machine:requests", dirty);
+    },
+    [setDraftDirty]
+  );
+  const onInstructionsDirty = useCallback(
+    (dirty: boolean): void => {
+      setDraftDirty("machine:instructions", dirty);
+    },
+    [setDraftDirty]
+  );
+  const hasUnsavedDraft = dirtyDraftIds.size > 0;
 
   // -- The two parallel copies (PP-43q3 always-live auto-save) ----------------
   // setsRef = the WORKING COPY: every field edit mutates this freely and
@@ -507,6 +562,7 @@ export function SettingsTab({
     enabled: canEdit,
     hasFailed: saveStatus.failedIds.size > 0,
     hasUnsaved: saveStatus.hasUnsaved,
+    hasUnsavedDraft,
     flushUnsaved,
   });
 
@@ -992,6 +1048,7 @@ export function SettingsTab({
         testId="machine-settings-requests"
         openWhenEmpty
         headingProminent
+        onDirtyChange={onRequestsDirty}
         onSave={async (id, value) => {
           const result = await updateMachineSettingsRequestsAction({
             machineId: id,
@@ -1014,6 +1071,7 @@ export function SettingsTab({
         presets={SETTINGS_INSTRUCTIONS_PRESETS}
         openWhenEmpty
         headingProminent
+        onDirtyChange={onInstructionsDirty}
         onSave={async (id, value) => {
           const result = await updateMachineSettingsInstructionsAction({
             machineId: id,

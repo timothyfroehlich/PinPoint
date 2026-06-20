@@ -24,6 +24,7 @@ import {
   duplicateSettingsSetAction,
   saveSettingsSetAction,
   setPreferredSettingsSetAction,
+  updateMachineSettingsRequestsAction,
 } from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
 import type { SettingsSetData } from "~/lib/machines/settings-types";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -959,6 +960,126 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         );
         // fireEvent.click returns false when a handler called preventDefault.
         expect(blocked).toBe(false);
+      } finally {
+        link.remove();
+      }
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Task 11: machine-level explicit-save drafts arm the nav guard (PP-8a5r)
+  //
+  // The two machine-level InlineEditableField sections use EXPLICIT Save/Cancel,
+  // not the auto-save machinery. A dirty draft there has nothing to flush, so
+  // leaving with it must PROMPT (like a failed save). After Save (dirty→clean)
+  // the prompt is gone.
+  // ---------------------------------------------------------------------------
+
+  it("(draft) a dirty machine-field draft PROMPTS on a link click, and cancel blocks navigation", async () => {
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
+
+      const link = document.createElement("a");
+      link.setAttribute("href", "/somewhere");
+      link.textContent = "Go";
+      document.body.appendChild(link);
+
+      try {
+        // Clean → clicking the anchor does NOT prompt.
+        fireEvent.click(link);
+        expect(confirmSpy).not.toHaveBeenCalled();
+
+        // Dirty the "Before you change anything" machine-level draft via the
+        // mock editor's onChange button (the field's ariaLabel is its label).
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: "type-in-Before you change anything",
+          })
+        );
+
+        // Let the onDirtyChange effect propagate (markdirty → hasUnsavedDraft).
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Now clicking the link must PROMPT with the generic unsaved-changes
+        // copy, and cancel (→ false) must block navigation (preventDefault).
+        const blocked = fireEvent.click(link);
+        expect(confirmSpy).toHaveBeenCalledTimes(1);
+        expect(confirmSpy).toHaveBeenCalledWith(
+          "You have unsaved changes. Leave without saving?"
+        );
+        expect(blocked).toBe(false);
+      } finally {
+        link.remove();
+      }
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
+  it("(draft) after Save the machine-field draft is clean → link click does NOT prompt", async () => {
+    const updateRequests = vi.mocked(updateMachineSettingsRequestsAction);
+    updateRequests.mockResolvedValue({ success: true });
+    const confirmSpy = vi
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+    try {
+      render(
+        <SettingsTab
+          canEdit
+          machineId="m1"
+          initialSets={[oneSet()]}
+          settingsRequests={null}
+          settingsInstructions={null}
+        />
+      );
+
+      const link = document.createElement("a");
+      link.setAttribute("href", "/somewhere");
+      link.textContent = "Go";
+      document.body.appendChild(link);
+
+      try {
+        // Dirty the draft.
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: "type-in-Before you change anything",
+          })
+        );
+        await act(async () => {
+          await Promise.resolve();
+        });
+
+        // Save the draft → onSave resolves ok → field clears dirty → guard
+        // disarms for this draft.
+        fireEvent.click(screen.getByTestId("machine-settings-requests-save"));
+        await waitFor(() => {
+          expect(updateRequests).toHaveBeenCalledTimes(1);
+        });
+        await act(async () => {
+          await Promise.resolve();
+          await Promise.resolve();
+        });
+
+        confirmSpy.mockClear();
+
+        // Clean again → clicking the link must NOT prompt.
+        fireEvent.click(link);
+        expect(confirmSpy).not.toHaveBeenCalled();
       } finally {
         link.remove();
       }

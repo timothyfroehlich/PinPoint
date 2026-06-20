@@ -124,6 +124,13 @@ export function InlineEditableField({
   const [pendingPreset, setPendingPreset] = useState<ProseMirrorDoc | null>(
     null
   );
+  // RichTextEditor (TipTap) takes `content` as an INITIAL prop and is
+  // uncontrolled afterward, so a bare `setEditValue` from a preset never reaches
+  // the already-mounted editor. Bumping this seed forces a remount (via the
+  // editor `key`) that re-seeds it from the freshly-set `editValue`. The handle
+  // exposes only clear()/focus() — no imperative setContent — so the remount is
+  // the only viable injection path (bug #6).
+  const [editorSeed, setEditorSeed] = useState(0);
   const [isPending, startTransition] = useTransition();
 
   const displayValue = optimistic ? optimistic.value : (value ?? null);
@@ -159,12 +166,18 @@ export function InlineEditableField({
       return;
     }
     setEditValue(doc);
+    // Remount the editor so the empty-field direct insert is seeded with the
+    // preset (the editor is uncontrolled after mount — bug #6).
+    setEditorSeed((s) => s + 1);
     setError(null);
   }
 
   function confirmPreset(): void {
     if (pendingPreset) {
       setEditValue(pendingPreset);
+      // Remount the editor so the overwrite-after-confirm is seeded with the
+      // preset (the editor is uncontrolled after mount — bug #6).
+      setEditorSeed((s) => s + 1);
       setError(null);
     }
     setPendingPreset(null);
@@ -290,6 +303,7 @@ export function InlineEditableField({
       {editorOpen ? (
         <div className="space-y-2">
           <RichTextEditor
+            key={editorSeed}
             content={editValue}
             onChange={setEditValue}
             mentionsEnabled={true}

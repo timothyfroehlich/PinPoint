@@ -1,16 +1,21 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
+import { useState } from "react";
 
 import { InlineEditableField } from "~/components/inline-editable-field";
 import { SETTINGS_INSTRUCTIONS_PRESETS } from "~/lib/machines/settings-instructions-presets";
 import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 // Stub the rich-text editor/display so the picker logic is tested without Tiptap.
-// The mock renders the current `content` as plain text (so we can assert what's
-// in the editor after a preset is applied/confirmed) and exposes a "clear"
-// button that pushes an empty doc through `onChange` (so we can drive an
-// optimistic-clear without ProseMirror in jsdom).
+// The real RichTextEditor (TipTap) is UNCONTROLLED after mount — `content` is an
+// INITIAL prop only; later `content` prop changes do NOT update the live editor.
+// The mock models that faithfully: it seeds local state from `content` AT MOUNT
+// ONLY, renders that local state (not the live prop), and pushes edits through
+// BOTH local state and `onChange`. So a preset injected via `setEditValue` (a
+// `content` prop change) is invisible until the component REMOUNTS the editor
+// (the `key` bump fix). The "clear" button pushes an empty doc through onChange
+// (so we can drive an optimistic-clear without ProseMirror in jsdom).
 vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
   RichTextEditor: ({
     ariaLabel,
@@ -20,18 +25,27 @@ vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
     ariaLabel?: string;
     content?: ProseMirrorDoc | null;
     onChange?: (doc: ProseMirrorDoc) => void;
-  }) => (
-    <div data-testid="mock-editor" aria-label={ariaLabel}>
-      <span data-testid="mock-editor-content">{docToPlainText(content)}</span>
-      <button
-        type="button"
-        aria-label={`mock-clear-${ariaLabel ?? ""}`}
-        onClick={() => {
-          onChange?.({ type: "doc", content: [{ type: "paragraph" }] });
-        }}
-      />
-    </div>
-  ),
+  }) => {
+    // Seed from `content` at mount only — ignore later prop changes (uncontrolled).
+    const [local, setLocal] = useState<ProseMirrorDoc | null>(content ?? null);
+    return (
+      <div data-testid="mock-editor" aria-label={ariaLabel}>
+        <span data-testid="mock-editor-content">{docToPlainText(local)}</span>
+        <button
+          type="button"
+          aria-label={`mock-clear-${ariaLabel ?? ""}`}
+          onClick={() => {
+            const empty: ProseMirrorDoc = {
+              type: "doc",
+              content: [{ type: "paragraph" }],
+            };
+            setLocal(empty);
+            onChange?.(empty);
+          }}
+        />
+      </div>
+    );
+  },
 }));
 vi.mock("~/components/editor/RichTextDisplay", () => ({
   RichTextDisplay: ({ content }: { content?: ProseMirrorDoc | null }) => (
@@ -156,6 +170,58 @@ describe("InlineEditableField — preset-free section (section 1: owner requests
   });
 });
 
+describe("InlineEditableField — viewer state (GAP6: no editor leaks to viewers)", () => {
+  const VIEWER_DOC: ProseMirrorDoc = {
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [{ type: "text", text: "read only" }] },
+    ],
+  };
+
+  it("viewer + value → renders RichTextDisplay, no editor chrome, no Save", () => {
+    render(
+      <InlineEditableField
+        label="How to change settings"
+        value={VIEWER_DOC}
+        machineId="m1"
+        canEdit={false}
+        testId={TID}
+        presets={SETTINGS_INSTRUCTIONS_PRESETS}
+        openWhenEmpty
+        headingProminent
+        onSave={vi.fn()}
+      />
+    );
+
+    // The value renders read-only via RichTextDisplay (the mock sentinel).
+    expect(screen.getByTestId("mock-display")).toHaveTextContent("read only");
+    // No editor, no preset control, no Save — none of the editing affordances.
+    expect(screen.queryByTestId("mock-editor")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /start from a preset/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`${TID}-save`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`${TID}-edit`)).not.toBeInTheDocument();
+  });
+
+  it("viewer + empty → renders nothing", () => {
+    const { container } = render(
+      <InlineEditableField
+        label="How to change settings"
+        value={null}
+        machineId="m1"
+        canEdit={false}
+        testId={TID}
+        presets={SETTINGS_INSTRUCTIONS_PRESETS}
+        openWhenEmpty
+        headingProminent
+        onSave={vi.fn()}
+      />
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
 const FILLED_DOC: ProseMirrorDoc = {
   type: "doc",
   content: [{ type: "paragraph", content: [{ type: "text", text: "old" }] }],
@@ -258,6 +324,51 @@ describe("InlineEditableField — preset overwrite confirm (B2 / Task 11)", () =
     await user.click(screen.getByTestId(`${TID}-preset-confirm`));
     expect(screen.getByTestId("mock-editor-content")).toHaveTextContent(
       "Stern path"
+    );
+  });
+
+  it("bug #6: replacing content via the confirm dialog actually reaches the (uncontrolled) editor", async () => {
+    // Regression for bug #6: the editor is uncontrolled after mount, so a bare
+    // `content` prop change from confirmPreset never reached it — the displayed
+    // text stayed stale. The fix bumps a `key` to remount the editor, re-seeding
+    // it from the new value. This test uses the realistic uncontrolled mock, so
+    // it FAILS without the key bump and PASSES with it.
+    const user = userEvent.setup();
+    const custom: ProseMirrorDoc = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "keep this" }] },
+      ],
+    };
+    render(
+      <InlineEditableField
+        label="How to change settings"
+        value={custom}
+        machineId="m1"
+        canEdit
+        testId={TID}
+        onSave={vi.fn().mockResolvedValue({ ok: true })}
+        presets={[sternPreset]}
+        openWhenEmpty
+        headingProminent
+      />
+    );
+
+    await user.click(screen.getByTestId(`${TID}-edit`));
+    expect(screen.getByTestId("mock-editor-content")).toHaveTextContent(
+      "keep this"
+    );
+
+    await user.click(screen.getByTestId(`${TID}-preset-trigger`));
+    await user.click(screen.getByTestId(`${TID}-preset-stern`));
+    await user.click(screen.getByTestId(`${TID}-preset-confirm`));
+
+    // The remount re-seeds the editor from the preset.
+    expect(screen.getByTestId("mock-editor-content")).toHaveTextContent(
+      "Stern path"
+    );
+    expect(screen.getByTestId("mock-editor-content")).not.toHaveTextContent(
+      "keep this"
     );
   });
 
