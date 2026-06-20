@@ -210,7 +210,7 @@ export function EditMachineDialog({
             Edit Machine
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Machine</DialogTitle>
             <DialogDescription>
