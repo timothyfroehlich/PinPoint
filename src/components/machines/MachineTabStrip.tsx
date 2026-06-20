@@ -24,6 +24,7 @@ export function MachineTabStrip({
       testIdPrefix="machine-tab"
       tabs={[
         { slug: "", label: "Info" },
+        { slug: "settings", label: "Settings" },
         // URL slug stays `maintenance` (folder name + existing routes/tests);
         // the visible label is "Service" — shorter, matches the
         // `needs_service` status vocabulary used elsewhere in the app.

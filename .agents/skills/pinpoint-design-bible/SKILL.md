@@ -59,9 +59,12 @@ Pick the surface level based on the element's role:
 | Full-width content section               | `bg-surface` (#0f0f11)            |
 | Card, popover, elevated container        | `bg-card` (#18151b, fully opaque) |
 | Header, app header, tab bar (nav chrome) | `bg-card/85 backdrop-blur-sm`     |
+| Header band inside a card/section        | `bg-muted` (#27272a, opaque)      |
 | Closed/archived/dimmed item              | `bg-surface-variant/30`           |
 
 **Key distinction:** Navigation chrome gets the frosted glass treatment (opacity + blur). Content cards are always fully opaque `bg-card`.
+
+**Header band:** when a card or full-bleed section gives its header zone (title + meta) its own surface distinct from the body, use opaque `bg-muted` — the same token table `<thead>`s use. Don't brighten past ~16% white-equivalent: `text-muted-foreground` on the band drops below the 4.5:1 AA floor. Reference implementation: `SettingsSetCard`.
 
 ## 3. Shell Contract
 

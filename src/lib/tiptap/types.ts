@@ -170,3 +170,35 @@ export function docToPlainText(
 
   return parts.join("").trim();
 }
+
+/**
+ * Whether a ProseMirror doc is structurally empty — no nodes, or a single empty
+ * paragraph. `content` is required on the {@link ProseMirrorDoc} *type* but
+ * optional in the persisted *schema*, so a stored bare `{ type: "doc" }` arrives
+ * with no `content`; this reads it undefined-tolerantly (a direct
+ * `doc.content[0]` would crash on such a doc).
+ */
+export function docIsEmpty(doc: ProseMirrorDoc | null | undefined): boolean {
+  const content = doc?.content;
+  const firstNode = content?.[0];
+  const length = content?.length ?? 0;
+  return (
+    !doc ||
+    length === 0 ||
+    (length === 1 && firstNode?.type === "paragraph" && !firstNode.content)
+  );
+}
+
+/**
+ * Whether two docs carry the same visible text — the comparison the settings
+ * editor persists on (a whitespace-only or formatting-only diff is not a real
+ * edit for storage purposes, since the value is normalized to null when its
+ * plain text is blank). Used for dirty-checks and the navigation guard so they
+ * agree with what {@link docToPlainText}-based normalization actually writes.
+ */
+export function docsEqualByText(
+  a: ProseMirrorDoc | string | null | undefined,
+  b: ProseMirrorDoc | string | null | undefined
+): boolean {
+  return docToPlainText(a).trim() === docToPlainText(b).trim();
+}

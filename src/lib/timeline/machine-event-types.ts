@@ -29,6 +29,14 @@ export type MachineTimelineEventData =
   | { kind: "description_updated" }
   | { kind: "owner_requirements_updated" }
   | { kind: "owner_notes_updated" }
+  // === sourceType='lifecycle', tag='settings' (PP-43q3, default-off) ===
+  // `setName` is an immutable snapshot of the set's name at event time (a
+  // deleted set has no row to resolve from; created/updated/preferred mirror
+  // the name_changed string-snapshot precedent).
+  | { kind: "settings_set_created"; setName: string }
+  | { kind: "settings_set_updated"; setName: string }
+  | { kind: "settings_set_deleted"; setName: string }
+  | { kind: "settings_set_preferred"; setName: string }
   // === sourceType='issue' (duplicate-written from issue actions) ===
   | {
       kind: "issue_opened";

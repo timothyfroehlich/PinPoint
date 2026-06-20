@@ -409,6 +409,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "machines.settings.manage",
+        label: "Manage machine settings",
+        description:
+          "Create, edit, duplicate, delete, and set the preferred settings set. Owners manage their own machines; technicians and admins manage any. (Viewing settings is public, via machines.view.)",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: "owner",
+          technician: true,
+          admin: true,
+        },
+      },
+      {
         id: "machines.timeline.comment.add",
         label: "Add machine timeline comments",
         description:
