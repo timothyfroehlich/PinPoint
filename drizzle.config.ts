@@ -78,6 +78,7 @@ export default defineConfig({
     "discord_integration_config",
     "timeline_events",
     "timeline_event_people",
+    "pinballmap_catalog",
   ],
   schemaFilter: ["public"],
   verbose: true,

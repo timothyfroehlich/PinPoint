@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/cleanup-blobs",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-catalog",
+      "schedule": "17 3 * * 0"
     }
   ]
 }

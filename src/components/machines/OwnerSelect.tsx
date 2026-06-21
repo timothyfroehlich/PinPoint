@@ -63,6 +63,8 @@ interface OwnerSelectProps {
   disabled?: boolean;
   onUsersChange?: (users: OwnerSelectUser[]) => void;
   onValueChange?: (id: string) => void;
+  /** Show the "owner receives notifications" helper line. */
+  showHelpText?: boolean;
 }
 
 export function OwnerSelect({
@@ -71,6 +73,7 @@ export function OwnerSelect({
   disabled,
   onUsersChange,
   onValueChange,
+  showHelpText = true,
 }: OwnerSelectProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -193,7 +196,7 @@ export function OwnerSelect({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            aria-describedby="owner-help"
+            {...(showHelpText ? { "aria-describedby": "owner-help" } : {})}
             disabled={!!disabled}
             data-testid="owner-select"
             className="w-full justify-between border-outline bg-surface text-foreground font-normal"
@@ -372,9 +375,11 @@ export function OwnerSelect({
         </PopoverContent>
       </Popover>
 
-      <p id="owner-help" className="text-xs text-muted-foreground">
-        The owner receives notifications for new issues on this machine.
-      </p>
+      {showHelpText && (
+        <p id="owner-help" className="text-xs text-muted-foreground">
+          The owner receives notifications for new issues on this machine.
+        </p>
+      )}
 
       <InviteUserDialog
         open={inviteDialogOpen}

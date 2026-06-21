@@ -2,10 +2,11 @@ import "server-only";
 import { log } from "~/lib/logger";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
 import { PBM_API_BASE, PBM_USER_AGENT } from "./config";
-import { parseCatalog, parseLocation } from "./parse";
+import { parseCatalog, parseLocation, parseMachineGroups } from "./parse";
 import type {
   CatalogMachine,
   LocationSnapshot,
+  MachineGroup,
   PbmAddMachineResult,
   PbmAuthResult,
   PbmCredentials,
@@ -235,6 +236,12 @@ export function createLiveClient(): PinballMapClient {
       // store on the machine record (vendored llms.txt §no_details).
       const raw = await readJson(`/machines.json`, "fetchCatalog");
       return parseCatalog(raw);
+    },
+
+    async fetchMachineGroups(): Promise<MachineGroup[]> {
+      assertNotInTransaction("pinballmap.fetchMachineGroups");
+      const raw = await readJson(`/machine_groups.json`, "fetchMachineGroups");
+      return parseMachineGroups(raw);
     },
 
     async authDetails(login: string, password: string): Promise<PbmAuthResult> {

@@ -29,6 +29,7 @@ const tables = [
   "timeline_events",
   "issues",
   "machines",
+  "pinballmap_catalog",
   "user_profiles",
   "invited_users",
   "unconfirmed_users",

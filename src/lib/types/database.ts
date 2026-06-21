@@ -16,6 +16,7 @@ import type {
   notificationPreferences,
   issueWatchers,
   issueImages,
+  pinballmapCatalog,
 } from "~/server/db/schema";
 
 // Enum types for type safety (import/define before using in Issue type)
@@ -61,3 +62,9 @@ export type NotificationPreference = InferSelectModel<
 >;
 export type IssueWatcher = InferSelectModel<typeof issueWatchers>;
 export type IssueImage = InferSelectModel<typeof issueImages>;
+
+// PinballMap catalog mirror (bead B / PP-o355.2)
+export type PinballmapCatalogEntry = InferSelectModel<typeof pinballmapCatalog>;
+export type NewPinballmapCatalogEntry = InferInsertModel<
+  typeof pinballmapCatalog
+>;

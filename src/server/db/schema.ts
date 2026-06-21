@@ -148,6 +148,19 @@ export const machines = pgTable(
     })
       .notNull()
       .default("on_the_floor"),
+    // PinballMap linking (bead B / PP-o355.2). All nullable. A machine is either
+    // linked to a PBM catalog title (pinballmapMachineId set) or explicitly
+    // excluded ("not on PinballMap"); the mutual-exclusion invariant is the CHECK
+    // below. The linked-or-excluded *requirement* is enforced at the action layer
+    // (currently off — see PBM_LINKING_REQUIRED). Model metadata is copied from
+    // the catalog mirror on link, never trusted from the client.
+    pinballmapMachineId: integer("pinballmap_machine_id"),
+    pinballmapExcluded: boolean("pinballmap_excluded").notNull().default(false),
+    pinballmapExcludedReason: text("pinballmap_excluded_reason"),
+    manufacturer: text("manufacturer"),
+    year: integer("year"),
+    opdbId: text("opdb_id"),
+    ipdbId: integer("ipdb_id"),
   },
   (t) => ({
     initialsCheck: check("initials_check", sql`initials ~ '^[A-Z0-9]{2,6}$'`),
@@ -155,11 +168,52 @@ export const machines = pgTable(
       "owner_check",
       sql`(owner_id IS NULL OR invited_owner_id IS NULL)`
     ),
+    // A machine cannot be both linked to PBM and marked excluded from it.
+    pinballmapLinkExclusiveCheck: check(
+      "machines_pinballmap_link_exclusive",
+      sql`NOT (pinballmap_machine_id IS NOT NULL AND pinballmap_excluded)`
+    ),
     ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
     invitedOwnerIdIdx: index("idx_machines_invited_owner_id").on(
       t.invitedOwnerId
     ),
     nameIdx: index("idx_machines_name").on(t.name),
+  })
+);
+
+/**
+ * Local mirror of PinballMap's canonical machine catalog (machine *titles*, not
+ * per-location instances). Powers the create/edit linking picker, which searches
+ * this table locally rather than hitting PBM per keystroke — PBM's recommended
+ * "cache locally" pattern. Refreshed weekly by /api/cron/refresh-catalog via the
+ * PinballMap client seam (bead B / PP-o355.2).
+ */
+export const pinballmapCatalog = pgTable(
+  "pinballmap_catalog",
+  {
+    pinballmapMachineId: integer("pinballmap_machine_id").primaryKey(),
+    name: text("name").notNull(),
+    manufacturer: text("manufacturer"),
+    year: integer("year"),
+    opdbId: text("opdb_id"),
+    ipdbId: integer("ipdb_id"),
+    // PBM groups editions of one title (e.g. Godzilla Pro/Premium/LE) under a
+    // machine_group_id; the group's display name lives in a separate endpoint,
+    // so we denormalize it here to power the family→edition picker without a
+    // join. Null for standalone/ungrouped titles (most older machines).
+    machineGroupId: integer("machine_group_id"),
+    groupName: text("group_name"),
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    // Btree index supports prefix search + ordering. The catalog is small
+    // (~10k titles), so an ILIKE '%q%' contains-scan is fine; upgrade to a
+    // pg_trgm GIN index here if it ever grows enough to matter.
+    nameIdx: index("idx_pinballmap_catalog_name").on(t.name),
+    // Edition lookup for a selected family.
+    groupIdx: index("idx_pinballmap_catalog_group").on(t.machineGroupId),
   })
 );
 
