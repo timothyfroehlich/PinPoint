@@ -163,91 +163,90 @@ export default async function MachineInfoTab({
     />
   );
 
+  // Single grid in DOM reading order: Description → Hero → reference rail →
+  // recent activity → maintainer tools. On mobile it's one flex column (the
+  // rail folds inline after the hero). On desktop the rail is pinned to the
+  // 320px right column, spanning the main column's rows; everything else
+  // auto-flows down column 1. Rendered once so test ids stay unique.
   return (
-    <div className="md:grid md:grid-cols-[minmax(0,1fr)_320px] md:items-start md:gap-6">
-      {/* Main column: Description → Hero → (mobile rail fold) → Recent
-          activity → maintainer tools. */}
-      <div className="flex flex-col gap-6">
-        <MachineDescriptionField
-          machineId={machine.id}
-          description={machine.description}
-          canEdit={canEdit}
-        />
+    <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-6">
+      <MachineDescriptionField
+        machineId={machine.id}
+        description={machine.description}
+        canEdit={canEdit}
+      />
 
-        <InfoHero
-          machineInitials={machine.initials}
-          machineStatus={machineStatus}
-          presenceStatus={machine.presenceStatus}
-          openIssues={openIssues}
-          reportHref={`/report?machine=${machine.initials}`}
-          serviceHref={`/m/${machine.initials}/maintenance`}
-        />
+      <InfoHero
+        machineInitials={machine.initials}
+        machineStatus={machineStatus}
+        presenceStatus={machine.presenceStatus}
+        openIssues={openIssues}
+        reportHref={`/report?machine=${machine.initials}`}
+        serviceHref={`/m/${machine.initials}/maintenance`}
+      />
 
-        {/* Mobile: rail folds inline after the hero (Tags → Owner → PBM). */}
-        <div className="flex flex-col gap-6 md:hidden">{rail}</div>
+      <aside className="flex flex-col gap-6 md:col-start-2 md:row-start-1 md:row-span-6">
+        {rail}
+      </aside>
 
-        <MachineRecentActivity
-          machineId={machine.id}
-          machineInitials={machine.initials}
-          machineName={machine.name}
-          canCompose={canCompose}
-        />
+      <MachineRecentActivity
+        machineId={machine.id}
+        machineInitials={machine.initials}
+        machineName={machine.name}
+        canCompose={canCompose}
+      />
 
-        {/* Maintainer tools (QR shown to everyone, matching pre-redesign
-            behavior; Edit + owner fields are permission-gated). */}
-        <div className="space-y-4 border-t border-outline-variant pt-6">
-          {showOwnerFields && (
-            <MachineTextFields
-              machineId={machine.id}
-              description={machine.description}
-              ownerRequirements={machine.ownerRequirements}
-              ownerNotes={machine.ownerNotes}
-              canEditGeneral={canEdit}
-              canEditOwnerNotes={canEditOwnerNotes}
-              canViewOwnerRequirements={canViewOwnerRequirements}
-              canViewOwnerNotes={canViewOwnerNotes}
-              showDescription={false}
+      {/* Maintainer tools (QR shown to everyone, matching pre-redesign
+          behavior; Edit + owner fields are permission-gated). */}
+      <div className="space-y-4 border-t border-outline-variant pt-6">
+        {showOwnerFields && (
+          <MachineTextFields
+            machineId={machine.id}
+            description={machine.description}
+            ownerRequirements={machine.ownerRequirements}
+            ownerNotes={machine.ownerNotes}
+            canEditGeneral={canEdit}
+            canEditOwnerNotes={canEditOwnerNotes}
+            canViewOwnerRequirements={canViewOwnerRequirements}
+            canViewOwnerNotes={canViewOwnerNotes}
+            showDescription={false}
+          />
+        )}
+        <div className="flex flex-wrap gap-3">
+          {canEdit && user ? (
+            <EditMachineDialog
+              machine={{
+                id: machine.id,
+                name: machine.name,
+                initials: machine.initials,
+                presenceStatus: machine.presenceStatus,
+                ownerId: machine.ownerId,
+                invitedOwnerId: machine.invitedOwnerId,
+                owner: machine.owner ? { name: machine.owner.name } : null,
+                invitedOwner: machine.invitedOwner
+                  ? { name: machine.invitedOwner.name }
+                  : null,
+                pinballmapMachineId: machine.pinballmapMachineId,
+                pinballmapExcluded: machine.pinballmapExcluded,
+                pinballmapExcludedReason: machine.pinballmapExcludedReason,
+                pinballmapTitleName,
+              }}
+              allUsers={allUsers}
+              canEditAnyMachine={canEditAnyMachine}
+              isOwner={isOwner}
+              canLink={canLink}
             />
-          )}
-          <div className="flex flex-wrap gap-3">
-            {canEdit && user ? (
-              <EditMachineDialog
-                machine={{
-                  id: machine.id,
-                  name: machine.name,
-                  initials: machine.initials,
-                  presenceStatus: machine.presenceStatus,
-                  ownerId: machine.ownerId,
-                  invitedOwnerId: machine.invitedOwnerId,
-                  owner: machine.owner ? { name: machine.owner.name } : null,
-                  invitedOwner: machine.invitedOwner
-                    ? { name: machine.invitedOwner.name }
-                    : null,
-                  pinballmapMachineId: machine.pinballmapMachineId,
-                  pinballmapExcluded: machine.pinballmapExcluded,
-                  pinballmapExcludedReason: machine.pinballmapExcludedReason,
-                  pinballmapTitleName,
-                }}
-                allUsers={allUsers}
-                canEditAnyMachine={canEditAnyMachine}
-                isOwner={isOwner}
-                canLink={canLink}
-              />
-            ) : user && editDeniedReason !== null ? (
-              <EditButtonWithTooltip reason={editDeniedReason} />
-            ) : null}
-            <QrCodeDialog
-              machineName={machine.name}
-              machineInitials={machine.initials}
-              qrDataUrl={qrDataUrl}
-              reportUrl={reportUrl}
-            />
-          </div>
+          ) : user && editDeniedReason !== null ? (
+            <EditButtonWithTooltip reason={editDeniedReason} />
+          ) : null}
+          <QrCodeDialog
+            machineName={machine.name}
+            machineInitials={machine.initials}
+            qrDataUrl={qrDataUrl}
+            reportUrl={reportUrl}
+          />
         </div>
       </div>
-
-      {/* Desktop rail (hidden on mobile, where the fold above renders it). */}
-      <aside className="hidden md:flex md:flex-col md:gap-6">{rail}</aside>
     </div>
   );
 }
