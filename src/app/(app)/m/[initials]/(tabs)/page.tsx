@@ -1,23 +1,22 @@
 import type React from "react";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { eq } from "drizzle-orm";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
-import { Calendar } from "lucide-react";
 import { deriveMachineStatus } from "~/lib/machines/status";
-import { MachineStatusBadge } from "~/components/machines/MachineStatusBadge";
-import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge";
-import { formatDate } from "~/lib/dates";
-import { headers } from "next/headers";
 import { resolveRequestUrl } from "~/lib/url";
+import { buildMachineReportUrl } from "~/lib/machines/report-url";
+import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { EditButtonWithTooltip } from "../edit-button-tooltip";
 import { EditMachineDialog } from "../update-machine-form";
 import { QrCodeDialog } from "../qr-code-dialog";
-import { buildMachineReportUrl } from "~/lib/machines/report-url";
-import { generateQrPngDataUrl } from "~/lib/machines/qr";
-import { MachineTextFields } from "../machine-text-fields";
+import {
+  MachineDescriptionField,
+  MachineTextFields,
+} from "../machine-text-fields";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
 import {
   getAccessLevel,
@@ -26,14 +25,22 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
-import { PersonHoverCard } from "~/components/people/PersonHoverCard";
+import { InfoHero } from "./info-hero";
+import { InfoRail } from "./info-rail";
 
 /**
- * Machine Info Tab (default route for /m/[initials]/)
+ * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
+ * player's landing (redesign PP-5sgt.2).
  *
- * Renders the machine info card with metadata and text fields. The persistent
- * header zone + tab strip live in the sibling layout.tsx, and the open-issues
- * list lives in the sibling Maintenance tab (`./maintenance/page.tsx`).
+ * Reading order (both breakpoints): Description (plain prose, no label) → Hero
+ * (status + presence + Report button + known-issues peek) → reference cluster
+ * (Tags / Owner / PinballMap) → recent-activity peek. Desktop is a main column
+ * + 320px rail; mobile folds the rail inline after the hero.
+ *
+ * NOTE (PP-5sgt.3): the maintainer tools at the bottom — Edit dialog, QR code,
+ * owner requirements/notes — are kept here temporarily. The Service-tab rework
+ * relocates QR to Service and Edit/owner-fields to Settings/Service; remove
+ * this block then.
  */
 export default async function MachineInfoTab({
   params,
@@ -56,7 +63,7 @@ export default async function MachineInfoTab({
 
   const accessLevel = getAccessLevel(currentUserProfile?.role);
 
-  const { machine, totalIssuesCount } = await getMachineForLayout(initials);
+  const { machine } = await getMachineForLayout(initials);
   if (!machine) {
     notFound();
   }
@@ -126,99 +133,63 @@ export default async function MachineInfoTab({
   });
   const qrDataUrl = await generateQrPngDataUrl(reportUrl);
 
+  const showOwnerFields = canViewOwnerRequirements || canViewOwnerNotes;
+
+  const rail = (
+    <InfoRail
+      owner={machine.owner}
+      invitedOwner={machine.invitedOwner}
+      addedAt={machine.createdAt}
+    />
+  );
+
   return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          {/* All identity + stats in one 2-col grid: Owner / Added Date,
-            Availability / Status, Open Issues / Total Issues. */}
-          <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-            <div data-testid="owner-display">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Machine Owner
-              </p>
-              {machine.owner || machine.invitedOwner ? (
-                <div className="flex items-center gap-2">
-                  {/* Activated owners link to their collection view
-                      (PP-slrd.1); invited owners have no userProfile, so
-                      no collection page exists for them yet. */}
-                  {machine.owner ? (
-                    <PersonHoverCard
-                      userId={machine.owner.id}
-                      displayName={machine.owner.name}
-                      className="text-sm font-medium text-foreground hover:text-primary hover:underline"
-                    />
-                  ) : (
-                    <p className="text-sm font-medium text-foreground">
-                      {machine.invitedOwner?.name}
-                    </p>
-                  )}
-                  {machine.invitedOwner && !machine.owner && (
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      (Invited)
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No owner assigned
-                </p>
-              )}
-            </div>
+    <div className="md:grid md:grid-cols-[minmax(0,1fr)_320px] md:items-start md:gap-6">
+      {/* Main column: Description → Hero → (mobile rail fold) → Recent
+          activity → maintainer tools. */}
+      <div className="flex flex-col gap-6">
+        <MachineDescriptionField
+          machineId={machine.id}
+          description={machine.description}
+          canEdit={canEdit}
+        />
 
-            <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Added Date
-              </p>
-              <div className="flex items-center gap-1.5 text-foreground">
-                <Calendar className="size-3 text-muted-foreground" />
-                <p className="text-sm font-medium">
-                  {formatDate(machine.createdAt)}
-                </p>
-              </div>
-            </div>
+        <InfoHero
+          machineInitials={machine.initials}
+          machineStatus={machineStatus}
+          presenceStatus={machine.presenceStatus}
+          openIssues={openIssues}
+          reportHref={`/report?machine=${machine.initials}`}
+          serviceHref={`/m/${machine.initials}/maintenance`}
+        />
 
-            <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Availability
-              </p>
-              <MachinePresenceBadge status={machine.presenceStatus} size="sm" />
-            </div>
+        {/* Mobile: rail folds inline after the hero (Tags → Owner → PBM). */}
+        <div className="flex flex-col gap-6 md:hidden">{rail}</div>
 
-            <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Status
-              </p>
-              <MachineStatusBadge status={machineStatus} size="xs" />
-            </div>
+        <MachineRecentActivity
+          machineId={machine.id}
+          machineInitials={machine.initials}
+          machineName={machine.name}
+          canCompose={canCompose}
+        />
 
-            <div data-testid="detail-open-issues">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Open Issues
-              </p>
-              <p
-                className="text-xl font-bold text-foreground"
-                data-testid="detail-open-issues-count"
-              >
-                {openIssues.length}
-              </p>
-            </div>
-
-            <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Total Issues
-              </p>
-              <p className="text-xl font-bold text-foreground">
-                {totalIssuesCount}
-              </p>
-            </div>
-          </div>
-
-          {/* Machine actions — Edit + QR. Sit at the bottom of the left column
-            so identity + stats read first. QR shows for everyone; Edit shows
-            as enabled for owner/admin, or as a disabled tooltip for other
-            auth'd users (guest / non-owner member). */}
-          <div className="space-y-3">
+        {/* Maintainer tools (QR shown to everyone, matching pre-redesign
+            behavior; Edit + owner fields are permission-gated). */}
+        <div className="space-y-4 border-t border-outline-variant pt-6">
+          {showOwnerFields && (
+            <MachineTextFields
+              machineId={machine.id}
+              description={machine.description}
+              ownerRequirements={machine.ownerRequirements}
+              ownerNotes={machine.ownerNotes}
+              canEditGeneral={canEdit}
+              canEditOwnerNotes={canEditOwnerNotes}
+              canViewOwnerRequirements={canViewOwnerRequirements}
+              canViewOwnerNotes={canViewOwnerNotes}
+              showDescription={false}
+            />
+          )}
+          <div className="flex flex-wrap gap-3">
             {canEdit && user ? (
               <EditMachineDialog
                 machine={{
@@ -248,26 +219,10 @@ export default async function MachineInfoTab({
             />
           </div>
         </div>
-
-        <div className="border-t border-outline-variant/50 pt-4 lg:border-t-0 lg:pt-0">
-          <MachineTextFields
-            machineId={machine.id}
-            description={machine.description}
-            ownerRequirements={machine.ownerRequirements}
-            ownerNotes={machine.ownerNotes}
-            canEditGeneral={canEdit}
-            canEditOwnerNotes={canEditOwnerNotes}
-            canViewOwnerRequirements={canViewOwnerRequirements}
-            canViewOwnerNotes={canViewOwnerNotes}
-          />
-        </div>
       </div>
-      <MachineRecentActivity
-        machineId={machine.id}
-        machineInitials={machine.initials}
-        machineName={machine.name}
-        canCompose={canCompose}
-      />
+
+      {/* Desktop rail (hidden on mobile, where the fold above renders it). */}
+      <aside className="hidden md:flex md:flex-col md:gap-6">{rail}</aside>
     </div>
   );
 }
