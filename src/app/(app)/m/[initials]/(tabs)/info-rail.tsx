@@ -1,5 +1,5 @@
 import type React from "react";
-import { Lock, Plus } from "lucide-react";
+import { Lock } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { PersonHoverCard } from "~/components/people/PersonHoverCard";
@@ -42,8 +42,9 @@ export function InfoRail({
   return (
     <>
       {/* Tags — reserved slot for the future Collections feature. The dashed
-          border + "Future" badge mark it as not-yet-live; the example tags
-          demonstrate the public-vs-private model (PP-5sgt.2 design §3). */}
+          border + "Future" badge mark it as not-yet-live. No fabricated tags;
+          a small legend explains the public-vs-private model the feature will
+          use (PP-5sgt.2 design §3). */}
       <div
         className="rounded-xl border border-dashed border-secondary/50 bg-card p-4"
         data-testid="machine-tags-placeholder"
@@ -51,23 +52,29 @@ export function InfoRail({
         <p className={`mb-2 flex items-center gap-2 ${LABEL}`}>
           Tags <span className={FUTURE_BADGE}>Future</span>
         </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-primary/35 bg-primary/10 px-3 py-1 text-xs text-primary">
-            Tournament Ready
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-secondary/50 bg-secondary/10 px-3 py-1 text-xs text-secondary">
-            <Lock className="size-3" aria-hidden="true" />
-            Friday League
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-outline-variant px-3 py-1 text-xs text-muted-foreground">
-            <Plus className="size-3" aria-hidden="true" />
-            add tag
-          </span>
-        </div>
-        <p className="mt-2.5 text-pretty text-[11px] leading-snug text-muted-foreground">
-          Green = admin tag (everyone sees it). Teal dashed + lock = a private
-          tag, visible only to you.
+        <p className="text-pretty text-[11px] leading-snug text-muted-foreground">
+          Tagging arrives with Collections.
         </p>
+        <ul className="mt-2.5 space-y-1.5 text-[11px] text-muted-foreground">
+          <li className="flex items-center gap-2">
+            <span
+              className="size-2 shrink-0 rounded-full bg-primary"
+              aria-hidden="true"
+            />
+            <span>
+              <span className="text-primary">Public</span> — visible to everyone
+            </span>
+          </li>
+          <li className="flex items-center gap-2">
+            <Lock
+              className="size-3 shrink-0 text-secondary"
+              aria-hidden="true"
+            />
+            <span>
+              <span className="text-secondary">Private</span> — only you
+            </span>
+          </li>
+        </ul>
       </div>
 
       {/* Owner — name only, never email (CORE-SEC-007). */}
