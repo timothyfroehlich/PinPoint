@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direction A — Info/Landing tab v3</title>
+<style>
+  :root{
+    --bg:#0f0f11; --card:#18151b; --primary:#4ade80; --secondary:#2dd4bf;
+    --fg:#ededf0; --muted:#a1a1aa; --muted2:#71717a;
+    --outline:#2b2730; --amber:#fbbf24; --red:#f87171;
+    --radius:12px;
+  }
+  /* Neutralize the companion's injected connection pill so it can't hijack our hero.
+     (helper.js does querySelector('.status') — we simply don't use that class.) */
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0a0c;color:var(--fg);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1280px;margin:0 auto;padding:24px}
+  h1.page{font-size:18px;margin:0 0 4px;font-weight:700}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+  .changes{font-size:12px;color:var(--muted);margin:0 0 20px;padding:10px 14px;border:1px solid var(--outline);border-radius:10px;background:#121016}
+  .changes b{color:var(--primary)}
+
+  .device{background:var(--bg);border:1px solid var(--outline);border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .appbar{height:56px;display:flex;align-items:center;gap:18px;padding:0 20px;background:rgba(24,21,27,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--outline)}
+  .logo{font-weight:800;letter-spacing:.5px;color:var(--primary)}
+  .navlink{color:var(--muted);font-size:13px}
+  .spacer{flex:1}
+  .pill-btn{background:var(--secondary);color:#08110f;font-weight:700;border:none;border-radius:8px;padding:7px 12px;font-size:12px}
+  .avatar{width:28px;height:28px;border-radius:50%;background:#3a3340}
+
+  /* Header row = identity block (left) + full-height translite (right).
+     The translite spans the header AND the tab strip, flush to the strip's
+     bottom line and the card's right edge. */
+  .headrow{display:flex;align-items:stretch}
+  .headmain{flex:1;min-width:0;display:flex;flex-direction:column}
+  .headmain .tabs{margin-top:auto}
+  .mh{display:flex;align-items:center;gap:14px;padding:18px 22px 0}
+  .chip{flex-shrink:0;width:46px;height:46px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:15px;background:#101a14;color:var(--primary);border:1px solid #234534}
+  .mh-text{min-width:0}
+  .mh .name{font-size:24px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mh .meta{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .mh-bb{flex-shrink:0;position:relative;margin:0;line-height:0;align-self:stretch;width:300px;overflow:hidden;border-left:1px solid var(--outline);border-bottom:1px solid var(--outline)}
+  .mh-bb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
+  .mh-bb .bbsrc{position:absolute;right:7px;bottom:9px;font-size:8.5px;letter-spacing:.03em;color:#cdd3cc;background:rgba(10,10,12,.74);padding:2px 6px;border-radius:5px;line-height:1.2}
+
+  .tabs{display:flex;gap:4px;padding:14px 22px 0;border-bottom:1px solid var(--outline);margin-top:14px}
+  .tab{padding:9px 14px;font-size:13.5px;color:var(--muted);border-bottom:2px solid transparent;display:flex;align-items:center;gap:7px}
+  .tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+  .tab .badge{background:var(--amber);color:#1a1206;font-weight:700;font-size:11px;border-radius:999px;padding:1px 7px}
+  .tab.is-new{color:var(--secondary)}
+  .tab .qr{font-size:10px;color:#062611;background:var(--primary);border-radius:4px;padding:1px 5px;margin-left:6px}
+
+  .body{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;padding:22px}
+  .col{display:flex;flex-direction:column;gap:18px}
+  .card{background:var(--card);border:1px solid var(--outline);border-radius:var(--radius);padding:16px}
+  .card.new{border-color:rgba(74,222,128,.5)}
+  .label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);margin:0 0 8px}
+
+  .hero{background:linear-gradient(180deg,#1a1620,#161219);border:1px solid rgba(74,222,128,.45);border-radius:14px;padding:18px}
+  .hero-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .mstatus{display:inline-flex;align-items:center;gap:8px;font-size:18px;font-weight:700}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .dot.amber{background:var(--amber);box-shadow:0 0 10px rgba(251,191,36,.6)}
+  .presence{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;border:1px solid var(--outline);border-radius:999px;padding:4px 10px}
+  .report{margin-left:auto}
+  .report .btn{background:var(--primary);color:#062611;font-weight:800;border:none;border-radius:10px;padding:13px 20px;font-size:15px;display:inline-flex;align-items:center;gap:9px;box-shadow:0 0 0 1px rgba(74,222,128,.4),0 8px 24px rgba(74,222,128,.18)}
+  .report small{display:block;color:var(--muted);font-size:11px;margin-top:6px;text-align:right}
+
+  .ki{margin-top:16px;border-top:1px solid var(--outline);padding-top:14px}
+  .ki .row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed #221e29}
+  .ki .row:last-child{border-bottom:none}
+  .sev{width:8px;height:8px;border-radius:50%}
+  .sev.major{background:var(--red)} .sev.minor{background:var(--amber)}
+  .ki .id{font-family:ui-monospace,Menlo,monospace;color:var(--muted);font-size:12px}
+  .ki .ttl{flex:1;font-size:13.5px}
+  .ki .st{font-size:11px;color:var(--muted);border:1px solid var(--outline);border-radius:6px;padding:2px 7px}
+  .ki .more{font-size:12.5px;color:var(--primary);margin-top:10px;display:inline-block}
+
+  .tagrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .tag{font-size:12px;border-radius:999px;padding:4px 11px;display:inline-flex;align-items:center;gap:6px}
+  .tag.public{background:rgba(74,222,128,.12);color:var(--primary);border:1px solid rgba(74,222,128,.35)}
+  .tag.private{background:rgba(45,212,191,.10);color:var(--secondary);border:1px dashed rgba(45,212,191,.5)}
+  .tag .lock{font-size:10px;opacity:.8}
+  .tag-add{font-size:12px;color:var(--muted);border:1px dashed var(--outline);border-radius:999px;padding:4px 11px}
+
+  .owner{display:flex;align-items:center;gap:10px}
+  .owner .av{width:34px;height:34px;border-radius:50%;background:#3a3340;flex:none}
+  .owner .nm{font-size:14px;font-weight:600}
+  .owner .nm a{color:var(--primary);text-decoration:none}
+  .owner .meta{font-size:11.5px;color:var(--muted2)}
+
+  /* compact PBM card */
+  .pbm{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pbm .nm{font-weight:700;font-size:13px;color:var(--secondary)}
+  .pbm-listed{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--primary)}
+  .warn{color:var(--amber);font-size:13px}
+  .pbm-actions{margin-left:auto;display:flex;gap:6px}
+  .pbm-actions .a{font-size:12px;border:1px solid var(--outline);border-radius:7px;padding:5px 9px;color:var(--muted)}
+
+  .desc{font-size:14px;color:#d4d4d8}
+
+  .act .arow{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed #221e29;font-size:13px}
+  .act .arow:last-child{border-bottom:none}
+  .act .ic{width:18px;text-align:center;color:var(--muted)}
+  .act .when{color:var(--muted2);font-size:11px;margin-left:auto;white-space:nowrap}
+  .viewall{font-size:12.5px;color:var(--primary)}
+
+  .zonetag{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--secondary);border:1px dashed var(--secondary);border-radius:5px;padding:1px 6px;margin-left:8px;vertical-align:middle}
+  .caption{color:var(--muted2);font-size:11.5px;margin:6px 2px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="page">Direction A — Info / Landing tab · v4 <span style="color:var(--muted);font-weight:400">· desktop</span></h1>
+  <p class="sub">Godzilla (Premium), 2 open issues.</p>
+  <div class="changes">
+    <b>Changes from v3:</b> &nbsp;① <b>Enriched header restored</b> — green <code>GZ</code> chip + name + <b>Stern · 2021 · Premium</b> subline (mfr/year/edition back home). &nbsp;② <b>Translite is now a full-height block on the right</b>, spanning the header <i>and</i> the tab strip and flush to the strip's bottom line + the card's right edge. Filling that taller height makes the image bigger (height-driven from the real 1.6:1 OPDB source) while eating the empty space that used to sit beside the tabs. &nbsp;Note: real prod tab strip is Info / Service / Timeline; Settings is our "assume it ships" addition.
+  </div>
+
+  <div class="device">
+    <div class="appbar">
+      <span class="logo">PINPOINT</span>
+      <span class="navlink">Dashboard</span>
+      <span class="navlink">Machines</span>
+      <span class="navlink">Issues</span>
+      <span class="spacer"></span>
+      <button class="pill-btn">⚠ Report Issue</button>
+      <div class="avatar"></div>
+    </div>
+
+    <div class="headrow">
+      <div class="headmain">
+        <div class="mh">
+          <div class="chip">GZ</div>
+          <div class="mh-text">
+            <h1 class="name">Godzilla (Premium)</h1>
+            <div class="meta">Stern · 2021 · Premium</div>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active">Info</div>
+          <div class="tab is-new">Settings</div>
+          <div class="tab">Service <span class="badge">2</span> <span class="qr">QR moved here</span></div>
+          <div class="tab">Timeline</div>
+        </div>
+      </div>
+
+      <figure class="mh-bb">
+        <img src="https://img.opdb.org/f9c9b40d-8953-49bc-8d41-3b53fab1c775-large.jpg" alt="Godzilla backbox translite">
+        <figcaption class="bbsrc">PinballMap · OPDB</figcaption>
+      </figure>
+    </div>
+
+    <div class="body">
+      <!-- MAIN COLUMN -->
+      <div class="col">
+        <div class="card">
+          <p class="desc">Stern's 2021 Godzilla, Premium edition. Located near the front window. Recently shopped — playfield waxed, new flipper rubbers.</p>
+        </div>
+
+        <div class="hero">
+          <div class="hero-top">
+            <span class="mstatus"><span class="dot amber"></span> Needs Service</span>
+            <span class="presence">● On the floor</span>
+            <span class="report">
+              <button class="btn">⚠ Report a problem →</button>
+              <small>takes you to the report page</small>
+            </span>
+          </div>
+          <div class="ki">
+            <p class="label" style="margin-bottom:6px">Known issues · 2 open</p>
+            <div class="row"><span class="sev major"></span><span class="id">GZ-7</span><span class="ttl">Left flipper feels weak</span><span class="st">New</span></div>
+            <div class="row"><span class="sev minor"></span><span class="id">GZ-5</span><span class="ttl">Ball occasionally stuck behind Godzilla building</span><span class="st">In&nbsp;Progress</span></div>
+            <a class="more">View all on Service →</a>
+          </div>
+        </div>
+
+        <div class="card act">
+          <p class="label">Recent activity <a class="viewall" style="margin-left:8px">View all →</a></p>
+          <div class="arow"><span class="ic">↪</span><span>Tim changed presence: On the floor → Off the floor</span><span class="when">9:14 AM</span></div>
+          <div class="arow"><span class="ic" style="color:var(--secondary)">◆</span><span><b>PinballMap</b> comment imported — "module temporarily replaced"</span><span class="when">Feb 24</span></div>
+          <div class="arow"><span class="ic">⚠</span><span>Issue opened: GZ-7 Left flipper feels weak</span><span class="when">Feb 20</span></div>
+        </div>
+      </div>
+
+      <!-- RIGHT RAIL -->
+      <div class="col">
+        <div class="card" style="border:1px dashed rgba(45,212,191,.5)">
+          <p class="label">Tags <span class="zonetag">future slot</span></p>
+          <div class="tagrow">
+            <span class="tag public">Tournament Ready</span>
+            <span class="tag private"><span class="lock">🔒</span> Friday League</span>
+            <span class="tag-add">+ add tag</span>
+          </div>
+          <p class="caption" style="margin-top:10px">Green = admin tag (all see). Teal dashed + lock = your private tag (e.g. a TD's tournament set).</p>
+        </div>
+
+        <div class="card">
+          <p class="label">Owner</p>
+          <div class="owner">
+            <div class="av"></div>
+            <div>
+              <div class="nm"><a>Tim Froehlich</a></div>
+              <div class="meta">Added Apr 17, 2026</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card new">
+          <div class="pbm">
+            <span class="nm">◆ PinballMap</span>
+            <span class="pbm-listed">● Listed</span>
+            <span class="warn" title="desynced">⚠</span>
+            <span class="pbm-actions">
+              <span class="a">Post</span>
+              <span class="a">View ↗</span>
+              <span class="a">⋯</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="caption" style="margin-top:18px">PinballMap is now a single compact row. Next: <b>mobile stack</b> + <b>Service workbench</b>. Anything else on this desktop layout before I move on?</p>
+</div>
+</body>
+</html>
