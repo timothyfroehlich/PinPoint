@@ -22,6 +22,7 @@ import { type TimelineEventData } from "~/lib/timeline/types";
 import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
 import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
+import { type LocationSnapshot } from "~/lib/pinballmap/types";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -214,6 +215,52 @@ export const pinballmapCatalog = pgTable(
     nameIdx: index("idx_pinballmap_catalog_name").on(t.name),
     // Edition lookup for a selected family.
     groupIdx: index("idx_pinballmap_catalog_group").on(t.machineGroupId),
+  })
+);
+
+/**
+ * PinballMap integration state (singleton; mirrors discordIntegrationConfig).
+ *
+ * One row holds the integration config (enabled, our PBM location id), the
+ * latest location SNAPSHOT (the whole `LocationSnapshot` stored as JSON — every
+ * downstream feature reads this, never the live API; bead C / PP-o355.3), sync
+ * health, and the manually-seeded outbound operator creds (bead E). The raw PBM
+ * token is never stored in a column — `outboundTokenVaultId` references
+ * `vault.secrets.id`, like the Discord bot token.
+ */
+export const pinballmapState = pgTable(
+  "pinballmap_state",
+  {
+    id: text("id").primaryKey().default("singleton"),
+    enabled: boolean("enabled").notNull().default(false),
+    // Austin Pinball Collective's PBM location (see APC_LOCATION_ID in config).
+    locationId: integer("location_id").notNull().default(26454),
+    // The whole LocationSnapshot from the last sync (raw PBM payload included).
+    // Typed via $type so reads come back as LocationSnapshot without a cast.
+    snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>(),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastSyncStatus: text("last_sync_status", {
+      enum: ["unknown", "ok", "error"],
+    })
+      .notNull()
+      .default("unknown"),
+    lastSyncError: text("last_sync_error"),
+    // Outbound operator creds (bead E). Token lives in Supabase Vault; this is
+    // only the UUID reference to vault.secrets.id (no FK — cross-schema).
+    outboundEmail: text("outbound_email"),
+    outboundTokenVaultId: uuid("outbound_token_vault_id"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // UUID reference to auth.users.id — no FK (Drizzle cannot cross-schema).
+    updatedBy: uuid("updated_by"),
+  },
+  (_t) => ({
+    singletonCheck: check("pinballmap_state_singleton", sql`id = 'singleton'`),
+    syncStatusCheck: check(
+      "pinballmap_state_sync_status_check",
+      sql`last_sync_status IN ('unknown', 'ok', 'error')`
+    ),
   })
 );
 

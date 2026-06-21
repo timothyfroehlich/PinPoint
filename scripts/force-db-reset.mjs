@@ -30,6 +30,7 @@ const tables = [
   "issues",
   "machines",
   "pinballmap_catalog",
+  "pinballmap_state",
   "user_profiles",
   "invited_users",
   "unconfirmed_users",
