@@ -81,7 +81,9 @@ function PersonHoverCardLink({
           </Avatar>
           <div className="min-w-0">
             <div className="truncate font-semibold">
-              {data?.name ?? displayName}
+              <Link href={`/u/${userId}`} className="hover:underline">
+                {data?.name ?? displayName}
+              </Link>
               {data?.pronouns ? (
                 <span className="ml-1 text-xs font-normal text-muted-foreground">
                   {data.pronouns}

@@ -1,4 +1,4 @@
-import type React from "react";
+import React from "react";
 import { isToday } from "date-fns";
 import { Activity } from "lucide-react";
 
@@ -8,6 +8,7 @@ import { bucketTimelineRows } from "~/lib/timeline/bucket-rows";
 import {
   getUserTimeline,
   resolveFeedMachineLabels,
+  PROFILE_FEED_LIMIT_MOBILE,
 } from "~/lib/profiles/queries";
 
 export async function ProfileActivityFeed({
@@ -15,9 +16,14 @@ export async function ProfileActivityFeed({
 }: {
   userId: string;
 }): Promise<React.JSX.Element> {
-  const rows = await getUserTimeline(userId, { limit: 8 });
+  const rows = await getUserTimeline(userId);
   const labels = await resolveFeedMachineLabels(rows);
   const groups = bucketTimelineRows(rows);
+  // Mobile caps the feed at PROFILE_FEED_LIMIT_MOBILE; the extra desktop rows
+  // stay in the DOM and reveal at the `@lg` container width.
+  const mobileHiddenIds = new Set(
+    rows.slice(PROFILE_FEED_LIMIT_MOBILE).map((r) => r.id)
+  );
 
   return (
     <section aria-labelledby="profile-activity-heading">
@@ -50,9 +56,8 @@ export async function ProfileActivityFeed({
                   const label = entry.row.machineId
                     ? labels.get(entry.row.machineId)
                     : undefined;
-                  return (
+                  const row = (
                     <TimelineRow
-                      key={entry.row.id}
                       row={entry.row}
                       showRelativeTime={showRelativeTime}
                       rowDateLabel={entry.bucket.rowDateLabel}
@@ -68,6 +73,13 @@ export async function ProfileActivityFeed({
                           }
                         : {})}
                     />
+                  );
+                  return mobileHiddenIds.has(entry.row.id) ? (
+                    <div key={entry.row.id} className="hidden @lg:block">
+                      {row}
+                    </div>
+                  ) : (
+                    <React.Fragment key={entry.row.id}>{row}</React.Fragment>
                   );
                 })}
               </div>

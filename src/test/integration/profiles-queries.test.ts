@@ -69,13 +69,16 @@ describe("profile queries", () => {
       })
     );
 
-    // Seed 8 owned machines to exercise the cap (cap=6, fetch 7, hasMore=true, total=8)
-    for (let i = 0; i < 8; i++) {
+    // Seed 9 owned machines to exercise the cap (cap=8, fetch 9, hasMore=true,
+    // total=9). createdAt is staggered so the "most recently added" ordering is
+    // deterministic: OWN8 is newest, OWN0 oldest.
+    for (let i = 0; i < 9; i++) {
       await db.insert(machines).values(
         createTestMachine({
           initials: `OWN${i}`,
           name: `Machine ${i}`,
           ownerId: USER,
+          createdAt: new Date(Date.UTC(2026, 0, 1 + i)),
         })
       );
     }
@@ -136,11 +139,26 @@ describe("profile queries", () => {
     expect(counts.comments).toBe(1);
   });
 
-  it("getCappedOwnedMachines caps at 6 and flags overflow", async () => {
+  it("getCappedOwnedMachines caps at PROFILE_MACHINE_CAP and flags overflow", async () => {
     const res = await getCappedOwnedMachines(USER);
     expect(res.machines).toHaveLength(PROFILE_MACHINE_CAP);
     expect(res.hasMore).toBe(true);
-    expect(res.total).toBe(8);
+    expect(res.total).toBe(9);
+  });
+
+  it("getCappedOwnedMachines orders by most recently added", async () => {
+    const res = await getCappedOwnedMachines(USER);
+    // OWN8 is newest (Jan 9), OWN1 the oldest still within the cap of 8.
+    expect(res.machines.map((m) => m.initials)).toEqual([
+      "OWN8",
+      "OWN7",
+      "OWN6",
+      "OWN5",
+      "OWN4",
+      "OWN3",
+      "OWN2",
+      "OWN1",
+    ]);
   });
 
   it("getProfileActivityCounts counts issues fixed by the user", async () => {

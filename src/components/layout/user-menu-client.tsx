@@ -118,9 +118,24 @@ export function UserMenu({
           </DropdownMenuItem>
         )}
 
-        {/* User Management — visible to admins only */}
+        {/* Settings — completes the user-specific group (Profile, My
+            Machines, Settings). */}
+        <DropdownMenuItem asChild>
+          <a
+            href="/settings"
+            className="flex items-center cursor-pointer"
+            data-testid="user-menu-settings"
+          >
+            <Settings className="mr-2 size-4" />
+            <span>Settings</span>
+          </a>
+        </DropdownMenuItem>
+
+        {/* Admin group — visible to admins only, kept together and separated
+            from the user-specific items above. */}
         {checkPermission("admin.access", getAccessLevel(role)) && (
           <>
+            <DropdownMenuSeparator className="bg-outline-variant" />
             <DropdownMenuItem asChild>
               <a
                 href="/admin/users"
@@ -141,21 +156,8 @@ export function UserMenu({
                 <span>Integrations</span>
               </a>
             </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-outline-variant" />
           </>
         )}
-
-        {/* Settings */}
-        <DropdownMenuItem asChild>
-          <a
-            href="/settings"
-            className="flex items-center cursor-pointer"
-            data-testid="user-menu-settings"
-          >
-            <Settings className="mr-2 size-4" />
-            <span>Settings</span>
-          </a>
-        </DropdownMenuItem>
 
         <DropdownMenuSeparator className="bg-outline-variant" />
 

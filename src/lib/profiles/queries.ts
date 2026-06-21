@@ -1,4 +1,4 @@
-import { eq, count, asc, inArray, and, sql } from "drizzle-orm";
+import { eq, count, desc, inArray, and, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import {
   userProfiles,
@@ -12,7 +12,9 @@ import {
 } from "~/lib/timeline/machine-events";
 import { CLOSED_STATUSES, OPEN_STATUSES } from "~/lib/issues/status";
 
-export const PROFILE_MACHINE_CAP = 6;
+export const PROFILE_MACHINE_CAP = 8;
+/** Mobile shows fewer; the extra desktop cards are CSS-hidden below `@lg`. */
+export const PROFILE_MACHINE_CAP_MOBILE = 4;
 
 export interface ProfileRow {
   id: string;
@@ -120,7 +122,7 @@ export async function getCappedOwnedMachines(userId: string): Promise<{
       })
       .from(machines)
       .where(eq(machines.ownerId, userId))
-      .orderBy(asc(machines.name))
+      .orderBy(desc(machines.createdAt))
       .limit(PROFILE_MACHINE_CAP + 1),
     db
       .select({ c: count() })
@@ -135,7 +137,9 @@ export async function getCappedOwnedMachines(userId: string): Promise<{
   };
 }
 
-export const PROFILE_FEED_LIMIT = 8;
+export const PROFILE_FEED_LIMIT = 5;
+/** Mobile shows fewer; the extra desktop rows are CSS-hidden below `@lg`. */
+export const PROFILE_FEED_LIMIT_MOBILE = 4;
 
 /** Recent timeline events authored by this user, across any machine. */
 export async function getUserTimeline(

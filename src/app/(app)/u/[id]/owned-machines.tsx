@@ -1,6 +1,8 @@
 import type React from "react";
 import Link from "next/link";
 
+import { PROFILE_MACHINE_CAP_MOBILE } from "~/lib/profiles/queries";
+
 interface OwnedMachinesProps {
   machines: { id: string; initials: string; name: string }[];
   total: number;
@@ -23,13 +25,18 @@ export function OwnedMachines({
         Owned machines · {total}
       </h2>
       <div className="mt-2 grid gap-3 @lg:grid-cols-2">
-        {machines.map((m) => {
+        {machines.map((m, index) => {
           const open = openCounts.get(m.initials) ?? 0;
+          // Mobile caps the grid at PROFILE_MACHINE_CAP_MOBILE; the extra
+          // desktop cards stay in the DOM and reveal at the `@lg` container
+          // width (the same seam the grid uses to go two-column).
+          const display =
+            index < PROFILE_MACHINE_CAP_MOBILE ? "flex" : "hidden @lg:flex";
           return (
             <Link
               key={m.id}
               href={`/m/${m.initials}`}
-              className="flex items-center gap-3 rounded-xl border border-outline-variant bg-card p-3 transition-[border-color,box-shadow] duration-150 hover:border-primary/50 hover:glow-primary"
+              className={`${display} items-center gap-3 rounded-xl border border-outline-variant bg-card p-3 transition-[border-color,box-shadow] duration-150 hover:border-primary/50 hover:glow-primary`}
             >
               <span className="shrink-0 rounded-lg border border-secondary/30 bg-secondary/15 px-2 py-1 font-mono text-xs font-bold text-secondary">
                 {m.initials}
