@@ -34,7 +34,9 @@ test.describe("Change Password", () => {
 
     await page.goto("/settings");
 
-    await expect(page.getByRole("heading", { name: "Security" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Authentication" })
+    ).toBeVisible();
 
     const form = page.getByTestId("change-password-form");
     await form.getByLabel(/^Current Password\s*\*?$/).fill(originalPassword);

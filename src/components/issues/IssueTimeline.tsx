@@ -10,6 +10,7 @@ import { isUserMachineOwner } from "~/lib/issues/owner";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import { resolveIssueReporter } from "~/lib/issues/utils";
+import { PersonHoverCard } from "~/components/people/PersonHoverCard";
 import { MessageSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { type IssueImage } from "~/server/db/schema";
@@ -246,11 +247,12 @@ function TimelineItem({
           <div className="flex flex-col gap-0.5 py-1 pl-4 text-xs text-muted-foreground @lg:pl-6">
             <div className="flex items-center gap-1.5">
               {event.author.id && (
-                <span
-                  className="font-semibold text-foreground/90"
-                  data-testid="system-event-actor"
-                >
-                  {event.author.name}
+                <span data-testid="system-event-actor">
+                  <PersonHoverCard
+                    userId={event.author.id}
+                    displayName={event.author.name}
+                    className="font-semibold text-foreground/90"
+                  />
                 </span>
               )}
               {event.author.id && (
@@ -287,11 +289,12 @@ function TimelineItem({
             <div className="mb-4 flex items-start justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span
-                    className="font-semibold text-foreground"
-                    data-testid="timeline-author-name"
-                  >
-                    {event.author.name}
+                  <span data-testid="timeline-author-name">
+                    <PersonHoverCard
+                      userId={event.author.id ?? null}
+                      displayName={event.author.name}
+                      className="font-semibold text-foreground"
+                    />
                   </span>
                   {isOwner && <OwnerBadge size="sm" />}
                   {isIssue && (
@@ -433,7 +436,10 @@ export function IssueTimeline({
     id: `issue-${issue.id}`,
     type: "issue",
     author: {
-      id: reporter.id ?? null,
+      // Only pass a real userProfiles.id (reportedByUser.id); invitedReporter
+      // has an invitedUsers.id which is not a valid profile id — pass null so
+      // PersonHoverCard degrades to plain text for invited/former reporters.
+      id: issue.reportedByUser?.id ?? null,
       name: reporter.name,
       avatarFallback: reporter.initial,
     },

@@ -5,7 +5,9 @@
     "role": "admin",
     "name": "Admin User",
     "firstName": "Admin",
-    "lastName": "User"
+    "lastName": "User",
+    "pronouns": "they/them",
+    "bio": "Collective admin and longtime EM/SS tinkerer. I keep the woodrails breathing and the DMDs honest. Find me elbow-deep in a backbox most weekends — say hi if a game's playing up."
   },
   "member": {
     "email": "member@test.com",

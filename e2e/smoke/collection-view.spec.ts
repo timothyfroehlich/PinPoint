@@ -47,13 +47,13 @@ test.describe("Collection view (PP-slrd.1)", () => {
     await assertNoA11yViolations(page);
   });
 
-  test("owner name on machine info links to the owner's collection", async ({
+  test("owner name on machine info links to the owner's profile", async ({
     page,
   }) => {
     // AFM is owned by the member user (seed-users.mjs ownerMap).
     await page.goto(`/m/${seededMachines.attackFromMars.initials}`);
     await page.getByTestId("owner-display").getByRole("link").click();
-    await expect(page).toHaveURL(/\/c\/owner\//);
-    await expect(page.getByTestId("collection-summary")).toBeVisible();
+    await expect(page).toHaveURL(/\/u\//);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 });

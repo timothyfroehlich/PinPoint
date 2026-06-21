@@ -6,6 +6,7 @@ import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { formatIssueId, resolveIssueReporter } from "~/lib/issues/utils";
 import { formatDate } from "~/lib/dates";
 import type { Issue } from "~/lib/types";
+import { PersonHoverCard } from "~/components/people/PersonHoverCard";
 
 interface IssueRowProps {
   issue: Pick<
@@ -25,6 +26,7 @@ interface IssueRowProps {
       name: string;
     } | null;
     reportedByUser: {
+      id?: string;
       name: string;
     } | null;
     invitedReporter: {
@@ -71,7 +73,13 @@ export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
           </span>
           <span>•</span>
           <span>opened on {formatDate(issue.createdAt)}</span>
-          <span>by {reporter.name}</span>
+          <span>
+            by{" "}
+            <PersonHoverCard
+              userId={issue.reportedByUser?.id ?? null}
+              displayName={reporter.name}
+            />
+          </span>
         </div>
       </div>
     </div>

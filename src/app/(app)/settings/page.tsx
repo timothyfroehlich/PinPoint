@@ -12,10 +12,11 @@ import {
 import { eq, and, ne, count } from "drizzle-orm";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { isDiscordIntegrationEnabled } from "~/lib/discord/config";
-import { ProfileForm } from "./profile-form";
+import Link from "next/link";
 import { ConnectedAccountsSection } from "./connected-accounts/connected-accounts-section";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
 import { ChangePasswordSection } from "./change-password-section";
+import { AccountEmail } from "./account-email";
 import { DeleteAccountSection } from "./delete-account-section";
 import { getReassignmentTargets } from "./account-deletion";
 import { Separator } from "~/components/ui/separator";
@@ -106,13 +107,12 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
           <h2 className="text-balance text-xl font-semibold mb-4">
             Profile Settings
           </h2>
-          <ProfileForm
-            firstName={profile.firstName}
-            lastName={profile.lastName}
-            email={profile.email}
-            role={profile.role}
-            isInternalAccount={isInternalAccount(profile.email)}
-          />
+          <Link
+            href={`/u/${user.id}`}
+            className="text-primary text-sm hover:underline"
+          >
+            View your public profile →
+          </Link>
         </div>
 
         <Separator />
@@ -164,7 +164,12 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
         <Separator />
 
         <div>
-          <h2 className="text-balance text-xl font-semibold mb-4">Security</h2>
+          <h2 className="text-balance text-xl font-semibold mb-4">
+            Authentication
+          </h2>
+          <div className="mb-6">
+            <AccountEmail email={profile.email} />
+          </div>
           <p className="text-pretty text-sm text-muted-foreground mb-4">
             Change your account password.
           </p>
