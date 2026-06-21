@@ -41,6 +41,7 @@ import { RelativeTime } from "~/components/issues/RelativeTime";
 import { formatRelative } from "~/lib/dates";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import { PersonHoverCard } from "~/components/people/PersonHoverCard";
 
 export interface MachineCommentRowData {
   id: string;
@@ -136,7 +137,11 @@ export function MachineTimelineCommentRow({
            * issue/system rows' time column.
            */}
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span className="font-semibold">{row.authorName ?? "Unknown"}</span>
+            <PersonHoverCard
+              userId={row.authorId}
+              displayName={row.authorName ?? "Unknown"}
+              className="font-semibold"
+            />
             <TagPill tag={row.tag} />
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">

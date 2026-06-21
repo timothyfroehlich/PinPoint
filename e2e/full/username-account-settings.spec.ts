@@ -2,25 +2,11 @@ import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions.js";
 
 test.describe("Username Account Settings", () => {
-  test("settings page shows 'no email on file' for username accounts", async ({
-    page,
-  }, testInfo) => {
-    // Login as the username test account
-    await loginAs(page, testInfo, {
-      email: "testuser",
-      password: "TestPassword123",
-    });
-
-    await page.goto("/settings");
-
-    const profileForm = page.getByTestId("profile-form");
-
-    // Should NOT show the email input
-    await expect(profileForm.getByLabel("Email")).not.toBeVisible();
-
-    // Should show the "no email" message
-    await expect(profileForm.getByText("Username account")).toBeVisible();
-  });
+  // Note: the "username account → no email on file" behavior moved from the
+  // old settings profile form to the Authentication section's AccountEmail
+  // component and is covered at the unit layer
+  // (src/app/(app)/settings/account-email.test.tsx). This file keeps the
+  // multi-element notification-form behavior, which is a settings-page journey.
 
   test("notification form hides email toggles but keeps in-app controls", async ({
     page,

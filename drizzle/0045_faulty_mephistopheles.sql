@@ -5,6 +5,8 @@ CREATE TABLE "pinballmap_catalog" (
 	"year" integer,
 	"opdb_id" text,
 	"ipdb_id" integer,
+	"machine_group_id" integer,
+	"group_name" text,
 	"refreshed_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -16,4 +18,5 @@ ALTER TABLE "machines" ADD COLUMN "year" integer;--> statement-breakpoint
 ALTER TABLE "machines" ADD COLUMN "opdb_id" text;--> statement-breakpoint
 ALTER TABLE "machines" ADD COLUMN "ipdb_id" integer;--> statement-breakpoint
 CREATE INDEX "idx_pinballmap_catalog_name" ON "pinballmap_catalog" USING btree ("name");--> statement-breakpoint
+CREATE INDEX "idx_pinballmap_catalog_group" ON "pinballmap_catalog" USING btree ("machine_group_id");--> statement-breakpoint
 ALTER TABLE "machines" ADD CONSTRAINT "machines_pinballmap_link_exclusive" CHECK (NOT (pinballmap_machine_id IS NOT NULL AND pinballmap_excluded));

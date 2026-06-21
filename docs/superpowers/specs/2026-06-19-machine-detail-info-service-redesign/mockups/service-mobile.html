@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direction A — Service workbench · mobile</title>
+<style>
+  :root{
+    --bg:#0f0f11; --card:#18151b; --primary:#4ade80; --secondary:#2dd4bf;
+    --fg:#ededf0; --muted:#a1a1aa; --muted2:#71717a;
+    --outline:#2b2730; --amber:#fbbf24; --red:#f87171; --orange:#fb923c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0a0c;color:var(--fg);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:24px;display:grid;grid-template-columns:390px 1fr;gap:32px;align-items:start}
+  h1.page{font-size:18px;margin:0 0 4px;font-weight:700}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+  .notes{font-size:12.5px;color:var(--muted);line-height:1.7}
+  .notes b{color:var(--primary)}
+  .notes li{margin-bottom:8px}
+
+  /* phone */
+  .phone{width:390px;border:10px solid #1b1820;border-radius:38px;overflow:hidden;background:var(--bg);box-shadow:0 24px 70px rgba(0,0,0,.6);position:relative}
+  .notch{height:26px;background:#0a0a0c;display:flex;justify-content:center;align-items:flex-start}
+  .notch::after{content:"";width:120px;height:18px;background:#1b1820;border-radius:0 0 14px 14px}
+  .screen{height:760px;overflow-y:auto}
+
+  .appbar{height:52px;display:flex;align-items:center;gap:12px;padding:0 14px;background:rgba(24,21,27,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--outline);position:sticky;top:0;z-index:5}
+  .logo{font-weight:800;letter-spacing:.5px;color:var(--primary);font-size:13px}
+  .spacer{flex:1}
+  .avatar{width:26px;height:26px;border-radius:50%;background:#3a3340}
+  .bell{color:var(--muted)}
+
+  .mh{display:flex;align-items:center;gap:12px;padding:14px 16px 0}
+  .chip{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:14px;background:#101a14;color:var(--primary);border:1px solid #234534;flex:none}
+  .mh-text{min-width:0}
+  .mh .name{font-size:18px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mh .meta{color:var(--muted);font-size:12px;margin-top:1px}
+
+  .tabs{display:flex;gap:2px;padding:12px 16px 0;border-bottom:1px solid var(--outline);margin-top:12px;overflow-x:auto;white-space:nowrap}
+  .tab{padding:8px 11px;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px;flex:none}
+  .tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+  .tab.is-new{color:var(--secondary)}
+  .tab .badge{background:var(--amber);color:#1a1206;font-weight:700;font-size:10px;border-radius:999px;padding:1px 6px}
+
+  .stack{padding:14px 16px 90px;display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--card);border:1px solid var(--outline);border-radius:12px;padding:14px}
+  .label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);margin:0 0 8px}
+  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .toolbar h2{font-size:15px;font-weight:700;margin:0}
+  .toolbar h2 .cnt{color:var(--muted)}
+  .viewall{font-size:12px;color:var(--primary);text-decoration:none;white-space:nowrap}
+  .addnote{font-size:11.5px;color:var(--secondary);border:1px solid rgba(45,212,191,.4);border-radius:7px;padding:3px 9px;margin-right:9px;white-space:nowrap}
+
+  /* status strip */
+  .statusbar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .dot.amber{background:var(--amber);box-shadow:0 0 8px rgba(251,191,36,.55)}
+  .mstatus{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:700}
+  .sel{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--fg);border:1px solid var(--outline);background:#141019;border-radius:8px;padding:6px 10px}
+  .sel .car{color:var(--muted2);font-size:9px}
+
+  /* issue rows */
+  .issues{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+  .issue{display:block;border:1px solid var(--outline);background:var(--bg);border-radius:10px;padding:11px 12px}
+  .issue .top{display:flex;align-items:center;gap:8px}
+  .sevdot{width:8px;height:8px;border-radius:50%;flex:none}
+  .sevdot.major{background:var(--orange)} .sevdot.minor{background:var(--amber)}
+  .issue .id{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--muted)}
+  .issue .ttl{flex:1;font-size:13.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .issue .age{color:var(--muted2);font-size:10.5px;white-space:nowrap}
+  .issue .meta{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .b{font-size:10.5px;border-radius:6px;padding:1px 7px;border:1px solid transparent;font-weight:600}
+  .b.status{background:rgba(74,222,128,.12);color:var(--primary);border-color:rgba(74,222,128,.3)}
+  .b.status.prog{background:rgba(45,212,191,.12);color:var(--secondary);border-color:rgba(45,212,191,.3)}
+  .b.sev{background:rgba(251,146,60,.12);color:var(--orange);border-color:rgba(251,146,60,.3)}
+  .b.sev.minorb{background:rgba(251,191,36,.12);color:var(--amber);border-color:rgba(251,191,36,.3)}
+  .b.pri{background:#1c1822;color:var(--muted);border-color:var(--outline)}
+  .issue .who{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted2)}
+  .miniav{width:16px;height:16px;border-radius:50%;background:#3a3340;flex:none}
+
+  /* timeline rows (authentic) */
+  .tl-row{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #1f1b25}
+  .tl-row:last-child{border-bottom:none}
+  .tl-ic{width:18px;flex:none;text-align:center;font-size:12.5px;line-height:1.5}
+  .tl-ic.teal{color:var(--secondary)} .tl-ic.green{color:var(--primary)} .tl-ic.muted{color:var(--muted2)}
+  .tl-av{width:26px;height:26px;border-radius:50%;background:#3a3340;flex:none;display:grid;place-items:center;font-size:9.5px;color:var(--fg);font-weight:700}
+  .tl-body{flex:1;min-width:0;font-size:12.5px}
+  .tl-l1{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .tl-id{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--muted)}
+  .tl-actor{color:var(--muted2);font-size:11.5px}
+  .tl-time{margin-left:auto;color:var(--muted2);font-size:10.5px;white-space:nowrap}
+  .tl-l2{margin-top:2px}
+  .tl-l2 .id2{font-family:ui-monospace,Menlo,monospace;color:var(--muted);font-size:11.5px;margin-right:6px}
+  .tl-l2 .t2{color:#d4d4d8;font-size:12.5px}
+  .tl-author{font-weight:600;font-size:12.5px}
+  .tl-note{color:#d4d4d8;font-size:12.5px;margin-top:3px}
+  .tag-pill{font-size:9.5px;border-radius:5px;padding:1px 6px;background:#1c1822;color:var(--muted);border:1px solid var(--outline);font-weight:600}
+
+  /* actions + qr */
+  .acts{display:flex;gap:8px;margin-top:11px}
+  .btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;border:1px solid var(--outline);border-radius:9px;padding:10px;color:var(--fg);flex:1}
+  .btn-ghost.act{border-color:rgba(74,222,128,.45);color:var(--primary)}
+
+  /* ⋯ menu on the issues card */
+  .menuwrap{position:relative}
+  .dots{font-size:15px;color:var(--muted);border:1px solid var(--outline);border-radius:7px;padding:1px 9px 3px;line-height:1}
+  .menu{position:absolute;right:0;top:30px;z-index:8;background:#1d1923;border:1px solid var(--outline);border-radius:10px;padding:7px;width:212px;box-shadow:0 14px 34px rgba(0,0,0,.55)}
+  .menu .mlabel{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted2);padding:3px 7px 5px}
+  .menu .seg{display:flex;gap:4px;background:#141019;border:1px solid var(--outline);border-radius:8px;padding:3px;margin:0 4px 7px}
+  .menu .seg span{flex:1;text-align:center;font-size:11.5px;padding:5px;border-radius:6px;color:var(--muted)}
+  .menu .seg span.on{background:var(--primary);color:#062611;font-weight:700}
+  .menu .mi{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--fg);padding:8px 7px;border-radius:7px}
+  .menu .mi .mic{width:16px;text-align:center;color:var(--muted)}
+  .menu hr{border:none;border-top:1px solid var(--outline);margin:5px 0}
+  .qrbox{display:flex;align-items:center;gap:14px}
+  .qrimg{width:104px;height:104px;border-radius:9px;background:#fff;padding:7px;flex:none}
+  .qrimg img{width:100%;height:100%;display:block}
+  .qrtext{font-size:12px;color:var(--muted)}
+  .qr-actions{display:flex;gap:7px;margin-top:9px}
+  .qr-actions .a{font-size:11.5px;border:1px solid var(--outline);border-radius:7px;padding:5px 9px;color:var(--fg)}
+  .caption{color:var(--muted2);font-size:11.5px;margin:7px 0 0;line-height:1.5}
+
+  /* bottom tab bar */
+  .btb{position:absolute;left:0;right:0;bottom:0;height:58px;background:rgba(24,21,27,.95);backdrop-filter:blur(8px);border-top:1px solid var(--outline);display:flex;justify-content:space-around;align-items:center}
+  .btb .b{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--muted2)}
+  .btb .b .d{font-size:16px}
+  .btb .b.report{color:var(--primary)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="appbar">
+          <span class="logo">PINPOINT</span>
+          <span class="spacer"></span>
+          <span class="bell">🔔</span>
+          <div class="avatar"></div>
+        </div>
+
+        <div class="mh">
+          <div class="chip">GZ</div>
+          <div class="mh-text">
+            <div class="name">Godzilla (Premium)</div>
+            <div class="meta">Stern · 2021 · Premium</div>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <span class="tab">Info</span>
+          <span class="tab is-new">Settings</span>
+          <span class="tab active">Service <span class="badge">2</span></span>
+          <span class="tab">Timeline</span>
+        </div>
+
+        <div class="stack">
+          <!-- status + presence + the action you'd take from here: Watch -->
+          <div class="card">
+            <div class="statusbar">
+              <span class="mstatus"><span class="dot amber"></span> Needs Service</span>
+              <span class="sel">On the Floor <span class="car">▾</span></span>
+            </div>
+            <div class="acts">
+              <span class="btn-ghost act">👁 Watch this machine</span>
+            </div>
+          </div>
+
+          <!-- open issues (default view) with a ⋯ menu for all/export/view-all -->
+          <div class="card menuwrap">
+            <div class="toolbar">
+              <h2>Open Issues <span class="cnt">(2)</span></h2>
+              <span class="dots">⋯</span>
+            </div>
+            <!-- ⋯ menu shown OPEN for illustration -->
+            <div class="menu">
+              <div class="mlabel">Show</div>
+              <div class="seg"><span class="on">Open</span><span>All issues</span></div>
+              <hr>
+              <div class="mi"><span class="mic">↗</span> View all in Issues list</div>
+              <div class="mi"><span class="mic">⤓</span> Export all issues (CSV)</div>
+            </div>
+            <div class="issues">
+              <a class="issue">
+                <div class="top">
+                  <span class="sevdot major"></span>
+                  <span class="id">GZ-7</span>
+                  <span class="ttl">Left flipper feels weak</span>
+                  <span class="age">2d</span>
+                </div>
+                <div class="meta">
+                  <span class="b status">New</span>
+                  <span class="b sev">Major</span>
+                  <span class="who"><span class="miniav"></span> Unassigned</span>
+                </div>
+              </a>
+              <a class="issue">
+                <div class="top">
+                  <span class="sevdot minor"></span>
+                  <span class="id">GZ-5</span>
+                  <span class="ttl">Ball stuck behind Godzilla building</span>
+                  <span class="age">5d</span>
+                </div>
+                <div class="meta">
+                  <span class="b status prog">In Progress</span>
+                  <span class="b sev minorb">Minor</span>
+                  <span class="who"><span class="miniav"></span> Tim</span>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <!-- activity (authentic timeline rows) -->
+          <div class="card">
+            <div class="toolbar">
+              <p class="label" style="margin:0">Activity</p>
+              <span><a class="addnote">+ Add note</a><a class="viewall">Timeline →</a></span>
+            </div>
+            <div style="margin-top:4px">
+              <div class="tl-row">
+                <span class="tl-av">TF</span>
+                <div class="tl-body">
+                  <div class="tl-l1">
+                    <span class="tl-author">Tim Froehlich</span>
+                    <span class="tag-pill">Parts</span>
+                    <span class="tl-time">1h</span>
+                  </div>
+                  <div class="tl-note">Ordered replacement flipper coil — ETA Friday.</div>
+                </div>
+              </div>
+              <div class="tl-row">
+                <span class="tl-ic teal">→</span>
+                <div class="tl-body">
+                  <div class="tl-l1">
+                    <span class="tl-id">GZ-5</span> <span>→ In Progress</span>
+                    <span class="b status prog">In&nbsp;Prog</span>
+                    <span class="tl-time">4d</span>
+                  </div>
+                  <div class="tl-l2"><span class="id2">GZ-5</span><span class="t2">Ball stuck behind building</span></div>
+                </div>
+              </div>
+              <div class="tl-row">
+                <span class="tl-ic teal">◉</span>
+                <div class="tl-body">
+                  <div class="tl-l1">
+                    <span class="tl-id">GZ-7</span> <span>opened</span>
+                    <span class="b sev">Major</span>
+                    <span class="tl-actor">— Anon</span>
+                    <span class="tl-time">Feb 20</span>
+                  </div>
+                  <div class="tl-l2"><span class="id2">GZ-7</span><span class="t2">Left flipper feels weak</span></div>
+                </div>
+              </div>
+              <div class="tl-row">
+                <span class="tl-ic muted">◷</span>
+                <div class="tl-body">
+                  <div class="tl-l1">
+                    <span>Availability changed from On the floor to Off the floor</span>
+                    <span class="tl-time">Feb 19</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- qr code -->
+          <div class="card">
+            <p class="label">QR code</p>
+            <div class="qrbox">
+              <span class="qrimg"><img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&data=https%3A%2F%2Fpinpoint.app%2Fm%2FGZ" alt="QR to machine page"></span>
+              <div class="qrtext">
+                Players scan this to reach <b>this machine's page</b> → the Report button.
+                <div class="qr-actions"><span class="a">⎙ Print</span><span class="a">⤓ Save</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="btb">
+          <div class="b"><span class="d">▦</span>Dashboard</div>
+          <div class="b"><span class="d">◫</span>Machines</div>
+          <div class="b"><span class="d">⚠</span>Issues</div>
+          <div class="b report"><span class="d">＋</span>Report</div>
+          <div class="b"><span class="d">⋯</span>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <h1 class="page">Direction A — Service workbench · mobile</h1>
+    <p class="sub">The maintainer's view, single column.</p>
+    <ul class="notes">
+      <li><b>Watch sits under the status</b> — it's the action you'd take after seeing "Needs Service".</li>
+      <li><b>Issues card defaults to "Open Issues"</b> with a <b>⋯ menu</b> (shown open) that holds: an <b>Open / All issues</b> view toggle, <b>View all</b> (→ the Issues list), and <b>Export all issues</b>. Export lives only here — it's not a prominent mobile action. Same pattern will go on desktop.</li>
+      <li><b>Stack order:</b> status + Watch → Open Issues (⋯) → Activity (+ Add note) → QR code.</li>
+      <li><b>Authentic Activity feed</b> — note rows (avatar + tag pill), two-line issue events, single-line lifecycle.</li>
+      <li><b>No translite</b> (desktop-only). QR is a compact horizontal card.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

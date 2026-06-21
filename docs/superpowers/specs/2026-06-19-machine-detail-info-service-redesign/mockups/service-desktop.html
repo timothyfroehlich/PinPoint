@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direction A — Service workbench · desktop</title>
+<style>
+  :root{
+    --bg:#0f0f11; --card:#18151b; --primary:#4ade80; --secondary:#2dd4bf;
+    --fg:#ededf0; --muted:#a1a1aa; --muted2:#71717a;
+    --outline:#2b2730; --amber:#fbbf24; --red:#f87171; --orange:#fb923c;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0a0c;color:var(--fg);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1280px;margin:0 auto;padding:24px}
+  h1.page{font-size:18px;margin:0 0 4px;font-weight:700}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+  .changes{font-size:12px;color:var(--muted);margin:0 0 20px;padding:10px 14px;border:1px solid var(--outline);border-radius:10px;background:#121016}
+  .changes b{color:var(--primary)}
+
+  .device{background:var(--bg);border:1px solid var(--outline);border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .appbar{height:56px;display:flex;align-items:center;gap:18px;padding:0 20px;background:rgba(24,21,27,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--outline)}
+  .logo{font-weight:800;letter-spacing:.5px;color:var(--primary)}
+  .navlink{color:var(--muted);font-size:13px}
+  .spacer{flex:1}
+  .pill-btn{background:var(--secondary);color:#08110f;font-weight:700;border:none;border-radius:8px;padding:7px 12px;font-size:12px}
+  .avatar{width:28px;height:28px;border-radius:50%;background:#3a3340}
+
+  /* shared header shell (identical to Info v4) */
+  .headrow{display:flex;align-items:stretch}
+  .headmain{flex:1;min-width:0;display:flex;flex-direction:column}
+  .headmain .tabs{margin-top:auto}
+  .mh{display:flex;align-items:center;gap:14px;padding:18px 22px 0}
+  .chip{flex-shrink:0;width:46px;height:46px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:15px;background:#101a14;color:var(--primary);border:1px solid #234534}
+  .mh-text{min-width:0}
+  .mh .name{font-size:24px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mh .meta{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .mh-bb{flex-shrink:0;position:relative;margin:0;line-height:0;align-self:stretch;width:300px;overflow:hidden;border-left:1px solid var(--outline);border-bottom:1px solid var(--outline)}
+  .mh-bb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
+  .mh-bb .bbsrc{position:absolute;right:7px;bottom:9px;font-size:8.5px;letter-spacing:.03em;color:#cdd3cc;background:rgba(10,10,12,.74);padding:2px 6px;border-radius:5px;line-height:1.2}
+
+  .tabs{display:flex;gap:4px;padding:14px 22px 0;border-bottom:1px solid var(--outline);margin-top:14px}
+  .tab{padding:9px 14px;font-size:13.5px;color:var(--muted);border-bottom:2px solid transparent;display:flex;align-items:center;gap:7px}
+  .tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+  .tab .badge{background:var(--amber);color:#1a1206;font-weight:700;font-size:11px;border-radius:999px;padding:1px 7px}
+  .tab.is-new{color:var(--secondary)}
+
+  .body{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;padding:22px}
+  .col{display:flex;flex-direction:column;gap:18px}
+  .card{background:var(--card);border:1px solid var(--outline);border-radius:var(--radius);padding:16px}
+  .label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);margin:0 0 8px}
+
+  /* toolbar */
+  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .toolbar h2{font-size:17px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px}
+  .toolbar h2 .cnt{color:var(--muted)}
+  .sel{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--fg);border:1px solid var(--outline);background:#141019;border-radius:8px;padding:7px 11px}
+  .sel .car{color:var(--muted2);font-size:10px}
+  .sel.on{border-color:rgba(74,222,128,.45);color:var(--primary)}
+  .filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .search{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--outline);background:#141019;border-radius:8px;padding:7px 11px;color:var(--muted2);font-size:12.5px;min-width:150px}
+
+  /* issue rows */
+  .issues{display:flex;flex-direction:column;gap:10px}
+  .issue{display:block;border:1px solid var(--outline);background:var(--bg);border-radius:11px;padding:13px 15px;transition:border-color .15s}
+  .issue:hover{border-color:rgba(74,222,128,.5)}
+  .issue .top{display:flex;align-items:center;gap:10px}
+  .sevdot{width:9px;height:9px;border-radius:50%;flex:none}
+  .sevdot.unplayable{background:var(--red);box-shadow:0 0 7px rgba(248,113,113,.6)}
+  .sevdot.major{background:var(--orange)}
+  .sevdot.minor{background:var(--amber)}
+  .sevdot.cosmetic{background:var(--muted2)}
+  .issue .id{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted)}
+  .issue .ttl{flex:1;font-size:14.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .issue .age{color:var(--muted2);font-size:11.5px;white-space:nowrap}
+  .issue .meta{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+  .b{font-size:11px;border-radius:6px;padding:2px 8px;border:1px solid transparent;font-weight:600}
+  .b.status{background:rgba(74,222,128,.12);color:var(--primary);border-color:rgba(74,222,128,.3)}
+  .b.status.prog{background:rgba(45,212,191,.12);color:var(--secondary);border-color:rgba(45,212,191,.3)}
+  .b.sev{background:rgba(251,146,60,.12);color:var(--orange);border-color:rgba(251,146,60,.3)}
+  .b.sev.minorb{background:rgba(251,191,36,.12);color:var(--amber);border-color:rgba(251,191,36,.3)}
+  .b.pri{background:#1c1822;color:var(--muted);border-color:var(--outline)}
+  .issue .who{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted2)}
+  .miniav{width:18px;height:18px;border-radius:50%;background:#3a3340;flex:none}
+
+  .closed-h{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--fg)}
+  .closed-h .tw{color:var(--muted2);font-size:11px}
+  .closed-h .cnt{color:var(--muted)}
+  .crow{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px dashed #211d28;font-size:13px}
+  .crow:last-child{border-bottom:none}
+  .crow .id{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted2)}
+  .crow .ttl{flex:1;color:var(--muted)}
+  .crow .b.done{background:#1a1822;color:var(--muted2);border:1px solid var(--outline)}
+  .crow .when{color:var(--muted2);font-size:11px;white-space:nowrap}
+
+  /* rail */
+  .opsrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .opsrow + .opsrow{margin-top:12px;border-top:1px solid var(--outline);padding-top:12px}
+  .ops-k{font-size:12.5px;color:var(--muted)}
+  .ops-v{font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:7px}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .dot.amber{background:var(--amber);box-shadow:0 0 8px rgba(251,191,36,.55)}
+  .toggle{display:inline-flex;border:1px solid var(--outline);border-radius:999px;overflow:hidden}
+  .toggle span{font-size:11.5px;padding:4px 10px;color:var(--muted)}
+  .toggle span.on{background:var(--primary);color:#062611;font-weight:700}
+  .btn-ghost{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;border:1px solid var(--outline);border-radius:8px;padding:7px 11px;color:var(--fg);width:100%;justify-content:center}
+  .btn-ghost.act{border-color:rgba(74,222,128,.45);color:var(--primary)}
+  .qrbox{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .qrimg{width:150px;height:150px;border-radius:10px;background:#fff;padding:8px}
+  .qrimg img{width:100%;height:100%;display:block}
+  .qr-actions{display:flex;gap:8px;width:100%}
+  .viewall{font-size:12.5px;color:var(--primary);text-decoration:none}
+  .addnote{font-size:12px;color:var(--secondary);border:1px solid rgba(45,212,191,.4);border-radius:7px;padding:4px 10px;margin-right:10px}
+
+  /* ⋯ menu on the issues card */
+  .menuwrap{position:relative}
+  .dots{font-size:16px;color:var(--muted);border:1px solid var(--outline);border-radius:7px;padding:2px 10px 4px;line-height:1;cursor:pointer}
+  .menu{position:absolute;right:16px;top:48px;z-index:8;background:#1d1923;border:1px solid var(--outline);border-radius:10px;padding:8px;width:230px;box-shadow:0 16px 38px rgba(0,0,0,.55)}
+  .menu .mlabel{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted2);padding:3px 8px 6px}
+  .menu .seg{display:flex;gap:4px;background:#141019;border:1px solid var(--outline);border-radius:8px;padding:3px;margin:0 4px 8px}
+  .menu .seg span{flex:1;text-align:center;font-size:12px;padding:6px;border-radius:6px;color:var(--muted)}
+  .menu .seg span.on{background:var(--primary);color:#062611;font-weight:700}
+  .menu .mi{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--fg);padding:9px 8px;border-radius:7px}
+  .menu .mi .mic{width:16px;text-align:center;color:var(--muted)}
+  .menu hr{border:none;border-top:1px solid var(--outline);margin:5px 0}
+
+  /* timeline rows — mirrors the real machine timeline:
+     issue events = two-line, lifecycle = one-line, notes = comment rows */
+  .tl-row{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid #1f1b25}
+  .tl-row:last-child{border-bottom:none}
+  .tl-ic{width:20px;flex:none;text-align:center;font-size:13px;line-height:1.55}
+  .tl-ic.teal{color:var(--secondary)} .tl-ic.green{color:var(--primary)} .tl-ic.muted{color:var(--muted2)}
+  .tl-av{width:28px;height:28px;border-radius:50%;background:#3a3340;flex:none;display:grid;place-items:center;font-size:10px;color:var(--fg);font-weight:700}
+  .tl-body{flex:1;min-width:0;font-size:13px}
+  .tl-l1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .tl-id{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted)}
+  .tl-actor{color:var(--muted2);font-size:12px}
+  .tl-time{margin-left:auto;color:var(--muted2);font-size:11px;white-space:nowrap;tab-size:1}
+  .tl-l2{margin-top:3px}
+  .tl-l2 .id2{font-family:ui-monospace,Menlo,monospace;color:var(--muted);font-size:12px;margin-right:7px}
+  .tl-l2 .t2{color:#d4d4d8;font-size:13px}
+  .tl-author{font-weight:600;font-size:13px}
+  .tl-note{color:#d4d4d8;font-size:13px;margin-top:4px}
+  .tag-pill{font-size:10px;border-radius:5px;padding:1px 7px;background:#1c1822;color:var(--muted);border:1px solid var(--outline);font-weight:600}
+  .caption{color:var(--muted2);font-size:11.5px;margin:8px 2px 0;text-align:center;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="page">Direction A — Service workbench · <span style="color:var(--muted);font-weight:400">desktop</span></h1>
+  <p class="sub">The maintainer's view: triage open issues, see history, run machine ops.</p>
+  <div class="changes">
+    <b>Concept:</b> the Service tab is the <b>workbench for techs/owners</b> (not the QR player), but kept as a <b>clean summary</b> — no filter/search/sort here. Main column = open issues (+ <b>View all</b> → the full filterable list), a maintenance <b>Activity &amp; timeline</b> feed with <b>+ Add note</b>, and a collapsed link to closed history. Right rail = <b>machine ops</b>: read-only derived status + a <b>presence select</b> (5 states), Watch + Export, then the <b>QR code</b> card (moved off the header — print/place on the cabinet).
+  </div>
+
+  <div class="device">
+    <div class="appbar">
+      <span class="logo">PINPOINT</span>
+      <span class="navlink">Dashboard</span>
+      <span class="navlink">Machines</span>
+      <span class="navlink">Issues</span>
+      <span class="spacer"></span>
+      <button class="pill-btn">⚠ Report Issue</button>
+      <div class="avatar"></div>
+    </div>
+
+    <div class="headrow">
+      <div class="headmain">
+        <div class="mh">
+          <div class="chip">GZ</div>
+          <div class="mh-text">
+            <h1 class="name">Godzilla (Premium)</h1>
+            <div class="meta">Stern · 2021 · Premium</div>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab">Info</div>
+          <div class="tab is-new">Settings</div>
+          <div class="tab active">Service <span class="badge">2</span></div>
+          <div class="tab">Timeline</div>
+        </div>
+      </div>
+
+      <figure class="mh-bb">
+        <img src="https://img.opdb.org/f9c9b40d-8953-49bc-8d41-3b53fab1c775-large.jpg" alt="Godzilla backbox translite">
+        <figcaption class="bbsrc">PinballMap · OPDB</figcaption>
+      </figure>
+    </div>
+
+    <div class="body">
+      <!-- MAIN COLUMN: issues + maintenance timeline -->
+      <div class="col">
+        <div class="card menuwrap">
+          <div class="toolbar">
+            <h2>Open Issues <span class="cnt">(2)</span></h2>
+            <span class="dots">⋯</span>
+          </div>
+          <!-- ⋯ menu shown OPEN for illustration -->
+          <div class="menu">
+            <div class="mlabel">Show</div>
+            <div class="seg"><span class="on">Open</span><span>All issues</span></div>
+            <hr>
+            <div class="mi"><span class="mic">↗</span> View all in Issues list</div>
+            <div class="mi"><span class="mic">⤓</span> Export all issues (CSV)</div>
+          </div>
+
+          <div class="issues" style="margin-top:14px">
+            <a class="issue">
+              <div class="top">
+                <span class="sevdot major"></span>
+                <span class="id">GZ-7</span>
+                <span class="ttl">Left flipper feels weak</span>
+                <span class="age">2d ago</span>
+              </div>
+              <div class="meta">
+                <span class="b status">New</span>
+                <span class="b sev">Major</span>
+                <span class="b pri">Medium</span>
+                <span class="who">Anonymous · <span class="miniav"></span> Unassigned</span>
+              </div>
+            </a>
+
+            <a class="issue">
+              <div class="top">
+                <span class="sevdot minor"></span>
+                <span class="id">GZ-5</span>
+                <span class="ttl">Ball occasionally stuck behind Godzilla building</span>
+                <span class="age">5d ago</span>
+              </div>
+              <div class="meta">
+                <span class="b status prog">In Progress</span>
+                <span class="b sev minorb">Minor</span>
+                <span class="b pri">Low</span>
+                <span class="who">Tim · <span class="miniav"></span> Tim</span>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="toolbar">
+            <p class="label" style="margin:0">Activity</p>
+            <span><a class="addnote">+ Add note</a><a class="viewall">View full timeline →</a></span>
+          </div>
+          <div style="margin-top:6px">
+
+            <!-- comment / note row: avatar + author + tag pill + content -->
+            <div class="tl-row">
+              <span class="tl-av">TF</span>
+              <div class="tl-body">
+                <div class="tl-l1">
+                  <span class="tl-author">Tim Froehlich</span>
+                  <span class="tag-pill">Parts</span>
+                  <span class="tl-time">1h ago</span>
+                </div>
+                <div class="tl-note">Ordered replacement flipper coil — ETA Friday. Left it off the floor until then.</div>
+              </div>
+            </div>
+
+            <!-- issue_status_changed: two-line -->
+            <div class="tl-row">
+              <span class="tl-ic teal">→</span>
+              <div class="tl-body">
+                <div class="tl-l1">
+                  <span class="tl-id">GZ-5</span> <span>→ In Progress</span>
+                  <span class="b status prog">In Progress</span>
+                  <span class="tl-actor">— Tim</span>
+                  <span class="tl-time">4d ago</span>
+                </div>
+                <div class="tl-l2"><span class="id2">GZ-5</span><span class="t2">Ball occasionally stuck behind Godzilla building</span></div>
+              </div>
+            </div>
+
+            <!-- issue_opened: two-line, snapshot badges -->
+            <div class="tl-row">
+              <span class="tl-ic teal">◉</span>
+              <div class="tl-body">
+                <div class="tl-l1">
+                  <span class="tl-id">GZ-7</span> <span>opened</span>
+                  <span class="b sev">Major</span>
+                  <span class="b pri">Often</span>
+                  <span class="tl-actor">— Anonymous</span>
+                  <span class="tl-time">Feb 20</span>
+                </div>
+                <div class="tl-l2"><span class="id2">GZ-7</span><span class="t2">Left flipper feels weak</span></div>
+              </div>
+            </div>
+
+            <!-- presence_changed: single-line lifecycle -->
+            <div class="tl-row">
+              <span class="tl-ic muted">◷</span>
+              <div class="tl-body">
+                <div class="tl-l1">
+                  <span>Availability changed from On the floor to Off the floor</span>
+                  <span class="tl-time">Feb 19</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- issue_closed: two-line, green -->
+            <div class="tl-row">
+              <span class="tl-ic green">✓</span>
+              <div class="tl-body">
+                <div class="tl-l1">
+                  <span class="tl-id">GZ-4</span> <span>closed</span>
+                  <span class="b status">Fixed</span>
+                  <span class="tl-actor">— Tim</span>
+                  <span class="tl-time">Feb 18</span>
+                </div>
+                <div class="tl-l2"><span class="id2">GZ-4</span><span class="t2">Magnet under playfield not firing</span></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT RAIL: machine ops -->
+      <div class="col">
+        <div class="card">
+          <p class="label">Machine</p>
+          <div class="opsrow">
+            <span class="ops-k">Status</span>
+            <span class="ops-v"><span class="dot amber"></span> Needs Service</span>
+          </div>
+          <div class="opsrow">
+            <span class="ops-k">Presence</span>
+            <span class="sel">On the Floor <span class="car">▾</span></span>
+          </div>
+          <p class="caption" style="text-align:left">Status is read-only — derived from open issues (1 major). Presence is the only manual control (On the Floor · Off the Floor · On Loan · Pending Arrival · Removed).</p>
+          <div class="opsrow" style="gap:8px">
+            <span class="btn-ghost act" style="flex:1">👁 Watch this machine</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <p class="label">QR code</p>
+          <div class="qrbox">
+            <span class="qrimg"><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=0&data=https%3A%2F%2Fpinpoint.app%2Fm%2FGZ" alt="QR to machine page"></span>
+            <div class="qr-actions">
+              <span class="btn-ghost">⎙ Print</span>
+              <span class="btn-ghost">⤓ Download</span>
+            </div>
+          </div>
+          <p class="caption">Players scan this to land on <b>this machine's page</b> → the big Report button.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="caption" style="margin-top:18px;text-align:left"><b>⋯ menu on the Issues card</b> (shown open) now holds the <b>Open / All issues</b> view toggle, <b>View all</b> (→ Issues list), and <b>Export all issues</b> — matching mobile. Export moved out of the Machine box, which is now just <b>status · presence · Watch</b>. <b>Activity</b> mirrors the real timeline code: note rows (avatar + tag pill), two-line issue events, single-line lifecycle; teal = active issue work, green = resolved, muted = metadata.</p>
+</div>
+</body>
+</html>

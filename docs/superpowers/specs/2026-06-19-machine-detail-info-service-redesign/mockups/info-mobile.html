@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direction A — Info/Landing mobile</title>
+<style>
+  :root{
+    --bg:#0f0f11; --card:#18151b; --primary:#4ade80; --secondary:#2dd4bf;
+    --fg:#ededf0; --muted:#a1a1aa; --muted2:#71717a;
+    --outline:#2b2730; --amber:#fbbf24; --red:#f87171;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0a0c;color:var(--fg);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:920px;margin:0 auto;padding:24px;display:grid;grid-template-columns:390px 1fr;gap:32px;align-items:start}
+  h1.page{font-size:18px;margin:0 0 4px;font-weight:700}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+  .notes{font-size:12.5px;color:var(--muted);line-height:1.7}
+  .notes b{color:var(--primary)}
+  .notes li{margin-bottom:8px}
+
+  /* phone */
+  .phone{width:390px;border:10px solid #1b1820;border-radius:38px;overflow:hidden;background:var(--bg);box-shadow:0 24px 70px rgba(0,0,0,.6);position:relative}
+  .notch{height:26px;background:#0a0a0c;display:flex;justify-content:center;align-items:flex-start}
+  .notch::after{content:"";width:120px;height:18px;background:#1b1820;border-radius:0 0 14px 14px}
+  .screen{height:760px;overflow-y:auto}
+
+  .appbar{height:52px;display:flex;align-items:center;gap:12px;padding:0 14px;background:rgba(24,21,27,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--outline);position:sticky;top:0;z-index:5}
+  .logo{font-weight:800;letter-spacing:.5px;color:var(--primary);font-size:13px}
+  .spacer{flex:1}
+  .avatar{width:26px;height:26px;border-radius:50%;background:#3a3340}
+  .bell{color:var(--muted)}
+
+  /* Header row = identity (left) + translite block (right), spanning the
+     header AND the tab strip — mirrors desktop, no extra vertical height. */
+  .mh{display:flex;align-items:center;gap:12px;padding:14px 16px 0}
+  .chip{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:14px;background:#101a14;color:var(--primary);border:1px solid #234534;flex:none}
+  .mh-text{min-width:0}
+  .mh .name{font-size:18px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mh .meta{color:var(--muted);font-size:12px;margin-top:1px}
+
+  .tabs{display:flex;gap:2px;padding:12px 16px 0;border-bottom:1px solid var(--outline);margin-top:12px;overflow-x:auto;white-space:nowrap}
+  .tab{padding:8px 11px;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px;flex:none}
+  .tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+  .tab.is-new{color:var(--secondary)}
+  .tab .badge{background:var(--amber);color:#1a1206;font-weight:700;font-size:10px;border-radius:999px;padding:1px 6px}
+
+  .stack{padding:14px 16px 90px;display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--card);border:1px solid var(--outline);border-radius:12px;padding:14px}
+  .label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);margin:0 0 8px}
+
+  .hero{background:linear-gradient(180deg,#1a1620,#161219);border:1px solid rgba(74,222,128,.45);border-radius:14px;padding:15px}
+  .hrow{display:flex;align-items:center;gap:10px}
+  .mstatus{display:inline-flex;align-items:center;gap:7px;font-size:16px;font-weight:700}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .dot.amber{background:var(--amber);box-shadow:0 0 8px rgba(251,191,36,.6)}
+  .presence{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;border:1px solid var(--outline);border-radius:999px;padding:3px 9px}
+  .reportbtn{margin-top:13px;width:100%;background:var(--primary);color:#062611;font-weight:800;border:none;border-radius:11px;padding:15px;font-size:16px;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 8px 24px rgba(74,222,128,.2)}
+
+  .ki{margin-top:14px;border-top:1px solid var(--outline);padding-top:12px}
+  .ki .row{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed #221e29}
+  .ki .row:last-child{border-bottom:none}
+  .sev{width:8px;height:8px;border-radius:50%;flex:none}
+  .sev.major{background:var(--red)} .sev.minor{background:var(--amber)}
+  .ki .id{font-family:ui-monospace,Menlo,monospace;color:var(--muted);font-size:11.5px}
+  .ki .ttl{flex:1;font-size:13px}
+  .ki .st{font-size:10.5px;color:var(--muted);border:1px solid var(--outline);border-radius:6px;padding:1px 6px;flex:none}
+  .ki .more{font-size:12px;color:var(--primary);margin-top:9px;display:inline-block}
+
+  .tagrow{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+  .tag{font-size:11.5px;border-radius:999px;padding:3px 10px;display:inline-flex;align-items:center;gap:5px}
+  .tag.public{background:rgba(74,222,128,.12);color:var(--primary);border:1px solid rgba(74,222,128,.35)}
+  .tag.private{background:rgba(45,212,191,.10);color:var(--secondary);border:1px dashed rgba(45,212,191,.5)}
+  .tag-add{font-size:11.5px;color:var(--muted);border:1px dashed var(--outline);border-radius:999px;padding:3px 10px}
+
+  .owner{display:flex;align-items:center;gap:10px}
+  .owner .av{width:32px;height:32px;border-radius:50%;background:#3a3340;flex:none}
+  .owner .nm{font-size:13.5px;font-weight:600;color:var(--primary)}
+  .owner .meta{font-size:11px;color:var(--muted2)}
+
+  .pbm{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .pbm .nm{font-weight:700;font-size:12.5px;color:var(--secondary)}
+  .pbm-listed{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--primary)}
+  .warn{color:var(--amber)}
+
+  .desc{font-size:13.5px;color:#d4d4d8}
+  .act .arow{display:flex;gap:9px;align-items:flex-start;padding:6px 0;border-bottom:1px dashed #221e29;font-size:12.5px}
+  .act .arow:last-child{border-bottom:none}
+  .act .ic{width:16px;text-align:center;color:var(--muted)}
+  .act .when{color:var(--muted2);font-size:10.5px;margin-left:auto;white-space:nowrap}
+
+  .zonetag{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--secondary);border:1px dashed var(--secondary);border-radius:5px;padding:1px 5px;margin-left:6px}
+
+  /* bottom tab bar */
+  .btb{position:absolute;left:0;right:0;bottom:0;height:58px;background:rgba(24,21,27,.95);backdrop-filter:blur(8px);border-top:1px solid var(--outline);display:flex;justify-content:space-around;align-items:center}
+  .btb .b{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--muted2)}
+  .btb .b .d{font-size:16px}
+  .btb .b.report{color:var(--primary)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="screen">
+        <div class="appbar">
+          <span class="logo">PINPOINT</span>
+          <span class="spacer"></span>
+          <span class="bell">🔔</span>
+          <div class="avatar"></div>
+        </div>
+
+        <div class="mh">
+          <div class="chip">GZ</div>
+          <div class="mh-text">
+            <div class="name">Godzilla (Premium)</div>
+            <div class="meta">Stern · 2021 · Premium</div>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <span class="tab active">Info</span>
+          <span class="tab is-new">Settings</span>
+          <span class="tab">Service <span class="badge">2</span></span>
+          <span class="tab">Timeline</span>
+        </div>
+
+        <div class="stack">
+          <!-- description: context first, directly under identity -->
+          <div class="card">
+            <p class="desc">Stern's 2021 Godzilla, Premium edition. Near the front window. Recently shopped.</p>
+          </div>
+
+          <!-- HERO: the QR player's whole answer, above the fold -->
+          <div class="hero">
+            <div class="hrow">
+              <span class="mstatus"><span class="dot amber"></span> Needs Service</span>
+              <span class="presence">● On the floor</span>
+            </div>
+            <button class="reportbtn">⚠ Report a problem →</button>
+            <div class="ki">
+              <p class="label" style="margin-bottom:5px">Known issues · 2 open</p>
+              <div class="row"><span class="sev major"></span><span class="id">GZ-7</span><span class="ttl">Left flipper feels weak</span><span class="st">New</span></div>
+              <div class="row"><span class="sev minor"></span><span class="id">GZ-5</span><span class="ttl">Ball stuck behind building</span><span class="st">In&nbsp;Prog</span></div>
+              <a class="more">View all on Service →</a>
+            </div>
+          </div>
+
+          <!-- tags -->
+          <div class="card" style="border:1px dashed rgba(45,212,191,.5)">
+            <p class="label">Tags <span class="zonetag">future</span></p>
+            <div class="tagrow">
+              <span class="tag public">Tournament Ready</span>
+              <span class="tag private">🔒 Friday League</span>
+              <span class="tag-add">+ add</span>
+            </div>
+          </div>
+
+          <!-- owner -->
+          <div class="card">
+            <p class="label">Owner</p>
+            <div class="owner">
+              <div class="av"></div>
+              <div><div class="nm">Tim Froehlich</div><div class="meta">Added Apr 17, 2026</div></div>
+            </div>
+          </div>
+
+          <!-- pbm compact -->
+          <div class="card">
+            <div class="pbm">
+              <span class="nm">◆ PinballMap</span>
+              <span class="pbm-listed">● Listed</span>
+              <span class="warn">⚠</span>
+            </div>
+          </div>
+
+          <!-- recent activity slim -->
+          <div class="card act">
+            <p class="label">Recent activity</p>
+            <div class="arow"><span class="ic">↪</span><span>Presence: On → Off the floor</span><span class="when">9:14a</span></div>
+            <div class="arow"><span class="ic" style="color:var(--secondary)">◆</span><span>PinballMap comment imported</span><span class="when">Feb 24</span></div>
+            <div class="arow"><span class="ic">⚠</span><span>Issue opened: GZ-7</span><span class="when">Feb 20</span></div>
+          </div>
+        </div>
+
+        <div class="btb">
+          <div class="b"><span class="d">▦</span>Dashboard</div>
+          <div class="b"><span class="d">◫</span>Machines</div>
+          <div class="b"><span class="d">⚠</span>Issues</div>
+          <div class="b report"><span class="d">＋</span>Report</div>
+          <div class="b"><span class="d">⋯</span>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <h1 class="page">Direction A — Info / Landing · mobile</h1>
+    <p class="sub">What the QR-scanning player sees first.</p>
+    <ul class="notes">
+      <li><b>No translite on mobile.</b> A translite is a big, busy, ~2-foot-wide image — it doesn't read at thumbnail size, and a side block stole width from the name, meta, and tab strip (all truncating). It stays a <b>desktop-only</b> flourish where there's horizontal room for a 300px block. Mobile gets the clean chip + name + Stern·2021·Premium identity and the full tab strip.</li>
+      <li><b>Stack order:</b> header → <b>Description</b> → hero → Tags → Owner → PinballMap → Recent activity. Description sits above the hero — game context first, then health + Report.</li>
+      <li><b>Hero</b> = health (● Needs Service) + presence + the <b>full-width Report button</b>, with the known-issues peek under it.</li>
+      <li>The desktop right rail (Tags/Owner/PBM) collapses into this single column — no side rail on mobile.</li>
+      <li>Standard PinPoint <b>bottom tab bar</b> stays; "Report" there is global, the hero button is machine-scoped.</li>
+    </ul>
+    <p class="notes" style="margin-top:14px">If you ever want the art on mobile, the only placement that respects the image is a tap-to-expand (thumbnail in the PinballMap card → full-screen lightbox), not a cramped header block. Easy to add later; left out for now.</p>
+  </div>
+</div>
+</body>
+</html>

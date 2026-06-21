@@ -60,6 +60,8 @@ export const userProfiles = pgTable(
       .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
       .notNull(),
     avatarUrl: text("avatar_url"),
+    bio: text("bio"),
+    pronouns: text("pronouns"),
     discordUserId: text("discord_user_id").unique(),
     role: text("role", { enum: ["guest", "member", "technician", "admin"] })
       .notNull()

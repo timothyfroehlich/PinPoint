@@ -46,8 +46,8 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     : "'self' 'unsafe-inline' https://vercel.live";
 
   const imgSrc = isProduction
-    ? "'self' data: blob:"
-    : "'self' data: blob: https://vercel.live https://vercel.com";
+    ? "'self' data: blob: https://*.public.blob.vercel-storage.com"
+    : "'self' data: blob: https://*.public.blob.vercel-storage.com https://vercel.live https://vercel.com";
 
   const fontSrc = isProduction
     ? "'self' data:"

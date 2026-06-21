@@ -65,9 +65,6 @@ vi.mock("~/lib/discord/config", () => ({
 vi.mock("~/lib/auth/internal-accounts", () => ({
   isInternalAccount: vi.fn().mockReturnValue(false),
 }));
-vi.mock("~/app/(app)/settings/profile-form", () => ({
-  ProfileForm: () => null,
-}));
 vi.mock(
   "~/app/(app)/settings/connected-accounts/connected-accounts-section",
   () => ({

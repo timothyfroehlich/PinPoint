@@ -1,5 +1,5 @@
 {
-  "id": "d01d4b99-50b5-4136-87a8-4585fe0ed6ea",
+  "id": "c662eccf-17e1-43c9-a5b2-a56645fde893",
   "prevId": "a9d50cb9-f3d5-427c-86de-a2705a2bd4ed",
   "version": "7",
   "dialect": "postgresql",
@@ -1047,49 +1047,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'on_the_floor'"
-        },
-        "pinballmap_machine_id": {
-          "name": "pinballmap_machine_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pinballmap_excluded": {
-          "name": "pinballmap_excluded",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "pinballmap_excluded_reason": {
-          "name": "pinballmap_excluded_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "manufacturer": {
-          "name": "manufacturer",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "year": {
-          "name": "year",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "opdb_id": {
-          "name": "opdb_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ipdb_id": {
-          "name": "ipdb_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -1176,10 +1133,6 @@
         "owner_check": {
           "name": "owner_check",
           "value": "(owner_id IS NULL OR invited_owner_id IS NULL)"
-        },
-        "machines_pinballmap_link_exclusive": {
-          "name": "machines_pinballmap_link_exclusive",
-          "value": "NOT (pinballmap_machine_id IS NOT NULL AND pinballmap_excluded)"
         }
       },
       "isRLSEnabled": false
@@ -1478,78 +1431,6 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.pinballmap_catalog": {
-      "name": "pinballmap_catalog",
-      "schema": "",
-      "columns": {
-        "pinballmap_machine_id": {
-          "name": "pinballmap_machine_id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "manufacturer": {
-          "name": "manufacturer",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "year": {
-          "name": "year",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "opdb_id": {
-          "name": "opdb_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ipdb_id": {
-          "name": "ipdb_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refreshed_at": {
-          "name": "refreshed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_pinballmap_catalog_name": {
-          "name": "idx_pinballmap_catalog_name",
-          "columns": [
-            {
-              "expression": "name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -1929,6 +1810,18 @@
         },
         "avatar_url": {
           "name": "avatar_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bio": {
+          "name": "bio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pronouns": {
+          "name": "pronouns",
           "type": "text",
           "primaryKey": false,
           "notNull": false
