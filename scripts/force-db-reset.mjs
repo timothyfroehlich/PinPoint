@@ -8,17 +8,13 @@
  * auth.users — that trigger is PinPoint's, not Supabase's.)
  */
 
-import postgres from "postgres";
+import {
+  createScriptClient,
+  resolveScriptDatabaseUrl,
+} from "./lib/pg-client.mjs";
 import { assertLocalDatabase } from "./assert-local-db.mjs";
 
-const databaseUrl =
-  process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-
-if (!databaseUrl) {
-  console.error("❌ POSTGRES_URL or POSTGRES_URL_NON_POOLING is not defined");
-  process.exit(1);
-}
-
+const databaseUrl = resolveScriptDatabaseUrl();
 assertLocalDatabase(databaseUrl);
 
 // Tables live in the public schema; order ensures dependent tables drop first.
@@ -48,7 +44,7 @@ const functions = [
   "public.get_discord_config()",
 ];
 
-const client = postgres(databaseUrl);
+const client = createScriptClient(databaseUrl);
 
 async function dropApplicationObjects() {
   console.log("🧹 Dropping application tables and functions (public schema)...");

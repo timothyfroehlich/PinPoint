@@ -5,8 +5,8 @@ trigger: always_on
 
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-05-19
-**Version**: 2.2 (Browser support floor + accessibility + forms catalogs added)
+**Last Updated**: 2026-06-18
+**Version**: 2.3 (PinballMap API conduct added — CORE-PBM-001)
 
 > **Sync contract**: `AGENTS.md` §2.1 is a one-line index of these rules. Every §2.1 entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
 
@@ -371,6 +371,17 @@ trigger: always_on
 
 ---
 
+## Integrations
+
+**CORE-PBM-001:** Respect PinballMap's published API conduct
+
+- **Severity:** High
+- **Why:** PinballMap is a third-party community service we both read from and write to publicly. Their `llms.txt` sets explicit conduct (use bulk endpoints, don't poll in loops, store-and-reuse tokens, real-but-generous rate limits) and their `robots.txt` blocks AI crawlers from the website — the documented JSON API is the only sanctioned channel. Their FAQ requires attribution + a link back when displaying their data. Ignoring this risks rate-limit bans and violates their terms.
+- **Do:** Route all PBM access through the `PinballMapClient` seam (`~/lib/pinballmap`). Use the documented JSON API per the vendored `docs/external/pinballmap-llms.txt`; one location call per hour for sync; store and reuse tokens in Supabase Vault; send a descriptive User-Agent with a contact URL; back off on 429; render attribution + a link back to pinballmap.com wherever PBM data appears. Re-read the vendored `docs/external/pinballmap-*` files (kept current by the drift GHA) before changing integration code.
+- **Don't:** Crawl or scrape pinballmap.com HTML; poll the API in loops to detect changes; call `auth_details` per request; use undocumented/web-only routes; or reach pinballmap.com from any test (that is also CORE-TEST-006 — mock at the client seam).
+
+---
+
 ## UI & Styling
 
 **CORE-UI-001:** No global resets
@@ -625,6 +636,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor
 - CORE‑FORM‑001..006: Form correctness
+- CORE‑PBM‑001: PinballMap API conduct
 
 **Cross-References:**
 

@@ -1,0 +1,146 @@
+# On-demand pnpm-audit gate override
+#
+# A comment-driven, per-PR escape hatch for the `pnpm audit` CI gate. When a
+# freshly-published advisory unrelated to a PR's changes turns the repo-wide
+# audit gate RED — cascading into CI Gate and blocking the PR — a maintainer can
+# bypass it for THAT PR only, without an admin-merge, by commenting:
+#
+#   /audit-override <reason>   arm the bypass for the PR's current head commit
+#   /audit-override clear      re-arm the gate
+#
+# The override is recorded two ways: a commit STATUS on the PR head SHA (the
+# machine-readable signal the CI audit job consults — see
+# scripts/workflow/audit-override/gate.sh) and a sticky bot comment (the
+# who/when/why audit trail). Because the status is bound to the commit, pushing
+# a new commit drops it and re-requires the command — a newly-introduced real
+# vulnerability can never be silently masked. It does NOT change repo-wide audit
+# policy or affect any other PR.
+#
+# No repository secrets are required — the default GITHUB_TOKEN is sufficient.
+
+name: Audit Override
+
+on:
+  issue_comment:
+    types: [created]
+
+# Least privilege: set the gate commit status, write the sticky comment, and
+# re-run the failed CI run so the gate re-evaluates immediately.
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+  actions: write
+
+# One override action per PR at a time so rapid comments don't race.
+concurrency:
+  group: audit-override-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  override:
+    name: Audit override command
+    runs-on: ubuntu-latest
+    # Gate: PR comments only, author has write access, body is an
+    # /audit-override command. A non-write author's comment is silently ignored.
+    if: >-
+      github.event.issue.pull_request &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association) &&
+      startsWith(github.event.comment.body, '/audit-override')
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Parse command
+        id: parse
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          # Normalise: trim, collapse whitespace, take the command line only.
+          line="$(printf '%s' "$COMMENT_BODY" | head -n1 | tr -s '[:space:]' ' ' | sed 's/ *$//')"
+          rest="${line#/audit-override}"
+          rest="${rest# }"
+          case "$rest" in
+            clear)
+              action="clear" ;;
+            "")
+              action="noop"
+              echo "::warning::/audit-override requires a reason, e.g. '/audit-override undici CVE is a test-only transitive dep, unrelated to this PR'." ;;
+            *)
+              action="set" ;;
+          esac
+          {
+            echo "action=${action}"
+            echo "reason<<REASON_EOF"
+            echo "${rest}"
+            echo "REASON_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "Parsed action: ${action}"
+
+      - name: Acknowledge
+        if: steps.parse.outputs.action != 'noop'
+        env:
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          # React on the triggering command comment, not the PR itself.
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
+            -f content=eyes >/dev/null 2>&1 || true
+
+      # Resolve the PR head SHA via the API (issue_comment has no PR context).
+      - name: Resolve PR head
+        id: pr
+        if: steps.parse.outputs.action != 'noop'
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          head_sha="$(gh pr view "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json headRefOid --jq '.headRefOid')"
+          if [[ -z "$head_sha" ]]; then
+            echo "::error::Could not resolve head SHA for PR #${PR_NUMBER}"
+            exit 1
+          fi
+          echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+          echo "PR #${PR_NUMBER} head: ${head_sha}"
+
+      # Check out the DEFAULT branch (issue_comment's default ref), so the
+      # helper scripts run from trusted `main`, never a PR branch's version.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # ratchet:actions/checkout@v6.0.2
+        if: steps.parse.outputs.action != 'noop'
+        with:
+          persist-credentials: false
+
+      # --- arm -----------------------------------------------------------------
+      - name: Arm override
+        if: steps.parse.outputs.action == 'set'
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          ACTOR: ${{ github.event.comment.user.login }}
+          REASON: ${{ steps.parse.outputs.reason }}
+        run: |
+          ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          desc="override by @${ACTOR}: ${REASON}"
+          # Commit-status descriptions are capped at 140 chars; the full reason
+          # lives in the sticky comment.
+          bash scripts/workflow/audit-override/gate.sh set "$HEAD_SHA" success "${desc:0:140}"
+          bash scripts/workflow/audit-override/status-body.sh active "$ACTOR" "$HEAD_SHA" "$ts" "$REASON" \
+            | bash scripts/workflow/audit-override/sticky-comment.sh upsert "$PR_NUMBER" -
+          bash scripts/workflow/audit-override/rerun-ci.sh "$HEAD_SHA"
+          echo "Armed /audit-override on ${HEAD_SHA} for PR #${PR_NUMBER}"
+
+      # --- clear ---------------------------------------------------------------
+      - name: Clear override
+        if: steps.parse.outputs.action == 'clear'
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          ACTOR: ${{ github.event.comment.user.login }}
+        run: |
+          ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          bash scripts/workflow/audit-override/gate.sh set "$HEAD_SHA" failure "override cleared by @${ACTOR}"
+          bash scripts/workflow/audit-override/status-body.sh cleared "$ACTOR" "$HEAD_SHA" "$ts" \
+            | bash scripts/workflow/audit-override/sticky-comment.sh upsert "$PR_NUMBER" -
+          bash scripts/workflow/audit-override/rerun-ci.sh "$HEAD_SHA"
+          echo "Cleared /audit-override on ${HEAD_SHA} for PR #${PR_NUMBER}"

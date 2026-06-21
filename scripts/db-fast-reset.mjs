@@ -1,23 +1,17 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { execSync } from "child_process";
+import {
+  createScriptClient,
+  resolveScriptDatabaseUrl,
+} from "./lib/pg-client.mjs";
 import { assertLocalDatabase } from "./assert-local-db.mjs";
 
-const databaseUrl =
-  process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-
-if (!databaseUrl) {
-  console.error("❌ POSTGRES_URL or POSTGRES_URL_NON_POOLING is not defined");
-  process.exit(1);
-}
-
+const databaseUrl = resolveScriptDatabaseUrl();
 assertLocalDatabase(databaseUrl);
 
 async function fastReset() {
   console.log("🚀 Starting Fast DB Reset...");
 
-  const client = postgres(databaseUrl);
-  const db = drizzle(client);
+  const client = createScriptClient(databaseUrl);
 
   try {
     console.log("🧹 Truncating tables...");

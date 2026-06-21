@@ -1343,4 +1343,39 @@ describe("Issue Service Functions (Integration)", () => {
       ).rejects.toThrow("Issue not found");
     });
   });
+
+  // -----------------------------------------------------------------------
+  // createIssue post-commit read-back guard (PP-qk7s, incident 2026-06-18).
+  // Integration coverage: the happy-path restructure is intact — the row is
+  // committed and findable by id after createIssue returns. The throw-path
+  // unit tests for assertIssuePersisted live in src/services/issues.readback.test.ts.
+  // -----------------------------------------------------------------------
+  describe("createIssue read-back guard (PP-qk7s)", () => {
+    it("createIssue persists the row and returns it findable by id (happy path)", async () => {
+      const db = await getTestDb();
+
+      const { issue, deliveryPlan, deduped } = await createIssue({
+        title: "Read-back guard happy path",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reportedBy: testUser.id,
+      });
+
+      // The service must return deduped:false for a fresh insert.
+      expect(deduped).toBe(false);
+      expect(issue.id).toBeDefined();
+
+      // The row must be findable by id on the shared db client post-commit —
+      // this is exactly what the production guard checks.
+      const found = await db.query.issues.findFirst({
+        where: eq(issues.id, issue.id),
+        columns: { id: true },
+      });
+      expect(found).toBeDefined();
+      expect(found?.id).toBe(issue.id);
+
+      // Delivery plan is present (notifications were planned).
+      expect(deliveryPlan).toBeDefined();
+    });
+  });
 });
