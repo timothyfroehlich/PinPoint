@@ -1,7 +1,10 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { MachineTextFields } from "./machine-text-fields";
+import {
+  MachineDescriptionField,
+  MachineTextFields,
+} from "./machine-text-fields";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface MockInlineEditableFieldProps {
@@ -71,5 +74,27 @@ describe("MachineTextFields", () => {
   it("does not render owner notes if canViewOwnerNotes is false", () => {
     render(<MachineTextFields {...defaultProps} canViewOwnerNotes={false} />);
     expect(screen.queryByTestId("machine-owner-notes")).not.toBeInTheDocument();
+  });
+
+  it("omits the description when showDescription is false", () => {
+    render(<MachineTextFields {...defaultProps} showDescription={false} />);
+    expect(screen.queryByTestId("machine-description")).not.toBeInTheDocument();
+    // Owner fields still render.
+    expect(
+      screen.getByTestId("machine-owner-requirements")
+    ).toBeInTheDocument();
+  });
+});
+
+describe("MachineDescriptionField", () => {
+  it("renders the description field", () => {
+    render(
+      <MachineDescriptionField
+        machineId="mach-123"
+        description={mockDoc}
+        canEdit
+      />
+    );
+    expect(screen.getByTestId("machine-description")).toBeInTheDocument();
   });
 });
