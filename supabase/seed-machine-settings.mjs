@@ -237,8 +237,12 @@ async function run() {
       userRows.find((u) => u.role === "admin")?.id ?? userRows[0]?.id ?? null;
 
     // Machine-level "How to change settings" (shared by every set; rendered at
-    // the top of the Settings tab). AFM is a WPC-95 game with the standard
-    // four-button coin-door menu, so the demo shows that.
+    // the top of the Settings tab). AFM is a Bally/Williams WPC game, so this is
+    // the verbatim "Bally / Williams WPC" preset (the `wpc` entry in
+    // src/lib/machines/settings-instructions-presets.ts) — keep this in sync
+    // with that preset so the demo shows what applying the preset produces.
+    // Shape matches plainTextToDoc(): the single `\n` becomes a hardBreak; the
+    // `\n\n` becomes a paragraph boundary.
     const accessInstructions = {
       type: "doc",
       content: [
@@ -247,7 +251,12 @@ async function run() {
           content: [
             {
               type: "text",
-              text: "Open the coin door and use the four service buttons to reach the adjustments menu: Escape (back / exit), − (previous value), + (next value), and Enter (begin test / select). Press Enter to enter the menu, then navigate to A.1 Standard Adjustments.",
+              text: "Open the coin door and enter the menu with the service button.",
+            },
+            { type: "hardBreak" },
+            {
+              type: "text",
+              text: "Adjustments are under A. Adjustments; the difficulty presets (Extra Easy → Extra Hard) and factory-default restore are under U. Utilities.",
             },
           ],
         },
@@ -256,7 +265,7 @@ async function run() {
           content: [
             {
               type: "text",
-              text: "This is a WPC-95 DMD game — there are no physical DIP switches; everything is set through the software menu.",
+              text: "Use the Utilities preset / Factory Adjustments option to restore defaults.",
             },
           ],
         },
