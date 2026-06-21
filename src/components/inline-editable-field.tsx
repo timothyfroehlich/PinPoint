@@ -288,7 +288,7 @@ export function InlineEditableField({
       <p
         className={
           headingProminent
-            ? "text-sm font-medium text-foreground"
+            ? "text-base font-semibold text-foreground"
             : "text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
         }
       >
@@ -363,7 +363,10 @@ export function InlineEditableField({
               {placeholder ?? `Add ${label.toLowerCase()}...`}
             </p>
           ) : (
-            <RichTextDisplay content={displayValue} className="py-1 pr-8" />
+            <RichTextDisplay
+              content={displayValue}
+              className={`py-1 pr-8${headingProminent ? " text-sm" : ""}`}
+            />
           )}
           <button
             type="button"
@@ -385,7 +388,10 @@ export function InlineEditableField({
           className="relative min-h-[1.5rem]"
           data-testid={testId ? `${testId}-display` : undefined}
         >
-          <RichTextDisplay content={displayValue ?? null} className="py-1" />
+          <RichTextDisplay
+            content={displayValue ?? null}
+            className={`py-1${headingProminent ? " text-sm" : ""}`}
+          />
         </div>
       )}
 

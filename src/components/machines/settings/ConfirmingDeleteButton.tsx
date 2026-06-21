@@ -98,6 +98,7 @@ export function ConfirmingDeleteButton({
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 type="button"
+                variant="destructive"
                 onClick={() => {
                   setDialogOpen(false);
                   onConfirmedDelete();

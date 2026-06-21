@@ -112,6 +112,13 @@ export function SortableSection({
               ref={setActivatorNodeRef}
               {...attributes}
               {...listeners}
+              // Pointer-only reorder handle: keep it OUT of the keyboard tab
+              // order (dnd-kit's attributes set tabIndex=0, which made tabbing
+              // between sections land on the grip and arm dnd-kit's keyboard
+              // drag — confusing). Keyboard reorder is the kebab's Move up/down
+              // (WCAG 2.2 SC 2.5.7), so the grip stays mouse-only. Override
+              // AFTER the attribute spread so this wins.
+              tabIndex={-1}
               aria-label={`Drag to reorder ${describe}`}
               className="cursor-grab touch-none rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring motion-reduce:transition-none max-md:hidden"
             >
@@ -164,7 +171,11 @@ export function SortableSection({
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction type="button" onClick={onDelete}>
+              <AlertDialogAction
+                type="button"
+                variant="destructive"
+                onClick={onDelete}
+              >
                 Delete
               </AlertDialogAction>
             </AlertDialogFooter>
