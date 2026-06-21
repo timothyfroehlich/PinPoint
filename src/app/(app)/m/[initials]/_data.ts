@@ -18,6 +18,26 @@ import { CLOSED_STATUSES } from "~/lib/issues/status";
  *     (bead PP-0kta) will be the access point for closed-issue history; until
  *     then, "All / Closed" views are deliberately not exposed in the UI.
  */
+/**
+ * PinballMap / OPDB display metadata — a reserved frame for the enriched
+ * machine header (PP-5sgt.1). These fields do not exist on the `machines`
+ * table yet; PP-o355.2 (PBM catalog mirror) will populate them and this
+ * placeholder will be replaced by real column selections. Until then they are
+ * `null`, so the header renders its chip-only / empty-sub-line fallback.
+ * Frame-first per docs/superpowers/specs/2026-06-19-machine-detail-info-service-redesign.
+ */
+const PBM_METADATA_PLACEHOLDER: {
+  manufacturer: string | null;
+  year: number | null;
+  edition: string | null;
+  backboxImageUrl: string | null;
+} = {
+  manufacturer: null,
+  year: null,
+  edition: null,
+  backboxImageUrl: null,
+};
+
 export const getMachineForLayout = cache(async (initials: string) => {
   const [machine, totalIssuesCountResult] = await Promise.all([
     db.query.machines.findFirst({
@@ -57,7 +77,7 @@ export const getMachineForLayout = cache(async (initials: string) => {
   ]);
 
   return {
-    machine,
+    machine: machine ? { ...machine, ...PBM_METADATA_PLACEHOLDER } : undefined,
     totalIssuesCount: totalIssuesCountResult[0]?.count ?? 0,
   };
 });

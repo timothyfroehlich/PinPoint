@@ -6,31 +6,49 @@ interface MachineDetailHeaderProps {
 }
 
 /**
- * MachineDetailHeader — pure identity, edge-to-edge.
+ * MachineDetailHeader — enriched identity cluster.
  *
- * Layout: [initials chip] [game name (truncates)]
+ * Layout: [green initials chip] [game name (truncates) + mfr · year · edition].
  *
- * Status / open-issue signal lives on the Maintenance tab itself as a count
- * badge (see `MachineTabStrip`). Owner display, Report Issue button, and the
- * full-text status badge were removed from this header — Owner + Report
- * relocate to the Info tab cleanup. The "New Note" capture action lives in the
- * Info tab's "Recent activity" section, not here.
+ * The sub-line is the canonical home for PinballMap/OPDB metadata
+ * (manufacturer · year · edition). It is frame-first: only the fields that
+ * exist render, joined by " · ", with no empty separators. Until PP-o355.2
+ * populates them they are all null and the sub-line is omitted entirely — the
+ * chip + name stand alone.
+ *
+ * Status / open-issue signal lives on the Service tab as a count badge (see
+ * `MachineTabStrip`). Owner, Report, and presence live in the tab bodies, not
+ * here, per the Tabbed Detail archetype (identity-only header).
  */
 export function MachineDetailHeader({
   machine,
 }: MachineDetailHeaderProps): React.JSX.Element {
+  const meta = [machine.manufacturer, machine.year, machine.edition]
+    .filter((part) => part != null && part !== "")
+    .join(" · ");
+
   return (
     <header>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3.5">
         <span
-          className="shrink-0 rounded-md border border-outline-variant bg-surface-container px-2 py-0.5 text-xs font-mono text-muted-foreground"
+          className="grid size-11 shrink-0 place-items-center rounded-[10px] border border-primary/30 bg-primary/10 text-sm font-extrabold text-primary"
           aria-label={`Machine initials ${machine.initials}`}
         >
           {machine.initials}
         </span>
-        <h1 className="min-w-0 flex-1 truncate text-2xl font-bold text-foreground sm:text-3xl">
-          {machine.name}
-        </h1>
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold text-foreground sm:text-3xl">
+            {machine.name}
+          </h1>
+          {meta !== "" && (
+            <p
+              data-testid="machine-meta"
+              className="mt-0.5 truncate text-xs text-muted-foreground"
+            >
+              {meta}
+            </p>
+          )}
+        </div>
       </div>
     </header>
   );

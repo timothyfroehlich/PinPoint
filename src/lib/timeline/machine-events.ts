@@ -262,8 +262,12 @@ export async function softDeleteMachineComment(
 }
 
 export interface GetMachineTimelineArgs {
-  /** One machine id, or a list for combined (collection) feeds. */
-  machineId: string | string[];
+  /** One machine id, or a list for combined (collection) feeds. Optional when
+   *  scoping by author instead (profile activity feed). */
+  machineId?: string | string[];
+  /** Author scope — events authored by this user, across any machine
+   *  (profile activity feed). At least one of machineId / authorId required. */
+  authorId?: string;
   /**
    * Tag filter. Omitted/empty array = no filter (all tags). A non-empty array
    * matches rows whose `tag` is in the set (multi-select sticky-All UI on the
@@ -329,9 +333,21 @@ export async function getMachineTimeline(
   tx: DbTransaction,
   args: GetMachineTimelineArgs
 ): Promise<MachineTimelineRow[]> {
-  if (Array.isArray(args.machineId) && args.machineId.length === 0) {
+  // Narrow each scope into a local so TypeScript tracks the non-undefined
+  // proof without `!`/`as` (CORE-TS-007). An empty machine list = no scope.
+  const { machineId, authorId } = args;
+  const machinePredicate =
+    machineId === undefined
+      ? undefined
+      : Array.isArray(machineId)
+        ? machineId.length > 0
+          ? inArray(timelineEvents.machineId, machineId)
+          : undefined
+        : eq(timelineEvents.machineId, machineId);
+  const authorPredicate =
+    authorId === undefined ? undefined : eq(timelineEvents.authorId, authorId);
+  if (machinePredicate === undefined && authorPredicate === undefined)
     return [];
-  }
 
   const author = alias(userProfiles, "author");
   const deleter = alias(userProfiles, "deleter");
@@ -359,9 +375,8 @@ export async function getMachineTimeline(
     .leftJoin(deleter, eq(timelineEvents.deletedBy, deleter.id))
     .where(
       and(
-        Array.isArray(args.machineId)
-          ? inArray(timelineEvents.machineId, args.machineId)
-          : eq(timelineEvents.machineId, args.machineId),
+        machinePredicate,
+        authorPredicate,
         args.tags && args.tags.length > 0
           ? inArray(timelineEvents.tag, args.tags)
           : undefined

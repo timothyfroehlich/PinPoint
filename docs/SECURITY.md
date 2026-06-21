@@ -26,20 +26,20 @@ Content-Security-Policy (CSP) is set dynamically in middleware to support nonce-
 
 #### Content-Security-Policy Directives
 
-| Directive                   | Value                                               | Purpose                                                                                      |
-| --------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `default-src`               | `'self'`                                            | Default policy: only load resources from same origin                                         |
-| `script-src`                | `'self' 'nonce-{random}' 'strict-dynamic'`          | Scripts: same origin or with valid nonce. 'strict-dynamic' allows dynamically loaded scripts |
-| `style-src`                 | `'self' 'unsafe-inline'`                            | Styles: same origin or inline (for CSS-in-JS compatibility)                                  |
-| `img-src`                   | `'self' data: blob:`                                | Images: same origin, data URIs, or blob URLs                                                 |
-| `font-src`                  | `'self' data:`                                      | Fonts: same origin or data URIs                                                              |
-| `connect-src`               | `'self' {supabase-url} {supabase-ws-url} localhost` | Network requests: same origin, Supabase, and local development                               |
-| `object-src`                | `'none'`                                            | No plugins (Flash, Java, etc.)                                                               |
-| `base-uri`                  | `'self'`                                            | Restricts `<base>` tag URLs                                                                  |
-| `form-action`               | `'self'`                                            | Forms can only submit to same origin                                                         |
-| `frame-ancestors`           | `'none'`                                            | Cannot be embedded in any frame (stricter than X-Frame-Options)                              |
-| `block-all-mixed-content`   | -                                                   | Blocks HTTP content on HTTPS pages                                                           |
-| `upgrade-insecure-requests` | -                                                   | Upgrades HTTP requests to HTTPS                                                              |
+| Directive                   | Value                                                         | Purpose                                                                                      |
+| --------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `default-src`               | `'self'`                                                      | Default policy: only load resources from same origin                                         |
+| `script-src`                | `'self' 'nonce-{random}' 'strict-dynamic'`                    | Scripts: same origin or with valid nonce. 'strict-dynamic' allows dynamically loaded scripts |
+| `style-src`                 | `'self' 'unsafe-inline'`                                      | Styles: same origin or inline (for CSS-in-JS compatibility)                                  |
+| `img-src`                   | `'self' data: blob: https://*.public.blob.vercel-storage.com` | Images: same origin, data URIs, blob URLs, or Vercel Blob CDN (uploaded avatars)             |
+| `font-src`                  | `'self' data:`                                                | Fonts: same origin or data URIs                                                              |
+| `connect-src`               | `'self' {supabase-url} {supabase-ws-url} localhost`           | Network requests: same origin, Supabase, and local development                               |
+| `object-src`                | `'none'`                                                      | No plugins (Flash, Java, etc.)                                                               |
+| `base-uri`                  | `'self'`                                                      | Restricts `<base>` tag URLs                                                                  |
+| `form-action`               | `'self'`                                                      | Forms can only submit to same origin                                                         |
+| `frame-ancestors`           | `'none'`                                                      | Cannot be embedded in any frame (stricter than X-Frame-Options)                              |
+| `block-all-mixed-content`   | -                                                             | Blocks HTTP content on HTTPS pages                                                           |
+| `upgrade-insecure-requests` | -                                                             | Upgrades HTTP requests to HTTPS                                                              |
 
 ## Implementation Details
 
@@ -176,7 +176,7 @@ Check that `content-security-policy` contains:
 - `default-src 'self'`
 - `script-src 'self' 'nonce-<random-uuid>' 'strict-dynamic'`
 - `style-src 'self' 'unsafe-inline'`
-- `img-src 'self' data: blob:`
+- `img-src 'self' data: blob: https://*.public.blob.vercel-storage.com`
 - `connect-src 'self' https://<project>.supabase.co wss://<project>.supabase.co`
 - `object-src 'none'`
 - `frame-ancestors 'none'`

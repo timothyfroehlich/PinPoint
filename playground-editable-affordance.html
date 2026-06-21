@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PinPoint · Editable Affordance Playground</title>
+<style>
+  :root{
+    --background:#0f0f11; --foreground:#f8fafc;
+    --card:#18151b; --surface:#0f0f11; --surface-variant:#18151b;
+    --muted:#27272a; --muted-foreground:#a1a1aa;
+    --input:#27272a; --border:#27272a;
+    --outline:#3f3f46; --outline-variant:#52525b;
+    --primary:#4ade80; --secondary:#2dd4bf; --warning:#eab308; --destructive:#dc2626;
+    --ring:#f8fafc;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--background); color:var(--foreground); font-family:var(--sans);
+    display:grid; grid-template-columns:360px 1fr; min-height:100vh;
+  }
+  .controls{grid-column:1; position:sticky; top:0; align-self:start; max-height:100vh; overflow-y:auto; padding:16px 16px 28px; border-right:1px solid var(--outline-variant); background:#121013;}
+  .controls h1{font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted-foreground); margin:0 0 4px}
+  .controls .sub{font-size:11px; color:var(--muted-foreground); margin:0 0 14px; line-height:1.45}
+  .group{margin-bottom:16px}
+  .group > label.title{display:block; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#c9c9d1; margin-bottom:8px}
+  .seg{display:flex; flex-wrap:wrap; gap:6px}
+  .seg button{flex:1 1 auto; min-width:60px; padding:7px 8px; font-size:12px; cursor:pointer; background:var(--surface-variant); color:var(--muted-foreground); border:1px solid var(--outline-variant); border-radius:6px; transition:all .12s;}
+  .seg button.active{background:color-mix(in srgb,var(--primary) 16%,transparent); color:var(--foreground); border-color:color-mix(in srgb,var(--primary) 60%,transparent)}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0; font-size:12px; color:#c9c9d1}
+  .row input[type=range]{flex:1; accent-color:var(--primary)}
+  .row .val{font-family:var(--mono); font-size:11px; color:var(--muted-foreground); min-width:42px; text-align:right}
+  .pgroup-label{font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted-foreground); margin:14px 0 6px}
+  .pgroup-label:first-child{margin-top:0}
+  .presets{display:flex; flex-direction:column; gap:6px}
+  .presets button{text-align:left; padding:9px 10px; font-size:12.5px; cursor:pointer; border-radius:7px; background:var(--surface-variant); color:var(--foreground); border:1px solid var(--outline-variant); transition:all .12s;}
+  .presets button:hover{border-color:color-mix(in srgb,var(--primary) 50%,transparent)}
+  .presets button .ds{display:inline-block; margin-left:6px; font-size:9.5px; padding:1px 5px; border-radius:99px; background:color-mix(in srgb,var(--warning) 18%,transparent); color:var(--warning); vertical-align:middle}
+  .presets button small{display:block; color:var(--muted-foreground); font-size:10.5px; margin-top:2px}
+  .checkrow{display:flex; align-items:center; gap:8px; font-size:12px; color:#c9c9d1; margin:8px 0}
+  .checkrow input{accent-color:var(--primary)}
+
+  .stage-wrap{grid-column:2; padding:28px 28px 96px; display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; justify-content:center; background:radial-gradient(900px 500px at 30% -10%, #15131a 0%, var(--background) 60%);}
+  .device-label{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted-foreground); margin:0 0 8px; text-align:center}
+  .frame{transition:width .2s}
+  .frame.editable-col{width:560px}
+  .frame.editable-col.mobile{width:390px}
+  .frame.readonly-col{width:330px}
+
+  .card{background:var(--card); border:1px solid var(--outline-variant); border-radius:12px; overflow:hidden}
+  .card.mobileflat{border-radius:0; border-left:0; border-right:0}
+  .stage-wrap.blackbg{background:#000}
+  .blackbg .card{background:#000}
+  .blackbg .card-head{background:#000}
+  .card-head{background:var(--muted); padding:14px 16px}
+  .set-name-line{display:flex; align-items:center; gap:8px}
+  .head-grid{display:flex; gap:8px; align-items:flex-start}
+  .head-col{flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:7px}
+  .chev{color:var(--muted-foreground); line-height:1.6}
+  .set-name{font-weight:600; font-size:14px}
+  .desc{font-size:12.5px; color:#cfcfd6; line-height:1.5}
+  .audit{font-size:11px; color:var(--muted-foreground); margin-top:2px}
+  .card-body{padding:14px 16px}
+  .section-title{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted-foreground); margin:2px 0 8px}
+  .access{font-size:12.5px; color:#cfcfd6; line-height:1.55; margin-bottom:16px}
+  table{width:100%; border-collapse:collapse; font-size:13px}
+  th{text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted-foreground); font-weight:600; padding:4px 8px; border-bottom:1px solid var(--outline-variant)}
+  td{padding:6px 8px; border-bottom:1px solid color-mix(in srgb,var(--outline-variant) 45%,transparent); vertical-align:middle}
+  .mono{font-family:var(--mono)}
+  .static-val{color:var(--foreground)}
+  .pill-toggle{display:inline-flex; align-items:center; gap:6px}
+  .switch{width:30px; height:17px; border-radius:99px; background:var(--primary); position:relative; display:inline-block}
+  .switch::after{content:""; position:absolute; top:2px; left:15px; width:13px; height:13px; border-radius:50%; background:#06210f}
+  .switch.off{background:var(--outline)} .switch.off::after{left:2px; background:#cfcfd6}
+
+  .editable{position:relative; border-radius:6px; padding:3px 7px; margin:-3px -7px; cursor:text; transition:background-color .14s, box-shadow .14s, border-color .14s, text-shadow .3s ease, color .3s ease; outline:none; border:1px solid transparent;}
+  .editable .pencil{position:absolute; right:5px; top:50%; transform:translateY(-50%); width:13px; height:13px; opacity:0; transition:opacity .14s; color:var(--muted-foreground)}
+  .rich.editable{display:block; padding:8px 10px; margin:0}
+  .name.editable{display:inline-block}
+  .readonly-note{font-size:11px; color:var(--muted-foreground); margin-top:10px; line-height:1.4}
+  .card.ref{padding:14px 16px}
+  .ref-take{font-size:12px; line-height:1.5; color:#d6d6dd; margin:0 0 14px; padding:10px 12px; border-radius:8px; background:color-mix(in srgb,var(--primary) 9%,transparent); border:1px solid color-mix(in srgb,var(--primary) 28%,transparent)}
+  .ref-row{display:flex; gap:10px; padding:9px 0; border-top:1px solid color-mix(in srgb,var(--outline-variant) 45%,transparent); font-size:12px; line-height:1.45}
+  .ref-row:first-of-type{border-top:0}
+  .ref-row b{color:var(--foreground)}
+  .ref-row span{color:var(--muted-foreground)}
+  .ref-row i{color:color-mix(in srgb,var(--primary) 80%,#a1a1aa); font-style:normal}
+  .ref-k{flex:0 0 22px; height:22px; display:flex; align-items:center; justify-content:center; border-radius:6px; font-weight:700; font-size:11px; background:var(--surface-variant); border:1px solid var(--outline-variant); color:#c9c9d1}
+
+  .prompt{grid-column:1/3; position:sticky; bottom:0; z-index:5; border-top:1px solid var(--outline-variant); background:#121013; padding:12px 16px; display:flex; gap:12px; align-items:flex-start}
+  .prompt .out{flex:1; font-family:var(--mono); font-size:12px; line-height:1.5; color:#d6d6dd; white-space:pre-wrap; max-height:120px; overflow:auto}
+  .prompt button{align-self:center; padding:9px 16px; font-size:13px; cursor:pointer; background:var(--primary); color:#06210f; border:0; border-radius:7px; font-weight:600}
+  .wcag{display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:11px}
+  .wcag .chip{font-family:var(--mono); padding:3px 8px; border-radius:6px; border:1px solid var(--outline-variant); background:var(--surface-variant)}
+  .wcag .ok{color:var(--primary); border-color:color-mix(in srgb,var(--primary) 40%,transparent)}
+  .wcag .bad{color:#ff8a8a; border-color:color-mix(in srgb,var(--destructive) 50%,transparent)}
+  .wcag .na{color:var(--muted-foreground)}
+</style>
+</head>
+<body>
+  <div class="controls">
+    <h1>Editable affordance</h1>
+    <p class="sub">Goal: an editable field looks <b>illuminated / live</b> at rest. Try the glow presets (your "background glows" idea) and the reference-site patterns. Flip to Mobile to test no-hover. Watch WCAG chips.</p>
+
+    <div class="presets" id="presets"></div>
+
+    <div class="group" style="margin-top:18px">
+      <label class="title">Base style</label>
+      <div class="seg" id="seg-base"></div>
+    </div>
+    <div class="group" id="fill-group">
+      <label class="title">Fill (solid tint)</label>
+      <div class="seg" id="seg-fillToken"></div>
+      <div class="row"><span>Fill opacity</span><input type="range" id="fillPct" min="0" max="100" /><span class="val" id="fillPct-v"></span></div>
+    </div>
+    <div class="group" id="border-group">
+      <label class="title">Border / underline</label>
+      <div class="seg" id="seg-borderToken"></div>
+      <div class="row"><span>Width</span><input type="range" id="borderWidth" min="1" max="3" /><span class="val" id="borderWidth-v"></span></div>
+    </div>
+    <div class="group">
+      <label class="title">Glow <span style="color:var(--warning);font-weight:600">(modifies design system)</span></label>
+      <div class="seg" id="seg-glowColor"></div>
+      <div style="height:6px"></div>
+      <div style="font-size:11px;color:var(--muted-foreground);margin-bottom:4px">Text glow trigger (fades in)</div>
+      <div class="seg" id="seg-textGlowTrigger"></div>
+      <div class="row"><span><b>Text glow</b> intensity</span><input type="range" id="textGlowPct" min="0" max="100" /><span class="val" id="textGlowPct-v"></span></div>
+      <div class="row"><span>Bg / inner glow</span><input type="range" id="bgGlowPct" min="0" max="70" /><span class="val" id="bgGlowPct-v"></span></div>
+      <div style="height:6px"></div>
+      <div class="seg" id="seg-glowMode"></div>
+      <div class="row"><span>Outer glow</span><input type="range" id="glowPct" min="0" max="80" /><span class="val" id="glowPct-v"></span></div>
+      <div class="row"><span>Outer spread</span><input type="range" id="glowSpread" min="4" max="28" /><span class="val" id="glowSpread-v"></span></div>
+    </div>
+    <div class="group">
+      <label class="title">Extras</label>
+      <div class="seg" id="seg-pencil"></div>
+      <div class="checkrow"><input type="checkbox" id="focusRing" /><label for="focusRing">Bright focus ring (ring/50, 3px)</label></div>
+    </div>
+    <div class="group">
+      <label class="title">Preview as</label>
+      <div class="seg" id="seg-device"></div>
+    </div>
+    <div class="group">
+      <label class="title">Page background</label>
+      <div class="seg" id="seg-pageBg"></div>
+    </div>
+  </div>
+
+  <div class="stage-wrap">
+    <div>
+      <p class="device-label" id="dev-label">Desktop · editor (can edit)</p>
+      <div class="frame editable-col" id="frame-edit">
+        <div class="card" id="edit-card">
+          <div class="card-head">
+            <div class="head-grid">
+              <span class="chev">▾</span>
+              <div class="head-col">
+                <span class="set-name editable name" tabindex="0">Tournament<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
+                <div class="desc editable rich" tabindex="0">Competition-ready setup for league nights.<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></div>
+                <div class="audit">updated by Tim · 6/18</div>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="section-title">How to change settings</div>
+            <div class="access editable rich" tabindex="0">Coin door → press the white button to enter the menu. Black buttons move; green confirms.<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></div>
+            <div class="section-title">Software settings</div>
+            <table>
+              <thead><tr><th style="width:22%">ID</th><th>Setting</th><th style="width:22%">Value</th><th style="width:54px">On</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><span class="editable mono" tabindex="0">A.1 01<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></td>
+                  <td><span class="editable" tabindex="0">Balls Per Game<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></td>
+                  <td><span class="editable mono" tabindex="0">3<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></td>
+                  <td><span class="pill-toggle"><span class="switch"></span></span></td>
+                </tr>
+                <tr>
+                  <td><span class="editable mono" tabindex="0">A.1 02<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></td>
+                  <td><span class="editable" tabindex="0">Free Play<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></td>
+                  <td><span class="editable mono" tabindex="0">ON<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></td>
+                  <td><span class="pill-toggle"><span class="switch"></span></span></td>
+                </tr>
+                <tr>
+                  <td><span class="editable mono" tabindex="0">A.2 14<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></td>
+                  <td><span class="editable" tabindex="0">Tilt Warnings<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></td>
+                  <td><span class="editable mono" tabindex="0">2<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span></td>
+                  <td><span class="pill-toggle"><span class="switch off"></span></span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="wcag" id="wcag"></div>
+      </div>
+    </div>
+
+    <div>
+      <p class="device-label">Read-only viewer (no edit) — for contrast</p>
+      <div class="frame readonly-col">
+        <div class="card">
+          <div class="card-head">
+            <div class="set-name-line"><span class="chev">▾</span><span class="set-name">Tournament</span></div>
+            <div class="desc">Competition-ready setup for league nights.</div>
+            <div class="audit">updated by Tim · 6/18</div>
+          </div>
+          <div class="card-body">
+            <div class="section-title">Software settings</div>
+            <table>
+              <thead><tr><th style="width:30%">ID</th><th>Setting</th><th style="width:20%">Value</th></tr></thead>
+              <tbody>
+                <tr><td class="mono static-val">A.1 01</td><td class="static-val">Balls Per Game</td><td class="mono static-val">3</td></tr>
+                <tr><td class="mono static-val">A.1 02</td><td class="static-val">Free Play</td><td class="mono static-val">ON</td></tr>
+                <tr><td class="mono static-val">A.2 14</td><td class="static-val">Tilt Warnings</td><td class="mono static-val">2</td></tr>
+              </tbody>
+            </table>
+            <p class="readonly-note">An editor (left) should instantly read "I can change these"; a viewer sees clean static text.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="device-label">How real consumer sites do it</p>
+      <div class="frame" style="width:360px">
+        <div class="card ref">
+          <p class="ref-take">For the average person on mixed devices, the subtle hover-reveal you have today (A) is the worst fit — invisible on touch. Consumer apps lean to <b>C</b> (obvious fields) or <b>D</b> (explicit control). Your glowing-field idea is a branded version of <b>C</b>.</p>
+
+          <div class="ref-row"><span class="ref-k">A</span><div><b>Subtle hover-reveal</b> · Notion, Linear, Coda, Asana<br><span>Plain text; hover shows a faint block/controls; click to edit. Clean, but invisible on touch & low-discoverability. <i>= presets "Notion", "Today".</i></span></div></div>
+
+          <div class="ref-row"><span class="ref-k">B</span><div><b>Spreadsheet grid</b> · Airtable, Google Sheets, Excel Online, Notion DBs<br><span>Visible cell borders; the grid itself says "all editable." Great for dense data; reads as a spreadsheet. <i>= preset "Airtable / Sheets".</i></span></div></div>
+
+          <div class="ref-row"><span class="ref-k">C</span><div><b>Always a form field</b> · Google Forms editor, Typeform builder, settings pages<br><span>Always-visible inputs; no view/edit split. Zero ambiguity, best for novices; visually heavy ("boxes everywhere"). <i>= preset "Google Forms".</i></span></div></div>
+
+          <div class="ref-row"><span class="ref-k">D</span><div><b>Explicit edit control</b> · YouTube Studio, Trello, Gmail signature, X "Edit profile", Spotify<br><span>An obvious affordance/button; separates view from edit. Discoverable; costs a click / pencils everywhere. <i>= preset "Explicit pencil".</i></span></div></div>
+
+          <div class="ref-row"><span class="ref-k">E</span><div><b>Tap-to-caret</b> · Google Docs, Apple Notes, Word Online<br><span>No affordance — click and a caret appears. Works only because the whole surface is a document.</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="prompt">
+    <div class="out" id="out"></div>
+    <button id="copy">Copy decision</button>
+  </div>
+
+  <style id="dyn"></style>
+<script>
+const TOK = {
+  background:"#0f0f11", surface:"#0f0f11", "surface-variant":"#18151b", card:"#18151b",
+  input:"#27272a", border:"#27272a", muted:"#27272a", outline:"#3f3f46", "outline-variant":"#52525b",
+  primary:"#4ade80", secondary:"#2dd4bf", warning:"#eab308", ring:"#f8fafc", foreground:"#f8fafc",
+  white:"#ffffff", black:"#000000",
+};
+// the two backgrounds editable fields actually sit on:
+const HEADER_BG="#27272a"; // .card-head (muted) — set name + description live here
+const BODY_BG="#18151b";   // .card / .card-body — table cells + access block live here
+const DEFAULTS = {
+  base:"fill", fillToken:"input", fillPct:30,
+  borderToken:"outline-variant", borderWidth:1,
+  glowColor:"primary", bgGlowPct:0, textGlowPct:0, textGlowTrigger:"hover",
+  glowMode:"off", glowPct:45, glowSpread:12,
+  focusRing:true, pencil:"off", device:"desktop", pageBg:"default",
+};
+// Airtable-style: outlined "cell" box + a subtle shade fill. Small variations.
+const AIRTABLE_PRESETS = [
+  ["Shade · adaptive ± (lighten dark / darken light)", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"adaptive", fillPct:8, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"off", focusRing:true}],
+  ["Shade · lighten (works on both bgs)", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"white", fillPct:6, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"off", focusRing:true}],
+  ["Shade · faint (input — fails on header)", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"input", fillPct:16, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"off", focusRing:true}],
+  ["Shade · medium", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"input", fillPct:28, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"off", focusRing:true}],
+  ["Shade · soft border", {base:"outline", borderToken:"outline-variant", borderWidth:1, fillToken:"input", fillPct:22, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"off", focusRing:true}],
+  ["Shade · warm tint", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"surface-variant", fillPct:60, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"off", focusRing:true}],
+  ["Shade · green edge", {base:"outline", borderToken:"primary", borderWidth:1, fillToken:"input", fillPct:16, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"off", focusRing:true, ds:true}],
+];
+// Airtable box (outline + shade) + the TEXT itself glowing neon.
+const TEXTGLOW_PRESETS = [
+  ["Black box + neon text (hover) ★", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"black", fillPct:100, glowColor:"primary", textGlowPct:55, textGlowTrigger:"hover", bgGlowPct:0, glowMode:"off", pencil:"off", focusRing:true, ds:true}],
+  ["Black box + neon text (always)", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"black", fillPct:100, glowColor:"primary", textGlowPct:50, textGlowTrigger:"always", bgGlowPct:0, glowMode:"off", pencil:"off", focusRing:true, ds:true}],
+  ["Box + green glow on hover (adaptive)", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"adaptive", fillPct:8, glowColor:"primary", textGlowPct:50, textGlowTrigger:"hover", bgGlowPct:0, glowMode:"off", pencil:"off", focusRing:true, ds:true}],
+  ["Box + teal glow on hover", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"white", fillPct:6, glowColor:"secondary", textGlowPct:50, textGlowTrigger:"hover", bgGlowPct:0, glowMode:"off", pencil:"off", focusRing:true, ds:true}],
+  ["Subtle green, always on", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"white", fillPct:6, glowColor:"primary", textGlowPct:42, textGlowTrigger:"always", bgGlowPct:0, glowMode:"off", pencil:"off", focusRing:true, ds:true}],
+  ["Glow on focus only", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"white", fillPct:6, glowColor:"primary", textGlowPct:60, textGlowTrigger:"focus", bgGlowPct:0, glowMode:"off", pencil:"off", focusRing:true, ds:true}],
+];
+// Your idea: the field BACKGROUND glows (radial inner glow) + the text glows.
+const GLOW_PRESETS = [
+  ["Illuminated field — green", {base:"fill", fillToken:"input", fillPct:34, bgGlowPct:40, glowColor:"primary", textGlowPct:80, glowMode:"off", pencil:"off", focusRing:false, ds:true}],
+  ["Illuminated field — teal", {base:"fill", fillToken:"input", fillPct:30, bgGlowPct:42, glowColor:"secondary", textGlowPct:80, glowMode:"off", pencil:"off", focusRing:false, ds:true}],
+  ["Illuminated + brighten on focus", {base:"fill", fillToken:"input", fillPct:26, bgGlowPct:30, glowColor:"primary", textGlowPct:80, glowMode:"focus", glowPct:50, glowSpread:13, pencil:"off", focusRing:false, ds:true}],
+  ["Glow on focus only (calm at rest)", {base:"fill", fillToken:"input", fillPct:24, bgGlowPct:0, glowColor:"primary", textGlowPct:0, glowMode:"focus", glowPct:48, glowSpread:13, pencil:"off", focusRing:false, ds:true}],
+];
+const REF_PRESETS = [
+  ["↪ Notion (hover-reveal)", {base:"fill", fillToken:"surface-variant", fillPct:0, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"off", focusRing:true}],
+  ["↪ Airtable / Sheets (grid)", {base:"outline", borderToken:"outline", borderWidth:1, fillPct:0, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"off", focusRing:true}],
+  ["↪ Google Forms (always a field)", {base:"outline", borderToken:"outline", borderWidth:1, fillToken:"input", fillPct:30, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"off", focusRing:true}],
+  ["↪ Explicit pencil (YouTube-ish)", {base:"none", fillPct:0, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"always", focusRing:true}],
+  ["↪ Today (PinPoint, pencil on hover)", {base:"none", fillPct:0, glowMode:"off", bgGlowPct:0, textGlowPct:0, pencil:"hover", focusRing:true}],
+];
+const SEGS = {
+  base:[["none","None"],["fill","Fill"],["outline","Outline"],["underline","Underline"]],
+  fillToken:[["black","black box"],["adaptive","adaptive ±"],["white","lighten"],["input","input"],["surface-variant","surf-var"],["primary","primary"]],
+  textGlowTrigger:[["off","Off"],["hover","On hover"],["focus","On focus"],["always","Always"]],
+  borderToken:[["outline-variant","outline-var"],["outline","outline"],["primary","primary"],["secondary","secondary"]],
+  glowColor:[["primary","green"],["secondary","teal"],["warning","amber"]],
+  glowMode:[["off","Outer: off"],["focus","Outer on focus"],["always","Outer always"]],
+  pencil:[["off","No pencil"],["hover","Pencil hover"],["always","Pencil always"]],
+  device:[["desktop","Desktop (hover)"],["mobile","Mobile (touch)"]],
+  pageBg:[["default","Default surfaces"],["black","Pure black"]],
+};
+let state = {...DEFAULTS};
+
+const hex2rgb = h => [1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const blend = (fg,bg,a)=>{const F=hex2rgb(fg),B=hex2rgb(bg);return F.map((c,i)=>Math.round(c*a+B[i]*(1-a)));};
+const lum = rgb => {const s=rgb.map(c=>{c/=255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4);});return 0.2126*s[0]+0.7152*s[1]+0.0722*s[2];};
+const ratio = (r1,r2)=>{const a=lum(r1)+0.05,b=lum(r2)+0.05;return Math.max(a,b)/Math.min(a,b);};
+
+function buildSeg(key){
+  const el=document.getElementById("seg-"+key); el.innerHTML="";
+  SEGS[key].forEach(([val,label])=>{
+    const b=document.createElement("button"); b.textContent=label; b.dataset.val=val;
+    b.onclick=()=>{
+      state[key]=val;
+      if(key==="base"&&val==="fill"&&state.fillPct===0) state.fillPct=30;
+      if(key==="base"&&val==="none") state.fillPct=0;
+      sync();
+    };
+    el.appendChild(b);
+  });
+}
+Object.keys(SEGS).forEach(buildSeg);
+["fillPct","borderWidth","glowPct","glowSpread","bgGlowPct","textGlowPct"].forEach(k=>{
+  document.getElementById(k).oninput=e=>{state[k]=+e.target.value; sync();};
+});
+document.getElementById("focusRing").onchange=e=>{state.focusRing=e.target.checked; sync();};
+
+const pEl=document.getElementById("presets");
+function addPresetGroup(label, list){
+  const h=document.createElement("div"); h.className="pgroup-label"; h.textContent=label; pEl.appendChild(h);
+  list.forEach(([name,patch])=>{
+    const b=document.createElement("button");
+    b.innerHTML=`${name}${patch.ds?'<span class="ds">DS change</span>':''}`;
+    b.onclick=()=>{state={...DEFAULTS,...patch}; sync();};
+    pEl.appendChild(b);
+  });
+}
+addPresetGroup("Airtable box + glowing text ★", TEXTGLOW_PRESETS);
+addPresetGroup("Airtable + shade (variations)", AIRTABLE_PRESETS);
+addPresetGroup("Glow directions (box/bg)", GLOW_PRESETS);
+addPresetGroup("Reference patterns (real sites)", REF_PRESETS);
+
+function outerGlow(){const c=TOK[state.glowColor];return `0 0 ${state.glowSpread}px color-mix(in srgb, ${c} ${state.glowPct}%, transparent), 0 0 ${state.glowSpread*2}px color-mix(in srgb, ${c} ${Math.round(state.glowPct*0.6)}%, transparent)`;}
+function ringShadow(){return `0 0 0 3px color-mix(in srgb, ${TOK.ring} 50%, transparent)`;}
+
+function css(){
+  const s=state, gc=TOK[s.glowColor];
+  const fillOn=s.fillPct>0;
+  // Adaptive shade: lighten on dark zones (body), darken on the lighter header.
+  const adaptive = s.fillToken==="adaptive";
+  const bump = (s.fillToken==="white"||adaptive)?4:12;
+  const mk=(tok,pct)=> pct>0?`color-mix(in srgb, ${TOK[tok]} ${pct}%, transparent)`:"transparent";
+  const bodyTok = adaptive?"white":s.fillToken;
+  const headerTok = adaptive?"black":s.fillToken;
+  const bodyFill=mk(bodyTok,s.fillPct),   bodyHover=mk(bodyTok,Math.min(s.fillPct+bump,100));
+  const headerFill=mk(headerTok,s.fillPct), headerHover=mk(headerTok,Math.min(s.fillPct+bump,100));
+  let borderRule="border:1px solid transparent;", radius="6px", extra="";
+  if(s.base==="outline") borderRule=`border:${s.borderWidth}px solid ${TOK[s.borderToken]};`;
+  else if(s.base==="underline"){borderRule="border:0;"; extra=`border-bottom:${s.borderWidth}px solid ${TOK[s.borderToken]}; border-radius:0;`; radius="0";}
+  const bgGlow=s.bgGlowPct>0?`background-image:radial-gradient(120% 160% at 50% 50%, color-mix(in srgb, ${gc} ${s.bgGlowPct}%, transparent) 0%, transparent 72%);`:"background-image:none;";
+  const restShadow=s.glowMode==="always"?outerGlow():"none";
+  // Neon text glow: two stacked shadows (tight + wide) so the TEXT itself glows.
+  const tg=s.textGlowPct;
+  const neon = tg>0
+    ? `text-shadow:0 0 ${Math.round(3+tg*0.05)}px color-mix(in srgb, ${gc} ${tg}%, transparent), 0 0 ${Math.round(8+tg*0.12)}px color-mix(in srgb, ${gc} ${Math.round(tg*0.7)}%, transparent); color:color-mix(in srgb, ${gc} ${Math.round(tg*0.35)}%, ${TOK.foreground});`
+    : "";
+  const trig = (tg>0) ? s.textGlowTrigger : "off";
+  // base state carries glow only if "always"; hover/focus rules add it (with the
+  // .editable transition on text-shadow+color giving the fade-in effect).
+  const restText = trig==="always" ? neon : "text-shadow:none;";
+  const hoverText = trig==="hover" ? neon : "";
+  const focusText = (trig==="focus"||trig==="always") ? neon : "";
+
+  let fs=[]; if(s.focusRing) fs.push(ringShadow()); if(s.glowMode==="focus"||s.glowMode==="always") fs.push(outerGlow());
+  const focusShadow=fs.length?`box-shadow:${fs.join(", ")};`:"";
+  const focusBorder=s.base==="outline"?`border-color:${TOK.ring};`:(s.base==="underline"?`border-bottom-color:${TOK.ring};`:"");
+  const pencilRest=s.pencil==="always"?1:0;
+  return `
+  .editable{ --ef:${bodyFill}; --efh:${bodyHover}; background-color:var(--ef); ${bgGlow} ${borderRule} border-radius:${radius}; box-shadow:${restShadow}; ${extra} ${restText} }
+  .card-head .editable{ --ef:${headerFill}; --efh:${headerHover}; }
+  .editable .pencil{ opacity:${pencilRest}; }
+  .stage-wrap:not(.touch) .editable:hover{ background-color:var(--efh); ${hoverText} }
+  .stage-wrap:not(.touch) .editable:hover .pencil{ opacity:${s.pencil==="off"?0:1}; }
+  .editable:focus, .editable:focus-within{ ${focusShadow} ${focusBorder} background-color:var(--efh); ${focusText} }
+  .editable:focus .pencil{ opacity:${s.pencil==="off"?0:1}; }
+  `;
+}
+
+function wcag(){
+  const s=state, el=document.getElementById("wcag"); el.innerHTML="";
+  const chips=[];
+  const HB = s.pageBg==="black" ? "#000000" : HEADER_BG;
+  const BB = s.pageBg==="black" ? "#000000" : BODY_BG;
+  function fieldOn(bgHex, zone){
+    if(s.fillPct<=0) return hex2rgb(bgHex);
+    let tok=s.fillToken;
+    if(s.fillToken==="adaptive") tok = (zone==="header")?"black":"white";
+    return blend(TOK[tok], bgHex, s.fillPct/100);
+  }
+  const hField=fieldOn(HB,"header"), bField=fieldOn(BB,"body");
+  // text glow tints the glyph toward the glow color — reflect that in contrast
+  const textColor = s.textGlowPct>0 ? blend(TOK[s.glowColor], TOK.foreground, (s.textGlowPct*0.35)/100) : hex2rgb(TOK.foreground);
+  chips.push(["Text vs field (body)", ratio(textColor,bField), 4.5]);
+  if(s.fillPct>0){
+    chips.push(["Shade on header", ratio(hField,hex2rgb(HB)), 3.0]);
+    chips.push(["Shade on body", ratio(bField,hex2rgb(BB)), 3.0]);
+  } else if(s.base==="outline"||s.base==="underline"){
+    chips.push(["Border on header", ratio(hex2rgb(TOK[s.borderToken]),hex2rgb(HB)), 3.0]);
+    chips.push(["Border on body", ratio(hex2rgb(TOK[s.borderToken]),hex2rgb(BB)), 3.0]);
+  } else chips.push(["Resting cue", null, 3.0]);
+  chips.forEach(([label,val,need])=>{
+    const c=document.createElement("span"); c.className="chip "+(val===null?"na":(val>=need?"ok":"bad"));
+    c.textContent=val===null?`${label}: none (glow/pencil only)`:`${label}: ${val.toFixed(2)}:1 ${val>=need?"✓":"✗ need "+need}`;
+    el.appendChild(c);
+  });
+  if(s.bgGlowPct>0||s.glowMode!=="off"||s.textGlowPct>0){
+    const g=document.createElement("span"); g.className="chip na"; g.textContent="glow = decorative; keep a non-glow cue too"; el.appendChild(g);
+  }
+  if(s.textGlowPct>75){
+    const g=document.createElement("span"); g.className="chip bad"; g.textContent="heavy text glow blurs glyph edges — watch legibility"; el.appendChild(g);
+  }
+}
+
+function prompt(){
+  const s=state, parts=[];
+  if(s.fillPct>0) parts.push(
+      s.fillToken==="black"&&s.fillPct>=100 ? "a pure-black inset field (a 'display' box that reads on any dark surface)"
+      : s.fillToken==="adaptive" ? `an adaptive shade at ${s.fillPct}% — lighten on dark zones (body), darken on the lighter header band — so it reads consistently in both`
+      : `a ${s.fillToken==="white"?"lighten":"bg-"+s.fillToken} shade at ${s.fillPct}%`);
+  if(s.textGlowPct>0&&s.textGlowTrigger!=="off") parts.push(`glowing ${s.glowColor} text ${s.textGlowTrigger==="hover"?"that fades in on hover":s.textGlowTrigger==="focus"?"on focus":"always on"} (neon text-shadow ~${s.textGlowPct}%)`);
+  if(s.bgGlowPct>0) parts.push(`a glowing ${s.glowColor} background (radial inner glow ~${s.bgGlowPct}%)`);
+  if(s.base==="outline") parts.push(`a ${s.borderWidth}px ${s.borderToken} border`);
+  if(s.base==="underline") parts.push(`a ${s.borderWidth}px ${s.borderToken} underline`);
+  if(s.glowMode==="focus") parts.push(`a ${s.glowColor} outer glow on focus (0 0 ${s.glowSpread}px ${s.glowColor}/${s.glowPct})`);
+  if(s.glowMode==="always") parts.push(`an always-on ${s.glowColor} outer glow`);
+  if(s.focusRing) parts.push("a bright ring/50 focus ring");
+  if(s.pencil==="always") parts.push("an always-visible edit pencil");
+  if(s.pencil==="hover") parts.push("a pencil on hover");
+  if(parts.length===0) parts.push("no resting cue (relies on tap-to-find)");
+  const ds=(s.bgGlowPct>0||s.glowMode!=="off"||s.textGlowPct>0)?"\n\n⚠ Requires amending design-bible §2 (\"no glow on form controls\") to allow glow on editable fields.":"";
+  document.getElementById("out").textContent=`Editable fields signal editability at rest with ${parts.join(", ")}. Apply to table cells, inline single-line text, and rich-text blocks; identical on desktop + touch (no hover dependence); read-only viewers get clean static text.${ds}`;
+}
+
+function sync(){
+  document.getElementById("fillPct").value=state.fillPct; document.getElementById("fillPct-v").textContent=state.fillPct+"%";
+  document.getElementById("borderWidth").value=state.borderWidth; document.getElementById("borderWidth-v").textContent=state.borderWidth+"px";
+  document.getElementById("glowPct").value=state.glowPct; document.getElementById("glowPct-v").textContent=state.glowPct+"%";
+  document.getElementById("glowSpread").value=state.glowSpread; document.getElementById("glowSpread-v").textContent=state.glowSpread+"px";
+  document.getElementById("bgGlowPct").value=state.bgGlowPct; document.getElementById("bgGlowPct-v").textContent=state.bgGlowPct+"%";
+  document.getElementById("textGlowPct").value=state.textGlowPct; document.getElementById("textGlowPct-v").textContent=state.textGlowPct+"%";
+  document.getElementById("focusRing").checked=state.focusRing;
+  Object.keys(SEGS).forEach(key=>{document.querySelectorAll("#seg-"+key+" button").forEach(b=>b.classList.toggle("active", b.dataset.val===String(state[key])));});
+  document.getElementById("fill-group").style.opacity=state.fillPct>0||state.base==="fill"?1:.5;
+  document.getElementById("border-group").style.opacity=(state.base==="outline"||state.base==="underline")?1:.4;
+  const wrap=document.querySelector(".stage-wrap"); wrap.classList.toggle("touch", state.device==="mobile");
+  wrap.classList.toggle("blackbg", state.pageBg==="black");
+  document.getElementById("frame-edit").classList.toggle("mobile", state.device==="mobile");
+  document.getElementById("edit-card").classList.toggle("mobileflat", state.device==="mobile");
+  document.getElementById("dev-label").textContent=state.device==="mobile"?"Mobile 390px · editor (touch, no hover)":"Desktop · editor (can edit)";
+  document.getElementById("dyn").textContent=css(); wcag(); prompt();
+}
+document.getElementById("copy").onclick=()=>{navigator.clipboard.writeText(document.getElementById("out").textContent).then(()=>{const b=document.getElementById("copy"),t=b.textContent;b.textContent="Copied!";setTimeout(()=>b.textContent=t,1200);});};
+state={...DEFAULTS, base:"outline", borderToken:"outline", fillToken:"black", fillPct:100, glowColor:"primary", textGlowPct:55, textGlowTrigger:"hover", focusRing:true};
+sync();
+</script>
+</body>
+</html>

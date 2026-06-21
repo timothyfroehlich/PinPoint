@@ -12,6 +12,7 @@ CREATE TABLE "machine_settings_sets" (
 );
 --> statement-breakpoint
 ALTER TABLE "machine_settings_sets" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "machines" ADD COLUMN "settings_requests" jsonb;--> statement-breakpoint
 ALTER TABLE "machines" ADD COLUMN "settings_instructions" jsonb;--> statement-breakpoint
 ALTER TABLE "machine_settings_sets" ADD CONSTRAINT "machine_settings_sets_machine_id_machines_id_fk" FOREIGN KEY ("machine_id") REFERENCES "public"."machines"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "machine_settings_sets" ADD CONSTRAINT "machine_settings_sets_created_by_user_profiles_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user_profiles"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

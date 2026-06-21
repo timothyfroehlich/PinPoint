@@ -1,5 +1,5 @@
 {
-  "id": "149541c4-078b-45c9-aa7c-aaafb0756cbb",
+  "id": "c662eccf-17e1-43c9-a5b2-a56645fde893",
   "prevId": "a9d50cb9-f3d5-427c-86de-a2705a2bd4ed",
   "version": "7",
   "dialect": "postgresql",
@@ -888,144 +888,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.machine_settings_sets": {
-      "name": "machine_settings_sets",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "machine_id": {
-          "name": "machine_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sections": {
-          "name": "sections",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "is_preferred": {
-          "name": "is_preferred",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_machine_settings_sets_machine": {
-          "name": "idx_machine_settings_sets_machine",
-          "columns": [
-            {
-              "expression": "machine_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "uniq_machine_settings_preferred": {
-          "name": "uniq_machine_settings_preferred",
-          "columns": [
-            {
-              "expression": "machine_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"machine_settings_sets\".\"is_preferred\"",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "machine_settings_sets_machine_id_machines_id_fk": {
-          "name": "machine_settings_sets_machine_id_machines_id_fk",
-          "tableFrom": "machine_settings_sets",
-          "tableTo": "machines",
-          "columnsFrom": ["machine_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "machine_settings_sets_created_by_user_profiles_id_fk": {
-          "name": "machine_settings_sets_created_by_user_profiles_id_fk",
-          "tableFrom": "machine_settings_sets",
-          "tableTo": "user_profiles",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "machine_settings_sets_updated_by_user_profiles_id_fk": {
-          "name": "machine_settings_sets_updated_by_user_profiles_id_fk",
-          "tableFrom": "machine_settings_sets",
-          "tableTo": "user_profiles",
-          "columnsFrom": ["updated_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": true
-    },
     "public.machine_watchers": {
       "name": "machine_watchers",
       "schema": "",
@@ -1175,12 +1037,6 @@
         },
         "owner_notes": {
           "name": "owner_notes",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "settings_instructions": {
-          "name": "settings_instructions",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -1954,6 +1810,18 @@
         },
         "avatar_url": {
           "name": "avatar_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bio": {
+          "name": "bio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pronouns": {
+          "name": "pronouns",
           "type": "text",
           "primaryKey": false,
           "notNull": false

@@ -129,6 +129,21 @@
   }
 }
 
+/* Profile hero - dual radial gradient wash over bg-card */
+@utility profile-hero-surface {
+  background-image:
+    radial-gradient(
+      120% 140% at 0% 0%,
+      color-mix(in srgb, var(--color-primary) 14%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      120% 140% at 100% 0%,
+      color-mix(in srgb, var(--color-secondary) 12%, transparent),
+      transparent 55%
+    );
+}
+
 @utility text-link {
   @apply text-primary transition-all duration-300;
   &:hover {

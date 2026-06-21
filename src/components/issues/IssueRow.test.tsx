@@ -19,7 +19,7 @@
  */
 
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import type { ReactElement } from "react";
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -30,6 +30,21 @@ import { IssueRow } from "./IssueRow";
 // is not rendered in unit tests.
 function renderWithProviders(ui: ReactElement) {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
+}
+
+/**
+ * Checks that the rendered output contains a reporter with the given name.
+ * PersonHoverCard splits the "by" text and the name into separate DOM nodes
+ * (a text node and a <span>/<a>), so a simple getByText(/by Name/) no longer
+ * works. This helper finds the metadata line by its container and checks the
+ * full text content.
+ */
+function expectReporterName(name: string) {
+  // PersonHoverCard splits "by" and the name into separate DOM nodes, so a
+  // simple getByText(/by Name/) no longer matches a single text node.
+  // Check the full body text content instead.
+  const text = document.body.textContent ?? "";
+  expect(text).toContain(`by ${name}`);
 }
 
 // IssueRow renders a Next/Link; resolve it to a plain anchor so jsdom is happy.
@@ -72,7 +87,7 @@ describe("IssueRow reporter display (subtitle regression)", () => {
         }}
       />
     );
-    expect(screen.getByText(/by Member User/)).toBeInTheDocument();
+    expectReporterName("Member User");
   });
 
   it("displays guest reporter name when both name and email are present", () => {
@@ -87,7 +102,7 @@ describe("IssueRow reporter display (subtitle regression)", () => {
         }}
       />
     );
-    expect(screen.getByText(/by John Guest/)).toBeInTheDocument();
+    expectReporterName("John Guest");
   });
 
   it("displays guest reporter name when name only is present", () => {
@@ -100,7 +115,7 @@ describe("IssueRow reporter display (subtitle regression)", () => {
         }}
       />
     );
-    expect(screen.getByText(/by League Player/)).toBeInTheDocument();
+    expectReporterName("League Player");
   });
 
   it("shows Anonymous when email-only guest (Rule #12 regression guard)", () => {
@@ -126,7 +141,7 @@ describe("IssueRow reporter display (subtitle regression)", () => {
         }}
       />
     );
-    expect(screen.getByText(/by Anonymous/)).toBeInTheDocument();
+    expectReporterName("Anonymous");
   });
 
   it("shows Anonymous for fully anonymous reporter", () => {
@@ -141,7 +156,7 @@ describe("IssueRow reporter display (subtitle regression)", () => {
         }}
       />
     );
-    expect(screen.getByText(/by Anonymous/)).toBeInTheDocument();
+    expectReporterName("Anonymous");
   });
 
   it("displays invited user (legacy invitedReporter) name", () => {
@@ -154,6 +169,6 @@ describe("IssueRow reporter display (subtitle regression)", () => {
         }}
       />
     );
-    expect(screen.getByText(/by Invited Guest/)).toBeInTheDocument();
+    expectReporterName("Invited Guest");
   });
 });
