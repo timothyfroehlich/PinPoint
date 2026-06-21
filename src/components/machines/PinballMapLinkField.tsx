@@ -168,9 +168,14 @@ export function PinballMapLinkField({
     const groupId = pick.machineGroupId;
     setEditionsLoading(true);
     void (async () => {
-      const rows = await listPinballMapEditionsAction(groupId);
-      setEditions(rows);
-      setEditionsLoading(false);
+      try {
+        const rows = await listPinballMapEditionsAction(groupId);
+        setEditions(rows);
+      } finally {
+        // Always clear the loading flag — a stuck-loading state must not leave
+        // the required edition select unsubmittable with no recourse.
+        setEditionsLoading(false);
+      }
     })();
   };
 
@@ -330,7 +335,11 @@ export function PinballMapLinkField({
           <Select
             name="pinballmapMachineId"
             required
-            disabled={disabled || editionsLoading}
+            // Do NOT disable while editions load: a disabled control is exempt
+            // from native `required` validation, so disabling here would let the
+            // form submit with no edition (silent un-linked save). Left enabled,
+            // the empty required select blocks submit until an edition is picked.
+            disabled={disabled}
             // Omit `value` entirely (not value={undefined}) when unset so the
             // placeholder shows — exactOptionalPropertyTypes forbids undefined.
             {...(selectedEditionId !== null

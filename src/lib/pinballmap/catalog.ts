@@ -146,10 +146,16 @@ export async function searchCatalogFamilies(
       >`case when count(*) = 1 then min(${pinballmapCatalog.pinballmapMachineId}) end`,
     })
     .from(pinballmapCatalog)
-    .where(
-      sql`${pinballmapCatalog.name} ilike ${contains} or ${pinballmapCatalog.groupName} ilike ${contains}`
-    )
     .groupBy(pinballmapCatalog.machineGroupId, standaloneKey)
+    // Filter in HAVING, not WHERE, so editionCount/singleMachineId aggregate the
+    // FULL group rather than only the rows matching the query. With a WHERE,
+    // typing one edition's name ("Godzilla (Pro)") — which the group name
+    // "Godzilla" does not contain — would pass a single row, collapsing a
+    // 3-edition family into a phantom single-edition family and wrongly skipping
+    // the edition step. bool_or keeps any group with at least one matching row.
+    .having(
+      sql`bool_or(${pinballmapCatalog.name} ilike ${contains} or ${pinballmapCatalog.groupName} ilike ${contains})`
+    )
     .orderBy(
       // Prefix matches ("godz" → "Godzilla") rank above mid-string matches.
       sql`bool_or(coalesce(${pinballmapCatalog.groupName}, ${pinballmapCatalog.name}) ilike ${prefix}) desc`,

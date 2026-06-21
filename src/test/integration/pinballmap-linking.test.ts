@@ -30,6 +30,14 @@ vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
+// Pin the PinballMap client to the in-memory mock at the seam (CORE-TEST-006),
+// so refreshCatalog() can never reach pinballmap.com even if PINBALLMAP_MODE=live
+// leaks into the test environment.
+vi.mock("~/lib/pinballmap/client", async () => {
+  const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+  return { getPinballMapClient: () => getMockClient() };
+});
+
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
@@ -69,7 +77,7 @@ async function mockAuthAs(userId: string): Promise<void> {
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: { id: userId } } }),
     },
-  } as never);
+  } as unknown as Awaited<ReturnType<typeof createClient>>);
 }
 
 async function seedCatalogEntry(overrides: {
@@ -183,6 +191,39 @@ describe("PinballMap catalog mirror (PGlite)", () => {
     // A bare "%" would match everything if not escaped; it matches the literal.
     const escaped = await searchCatalogFamilies("%");
     expect(escaped.map((f) => f.pinballmapMachineId)).toEqual([11]);
+  });
+
+  it("searchCatalogFamilies counts editions over the whole group, even when the query matches one edition by name", async () => {
+    const { searchCatalogFamilies } = await import("~/lib/pinballmap/catalog");
+    // 3-edition family whose group name ("Godzilla") does NOT contain the
+    // edition qualifier the user types ("(Pro)").
+    await seedCatalogEntry({
+      pinballmapMachineId: 1,
+      name: "Godzilla (Pro)",
+      machineGroupId: 100,
+      groupName: "Godzilla",
+    });
+    await seedCatalogEntry({
+      pinballmapMachineId: 2,
+      name: "Godzilla (Premium)",
+      machineGroupId: 100,
+      groupName: "Godzilla",
+    });
+    await seedCatalogEntry({
+      pinballmapMachineId: 3,
+      name: "Godzilla (LE)",
+      machineGroupId: 100,
+      groupName: "Godzilla",
+    });
+
+    const families = await searchCatalogFamilies("Godzilla (Pro)");
+    // Still ONE family (the group), with all 3 editions counted — not a phantom
+    // single-edition family that would skip the required edition step.
+    expect(families.length).toBe(1);
+    const group = families[0];
+    expect(group?.machineGroupId).toBe(100);
+    expect(group?.editionCount).toBe(3);
+    expect(group?.pinballmapMachineId).toBeNull();
   });
 
   it("listGroupEditions returns a family's editions; getCatalogEntry resolves by id", async () => {

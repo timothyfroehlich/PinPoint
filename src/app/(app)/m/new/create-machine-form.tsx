@@ -59,14 +59,12 @@ export function CreateMachineForm({
   >(null);
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
 
-  // Snapshot of the form's field values captured at first submission time,
-  // so the promote-confirm re-submission has the correct data even if the
-  // server action response caused a component re-render.
-  const submittedDataRef = useRef<{
-    name: string;
-    initials: string;
-    ownerId: string;
-  } | null>(null);
+  // Snapshot of the full FormData captured at first submission time, so the
+  // promote-confirm re-submission carries EVERY field (incl. the PinballMap
+  // link) even if the server action response caused a component re-render. A
+  // typed subset previously dropped the link fields, silently un-linking the
+  // machine when an owner promotion was confirmed.
+  const submittedDataRef = useRef<FormData | null>(null);
 
   // Track the last state we've already handled to avoid re-opening on cancel
   const handledStateRef = useRef<typeof state>(undefined);
@@ -108,14 +106,17 @@ export function CreateMachineForm({
   const confirmPromote = (): void => {
     if (!promoteAssignee) return;
     setIsPromoteOpen(false);
-    // Build FormData from the snapshotted submission values captured at first
-    // submission — these survive any component re-renders caused by server action.
-    const snapshot = submittedDataRef.current;
-    const fd = new FormData();
-    fd.set("name", snapshot?.name ?? nameValue);
-    fd.set("initials", snapshot?.initials ?? initialsValue);
-    const ownerId = snapshot?.ownerId ?? ownerIdValue;
-    if (ownerId) fd.set("ownerId", ownerId);
+    // Re-dispatch the originally-submitted FormData (captured in onSubmit), which
+    // survives any component re-render from the server action and carries all
+    // fields — name, initials, owner, AND the PinballMap link. Fall back to
+    // controlled state only if the snapshot is somehow unset (confirmPromote runs
+    // after a submit, so it normally exists).
+    const fd = submittedDataRef.current ?? new FormData();
+    if (!submittedDataRef.current) {
+      fd.set("name", nameValue);
+      fd.set("initials", initialsValue);
+      if (ownerIdValue) fd.set("ownerId", ownerIdValue);
+    }
     fd.set("forcePromoteUserId", promoteAssignee.id);
     // useActionState dispatch must be called inside a transition — calling it
     // outside a transition silently skips the server action (React 19 requirement).
@@ -196,13 +197,8 @@ export function CreateMachineForm({
         action={formAction}
         ref={formRef}
         onSubmit={(e) => {
-          // Snapshot field values at first submission time for use in confirmPromote
-          const fd = new FormData(e.currentTarget);
-          submittedDataRef.current = {
-            name: (fd.get("name") as string | null) ?? "",
-            initials: (fd.get("initials") as string | null) ?? "",
-            ownerId: (fd.get("ownerId") as string | null) ?? "",
-          };
+          // Snapshot the full submitted FormData for confirmPromote's re-dispatch.
+          submittedDataRef.current = new FormData(e.currentTarget);
         }}
         id="create-machine-form"
         className="space-y-4"

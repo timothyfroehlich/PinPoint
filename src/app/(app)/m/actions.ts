@@ -14,10 +14,10 @@ import {
   machineWatchers,
   userProfiles,
   invitedUsers,
-  pinballmapCatalog,
 } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { validatePbmLinkSelection } from "~/lib/pinballmap/linking";
+import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { type Result, ok, err } from "~/lib/result";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
@@ -221,9 +221,7 @@ async function resolvePbmLinkColumns(input: {
   }
 
   if (pinballmapMachineId !== null) {
-    const entry = await db.query.pinballmapCatalog.findFirst({
-      where: eq(pinballmapCatalog.pinballmapMachineId, pinballmapMachineId),
-    });
+    const entry = await getCatalogEntry(pinballmapMachineId);
     if (!entry) {
       return {
         ok: false,
