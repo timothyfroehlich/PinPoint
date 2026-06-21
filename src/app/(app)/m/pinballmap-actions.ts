@@ -12,11 +12,7 @@
 
 "use server";
 
-import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
-import { getAccessLevel } from "~/lib/permissions/helpers";
 import {
   searchCatalogFamilies,
   listGroupEditions,
@@ -37,23 +33,19 @@ export interface ResolvedPbmLink {
 }
 
 /**
- * True when the caller may read the catalog (any authenticated member+ user —
- * anyone who can reach a machine form). Guests/unauthenticated callers get the
- * picker's quiet-degrade path (empty results / null) rather than an error.
+ * True when the caller may read the catalog. The catalog is non-sensitive
+ * mirrored *public* PBM data, and the create/edit forms that host the picker are
+ * already permission-gated above this seam, so authentication is the only gate
+ * needed here — we deliberately skip a per-call role lookup. `getUser()` is kept
+ * (CORE-SSR) to validate the session; the unauthenticated path quiet-degrades to
+ * empty results / null rather than erroring.
  */
 async function canReadCatalog(): Promise<boolean> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-  const accessLevel = getAccessLevel(profile?.role);
-  return accessLevel !== "unauthenticated" && accessLevel !== "guest";
+  return user !== null;
 }
 
 /** Search catalog families for the picker's first step. */
