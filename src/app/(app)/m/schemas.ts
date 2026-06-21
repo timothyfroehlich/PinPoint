@@ -9,6 +9,22 @@ import { z } from "zod";
 import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 
 /**
+ * PinballMap linking fields shared by create + edit (bead B / PP-o355.2).
+ * The picker submits `pinballmapMachineId`; the "not on PinballMap" checkbox
+ * submits `pinballmapExcluded` (+ optional reason). Model metadata is NOT taken
+ * from the client — the server derives it from the catalog mirror on link.
+ */
+const pinballmapLinkFields = {
+  pinballmapMachineId: z.coerce.number().int().positive().optional(),
+  pinballmapExcluded: z.boolean().optional(),
+  pinballmapExcludedReason: z
+    .string()
+    .trim()
+    .max(200, "Reason must be less than 200 characters")
+    .optional(),
+};
+
+/**
  * Create Machine Schema
  *
  * Validates machine creation input.
@@ -30,6 +46,7 @@ export const createMachineSchema = z.object({
     .transform((val) => val.toUpperCase()),
   ownerId: z.string().uuid().optional(),
   forcePromoteUserId: z.string().uuid().optional(),
+  ...pinballmapLinkFields,
 });
 
 export type CreateMachineInput = z.infer<typeof createMachineSchema>;
@@ -51,6 +68,7 @@ export const updateMachineSchema = z.object({
   ownerId: z.string().uuid().optional(),
   presenceStatus: z.enum(VALID_MACHINE_PRESENCE_STATUSES).optional(),
   forcePromoteUserId: z.string().uuid().optional(),
+  ...pinballmapLinkFields,
 });
 
 export type UpdateMachineInput = z.infer<typeof updateMachineSchema>;

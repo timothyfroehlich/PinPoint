@@ -109,7 +109,12 @@ test.describe("Machine Timeline (PP-0x98)", () => {
         page.getByRole("heading", { name: /recent activity/i })
       ).toBeVisible();
 
-      await page.getByRole("link", { name: /view all/i }).click();
+      // Scope to the Recent activity region — the player hero also has a
+      // "View all on Service" link, so an unscoped /view all/ now matches two.
+      await page
+        .getByRole("region", { name: /recent activity/i })
+        .getByRole("link", { name: /view all/i })
+        .click();
       await page.waitForURL(new RegExp(`/m/${machineA}/timeline$`), {
         timeout: 10_000,
       });

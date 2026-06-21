@@ -16,6 +16,8 @@ import {
   invitedUsers,
 } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
+import { validatePbmLinkSelection } from "~/lib/pinballmap/linking";
+import { getCatalogEntry } from "~/lib/pinballmap/catalog";
 import { type Result, ok, err } from "~/lib/result";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
@@ -145,6 +147,142 @@ export type DeleteMachineResult = Result<
   "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
 
+/** Machine columns derived from a create/edit form's PinballMap link selection. */
+interface PbmLinkColumns {
+  pinballmapMachineId: number | null;
+  pinballmapExcluded: boolean;
+  pinballmapExcludedReason: string | null;
+  manufacturer: string | null;
+  year: number | null;
+  opdbId: string | null;
+  ipdbId: number | null;
+}
+
+type ResolvePbmLinkResult =
+  | { ok: true; columns: PbmLinkColumns }
+  | { ok: false; message: string };
+
+/**
+ * Resolve the machine's PinballMap columns from the submitted link selection.
+ *
+ * Enforces the mutual-exclusion + (flag-gated) requirement via
+ * {@link validatePbmLinkSelection}, and — crucially — derives model metadata
+ * (manufacturer/year/OPDB/IPDB) from the catalog mirror rather than trusting the
+ * client. Returns the full column set so both the create and edit inserts/updates
+ * can spread it; the submitted state is authoritative (clearing the picker
+ * unlinks, which is how re-link/unlink works).
+ */
+async function resolvePbmLinkColumns(input: {
+  pinballmapMachineId?: number | undefined;
+  pinballmapExcluded?: boolean | undefined;
+  pinballmapExcludedReason?: string | undefined;
+}): Promise<ResolvePbmLinkResult> {
+  const pinballmapMachineId = input.pinballmapMachineId ?? null;
+  const pinballmapExcluded = input.pinballmapExcluded ?? false;
+
+  const validationError = validatePbmLinkSelection({
+    pinballmapMachineId,
+    pinballmapExcluded,
+  });
+  if (validationError === "both_link_and_excluded") {
+    return {
+      ok: false,
+      message:
+        "A machine can't be both linked to PinballMap and marked as not on it.",
+    };
+  }
+  if (validationError === "link_required") {
+    return {
+      ok: false,
+      message:
+        "Select a PinballMap title or mark the machine as not on PinballMap.",
+    };
+  }
+
+  const empty: PbmLinkColumns = {
+    pinballmapMachineId: null,
+    pinballmapExcluded: false,
+    pinballmapExcludedReason: null,
+    manufacturer: null,
+    year: null,
+    opdbId: null,
+    ipdbId: null,
+  };
+
+  if (pinballmapExcluded) {
+    return {
+      ok: true,
+      columns: {
+        ...empty,
+        pinballmapExcluded: true,
+        pinballmapExcludedReason: input.pinballmapExcludedReason ?? null,
+      },
+    };
+  }
+
+  if (pinballmapMachineId !== null) {
+    const entry = await getCatalogEntry(pinballmapMachineId);
+    if (!entry) {
+      return {
+        ok: false,
+        message:
+          "That PinballMap title is no longer in the catalog — search again.",
+      };
+    }
+    return {
+      ok: true,
+      columns: {
+        ...empty,
+        pinballmapMachineId,
+        manufacturer: entry.manufacturer,
+        year: entry.year,
+        opdbId: entry.opdbId,
+        ipdbId: entry.ipdbId,
+      },
+    };
+  }
+
+  // Neither linked nor excluded (requirement off): all PBM columns stay empty.
+  return { ok: true, columns: empty };
+}
+
+/** True when the submitted form expresses any PinballMap link intent. */
+function wantsPbmLinkChange(input: {
+  pinballmapMachineId?: number | undefined;
+  pinballmapExcluded?: boolean | undefined;
+  pinballmapExcludedReason?: string | undefined;
+}): boolean {
+  return (
+    input.pinballmapMachineId !== undefined ||
+    input.pinballmapExcluded === true ||
+    input.pinballmapExcludedReason !== undefined
+  );
+}
+
+/**
+ * Pull the raw PinballMap link fields off a create/edit FormData for Zod parsing.
+ * `pinballmapMachineId` stays a string (the schema coerces it); the excluded
+ * checkbox becomes `true`/`undefined`; a blank reason becomes `undefined`.
+ */
+function readPbmLinkFormFields(formData: FormData): {
+  pinballmapMachineId: string | undefined;
+  pinballmapExcluded: boolean | undefined;
+  pinballmapExcludedReason: string | undefined;
+} {
+  const idRaw = formData.get("pinballmapMachineId");
+  const reasonRaw = formData.get("pinballmapExcludedReason");
+  return {
+    pinballmapMachineId:
+      typeof idRaw === "string" && idRaw.length > 0 ? idRaw : undefined,
+    pinballmapExcluded:
+      formData.get("pinballmapExcluded") === "on" ? true : undefined,
+    pinballmapExcludedReason:
+      typeof reasonRaw === "string" && reasonRaw.trim().length > 0
+        ? reasonRaw
+        : undefined,
+  };
+}
+
 /**
  * Create Machine Action
  *
@@ -207,6 +345,7 @@ export async function createMachineAction(
       (formData.get("forcePromoteUserId") as string).length > 0
         ? (formData.get("forcePromoteUserId") as string)
         : undefined,
+    ...readPbmLinkFormFields(formData),
   };
 
   // Validate input (CORE-SEC-002)
@@ -217,6 +356,22 @@ export async function createMachineAction(
   }
 
   const { name, initials, ownerId, forcePromoteUserId } = validation.data;
+
+  // Resolve PinballMap link columns (mutual-exclusion + catalog-derived metadata).
+  // Creators are tech/admin (machines.create), who always hold the link
+  // permission; the explicit check keeps this honest if that ever changes.
+  if (
+    wantsPbmLinkChange(validation.data) &&
+    !checkPermission("machines.pinballmap.link", accessLevel)
+  ) {
+    return err(
+      "UNAUTHORIZED",
+      "You do not have permission to link machines to PinballMap."
+    );
+  }
+  const pbm = await resolvePbmLinkColumns(validation.data);
+  if (!pbm.ok) return err("VALIDATION", pbm.message);
+  const pbmColumns = pbm.columns;
 
   // Handle forcePromoteUserId path: gate, validate, then wrap in transaction
   if (forcePromoteUserId !== undefined) {
@@ -279,6 +434,7 @@ export async function createMachineAction(
             initials,
             ownerId: machineOwnerId,
             invitedOwnerId: machineInvitedOwnerId,
+            ...pbmColumns,
           })
           .returning();
 
@@ -431,6 +587,7 @@ export async function createMachineAction(
           initials,
           ownerId: finalOwnerId,
           invitedOwnerId: finalInvitedOwnerId,
+          ...pbmColumns,
         })
         .returning();
 
@@ -543,7 +700,12 @@ export async function updateMachineAction(
       (formData.get("forcePromoteUserId") as string).length > 0
         ? (formData.get("forcePromoteUserId") as string)
         : undefined,
+    ...readPbmLinkFormFields(formData),
   };
+
+  // Only the form that renders the PBM picker carries this marker; other edit
+  // surfaces (e.g. inline field saves) omit it so they never touch link columns.
+  const pbmFormPresent = formData.get("pbmLinkPresent") === "1";
 
   const validation = updateMachineSchema.safeParse(rawData);
   if (!validation.success) {
@@ -585,6 +747,28 @@ export async function updateMachineAction(
         "UNAUTHORIZED",
         "You do not have permission to edit this machine."
       );
+    }
+
+    // Resolve PinballMap link columns when the picker is on this form. The
+    // submitted state is authoritative (clearing it unlinks), so it requires the
+    // link permission and derives metadata from the catalog mirror. When the
+    // marker is absent, link columns are left untouched.
+    let pbmColumns: PbmLinkColumns | null = null;
+    if (pbmFormPresent) {
+      if (
+        !checkPermission("machines.pinballmap.link", accessLevel, {
+          userId: user.id,
+          machineOwnerId: currentMachine.ownerId,
+        })
+      ) {
+        return err(
+          "UNAUTHORIZED",
+          "You do not have permission to link this machine to PinballMap."
+        );
+      }
+      const pbm = await resolvePbmLinkColumns(validation.data);
+      if (!pbm.ok) return err("VALIDATION", pbm.message);
+      pbmColumns = pbm.columns;
     }
 
     // Handle forcePromoteUserId path
@@ -647,6 +831,7 @@ export async function updateMachineAction(
             ...(presenceStatus !== undefined && { presenceStatus }),
             ownerId: machineOwnerId ?? null,
             invitedOwnerId: machineInvitedOwnerId ?? null,
+            ...(pbmColumns ?? {}),
           })
           .where(eq(machines.id, id))
           .returning();
@@ -833,6 +1018,7 @@ export async function updateMachineAction(
             ownerId: finalOwnerId,
             invitedOwnerId: finalInvitedOwnerId,
           }),
+          ...(pbmColumns ?? {}),
         })
         .where(eq(machines.id, id))
         .returning();

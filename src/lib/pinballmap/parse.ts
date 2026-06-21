@@ -8,6 +8,7 @@
 import type {
   CatalogMachine,
   LocationSnapshot,
+  MachineGroup,
   PbmCondition,
   PbmLmx,
 } from "./types";
@@ -107,6 +108,7 @@ function parseCatalogMachine(raw: unknown): CatalogMachine | null {
     year: asNumber(r["year"]),
     opdbId: asString(r["opdb_id"]),
     ipdbId: asNumber(r["ipdb_id"]),
+    machineGroupId: asNumber(r["machine_group_id"]),
   };
 }
 
@@ -117,4 +119,22 @@ export function parseCatalog(raw: unknown): CatalogMachine[] {
   return list
     .map(parseCatalogMachine)
     .filter((m): m is CatalogMachine => m !== null);
+}
+
+function parseMachineGroup(raw: unknown): MachineGroup | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const machineGroupId = asNumber(r["id"]);
+  const name = asString(r["name"]);
+  if (machineGroupId === null || name === null) return null;
+  return { machineGroupId, name };
+}
+
+/** machine_groups.json returns either a bare array or `{ machine_groups: [...] }`. */
+export function parseMachineGroups(raw: unknown): MachineGroup[] {
+  const r = asRecord(raw);
+  const list = r ? asArray(r["machine_groups"]) : asArray(raw);
+  return list
+    .map(parseMachineGroup)
+    .filter((g): g is MachineGroup => g !== null);
 }

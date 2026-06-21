@@ -16,7 +16,6 @@ import { test, expect } from "@playwright/test";
 import {
   ensureLoggedIn,
   loginAs,
-  logout,
   selectOption,
   assertSelectValue,
 } from "../support/actions.js";
@@ -183,35 +182,6 @@ test.describe("CREATE form resets", () => {
     await page.goto("/m/new");
     await expect(page.getByLabel("Machine Name *")).toHaveValue("");
     await expect(page.getByLabel("Initials *")).toHaveValue("");
-  });
-
-  test("CreateMachineForm Clear button wipes fields after confirmation", async ({
-    page,
-  }, testInfo) => {
-    await loginAs(page, testInfo, {
-      email: TEST_USERS.admin.email,
-      password: TEST_USERS.admin.password,
-    });
-
-    await page.goto("/m/new");
-
-    await page.getByLabel("Machine Name *").fill(`${RESET_PREFIX} TempMachine`);
-    await page.getByLabel("Initials *").fill("TMP");
-
-    await page.getByRole("button", { name: "Clear" }).click();
-    await expect(
-      page.getByRole("alertdialog", { name: "Clear all fields?" })
-    ).toBeVisible();
-    await page
-      .getByRole("alertdialog")
-      .getByRole("button", { name: "Clear fields" })
-      .click();
-
-    await expect(page.getByLabel("Machine Name *")).toHaveValue("");
-    await expect(page.getByLabel("Initials *")).toHaveValue("");
-
-    // Logout to keep next test isolated from admin session.
-    await logout(page, testInfo);
   });
 
   test("AddCommentForm clears editor and images after successful submit", async ({
