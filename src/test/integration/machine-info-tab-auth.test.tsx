@@ -47,6 +47,14 @@ const mockMachineTextFields = vi.fn(() => (
 const mockMachineDescriptionField = vi.fn(() => (
   <div data-testid="machine-description" />
 ));
+// MachineRecentActivity is an async server component; left unmocked it
+// suspends during the RTL render and prevents later siblings (the maintainer
+// tools block, which holds MachineTextFields) from rendering. This test only
+// cares about the permission props, so stub it out.
+vi.mock("~/components/machines/timeline/MachineRecentActivity", () => ({
+  MachineRecentActivity: () => <div data-testid="machine-recent-activity" />,
+}));
+
 vi.mock("~/app/(app)/m/[initials]/machine-text-fields", () => ({
   MachineTextFields: (props: {
     machineId: string;
