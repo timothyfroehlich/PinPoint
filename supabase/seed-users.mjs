@@ -13,7 +13,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import postgres from "postgres";
+import { createScriptClient } from "../scripts/lib/pg-client.mjs";
 import machinesData from "../src/test/data/machines.json" with { type: "json" };
 import usersData from "../src/test/data/users.json" with { type: "json" };
 
@@ -40,7 +40,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 // Create direct database connection for role updates and data seeding
-const sql = postgres(POSTGRES_URL);
+const sql = createScriptClient(POSTGRES_URL);
 
 /** Helper to wrap plain text in ProseMirror JSON format for JSONB columns */
 function wrapTextInProseMirror(text) {

@@ -8,20 +8,16 @@
  * that script seeds users plus machines, despite its name.
  */
 
-import postgres from "postgres";
+import {
+  createScriptClient,
+  resolveScriptDatabaseUrl,
+} from "./lib/pg-client.mjs";
 import { assertLocalDatabase } from "./assert-local-db.mjs";
 
-const databaseUrl =
-  process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-
-if (!databaseUrl) {
-  console.error("❌ POSTGRES_URL or POSTGRES_URL_NON_POOLING is not defined");
-  process.exit(1);
-}
-
+const databaseUrl = resolveScriptDatabaseUrl();
 assertLocalDatabase(databaseUrl);
 
-const client = postgres(databaseUrl);
+const client = createScriptClient(databaseUrl);
 
 async function resetToEmpty() {
   console.log("🧹 Truncating content tables (users preserved, no reseed)...");
