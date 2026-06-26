@@ -329,6 +329,9 @@ importers:
       tailwindcss:
         specifier: ^4.2.2
         version: 4.3.0
+      tsc-baseline:
+        specifier: ^1.9.0
+        version: 1.9.0
       tsx:
         specifier: ^4.21.0
         version: 4.22.4
@@ -3698,6 +3701,10 @@ packages:
   comma-separated-tokens@2.0.3:
     resolution: {integrity: sha512-Fu4hJdvzeylCfQPp9SGWidpzrMs7tTrlu6Vb8XGaRGck8QSNZJJp538Wrb60Lax4fPwR64ViY468OIUTbRlGZg==}
 
+  commander@11.0.0:
+    resolution: {integrity: sha512-9HMlXtt/BNoYr8ooyjjNRdIilOTkVJXB+GhxMTtOKwk0R4j4lS4NpjuqmRxroBfnfTSHQIHQB7wryHhXarNjmQ==}
+    engines: {node: '>=16'}
+
   commander@2.20.3:
     resolution: {integrity: sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==}
 
@@ -5164,6 +5171,10 @@ packages:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
     engines: {node: '>=0.10.0'}
 
+  object-hash@3.0.0:
+    resolution: {integrity: sha512-RSn9F68PjH9HqtltsSnqYC1XXoWe9Bju5+213R98cNGttag9q9yAOTzdbsqvIa7aNm5WffBZFpWYr2aWrklWAw==}
+    engines: {node: '>= 6'}
+
   object-inspect@1.13.4:
     resolution: {integrity: sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew==}
     engines: {node: '>= 0.4'}
@@ -6045,6 +6056,10 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  tsc-baseline@1.9.0:
+    resolution: {integrity: sha512-H4PGB4a6VpY3zauiy+C82SQXCcQrrUDzO/jqepf2e/wY1++CZKbUKjHo5oi9Dts9zTg7EzdJARYgmsPzUWcRsA==}
+    hasBin: true
 
   tsconfig-paths-webpack-plugin@4.2.0:
     resolution: {integrity: sha512-zbem3rfRS8BgeNK50Zz5SIQgXzLafiHjOwUAvk/38/o1jHn/V5QAgVUcz884or7WYcPaH3N2CIfUc2u0ul7UcA==}
@@ -9687,6 +9702,8 @@ snapshots:
 
   comma-separated-tokens@2.0.3: {}
 
+  commander@11.0.0: {}
+
   commander@2.20.3: {}
 
   commondir@1.0.1: {}
@@ -11430,6 +11447,8 @@ snapshots:
 
   object-assign@4.1.1: {}
 
+  object-hash@3.0.0: {}
+
   object-inspect@1.13.4: {}
 
   object-keys@1.1.1: {}
@@ -12493,6 +12512,11 @@ snapshots:
   ts-essentials@10.2.0(typescript@6.0.3):
     optionalDependencies:
       typescript: 6.0.3
+
+  tsc-baseline@1.9.0:
+    dependencies:
+      commander: 11.0.0
+      object-hash: 3.0.0
 
   tsconfig-paths-webpack-plugin@4.2.0:
     dependencies:

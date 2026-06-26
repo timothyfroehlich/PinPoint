@@ -1,0 +1,452 @@
+{
+  "meta": {
+    "baselineFileVersion": 1,
+    "ignoreMessages": false
+  },
+  "errors": {
+    "b415e5ab7fec0a8f4916b3debd0690774dfa2b41": {
+      "file": "e2e/global-setup.ts",
+      "code": "TS2339",
+      "count": 1,
+      "message": "Property 'code' does not exist on type 'Error'."
+    },
+    "1f5c1a3e409f28a11722697f6e53387f5401793b": {
+      "file": "src/app/(app)/issues/export-action.test.ts",
+      "code": "TS2556",
+      "count": 2,
+      "message": "A spread argument must either have a tuple type or be passed to a rest parameter."
+    },
+    "5d0dad98a7426086799f8e6cf2aab762847c4b13": {
+      "file": "src/app/(app)/issues/export-action.test.ts",
+      "code": "TS2352",
+      "count": 5,
+      "message": "Conversion of type '[]' to type '[Record<string, unknown>, unknown, unknown]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+    },
+    "b5a72af05c83d300ff5fe1219b0876af796e5a46": {
+      "file": "src/app/(app)/m/[initials]/issues-expando.test.tsx",
+      "code": "TS2352",
+      "count": 1,
+      "message": "Conversion of type '{ id: string; title: string; issueNumber: number; status: \"new\"; severity: \"minor\"; priority: \"low\"; frequency: \"intermittent\"; createdAt: Date; updatedAt: Date; reportedBy: null; assignedTo: null; closedAt: null; machineInitials: string; }' to type 'IssueCardIssue' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+    },
+    "57947199addd91546cf7c25d70336ab38c2ef7b9": {
+      "file": "src/app/(app)/report/unified-report-form.test.tsx",
+      "code": "TS2322",
+      "count": 11,
+      "message": "Type '{ machinesList: { id: string; name: string; initials: string; }[]; defaultMachineId: undefined; userAuthenticated: boolean; accessLevel: \"public\"; assignees: never[]; initialIssues: never[]; initialMachineInitials: string; }' is not assignable to type 'UnifiedReportFormProps'."
+    },
+    "0aa9db4ef3f7831a90a3c81a852f3b0aef3bc163": {
+      "file": "src/app/(app)/settings/notifications/notification-preferences-form.test.tsx",
+      "code": "TS2345",
+      "count": 1,
+      "message": "Argument of type '{ ok: true; }' is not assignable to parameter of type 'UpdatePreferencesResult'."
+    },
+    "e793829a60d505f02147b52ff194a88fb4c289c5": {
+      "file": "src/app/(auth)/forgot-password/forgot-password-form.test.tsx",
+      "code": "TS2353",
+      "count": 1,
+      "message": "Object literal may only specify known properties, and 'data' does not exist in type '{ ok: true; value: void; }'."
+    },
+    "f8da73ca95a04dd3d8075797c4a5bc1a361b78cc": {
+      "file": "src/app/(auth)/signup/signup-form.test.tsx",
+      "code": "TS2353",
+      "count": 1,
+      "message": "Object literal may only specify known properties, and 'data' does not exist in type '{ ok: true; value: { userId: string; }; }'."
+    },
+    "1a0d412fd45d208f1a7b502d9a73b7d285def3e3": {
+      "file": "src/app/api/test-data/cleanup/route.test.ts",
+      "code": "TS2540",
+      "count": 1,
+      "message": "Cannot assign to 'NODE_ENV' because it is a read-only property."
+    },
+    "5893b201affa593c810a2ea73ec871bb7835b362": {
+      "file": "src/lib/blob/cleanup.test.ts",
+      "code": "TS2352",
+      "count": 1,
+      "message": "Conversion of type 'Promise<Record<string, unknown>[]>' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+    },
+    "845b60accd9bc87b86675609da237563552d4048": {
+      "file": "src/lib/cookies/client.test.ts",
+      "code": "TS2322",
+      "count": 4,
+      "message": "Type 'Mock<Procedure | Constructable>' is not assignable to type '((v: any) => void) | undefined'."
+    },
+    "f31631a0c8d574f27334a1bc348b39bf27b97942": {
+      "file": "src/lib/issues/owner.test.ts",
+      "code": "TS2322",
+      "count": 3,
+      "message": "Type '{ id: string; name: string; owner: { id: string; name: string; } | null; invitedOwner: { id: string; name: string; } | null; }' is not assignable to type 'Pick<{ name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; nextIssueNumber: number; ownerId: string | null; invitedOwnerId: string | null; description: ProseMirrorDoc | null; ... 9 more ...; ipdbId: number | null; }, \"name\" | ... 1 more ... | \"ownerRequirements\"> & { ...; }'."
+    },
+    "391bb83eff1684f39caa6f1fa9071a29bccf4a8e": {
+      "file": "src/lib/security/turnstile.test.ts",
+      "code": "TS2540",
+      "count": 2,
+      "message": "Cannot assign to 'NODE_ENV' because it is a read-only property."
+    },
+    "d738f05c3e45b8a147991bb06df40d3fe6775f11": {
+      "file": "src/lib/supabase/middleware.test.ts",
+      "code": "TS2540",
+      "count": 1,
+      "message": "Cannot assign to 'NODE_ENV' because it is a read-only property."
+    },
+    "ac734c26f079a0383a4515d857f329c3da8b60b1": {
+      "file": "src/server/actions/images.test.ts",
+      "code": "TS2353",
+      "count": 2,
+      "message": "Object literal may only specify known properties, and 'size' does not exist in type 'PutBlobResult'."
+    },
+    "dfc7f000820bc0a4f7752524a1a7dd94822c76fe": {
+      "file": "src/test/eslint/no-side-effects-in-transaction.test.ts",
+      "code": "TS2578",
+      "count": 1,
+      "message": "Unused '@ts-expect-error' directive."
+    },
+    "d6723e9aca0dac88f242d78d0b970a75b2159908": {
+      "file": "src/test/helpers/factories.ts",
+      "code": "TS2322",
+      "count": 2,
+      "message": "Type 'string' is not assignable to type 'ProseMirrorDoc'."
+    },
+    "c0e94e7977c352f9829d9158e6fc2b31616bd4fe": {
+      "file": "src/test/integration/account-deletion.test.ts",
+      "code": "TS2769",
+      "count": 8,
+      "message": "No overload matches this call."
+    },
+    "c08bd629fe1fb0844eb28372da7d20bdea204f91": {
+      "file": "src/test/integration/account-deletion.test.ts",
+      "code": "TS2345",
+      "count": 5,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'PostgresJsDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")> & { $client: Sql<{}>; }'."
+    },
+    "77cc6beff03244fc658f8c3060c1e390610ffccc": {
+      "file": "src/test/integration/admin/discord-integration-actions.test.ts",
+      "code": "TS2345",
+      "count": 1,
+      "message": "Argument of type '(callback: (tx: unknown) => unknown) => unknown' is not assignable to parameter of type '(callback: (tx: Tx) => unknown) => unknown'."
+    },
+    "4c067ca28342d1a1ad2b05f779f5b32447d6e5f2": {
+      "file": "src/test/integration/admin/discord-integration-actions.test.ts",
+      "code": "TS2493",
+      "count": 1,
+      "message": "Tuple type '[]' of length '0' has no element at index '0'."
+    },
+    "4d4b668663af5dde4a01560925ea0dd3f04216e4": {
+      "file": "src/test/integration/admin/discord-integration-actions.test.ts",
+      "code": "TS2352",
+      "count": 1,
+      "message": "Conversion of type 'undefined' to type '{ botTokenVaultId?: string | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
+    },
+    "d5f9ffde938f24a27139e8fc8eda62208ce6eabd": {
+      "file": "src/test/integration/admin/user-management.test.ts",
+      "code": "TS2345",
+      "count": 1,
+      "message": "Argument of type '\"user\"' is not assignable to parameter of type '\"admin\" | \"technician\" | \"member\" | \"guest\"'."
+    },
+    "bb258a57b75541208dffd2dfdfebc353f0c1d2fc": {
+      "file": "src/test/integration/api/client-logs.route.test.ts",
+      "code": "TS2540",
+      "count": 6,
+      "message": "Cannot assign to 'NODE_ENV' because it is a read-only property."
+    },
+    "73fc9c6b7165b29215abceca1b1903afef6e6c04": {
+      "file": "src/test/integration/avatar-upload-action.test.ts",
+      "code": "TS2556",
+      "count": 1,
+      "message": "A spread argument must either have a tuple type or be passed to a rest parameter."
+    },
+    "10e73434396b04c6f5d359499f3c16d81d4a8fc4": {
+      "file": "src/test/integration/collections-issues-scope.test.ts",
+      "code": "TS2345",
+      "count": 2,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'PostgresJsDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>'."
+    },
+    "17d29bf834b36b6efae32a7204dada541e09b1b0": {
+      "file": "src/test/integration/collections-latest-activity.test.ts",
+      "code": "TS2345",
+      "count": 3,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
+    },
+    "7888abcd4dac4a8b5576204f3b971f83e989f5f8": {
+      "file": "src/test/integration/collections-latest-activity.test.ts",
+      "code": "TS2345",
+      "count": 3,
+      "message": "Argument of type 'string | undefined' is not assignable to parameter of type 'string'."
+    },
+    "7aadc7cb4a773ef3f0761283c4a404de55e7dc08": {
+      "file": "src/test/integration/collections-owner.test.ts",
+      "code": "TS2345",
+      "count": 4,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
+    },
+    "3852c6737173e0e0b6f7db759682ceef6aa61d7c": {
+      "file": "src/test/integration/dashboard.test.ts",
+      "code": "TS2820",
+      "count": 1,
+      "message": "Type '\"playable\"' is not assignable to type '\"cosmetic\" | \"minor\" | \"major\" | \"unplayable\" | undefined'. Did you mean '\"unplayable\"'?"
+    },
+    "5ddbe9688d462da2e96e44cfdac42ad92fd9e2e3": {
+      "file": "src/test/integration/database-queries.test.ts",
+      "code": "TS2769",
+      "count": 4,
+      "message": "No overload matches this call."
+    },
+    "bcf6e36f5420d4569cbd6161bef42fca2e12abd7": {
+      "file": "src/test/integration/database-queries.test.ts",
+      "code": "TS2345",
+      "count": 1,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
+    },
+    "769612d8245ffd8f7a133111fa599531bc52607b": {
+      "file": "src/test/integration/doodle-bug-regression.test.ts",
+      "code": "TS2345",
+      "count": 1,
+      "message": "Argument of type 'PgTransaction<PgliteQueryResultHKT, typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>>' is not assignable to parameter of type 'DbOrTx'."
+    },
+    "2a809b79daaf60ef356251072619b33d4c20db2c": {
+      "file": "src/test/integration/doodle-bug-regression.test.ts",
+      "code": "TS2345",
+      "count": 1,
+      "message": "Argument of type 'PgTransaction<PgliteQueryResultHKT, typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>>' is not assignable to parameter of type 'DbOrTx | undefined'."
+    },
+    "3f1462ae68abc5eddc4e6a5a8ed87741a4ca995e": {
+      "file": "src/test/integration/issue-comment-actions.test.ts",
+      "code": "TS2769",
+      "count": 2,
+      "message": "No overload matches this call."
+    },
+    "76c013a7c16640084dcab521d9b594c993d6079d": {
+      "file": "src/test/integration/issue-detail-permissions.test.ts",
+      "code": "TS2769",
+      "count": 1,
+      "message": "No overload matches this call."
+    },
+    "8cdec8e43e5f014fadb26b4f3c308db7b85c4592": {
+      "file": "src/test/integration/issue-services.test.ts",
+      "code": "TS2769",
+      "count": 2,
+      "message": "No overload matches this call."
+    },
+    "2882c46ab61fc59adaa451c0865682d553ff4c31": {
+      "file": "src/test/integration/machine-info-tab-auth.test.tsx",
+      "code": "TS2554",
+      "count": 1,
+      "message": "Expected 0 arguments, but got 1."
+    },
+    "5038f80ebb5402883ae35fabfaaa6657aeaf6bac": {
+      "file": "src/test/integration/machine-info-tab-auth.test.tsx",
+      "code": "TS2493",
+      "count": 5,
+      "message": "Tuple type '[]' of length '0' has no element at index '0'."
+    },
+    "989448e9234b0618b629baaffe1d8a051555c379": {
+      "file": "src/test/integration/machine-info-tab-auth.test.tsx",
+      "code": "TS18048",
+      "count": 20,
+      "message": "'props' is possibly 'undefined'."
+    },
+    "5e86a65ebeb2921e698c19cb786ea26e8b98f2b0": {
+      "file": "src/test/integration/machine-owner-promotion.test.ts",
+      "code": "TS2345",
+      "count": 1,
+      "message": "Argument of type '(callback: (tx: PgliteDatabase<typeof import(\"~/server/db/schema\")>) => Promise<unknown>) => Promise<unknown>' is not assignable to parameter of type '(transaction: (tx: PgTransaction<PgliteQueryResultHKT, typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>>) => Promis...'."
+    },
+    "d4dc47855bc13a00775c34b4be3c20866312353c": {
+      "file": "src/test/integration/machine-timeline-actions.test.ts",
+      "code": "TS2345",
+      "count": 1,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
+    },
+    "acb749c12055c11a53430f7b9444a6931205317f": {
+      "file": "src/test/integration/machine-timeline-actions.test.ts",
+      "code": "TS2345",
+      "count": 4,
+      "message": "Argument of type '{ readonly type: \"doc\"; readonly content: readonly [{ readonly type: \"paragraph\"; readonly content: readonly [{ readonly type: \"text\"; readonly text: \"x\"; }]; }]; }' is not assignable to parameter of type 'ProseMirrorDoc'."
+    },
+    "cb5fb8bf085422276969a69395a486193fbdbe5b": {
+      "file": "src/test/integration/machine-timeline-events.test.ts",
+      "code": "TS2345",
+      "count": 25,
+      "message": "Argument of type 'string | undefined' is not assignable to parameter of type 'string'."
+    },
+    "1f0937be2ace50d502ecadbad2dc286addd8abb1": {
+      "file": "src/test/integration/machine-timeline-events.test.ts",
+      "code": "TS2769",
+      "count": 4,
+      "message": "No overload matches this call."
+    },
+    "afee4bf921ee0b0290e4fe4ce4a0610aee6537c1": {
+      "file": "src/test/integration/machine-timeline-events.test.ts",
+      "code": "TS2345",
+      "count": 8,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
+    },
+    "3bc90808fb76168575f5a899084edbf635cb58b5": {
+      "file": "src/test/integration/machine-timeline-events.test.ts",
+      "code": "TS2345",
+      "count": 13,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
+    },
+    "a1bd7b7a40249533f1aa8c4dde72efe301f5124f": {
+      "file": "src/test/integration/machine-timeline-events.test.ts",
+      "code": "TS2538",
+      "count": 1,
+      "message": "Type 'undefined' cannot be used as an index type."
+    },
+    "fb4bccbb6b2c8f703e2b85e2d3ffe321966009fe": {
+      "file": "src/test/integration/machine-timeline-multi.test.ts",
+      "code": "TS2345",
+      "count": 3,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
+    },
+    "544101e04a199e246308f45a003c636c358fd829": {
+      "file": "src/test/integration/machine-timeline-permissions.test.ts",
+      "code": "TS2578",
+      "count": 1,
+      "message": "Unused '@ts-expect-error' directive."
+    },
+    "2e56d29d85f8a832573270eda0367d2ea6b56699": {
+      "file": "src/test/integration/notifications.test.ts",
+      "code": "TS2345",
+      "count": 21,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
+    },
+    "85c777f4a67916103841e41ee34931cf974bc14c": {
+      "file": "src/test/integration/profile-feed-queries.test.ts",
+      "code": "TS2322",
+      "count": 1,
+      "message": "Type '{ type: string; content: { type: string; content: { type: string; text: string; }[]; }[]; }' is not assignable to type 'ProseMirrorDoc'."
+    },
+    "a324e6d3aa0efda363963d2dfbd6b843eb415831": {
+      "file": "src/test/integration/supabase/images.test.ts",
+      "code": "TS2769",
+      "count": 4,
+      "message": "No overload matches this call."
+    },
+    "5fd033a55e655ab3bb0bfea8299f5cda0e8d8780": {
+      "file": "src/test/integration/supabase/images.test.ts",
+      "code": "TS2322",
+      "count": 1,
+      "message": "Type '{ data: { user: User; }; error: null; } | { data: { user: null; }; error: AuthError | null; }' is not assignable to type 'UserResponse'."
+    },
+    "a39ad70cc4b1e7eca8cbebc553084f6a0a001c8f": {
+      "file": "src/test/integration/supabase/images.test.ts",
+      "code": "TS2322",
+      "count": 1,
+      "message": "Type 'Promise<{ url: string; pathname: string; size: number; uploadedAt: Date; }>' is not assignable to type 'Promise<PutBlobResult>'."
+    },
+    "10f2617d50d3974e4e34fa25b5fb2a389cbe59dd": {
+      "file": "src/test/integration/supabase/images.test.ts",
+      "code": "TS2353",
+      "count": 1,
+      "message": "Object literal may only specify known properties, and 'size' does not exist in type 'PutBlobResult'."
+    },
+    "3f0e472ba5da189db1fe14805ea636a8ee605875": {
+      "file": "src/test/integration/supabase/issue-filtering.test.ts",
+      "code": "TS2345",
+      "count": 11,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'PostgresJsDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>'."
+    },
+    "d3b6ea1b2ee59598cc4ffe0928397b3f9d20a333": {
+      "file": "src/test/integration/supabase/issues.test.ts",
+      "code": "TS2769",
+      "count": 7,
+      "message": "No overload matches this call."
+    },
+    "abab087678d80a562f6a46c02f91c7cdd8d75dd5": {
+      "file": "src/test/integration/supabase/issues.test.ts",
+      "code": "TS2578",
+      "count": 1,
+      "message": "Unused '@ts-expect-error' directive."
+    },
+    "8b0953bdf2a95da0db046f94f2cdc26ff3887693": {
+      "file": "src/test/integration/supabase/machine-text-fields.test.ts",
+      "code": "TS2322",
+      "count": 7,
+      "message": "Type 'string' is not assignable to type 'SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}> | ProseMirrorDoc | null | undefined'."
+    },
+    "67ed3b5a6fb898d6ba1eee2542b4cb9094742608": {
+      "file": "src/test/integration/supabase/timeline-invited-conversion.test.ts",
+      "code": "TS2345",
+      "count": 2,
+      "message": "Argument of type 'Row' is not assignable to parameter of type 'PersonResolverInput'."
+    },
+    "d5b9748474f7c48c2a56b31c8609c634e0757511": {
+      "file": "src/test/integration/timeline-author-scope.test.ts",
+      "code": "TS2322",
+      "count": 3,
+      "message": "Type '{ type: string; content: { type: string; content: { type: string; text: string; }[]; }[]; }' is not assignable to type 'ProseMirrorDoc'."
+    },
+    "f2cbc60f1d75a1078b62e3b4e820c0f5201f2eca": {
+      "file": "src/test/integration/timeline-author-scope.test.ts",
+      "code": "TS2345",
+      "count": 3,
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
+    },
+    "1a1f1697e4b5dd7f3535aa3cad41cf74825832de": {
+      "file": "src/test/setup/cleanup.ts",
+      "code": "TS2677",
+      "count": 1,
+      "message": "A type predicate's type must be assignable to its parameter's type."
+    },
+    "54783305bbe07dacf35ac9ea7e48937db508d756": {
+      "file": "src/test/setup/cleanup.ts",
+      "code": "TS2345",
+      "count": 7,
+      "message": "Argument of type 'PgTableWithColumns<{ name: \"user_profiles\"; schema: undefined; columns: { id: PgColumn<{ name: \"id\"; tableName: \"user_profiles\"; dataType: \"string\"; columnType: \"PgUUID\"; data: string; driverParam: string; notNull: true; ... 7 more ...; generated: undefined; }, {}, {}>; ... 11 more ...; updatedAt: PgColumn<...>; }; ...' is not assignable to parameter of type 'PgTable<TableConfig>'."
+    },
+    "2b16d5e5a6f4dda6617271ee065a00fb44c71321": {
+      "file": "src/test/unit/cleanup-helper.test.ts",
+      "code": "TS2339",
+      "count": 1,
+      "message": "Property 'mock' does not exist on type '(url: string, options?: { data?: any; failOnStatusCode?: boolean | undefined; form?: FormData | { [key: string]: string | number | boolean; } | undefined; headers?: { [key: string]: string; } | undefined; ... 5 more ...; timeout?: number | undefined; } | undefined) => Promise<...>'."
+    },
+    "b3759dff81c333522b8208c5e44c3895d62015a9": {
+      "file": "src/test/unit/cleanup-order.test.ts",
+      "code": "TS2554",
+      "count": 1,
+      "message": "Expected 1 arguments, but got 2."
+    },
+    "60ff984e077b7e5c002b2c720ee35e72bc5ab8b2": {
+      "file": "src/test/unit/components/issues/issue-detail-permissions.test.tsx",
+      "code": "TS2322",
+      "count": 1,
+      "message": "Type '{ id: string; name: string; owner: { id: string; name: string; }; invitedOwner: null; }' is not assignable to type 'Pick<{ name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; nextIssueNumber: number; ownerId: string | null; invitedOwnerId: string | null; description: ProseMirrorDoc | null; ... 9 more ...; ipdbId: number | null; }, \"name\" | ... 1 more ... | \"ownerRequirements\"> & { ...; }'."
+    },
+    "984c107b96f2f04776bacdd1b666d9e7cdca183b": {
+      "file": "src/test/unit/components/issues/IssueFilters.test.tsx",
+      "code": "TS2345",
+      "count": 1,
+      "message": "Argument of type '\"fixed\" | \"new\" | \"confirmed\" | \"in_progress\" | \"need_parts\" | \"need_help\" | \"wait_owner\" | \"wont_fix\" | \"wai\" | \"no_repro\" | \"duplicate\"' is not assignable to parameter of type '\"new\" | \"confirmed\"'."
+    },
+    "0767fad5970f24593f6093e1ddec95b31205f5e5": {
+      "file": "src/test/unit/components/machines/MachineDetailHeader.test.tsx",
+      "code": "TS2719",
+      "count": 1,
+      "message": "Type '{ manufacturer: string | null; year: number | null; edition: string | null; backboxImageUrl: string | null; name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; ... 15 more ...; watchers: { ...; }[]; }' is not assignable to type '{ manufacturer: string | null; year: number | null; edition: string | null; backboxImageUrl: string | null; name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; ... 15 more ...; watchers: { ...; }[]; }'. Two different types with this name exist, but they are unrelated."
+    },
+    "c29d27cfd073ce9a31f7a0f2d6913d1d7d2609d5": {
+      "file": "src/test/unit/global-setup.test.ts",
+      "code": "TS2322",
+      "count": 1,
+      "message": "Type 'null' is not assignable to type 'number'."
+    },
+    "752b18d4984730ab7a272820284e5b8f2181ac42": {
+      "file": "src/test/unit/global-setup.test.ts",
+      "code": "TS2322",
+      "count": 1,
+      "message": "Type 'Error & { code: string; }' is not assignable to type 'null'."
+    },
+    "08ad5a90c37ffe0344268143452f81b5f28cdd48": {
+      "file": "src/test/unit/machine-actions.test.ts",
+      "code": "TS2556",
+      "count": 6,
+      "message": "A spread argument must either have a tuple type or be passed to a rest parameter."
+    },
+    "2bea5e1daa14000bfd94918b3a4fb85e58ef55ed": {
+      "file": "src/test/unit/notification-channels.test.ts",
+      "code": "TS2322",
+      "count": 1,
+      "message": "Type '{ userId: string; emailEnabled: boolean; inAppEnabled: boolean; suppressOwnActions: boolean; emailNotifyOnAssigned: boolean; inAppNotifyOnAssigned: boolean; emailNotifyOnStatusChange: boolean; ... 16 more ...; discordDmBlockedAt?: Date | ... 1 more ... | undefined; }' is not assignable to type '{ userId: string; emailEnabled: boolean; inAppEnabled: boolean; suppressOwnActions: boolean; emailNotifyOnAssigned: boolean; inAppNotifyOnAssigned: boolean; emailNotifyOnStatusChange: boolean; ... 16 more ...; discordDmBlockedAt: Date | null; }'."
+    }
+  }
+}
