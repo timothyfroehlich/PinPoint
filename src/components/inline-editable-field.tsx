@@ -17,6 +17,13 @@ export interface InlineEditSaveResult {
 interface InlineEditableFieldProps {
   /** The field label displayed above the content */
   label: string;
+  /**
+   * Visually hide the label heading (kept for accessibility — `aria-label`,
+   * placeholder fallback, and the editor's `ariaLabel` still use it). Used by
+   * the Info-tab Description, which renders as standalone prose with no
+   * "Description" heading per the player-landing redesign.
+   */
+  hideLabel?: boolean;
   /** Current value (null/undefined/empty treated as empty) */
   value: ProseMirrorDoc | null | undefined;
   /** Server action to save the updated value */
@@ -36,6 +43,7 @@ interface InlineEditableFieldProps {
 
 export function InlineEditableField({
   label,
+  hideLabel = false,
   value,
   onSave,
   machineId,
@@ -102,7 +110,13 @@ export function InlineEditableField({
 
   return (
     <div data-testid={testId} className="space-y-1.5">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <p
+        className={
+          hideLabel
+            ? "sr-only"
+            : "text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+        }
+      >
         {label}
       </p>
 

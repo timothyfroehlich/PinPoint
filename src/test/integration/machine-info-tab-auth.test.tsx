@@ -37,10 +37,24 @@ vi.mock("~/server/db", async () => {
   return { db };
 });
 
-// Mock MachineTextFields to capture props passed down
+// Mock the text-field components to capture the permission props the page
+// computes. `MachineTextFields` (owner requirements/notes) only renders when
+// the viewer is allowed to see at least one owner-private field; the
+// description renders separately via `MachineDescriptionField`.
 const mockMachineTextFields = vi.fn(() => (
   <div data-testid="machine-text-fields" />
 ));
+const mockMachineDescriptionField = vi.fn(() => (
+  <div data-testid="machine-description" />
+));
+// MachineRecentActivity is an async server component; left unmocked it
+// suspends during the RTL render and prevents later siblings (the maintainer
+// tools block, which holds MachineTextFields) from rendering. This test only
+// cares about the permission props, so stub it out.
+vi.mock("~/components/machines/timeline/MachineRecentActivity", () => ({
+  MachineRecentActivity: () => <div data-testid="machine-recent-activity" />,
+}));
+
 vi.mock("~/app/(app)/m/[initials]/machine-text-fields", () => ({
   MachineTextFields: (props: {
     machineId: string;
@@ -51,9 +65,18 @@ vi.mock("~/app/(app)/m/[initials]/machine-text-fields", () => ({
     canEditOwnerNotes: boolean;
     canViewOwnerRequirements: boolean;
     canViewOwnerNotes: boolean;
+    showDescription?: boolean;
   }) => {
     mockMachineTextFields(props);
     return <div data-testid="machine-text-fields" />;
+  },
+  MachineDescriptionField: (props: {
+    machineId: string;
+    description: string | null;
+    canEdit: boolean;
+  }) => {
+    mockMachineDescriptionField(props);
+    return <div data-testid="machine-description" />;
   },
 }));
 
@@ -80,7 +103,7 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     testMachine = machine;
   });
 
-  it("denies ownerRequirements view and ownerNotes view/edit to unauthenticated visitors", async () => {
+  it("hides all owner-private fields from unauthenticated visitors", async () => {
     // Mock no user logged in
     mockGetUser.mockResolvedValue({ data: { user: null } });
 
@@ -91,14 +114,14 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
 
     render(result);
 
-    expect(mockMachineTextFields).toHaveBeenCalled();
-    const props = mockMachineTextFields.mock.calls[0][0];
+    // Anonymous viewers can see neither requirements nor notes, so the
+    // owner-fields block is not rendered at all (privacy by omission).
+    expect(mockMachineTextFields).not.toHaveBeenCalled();
 
-    // Assert computed permissions passed to the child component
-    expect(props.canViewOwnerRequirements).toBe(false);
-    expect(props.canViewOwnerNotes).toBe(false);
-    expect(props.canEditGeneral).toBe(false);
-    expect(props.canEditOwnerNotes).toBe(false);
+    // The description still renders, read-only (cannot edit).
+    expect(mockMachineDescriptionField).toHaveBeenCalled();
+    const descProps = mockMachineDescriptionField.mock.calls[0][0];
+    expect(descProps.canEdit).toBe(false);
   });
 
   it("allows ownerRequirements view to guest, but denies ownerNotes view/edit", async () => {

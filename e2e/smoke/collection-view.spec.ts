@@ -52,7 +52,7 @@ test.describe("Collection view (PP-slrd.1)", () => {
   }) => {
     // AFM is owned by the member user (seed-users.mjs ownerMap).
     await page.goto(`/m/${seededMachines.attackFromMars.initials}`);
-    await page.getByTestId("owner-display").getByRole("link").click();
+    await page.getByTestId("machine-owner-card").getByRole("link").click();
     await expect(page).toHaveURL(/\/u\//);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
