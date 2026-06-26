@@ -32,11 +32,8 @@ const defaultProps = {
   machineId: "mach-123",
   description: mockDoc,
   ownerRequirements: mockDoc,
-  ownerNotes: mockDoc,
   canEditGeneral: true,
-  canEditOwnerNotes: true,
   canViewOwnerRequirements: true,
-  canViewOwnerNotes: true,
 };
 
 describe("MachineTextFields", () => {
@@ -61,15 +58,5 @@ describe("MachineTextFields", () => {
     expect(
       screen.queryByTestId("machine-owner-requirements")
     ).not.toBeInTheDocument();
-  });
-
-  it("renders owner notes if canViewOwnerNotes is true", () => {
-    render(<MachineTextFields {...defaultProps} canViewOwnerNotes={true} />);
-    expect(screen.getByTestId("machine-owner-notes")).toBeInTheDocument();
-  });
-
-  it("does not render owner notes if canViewOwnerNotes is false", () => {
-    render(<MachineTextFields {...defaultProps} canViewOwnerNotes={false} />);
-    expect(screen.queryByTestId("machine-owner-notes")).not.toBeInTheDocument();
   });
 });
