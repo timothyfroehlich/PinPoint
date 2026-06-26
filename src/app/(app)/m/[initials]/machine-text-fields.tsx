@@ -8,7 +8,6 @@ import {
 import {
   updateMachineDescription,
   updateMachineOwnerRequirements,
-  updateMachineOwnerNotes,
   type UpdateMachineFieldResult,
 } from "~/app/(app)/m/actions";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -32,22 +31,16 @@ interface MachineTextFieldsProps {
   machineId: string;
   description: ProseMirrorDoc | null;
   ownerRequirements: ProseMirrorDoc | null;
-  ownerNotes: ProseMirrorDoc | null;
   canEditGeneral: boolean;
-  canEditOwnerNotes: boolean;
   canViewOwnerRequirements: boolean;
-  canViewOwnerNotes: boolean;
 }
 
 export function MachineTextFields({
   machineId,
   description,
   ownerRequirements,
-  ownerNotes,
   canEditGeneral,
-  canEditOwnerNotes,
   canViewOwnerRequirements,
-  canViewOwnerNotes,
 }: MachineTextFieldsProps): React.JSX.Element {
   return (
     <div className="space-y-4">
@@ -70,18 +63,6 @@ export function MachineTextFields({
           canEdit={canEditGeneral}
           placeholder="Add owner's requirements..."
           testId="machine-owner-requirements"
-        />
-      )}
-
-      {canViewOwnerNotes && (
-        <InlineEditableField
-          label="Owner's Notes"
-          value={ownerNotes}
-          onSave={wrapAction(updateMachineOwnerNotes)}
-          machineId={machineId}
-          canEdit={canEditOwnerNotes}
-          placeholder="Add private notes (only visible to you)..."
-          testId="machine-owner-notes"
         />
       )}
     </div>

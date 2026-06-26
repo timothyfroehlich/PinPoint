@@ -9,7 +9,6 @@ import {
   FileText,
   Pencil,
   Plus,
-  StickyNote,
   UserCheck,
   UserCog,
   UserMinus,
@@ -54,10 +53,6 @@ export const MACHINE_EVENT_ICONS: Record<
   description_updated: { Icon: FileText, colorClass: "text-muted-foreground" },
   owner_requirements_updated: {
     Icon: ClipboardList,
-    colorClass: "text-muted-foreground",
-  },
-  owner_notes_updated: {
-    Icon: StickyNote,
     colorClass: "text-muted-foreground",
   },
 

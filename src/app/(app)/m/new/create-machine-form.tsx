@@ -175,7 +175,7 @@ export function CreateMachineForm({
             </p>
             <p className="text-sm text-muted-foreground">
               As a member they&apos;ll be able to edit the machine&apos;s
-              details, owner notes, and owner requirements.
+              details and owner requirements.
             </p>
             <Alert>
               <AlertDescription>

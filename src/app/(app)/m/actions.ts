@@ -61,16 +61,12 @@ import { type MachineTimelineEventKind } from "~/lib/timeline/machine-event-type
  *  `{ kind: ... }` event-data construction below assignable to the full
  *  discriminated `MachineTimelineEventData` union (TS otherwise widens
  *  to the whole 16-variant kind and demands the issue-event fields). */
-type ProseFieldEventKind = "owner_requirements_updated" | "owner_notes_updated";
+type ProseFieldEventKind = "owner_requirements_updated";
 
 const PROSE_FIELD_TO_EVENT_KIND: Partial<
-  Record<
-    "description" | "ownerRequirements" | "ownerNotes",
-    ProseFieldEventKind
-  >
+  Record<"description" | "ownerRequirements", ProseFieldEventKind>
 > = {
   ownerRequirements: "owner_requirements_updated",
-  ownerNotes: "owner_notes_updated",
 };
 
 /**
@@ -1234,28 +1230,15 @@ export async function updateMachineOwnerRequirements(
 }
 
 /**
- * Update Machine Owner Notes
- *
- * Editable by machine owner ONLY (not even admins).
- */
-export async function updateMachineOwnerNotes(
-  machineId: string,
-  value: ProseMirrorDoc | null
-): Promise<UpdateMachineFieldResult> {
-  return updateMachineTextField(machineId, value, "ownerNotes");
-}
-
-/**
  * Internal helper for updating a machine text field.
  *
  * Permission logic:
  * - description, ownerRequirements: owner + tech + admins
- * - ownerNotes: owner only (machines.edit.ownerNotes)
  */
 async function updateMachineTextField(
   machineId: string,
   value: ProseMirrorDoc | null,
-  field: "description" | "ownerRequirements" | "ownerNotes"
+  field: "description" | "ownerRequirements"
 ): Promise<UpdateMachineFieldResult> {
   // Auth check (CORE-SEC-001)
   const supabase = await createClient();
@@ -1320,16 +1303,9 @@ async function updateMachineTextField(
     const accessLevel = getAccessLevel(profile.role);
     const ctx = { userId: user.id, machineOwnerId: machine.ownerId };
 
-    // Permission check via matrix — ownerNotes uses its own permission
-    const permissionId =
-      field === "ownerNotes" ? "machines.edit.ownerNotes" : "machines.edit";
+    // Permission check via matrix
+    const permissionId = "machines.edit";
     if (!checkPermission(permissionId, accessLevel, ctx)) {
-      if (field === "ownerNotes") {
-        return err(
-          "UNAUTHORIZED",
-          "Only the machine owner can edit owner notes."
-        );
-      }
       return err(
         "UNAUTHORIZED",
         "Only the machine owner, technicians, or admins can edit this field."

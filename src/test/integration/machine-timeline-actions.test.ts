@@ -530,9 +530,9 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
     return machine;
   }
 
-  // Use the member-who-is-also-owner pattern: passes both `machines.edit`
-  // (owner condition) and `machines.edit.ownerNotes` (owner-only) so all four
-  // prose-field actions are authorized by the same test user.
+  // Use the member-who-is-also-owner pattern: passes `machines.edit`
+  // (owner condition) so the prose-field actions are authorized by the same
+  // test user.
   //
   // Only the owner-facing prose fields emit a marker timeline event. The
   // public `description` field is intentionally SILENT on edit (PP-0x98 V2
@@ -546,12 +546,6 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
         import("~/app/(app)/m/actions").then(
           (m) => m.updateMachineOwnerRequirements
         ),
-    },
-    {
-      label: "ownerNotes",
-      kind: "owner_notes_updated" as const,
-      load: () =>
-        import("~/app/(app)/m/actions").then((m) => m.updateMachineOwnerNotes),
     },
   ];
 
@@ -629,7 +623,8 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
     const owner = await makeUser("member");
     await mockAuth(owner.id);
     const machine = await makeMachine(owner.id);
-    const { updateMachineOwnerNotes } = await import("~/app/(app)/m/actions");
+    const { updateMachineOwnerRequirements } =
+      await import("~/app/(app)/m/actions");
 
     const doc = {
       type: "doc",
@@ -637,11 +632,11 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
     } as const;
 
     // First edit: sets initial value, emits one event.
-    const first = await updateMachineOwnerNotes(machine.id, doc);
+    const first = await updateMachineOwnerRequirements(machine.id, doc);
     expect(first.ok).toBe(true);
 
     // Second edit: same content, should emit NOTHING extra.
-    const second = await updateMachineOwnerNotes(machine.id, doc);
+    const second = await updateMachineOwnerRequirements(machine.id, doc);
     expect(second.ok).toBe(true);
 
     const rows = await db
@@ -650,7 +645,8 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
       .where(eq(timelineEvents.machineId, machine.id));
     const markers = rows.filter(
       (r) =>
-        (r.eventData as { kind: string } | null)?.kind === "owner_notes_updated"
+        (r.eventData as { kind: string } | null)?.kind ===
+        "owner_requirements_updated"
     );
     expect(markers).toHaveLength(1);
   });
