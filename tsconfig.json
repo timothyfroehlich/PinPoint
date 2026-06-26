@@ -20,6 +20,7 @@
     "out",
     "dist",
     ".archived_v1",
+    ".claude/worktrees/**/*",
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/*.spec.ts",
