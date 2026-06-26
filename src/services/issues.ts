@@ -707,7 +707,11 @@ export async function addIssueComment({
     //    row verbatim with an empty delivery plan — no second notification.
     if (idempotencyKey) {
       const existing = await tx.query.issueComments.findFirst({
-        where: eq(issueComments.idempotencyKey, idempotencyKey),
+        where: and(
+          eq(issueComments.idempotencyKey, idempotencyKey),
+          eq(issueComments.authorId, userId),
+          eq(issueComments.issueId, issueId)
+        ),
       });
       if (existing) {
         log.info(
@@ -741,7 +745,11 @@ export async function addIssueComment({
       // race-winner row with an empty delivery plan. (PP-e5th)
       if (idempotencyKey) {
         const winner = await tx.query.issueComments.findFirst({
-          where: eq(issueComments.idempotencyKey, idempotencyKey),
+          where: and(
+            eq(issueComments.idempotencyKey, idempotencyKey),
+            eq(issueComments.authorId, userId),
+            eq(issueComments.issueId, issueId)
+          ),
         });
         if (winner) {
           log.info(
