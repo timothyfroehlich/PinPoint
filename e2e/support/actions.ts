@@ -263,8 +263,11 @@ export async function selectOption(
     await expect(option).toBeVisible({ timeout: 5000 });
     await option.dispatchEvent("click");
   } else {
-    // Use force: true because shadcn/ui Select uses a portal where Radix Select dropdown options
-    // can be positioned outside the viewport despite being visible in the DOM
+    // Wait for the Radix Select portal to mount — options aren't in the DOM until the portal
+    // opens (async portal render), so clicking without waiting causes a 30s timeout race.
+    // force:true is still needed because shadcn/ui Select options can be positioned outside
+    // the visible viewport but are still technically "visible" per Playwright's CSS check.
+    await expect(option).toBeVisible({ timeout: 5000 });
     await option.click({ force: true });
   }
 
