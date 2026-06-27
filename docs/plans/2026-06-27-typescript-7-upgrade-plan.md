@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-27
 **Author:** Claude (investigation + empirical validation on this repo)
-**Status:** Proposal — awaiting Tim's go/no-go
+**Status:** Phase 1 implemented on this branch (typecheck gate → `tsgo`). Phases 2–4 deferred.
 **Branch:** `claude/typescript-7-upgrade-plan-o85h0g`
 
 ---
