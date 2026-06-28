@@ -105,11 +105,16 @@ test.describe("Machine Timeline (PP-0x98)", () => {
       // events plus a "View all" link into the full timeline (PP-0x98.3).
       await page.goto(`/m/${machineA}`);
 
+      const recentActivity = page.getByRole("region", {
+        name: /recent activity/i,
+      });
       await expect(
-        page.getByRole("heading", { name: /recent activity/i })
+        recentActivity.getByRole("heading", { name: /recent activity/i })
       ).toBeVisible();
 
-      await page.getByRole("link", { name: /view all/i }).click();
+      // Scope to the "Recent activity" region to avoid matching any other
+      // "View all" links that may exist elsewhere on the machine details page.
+      await recentActivity.getByRole("link", { name: /view all/i }).click();
       await page.waitForURL(new RegExp(`/m/${machineA}/timeline$`), {
         timeout: 10_000,
       });
