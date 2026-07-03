@@ -159,7 +159,7 @@
     "@types/sanitize-html": "^2.16.1",
     "@typescript-eslint/eslint-plugin": "^8.58.1",
     "@typescript-eslint/parser": "^8.58.1",
-    "@typescript/native-preview": "7.0.0-dev.20260627.2",
+    "@typescript/native-preview": "7.0.0-dev.20260702.3",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.1.4",
     "@vitest/ui": "^4.1.4",
