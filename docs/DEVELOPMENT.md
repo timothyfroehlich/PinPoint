@@ -190,7 +190,11 @@ For preview and production, we use **Automated Migrations** via Vercel build hoo
 
 Before merging a PR, the following checks must pass:
 
-- `pnpm run typecheck`: No TypeScript errors.
+- `pnpm run typecheck`: No TypeScript errors. Runs on the **Go-native compiler**
+  (`tsgo`, from `@typescript/native-preview`) — ~4–6× faster than `tsc`. ESLint and
+  `next build` still type-check on the JS-based `typescript@6` (they need the compiler
+  JS API the native build omits until TS 7.1). Use `pnpm run typecheck:tsc6` to A/B
+  against the old engine. See `docs/plans/2026-06-27-typescript-7-upgrade-plan.md`.
 - `pnpm run lint`: No ESLint errors.
 - `pnpm run format`: Code is formatted with Prettier.
 - `pnpm test`: All unit and integration tests pass.

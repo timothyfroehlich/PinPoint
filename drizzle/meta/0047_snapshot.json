@@ -1,6 +1,6 @@
 {
-  "id": "72728344-8828-4e90-adcb-962eb2a64a18",
-  "prevId": "f826e4d6-3025-4e90-a677-8c95c0d4764d",
+  "id": "7fa070cb-e880-4ca7-a1ed-0643ddf40421",
+  "prevId": "72728344-8828-4e90-adcb-962eb2a64a18",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1031,12 +1031,6 @@
         },
         "owner_requirements": {
           "name": "owner_requirements",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "owner_notes": {
-          "name": "owner_notes",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false

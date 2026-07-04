@@ -214,7 +214,7 @@ export const pinballmapCatalog = pgTable(
     // Edition lookup for a selected family.
     groupIdx: index("idx_pinballmap_catalog_group").on(t.machineGroupId),
   })
-);
+).enableRLS();
 
 /**
  * Issues Table
