@@ -330,6 +330,13 @@
       "when": 1783019078374,
       "tag": "0046_clear_bug",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1783192335376,
+      "tag": "0047_left_triton",
+      "breakpoints": true
     }
   ]
 }

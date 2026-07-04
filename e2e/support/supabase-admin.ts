@@ -344,11 +344,11 @@ export function generateUnsubscribeTokenForTest(userId: string): string {
 
 /**
  * Clear a rich-text field on a machine (sets it to null).
- * Useful for restoring ownerRequirements / ownerNotes / description after tests.
+ * Useful for restoring ownerRequirements / description after tests.
  */
 export async function clearMachineField(
   machineInitials: string,
-  field: "owner_requirements" | "owner_notes" | "description"
+  field: "owner_requirements" | "description"
 ) {
   const { error } = await supabaseAdmin
     .from("machines")

@@ -46,11 +46,8 @@ vi.mock("~/app/(app)/m/[initials]/machine-text-fields", () => ({
     machineId: string;
     description: string | null;
     ownerRequirements: string | null;
-    ownerNotes: string | null;
     canEditGeneral: boolean;
-    canEditOwnerNotes: boolean;
     canViewOwnerRequirements: boolean;
-    canViewOwnerNotes: boolean;
   }) => {
     mockMachineTextFields(props);
     return <div data-testid="machine-text-fields" />;
@@ -80,7 +77,7 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     testMachine = machine;
   });
 
-  it("denies ownerRequirements view and ownerNotes view/edit to unauthenticated visitors", async () => {
+  it("denies ownerRequirements view to unauthenticated visitors", async () => {
     // Mock no user logged in
     mockGetUser.mockResolvedValue({ data: { user: null } });
 
@@ -96,12 +93,10 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
 
     // Assert computed permissions passed to the child component
     expect(props.canViewOwnerRequirements).toBe(false);
-    expect(props.canViewOwnerNotes).toBe(false);
     expect(props.canEditGeneral).toBe(false);
-    expect(props.canEditOwnerNotes).toBe(false);
   });
 
-  it("allows ownerRequirements view to guest, but denies ownerNotes view/edit", async () => {
+  it("allows ownerRequirements view to guest", async () => {
     const db = await getTestDb();
 
     const guestId = randomUUID();
@@ -129,14 +124,12 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     expect(mockMachineTextFields).toHaveBeenCalled();
     const props = mockMachineTextFields.mock.calls[0][0];
 
-    // Guests can view requirements, but not view/edit owner notes
+    // Guests can view requirements
     expect(props.canViewOwnerRequirements).toBe(true);
-    expect(props.canViewOwnerNotes).toBe(false);
     expect(props.canEditGeneral).toBe(false);
-    expect(props.canEditOwnerNotes).toBe(false);
   });
 
-  it("allows ownerRequirements view to non-owner member, but denies ownerNotes view/edit", async () => {
+  it("allows ownerRequirements view to non-owner member", async () => {
     const db = await getTestDb();
 
     const memberId = randomUUID();
@@ -164,14 +157,12 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     expect(mockMachineTextFields).toHaveBeenCalled();
     const props = mockMachineTextFields.mock.calls[0][0];
 
-    // Non-owner member can view requirements, but not view/edit owner notes
+    // Non-owner member can view requirements
     expect(props.canViewOwnerRequirements).toBe(true);
-    expect(props.canViewOwnerNotes).toBe(false);
     expect(props.canEditGeneral).toBe(false);
-    expect(props.canEditOwnerNotes).toBe(false);
   });
 
-  it("allows ownerRequirements view AND ownerNotes view/edit to machine owner member", async () => {
+  it("allows ownerRequirements view to machine owner member", async () => {
     const db = await getTestDb();
 
     const ownerId = randomUUID();
@@ -205,14 +196,12 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     expect(mockMachineTextFields).toHaveBeenCalled();
     const props = mockMachineTextFields.mock.calls[0][0];
 
-    // Owner member has full view & edit of owner requirements and notes
+    // Owner member has full view & edit of owner requirements
     expect(props.canViewOwnerRequirements).toBe(true);
-    expect(props.canViewOwnerNotes).toBe(true);
     expect(props.canEditGeneral).toBe(true);
-    expect(props.canEditOwnerNotes).toBe(true);
   });
 
-  it("allows ownerRequirements view to admin, but denies ownerNotes view/edit if not the machine owner", async () => {
+  it("allows ownerRequirements view to admin", async () => {
     const db = await getTestDb();
 
     const adminId = randomUUID();
@@ -257,8 +246,6 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     const props = mockMachineTextFields.mock.calls[0][0];
 
     expect(props.canViewOwnerRequirements).toBe(true);
-    expect(props.canViewOwnerNotes).toBe(false);
     expect(props.canEditGeneral).toBe(true);
-    expect(props.canEditOwnerNotes).toBe(false);
   });
 });
