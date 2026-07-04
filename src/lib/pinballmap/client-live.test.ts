@@ -117,6 +117,27 @@ describe("live client — reads", () => {
       ipdbId: 6845,
     });
   });
+
+  it("fetchCatalog captures machine_group_id (null when absent)", async () => {
+    installFetchMock(() =>
+      json([
+        { id: 1, name: "Godzilla (Pro)", machine_group_id: 9001 },
+        { id: 2, name: "Medieval Madness" },
+      ])
+    );
+    const catalog = await createLiveClient().fetchCatalog();
+    expect(catalog[0]?.machineGroupId).toBe(9001);
+    expect(catalog[1]?.machineGroupId).toBeNull();
+  });
+
+  it("fetchMachineGroups hits the endpoint and parses {machine_groups}", async () => {
+    const calls = installFetchMock(() =>
+      json({ machine_groups: [{ id: 9001, name: "Godzilla" }] })
+    );
+    const groups = await createLiveClient().fetchMachineGroups();
+    expect(calls[0]?.url).toContain("/machine_groups.json");
+    expect(groups).toEqual([{ machineGroupId: 9001, name: "Godzilla" }]);
+  });
 });
 
 describe("live client — auth", () => {

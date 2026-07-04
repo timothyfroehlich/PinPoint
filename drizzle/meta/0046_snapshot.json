@@ -1,6 +1,6 @@
 {
-  "id": "f826e4d6-3025-4e90-a677-8c95c0d4764d",
-  "prevId": "c662eccf-17e1-43c9-a5b2-a56645fde893",
+  "id": "72728344-8828-4e90-adcb-962eb2a64a18",
+  "prevId": "f826e4d6-3025-4e90-a677-8c95c0d4764d",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1581,7 +1581,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.timeline_event_people": {
       "name": "timeline_event_people",

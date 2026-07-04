@@ -31,6 +31,7 @@
 17. **Accessibility floor** (CORE-A11Y-001..006): skip-to-main link, `motion-reduce:` paired with animations, `<th scope="col">` + `aria-sort` + accessible name on data tables, real `<button>` (never `<div role="button">`), `title` is not a tooltip, `inert` on background regions when a modal opens.
 18. **No side effects inside DB transactions** (CORE-ARCH-011): external/non-transactional effects (HTTP, email, Discord, blob, Vault RPC) never run inside `db.transaction` — fetch inputs before it, deliver effects after commit (`after()` + `planNotification`/`dispatchNotification`). A runtime tripwire throws `SideEffectInTransactionError` if violated. (The Doodle Bug, PP-2053.)
 19. **Respect PinballMap API conduct** (CORE-PBM-001): all PBM access goes through the `~/lib/pinballmap` client seam using the documented JSON API — one sync call/hour, store+reuse tokens (Vault), descriptive User-Agent, 429 backoff, attribution + link-back when rendering PBM data. Never crawl pinballmap.com or reach it from tests. Re-read `docs/external/pinballmap-*` before changing integration code.
+20. **Env vars: central registry + no secret coupling** (CORE-SEC-009): every production-required env var is declared in the `next.config.ts` build registry (`assertVercelDeploymentEnv`) so a missing value fails the Vercel build, not silently degrades. No secret reused as another's fallback; no secret prefixed `NEXT_PUBLIC_`. Catalog + scope matrix: `docs/ENV_VARS.md`.
 
 ### 2.2 Process rules
 
@@ -116,6 +117,10 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `ruff check && ruff format`           | Python lint/format (no venv needed)                                                                                                                                                                                              |
 | `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                          |
 | `FORCE_MEM_PRECHECK=skip <command>`   | Bypass the memory-pressure gate for one run (e.g. when you know pressure is transient or acceptable).                                                                                                                            |
+
+### Type-check engine (TS 7 migration — in progress)
+
+The `typecheck` gate runs on the **Go-native compiler** (`tsgo`, from `@typescript/native-preview`, pinned to a nightly) — ~4–6× faster than `tsc`. **ESLint type-aware linting and `next build` still type-check on `typescript@6`** — they need the JS compiler API the native build omits until TS 7.1, so `typescript@6` stays installed; do not remove it. `pnpm run typecheck:tsc6` runs the old engine for A/B comparison. This is Phase 1 of `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PR #1586) — proven 0 divergences vs `tsc 6` on `tsconfig.json`. **When TS 7.0 GA lands (~July 2026), bump the pinned nightly to the GA release.** Later phases (type-check tests/e2e, type-aware lint on the Go engine, Next native build) are deferred follow-ups.
 
 ### Prototype mode (rapid iteration)
 

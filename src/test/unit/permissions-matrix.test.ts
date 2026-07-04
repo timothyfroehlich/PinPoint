@@ -414,6 +414,18 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.edit", "admin")).toBe(true);
     });
 
+    it("should mirror machines.edit for PinballMap linking (owner/tech/admin)", () => {
+      expect(getPermission("machines.pinballmap.link", "unauthenticated")).toBe(
+        false
+      );
+      expect(getPermission("machines.pinballmap.link", "guest")).toBe(false);
+      expect(getPermission("machines.pinballmap.link", "member")).toBe("owner");
+      expect(getPermission("machines.pinballmap.link", "technician")).toBe(
+        true
+      );
+      expect(getPermission("machines.pinballmap.link", "admin")).toBe(true);
+    });
+
     it("should require authentication to watch machines", () => {
       expect(getPermission("machines.watch", "unauthenticated")).toBe(false);
       expect(getPermission("machines.watch", "guest")).toBe(true);

@@ -64,8 +64,10 @@ test.describe("Technician Role Permissions", () => {
     await page.getByLabel("Machine Name").fill("Technician Test Machine");
     await page.getByLabel("Initials").fill(initials);
 
-    // Should be able to select an owner
-    await page.getByRole("combobox").click();
+    // Should be able to select an owner. Target the owner select specifically —
+    // the create form now also has the PinballMap link picker (another
+    // role="combobox"), so a bare getByRole("combobox") is ambiguous.
+    await page.getByTestId("owner-select").click();
     await page.getByRole("option", { name: "Admin User" }).click();
 
     await page.getByRole("button", { name: "Create Machine" }).click();

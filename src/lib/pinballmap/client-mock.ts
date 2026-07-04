@@ -1,10 +1,14 @@
-import { parseCatalog, parseLocation } from "./parse";
+import "server-only";
+
+import { parseCatalog, parseLocation, parseMachineGroups } from "./parse";
 import locationFixture from "./fixtures/location-26454.json";
 import catalogFixture from "./fixtures/catalog-apc.json";
+import machineGroupsFixture from "./fixtures/machine-groups.json";
 import { APC_LOCATION_ID } from "./config";
 import type {
   CatalogMachine,
   LocationSnapshot,
+  MachineGroup,
   PbmAddMachineResult,
   PbmAuthResult,
   PbmCondition,
@@ -78,6 +82,10 @@ export function createMockClient(): PinballMapClient {
 
     fetchCatalog(): Promise<CatalogMachine[]> {
       return Promise.resolve(catalog.map((m) => ({ ...m })));
+    },
+
+    fetchMachineGroups(): Promise<MachineGroup[]> {
+      return Promise.resolve(parseMachineGroups(machineGroupsFixture));
     },
 
     authDetails(login: string, password: string): Promise<PbmAuthResult> {

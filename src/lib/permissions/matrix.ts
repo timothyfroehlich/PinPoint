@@ -396,6 +396,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "machines.pinballmap.link",
+        label: "Link machines to PinballMap",
+        description:
+          "Set or change a machine's PinballMap catalog link, or mark it as not on PinballMap",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: "owner",
+          technician: true,
+          admin: true,
+        },
+      },
+      {
         id: "machines.edit.ownerNotes",
         label: "Edit owner notes",
         description:

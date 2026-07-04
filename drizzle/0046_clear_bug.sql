@@ -1,0 +1,1 @@
+ALTER TABLE "pinballmap_catalog" ENABLE ROW LEVEL SECURITY;
