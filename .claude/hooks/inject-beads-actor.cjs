@@ -109,13 +109,20 @@ async function main() {
   // Prepend an export so attribution covers compound/piped commands.
   const modified = `export BEADS_ACTOR="${name}"; ${command}`;
 
-  // Rewrite the command WITHOUT emitting a permissionDecision: returning
-  // "allow" would short-circuit the remaining permission checks and downstream
-  // blocking hooks. We only want the input rewrite, not to change the
-  // permission posture — bd commands still flow through the normal allowlist.
+  // Emit permissionDecision: "allow" alongside updatedInput. A PreToolUse
+  // updatedInput is only applied when it rides on a permission result, and a
+  // hook produces a permission result ONLY when it emits a permissionDecision
+  // (verified against bundled Claude Code v2.1.201) — so we MUST return "allow"
+  // for the command rewrite to take effect. This matches the
+  // normalize-workspace-paths.cjs precedent. Tradeoff: "allow" auto-approves
+  // the matched bd command; that is consistent with normalize-workspace-paths,
+  // and the block-* deny hooks still fire (deny > allow), so no safety
+  // regression.
   const decision = {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
+      permissionDecision: "allow",
+      permissionDecisionReason: `Injected BEADS_ACTOR="${name}" so this agent's bd writes are attributed to it, not to Tim.`,
       updatedInput: { ...input.tool_input, command: modified },
     },
   };
