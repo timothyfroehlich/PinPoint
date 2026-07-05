@@ -25,6 +25,11 @@
           },
           {
             "type": "command",
+            "command": "node .claude/hooks/inject-beads-actor.cjs",
+            "timeout": 5000
+          },
+          {
+            "type": "command",
             "command": "node .claude/hooks/block-bad-shell-patterns.cjs",
             "timeout": 5000
           },
@@ -154,7 +159,6 @@
     "code-simplifier@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
     "security-guidance@claude-plugins-official": true,
-    "beads@beads-marketplace": true,
     "pr-review-toolkit@claude-plugins-official": true,
     "modern-web-guidance@googlechrome": true,
     "claude-md-management@claude-plugins-official": true
