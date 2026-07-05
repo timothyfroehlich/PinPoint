@@ -70,11 +70,11 @@
       "count": 4,
       "message": "Type 'Mock<Procedure | Constructable>' is not assignable to type '((v: any) => void) | undefined'."
     },
-    "f31631a0c8d574f27334a1bc348b39bf27b97942": {
+    "4d98d446e44ae35c767314576410c3c8be41a22a": {
       "file": "src/lib/issues/owner.test.ts",
       "code": "TS2322",
       "count": 3,
-      "message": "Type '{ id: string; name: string; owner: { id: string; name: string; } | null; invitedOwner: { id: string; name: string; } | null; }' is not assignable to type 'Pick<{ name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; nextIssueNumber: number; ownerId: string | null; invitedOwnerId: string | null; description: ProseMirrorDoc | null; ... 9 more ...; ipdbId: number | null; }, \"name\" | ... 1 more ... | \"ownerRequirements\"> & { ...; }'."
+      "message": "Type '{ id: string; name: string; owner: { id: string; name: string; } | null; invitedOwner: { id: string; name: string; } | null; }' is not assignable to type 'Pick<{ name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; nextIssueNumber: number; ownerId: string | null; invitedOwnerId: string | null; description: ProseMirrorDoc | null; ... 8 more ...; ipdbId: number | null; }, \"name\" | ... 1 more ... | \"ownerRequirements\"> & { ...; }'."
     },
     "391bb83eff1684f39caa6f1fa9071a29bccf4a8e": {
       "file": "src/lib/security/turnstile.test.ts",
@@ -112,11 +112,11 @@
       "count": 8,
       "message": "No overload matches this call."
     },
-    "c08bd629fe1fb0844eb28372da7d20bdea204f91": {
+    "3b3bb9bd117e7d02ba106c613c4dedd90a6b47ad": {
       "file": "src/test/integration/account-deletion.test.ts",
       "code": "TS2345",
       "count": 5,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'PostgresJsDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")> & { $client: Sql<{}>; }'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'PostgresJsDatabase<typeof import(\"./src/server/db/schema\")> & { $client: Sql<{}>; }'."
     },
     "77cc6beff03244fc658f8c3060c1e390610ffccc": {
       "file": "src/test/integration/admin/discord-integration-actions.test.ts",
@@ -154,17 +154,17 @@
       "count": 1,
       "message": "A spread argument must either have a tuple type or be passed to a rest parameter."
     },
-    "10e73434396b04c6f5d359499f3c16d81d4a8fc4": {
+    "05090a2b030174078bc02ef595827568503f2220": {
       "file": "src/test/integration/collections-issues-scope.test.ts",
       "code": "TS2345",
       "count": 2,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'PostgresJsDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'PostgresJsDatabase<typeof import(\"./src/server/db/schema\")>'."
     },
-    "17d29bf834b36b6efae32a7204dada541e09b1b0": {
+    "581d3795c752c5bcbb55bb1c84721690b0103e2f": {
       "file": "src/test/integration/collections-latest-activity.test.ts",
       "code": "TS2345",
       "count": 3,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
     "7888abcd4dac4a8b5576204f3b971f83e989f5f8": {
       "file": "src/test/integration/collections-latest-activity.test.ts",
@@ -172,11 +172,11 @@
       "count": 3,
       "message": "Argument of type 'string | undefined' is not assignable to parameter of type 'string'."
     },
-    "7aadc7cb4a773ef3f0761283c4a404de55e7dc08": {
+    "28e2c6a03607c96b58aa4b21dc08d85114dc9fd9": {
       "file": "src/test/integration/collections-owner.test.ts",
       "code": "TS2345",
       "count": 4,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
     "3852c6737173e0e0b6f7db759682ceef6aa61d7c": {
       "file": "src/test/integration/dashboard.test.ts",
@@ -190,23 +190,23 @@
       "count": 4,
       "message": "No overload matches this call."
     },
-    "bcf6e36f5420d4569cbd6161bef42fca2e12abd7": {
+    "317408be15b8b91333290553023786d454e5c093": {
       "file": "src/test/integration/database-queries.test.ts",
       "code": "TS2345",
       "count": 1,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
-    "769612d8245ffd8f7a133111fa599531bc52607b": {
+    "2670fb3d1a93b557fee93491cf2f158864fb109e": {
       "file": "src/test/integration/doodle-bug-regression.test.ts",
       "code": "TS2345",
       "count": 1,
-      "message": "Argument of type 'PgTransaction<PgliteQueryResultHKT, typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>>' is not assignable to parameter of type 'DbOrTx'."
+      "message": "Argument of type 'PgTransaction<PgliteQueryResultHKT, typeof import(\"./src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"./src/server/db/schema\")>>' is not assignable to parameter of type 'DbOrTx'."
     },
-    "2a809b79daaf60ef356251072619b33d4c20db2c": {
+    "81c139158a90aa866aba9cf2487d4ed2a9931f3f": {
       "file": "src/test/integration/doodle-bug-regression.test.ts",
       "code": "TS2345",
       "count": 1,
-      "message": "Argument of type 'PgTransaction<PgliteQueryResultHKT, typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>>' is not assignable to parameter of type 'DbOrTx | undefined'."
+      "message": "Argument of type 'PgTransaction<PgliteQueryResultHKT, typeof import(\"./src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"./src/server/db/schema\")>>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
     "3f1462ae68abc5eddc4e6a5a8ed87741a4ca995e": {
       "file": "src/test/integration/issue-comment-actions.test.ts",
@@ -241,20 +241,20 @@
     "989448e9234b0618b629baaffe1d8a051555c379": {
       "file": "src/test/integration/machine-info-tab-auth.test.tsx",
       "code": "TS18048",
-      "count": 20,
+      "count": 10,
       "message": "'props' is possibly 'undefined'."
     },
-    "5e86a65ebeb2921e698c19cb786ea26e8b98f2b0": {
+    "4168547bedd9b91208cb25ead78c9ec6d0b3b10b": {
       "file": "src/test/integration/machine-owner-promotion.test.ts",
       "code": "TS2345",
       "count": 1,
-      "message": "Argument of type '(callback: (tx: PgliteDatabase<typeof import(\"~/server/db/schema\")>) => Promise<unknown>) => Promise<unknown>' is not assignable to parameter of type '(transaction: (tx: PgTransaction<PgliteQueryResultHKT, typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>>) => Promis...'."
+      "message": "Argument of type '(callback: (tx: PgliteDatabase<typeof import(\"~/server/db/schema\")>) => Promise<unknown>) => Promise<unknown>' is not assignable to parameter of type '(transaction: (tx: PgTransaction<PgliteQueryResultHKT, typeof import(\"./src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"./src/server/db/schema\")>>) => Promise<...>...'."
     },
-    "d4dc47855bc13a00775c34b4be3c20866312353c": {
+    "739a74dc7dc2d5861a2149b75633faadbcb86da4": {
       "file": "src/test/integration/machine-timeline-actions.test.ts",
       "code": "TS2345",
       "count": 1,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
     },
     "acb749c12055c11a53430f7b9444a6931205317f": {
       "file": "src/test/integration/machine-timeline-actions.test.ts",
@@ -274,17 +274,17 @@
       "count": 4,
       "message": "No overload matches this call."
     },
-    "afee4bf921ee0b0290e4fe4ce4a0610aee6537c1": {
+    "4718b4c38e711166211c565b20ec7797b6c62aa8": {
       "file": "src/test/integration/machine-timeline-events.test.ts",
       "code": "TS2345",
       "count": 8,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
-    "3bc90808fb76168575f5a899084edbf635cb58b5": {
+    "f5ad5b00e27a411bb8d0a273190df25fbe3ca6db": {
       "file": "src/test/integration/machine-timeline-events.test.ts",
       "code": "TS2345",
       "count": 13,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
     },
     "a1bd7b7a40249533f1aa8c4dde72efe301f5124f": {
       "file": "src/test/integration/machine-timeline-events.test.ts",
@@ -292,11 +292,11 @@
       "count": 1,
       "message": "Type 'undefined' cannot be used as an index type."
     },
-    "fb4bccbb6b2c8f703e2b85e2d3ffe321966009fe": {
+    "295cdf4544a83ff5d10918090ec17491b7e80a2f": {
       "file": "src/test/integration/machine-timeline-multi.test.ts",
       "code": "TS2345",
       "count": 3,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
     },
     "544101e04a199e246308f45a003c636c358fd829": {
       "file": "src/test/integration/machine-timeline-permissions.test.ts",
@@ -304,11 +304,11 @@
       "count": 1,
       "message": "Unused '@ts-expect-error' directive."
     },
-    "2e56d29d85f8a832573270eda0367d2ea6b56699": {
+    "08d6f926adecb5d45e67ac332f6af6e8845ef206": {
       "file": "src/test/integration/notifications.test.ts",
       "code": "TS2345",
       "count": 21,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
     "85c777f4a67916103841e41ee34931cf974bc14c": {
       "file": "src/test/integration/profile-feed-queries.test.ts",
@@ -340,11 +340,11 @@
       "count": 1,
       "message": "Object literal may only specify known properties, and 'size' does not exist in type 'PutBlobResult'."
     },
-    "3f0e472ba5da189db1fe14805ea636a8ee605875": {
+    "6a8d331325851ff41f3e7c5a003925125aae1888": {
       "file": "src/test/integration/supabase/issue-filtering.test.ts",
       "code": "TS2345",
       "count": 11,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'PostgresJsDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'PostgresJsDatabase<typeof import(\"./src/server/db/schema\")>'."
     },
     "d3b6ea1b2ee59598cc4ffe0928397b3f9d20a333": {
       "file": "src/test/integration/supabase/issues.test.ts",
@@ -361,7 +361,7 @@
     "8b0953bdf2a95da0db046f94f2cdc26ff3887693": {
       "file": "src/test/integration/supabase/machine-text-fields.test.ts",
       "code": "TS2322",
-      "count": 7,
+      "count": 5,
       "message": "Type 'string' is not assignable to type 'SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}> | ProseMirrorDoc | null | undefined'."
     },
     "67ed3b5a6fb898d6ba1eee2542b4cb9094742608": {
@@ -376,11 +376,11 @@
       "count": 3,
       "message": "Type '{ type: string; content: { type: string; content: { type: string; text: string; }[]; }[]; }' is not assignable to type 'ProseMirrorDoc'."
     },
-    "f2cbc60f1d75a1078b62e3b4e820c0f5201f2eca": {
+    "d93c601d0ee326f17be220a5e704b3defd0447f0": {
       "file": "src/test/integration/timeline-author-scope.test.ts",
       "code": "TS2345",
       "count": 3,
-      "message": "Argument of type 'PgliteDatabase<typeof import(\"/Users/froeht/Code/PinPoint/.claude/worktrees/lsp-tsconfig-tests-PP-4k76/src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
+      "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
     },
     "1a1f1697e4b5dd7f3535aa3cad41cf74825832de": {
       "file": "src/test/setup/cleanup.ts",
@@ -406,11 +406,11 @@
       "count": 1,
       "message": "Expected 1 arguments, but got 2."
     },
-    "60ff984e077b7e5c002b2c720ee35e72bc5ab8b2": {
+    "b3be1c5ca7aa1ddb727ca1ce87ff06fb7995abac": {
       "file": "src/test/unit/components/issues/issue-detail-permissions.test.tsx",
       "code": "TS2322",
       "count": 1,
-      "message": "Type '{ id: string; name: string; owner: { id: string; name: string; }; invitedOwner: null; }' is not assignable to type 'Pick<{ name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; nextIssueNumber: number; ownerId: string | null; invitedOwnerId: string | null; description: ProseMirrorDoc | null; ... 9 more ...; ipdbId: number | null; }, \"name\" | ... 1 more ... | \"ownerRequirements\"> & { ...; }'."
+      "message": "Type '{ id: string; name: string; owner: { id: string; name: string; }; invitedOwner: null; }' is not assignable to type 'Pick<{ name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; nextIssueNumber: number; ownerId: string | null; invitedOwnerId: string | null; description: ProseMirrorDoc | null; ... 8 more ...; ipdbId: number | null; }, \"name\" | ... 1 more ... | \"ownerRequirements\"> & { ...; }'."
     },
     "984c107b96f2f04776bacdd1b666d9e7cdca183b": {
       "file": "src/test/unit/components/issues/IssueFilters.test.tsx",
@@ -418,11 +418,11 @@
       "count": 1,
       "message": "Argument of type '\"fixed\" | \"new\" | \"confirmed\" | \"in_progress\" | \"need_parts\" | \"need_help\" | \"wait_owner\" | \"wont_fix\" | \"wai\" | \"no_repro\" | \"duplicate\"' is not assignable to parameter of type '\"new\" | \"confirmed\"'."
     },
-    "0767fad5970f24593f6093e1ddec95b31205f5e5": {
+    "9a24373277fa0dfd3cee729a60ad3152fb43eac6": {
       "file": "src/test/unit/components/machines/MachineDetailHeader.test.tsx",
       "code": "TS2719",
       "count": 1,
-      "message": "Type '{ manufacturer: string | null; year: number | null; edition: string | null; backboxImageUrl: string | null; name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; ... 15 more ...; watchers: { ...; }[]; }' is not assignable to type '{ manufacturer: string | null; year: number | null; edition: string | null; backboxImageUrl: string | null; name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; ... 15 more ...; watchers: { ...; }[]; }'. Two different types with this name exist, but they are unrelated."
+      "message": "Type '{ manufacturer: string | null; year: number | null; edition: string | null; backboxImageUrl: string | null; name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; ... 14 more ...; watchers: { ...; }[]; }' is not assignable to type '{ manufacturer: string | null; year: number | null; edition: string | null; backboxImageUrl: string | null; name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; ... 14 more ...; watchers: { ...; }[]; }'. Two different types with this name exist, but they are unrelated."
     },
     "c29d27cfd073ce9a31f7a0f2d6913d1d7d2609d5": {
       "file": "src/test/unit/global-setup.test.ts",
