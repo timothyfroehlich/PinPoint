@@ -70,7 +70,7 @@ test.describe("Machine Settings (PP-43q3)", () => {
       viewport: { width: 1280, height: 1800 },
     });
 
-    test("creates a set, persists on Save, and survives a reload", async ({
+    test("creates a set, auto-saves, and survives a reload", async ({
       page,
     }) => {
       // The reload recompiles the route in dev mode (the E2E webServer runs
@@ -86,28 +86,32 @@ test.describe("Machine Settings (PP-43q3)", () => {
 
       // New set opens straight into edit mode with the name field focused.
       await page.getByRole("button", { name: /new set/i }).click();
-      // New sets are prepended, so the just-created (empty) set is the first
-      // "set name" field. Scoping to .first() keeps this unambiguous if a retry
-      // re-runs against a machine that already holds the previous attempt's set.
+      // New sets are prepended, so the just-created set is the first "set name"
+      // field. Scoping to .first() keeps this unambiguous if a retry re-runs
+      // against a machine that already holds the previous attempt's set.
       const nameField = page
         .getByRole("textbox", { name: /set name/i })
         .first();
       await nameField.fill(name);
-      await nameField.press("Enter"); // commit the name
+      // The set name is always-live: blurring commits it (onBlurCommit), which
+      // auto-saves the new set as a row insert — there is no explicit Save
+      // button (PP-43q3 pivoted the sets to always-live auto-save). Tab moves
+      // focus off the field to fire the blur.
+      await nameField.press("Tab");
+      await expect(nameField).toHaveValue(name);
 
-      // The header unit's Save persists the new set (name + description) as one
-      // atomic row insert (PP-43q3 per-unit commit model).
-      await page.getByRole("button", { name: /save set details/i }).click();
-      await expect(page.getByText(name)).toBeVisible({ timeout: 10_000 });
-
-      // Reload — if it's still here, it was written to the DB (not just local
-      // state). Wrapped in toPass: the dev webServer can briefly serve a stale
-      // route render right after the action's revalidate, so retry the reload
-      // until the persisted set appears. (Production renders this route
-      // dynamically, so the staleness is a dev-mode artifact.)
+      // Reload — if the set is still here, the auto-save wrote it to the DB (not
+      // just local island state). The set name renders into the always-present
+      // name input, so assert on its value. Wrapped in toPass: the dev webServer
+      // can briefly serve a stale route render right after the action's
+      // revalidate, so retry the reload until the persisted name reappears.
+      // (Production renders this route dynamically, so the staleness is a
+      // dev-mode artifact.)
       await expect(async () => {
         await page.reload();
-        await expect(page.getByText(name)).toBeVisible({ timeout: 8_000 });
+        await expect(
+          page.getByRole("textbox", { name: /set name/i }).first()
+        ).toHaveValue(name, { timeout: 8_000 });
       }).toPass({ timeout: 45_000 });
     });
 
