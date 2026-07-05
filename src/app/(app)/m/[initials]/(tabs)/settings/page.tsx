@@ -1,4 +1,5 @@
 import type React from "react";
+import type { Viewport } from "next";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
@@ -8,6 +9,22 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { SettingsTab } from "~/components/machines/settings/SettingsTab";
+
+/**
+ * Soft-keyboard resilience (PP-a0pl, scoped to this settings-heavy page).
+ *
+ * The default `interactive-widget=resizes-visual` lets the on-screen keyboard
+ * cover content: it shrinks only the *visual* viewport, so the layout doesn't
+ * move and a focused editor / the RowEditSheet inputs / the Save-Cancel row can
+ * end up hidden behind the keyboard. `resizes-content` shrinks the *layout*
+ * viewport instead, so content reflows above the keyboard. (App-wide rollout +
+ * the Playwright CI guard live in PP-a0pl.)
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content",
+};
 
 /**
  * Machine Settings Tab (/m/[initials]/settings) — PP-43q3.
