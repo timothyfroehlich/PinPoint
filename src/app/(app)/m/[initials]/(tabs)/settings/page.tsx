@@ -17,8 +17,12 @@ import { SettingsTab } from "~/components/machines/settings/SettingsTab";
  * cover content: it shrinks only the *visual* viewport, so the layout doesn't
  * move and a focused editor / the RowEditSheet inputs / the Save-Cancel row can
  * end up hidden behind the keyboard. `resizes-content` shrinks the *layout*
- * viewport instead, so content reflows above the keyboard. (App-wide rollout +
- * the Playwright CI guard live in PP-a0pl.)
+ * viewport instead, so content reflows above the keyboard.
+ *
+ * Cross-browser: honored by Chromium (Chrome/Edge/Android); iOS Safari ignores
+ * `interactive-widget` and keeps its own default focus-scroll — so this is a
+ * strict improvement on Chromium and a harmless no-op on iOS. App-wide rollout,
+ * the §19 Baseline write-up, and real-device iOS verification ride with PP-a0pl.
  */
 export const viewport: Viewport = {
   width: "device-width",

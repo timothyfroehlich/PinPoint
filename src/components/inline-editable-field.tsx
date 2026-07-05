@@ -291,7 +291,7 @@ export function InlineEditableField({
       data-testid={testId}
       className={
         headingProminent
-          ? "space-y-1.5 rounded-lg border border-outline-variant/60 border-l-[3px] border-l-primary bg-primary/[0.06] p-4"
+          ? "space-y-1.5 rounded-lg border border-outline-variant/60 border-l-[3px] border-l-primary bg-primary/5 p-4"
           : "space-y-1.5"
       }
     >
