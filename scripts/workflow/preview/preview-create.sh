@@ -155,6 +155,13 @@ PREVIEW_RESET="$PREVIEW_RESET" \
 PROD_PROJECT_REF="$SUPABASE_PROJECT_ID" \
   bash scripts/workflow/preview/preview-migrate-seed.sh
 
+# Machine-settings demo (AFM gets two showcase sets) so the Settings tab has
+# meaningful content in the preview. Reads POSTGRES_URL_NON_POOLING (the :5432
+# session pooler exported above for DDL) ?? POSTGRES_URL.
+echo "::group::Seed machine settings demo"
+node supabase/seed-machine-settings.mjs
+echo "::endgroup::"
+
 # --- Vercel wiring ----------------------------------------------------------
 # With native Supabase auto-branching disabled, Vercel does NOT receive branch
 # DB creds automatically. Two steps, in order:

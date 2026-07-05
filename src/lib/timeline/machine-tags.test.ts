@@ -13,6 +13,7 @@ describe("machine-tags", () => {
     expect([...TIMELINE_TAGS]).toEqual([
       "lifecycle",
       "issue",
+      "settings",
       "maintenance",
       "adjustment",
       "parts",
@@ -24,12 +25,15 @@ describe("machine-tags", () => {
     ]);
   });
 
-  it("DEFAULT_TIMELINE_TAGS equals the full tag list (until PP-43q3)", () => {
-    expect([...DEFAULT_TIMELINE_TAGS]).toEqual([...TIMELINE_TAGS]);
+  it("DEFAULT_TIMELINE_TAGS is the full list minus default-off `settings` (PP-43q3)", () => {
+    expect([...DEFAULT_TIMELINE_TAGS]).toEqual(
+      TIMELINE_TAGS.filter((t) => t !== "settings")
+    );
+    expect([...DEFAULT_TIMELINE_TAGS]).not.toContain("settings");
   });
 
-  it("marks lifecycle and issue as reserved", () => {
-    expect([...RESERVED_TAGS]).toEqual(["lifecycle", "issue"]);
+  it("marks lifecycle, issue, and settings as reserved", () => {
+    expect([...RESERVED_TAGS]).toEqual(["lifecycle", "issue", "settings"]);
   });
 
   it("tagSchema accepts any built-in tag", () => {
@@ -47,6 +51,7 @@ describe("machine-tags", () => {
   it("userTagSchema rejects reserved tags", () => {
     expect(() => userTagSchema.parse("lifecycle")).toThrow();
     expect(() => userTagSchema.parse("issue")).toThrow();
+    expect(() => userTagSchema.parse("settings")).toThrow();
     expect(userTagSchema.parse("maintenance")).toBe("maintenance");
     expect(userTagSchema.parse("adjustment")).toBe("adjustment");
     expect(userTagSchema.parse("parts")).toBe("parts");

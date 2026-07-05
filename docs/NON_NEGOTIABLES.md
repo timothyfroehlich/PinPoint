@@ -437,6 +437,7 @@ trigger: always_on
 - **Why:** JS viewport checks create hydration mismatches, add resize listeners, and duplicate CSS's job
 - **Do:** Use Tailwind breakpoint classes or container queries
 - **Don't:** `window.innerWidth`, `window.matchMedia`, `useMediaQuery` hooks
+- **Sanctioned exceptions** (behavior swaps CSS can't express, not styling): `use-table-responsive-columns` (PP-rs9), `use-is-mobile` (PP-43q3 — swaps inline cell editing for a bottom-sheet editor on mobile)
 
 **CORE-RESP-003:** sm: is padding only
 

@@ -45,7 +45,7 @@ opportunistically, not extended.
 - **`dark:` utility classes are forbidden.** PinPoint is dark-only; `dark:` classes are dead code. Remove them when you touch a file that still contains them.
 - **Design-layer config is the only exception.** The four color tables in [`src/lib/issues/status.ts`](../../../src/lib/issues/status.ts) (`STATUS_CONFIG`, `SEVERITY_CONFIG`, `PRIORITY_CONFIG`, `FREQUENCY_CONFIG`) and the equivalent mapping in `src/lib/machines/presence.ts` may use raw Tailwind palette classes — because the raw palette _is_ the design decision being expressed. Component code consumes the resulting class strings via `STATUS_CONFIG[status].styles`; never replicate those class strings at call sites.
 - Status colors come from `STATUS_CONFIG` / `SEVERITY_CONFIG` / `PRIORITY_CONFIG` / `FREQUENCY_CONFIG` -- never freestyle status colors in components.
-- Glow effects (`glow-primary`, `glow-secondary`) are for interactive hover states only, never static decoration. Apply `hover:glow-primary` to navigable card surfaces: machine cards (list and dashboard panels), issue cards, and interactive stat cards. Apply `hover:glow-success` to "recently fixed" machine cards where the success color already conveys status semantically. Do not apply any glow to form controls, buttons, modals, destructive actions, nav links, input fields, or dropdown triggers.
+- Glow effects (`glow-primary`, `glow-secondary`) are for interactive hover states only, never static decoration. Apply `hover:glow-primary` to navigable card surfaces: machine cards (list and dashboard panels), issue cards, and interactive stat cards. Apply `hover:glow-success` to "recently fixed" machine cards where the success color already conveys status semantically. Do not apply any glow to form controls, buttons, modals, destructive actions, nav links, input fields, or dropdown triggers. Glow is permitted **as an interactivity affordance on editable fields** — a text-glow that fades in on hover marks "you can edit this" (`glow-editable-text`, PP-43q3). This is distinct from decorative glow on arbitrary form controls, which remains banned. Editable Machine Settings fields use it via `~/components/machines/settings/affordance`.
 - Frosted glass (bg-card with opacity + `backdrop-blur-sm`) is reserved for navigation chrome.
 - **Never rely on color alone to convey semantics.** Destructive, warning, success, and status cues must ship with an accessible text label — either visible, or via `aria-label` / `sr-only`. Decorative icons that accompany the color cue should be marked `aria-hidden="true"` so screen readers receive the label, not the icon. Under deuteranopia / protanopia (combined ~8% of men), destructive-red and warning-amber collapse to similar mustard shades and are not distinguishable by hue. Concretely: `<Alert variant="destructive">` and `<Alert variant="warning">` include a leading `AlertOctagon` / `AlertTriangle` (or equivalent) as `aria-hidden` decoration plus body text that names the condition; destructive buttons carry a verb label like "Delete" (with any icon `aria-hidden`); status / severity / priority badges expose `.label` alongside their icon.
 
@@ -59,9 +59,12 @@ Pick the surface level based on the element's role:
 | Full-width content section               | `bg-surface` (#0f0f11)            |
 | Card, popover, elevated container        | `bg-card` (#18151b, fully opaque) |
 | Header, app header, tab bar (nav chrome) | `bg-card/85 backdrop-blur-sm`     |
+| Header band inside a card/section        | `bg-muted` (#27272a, opaque)      |
 | Closed/archived/dimmed item              | `bg-surface-variant/30`           |
 
 **Key distinction:** Navigation chrome gets the frosted glass treatment (opacity + blur). Content cards are always fully opaque `bg-card`.
+
+**Header band:** when a card or full-bleed section gives its header zone (title + meta) its own surface distinct from the body, use opaque `bg-muted` — the same token table `<thead>`s use. Don't brighten past ~16% white-equivalent: `text-muted-foreground` on the band drops below the 4.5:1 AA floor. Reference implementation: `SettingsSetCard`.
 
 ## 3. Shell Contract
 

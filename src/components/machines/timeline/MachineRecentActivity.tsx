@@ -10,6 +10,7 @@ import { MachineTimelineSystemRow } from "~/components/machines/timeline/Machine
 import { MachineTimelineTombstoneRow } from "~/components/machines/timeline/MachineTimelineTombstoneRow";
 import { isMachineIssueEvent } from "~/lib/timeline/machine-event-types";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
+import { DEFAULT_TIMELINE_TAGS } from "~/lib/timeline/machine-tags";
 import { db } from "~/server/db";
 
 const RECENT_LIMIT = 5;
@@ -39,6 +40,9 @@ export async function MachineRecentActivity({
 }): Promise<React.JSX.Element> {
   const rows = await getMachineTimeline(db, {
     machineId,
+    // Match the timeline's default view — settings-change events are off by
+    // default and must not leak into the Info-tab recent activity (PP-43q3).
+    tags: [...DEFAULT_TIMELINE_TAGS],
     limit: RECENT_LIMIT,
   });
 
