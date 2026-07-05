@@ -17,7 +17,7 @@
  * (admin edits any machine), and the member test user sees it read-only.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { STORAGE_STATE } from "../support/auth-state.js";
 import { seededMachines } from "../support/constants.js";
 import {
@@ -30,9 +30,45 @@ import {
 const machine = seededMachines.addamsFamily.initials;
 const PREFIX = "E2E PP-43q3";
 
+/**
+ * Open a section's kebab menu and click one of its items.
+ *
+ * Context: on a machine with no machine-wide guidance yet, the two "Before you
+ * change anything" / "How to change settings" blocks render as tall always-open
+ * editors that push the settings sets far down the page. At the default 720px
+ * test viewport a section's kebab could sit at the very bottom edge, and the
+ * Radix menu — a fixed-position portal — then opened below the fold where its
+ * items reported "outside of the viewport" and a plain click could never reach
+ * them (a fixed element can't be scrolled into view; the last section can't be
+ * scrolled up either — nothing below it). A real user is never blocked: the menu
+ * is reachable once there's room, and Radix flips it up near the viewport bottom
+ * anyway. The describe blocks give these tests a tall viewport so the whole page
+ * fits and every menu opens on-screen, which is all this needs. (PP-43q3 review
+ * casework — verified a plain menu-item click works once the trigger has room.)
+ */
+async function activateSectionMenuItem(
+  page: Page,
+  sectionLabel: string,
+  itemName: RegExp
+): Promise<void> {
+  await page
+    .getByRole("button", {
+      name: `More options for the ${sectionLabel} section`,
+    })
+    .click();
+  await page.getByRole("menuitem", { name: itemName }).click();
+}
+
 test.describe("Machine Settings (PP-43q3)", () => {
   test.describe("editor journey (admin)", () => {
-    test.use({ storageState: STORAGE_STATE.admin });
+    test.use({
+      storageState: STORAGE_STATE.admin,
+      // Tall viewport so the always-open machine-wide guidance editors can't
+      // push a set's controls or a section's kebab menu below the fold, where a
+      // fixed-position Radix menu item can't be scrolled into view for a click
+      // (PP-43q3 review casework).
+      viewport: { width: 1280, height: 1800 },
+    });
 
     test("creates a set, persists on Save, and survives a reload", async ({
       page,
@@ -50,7 +86,12 @@ test.describe("Machine Settings (PP-43q3)", () => {
 
       // New set opens straight into edit mode with the name field focused.
       await page.getByRole("button", { name: /new set/i }).click();
-      const nameField = page.getByRole("textbox", { name: /set name/i });
+      // New sets are prepended, so the just-created (empty) set is the first
+      // "set name" field. Scoping to .first() keeps this unambiguous if a retry
+      // re-runs against a machine that already holds the previous attempt's set.
+      const nameField = page
+        .getByRole("textbox", { name: /set name/i })
+        .first();
       await nameField.fill(name);
       await nameField.press("Enter"); // commit the name
 
@@ -86,7 +127,14 @@ test.describe("Machine Settings (PP-43q3)", () => {
   // island state). Each test seeds its OWN machine + set so it never touches the
   // shared AFM seed and can't cross-talk with another worker. (PP-43q3)
   test.describe("section ops persist (admin, isolated machine)", () => {
-    test.use({ storageState: STORAGE_STATE.admin });
+    test.use({
+      storageState: STORAGE_STATE.admin,
+      // Tall viewport so the always-open machine-wide guidance editors can't
+      // push a set's controls or a section's kebab menu below the fold, where a
+      // fixed-position Radix menu item can't be scrolled into view for a click
+      // (PP-43q3 review casework).
+      viewport: { width: 1280, height: 1800 },
+    });
 
     let machineId: string;
     let machineInitials: string;
@@ -139,10 +187,7 @@ test.describe("Machine Settings (PP-43q3)", () => {
       await expect(rubbersHeading).toBeVisible();
 
       // Open the Rubbers section kebab and delete it (AlertDialog confirm).
-      await page
-        .getByRole("button", { name: "More options for the Rubbers section" })
-        .click();
-      await page.getByRole("menuitem", { name: /delete section/i }).click();
+      await activateSectionMenuItem(page, "Rubbers", /delete section/i);
       // The confirm dialog names the section.
       const dialog = page.getByRole("alertdialog");
       await expect(
@@ -197,12 +242,7 @@ test.describe("Machine Settings (PP-43q3)", () => {
       ]);
 
       // Move the first section (software) down — persists immediately.
-      await page
-        .getByRole("button", {
-          name: "More options for the Software settings section",
-        })
-        .click();
-      await page.getByRole("menuitem", { name: /move down/i }).click();
+      await activateSectionMenuItem(page, "Software settings", /move down/i);
 
       // Order flipped locally.
       expect(await sectionOrder()).toEqual([
