@@ -127,6 +127,37 @@ export async function createMachineTimelineEvent(
   return row.id;
 }
 
+/** The settings-set lifecycle event kinds (PP-43q3), tagged `settings`. */
+export type SettingsSetEventKind =
+  | "settings_set_created"
+  | "settings_set_updated"
+  | "settings_set_deleted"
+  | "settings_set_preferred";
+
+/**
+ * Emit a settings-set lifecycle event under the (default-off) `settings` tag.
+ * Pass the actor and a snapshot of the set's name. Compose inside the settings
+ * action's transaction so the event and the mutation commit together.
+ */
+export async function emitSettingsSetEvent(
+  machineId: string,
+  kind: SettingsSetEventKind,
+  setName: string,
+  actorId: string,
+  tx: DbTransaction = db
+): Promise<void> {
+  await createMachineTimelineEvent(
+    machineId,
+    {
+      sourceType: "lifecycle",
+      tag: "settings",
+      eventData: { kind, setName },
+      actorId,
+    },
+    tx
+  );
+}
+
 /**
  * Insert a user-authored comment on a machine timeline.
  *

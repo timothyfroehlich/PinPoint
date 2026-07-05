@@ -51,5 +51,13 @@ export function formatMachineEvent(
       return "Description updated";
     case "owner_requirements_updated":
       return "Owner requirements updated";
+    case "settings_set_created":
+      return `Settings set "${event.setName}" created`;
+    case "settings_set_updated":
+      return `Settings set "${event.setName}" updated`;
+    case "settings_set_deleted":
+      return `Settings set "${event.setName}" removed`;
+    case "settings_set_preferred":
+      return `Marked "${event.setName}" as the preferred settings set`;
   }
 }

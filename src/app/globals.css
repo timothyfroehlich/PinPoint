@@ -110,6 +110,25 @@
     0 0 20px color-mix(in srgb, var(--color-success) 30%, transparent);
 }
 
+/* Editable-field affordance (PP-43q3): a primary-green neon text-shadow that
+   fades IN on hover, signalling "you can edit this". Desktop delight only —
+   the box+border+text carries the cue on touch (no hover). Distinct from the
+   decorative glow-* box-shadows above; this glows the VALUE TEXT to mark
+   interactivity. motion-reduce disables the transition (CORE-A11Y). */
+@utility glow-editable-text {
+  transition: text-shadow 0.3s ease;
+  @media (hover: hover) {
+    &:hover {
+      text-shadow:
+        0 0 10px color-mix(in srgb, var(--color-primary) 55%, transparent),
+        0 0 20px color-mix(in srgb, var(--color-primary) 30%, transparent);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
 /* Profile hero - dual radial gradient wash over bg-card */
 @utility profile-hero-surface {
   background-image:
@@ -153,6 +172,7 @@
   content: attr(data-placeholder);
   float: left;
   color: var(--color-muted-foreground);
+  font-style: italic;
   pointer-events: none;
   height: 0;
 }

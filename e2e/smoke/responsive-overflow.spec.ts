@@ -28,6 +28,7 @@ const authenticatedRoutes = [
   "/issues",
   "/m",
   `/m/${machineInitials}`,
+  `/m/${machineInitials}/settings`,
   `/m/${machineInitials}/maintenance`,
   `/m/${machineInitials}/timeline`,
   `/m/${machineInitials}/i/${issueNum}`,
