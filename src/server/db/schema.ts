@@ -137,7 +137,6 @@ export const machines = pgTable(
       .defaultNow(),
     description: jsonb("description").$type<ProseMirrorDoc>(),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
-    ownerNotes: jsonb("owner_notes").$type<ProseMirrorDoc>(),
     // Machine-level "Before you change anything": the owner's honor-system
     // requests for how people should handle THIS machine's settings ("ask me
     // first", "change individually — don't standard-reset", "techs only"). NOT

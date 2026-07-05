@@ -28,7 +28,6 @@ export type MachineTimelineEventData =
     }
   | { kind: "description_updated" }
   | { kind: "owner_requirements_updated" }
-  | { kind: "owner_notes_updated" }
   // === sourceType='lifecycle', tag='settings' (PP-43q3, default-off) ===
   // `setName` is an immutable snapshot of the set's name at event time (a
   // deleted set has no row to resolve from; created/updated/preferred mirror

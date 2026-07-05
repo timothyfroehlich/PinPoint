@@ -51,8 +51,6 @@ export function formatMachineEvent(
       return "Description updated";
     case "owner_requirements_updated":
       return "Owner requirements updated";
-    case "owner_notes_updated":
-      return "Owner notes updated";
     case "settings_set_created":
       return `Settings set "${event.setName}" created`;
     case "settings_set_updated":

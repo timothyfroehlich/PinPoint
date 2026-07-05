@@ -216,7 +216,6 @@ describe("updateMachineAction", () => {
 // Permission matrix for reference:
 //   machines.edit: unauthenticated=false, guest=false, member="owner",
 //                  technician=true, admin=true
-//   machines.edit.ownerNotes: all roles = "owner" (owner-only, even for admins)
 //
 // Blocks 4–11 and 13–14 have been RECLASS'd to machine-owner-promotion.test.ts
 // (Wave 3 RECLASS, PP-x4li.1.3). Only pre-permission gate tests remain here:

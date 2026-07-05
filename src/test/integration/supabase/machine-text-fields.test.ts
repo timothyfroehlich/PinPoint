@@ -1,7 +1,7 @@
 /**
  * Integration Tests for Machine Text Fields
  *
- * Tests the text fields (description, ownerRequirements, ownerNotes)
+ * Tests the text fields (description, ownerRequirements)
  * on the machines table.
  */
 
@@ -55,7 +55,6 @@ describe("Machine Text Fields (PGlite)", () => {
       expect(machine).toBeDefined();
       expect(machine?.description).toBeNull();
       expect(machine?.ownerRequirements).toBeNull();
-      expect(machine?.ownerNotes).toBeNull();
     });
 
     it("should update description field", async () => {
@@ -88,21 +87,6 @@ describe("Machine Text Fields (PGlite)", () => {
       expect(updated?.ownerRequirements).toBe("Please use soft plunge only");
     });
 
-    it("should update ownerNotes field", async () => {
-      const db = await getTestDb();
-
-      await db
-        .update(machines)
-        .set({ ownerNotes: "Left flipper coil replaced 2024-01-15" })
-        .where(eq(machines.id, testMachine.id));
-
-      const updated = await db.query.machines.findFirst({
-        where: eq(machines.id, testMachine.id),
-      });
-
-      expect(updated?.ownerNotes).toBe("Left flipper coil replaced 2024-01-15");
-    });
-
     it("should update all text fields simultaneously", async () => {
       const db = await getTestDb();
 
@@ -111,7 +95,6 @@ describe("Machine Text Fields (PGlite)", () => {
         .set({
           description: "Desc",
           ownerRequirements: "Requirements",
-          ownerNotes: "Notes",
         })
         .where(eq(machines.id, testMachine.id));
 
@@ -121,7 +104,6 @@ describe("Machine Text Fields (PGlite)", () => {
 
       expect(updated?.description).toBe("Desc");
       expect(updated?.ownerRequirements).toBe("Requirements");
-      expect(updated?.ownerNotes).toBe("Notes");
     });
 
     it("should allow clearing a text field by setting to null", async () => {

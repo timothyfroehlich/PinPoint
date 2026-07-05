@@ -9,8 +9,8 @@
  * and design reviews. Also sprinkles in a few user comments with mixed
  * authors.
  *
- * Idempotent: bails if AFM already has an `owner_notes_updated` row (which
- * the demo is the only source of in seed data).
+ * Idempotent: bails if AFM already has an `owner_requirements_updated` row
+ * (which the demo is the only source of in seed data).
  *
  * NEVER run on prod. The script refuses to run unless POSTGRES_URL points
  * at a localhost/127.0.0.1 host.
@@ -43,15 +43,15 @@ async function run() {
       return;
     }
 
-    // Idempotency sentinel: `owner_notes_updated` is unique to the demo seed
-    // on AFM (the backfill script doesn't emit it). Previously this used
+    // Idempotency sentinel: `owner_requirements_updated` is unique to the demo
+    // seed on AFM (the backfill script doesn't emit it). Previously this used
     // `description_updated`, but that event was dropped from the demo as
     // part of the V2 design pass.
     const existing = await sql`
       SELECT count(*)::int AS cnt
       FROM timeline_events
       WHERE machine_id = ${afm.id}
-        AND event_data->>'kind' = 'owner_notes_updated'
+        AND event_data->>'kind' = 'owner_requirements_updated'
     `;
     if ((existing[0]?.cnt ?? 0) > 0) {
       console.log("ℹ️  AFM demo already seeded; skipping.");
@@ -235,7 +235,6 @@ async function run() {
       );
     }
     events.push(lifecycle({ kind: "owner_requirements_updated" }));
-    events.push(lifecycle({ kind: "owner_notes_updated" }));
 
     // -- A week ago --
     skipToDaysAgo(7);
