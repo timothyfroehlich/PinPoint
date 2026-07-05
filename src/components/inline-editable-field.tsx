@@ -74,13 +74,20 @@ interface InlineEditableFieldProps {
    */
   openWhenEmpty?: boolean;
   /**
-   * When true, the heading renders as a prominent section title (matching the
-   * "Game settings" heading on the Settings tab — `text-sm font-medium
-   * text-foreground`) rather than the default tiny uppercase muted field-label
-   * style. PP-8a5r: the two machine-level Settings sections are real section
-   * headings, not field labels. Defaults to false.
+   * When true, the field renders as a tinted callout box with a left primary
+   * accent, and its heading becomes a real section title (`text-sm font-bold`
+   * with an optional leading `icon`) rather than the default tiny uppercase
+   * muted field-label style. PP-8a5r: the two machine-level Settings sections
+   * are real section callouts, not field labels. Defaults to false; only the
+   * two machine-wide Settings-tab blocks pass it.
    */
   headingProminent?: boolean;
+  /**
+   * Optional leading icon rendered before the heading text. Only shown in the
+   * `headingProminent` callout mode. Callers pass a sized, `aria-hidden` lucide
+   * icon (e.g. `<Info className="size-4 shrink-0 text-primary" aria-hidden />`).
+   */
+  icon?: React.ReactNode;
   /**
    * Notified whenever this field's draft becomes dirty / clean. These always-
    * open machine-level fields hold their draft HERE (not in the parent's per-
@@ -101,6 +108,7 @@ export function InlineEditableField({
   presets,
   openWhenEmpty = false,
   headingProminent = false,
+  icon,
   onDirtyChange,
 }: InlineEditableFieldProps): React.JSX.Element | null {
   // `isEditing` only tracks an EXPLICIT edit opened from the filled state (the
@@ -279,19 +287,28 @@ export function InlineEditableField({
   }
 
   return (
-    <div data-testid={testId} className="space-y-1.5">
+    <div
+      data-testid={testId}
+      className={
+        headingProminent
+          ? "space-y-1.5 rounded-lg border border-outline-variant/60 border-l-[3px] border-l-primary bg-primary/[0.06] p-4"
+          : "space-y-1.5"
+      }
+    >
       {/* The heading always renders for a permitted user (the empty state is an
           open box, so there's always something below it) and for anyone viewing
           filled content; the only no-heading case is empty + viewer, handled by
           the early return above. `headingProminent` swaps the tiny uppercase
-          field-label style for a real section title matching "Game settings". */}
+          field-label style for a 14px bold section title with an optional
+          leading icon (the machine-wide callout blocks). */}
       <p
         className={
           headingProminent
-            ? "text-base font-semibold text-foreground"
+            ? "flex items-center gap-2 text-sm font-bold text-foreground"
             : "text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
         }
       >
+        {headingProminent && icon}
         {label}
       </p>
 

@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Info, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Button } from "~/components/ui/button";
@@ -1038,50 +1038,56 @@ export function SettingsTab({
         }}
       />
 
-      {/* SECTION 1 — the owner's requests ("Before you change anything"). */}
-      <InlineEditableField
-        label="Before you change anything"
-        value={settingsRequests}
-        machineId={machineId}
-        canEdit={canEdit}
-        placeholder="How would you like people to handle your machine's settings — who to ask, how to make changes, anything to avoid? Even one sentence protects the setup you've dialed in."
-        testId="machine-settings-requests"
-        openWhenEmpty
-        headingProminent
-        onDirtyChange={onRequestsDirty}
-        onSave={async (id, value) => {
-          const result = await updateMachineSettingsRequestsAction({
-            machineId: id,
-            value,
-          });
-          return result.success
-            ? { ok: true }
-            : { ok: false, message: result.error };
-        }}
-      />
+      {/* The two machine-wide guidance callouts. Their own 14px (gap-3.5)
+          inter-block gap is independent of the page-level space-y-4 rhythm. */}
+      <div className="flex flex-col gap-3.5">
+        {/* SECTION 1 — the owner's requests ("Before you change anything"). */}
+        <InlineEditableField
+          label="Before you change anything"
+          value={settingsRequests}
+          machineId={machineId}
+          canEdit={canEdit}
+          icon={<Info className="size-4 shrink-0 text-primary" aria-hidden />}
+          placeholder="How would you like people to handle your machine's settings — who to ask, how to make changes, anything to avoid? Even one sentence protects the setup you've dialed in."
+          testId="machine-settings-requests"
+          openWhenEmpty
+          headingProminent
+          onDirtyChange={onRequestsDirty}
+          onSave={async (id, value) => {
+            const result = await updateMachineSettingsRequestsAction({
+              machineId: id,
+              value,
+            });
+            return result.success
+              ? { ok: true }
+              : { ok: false, message: result.error };
+          }}
+        />
 
-      {/* SECTION 2 — machine-level access instructions ("How to change settings"). */}
-      <InlineEditableField
-        label="How to change settings"
-        value={settingsInstructions}
-        machineId={machineId}
-        canEdit={canEdit}
-        placeholder="How to change the settings on this machine — menus, button meanings, where the DIP switches are. Or start from a preset above."
-        testId="machine-settings-instructions"
-        presets={SETTINGS_INSTRUCTIONS_PRESETS}
-        openWhenEmpty
-        headingProminent
-        onDirtyChange={onInstructionsDirty}
-        onSave={async (id, value) => {
-          const result = await updateMachineSettingsInstructionsAction({
-            machineId: id,
-            value,
-          });
-          return result.success
-            ? { ok: true }
-            : { ok: false, message: result.error };
-        }}
-      />
+        {/* SECTION 2 — machine-level access instructions ("How to change settings"). */}
+        <InlineEditableField
+          label="How to change settings"
+          value={settingsInstructions}
+          machineId={machineId}
+          canEdit={canEdit}
+          icon={<Wrench className="size-4 shrink-0 text-primary" aria-hidden />}
+          placeholder="How to change the settings on this machine — menus, button meanings, where the DIP switches are. Or start from a preset above."
+          testId="machine-settings-instructions"
+          presets={SETTINGS_INSTRUCTIONS_PRESETS}
+          openWhenEmpty
+          headingProminent
+          onDirtyChange={onInstructionsDirty}
+          onSave={async (id, value) => {
+            const result = await updateMachineSettingsInstructionsAction({
+              machineId: id,
+              value,
+            });
+            return result.success
+              ? { ok: true }
+              : { ok: false, message: result.error };
+          }}
+        />
+      </div>
 
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-foreground">
