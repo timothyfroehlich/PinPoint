@@ -40,6 +40,7 @@
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md` and `.agents/rules/AGY.md`. (PP-46z, PP-bg45.)
 6. **Never `--no-verify`**, never `gh pr merge`, never wildcard tool permissions — without explicit user approval each time.
+7. **Beads: `team-maintainer` policy** (not the conservative default).
 
 ## 3. Agent Skills
 
@@ -193,7 +194,6 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 - **Polish before shipping — no "fast follow."** Get a change genuinely good before it merges; don't ship something rough on the promise of a later cleanup PR. There is no fast-follow culture here.
 - **Slice large work into smaller _complete_ features.** When something is too big to polish in one pass, split it into smaller features that each ship finished — not one big half-done change followed by patch-up PRs. Smaller-but-complete beats larger-but-rough.
-- **One bead = one PR.** A bead is a unit of shippable work that maps to a single PR. File a bead only for genuinely separate work that will become its own PR — a real follow-up, a discovered out-of-scope problem, or future work. Conversely, don't create slivers: if a task is too small to justify its own session/PR overhead, fold it into a related bead or add it to an existing unstarted bead where it fits.
 
 ## 7. Deployment
 
@@ -256,7 +256,7 @@ Work isn't done at "git push" — it's done when the change is **merged, deploye
 1. **Before you push:** `pnpm run check` is the floor (types, lint, format, unit). Run `pnpm run preflight` for non-trivial changes — migrations, security/auth, server actions, middleware, DB schema. Don't run the full E2E suite locally; CI owns it.
 2. **Push and open the PR ready-for-review** (draft only while iterating — see "Working style"). Sync with main by **merge, never rebase**; `git status` must show "up to date with origin".
 3. **Lean on CI for the full E2E suite** — don't run `e2e:full` locally; CI owns it once the PR is up. Do run **selected specs locally** while writing them or iterating on a feature they touch (`pnpm exec playwright test <spec> --project=chromium`).
-4. **The bead stays open until the PR merges.** Opening the PR does NOT close it — the bead stays `in_progress`, closed only after merge (`bd close <id> --reason="PR #N merged"`). Merge via `scripts/workflow/merge-pr.sh <PR>` — never `gh pr merge` or MCP merge directly.
+4. **Merge via `scripts/workflow/merge-pr.sh <PR>`** — never `gh pr merge` or MCP merge directly. (Bead close timing follows beads' defaults; there's no fixed at-merge rule.)
 5. **After merge, watch the deployment.** Don't walk away at merge — watch the production deploy land and confirm no build, migration, or runtime errors. A merge that breaks prod isn't done.
 6. **Cleanup — non-destructive now, destructive on confirmation.** Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
 7. **Hand off** for the next session, and post to the huddle daily bead if other sessions need to know what landed.
