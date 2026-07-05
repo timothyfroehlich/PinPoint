@@ -90,8 +90,5 @@ describe("formatMachineEvent", () => {
     expect(formatMachineEvent({ kind: "owner_requirements_updated" }, {})).toBe(
       "Owner requirements updated"
     );
-    expect(formatMachineEvent({ kind: "owner_notes_updated" }, {})).toBe(
-      "Owner notes updated"
-    );
   });
 });

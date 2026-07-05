@@ -1,3 +1,5 @@
+import "server-only";
+
 import { parseCatalog, parseLocation, parseMachineGroups } from "./parse";
 import locationFixture from "./fixtures/location-26454.json";
 import catalogFixture from "./fixtures/catalog-apc.json";

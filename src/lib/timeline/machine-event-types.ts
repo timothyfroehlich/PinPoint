@@ -28,7 +28,6 @@ export type MachineTimelineEventData =
     }
   | { kind: "description_updated" }
   | { kind: "owner_requirements_updated" }
-  | { kind: "owner_notes_updated" }
   // === sourceType='issue' (duplicate-written from issue actions) ===
   | {
       kind: "issue_opened";

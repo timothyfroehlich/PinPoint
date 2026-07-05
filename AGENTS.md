@@ -30,6 +30,7 @@
 17. **Accessibility floor** (CORE-A11Y-001..006): skip-to-main link, `motion-reduce:` paired with animations, `<th scope="col">` + `aria-sort` + accessible name on data tables, real `<button>` (never `<div role="button">`), `title` is not a tooltip, `inert` on background regions when a modal opens.
 18. **No side effects inside DB transactions** (CORE-ARCH-011): external/non-transactional effects (HTTP, email, Discord, blob, Vault RPC) never run inside `db.transaction` — fetch inputs before it, deliver effects after commit (`after()` + `planNotification`/`dispatchNotification`). A runtime tripwire throws `SideEffectInTransactionError` if violated. (The Doodle Bug, PP-2053.)
 19. **Respect PinballMap API conduct** (CORE-PBM-001): all PBM access goes through the `~/lib/pinballmap` client seam using the documented JSON API — one sync call/hour, store+reuse tokens (Vault), descriptive User-Agent, 429 backoff, attribution + link-back when rendering PBM data. Never crawl pinballmap.com or reach it from tests. Re-read `docs/external/pinballmap-*` before changing integration code.
+20. **Env vars: central registry + no secret coupling** (CORE-SEC-009): every production-required env var is declared in the `next.config.ts` build registry (`assertVercelDeploymentEnv`) so a missing value fails the Vercel build, not silently degrades. No secret reused as another's fallback; no secret prefixed `NEXT_PUBLIC_`. Catalog + scope matrix: `docs/ENV_VARS.md`.
 
 ### 2.2 Process rules
 
@@ -39,6 +40,7 @@
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md` and `.agents/rules/AGY.md`. (PP-46z, PP-bg45.)
 6. **Never `--no-verify`**, never `gh pr merge`, never wildcard tool permissions — without explicit user approval each time.
+7. **Beads: `team-maintainer` policy** (not the conservative default).
 
 ## 3. Agent Skills
 
@@ -116,6 +118,10 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                          |
 | `FORCE_MEM_PRECHECK=skip <command>`   | Bypass the memory-pressure gate for one run (e.g. when you know pressure is transient or acceptable).                                                                                                                            |
 
+### Type-check engine (TS 7 migration — in progress)
+
+The `typecheck` gate runs on the **Go-native compiler** (`tsgo`, from `@typescript/native-preview`, pinned to a nightly) — ~4–6× faster than `tsc`. **ESLint type-aware linting and `next build` still type-check on `typescript@6`** — they need the JS compiler API the native build omits until TS 7.1, so `typescript@6` stays installed; do not remove it. `pnpm run typecheck:tsc6` runs the old engine for A/B comparison. This is Phase 1 of `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PR #1586) — proven 0 divergences vs `tsc 6` on `tsconfig.json`. **When TS 7.0 GA lands (~July 2026), bump the pinned nightly to the GA release.** Later phases (type-check tests/e2e, type-aware lint on the Go engine, Next native build) are deferred follow-ups.
+
 ### Prototype mode (rapid iteration)
 
 When the user explicitly asks for "prototype mode" / "rapid iteration" / "just explore" **for UI/UX work**, load the `pinpoint-prototype-mode` skill and enter it. It's scoped to **presentation only** — layout, components, styling, page structure, interaction/flow — and explicitly **not** for backend/internal work (data layer, server-action logic, auth, permissions, migrations), which keep full rigor; stub data rather than building it. Within that scope it relaxes the §2 rigor (skip preflight/tests before showing work, defer lint/type fixes, defer coverage and DRY) while logging every skipped item to a `.prototype-mode` debt ledger. It changes **agent behavior only** — pre-commit and `preflight` hooks still run on any real commit, which is fine because prototype work stays local and uncommitted. Never self-elect into it; full rigor is the default. A `UserPromptSubmit`/`SessionStart` hook reminds the agent while the marker exists, so the mode survives compaction. Exit on "exit prototype mode" / "make this real" — then repay the ledger.
@@ -188,7 +194,6 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 - **Polish before shipping — no "fast follow."** Get a change genuinely good before it merges; don't ship something rough on the promise of a later cleanup PR. There is no fast-follow culture here.
 - **Slice large work into smaller _complete_ features.** When something is too big to polish in one pass, split it into smaller features that each ship finished — not one big half-done change followed by patch-up PRs. Smaller-but-complete beats larger-but-rough.
-- **One bead = one PR.** A bead is a unit of shippable work that maps to a single PR. File a bead only for genuinely separate work that will become its own PR — a real follow-up, a discovered out-of-scope problem, or future work. Conversely, don't create slivers: if a task is too small to justify its own session/PR overhead, fold it into a related bead or add it to an existing unstarted bead where it fits.
 
 ## 7. Deployment
 
@@ -251,7 +256,7 @@ Work isn't done at "git push" — it's done when the change is **merged, deploye
 1. **Before you push:** `pnpm run check` is the floor (types, lint, format, unit). Run `pnpm run preflight` for non-trivial changes — migrations, security/auth, server actions, middleware, DB schema. Don't run the full E2E suite locally; CI owns it.
 2. **Push and open the PR ready-for-review** (draft only while iterating — see "Working style"). Sync with main by **merge, never rebase**; `git status` must show "up to date with origin".
 3. **Lean on CI for the full E2E suite** — don't run `e2e:full` locally; CI owns it once the PR is up. Do run **selected specs locally** while writing them or iterating on a feature they touch (`pnpm exec playwright test <spec> --project=chromium`).
-4. **The bead stays open until the PR merges.** Opening the PR does NOT close it — the bead stays `in_progress`, closed only after merge (`bd close <id> --reason="PR #N merged"`). Merge via `scripts/workflow/merge-pr.sh <PR>` — never `gh pr merge` or MCP merge directly.
+4. **Merge via `scripts/workflow/merge-pr.sh <PR>`** — never `gh pr merge` or MCP merge directly. (Bead close timing follows beads' defaults; there's no fixed at-merge rule.)
 5. **After merge, watch the deployment.** Don't walk away at merge — watch the production deploy land and confirm no build, migration, or runtime errors. A merge that breaks prod isn't done.
 6. **Cleanup — non-destructive now, destructive on confirmation.** Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
 7. **Hand off** for the next session, and post to the huddle daily bead if other sessions need to know what landed.

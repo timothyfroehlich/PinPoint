@@ -136,7 +136,6 @@ export const machines = pgTable(
       .defaultNow(),
     description: jsonb("description").$type<ProseMirrorDoc>(),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
-    ownerNotes: jsonb("owner_notes").$type<ProseMirrorDoc>(),
     presenceStatus: text("presence_status", {
       enum: [
         "on_the_floor",
@@ -215,7 +214,7 @@ export const pinballmapCatalog = pgTable(
     // Edition lookup for a selected family.
     groupIdx: index("idx_pinballmap_catalog_group").on(t.machineGroupId),
   })
-);
+).enableRLS();
 
 /**
  * Issues Table

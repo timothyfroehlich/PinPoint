@@ -190,12 +190,9 @@ describe("requiresOwnershipCheck", () => {
 
 describe("Permission hierarchy", () => {
   // Permissions where admin intentionally does NOT escalate beyond technician.
-  // - ownerNotes: privacy-scoped to machine owner, even admins can't see/edit
   // - comments.edit/delete: all roles are "own" only; admin deleting others'
   //   comments is handled by the separate "comments.delete.any" permission
   const noAdminEscalation = new Set([
-    "machines.edit.ownerNotes",
-    "machines.view.ownerNotes",
     "comments.edit",
     "comments.delete",
     // Editing a machine-timeline comment is author-only at every level
@@ -429,30 +426,6 @@ describe("Specific permission rules from design", () => {
     it("should require authentication to watch machines", () => {
       expect(getPermission("machines.watch", "unauthenticated")).toBe(false);
       expect(getPermission("machines.watch", "guest")).toBe(true);
-    });
-
-    it("should allow owner-only access for ownerNotes editing", () => {
-      expect(getPermission("machines.edit.ownerNotes", "unauthenticated")).toBe(
-        false
-      );
-      expect(getPermission("machines.edit.ownerNotes", "guest")).toBe(false);
-      expect(getPermission("machines.edit.ownerNotes", "member")).toBe("owner");
-      expect(getPermission("machines.edit.ownerNotes", "technician")).toBe(
-        "owner"
-      );
-      expect(getPermission("machines.edit.ownerNotes", "admin")).toBe("owner");
-    });
-
-    it("should allow owner-only access for viewing ownerNotes", () => {
-      expect(getPermission("machines.view.ownerNotes", "unauthenticated")).toBe(
-        false
-      );
-      expect(getPermission("machines.view.ownerNotes", "guest")).toBe(false);
-      expect(getPermission("machines.view.ownerNotes", "member")).toBe("owner");
-      expect(getPermission("machines.view.ownerNotes", "technician")).toBe(
-        "owner"
-      );
-      expect(getPermission("machines.view.ownerNotes", "admin")).toBe("owner");
     });
 
     it("should define machines.timeline.comment.add: members+ can post (PP-0x98)", () => {
