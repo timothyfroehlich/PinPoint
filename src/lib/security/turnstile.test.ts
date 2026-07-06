@@ -23,19 +23,20 @@ describe("verifyTurnstileToken", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     process.env = originalEnv;
   });
 
   it("returns true when TURNSTILE_SECRET_KEY is not set in development (graceful skip)", async () => {
     delete process.env.TURNSTILE_SECRET_KEY;
-    process.env.NODE_ENV = "test";
+    vi.stubEnv("NODE_ENV", "test");
     const result = await verifyTurnstileToken("some-token");
     expect(result).toBe(true);
   });
 
   it("returns false when TURNSTILE_SECRET_KEY is not set in production", async () => {
     delete process.env.TURNSTILE_SECRET_KEY;
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     const result = await verifyTurnstileToken("some-token");
     expect(result).toBe(false);
   });

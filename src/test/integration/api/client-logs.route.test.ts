@@ -15,14 +15,12 @@ vi.mock("~/lib/logger", () => ({
 import { POST } from "~/app/api/client-logs/route";
 
 describe("/api/client-logs (integration)", () => {
-  const originalNodeEnv = process.env.NODE_ENV;
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
+    vi.unstubAllEnvs();
   });
 
   const buildRequest = (body: unknown): Request =>
@@ -33,7 +31,7 @@ describe("/api/client-logs (integration)", () => {
     });
 
   it("returns 403 outside development", async () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
 
     const response = await POST(
       buildRequest({
@@ -48,7 +46,7 @@ describe("/api/client-logs (integration)", () => {
   });
 
   it("rejects invalid payloads with 400", async () => {
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
 
     const response = await POST(
       buildRequest({
@@ -65,7 +63,7 @@ describe("/api/client-logs (integration)", () => {
   });
 
   it("logs info entries with expected shape", async () => {
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
 
     const payload = {
       level: "info" as const,
@@ -96,7 +94,7 @@ describe("/api/client-logs (integration)", () => {
   });
 
   it("routes error level entries to log.error", async () => {
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
 
     const response = await POST(
       buildRequest({
@@ -115,7 +113,7 @@ describe("/api/client-logs (integration)", () => {
   });
 
   it("returns 400 on invalid JSON", async () => {
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
 
     const response = await POST(buildRequest("invalid json"));
     const data = (await response.json()) as { error: string };
