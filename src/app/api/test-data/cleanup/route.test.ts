@@ -49,6 +49,7 @@ describe("api/test-data/cleanup", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     process.env = envBackup;
   });
 
@@ -88,7 +89,7 @@ describe("api/test-data/cleanup", () => {
   });
 
   it("returns 403 in production", async () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
 
     const response = await POST(makeRequest({}));
 
