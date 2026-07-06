@@ -72,6 +72,11 @@ fi
 do_rotation() {
   set -euo pipefail
 
+  # Pull peer machines' state before the date re-check. If another machine
+  # already rotated and pushed, this pull surfaces today's date and we no-op
+  # below — the cross-machine equivalent of the local-lock peer check. Fail-open.
+  bd dolt pull --quiet >/dev/null 2>&1 || true
+
   # Re-check date inside the lock (idempotency: a peer may have rotated first).
   # Reserve `exit 0` for the explicit "already up to date" case below. Anything
   # else (bd unreachable, root bead unreadable, notes corrupted) is a hard error
@@ -162,21 +167,33 @@ except Exception:
     month_rolled=1
   fi
 
-  # Create new daily bead (orphan until root notes are updated)
+  # Create new daily bead (orphan until root notes are updated), OR adopt one a
+  # peer machine already created for today — idempotent across machines. We
+  # queried after the pull above, so a peer's pushed daily is visible here.
   local new_today_id
-  new_today_id=$(bd create -t task \
-    --parent "$ROOT_ID" \
-    --title "Huddle daily $today" \
-    --description "Active coordination bead for $today. Agents post updates here. At midnight rotation this bead gets a categorized summary and closes." \
-    --silent)
+  new_today_id=$(bd children "$ROOT_ID" --json 2>/dev/null \
+    | jq -r --arg t "Huddle daily $today" \
+      '[ .[] | select(.title==$t and .status!="closed") ] | sort_by(.id) | (.[0].id // "")' 2>/dev/null || echo "")
+  if [[ -z "$new_today_id" ]]; then
+    new_today_id=$(bd create -t task \
+      --parent "$ROOT_ID" \
+      --title "Huddle daily $today" \
+      --description "Active coordination bead for $today. Agents post updates here. At midnight rotation this bead gets a categorized summary and closes." \
+      --silent)
+  fi
 
   local new_monthly_id="$old_monthly_id"
   if [[ "$month_rolled" -eq 1 ]]; then
-    new_monthly_id=$(bd create -t task \
-      --parent "$ROOT_ID" \
-      --title "Huddle monthly $current_month" \
-      --description "Monthly coordination summary for $current_month. Receives aggregated summaries of daily beads when they close." \
-      --silent)
+    new_monthly_id=$(bd children "$ROOT_ID" --json 2>/dev/null \
+      | jq -r --arg t "Huddle monthly $current_month" \
+        '[ .[] | select(.title==$t and .status!="closed") ] | sort_by(.id) | (.[0].id // "")' 2>/dev/null || echo "")
+    if [[ -z "$new_monthly_id" ]]; then
+      new_monthly_id=$(bd create -t task \
+        --parent "$ROOT_ID" \
+        --title "Huddle monthly $current_month" \
+        --description "Monthly coordination summary for $current_month. Receives aggregated summaries of daily beads when they close." \
+        --silent)
+    fi
   fi
 
   local now
@@ -209,6 +226,10 @@ print(json.dumps(notes))
 
   # ATOMIC: update root notes — after this the system is consistent
   bd update "$ROOT_ID" --notes "$new_notes"
+
+  # Push the new pointers so peer machines converge fast and don't double-rotate.
+  # Fail-open: a transient push failure doesn't abort (pre-push + next sync catch up).
+  bd dolt push --quiet >/dev/null 2>&1 || true
 
   # Post continuation comments on old beads (best-effort: failures do not abort)
   if [[ -n "$old_today_id" ]]; then
@@ -245,3 +266,9 @@ case "$LOCK_TOOL" in
     flock -x -w 60 "$LOCK_FILE" bash -c 'do_rotation'
     ;;
 esac
+
+# Safety-net dedup (runs in the parent shell, where huddle-lib.sh is sourced and
+# huddle_reconcile_today is defined). If a peer machine created a duplicate daily
+# for today inside the race window — both rotated before either pushed — collapse
+# to the deterministic canonical. Silent + fail-open; no-op in the common case.
+huddle_reconcile_today || true

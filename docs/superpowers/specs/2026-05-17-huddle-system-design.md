@@ -40,6 +40,8 @@ git-ignored, shared across linked worktrees via `git rev-parse --git-common-dir`
 - `<main-worktree>/.agents/huddle/config.json` — local config, holds root bead ID
 - `<main-worktree>/.agents/huddle/session-names.json` — session_id → name mapping
 - `<main-worktree>/.agents/huddle/last-seen-<path-hash>` — per-checkout poll cursor
+- `<main-worktree>/.agents/huddle/last-pull` — per-machine Dolt-sync throttle marker (§14)
+- `<main-worktree>/.agents/huddle/pull.lock` — non-blocking sync lock (§14)
 - `<main-worktree>/.agents/huddle/rotation.lock` — flock target for rotation
 
 ## 3. Plugin Packaging
@@ -132,18 +134,21 @@ agent_type? }` where `source` is `startup` | `resume` | `clear` | `compact`.
 Logic, in order:
 
 1. **Skip if subagent:** if `transcript_path` contains `/subagents/`, exit 0.
-2. **Skip if not bootstrapped:** if `config.json` is missing OR
-   `root_bead_id` points to a nonexistent bead, emit the "bootstrap needed"
-   notice (see §7.1) and exit.
-3. **Rotation check:** source `huddle-rotation-check.sh`. If the active
+2. **Per-machine sync** (§14.1): `huddle_sync` — throttled `bd dolt push`+`pull`
+   so this session opens on the freshest cross-machine state.
+3. **Skip if not bootstrapped:** if `config.json` is missing, first try
+   `huddle_discover_root` to **auto-adopt** an already-synced root (§14.2); only
+   if none exists emit the "bootstrap needed" notice (see §7.1) and exit.
+4. **Rotation check:** source `huddle-rotation-check.sh`. If the active
    `today_bead.date` ≠ today's local date, emit the "rotation needed" notice
-   (see §7.2) and skip steps 4-5. The lead agent dispatches a rotation
-   subagent before continuing.
-4. **Identity announcement** (suppressed if `source == "compact"`): look up
+   (see §7.2) and skip the remaining steps. The lead agent dispatches a rotation
+   subagent before continuing. Otherwise `huddle_reconcile_today` runs once
+   (§14.3) to collapse any cross-machine duplicate daily.
+5. **Identity announcement** (suppressed if `source == "compact"`): look up
    the session's name in `session-names.json`. Emit either the
    "registered as Claude-<Name>" block or the "registration needed" notice
    (see §7.3 and §7.4).
-5. **Summary injection** (suppressed if `source == "compact"`): inject the
+6. **Summary injection** (suppressed if `source == "compact"`): inject the
    monthly summary description and the descriptions of the
    `n_dailies_to_inject` most-recent daily beads (from `recent_dailies`).
 
@@ -155,12 +160,14 @@ cwd, permission_mode, hook_event_name, prompt }`.
 Logic, in order:
 
 1. **Skip if subagent:** if `transcript_path` contains `/subagents/`, exit 0.
-2. **Skip if not bootstrapped:** if config missing, exit 0 silently (the
-   SessionStart hook handles the user-visible notice).
-3. **Rotation check:** source `huddle-rotation-check.sh`. If rotation needed,
-   emit the rotation notice and skip step 4 — new comments must wait for the
+2. **Per-machine sync** (§14.1): `huddle_sync` (throttled) before reading, so
+   peer machines' new comments are pulled in before the poll.
+3. **Skip if not bootstrapped:** if config missing, exit 0 silently (the
+   SessionStart hook handles the user-visible notice / auto-adopt).
+4. **Rotation check:** source `huddle-rotation-check.sh`. If rotation needed,
+   emit the rotation notice and skip the poll — new comments must wait for the
    new today_bead to be created.
-4. **Poll for new comments:** read the current `today_bead.id` from
+5. **Poll for new comments:** read the current `today_bead.id` from
    `config.json` + root notes. Run `bd comments <today_bead> --json`.
    Filter to comments newer than `last-seen-<path-hash>` and not
    signed by the current session (self-filter). Inject any matches as a
@@ -401,11 +408,23 @@ catches it.
 
 ### 9.4 Two sessions racing rotation
 
-Both sessions see "rotation needed" at the same time. Both dispatch a
-rotation subagent. The lock (`rotation.lock`) serializes them. The
+**Same machine:** Both sessions see "rotation needed" at the same time. Both
+dispatch a rotation subagent. The lock (`rotation.lock`) serializes them. The
 second subagent acquires the lock after the first finishes, re-checks the
 date inside the lock, sees rotation is no longer needed, and exits 0.
 Idempotent.
+
+**Different machines (see §14):** the local lock cannot serialize across
+machines, so cross-machine safety is layered: (a) `huddle-rotate.sh` pulls
+before the date re-check, so a machine whose peer already rotated + pushed
+sees today's date and no-ops; (b) before creating the new daily it queries
+root's children and **adopts** an existing "Huddle daily `<today>`" instead of
+creating a duplicate; (c) `huddle_reconcile_today` deterministically collapses
+any residual duplicate (canonical = lowest id) at end of rotation and once per
+session-start. The only window that produces a duplicate is two machines both
+passing the date check _and_ both creating before either pushes — reconcile
+cleans it on the next sync/session; rotation is lazy so the transient duplicate
+is harmless.
 
 ### 9.5 Crash during rotation
 
@@ -499,3 +518,47 @@ foundation is on main. Brand-new bead to be filed when PR #1357 lands.
 - **N default value** — starting at 5. Tunable in `settings.n_dailies_to_inject`.
 - **Lock timeout** — 60s. Larger than PP-bg45's worktree lock (30s) because
   this lock covers LLM-driven summarization, which can be the slowest step.
+
+## 14. Multi-machine synchronization (PP-lt12.38)
+
+The huddle runs across Tim's machines (Mac + Bazzite) with many concurrent
+sessions per machine. It piggybacks on the beads sync backbone rather than
+inventing its own: beads is **Dolt embedded + a DoltHub remote** (`sync.remote`
+in `.beads/config.yaml`), so the root bead + its `notes` pointers, the
+daily/monthly beads, and every comment already replicate via `bd dolt push` /
+`bd dolt pull`. What was machine-local — and had to be fixed — was the _pointer
+to the root_, the _freshness of reads_, and the _rotation lock_.
+
+### 14.1 Throttled per-machine sync
+
+`huddle_sync` (`huddle-lib.sh`) does `bd dolt push` then `pull`, gated by a
+`last-pull` epoch marker in the shared state dir plus a non-blocking `pull.lock`.
+Because the state dir resolves identically for every worktree/session of a clone
+(`git rev-parse --git-common-dir`), the throttle is **per-machine**: one sync per
+`HUDDLE_SYNC_SECONDS` (default 180) serves all sessions, and when many fire at
+once exactly one holds the lock while the rest skip and read the freshly-pulled
+DB. Called from session-start (before reading root notes) and the poll hook
+(before fetching comments). Fully fail-open — offline/bd errors write the marker
+and return 0, never blocking a prompt; the next successful sync catches up.
+
+### 14.2 Fork-proof discovery / auto-adopt
+
+`config.json` (the `root_bead_id`) is machine-local, so a fresh machine used to
+see "not bootstrapped" and, if bootstrapped, forked a second root epic.
+`huddle_discover_root` pulls and queries for the existing "Huddle coordination
+root" epic; session-start **auto-adopts** it (writes `config.json`) when
+`config.json` is missing, and `huddle-bootstrap.sh` adopts-before-create. One
+canonical root, shared by every machine.
+
+### 14.3 Idempotent rotation + reconcile
+
+Covered in §9.4: pull-first, adopt-existing-daily-by-title, push-after, and a
+deterministic `huddle_reconcile_today` dedup. This replaces the (single-machine)
+`rotation.lock` as the _cross-machine_ guarantee; the local lock is retained only
+to serialize same-machine sessions.
+
+### 14.4 Intentionally still machine-local
+
+`session-names.json` (self-filter) and `last-seen-<hash>` (poll cursor) stay
+per-machine/per-checkout by design — a session lives on one machine, and a peer
+machine's posts must not be self-filtered on yours.
