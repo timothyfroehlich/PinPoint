@@ -113,9 +113,12 @@ huddle_sync() {
 
   # The locked body re-checks the marker (a peer may have synced between our
   # fast check and acquiring the lock), writes the marker, then push+pulls.
-  # Exported so the child bash under flock/lockf inherits it.
+  # It reads the marker path + interval from exported env vars (not positional
+  # args) so the `bash -c` string needs no single-quote expansion — same
+  # exported-function + exported-vars pattern as huddle-rotate.sh's do_rotation.
+  export _HS_MARKER="$marker" _HS_INTERVAL="$interval"
   _huddle_sync_body() {
-    local m="$1" iv="$2" l n
+    local m="$_HS_MARKER" iv="$_HS_INTERVAL" l n
     if [[ -f "$m" ]]; then
       l=0
       read -r l < "$m" 2>/dev/null || true
@@ -133,16 +136,15 @@ huddle_sync() {
 
   # Non-blocking lock — same lockf(macOS)/flock(Linux) split as huddle-rotate.sh.
   # If another session holds it, skip immediately (it is doing the sync for us).
-  # shellcheck disable=SC2016  # single quotes intentional: the child bash under
-  # flock/lockf expands $1/$2 from its own positional args, not this shell.
   if command -v flock >/dev/null 2>&1; then
-    flock -n "$lockfile" bash -c '_huddle_sync_body "$1" "$2"' _ "$marker" "$interval" 2>/dev/null || true
+    flock -n "$lockfile" bash -c '_huddle_sync_body' 2>/dev/null || true
   elif command -v lockf >/dev/null 2>&1; then
-    lockf -t 0 "$lockfile" bash -c '_huddle_sync_body "$1" "$2"' _ "$marker" "$interval" 2>/dev/null || true
+    lockf -t 0 "$lockfile" bash -c '_huddle_sync_body' 2>/dev/null || true
   else
-    _huddle_sync_body "$marker" "$interval"
+    _huddle_sync_body
   fi
   unset -f _huddle_sync_body 2>/dev/null || true
+  unset _HS_MARKER _HS_INTERVAL 2>/dev/null || true
   return 0
 }
 
@@ -218,7 +220,9 @@ huddle_reconcile_today() {
   cur_today_id=$(printf '%s' "$notes_str" | jq -r '.today_bead.id // ""' 2>/dev/null) || cur_today_id=""
   if [[ "$cur_today_id" != "$canon" ]]; then
     new_notes=$(printf '%s' "$notes_str" | jq -c --arg id "$canon" '.today_bead.id = $id' 2>/dev/null) || new_notes=""
-    [[ -n "$new_notes" ]] && bd update "$root_id" --notes "$new_notes" >/dev/null 2>&1 || true
+    if [[ -n "$new_notes" ]]; then
+      bd update "$root_id" --notes "$new_notes" >/dev/null 2>&1 || true
+    fi
   fi
   bd dolt push --quiet >/dev/null 2>&1 || true
   return 0
