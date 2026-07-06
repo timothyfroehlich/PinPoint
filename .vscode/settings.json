@@ -63,20 +63,26 @@
   },
 
   // Performance Optimization - File Exclusions
+  // .claude/worktrees holds linked git worktrees (full checkouts, git-ignored,
+  // machine-local). Excluding them from the main checkout keeps tsserver from
+  // analyzing their files with this checkout's config — those cross-worktree
+  // diagnostics are false positives (PP-8x3c).
   "files.exclude": {
     "**/.next": true,
     "**/node_modules": true,
     "**/.git": true,
     "**/dist": true,
     "**/.turbo": true,
-    "**/.claude/recycle_bin": true
+    "**/.claude/recycle_bin": true,
+    "**/.claude/worktrees": true
   },
   "search.exclude": {
     "**/.next": true,
     "**/node_modules": true,
     "**/dist": true,
     "**/.turbo": true,
-    "**/.claude/recycle_bin": true
+    "**/.claude/recycle_bin": true,
+    "**/.claude/worktrees": true
   },
   "files.watcherExclude": {
     "**/.git/objects/**": true,
@@ -84,7 +90,8 @@
     "**/node_modules/**": true,
     "**/.next/**": true,
     "**/dist/**": true,
-    "**/.turbo/**": true
+    "**/.turbo/**": true,
+    "**/.claude/worktrees/**": true
   },
 
   // Problem Panel Optimization for @tsconfig/strictest

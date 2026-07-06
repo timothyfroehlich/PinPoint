@@ -173,7 +173,6 @@ export default [
       "**/*.spec.ts",
       "**/*.spec.tsx",
       "src/test/**/*",
-      "e2e/**/*",
     ],
     languageOptions: {
       parser: typescriptParser,
@@ -203,6 +202,39 @@ export default [
       // Allow disabling rules in tests if needed (mocking often requires it)
       "eslint-comments/no-restricted-disable": "off",
 
+      "@typescript-eslint/no-empty-function": "off",
+      "@typescript-eslint/no-unnecessary-condition": "off",
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // E2E files use their own tsconfig (NodeNext resolution, separate from
+    // tsconfig.tests.json's bundler resolution) — see e2e/tsconfig.json.
+    // Dropped from tsconfig.tests.json's `include` in PP-d8uq; this block
+    // keeps ESLint's parserOptions.project in sync with that change so
+    // type-aware linting of e2e/**/* doesn't hit a "file not included in any
+    // tsconfig" parse error. Same rule relaxations as the test-files block
+    // above (mocking/test-data patterns are common to both).
+    files: ["e2e/**/*"],
+    languageOptions: {
+      parser: typescriptParser,
+      parserOptions: {
+        project: "./e2e/tsconfig.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-floating-promises": "off",
+      "@typescript-eslint/explicit-function-return-type": "off",
+      "unused-imports/no-unused-vars": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/unbound-method": "off",
+      "eslint-comments/no-restricted-disable": "off",
       "@typescript-eslint/no-empty-function": "off",
       "@typescript-eslint/no-unnecessary-condition": "off",
       "no-restricted-imports": "off",
