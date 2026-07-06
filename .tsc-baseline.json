@@ -10,18 +10,6 @@
       "count": 1,
       "message": "Property 'code' does not exist on type 'Error'."
     },
-    "1f5c1a3e409f28a11722697f6e53387f5401793b": {
-      "file": "src/app/(app)/issues/export-action.test.ts",
-      "code": "TS2556",
-      "count": 2,
-      "message": "A spread argument must either have a tuple type or be passed to a rest parameter."
-    },
-    "5d0dad98a7426086799f8e6cf2aab762847c4b13": {
-      "file": "src/app/(app)/issues/export-action.test.ts",
-      "code": "TS2352",
-      "count": 5,
-      "message": "Conversion of type '[]' to type '[Record<string, unknown>, unknown, unknown]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
-    },
     "b5a72af05c83d300ff5fe1219b0876af796e5a46": {
       "file": "src/app/(app)/m/[initials]/issues-expando.test.tsx",
       "code": "TS2352",
@@ -57,12 +45,6 @@
       "code": "TS2352",
       "count": 1,
       "message": "Conversion of type 'Promise<Record<string, unknown>[]>' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
-    },
-    "845b60accd9bc87b86675609da237563552d4048": {
-      "file": "src/lib/cookies/client.test.ts",
-      "code": "TS2322",
-      "count": 4,
-      "message": "Type 'Mock<Procedure | Constructable>' is not assignable to type '((v: any) => void) | undefined'."
     },
     "e948226ef61a5ef00c2773c2cbf6a35a381e62c5": {
       "file": "src/lib/issues/owner.test.ts",
@@ -124,12 +106,6 @@
       "count": 1,
       "message": "Argument of type '\"user\"' is not assignable to parameter of type '\"guest\" | \"member\" | \"technician\" | \"admin\"'."
     },
-    "73fc9c6b7165b29215abceca1b1903afef6e6c04": {
-      "file": "src/test/integration/avatar-upload-action.test.ts",
-      "code": "TS2556",
-      "count": 1,
-      "message": "A spread argument must either have a tuple type or be passed to a rest parameter."
-    },
     "05090a2b030174078bc02ef595827568503f2220": {
       "file": "src/test/integration/collections-issues-scope.test.ts",
       "code": "TS2345",
@@ -189,24 +165,6 @@
       "code": "TS2769",
       "count": 2,
       "message": "No overload matches this call."
-    },
-    "2882c46ab61fc59adaa451c0865682d553ff4c31": {
-      "file": "src/test/integration/machine-info-tab-auth.test.tsx",
-      "code": "TS2554",
-      "count": 1,
-      "message": "Expected 0 arguments, but got 1."
-    },
-    "5038f80ebb5402883ae35fabfaaa6657aeaf6bac": {
-      "file": "src/test/integration/machine-info-tab-auth.test.tsx",
-      "code": "TS2493",
-      "count": 5,
-      "message": "Tuple type '[]' of length '0' has no element at index '0'."
-    },
-    "989448e9234b0618b629baaffe1d8a051555c379": {
-      "file": "src/test/integration/machine-info-tab-auth.test.tsx",
-      "code": "TS18048",
-      "count": 10,
-      "message": "'props' is possibly 'undefined'."
     },
     "219c3f773b594bedad5dc52cc7f8bb63c57a53d6": {
       "file": "src/test/integration/machine-owner-promotion.test.ts",
@@ -399,12 +357,6 @@
       "code": "TS2322",
       "count": 1,
       "message": "Type 'Error & { code: string; }' is not assignable to type 'null'."
-    },
-    "08ad5a90c37ffe0344268143452f81b5f28cdd48": {
-      "file": "src/test/unit/machine-actions.test.ts",
-      "code": "TS2556",
-      "count": 6,
-      "message": "A spread argument must either have a tuple type or be passed to a rest parameter."
     },
     "2bea5e1daa14000bfd94918b3a4fb85e58ef55ed": {
       "file": "src/test/unit/notification-channels.test.ts",
