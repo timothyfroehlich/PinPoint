@@ -91,7 +91,7 @@
     "c0e94e7977c352f9829d9158e6fc2b31616bd4fe": {
       "file": "src/test/integration/account-deletion.test.ts",
       "code": "TS2769",
-      "count": 8,
+      "count": 2,
       "message": "No overload matches this call."
     },
     "3b3bb9bd117e7d02ba106c613c4dedd90a6b47ad": {
@@ -118,11 +118,11 @@
       "count": 1,
       "message": "Conversion of type 'undefined' to type '{ botTokenVaultId?: string | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
     },
-    "d5f9ffde938f24a27139e8fc8eda62208ce6eabd": {
+    "e3e6c847bc4e8b9b8eca05ab4477b486aa7776ad": {
       "file": "src/test/integration/admin/user-management.test.ts",
       "code": "TS2345",
       "count": 1,
-      "message": "Argument of type '\"user\"' is not assignable to parameter of type '\"admin\" | \"technician\" | \"member\" | \"guest\"'."
+      "message": "Argument of type '\"user\"' is not assignable to parameter of type '\"guest\" | \"member\" | \"technician\" | \"admin\"'."
     },
     "73fc9c6b7165b29215abceca1b1903afef6e6c04": {
       "file": "src/test/integration/avatar-upload-action.test.ts",
@@ -142,12 +142,6 @@
       "count": 3,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
-    "7888abcd4dac4a8b5576204f3b971f83e989f5f8": {
-      "file": "src/test/integration/collections-latest-activity.test.ts",
-      "code": "TS2345",
-      "count": 3,
-      "message": "Argument of type 'string | undefined' is not assignable to parameter of type 'string'."
-    },
     "28e2c6a03607c96b58aa4b21dc08d85114dc9fd9": {
       "file": "src/test/integration/collections-owner.test.ts",
       "code": "TS2345",
@@ -159,12 +153,6 @@
       "code": "TS2820",
       "count": 1,
       "message": "Type '\"playable\"' is not assignable to type '\"cosmetic\" | \"minor\" | \"major\" | \"unplayable\" | undefined'. Did you mean '\"unplayable\"'?"
-    },
-    "5ddbe9688d462da2e96e44cfdac42ad92fd9e2e3": {
-      "file": "src/test/integration/database-queries.test.ts",
-      "code": "TS2769",
-      "count": 4,
-      "message": "No overload matches this call."
     },
     "317408be15b8b91333290553023786d454e5c093": {
       "file": "src/test/integration/database-queries.test.ts",
@@ -250,22 +238,10 @@
       "count": 4,
       "message": "Argument of type '{ readonly type: \"doc\"; readonly content: readonly [{ readonly type: \"paragraph\"; readonly content: readonly [{ readonly type: \"text\"; readonly text: \"x\"; }]; }]; }' is not assignable to parameter of type 'ProseMirrorDoc'."
     },
-    "cb5fb8bf085422276969a69395a486193fbdbe5b": {
-      "file": "src/test/integration/machine-timeline-events.test.ts",
-      "code": "TS2345",
-      "count": 25,
-      "message": "Argument of type 'string | undefined' is not assignable to parameter of type 'string'."
-    },
-    "1f0937be2ace50d502ecadbad2dc286addd8abb1": {
-      "file": "src/test/integration/machine-timeline-events.test.ts",
-      "code": "TS2769",
-      "count": 4,
-      "message": "No overload matches this call."
-    },
     "4718b4c38e711166211c565b20ec7797b6c62aa8": {
       "file": "src/test/integration/machine-timeline-events.test.ts",
       "code": "TS2345",
-      "count": 8,
+      "count": 33,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
     "f5ad5b00e27a411bb8d0a273190df25fbe3ca6db": {
@@ -273,12 +249,6 @@
       "code": "TS2345",
       "count": 13,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
-    },
-    "a1bd7b7a40249533f1aa8c4dde72efe301f5124f": {
-      "file": "src/test/integration/machine-timeline-events.test.ts",
-      "code": "TS2538",
-      "count": 1,
-      "message": "Type 'undefined' cannot be used as an index type."
     },
     "295cdf4544a83ff5d10918090ec17491b7e80a2f": {
       "file": "src/test/integration/machine-timeline-multi.test.ts",
