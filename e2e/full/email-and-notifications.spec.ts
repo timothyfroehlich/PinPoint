@@ -22,7 +22,7 @@ import {
   updateNotificationPreferences,
   generateUnsubscribeTokenForTest,
   getNotificationPreferences,
-} from "e2e/support/supabase-admin.js";
+} from "../support/supabase-admin.js";
 import {
   getTestIssueTitle,
   getTestEmail,

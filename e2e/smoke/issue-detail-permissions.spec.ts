@@ -11,13 +11,13 @@
  */
 import { test, expect } from "@playwright/test";
 import { assertNoA11yViolations } from "../support/actions.js";
-import { seededIssues } from "../support/constants.js";
+import { seededIssue } from "../support/constants.js";
 
 test.describe("Issue detail smoke — unauthenticated render", () => {
   test("page loads without error for unauthenticated visitor", async ({
     page,
   }) => {
-    const issue = seededIssues.AFM[0];
+    const issue = seededIssue("AFM");
     const response = await page.goto(`/m/AFM/i/${issue.num}`);
 
     // Assert the server actually returned 2xx — a 500 error page can still

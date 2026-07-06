@@ -9,8 +9,8 @@ import postgres from "postgres";
  * Uses service role key which bypasses RLS and auth restrictions.
  */
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = process.env["NEXT_PUBLIC_SUPABASE_URL"];
+const SUPABASE_SERVICE_ROLE_KEY = process.env["SUPABASE_SERVICE_ROLE_KEY"];
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error(
@@ -281,7 +281,7 @@ export async function disableDiscordIntegration(): Promise<void> {
  */
 export async function enableDiscordIntegrationForTest(): Promise<void> {
   const postgresUrl =
-    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+    process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
   if (!postgresUrl) {
     throw new Error(
       "POSTGRES_URL_NON_POOLING / POSTGRES_URL not set. Check .env.local."
@@ -355,7 +355,7 @@ export async function deleteTestMachine(machineId: string) {
  * server uses to verify them, otherwise verification fails.
  */
 export function generateUnsubscribeTokenForTest(userId: string): string {
-  const secret = process.env.UNSUBSCRIBE_SIGNING_SECRET;
+  const secret = process.env["UNSUBSCRIBE_SIGNING_SECRET"];
   if (!secret) {
     throw new Error(
       "Missing UNSUBSCRIBE_SIGNING_SECRET — required for unsubscribe E2E tests. Set it in .env.local (and in CI workflow env)."
