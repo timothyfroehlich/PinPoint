@@ -37,7 +37,7 @@ describe("SignupForm", () => {
   it("should call signup action on submit", async () => {
     const user = userEvent.setup();
     // Mock response
-    signupActionSpy.mockResolvedValue({ ok: true, data: { userId: "123" } });
+    signupActionSpy.mockResolvedValue({ ok: true, value: { userId: "123" } });
 
     render(<SignupForm />);
 
