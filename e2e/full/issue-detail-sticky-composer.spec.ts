@@ -11,11 +11,11 @@
 
 import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions.js";
-import { seededIssues } from "../support/constants.js";
+import { seededIssue } from "../support/constants.js";
 
 // Use AFM issue 1 — confirmed publicly accessible without auth (public-routes-audit).
 // The initials + num are stable seeded values that never change across test runs.
-const ISSUE = seededIssues.AFM[0];
+const ISSUE = seededIssue("AFM");
 const ISSUE_URL = `/m/AFM/i/${ISSUE.num}`;
 
 // ----------------------------------------------------------------------------

@@ -1,14 +1,11 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "baseUrl": "..",
-    "paths": {
-      "~/*": ["src/*"]
-    },
     "noEmit": true,
     "moduleResolution": "NodeNext",
     "target": "es2022",
-    "module": "NodeNext"
+    "module": "NodeNext",
+    "types": ["node"]
   },
   "include": ["**/*.ts", "**/*.tsx", "../playwright.config.ts"],
   "exclude": ["../node_modules"]

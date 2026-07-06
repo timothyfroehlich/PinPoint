@@ -3,7 +3,7 @@ import {
   assertNoHorizontalOverflow,
   assertNoA11yViolations,
 } from "../support/actions.js";
-import { seededIssues } from "../support/constants.js";
+import { seededIssue } from "../support/constants.js";
 import { STORAGE_STATE } from "../support/auth-state.js";
 
 test.describe("Issue List Features", () => {
@@ -18,8 +18,8 @@ test.describe("Issue List Features", () => {
     // 1. Setup: Use seeded issues
     // Issue 1: "Thing flips the bird" (TAF-01)
     // Issue 2: "Bookcase not registering" (TAF-02)
-    const title1 = seededIssues.TAF[0].title;
-    const title2 = seededIssues.TAF[1].title;
+    const title1 = seededIssue("TAF").title;
+    const title2 = seededIssue("TAF", 1).title;
 
     await page.goto("/issues");
     // Wait for hydration before interacting with the search form. In Mobile

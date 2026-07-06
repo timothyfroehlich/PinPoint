@@ -5,7 +5,7 @@ import {
   type Page,
   type TestInfo,
 } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
+import { AxeBuilder } from "@axe-core/playwright";
 
 import { TEST_USERS } from "./constants.js";
 
@@ -28,7 +28,7 @@ interface LoginOptions {
  */
 export async function loginAs(
   page: Page,
-  testInfo: TestInfo,
+  _testInfo: TestInfo,
   {
     email = TEST_USERS.member.email,
     password = TEST_USERS.member.password,

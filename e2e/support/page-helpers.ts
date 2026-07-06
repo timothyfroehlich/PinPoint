@@ -15,7 +15,7 @@ import { selectOption } from "./actions.js";
 
 declare global {
   interface Window {
-    __E2E_REDIRECT_TARGET?: string;
+    __E2E_REDIRECT_TARGET?: string | undefined;
   }
 }
 

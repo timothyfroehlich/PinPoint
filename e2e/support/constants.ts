@@ -8,6 +8,24 @@ export const seededMachines = machines;
 
 export const seededIssues = issues;
 
+/**
+ * Index into a seeded-issue array with a guaranteed-defined result.
+ *
+ * `noUncheckedIndexedAccess` (ts-strictest) types array access as `T | undefined`.
+ * These seeded fixtures are stable, so a missing entry is a test-setup bug worth
+ * throwing on rather than silencing with a non-null assertion.
+ */
+export function seededIssue(
+  initials: keyof typeof seededIssues,
+  index = 0
+): (typeof seededIssues)[keyof typeof seededIssues][number] {
+  const issue = seededIssues[initials][index];
+  if (issue === undefined) {
+    throw new Error(`Missing seeded issue: ${initials}[${index}]`);
+  }
+  return issue;
+}
+
 export const DEFAULT_NAVIGATION_TIMEOUT = 10_000;
 
 export const TEST_USERS = users;

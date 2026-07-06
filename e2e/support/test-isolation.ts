@@ -11,7 +11,7 @@
  */
 
 // Worker index from Playwright (0-based index of the worker)
-const workerIndex = process.env.TEST_PARALLEL_INDEX ?? "0";
+const workerIndex = process.env["TEST_PARALLEL_INDEX"] ?? "0";
 
 // Stable run ID for this worker process — generated once at module load so
 // that every call to getTestPrefix() / hasTestPrefix() returns the same value
