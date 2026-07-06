@@ -57,7 +57,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
           description: plainTextToDoc("Test description"),
           machineInitials: testMachine.initials,
           issueNumber: 1,
-          severity: "playable",
+          severity: "major",
           reportedBy: testUser.id,
           status: "new",
         })
@@ -68,7 +68,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
       expect(issue.description).toEqual(plainTextToDoc("Test description"));
       expect(issue.machineInitials).toBe(testMachine.initials);
       expect(issue.issueNumber).toBe(1);
-      expect(issue.severity).toBe("playable");
+      expect(issue.severity).toBe("major");
       expect(issue.status).toBe("new");
       expect(issue.reportedBy).toBe(testUser.id);
     });
@@ -141,7 +141,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
           title: "Issue 2",
           machineInitials: testMachine.initials,
           issueNumber: 2,
-          severity: "playable",
+          severity: "major",
           status: "in_progress",
           reportedBy: testUser.id,
         },
@@ -223,7 +223,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
           title: "Test Issue",
           machineInitials: testMachine.initials,
           issueNumber: 1,
-          severity: "playable",
+          severity: "major",
           status: "new",
           reportedBy: testUser.id,
         })
@@ -310,7 +310,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
           title: "Test Issue",
           machineInitials: testMachine.initials,
           issueNumber: 1,
-          severity: "playable",
+          severity: "major",
           reportedBy: testUser.id,
         })
         .returning();
@@ -458,7 +458,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
           title: "Member Issue",
           machineInitials: testMachine.initials,
           issueNumber: 1,
-          severity: "playable",
+          severity: "major",
           reportedBy: testUser.id,
         },
         {

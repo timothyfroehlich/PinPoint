@@ -87,7 +87,7 @@ describe("Issue Images Database Operations (PGlite)", () => {
         title: "Test Issue",
         machineInitials: testMachine.initials,
         issueNumber: 1,
-        severity: "playable",
+        severity: "major",
         reportedBy: testUser.id,
       })
       .returning();
@@ -421,7 +421,7 @@ describe("uploadIssueImage — action integration (PGlite)", () => {
         title: "Action Test Issue",
         machineInitials: machine.initials,
         issueNumber: 1,
-        severity: "playable",
+        severity: "major",
         reportedBy: reporterId,
       })
       .returning();
@@ -518,7 +518,7 @@ describe("uploadIssueImage — action integration (PGlite)", () => {
         title: "Perm Test Issue",
         machineInitials: machine.initials,
         issueNumber: 2,
-        severity: "playable",
+        severity: "major",
         reportedBy: reporterId,
       })
       .returning();

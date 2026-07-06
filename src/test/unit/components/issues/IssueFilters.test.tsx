@@ -90,7 +90,7 @@ describe("IssueFilters", () => {
     // New Group = NEW_STATUSES (new, confirmed)
     // Expected = OPEN_STATUSES without NEW_STATUSES
     const expectedStatuses = OPEN_STATUSES.filter(
-      (s: IssueStatus) => !STATUS_GROUPS.new.includes(s)
+      (s: IssueStatus) => !STATUS_GROUPS.new.some((g) => g === s)
     );
 
     expect(pushMock).toHaveBeenCalledWith(
