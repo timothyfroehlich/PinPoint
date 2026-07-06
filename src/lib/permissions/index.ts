@@ -35,18 +35,3 @@ export {
   getRawPermissionValue,
   isConditionalPermission,
 } from "./helpers";
-
-// Hook exports (client-side only)
-export {
-  type PermissionUser,
-  type IssueContext,
-  type MachineContext,
-  usePermission,
-  usePermissionState,
-  usePermissions,
-  usePermissionStates,
-  useAccessLevel,
-  useIsAuthenticated,
-  useIsConditionalPermission,
-  useRawPermission,
-} from "./hooks";
