@@ -36,7 +36,9 @@ vi.mock("~/lib/supabase/server", () => ({
     }),
 }));
 
-const deleteFromBlob = vi.fn(() => Promise.resolve(undefined));
+const deleteFromBlob = vi.fn((..._args: unknown[]) =>
+  Promise.resolve(undefined)
+);
 vi.mock("~/lib/blob/client", () => ({
   uploadToBlob: (_file: File, pathname: string) =>
     Promise.resolve({

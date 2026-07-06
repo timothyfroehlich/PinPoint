@@ -63,9 +63,9 @@ const { chain, dbMock } = vi.hoisted(() => {
   chain.onConflictDoNothing.mockReturnValue(chain);
 
   const dbMock = {
-    insert: vi.fn(() => chain),
-    update: vi.fn(() => chain),
-    delete: vi.fn(() => chain),
+    insert: vi.fn((..._args: unknown[]) => chain),
+    update: vi.fn((..._args: unknown[]) => chain),
+    delete: vi.fn((..._args: unknown[]) => chain),
     transaction: vi.fn(),
     query: {
       userProfiles: { findFirst: vi.fn() },
