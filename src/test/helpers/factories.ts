@@ -18,7 +18,6 @@ export function createTestUser(
   overrides?: Partial<InferInsertModel<typeof userProfiles>>
 ): InferInsertModel<typeof userProfiles> & { id: string } {
   return {
-    id: randomUUID(),
     email: `test-${randomUUID()}@example.com`,
     firstName: "Test",
     lastName: "User",
@@ -26,6 +25,7 @@ export function createTestUser(
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
+    id: overrides?.id ?? randomUUID(),
   };
 }
 
@@ -36,12 +36,12 @@ export function createTestMachine(
   overrides?: Partial<InferInsertModel<typeof machines>>
 ): InferInsertModel<typeof machines> & { id: string } {
   return {
-    id: randomUUID(),
     initials: "TM",
     name: "Test Machine",
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
+    id: overrides?.id ?? randomUUID(),
   };
 }
 
@@ -53,7 +53,6 @@ export function createTestIssue(
   overrides?: Partial<InferInsertModel<typeof issues>>
 ): InferInsertModel<typeof issues> & { id: string } {
   return {
-    id: randomUUID(),
     machineInitials,
     issueNumber: 1,
     title: "Test Issue",
@@ -67,6 +66,7 @@ export function createTestIssue(
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
+    id: overrides?.id ?? randomUUID(),
   };
 }
 
@@ -78,7 +78,6 @@ export function createTestComment(
   overrides?: Partial<InferInsertModel<typeof issueComments>>
 ): InferInsertModel<typeof issueComments> & { id: string } {
   return {
-    id: randomUUID(),
     issueId,
     authorId: null,
     content: "Test comment",
@@ -86,5 +85,6 @@ export function createTestComment(
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
+    id: overrides?.id ?? randomUUID(),
   };
 }

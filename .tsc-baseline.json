@@ -118,11 +118,11 @@
       "count": 1,
       "message": "Conversion of type 'undefined' to type '{ botTokenVaultId?: string | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
     },
-    "d5f9ffde938f24a27139e8fc8eda62208ce6eabd": {
+    "e3e6c847bc4e8b9b8eca05ab4477b486aa7776ad": {
       "file": "src/test/integration/admin/user-management.test.ts",
       "code": "TS2345",
       "count": 1,
-      "message": "Argument of type '\"user\"' is not assignable to parameter of type '\"admin\" | \"technician\" | \"member\" | \"guest\"'."
+      "message": "Argument of type '\"user\"' is not assignable to parameter of type '\"guest\" | \"member\" | \"technician\" | \"admin\"'."
     },
     "73fc9c6b7165b29215abceca1b1903afef6e6c04": {
       "file": "src/test/integration/avatar-upload-action.test.ts",
