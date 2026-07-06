@@ -22,41 +22,11 @@
       "count": 11,
       "message": "Type '{ machinesList: { id: string; name: string; initials: string; }[]; defaultMachineId: undefined; userAuthenticated: boolean; accessLevel: \"public\"; assignees: never[]; initialIssues: never[]; initialMachineInitials: string; }' is not assignable to type 'UnifiedReportFormProps'."
     },
-    "0aa9db4ef3f7831a90a3c81a852f3b0aef3bc163": {
-      "file": "src/app/(app)/settings/notifications/notification-preferences-form.test.tsx",
-      "code": "TS2345",
-      "count": 1,
-      "message": "Argument of type '{ ok: true; }' is not assignable to parameter of type 'UpdatePreferencesResult'."
-    },
-    "e793829a60d505f02147b52ff194a88fb4c289c5": {
-      "file": "src/app/(auth)/forgot-password/forgot-password-form.test.tsx",
-      "code": "TS2353",
-      "count": 1,
-      "message": "Object literal may only specify known properties, and 'data' does not exist in type '{ ok: true; value: void; }'."
-    },
-    "f8da73ca95a04dd3d8075797c4a5bc1a361b78cc": {
-      "file": "src/app/(auth)/signup/signup-form.test.tsx",
-      "code": "TS2353",
-      "count": 1,
-      "message": "Object literal may only specify known properties, and 'data' does not exist in type '{ ok: true; value: { userId: string; }; }'."
-    },
     "5893b201affa593c810a2ea73ec871bb7835b362": {
       "file": "src/lib/blob/cleanup.test.ts",
       "code": "TS2352",
       "count": 1,
       "message": "Conversion of type 'Promise<Record<string, unknown>[]>' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
-    },
-    "e948226ef61a5ef00c2773c2cbf6a35a381e62c5": {
-      "file": "src/lib/issues/owner.test.ts",
-      "code": "TS2322",
-      "count": 3,
-      "message": "Type '{ id: string; name: string; owner: { id: string; name: string; } | null; invitedOwner: { id: string; name: string; } | null; }' is not assignable to type 'Pick<{ name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; nextIssueNumber: number; ownerId: string | null; invitedOwnerId: string | null; description: ProseMirrorDoc | null; ... 10 more ...; ipdbId: number | null; }, \"name\" | ... 1 more ... | \"ownerRequirements\"> & { ...; }'."
-    },
-    "ac734c26f079a0383a4515d857f329c3da8b60b1": {
-      "file": "src/server/actions/images.test.ts",
-      "code": "TS2353",
-      "count": 2,
-      "message": "Object literal may only specify known properties, and 'size' does not exist in type 'PutBlobResult'."
     },
     "dfc7f000820bc0a4f7752524a1a7dd94822c76fe": {
       "file": "src/test/eslint/no-side-effects-in-transaction.test.ts",
@@ -100,11 +70,11 @@
       "count": 1,
       "message": "Conversion of type 'undefined' to type '{ botTokenVaultId?: string | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
     },
-    "e3e6c847bc4e8b9b8eca05ab4477b486aa7776ad": {
+    "d5f9ffde938f24a27139e8fc8eda62208ce6eabd": {
       "file": "src/test/integration/admin/user-management.test.ts",
       "code": "TS2345",
       "count": 1,
-      "message": "Argument of type '\"user\"' is not assignable to parameter of type '\"guest\" | \"member\" | \"technician\" | \"admin\"'."
+      "message": "Argument of type '\"user\"' is not assignable to parameter of type '\"admin\" | \"technician\" | \"member\" | \"guest\"'."
     },
     "05090a2b030174078bc02ef595827568503f2220": {
       "file": "src/test/integration/collections-issues-scope.test.ts",
@@ -280,12 +250,6 @@
       "count": 5,
       "message": "Type 'string' is not assignable to type 'SQL<unknown> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}> | ProseMirrorDoc | null | undefined'."
     },
-    "67ed3b5a6fb898d6ba1eee2542b4cb9094742608": {
-      "file": "src/test/integration/supabase/timeline-invited-conversion.test.ts",
-      "code": "TS2345",
-      "count": 2,
-      "message": "Argument of type 'Row' is not assignable to parameter of type 'PersonResolverInput'."
-    },
     "d5b9748474f7c48c2a56b31c8609c634e0757511": {
       "file": "src/test/integration/timeline-author-scope.test.ts",
       "code": "TS2322",
@@ -333,36 +297,6 @@
       "code": "TS2345",
       "count": 1,
       "message": "Argument of type '\"fixed\" | \"new\" | \"confirmed\" | \"in_progress\" | \"need_parts\" | \"need_help\" | \"wait_owner\" | \"wont_fix\" | \"wai\" | \"no_repro\" | \"duplicate\"' is not assignable to parameter of type '\"new\" | \"confirmed\"'."
-    },
-    "c7996dd8b9403f893bbca6c19b7b357656ad6130": {
-      "file": "src/test/unit/components/issues/issue-detail-permissions.test.tsx",
-      "code": "TS2322",
-      "count": 1,
-      "message": "Type '{ id: string; name: string; owner: { id: string; name: string; }; invitedOwner: null; }' is not assignable to type 'Pick<{ name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; nextIssueNumber: number; ownerId: string | null; invitedOwnerId: string | null; description: ProseMirrorDoc | null; ... 10 more ...; ipdbId: number | null; }, \"name\" | ... 1 more ... | \"ownerRequirements\"> & { ...; }'."
-    },
-    "afd6cd559827028969eef647d3a1cd805f158e13": {
-      "file": "src/test/unit/components/machines/MachineDetailHeader.test.tsx",
-      "code": "TS2719",
-      "count": 1,
-      "message": "Type '{ manufacturer: string | null; year: number | null; edition: string | null; backboxImageUrl: string | null; name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; ... 16 more ...; watchers: { ...; }[]; }' is not assignable to type '{ manufacturer: string | null; year: number | null; edition: string | null; backboxImageUrl: string | null; name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; ... 16 more ...; watchers: { ...; }[]; }'. Two different types with this name exist, but they are unrelated."
-    },
-    "c29d27cfd073ce9a31f7a0f2d6913d1d7d2609d5": {
-      "file": "src/test/unit/global-setup.test.ts",
-      "code": "TS2322",
-      "count": 1,
-      "message": "Type 'null' is not assignable to type 'number'."
-    },
-    "752b18d4984730ab7a272820284e5b8f2181ac42": {
-      "file": "src/test/unit/global-setup.test.ts",
-      "code": "TS2322",
-      "count": 1,
-      "message": "Type 'Error & { code: string; }' is not assignable to type 'null'."
-    },
-    "2bea5e1daa14000bfd94918b3a4fb85e58ef55ed": {
-      "file": "src/test/unit/notification-channels.test.ts",
-      "code": "TS2322",
-      "count": 1,
-      "message": "Type '{ userId: string; emailEnabled: boolean; inAppEnabled: boolean; suppressOwnActions: boolean; emailNotifyOnAssigned: boolean; inAppNotifyOnAssigned: boolean; emailNotifyOnStatusChange: boolean; ... 16 more ...; discordDmBlockedAt?: Date | ... 1 more ... | undefined; }' is not assignable to type '{ userId: string; emailEnabled: boolean; inAppEnabled: boolean; suppressOwnActions: boolean; emailNotifyOnAssigned: boolean; inAppNotifyOnAssigned: boolean; emailNotifyOnStatusChange: boolean; ... 16 more ...; discordDmBlockedAt: Date | null; }'."
     }
   }
 }

@@ -18,7 +18,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import postgres from "postgres";
 
-import { resolvePerson } from "~/lib/timeline/resolve-person";
+import {
+  resolvePerson,
+  type PersonResolverInput,
+} from "~/lib/timeline/resolve-person";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -85,7 +88,7 @@ describe("invited→real timeline conversion (PP-tv9l)", () => {
 
   it("rewrites the person-reference invited→real and drops the invited row on signup", async () => {
     // Pre-state: the reference points at the invited user, resolves "(invited)".
-    const [before] = await sql`
+    const [before] = await sql<PersonResolverInput[]>`
       SELECT tep.user_id AS "userId", tep.invited_id AS "invitedId",
              up.name AS "userName", iu.name AS "invitedName"
       FROM timeline_event_people tep
@@ -113,7 +116,7 @@ describe("invited→real timeline conversion (PP-tv9l)", () => {
 
     // Post-state: the reference now points at the real user, the invited_users
     // row is gone, and nothing dangles.
-    const [after] = await sql`
+    const [after] = await sql<PersonResolverInput[]>`
       SELECT tep.user_id AS "userId", tep.invited_id AS "invitedId",
              up.name AS "userName", iu.name AS "invitedName"
       FROM timeline_event_people tep
