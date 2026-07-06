@@ -7,11 +7,11 @@ import {
 } from "./client";
 
 describe("client cookie utilities", () => {
-  let cookieSetter: ReturnType<typeof vi.fn>;
+  let cookieSetter: ReturnType<typeof vi.fn<(value: string) => void>>;
   let originalCookie: PropertyDescriptor | undefined;
 
   beforeEach(() => {
-    cookieSetter = vi.fn();
+    cookieSetter = vi.fn<(value: string) => void>();
     originalCookie = Object.getOwnPropertyDescriptor(document, "cookie");
 
     Object.defineProperty(document, "cookie", {
@@ -36,7 +36,7 @@ describe("client cookie utilities", () => {
       storeLastIssuesPath("/issues?q=test");
 
       expect(cookieSetter).toHaveBeenCalledTimes(1);
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).toContain("lastIssuesPath=");
       expect(cookieString).toContain(encodeURIComponent("/issues?q=test"));
     });
@@ -44,21 +44,21 @@ describe("client cookie utilities", () => {
     it("sets cookie with 1 year max-age", () => {
       storeLastIssuesPath("/issues");
 
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).toContain("max-age=31536000"); // 1 year in seconds
     });
 
     it("sets SameSite=Lax", () => {
       storeLastIssuesPath("/issues");
 
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).toContain("SameSite=Lax");
     });
 
     it("does not set Secure flag on http", () => {
       storeLastIssuesPath("/issues");
 
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).not.toContain("Secure");
     });
 
@@ -67,14 +67,14 @@ describe("client cookie utilities", () => {
 
       storeLastIssuesPath("/issues");
 
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).toContain("Secure");
     });
 
     it("encodes special characters in path", () => {
       storeLastIssuesPath("/issues?q=test&severity=major");
 
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).toContain(
         encodeURIComponent("/issues?q=test&severity=major")
       );
@@ -86,14 +86,14 @@ describe("client cookie utilities", () => {
       storeCookieConsent();
 
       expect(cookieSetter).toHaveBeenCalledTimes(1);
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).toContain("cookieConsent=true");
     });
 
     it("sets cookie with 1 year max-age", () => {
       storeCookieConsent();
 
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).toContain("max-age=31536000");
     });
   });
@@ -139,21 +139,21 @@ describe("client cookie utilities", () => {
     it("sets cookie with correct name and numeric value", () => {
       storeChangelogSeen(42);
 
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).toContain("changelogSeen=42");
     });
 
     it("sets cookie with 1 year max-age", () => {
       storeChangelogSeen(10);
 
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).toContain("max-age=31536000");
     });
 
     it("sets SameSite=Lax", () => {
       storeChangelogSeen(10);
 
-      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      const cookieString = cookieSetter.mock.calls[0][0];
       expect(cookieString).toContain("SameSite=Lax");
     });
   });
