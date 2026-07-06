@@ -52,12 +52,6 @@
       "count": 1,
       "message": "Object literal may only specify known properties, and 'data' does not exist in type '{ ok: true; value: { userId: string; }; }'."
     },
-    "1a0d412fd45d208f1a7b502d9a73b7d285def3e3": {
-      "file": "src/app/api/test-data/cleanup/route.test.ts",
-      "code": "TS2540",
-      "count": 1,
-      "message": "Cannot assign to 'NODE_ENV' because it is a read-only property."
-    },
     "5893b201affa593c810a2ea73ec871bb7835b362": {
       "file": "src/lib/blob/cleanup.test.ts",
       "code": "TS2352",
@@ -75,18 +69,6 @@
       "code": "TS2322",
       "count": 3,
       "message": "Type '{ id: string; name: string; owner: { id: string; name: string; } | null; invitedOwner: { id: string; name: string; } | null; }' is not assignable to type 'Pick<{ name: string; id: string; createdAt: Date; updatedAt: Date; initials: string; nextIssueNumber: number; ownerId: string | null; invitedOwnerId: string | null; description: ProseMirrorDoc | null; ... 10 more ...; ipdbId: number | null; }, \"name\" | ... 1 more ... | \"ownerRequirements\"> & { ...; }'."
-    },
-    "391bb83eff1684f39caa6f1fa9071a29bccf4a8e": {
-      "file": "src/lib/security/turnstile.test.ts",
-      "code": "TS2540",
-      "count": 2,
-      "message": "Cannot assign to 'NODE_ENV' because it is a read-only property."
-    },
-    "d738f05c3e45b8a147991bb06df40d3fe6775f11": {
-      "file": "src/lib/supabase/middleware.test.ts",
-      "code": "TS2540",
-      "count": 1,
-      "message": "Cannot assign to 'NODE_ENV' because it is a read-only property."
     },
     "ac734c26f079a0383a4515d857f329c3da8b60b1": {
       "file": "src/server/actions/images.test.ts",
@@ -109,7 +91,7 @@
     "c0e94e7977c352f9829d9158e6fc2b31616bd4fe": {
       "file": "src/test/integration/account-deletion.test.ts",
       "code": "TS2769",
-      "count": 2,
+      "count": 8,
       "message": "No overload matches this call."
     },
     "3b3bb9bd117e7d02ba106c613c4dedd90a6b47ad": {
@@ -142,12 +124,6 @@
       "count": 1,
       "message": "Argument of type '\"user\"' is not assignable to parameter of type '\"admin\" | \"technician\" | \"member\" | \"guest\"'."
     },
-    "bb258a57b75541208dffd2dfdfebc353f0c1d2fc": {
-      "file": "src/test/integration/api/client-logs.route.test.ts",
-      "code": "TS2540",
-      "count": 6,
-      "message": "Cannot assign to 'NODE_ENV' because it is a read-only property."
-    },
     "73fc9c6b7165b29215abceca1b1903afef6e6c04": {
       "file": "src/test/integration/avatar-upload-action.test.ts",
       "code": "TS2556",
@@ -166,6 +142,12 @@
       "count": 3,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
+    "7888abcd4dac4a8b5576204f3b971f83e989f5f8": {
+      "file": "src/test/integration/collections-latest-activity.test.ts",
+      "code": "TS2345",
+      "count": 3,
+      "message": "Argument of type 'string | undefined' is not assignable to parameter of type 'string'."
+    },
     "28e2c6a03607c96b58aa4b21dc08d85114dc9fd9": {
       "file": "src/test/integration/collections-owner.test.ts",
       "code": "TS2345",
@@ -177,6 +159,12 @@
       "code": "TS2820",
       "count": 1,
       "message": "Type '\"playable\"' is not assignable to type '\"cosmetic\" | \"minor\" | \"major\" | \"unplayable\" | undefined'. Did you mean '\"unplayable\"'?"
+    },
+    "5ddbe9688d462da2e96e44cfdac42ad92fd9e2e3": {
+      "file": "src/test/integration/database-queries.test.ts",
+      "code": "TS2769",
+      "count": 4,
+      "message": "No overload matches this call."
     },
     "317408be15b8b91333290553023786d454e5c093": {
       "file": "src/test/integration/database-queries.test.ts",
@@ -262,10 +250,22 @@
       "count": 4,
       "message": "Argument of type '{ readonly type: \"doc\"; readonly content: readonly [{ readonly type: \"paragraph\"; readonly content: readonly [{ readonly type: \"text\"; readonly text: \"x\"; }]; }]; }' is not assignable to parameter of type 'ProseMirrorDoc'."
     },
+    "cb5fb8bf085422276969a69395a486193fbdbe5b": {
+      "file": "src/test/integration/machine-timeline-events.test.ts",
+      "code": "TS2345",
+      "count": 25,
+      "message": "Argument of type 'string | undefined' is not assignable to parameter of type 'string'."
+    },
+    "1f0937be2ace50d502ecadbad2dc286addd8abb1": {
+      "file": "src/test/integration/machine-timeline-events.test.ts",
+      "code": "TS2769",
+      "count": 4,
+      "message": "No overload matches this call."
+    },
     "4718b4c38e711166211c565b20ec7797b6c62aa8": {
       "file": "src/test/integration/machine-timeline-events.test.ts",
       "code": "TS2345",
-      "count": 33,
+      "count": 8,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
     "f5ad5b00e27a411bb8d0a273190df25fbe3ca6db": {
@@ -273,6 +273,12 @@
       "code": "TS2345",
       "count": 13,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
+    },
+    "a1bd7b7a40249533f1aa8c4dde72efe301f5124f": {
+      "file": "src/test/integration/machine-timeline-events.test.ts",
+      "code": "TS2538",
+      "count": 1,
+      "message": "Type 'undefined' cannot be used as an index type."
     },
     "295cdf4544a83ff5d10918090ec17491b7e80a2f": {
       "file": "src/test/integration/machine-timeline-multi.test.ts",
