@@ -46,23 +46,24 @@
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
-| Category    | Skill                     | When to use                                                             |
-| :---------- | :------------------------ | :---------------------------------------------------------------------- |
-| UI          | `pinpoint-ui`             | Components, shadcn/ui, forms, responsive design                         |
-| UI          | `pinpoint-design-bible`   | Design system, page archetypes, spacing, surfaces                       |
-| TypeScript  | `pinpoint-typescript`     | Type errors, generics, Drizzle types                                    |
-| Testing     | `pinpoint-testing`        | Writing tests, PGlite, test-layer decisions                             |
-| Testing     | `pinpoint-e2e`            | E2E tests, worker isolation, Playwright stability                       |
-| Security    | `pinpoint-security`       | Auth, CSP, Zod, Supabase SSR                                            |
-| Patterns    | `pinpoint-patterns`       | Server Actions, data fetching, architecture                             |
-| Workflow    | `pinpoint-prototype-mode` | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt |
-| Workflow    | `pinpoint-briefing`       | Session-start health review                                             |
-| Workflow    | `pinpoint-pr-workflow`    | Full PR lifecycle: commit, push, CI, merge                              |
-| Workflow    | `pinpoint-orchestrator`   | Parallel subagent work in worktrees: dispatch, monitor, follow-up       |
-| Workflow    | `pinpoint-huddle`         | Inter-session coordination via daily/monthly beads (the huddle hooks)   |
-| Antigravity | `pinpoint-agy-triage`     | Grooming: evaluate whether a bead is agy-ready/agy-ui                   |
-| Antigravity | `pinpoint-agy-dispatch`   | Emit an Antigravity copy-paste prompt for a chosen bead                 |
-| Antigravity | `pinpoint-agy-execute`    | Runbook for Antigravity to execute an agy-ready bead end-to-end         |
+| Category    | Skill                         | When to use                                                                                                                              |
+| :---------- | :---------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| UI          | `pinpoint-ui`                 | Components, shadcn/ui, forms, responsive design                                                                                          |
+| UI          | `pinpoint-design-bible`       | Design system, page archetypes, spacing, surfaces                                                                                        |
+| TypeScript  | `pinpoint-typescript`         | Type errors, generics, Drizzle types                                                                                                     |
+| Testing     | `pinpoint-testing`            | Writing tests, PGlite, test-layer decisions                                                                                              |
+| Testing     | `pinpoint-e2e`                | E2E tests, worker isolation, Playwright stability                                                                                        |
+| Security    | `pinpoint-security`           | Auth, CSP, Zod, Supabase SSR                                                                                                             |
+| Patterns    | `pinpoint-patterns`           | Server Actions, data fetching, architecture                                                                                              |
+| Workflow    | `pinpoint-prototype-mode`     | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt                                                                  |
+| Workflow    | `pinpoint-briefing`           | Session-start health review                                                                                                              |
+| Workflow    | `pinpoint-pr-workflow`        | Full PR lifecycle: commit, push, CI, merge                                                                                               |
+| Workflow    | `pinpoint-orchestrator`       | Parallel subagent work in worktrees: dispatch, monitor, follow-up                                                                        |
+| Workflow    | `pinpoint-huddle`             | Inter-session coordination via daily/monthly beads (the huddle hooks)                                                                    |
+| Workflow    | `pinpoint-superpowers-bridge` | Running the superpowers lifecycle in PinPoint: bead field pointers + overrides for the conflicting finish/worktree/review/subagent steps |
+| Antigravity | `pinpoint-agy-triage`         | Grooming: evaluate whether a bead is agy-ready/agy-ui                                                                                    |
+| Antigravity | `pinpoint-agy-dispatch`       | Emit an Antigravity copy-paste prompt for a chosen bead                                                                                  |
+| Antigravity | `pinpoint-agy-execute`        | Runbook for Antigravity to execute an agy-ready bead end-to-end                                                                          |
 
 ## 4. Environment
 
@@ -175,6 +176,17 @@ If a PR accumulates review comments (from Tim or another agent): fix the code, O
 ### Parallel subagent work
 
 Use worktree-isolated subagents for independent tasks. Tool-specific dispatch, hooks, and known bugs live in your tool's instructions file. Full multi-tool workflow: `pinpoint-orchestrator` skill.
+
+### Superpowers lifecycle → beads
+
+When you run the superpowers plugin lifecycle (`brainstorming → writing-plans → subagent-driven-development → finishing-a-development-branch`), load `pinpoint-superpowers-bridge` — several superpowers steps conflict with PinPoint rules (local merge, raw `git worktree remove`, generic test commands, uncapped subagent dispatch, the plugin's own review-reply flow) and the skill spells out the overrides. Specs and plans stay as **files in git** (their superpowers default locations, kept as records — §8); beads carry **pointers**, not copies:
+
+- `--spec-id` = spec file path
+- `--design` = plan file path(s) **+ branch name** while unmerged (recover with `git show origin/<branch>:<path>`)
+- `--acceptance` = distilled success criteria
+- `--notes` = landing breadcrumbs (PR #, migration state, follow-ups)
+
+Plan-file checkboxes are within-PR execution state, **not** durable task tracking — the bead is the cross-session source of truth. Single-PR work gets one bead (no per-task sliver-beads); only multi-PR epics decompose into children.
 
 ### Surfacing visual or ambiguous decisions (playgrounds)
 
