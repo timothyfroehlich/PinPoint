@@ -24,6 +24,7 @@ import {
   anonymizeUserReferences,
   getReassignmentTargets,
 } from "~/app/(app)/settings/account-deletion";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 import { randomUUID } from "node:crypto";
 
 // ---------------------------------------------------------------------------
@@ -137,7 +138,7 @@ describe("Account Deletion Anonymization (PGlite)", () => {
       .values({
         issueId: issueReported.id,
         authorId: userToDeleteId,
-        content: "I am leaving",
+        content: plainTextToDoc("I am leaving"),
       })
       .returning();
 
@@ -169,7 +170,7 @@ describe("Account Deletion Anonymization (PGlite)", () => {
     });
     expect(anonymizedComment?.authorId).toBeNull();
     // Content should remain
-    expect(anonymizedComment?.content).toBe("I am leaving");
+    expect(anonymizedComment?.content).toEqual(plainTextToDoc("I am leaving"));
 
     const anonymizedImage = await db.query.issueImages.findFirst({
       where: eq(issueImages.issueId, issueReported.id),
@@ -379,7 +380,11 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
 
     const [comment] = await db
       .insert(issueComments)
-      .values({ issueId: issue.id, authorId: userId, content: "goodbye" })
+      .values({
+        issueId: issue.id,
+        authorId: userId,
+        content: plainTextToDoc("goodbye"),
+      })
       .returning();
 
     // Call the real action — DB hits PGlite, external SDKs are mocked
@@ -404,7 +409,7 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
       where: eq(issueComments.id, comment.id),
     });
     expect(updatedComment?.authorId).toBeNull();
-    expect(updatedComment?.content).toBe("goodbye"); // content preserved
+    expect(updatedComment?.content).toEqual(plainTextToDoc("goodbye")); // content preserved
 
     const updatedMachine = await db.query.machines.findFirst({
       where: eq(machines.id, machine.id),

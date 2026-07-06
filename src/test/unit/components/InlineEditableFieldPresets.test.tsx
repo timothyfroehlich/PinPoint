@@ -4,7 +4,10 @@ import { describe, it, expect, vi } from "vitest";
 import { useState } from "react";
 
 import { InlineEditableField } from "~/components/inline-editable-field";
-import { SETTINGS_INSTRUCTIONS_PRESETS } from "~/lib/machines/settings-instructions-presets";
+import {
+  SETTINGS_INSTRUCTIONS_PRESETS,
+  type SettingsInstructionsPreset,
+} from "~/lib/machines/settings-instructions-presets";
 import { docToPlainText, type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 // Stub the rich-text editor/display so the picker logic is tested without Tiptap.
@@ -265,7 +268,7 @@ describe("InlineEditableField — optimistic clear (B3)", () => {
 });
 
 describe("InlineEditableField — preset overwrite confirm (B2 / Task 11)", () => {
-  const sternPreset = {
+  const sternPreset: SettingsInstructionsPreset = {
     key: "stern",
     label: "Stern",
     doc: {
@@ -274,7 +277,7 @@ describe("InlineEditableField — preset overwrite confirm (B2 / Task 11)", () =
         { type: "paragraph", content: [{ type: "text", text: "Stern path" }] },
       ],
     },
-  } as const;
+  };
 
   it("confirms before a preset overwrites existing editor content", async () => {
     const user = userEvent.setup();

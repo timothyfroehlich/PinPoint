@@ -102,7 +102,11 @@ function checkDocker(): void {
       timeout: 5000,
     });
 
-    if (result.error?.code === "ENOENT") {
+    if (
+      result.error &&
+      "code" in result.error &&
+      result.error.code === "ENOENT"
+    ) {
       throw new Error(
         "Docker is not installed.\n" +
           "  Install OrbStack, Docker Desktop, or Docker Engine (whichever your platform supports).\n" +

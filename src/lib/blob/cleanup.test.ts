@@ -71,10 +71,10 @@ function chainableSelect(rows: Record<string, unknown>[]) {
   const from = vi.fn().mockReturnValue({ where });
   // Also allow resolution without where (for issueImages query)
   from.mockImplementation(() => {
-    // Return an object that is both thenable and has .where()
+    // Return an object that is both thenable and has .where().
+    // Object.assign attaches `.where` to the promise without an unsafe cast.
     const result = Promise.resolve(rows);
-    (result as Record<string, unknown>).where = where;
-    return result;
+    return Object.assign(result, { where });
   });
   return { from, where };
 }

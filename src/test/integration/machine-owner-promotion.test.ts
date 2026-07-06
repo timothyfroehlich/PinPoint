@@ -229,38 +229,41 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
         },
       } as any);
 
-      // Spy on the real transaction to intercept the tx object
+      // Spy on the real transaction to intercept the tx object.
+      // Type the mock/callback with the transaction's own parameter types so
+      // the spy signature matches `db.transaction` exactly (the callback
+      // receives a PgTransaction, not the top-level db).
+      type TxCb = Parameters<typeof db.transaction>[0];
+      type Tx = Parameters<TxCb>[0];
       const originalTransaction = db.transaction.bind(db);
       const transactionSpy = vi
         .spyOn(db, "transaction")
-        .mockImplementationOnce(
-          async (callback: (tx: typeof db) => Promise<unknown>) => {
-            return originalTransaction(async (realTx: typeof db) => {
-              // Wrap the tx: let the first update (role promotion on userProfiles) go
-              // through, then throw on the second update (machines) to simulate a
-              // constraint violation or infrastructure failure mid-transaction.
-              let updateCallCount = 0;
-              const txProxy = new Proxy(realTx, {
-                get(target, prop, receiver) {
-                  if (prop === "update") {
-                    return (...args: Parameters<typeof target.update>) => {
-                      updateCallCount++;
-                      if (updateCallCount > 1) {
-                        // Simulate the machine update failing (e.g. constraint violation)
-                        throw new Error(
-                          "Simulated mid-transaction constraint violation on machines table"
-                        );
-                      }
-                      return target.update(...args);
-                    };
-                  }
-                  return Reflect.get(target, prop, receiver);
-                },
-              });
-              return callback(txProxy);
+        .mockImplementationOnce(async (callback: TxCb) => {
+          return originalTransaction(async (realTx: Tx) => {
+            // Wrap the tx: let the first update (role promotion on userProfiles) go
+            // through, then throw on the second update (machines) to simulate a
+            // constraint violation or infrastructure failure mid-transaction.
+            let updateCallCount = 0;
+            const txProxy = new Proxy(realTx, {
+              get(target, prop, receiver) {
+                if (prop === "update") {
+                  return (...args: Parameters<typeof target.update>) => {
+                    updateCallCount++;
+                    if (updateCallCount > 1) {
+                      // Simulate the machine update failing (e.g. constraint violation)
+                      throw new Error(
+                        "Simulated mid-transaction constraint violation on machines table"
+                      );
+                    }
+                    return target.update(...args);
+                  };
+                }
+                return Reflect.get(target, prop, receiver);
+              },
             });
-          }
-        );
+            return callback(txProxy);
+          });
+        });
 
       const formData = new FormData();
       formData.append("id", machine.id);

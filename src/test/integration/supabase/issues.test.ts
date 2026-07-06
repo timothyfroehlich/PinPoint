@@ -78,9 +78,10 @@ describe("Issues CRUD Operations (PGlite)", () => {
 
       // Attempt to create issue without machineInitials should fail
       await expect(
+        // @ts-expect-error - deliberately passing null for a NOT NULL column to
+        // assert the runtime constraint rejection (the call has no matching overload).
         db.insert(issues).values({
           title: "Test Issue",
-          // @ts-expect-error - Testing validation
           machineInitials: null,
           issueNumber: 1,
           severity: "minor",
