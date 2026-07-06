@@ -13,6 +13,7 @@ import type {
   issues,
   issueComments,
 } from "~/server/db/schema";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 
 export function createTestUser(
   overrides?: Partial<InferInsertModel<typeof userProfiles>>
@@ -56,7 +57,7 @@ export function createTestIssue(
     machineInitials,
     issueNumber: 1,
     title: "Test Issue",
-    description: "Test description",
+    description: plainTextToDoc("Test description"),
     status: "new",
     severity: "minor",
     priority: "low",
@@ -80,7 +81,7 @@ export function createTestComment(
   return {
     issueId,
     authorId: null,
-    content: "Test comment",
+    content: plainTextToDoc("Test comment"),
     isSystem: false,
     createdAt: new Date(),
     updatedAt: new Date(),
