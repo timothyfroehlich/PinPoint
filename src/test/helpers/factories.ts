@@ -16,7 +16,7 @@ import type {
 
 export function createTestUser(
   overrides?: Partial<InferInsertModel<typeof userProfiles>>
-): InferInsertModel<typeof userProfiles> {
+): InferInsertModel<typeof userProfiles> & { id: string } {
   return {
     id: randomUUID(),
     email: `test-${randomUUID()}@example.com`,
@@ -34,7 +34,7 @@ export function createTestUser(
  */
 export function createTestMachine(
   overrides?: Partial<InferInsertModel<typeof machines>>
-): InferInsertModel<typeof machines> {
+): InferInsertModel<typeof machines> & { id: string } {
   return {
     id: randomUUID(),
     initials: "TM",
@@ -51,7 +51,7 @@ export function createTestMachine(
 export function createTestIssue(
   machineInitials: string,
   overrides?: Partial<InferInsertModel<typeof issues>>
-): InferInsertModel<typeof issues> {
+): InferInsertModel<typeof issues> & { id: string } {
   return {
     id: randomUUID(),
     machineInitials,
@@ -76,7 +76,7 @@ export function createTestIssue(
 export function createTestComment(
   issueId: string,
   overrides?: Partial<InferInsertModel<typeof issueComments>>
-): InferInsertModel<typeof issueComments> {
+): InferInsertModel<typeof issueComments> & { id: string } {
   return {
     id: randomUUID(),
     issueId,
