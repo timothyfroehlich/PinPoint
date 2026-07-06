@@ -117,7 +117,7 @@ const DEFAULT_PROPS = {
   machinesList: MACHINES,
   defaultMachineId: undefined,
   userAuthenticated: false,
-  accessLevel: "public" as const,
+  accessLevel: "unauthenticated" as const,
   assignees: [],
   initialIssues: [],
   initialMachineInitials: "",

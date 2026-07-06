@@ -16,12 +16,6 @@
       "count": 1,
       "message": "Conversion of type '{ id: string; title: string; issueNumber: number; status: \"new\"; severity: \"minor\"; priority: \"low\"; frequency: \"intermittent\"; createdAt: Date; updatedAt: Date; reportedBy: null; assignedTo: null; closedAt: null; machineInitials: string; }' to type 'IssueCardIssue' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
     },
-    "57947199addd91546cf7c25d70336ab38c2ef7b9": {
-      "file": "src/app/(app)/report/unified-report-form.test.tsx",
-      "code": "TS2322",
-      "count": 11,
-      "message": "Type '{ machinesList: { id: string; name: string; initials: string; }[]; defaultMachineId: undefined; userAuthenticated: boolean; accessLevel: \"public\"; assignees: never[]; initialIssues: never[]; initialMachineInitials: string; }' is not assignable to type 'UnifiedReportFormProps'."
-    },
     "5893b201affa593c810a2ea73ec871bb7835b362": {
       "file": "src/lib/blob/cleanup.test.ts",
       "code": "TS2352",
@@ -64,12 +58,6 @@
       "count": 1,
       "message": "Conversion of type 'undefined' to type '{ botTokenVaultId?: string | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
     },
-    "e3e6c847bc4e8b9b8eca05ab4477b486aa7776ad": {
-      "file": "src/test/integration/admin/user-management.test.ts",
-      "code": "TS2345",
-      "count": 1,
-      "message": "Argument of type '\"user\"' is not assignable to parameter of type '\"guest\" | \"member\" | \"technician\" | \"admin\"'."
-    },
     "05090a2b030174078bc02ef595827568503f2220": {
       "file": "src/test/integration/collections-issues-scope.test.ts",
       "code": "TS2345",
@@ -88,12 +76,6 @@
       "count": 4,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
-    "3852c6737173e0e0b6f7db759682ceef6aa61d7c": {
-      "file": "src/test/integration/dashboard.test.ts",
-      "code": "TS2820",
-      "count": 1,
-      "message": "Type '\"playable\"' is not assignable to type '\"cosmetic\" | \"minor\" | \"major\" | \"unplayable\" | undefined'. Did you mean '\"unplayable\"'?"
-    },
     "317408be15b8b91333290553023786d454e5c093": {
       "file": "src/test/integration/database-queries.test.ts",
       "code": "TS2345",
@@ -111,12 +93,6 @@
       "code": "TS2345",
       "count": 1,
       "message": "Argument of type 'PgTransaction<PgliteQueryResultHKT, typeof import(\"./src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"./src/server/db/schema\")>>' is not assignable to parameter of type 'DbOrTx | undefined'."
-    },
-    "76c013a7c16640084dcab521d9b594c993d6079d": {
-      "file": "src/test/integration/issue-detail-permissions.test.ts",
-      "code": "TS2769",
-      "count": 1,
-      "message": "No overload matches this call."
     },
     "8cdec8e43e5f014fadb26b4f3c308db7b85c4592": {
       "file": "src/test/integration/issue-services.test.ts",
@@ -184,12 +160,6 @@
       "count": 1,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
-    "a324e6d3aa0efda363963d2dfbd6b843eb415831": {
-      "file": "src/test/integration/supabase/images.test.ts",
-      "code": "TS2769",
-      "count": 3,
-      "message": "No overload matches this call."
-    },
     "5fd033a55e655ab3bb0bfea8299f5cda0e8d8780": {
       "file": "src/test/integration/supabase/images.test.ts",
       "code": "TS2322",
@@ -217,7 +187,7 @@
     "d3b6ea1b2ee59598cc4ffe0928397b3f9d20a333": {
       "file": "src/test/integration/supabase/issues.test.ts",
       "code": "TS2769",
-      "count": 6,
+      "count": 1,
       "message": "No overload matches this call."
     },
     "abab087678d80a562f6a46c02f91c7cdd8d75dd5": {
@@ -267,12 +237,6 @@
       "code": "TS2322",
       "count": 3,
       "message": "Type '{ readonly key: \"stern\"; readonly label: \"Stern\"; readonly doc: { readonly type: \"doc\"; readonly content: readonly [{ readonly type: \"paragraph\"; readonly content: readonly [{ readonly type: \"text\"; readonly text: \"Stern path\"; }]; }]; }; }' is not assignable to type 'SettingsInstructionsPreset'."
-    },
-    "984c107b96f2f04776bacdd1b666d9e7cdca183b": {
-      "file": "src/test/unit/components/issues/IssueFilters.test.tsx",
-      "code": "TS2345",
-      "count": 1,
-      "message": "Argument of type '\"fixed\" | \"new\" | \"confirmed\" | \"in_progress\" | \"need_parts\" | \"need_help\" | \"wait_owner\" | \"wont_fix\" | \"wai\" | \"no_repro\" | \"duplicate\"' is not assignable to parameter of type '\"new\" | \"confirmed\"'."
     }
   }
 }
