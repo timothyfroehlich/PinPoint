@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestUser } from "~/test/helpers/factories";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 import {
   issues,
   machines,
@@ -53,7 +54,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
         .insert(issues)
         .values({
           title: "Test Issue",
-          description: "Test description",
+          description: plainTextToDoc("Test description"),
           machineInitials: testMachine.initials,
           issueNumber: 1,
           severity: "playable",
@@ -64,7 +65,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
 
       expect(issue).toBeDefined();
       expect(issue.title).toBe("Test Issue");
-      expect(issue.description).toBe("Test description");
+      expect(issue.description).toEqual(plainTextToDoc("Test description"));
       expect(issue.machineInitials).toBe(testMachine.initials);
       expect(issue.issueNumber).toBe(1);
       expect(issue.severity).toBe("playable");
@@ -352,7 +353,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
       // Create regular comment (for future feature)
       await db.insert(issueComments).values({
         issueId: testIssue.id,
-        content: "This is a comment",
+        content: plainTextToDoc("This is a comment"),
         isSystem: false,
         authorId: testUser.id,
       });

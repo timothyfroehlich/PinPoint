@@ -11,6 +11,7 @@ import { eq, count } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestUser } from "~/test/helpers/factories";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 import {
   issues,
   machines,
@@ -174,7 +175,7 @@ describe("Issue Images Database Operations (PGlite)", () => {
         .insert(issueComments)
         .values({
           issueId: testIssue.id,
-          content: "Test Comment",
+          content: plainTextToDoc("Test Comment"),
           authorId: testUser.id,
         })
         .returning();

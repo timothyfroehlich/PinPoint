@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { userProfiles, machines } from "~/server/db/schema";
 import { createTestUser, createTestMachine } from "~/test/helpers/factories";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 vi.mock("server-only", () => ({}));
 vi.mock("~/server/db", async () => {
@@ -14,7 +15,7 @@ const { getUserTimeline, resolveFeedMachineLabels } =
 const { createMachineComment } = await import("~/lib/timeline/machine-events");
 
 const USER = "00000000-0000-0000-0000-00000000c001";
-const doc = (t: string) => ({
+const doc = (t: string): ProseMirrorDoc => ({
   type: "doc",
   content: [{ type: "paragraph", content: [{ type: "text", text: t }] }],
 });
