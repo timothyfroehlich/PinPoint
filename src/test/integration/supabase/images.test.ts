@@ -361,7 +361,7 @@ describe("uploadIssueImage — action integration (PGlite)", () => {
           error: {
             name: "AuthSessionMissingError",
             message: "Auth session missing!",
-          } as GetUserResult["error"],
+          } as NonNullable<GetUserResult["error"]>,
         };
 
     const auth: Pick<SupabaseClient["auth"], "getUser"> = {
@@ -389,9 +389,11 @@ describe("uploadIssueImage — action integration (PGlite)", () => {
     vi.mocked(uploadToBlob).mockImplementation((_file, pathname) =>
       Promise.resolve({
         url: `https://blob.com/${pathname}`,
+        downloadUrl: `https://blob.com/${pathname}?download=1`,
         pathname,
-        size: 1024,
-        uploadedAt: new Date(),
+        contentType: "image/jpeg",
+        contentDisposition: `inline; filename="${pathname}"`,
+        etag: "mock-etag",
       })
     );
   }
@@ -529,9 +531,11 @@ describe("uploadIssueImage — action integration (PGlite)", () => {
 
     vi.mocked(uploadToBlob).mockResolvedValue({
       url: "https://blob.com/should-not-upload.jpg",
+      downloadUrl: "https://blob.com/should-not-upload.jpg?download=1",
       pathname: "issue-images/should-not-upload.jpg",
-      size: 1024,
-      uploadedAt: new Date(),
+      contentType: "image/jpeg",
+      contentDisposition: 'inline; filename="should-not-upload.jpg"',
+      etag: "mock-etag",
     });
 
     const { uploadIssueImage } = await import("~/server/actions/images");

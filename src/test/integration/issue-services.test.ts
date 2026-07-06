@@ -904,9 +904,9 @@ describe("Issue Service Functions (Integration)", () => {
         reportedBy: testUser.id,
       });
 
-      const mockFn = planNotification as ReturnType<typeof vi.fn>;
+      const mockFn = vi.mocked(planNotification);
       const mentionCalls = mockFn.mock.calls.filter(
-        ([payload]: [{ type?: string }]) => payload.type === "mentioned"
+        ([payload]) => payload.type === "mentioned"
       );
       expect(mentionCalls).toHaveLength(1);
       expect(mentionCalls[0]?.[0]).toEqual(
@@ -940,9 +940,9 @@ describe("Issue Service Functions (Integration)", () => {
         reportedBy: testUser.id,
       });
 
-      const mockFn = planNotification as ReturnType<typeof vi.fn>;
+      const mockFn = vi.mocked(planNotification);
       const mentionCalls = mockFn.mock.calls.filter(
-        ([payload]: [{ type?: string }]) => payload.type === "mentioned"
+        ([payload]) => payload.type === "mentioned"
       );
       expect(mentionCalls).toHaveLength(0);
     });

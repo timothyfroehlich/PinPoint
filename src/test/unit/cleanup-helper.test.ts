@@ -20,7 +20,7 @@ describe("cleanupTestEntities helper", () => {
     });
 
     expect(request.post).toHaveBeenCalledTimes(1);
-    const postArgs = request.post.mock.calls[0];
+    const postArgs = vi.mocked(request.post).mock.calls[0];
     expect(postArgs[0]).toBe("/api/test-data/cleanup");
     expect(postArgs[1]?.data).toEqual({
       issueIds: [],

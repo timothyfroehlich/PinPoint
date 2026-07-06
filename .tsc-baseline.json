@@ -4,59 +4,11 @@
     "ignoreMessages": false
   },
   "errors": {
-    "b415e5ab7fec0a8f4916b3debd0690774dfa2b41": {
-      "file": "e2e/global-setup.ts",
-      "code": "TS2339",
-      "count": 1,
-      "message": "Property 'code' does not exist on type 'Error'."
-    },
-    "b5a72af05c83d300ff5fe1219b0876af796e5a46": {
-      "file": "src/app/(app)/m/[initials]/issues-expando.test.tsx",
-      "code": "TS2352",
-      "count": 1,
-      "message": "Conversion of type '{ id: string; title: string; issueNumber: number; status: \"new\"; severity: \"minor\"; priority: \"low\"; frequency: \"intermittent\"; createdAt: Date; updatedAt: Date; reportedBy: null; assignedTo: null; closedAt: null; machineInitials: string; }' to type 'IssueCardIssue' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
-    },
-    "5893b201affa593c810a2ea73ec871bb7835b362": {
-      "file": "src/lib/blob/cleanup.test.ts",
-      "code": "TS2352",
-      "count": 1,
-      "message": "Conversion of type 'Promise<Record<string, unknown>[]>' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
-    },
-    "dfc7f000820bc0a4f7752524a1a7dd94822c76fe": {
-      "file": "src/test/eslint/no-side-effects-in-transaction.test.ts",
-      "code": "TS2578",
-      "count": 1,
-      "message": "Unused '@ts-expect-error' directive."
-    },
-    "c0e94e7977c352f9829d9158e6fc2b31616bd4fe": {
-      "file": "src/test/integration/account-deletion.test.ts",
-      "code": "TS2769",
-      "count": 2,
-      "message": "No overload matches this call."
-    },
     "3b3bb9bd117e7d02ba106c613c4dedd90a6b47ad": {
       "file": "src/test/integration/account-deletion.test.ts",
       "code": "TS2345",
       "count": 5,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'PostgresJsDatabase<typeof import(\"./src/server/db/schema\")> & { $client: Sql<{}>; }'."
-    },
-    "77cc6beff03244fc658f8c3060c1e390610ffccc": {
-      "file": "src/test/integration/admin/discord-integration-actions.test.ts",
-      "code": "TS2345",
-      "count": 1,
-      "message": "Argument of type '(callback: (tx: unknown) => unknown) => unknown' is not assignable to parameter of type '(callback: (tx: Tx) => unknown) => unknown'."
-    },
-    "4c067ca28342d1a1ad2b05f779f5b32447d6e5f2": {
-      "file": "src/test/integration/admin/discord-integration-actions.test.ts",
-      "code": "TS2493",
-      "count": 1,
-      "message": "Tuple type '[]' of length '0' has no element at index '0'."
-    },
-    "4d4b668663af5dde4a01560925ea0dd3f04216e4": {
-      "file": "src/test/integration/admin/discord-integration-actions.test.ts",
-      "code": "TS2352",
-      "count": 1,
-      "message": "Conversion of type 'undefined' to type '{ botTokenVaultId?: string | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first."
     },
     "05090a2b030174078bc02ef595827568503f2220": {
       "file": "src/test/integration/collections-issues-scope.test.ts",
@@ -94,29 +46,11 @@
       "count": 1,
       "message": "Argument of type 'PgTransaction<PgliteQueryResultHKT, typeof import(\"./src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"./src/server/db/schema\")>>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
-    "8cdec8e43e5f014fadb26b4f3c308db7b85c4592": {
-      "file": "src/test/integration/issue-services.test.ts",
-      "code": "TS2769",
-      "count": 2,
-      "message": "No overload matches this call."
-    },
-    "219c3f773b594bedad5dc52cc7f8bb63c57a53d6": {
-      "file": "src/test/integration/machine-owner-promotion.test.ts",
-      "code": "TS2345",
-      "count": 1,
-      "message": "Argument of type '(callback: (tx: PgliteDatabase<typeof import(\"~/server/db/schema\")>) => Promise<unknown>) => Promise<unknown>' is not assignable to parameter of type '(transaction: (tx: PgTransaction<PgliteQueryResultHKT, typeof import(\"./src/server/db/schema\"), ExtractTablesWithRelations<typeof import(\"./src/server/db/schema\")>>) => Promis...'."
-    },
     "874d3f80ead79635d0637ce80bb8b9228808f72e": {
       "file": "src/test/integration/machine-settings-actions.test.ts",
       "code": "TS2345",
       "count": 2,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
-    },
-    "1c007fe3ddc541fdbac1054bcb5ee82cf038c635": {
-      "file": "src/test/integration/machine-settings-actions.test.ts",
-      "code": "TS2339",
-      "count": 1,
-      "message": "Property 'changed' does not exist on type 'SaveResult'."
     },
     "739a74dc7dc2d5861a2149b75633faadbcb86da4": {
       "file": "src/test/integration/machine-timeline-actions.test.ts",
@@ -142,12 +76,6 @@
       "count": 3,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
     },
-    "544101e04a199e246308f45a003c636c358fd829": {
-      "file": "src/test/integration/machine-timeline-permissions.test.ts",
-      "code": "TS2578",
-      "count": 1,
-      "message": "Unused '@ts-expect-error' directive."
-    },
     "08d6f926adecb5d45e67ac332f6af6e8845ef206": {
       "file": "src/test/integration/notifications.test.ts",
       "code": "TS2345",
@@ -160,41 +88,11 @@
       "count": 1,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx | undefined'."
     },
-    "5fd033a55e655ab3bb0bfea8299f5cda0e8d8780": {
-      "file": "src/test/integration/supabase/images.test.ts",
-      "code": "TS2322",
-      "count": 1,
-      "message": "Type '{ data: { user: User; }; error: null; } | { data: { user: null; }; error: AuthError | null; }' is not assignable to type 'UserResponse'."
-    },
-    "a39ad70cc4b1e7eca8cbebc553084f6a0a001c8f": {
-      "file": "src/test/integration/supabase/images.test.ts",
-      "code": "TS2322",
-      "count": 1,
-      "message": "Type 'Promise<{ url: string; pathname: string; size: number; uploadedAt: Date; }>' is not assignable to type 'Promise<PutBlobResult>'."
-    },
-    "10f2617d50d3974e4e34fa25b5fb2a389cbe59dd": {
-      "file": "src/test/integration/supabase/images.test.ts",
-      "code": "TS2353",
-      "count": 1,
-      "message": "Object literal may only specify known properties, and 'size' does not exist in type 'PutBlobResult'."
-    },
     "6a8d331325851ff41f3e7c5a003925125aae1888": {
       "file": "src/test/integration/supabase/issue-filtering.test.ts",
       "code": "TS2345",
       "count": 11,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'PostgresJsDatabase<typeof import(\"./src/server/db/schema\")>'."
-    },
-    "d3b6ea1b2ee59598cc4ffe0928397b3f9d20a333": {
-      "file": "src/test/integration/supabase/issues.test.ts",
-      "code": "TS2769",
-      "count": 1,
-      "message": "No overload matches this call."
-    },
-    "abab087678d80a562f6a46c02f91c7cdd8d75dd5": {
-      "file": "src/test/integration/supabase/issues.test.ts",
-      "code": "TS2578",
-      "count": 1,
-      "message": "Unused '@ts-expect-error' directive."
     },
     "7c2bf505f349115e712cb0825002a3dd797dfd3f": {
       "file": "src/test/integration/timeline-author-scope.test.ts",
@@ -207,36 +105,6 @@
       "code": "TS2345",
       "count": 3,
       "message": "Argument of type 'PgliteDatabase<typeof import(\"./src/server/db/schema\")>' is not assignable to parameter of type 'DbOrTx'."
-    },
-    "1a1f1697e4b5dd7f3535aa3cad41cf74825832de": {
-      "file": "src/test/setup/cleanup.ts",
-      "code": "TS2677",
-      "count": 1,
-      "message": "A type predicate's type must be assignable to its parameter's type."
-    },
-    "54783305bbe07dacf35ac9ea7e48937db508d756": {
-      "file": "src/test/setup/cleanup.ts",
-      "code": "TS2345",
-      "count": 7,
-      "message": "Argument of type 'PgTableWithColumns<{ name: \"user_profiles\"; schema: undefined; columns: { id: PgColumn<{ name: \"id\"; tableName: \"user_profiles\"; dataType: \"string\"; columnType: \"PgUUID\"; data: string; driverParam: string; notNull: true; ... 7 more ...; generated: undefined; }, {}, {}>; ... 11 more ...; updatedAt: PgColumn<...>; }; ...' is not assignable to parameter of type 'PgTable<TableConfig>'."
-    },
-    "2b16d5e5a6f4dda6617271ee065a00fb44c71321": {
-      "file": "src/test/unit/cleanup-helper.test.ts",
-      "code": "TS2339",
-      "count": 1,
-      "message": "Property 'mock' does not exist on type '(url: string, options?: { data?: any; failOnStatusCode?: boolean | undefined; form?: FormData | { [key: string]: string | number | boolean; } | undefined; headers?: { [key: string]: string; } | undefined; ... 5 more ...; timeout?: number | undefined; } | undefined) => Promise<...>'."
-    },
-    "b3759dff81c333522b8208c5e44c3895d62015a9": {
-      "file": "src/test/unit/cleanup-order.test.ts",
-      "code": "TS2554",
-      "count": 1,
-      "message": "Expected 1 arguments, but got 2."
-    },
-    "a16d904be459a092292ba054b564205d82ee35ce": {
-      "file": "src/test/unit/components/InlineEditableFieldPresets.test.tsx",
-      "code": "TS2322",
-      "count": 3,
-      "message": "Type '{ readonly key: \"stern\"; readonly label: \"Stern\"; readonly doc: { readonly type: \"doc\"; readonly content: readonly [{ readonly type: \"paragraph\"; readonly content: readonly [{ readonly type: \"text\"; readonly text: \"Stern path\"; }]; }]; }; }' is not assignable to type 'SettingsInstructionsPreset'."
     }
   }
 }

@@ -34,22 +34,18 @@ vi.mock("~/components/issues/ExportButton", () => ({
   ExportButton: () => <button data-testid="export-csv-button">Export</button>,
 }));
 
-const makeIssue = (id: string, title: string): IssueCardIssue =>
-  ({
-    id,
-    title,
-    issueNumber: 1,
-    status: "new",
-    severity: "minor",
-    priority: "low",
-    frequency: "intermittent",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    reportedBy: null,
-    assignedTo: null,
-    closedAt: null,
-    machineInitials: "TM",
-  }) as IssueCardIssue;
+const makeIssue = (id: string, title: string): IssueCardIssue => ({
+  id,
+  title,
+  issueNumber: 1,
+  status: "new",
+  severity: "minor",
+  priority: "low",
+  frequency: "intermittent",
+  createdAt: new Date(),
+  machineInitials: "TM",
+  reporterName: null,
+});
 
 const defaultProps = {
   machineName: "Test Machine",

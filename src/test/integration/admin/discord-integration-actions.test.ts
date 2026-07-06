@@ -37,7 +37,11 @@ const {
   const mockExecute = vi.fn().mockResolvedValue([]);
   const mockReturning = vi.fn().mockResolvedValue([{ id: "singleton" }]);
   const mockUpdateWhere = vi.fn(() => ({ returning: mockReturning }));
-  const mockUpdateSet = vi.fn(() => ({ where: mockUpdateWhere }));
+  const mockUpdateSet = vi.fn(
+    (_payload: { botTokenVaultId?: string | null }) => ({
+      where: mockUpdateWhere,
+    })
+  );
   const mockUpdate = vi.fn(() => ({ set: mockUpdateSet }));
   const mockFindFirst = vi
     .fn()
@@ -437,16 +441,14 @@ describe("saveDiscordConfig", () => {
         order.push("execute");
         return Promise.resolve([]);
       });
-      mockTransaction.mockImplementation(
-        (callback: (tx: unknown) => unknown) => {
-          order.push("transaction");
-          return callback({
-            query: { discordIntegrationConfig: { findFirst: mockFindFirst } },
-            update: mockUpdate,
-            execute: mockExecute,
-          });
-        }
-      );
+      mockTransaction.mockImplementation((callback) => {
+        order.push("transaction");
+        return callback({
+          query: { discordIntegrationConfig: { findFirst: mockFindFirst } },
+          update: mockUpdate,
+          execute: mockExecute,
+        });
+      });
 
       const fd = makeFormData({
         enabled: "true",
@@ -490,11 +492,7 @@ describe("saveDiscordConfig", () => {
       // race-guard set (botTokenVaultId present in the .set() payload).
       const setPayloads = mockUpdateSet.mock.calls.map((c) => c[0]);
       expect(
-        setPayloads.some(
-          (p) =>
-            (p as { botTokenVaultId?: string }).botTokenVaultId ===
-            "new-vault-id"
-        )
+        setPayloads.some((p) => p.botTokenVaultId === "new-vault-id")
       ).toBe(true);
     });
 
