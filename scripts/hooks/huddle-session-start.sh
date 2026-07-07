@@ -48,12 +48,31 @@ STATE_DIR=$(huddle_state_dir) || exit 0
 NAMES_JSON="$STATE_DIR/session-names.json"
 mkdir -p "$STATE_DIR"
 
+# --- Per-machine Dolt sync (throttled, fail-open) ---
+# Pull peer machines' huddle updates (and push ours) before reading root notes,
+# so this session opens with the freshest cross-machine state. Throttled
+# per-machine; never blocks session start.
+huddle_sync
+
 # --- Bootstrap check ---
 # If config.json is missing, emit the user-visible bootstrap notice and exit.
 # This is the only hook that emits the notice; huddle-poll.sh exits silently.
 CONFIG_FILE="$STATE_DIR/config.json"
 ROOT_ID=""
 if [[ ! -f "$CONFIG_FILE" ]]; then
+  # Fresh-machine auto-adopt: before nagging to bootstrap, look for an existing
+  # "Huddle coordination root" epic in the synced beads DB. On a machine that
+  # cloned + synced the beads but never ran bootstrap locally, this finds the
+  # shared root and adopts it (writes config.json) instead of forking a
+  # duplicate — the multi-machine "just works" path. Only fall through to the
+  # bootstrap notice when discovery genuinely finds nothing (true first init).
+  ADOPTED_ROOT=$(huddle_discover_root 2>/dev/null) || ADOPTED_ROOT=""
+  if [[ -n "$ADOPTED_ROOT" ]]; then
+    printf '{"schema_version": 1, "root_bead_id": "%s"}\n' "$ADOPTED_ROOT" > "$CONFIG_FILE" 2>/dev/null || true
+    ROOT_ID="$ADOPTED_ROOT"
+  fi
+fi
+if [[ -z "$ROOT_ID" && ! -f "$CONFIG_FILE" ]]; then
   MAIN_ROOT=$(dirname "$(git rev-parse --git-common-dir 2>/dev/null || echo ".")" 2>/dev/null || echo "<main-worktree>")
   printf '## ⚠️ Huddle not bootstrapped\n\n'
   printf 'The huddle coordination system is not set up yet. It maintains a daily bead\n'
@@ -140,6 +159,13 @@ except Exception:
     exit 0
   fi
 fi
+
+# --- Cross-machine dedup safety-net (once per session, up-to-date path only) ---
+# huddle_sync above already pulled, so the local DB is fresh. If the rare
+# midnight race left two open dailies for today (two machines rotated before
+# either pushed), collapse them to the canonical here. No-op in the common case
+# (two cheap local reads); silent + fail-open.
+huddle_reconcile_today || true
 
 SESSION_ID=""
 SOURCE=""
