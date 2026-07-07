@@ -252,28 +252,27 @@ Huddle Root  (epic, never closes)                   ── PP-XXXX
 ## Multi-machine (sync across Tim's machines)
 
 The huddle works across multiple machines (Mac + Bazzite) with many concurrent
-sessions per machine. It rides the beads sync backbone: beads is \*\*Dolt embedded
+sessions per machine. It rides the beads sync backbone: beads is **Dolt embedded
+plus a DoltHub remote** (`sync.remote` in `.beads/config.yaml`), so the root bead,
+its `notes` pointers, the daily/monthly beads, and all comments already sync via
+`bd dolt push` / `bd dolt pull`. Three machine-local mechanisms make that
+seamless:
 
-- a DoltHub remote\*\* (`sync.remote` in `.beads/config.yaml`), so the root bead,
-  its `notes` pointers, the daily/monthly beads, and all comments already sync via
-  `bd dolt push` / `bd dolt pull`. Three machine-local mechanisms make that
-  seamless:
-
-* **Throttled per-machine sync.** `huddle_sync` (in `huddle-lib.sh`, called by
+- **Throttled per-machine sync.** `huddle_sync` (in `huddle-lib.sh`, called by
   the session-start and poll hooks) does `bd dolt push` then `pull`, gated by the
   shared `last-pull` marker + non-blocking `pull.lock`. One sync per
   `HUDDLE_SYNC_SECONDS` (default 180) per machine serves **every** session on it
   — not one-per-session. Fully fail-open: offline or bd errors never block a
   prompt; local coordination keeps working, and the next successful sync catches
   up. Peer posts land in your context within one interval.
-* **Fresh-machine auto-adopt (no fork).** `config.json` (the `root_bead_id`
+- **Fresh-machine auto-adopt (no fork).** `config.json` (the `root_bead_id`
   pointer) is machine-local. On a machine that cloned + synced the beads but
   never ran bootstrap, session-start calls `huddle_discover_root` — finds the
   existing "Huddle coordination root" epic in the synced DB and **adopts** it
   (writes `config.json`) instead of nagging or forking a duplicate root.
   `huddle-bootstrap.sh` does the same discover-and-adopt before ever creating a
   root, so it's safe to run on any machine.
-* **Idempotent cross-machine rotation.** `huddle-rotate.sh` pulls first (so a
+- **Idempotent cross-machine rotation.** `huddle-rotate.sh` pulls first (so a
   peer that already rotated is seen and this machine no-ops), then **adopts** an
   existing "Huddle daily `<today>`" instead of creating a duplicate, then pushes.
   A deterministic `huddle_reconcile_today` safety-net (run at end of rotation and

@@ -271,4 +271,10 @@ esac
 # huddle_reconcile_today is defined). If a peer machine created a duplicate daily
 # for today inside the race window — both rotated before either pushed — collapse
 # to the deterministic canonical. Silent + fail-open; no-op in the common case.
+#
+# Pull once more first: in the "both machines created before either pushed" race,
+# the peer's duplicate may not be in our local DB yet, so without a fresh pull the
+# reconcile would just no-op. Rotation is rare, so the extra pull is cheap and
+# makes the safety-net materially more effective. Fail-open (offline → skip).
+bd dolt pull --quiet >/dev/null 2>&1 || true
 huddle_reconcile_today || true

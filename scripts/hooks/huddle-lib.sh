@@ -72,7 +72,15 @@ except Exception:
 
 # huddle_sync — throttled, per-machine Dolt push+pull to keep the huddle beads
 # fresh across Tim's machines (Mac + Bazzite). Fail-open: any error (offline,
-# no remote, bd missing, lock held) returns 0 silently and NEVER blocks a hook.
+# no remote, bd missing, lock held) returns 0 silently and never stalls a hook
+# for more than the bounded network timeout.
+#
+# Bounded blocking: the push/pull are synchronous, so the one session that wins
+# the lock does wait on the network — but each call is wrapped in `timeout`
+# (GNU `timeout`, or `gtimeout` from coreutils on macOS) capped at
+# $HUDDLE_SYNC_TIMEOUT seconds (default 15). A hung remote is killed at the cap
+# instead of stalling the prompt indefinitely. If neither timeout binary exists
+# the calls run unwrapped (bd/dolt still apply their own network deadlines).
 #
 # Per-machine throttle: the marker lives in the shared huddle state dir
 # (<main-worktree>/.agents/huddle/last-pull), which every worktree/session of
@@ -97,6 +105,16 @@ huddle_sync() {
   lockfile="$state_dir/pull.lock"
   interval="${HUDDLE_SYNC_SECONDS:-180}"
   [[ "$interval" =~ ^[0-9]+$ ]] || interval=180
+  local sync_timeout="${HUDDLE_SYNC_TIMEOUT:-15}"
+  [[ "$sync_timeout" =~ ^[0-9]+$ ]] || sync_timeout=15
+  # Resolve a timeout binary once (GNU `timeout`, or `gtimeout` on macOS via
+  # coreutils). Empty → run the network calls unwrapped.
+  local timeout_bin=""
+  if command -v timeout >/dev/null 2>&1; then
+    timeout_bin="timeout"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    timeout_bin="gtimeout"
+  fi
 
   # Fast throttle check (no lock): skip if the marker is fresh.
   if [[ -f "$marker" ]]; then
@@ -117,6 +135,7 @@ huddle_sync() {
   # args) so the `bash -c` string needs no single-quote expansion — same
   # exported-function + exported-vars pattern as huddle-rotate.sh's do_rotation.
   export _HS_MARKER="$marker" _HS_INTERVAL="$interval"
+  export _HS_TIMEOUT_BIN="$timeout_bin" _HS_TIMEOUT="$sync_timeout"
   _huddle_sync_body() {
     local m="$_HS_MARKER" iv="$_HS_INTERVAL" l n
     if [[ -f "$m" ]]; then
@@ -129,8 +148,15 @@ huddle_sync() {
       fi
     fi
     date +%s > "$m" 2>/dev/null || true
-    bd dolt push --quiet >/dev/null 2>&1 || true
-    bd dolt pull --quiet >/dev/null 2>&1 || true
+    # Wrap each network call in the resolved timeout binary (if any) so a hung
+    # remote is killed at the cap rather than stalling the hook.
+    if [[ -n "$_HS_TIMEOUT_BIN" ]]; then
+      "$_HS_TIMEOUT_BIN" "$_HS_TIMEOUT" bd dolt push --quiet >/dev/null 2>&1 || true
+      "$_HS_TIMEOUT_BIN" "$_HS_TIMEOUT" bd dolt pull --quiet >/dev/null 2>&1 || true
+    else
+      bd dolt push --quiet >/dev/null 2>&1 || true
+      bd dolt pull --quiet >/dev/null 2>&1 || true
+    fi
   }
   export -f _huddle_sync_body
 
@@ -144,7 +170,7 @@ huddle_sync() {
     _huddle_sync_body
   fi
   unset -f _huddle_sync_body 2>/dev/null || true
-  unset _HS_MARKER _HS_INTERVAL 2>/dev/null || true
+  unset _HS_MARKER _HS_INTERVAL _HS_TIMEOUT_BIN _HS_TIMEOUT 2>/dev/null || true
   return 0
 }
 
@@ -208,7 +234,24 @@ huddle_reconcile_today() {
   canon=$(printf '%s\n' "$dailies" | head -n1)
   [[ -n "$canon" ]] || return 0
 
-  # Close every non-canonical duplicate.
+  # Repoint FIRST, close SECOND. If we closed losers first and the repoint then
+  # failed, root notes could be left pointing at a now-closed daily. Repointing
+  # up front means the worst case is a still-open duplicate (harmless, caught on
+  # the next reconcile) rather than a dangling pointer. Only close duplicates
+  # once root is confirmed pointing at the canonical id.
+  cur_today_id=$(printf '%s' "$notes_str" | jq -r '.today_bead.id // ""' 2>/dev/null) || cur_today_id=""
+  if [[ "$cur_today_id" != "$canon" ]]; then
+    new_notes=$(printf '%s' "$notes_str" | jq -c --arg id "$canon" '.today_bead.id = $id' 2>/dev/null) || new_notes=""
+    if [[ -z "$new_notes" ]]; then
+      return 0   # couldn't build the repoint → leave dups open for next reconcile
+    fi
+    # `bd update` is transactional — a zero exit means the notes were written, so
+    # it confirms root now points at the canonical id. On any failure, skip the
+    # closes and leave the duplicate open for the next reconcile to collapse.
+    bd update "$root_id" --notes "$new_notes" >/dev/null 2>&1 || return 0
+  fi
+
+  # Root now points at the canonical → safe to close every non-canonical dup.
   while IFS= read -r d; do
     [[ -z "$d" ]] && continue
     [[ "$d" == "$canon" ]] && continue
@@ -216,14 +259,6 @@ huddle_reconcile_today() {
     bd close "$d" >/dev/null 2>&1 || true
   done <<< "$dailies"
 
-  # Re-point root notes' today_bead.id at the canonical daily if needed.
-  cur_today_id=$(printf '%s' "$notes_str" | jq -r '.today_bead.id // ""' 2>/dev/null) || cur_today_id=""
-  if [[ "$cur_today_id" != "$canon" ]]; then
-    new_notes=$(printf '%s' "$notes_str" | jq -c --arg id "$canon" '.today_bead.id = $id' 2>/dev/null) || new_notes=""
-    if [[ -n "$new_notes" ]]; then
-      bd update "$root_id" --notes "$new_notes" >/dev/null 2>&1 || true
-    fi
-  fi
   bd dolt push --quiet >/dev/null 2>&1 || true
   return 0
 }
