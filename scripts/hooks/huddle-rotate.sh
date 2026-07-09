@@ -72,10 +72,28 @@ fi
 do_rotation() {
   set -euo pipefail
 
-  # Pull peer machines' state before the date re-check. If another machine
-  # already rotated and pushed, this pull surfaces today's date and we no-op
-  # below — the cross-machine equivalent of the local-lock peer check. Fail-open.
-  bd dolt pull --quiet >/dev/null 2>&1 || true
+  # Pull peer state before allocating any child id. A stale local child counter
+  # (this machine behind the remote) would mint a colliding daily id → an
+  # unmergeable Dolt conflict across machines (PP-1d51). So this pull is VERIFIED,
+  # not fail-open: if it FAILS on a merge conflict, refuse to rotate rather than
+  # mint the daily bead off a possibly-stale counter. Offline/unreachable stays
+  # fail-open — a single active machine cannot collide, and rotation must still
+  # work without a network.
+  #
+  # If another machine already rotated and pushed cleanly, this pull surfaces
+  # today's date and we no-op below — the cross-machine equivalent of the
+  # local-lock peer check.
+  #
+  # Note: --quiet is dropped deliberately so the conflict message is captured in
+  # pull_out for the conflict check below.
+  local pull_rc=0 pull_out
+  pull_out=$(bd dolt pull 2>&1) || pull_rc=$?
+  if [[ "$pull_rc" -ne 0 ]] && printf '%s' "$pull_out" | grep -qiE 'conflict|operator resolution'; then
+    printf 'huddle-rotate.sh: beads sync has unresolved merge conflicts — refusing to rotate.\n' >&2
+    printf 'Rotating now would allocate the daily bead off a possibly-stale child counter and collide across machines (see PP-1d51).\n' >&2
+    printf 'Resolve the beads Dolt conflict first (bd dolt pull), then re-run rotation.\n' >&2
+    exit 1
+  fi
 
   # Re-check date inside the lock (idempotency: a peer may have rotated first).
   # Reserve `exit 0` for the explicit "already up to date" case below. Anything
