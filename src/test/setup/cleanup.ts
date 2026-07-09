@@ -14,8 +14,12 @@ import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
 import * as schema from "~/server/db/schema";
 
 function buildCleanupOrder(): PgTable[] {
-  // Collect every PgTable export (includes authUsers from pgSchema.table())
-  const tables = Object.values(schema).filter(
+  // Collect every PgTable export (includes authUsers from pgSchema.table()).
+  // Widen to `unknown` first: `Object.values(schema)` infers a union of every
+  // export's concrete type, and `PgTable<TableConfig>` (the guard's predicate
+  // type) is not assignable to that union — so the guard needs an `unknown`
+  // input to narrow cleanly.
+  const tables = Object.values(schema as Record<string, unknown>).filter(
     (v): v is PgTable => v instanceof PgTable
   );
 

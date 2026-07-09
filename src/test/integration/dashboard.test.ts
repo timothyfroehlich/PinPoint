@@ -297,7 +297,7 @@ describe("Dashboard Queries (PGlite)", () => {
       await db.insert(issues).values(
         createTestIssue(machine4.initials, {
           issueNumber: 1,
-          severity: "playable",
+          severity: "minor",
           status: "fixed",
         })
       );

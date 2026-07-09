@@ -17,10 +17,21 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 ### Readiness and Merge
 
-| Script             | Purpose                                                                                                                                    |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `merge-pr.sh <PR>` | Re-evaluates the gates (CI, no-conflict) and squash-merges if all pass. Removes ready-for-review label on failure. `--dry-run` to preview. |
-| `_pr-gates.sh`     | Shared bash helper sourced by merge-pr.sh. Defines the gate functions.                                                                     |
+| Script                                 | Purpose                                                                                                                                                                             |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `merge-pr.sh <PR>`                     | Re-evaluates all 5 gates (`ci`, `currency`, `threads`, `reviewed`, `no_conflict`) and squash-merges if all pass. Removes ready-for-review label on failure. `--dry-run` to preview. |
+| `mark-claude-review.sh <PR> [summary]` | Posts/updates a sticky SHA-pinned Claude-review marker comment (`<!-- pinpoint-claude-review: <head_sha> -->`) that satisfies the `reviewed` gate when Copilot skips.               |
+| `_pr-gates.sh`                         | Shared bash helper sourced by merge-pr.sh. Defines the gate functions.                                                                                                              |
+
+### Gates (evaluated by `merge-pr.sh`, defined in `_pr-gates.sh`)
+
+| Gate          | Passes when                                                                                                                                    | Bypass kind |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `ci`          | `CI Gate` check is SUCCESS/NEUTRAL/SKIPPED                                                                                                     | `admin`     |
+| `currency`    | Latest Copilot review covers head (WARN-proceeds if stale past 600s)                                                                           | `force`     |
+| `threads`     | Zero unresolved Copilot review threads                                                                                                         | `force`     |
+| `reviewed`    | Head commit covered by a Copilot review OR a SHA-pinned Claude marker; WAITs inside the 600s window, FAILs after with no review of either kind | `force`     |
+| `no_conflict` | PR is MERGEABLE (never bypassable — GitHub rejects conflicting merges)                                                                         | `none`      |
 
 ## Status Token Vocabulary
 

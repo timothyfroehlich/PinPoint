@@ -152,7 +152,7 @@ describe("Issue detail permission states (integration)", () => {
         title: "Guest-reported issue",
         severity: "minor",
         priority: "low",
-        frequency: "occasional",
+        frequency: "intermittent",
         status: "new",
         reportedBy: guestReporterId,
       })

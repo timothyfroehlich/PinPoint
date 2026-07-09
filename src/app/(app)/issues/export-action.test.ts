@@ -31,12 +31,21 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn((...conditions: unknown[]) => ({ type: "and", conditions })),
 }));
 
-const mockBuildWhereConditions = vi.fn(() => []);
-const mockBuildOrderBy = vi.fn(() => []);
+const mockBuildWhereConditions = vi.fn<
+  (
+    ...args: [filters: Record<string, unknown>, db?: unknown, options?: unknown]
+  ) => unknown[]
+>(() => []);
+const mockBuildOrderBy = vi.fn<(...args: unknown[]) => unknown[]>(() => []);
 vi.mock("~/lib/issues/filters-queries", () => ({
-  buildWhereConditions: (...args: unknown[]) =>
-    mockBuildWhereConditions(...args),
-  buildOrderBy: (...args: unknown[]) => mockBuildOrderBy(...args),
+  // Named-param wrappers (not spreads) keep the forwarding type-safe while
+  // deferring access to the hoisted mocks until call time (avoids TDZ).
+  buildWhereConditions: (
+    filters: Record<string, unknown>,
+    db?: unknown,
+    options?: unknown
+  ) => mockBuildWhereConditions(filters, db, options),
+  buildOrderBy: (sort?: unknown) => mockBuildOrderBy(sort),
 }));
 
 vi.mock("~/server/db/schema", () => ({
@@ -246,11 +255,7 @@ describe("exportIssuesAction", () => {
       await exportIssuesAction({ filtersJson: JSON.stringify(filters) });
 
       expect(mockBuildWhereConditions).toHaveBeenCalledOnce();
-      const [passedFilters] = mockBuildWhereConditions.mock.calls[0] as [
-        Record<string, unknown>,
-        unknown,
-        unknown,
-      ];
+      const [passedFilters] = mockBuildWhereConditions.mock.calls[0];
       expect(passedFilters.status).toEqual(["new", "confirmed"]);
       expect(passedFilters.machine).toEqual(["AFM"]);
     });
@@ -264,11 +269,7 @@ describe("exportIssuesAction", () => {
       await exportIssuesAction({ filtersJson: JSON.stringify(filters) });
 
       expect(mockBuildWhereConditions).toHaveBeenCalledOnce();
-      const [passedFilters] = mockBuildWhereConditions.mock.calls[0] as [
-        Record<string, unknown>,
-        unknown,
-        unknown,
-      ];
+      const [passedFilters] = mockBuildWhereConditions.mock.calls[0];
       expect(passedFilters.createdFrom).toBeInstanceOf(Date);
       expect(passedFilters.updatedTo).toBeInstanceOf(Date);
       expect((passedFilters.createdFrom as Date).toISOString()).toBe(
@@ -285,11 +286,7 @@ describe("exportIssuesAction", () => {
       await exportIssuesAction({ filtersJson: JSON.stringify(filters) });
 
       expect(mockBuildWhereConditions).toHaveBeenCalledOnce();
-      const [passedFilters] = mockBuildWhereConditions.mock.calls[0] as [
-        Record<string, unknown>,
-        unknown,
-        unknown,
-      ];
+      const [passedFilters] = mockBuildWhereConditions.mock.calls[0];
       // Both fields dropped because the whole parse fails on invalid enum
       expect(passedFilters.status).toBeUndefined();
       expect(passedFilters.q).toBeUndefined();
@@ -298,11 +295,7 @@ describe("exportIssuesAction", () => {
     it("injects currentUserId from the authenticated user", async () => {
       await exportIssuesAction({});
 
-      const [passedFilters] = mockBuildWhereConditions.mock.calls[0] as [
-        Record<string, unknown>,
-        unknown,
-        unknown,
-      ];
+      const [passedFilters] = mockBuildWhereConditions.mock.calls[0];
       expect(passedFilters.currentUserId).toBe(MOCK_USER.id);
     });
   });
@@ -315,11 +308,7 @@ describe("exportIssuesAction", () => {
       await exportIssuesAction({ machineInitials: "TZ" });
 
       expect(mockBuildWhereConditions).toHaveBeenCalledOnce();
-      const [passedFilters] = mockBuildWhereConditions.mock.calls[0] as [
-        Record<string, unknown>,
-        unknown,
-        unknown,
-      ];
+      const [passedFilters] = mockBuildWhereConditions.mock.calls[0];
       expect(passedFilters.machine).toEqual(["TZ"]);
       expect(passedFilters.status).toEqual([]);
       expect(passedFilters.includeInactiveMachines).toBe(true);

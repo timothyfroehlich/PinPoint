@@ -347,19 +347,6 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
-        id: "machines.view.ownerNotes",
-        label: "View owner notes",
-        description:
-          "View private owner notes on a machine (owner only, not even admins)",
-        access: {
-          unauthenticated: false,
-          guest: false,
-          member: "owner",
-          technician: "owner",
-          admin: "owner",
-        },
-      },
-      {
         id: "machines.watch",
         label: "Watch machines",
         description: "Subscribe to notifications for a machine",
@@ -409,16 +396,16 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
-        id: "machines.edit.ownerNotes",
-        label: "Edit owner notes",
+        id: "machines.settings.manage",
+        label: "Manage machine settings",
         description:
-          "Edit private owner notes on a machine (owner only, not even admins)",
+          "Create, edit, duplicate, delete, and set the preferred settings set. Owners manage their own machines; technicians and admins manage any. (Viewing settings is public, via machines.view.)",
         access: {
           unauthenticated: false,
           guest: false,
           member: "owner",
-          technician: "owner",
-          admin: "owner",
+          technician: true,
+          admin: true,
         },
       },
       {

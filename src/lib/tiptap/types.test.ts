@@ -4,6 +4,8 @@ import {
   plainTextToDoc,
   extractMentions,
   docToPlainText,
+  docIsEmpty,
+  docsEqualByText,
   type ProseMirrorDoc,
 } from "./types";
 
@@ -129,5 +131,47 @@ describe("docToPlainText", () => {
       ],
     };
     expect(docToPlainText(doc)).toBe("Hey @Tim");
+  });
+});
+
+describe("docIsEmpty", () => {
+  it("treats a bare { type: doc } (no content) as empty without crashing", () => {
+    expect(docIsEmpty({ type: "doc" } as never)).toBe(true);
+  });
+  it("treats a single empty paragraph as empty", () => {
+    expect(docIsEmpty({ type: "doc", content: [{ type: "paragraph" }] })).toBe(
+      true
+    );
+  });
+  it("treats a paragraph with text as non-empty", () => {
+    expect(
+      docIsEmpty({
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "x" }] },
+        ],
+      })
+    ).toBe(false);
+  });
+});
+
+describe("docsEqualByText", () => {
+  it("ignores whitespace-only differences", () => {
+    const a: ProseMirrorDoc = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "hi" }] }],
+    };
+    const b: ProseMirrorDoc = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "hi  " }] },
+      ],
+    };
+    expect(docsEqualByText(a, b)).toBe(true);
+  });
+  it("null and empty doc are text-equal", () => {
+    expect(
+      docsEqualByText(null, { type: "doc", content: [{ type: "paragraph" }] })
+    ).toBe(true);
   });
 });

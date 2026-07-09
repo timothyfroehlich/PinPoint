@@ -904,9 +904,9 @@ describe("Issue Service Functions (Integration)", () => {
         reportedBy: testUser.id,
       });
 
-      const mockFn = planNotification as ReturnType<typeof vi.fn>;
+      const mockFn = vi.mocked(planNotification);
       const mentionCalls = mockFn.mock.calls.filter(
-        ([payload]: [{ type?: string }]) => payload.type === "mentioned"
+        ([payload]) => payload.type === "mentioned"
       );
       expect(mentionCalls).toHaveLength(1);
       expect(mentionCalls[0]?.[0]).toEqual(
@@ -940,9 +940,9 @@ describe("Issue Service Functions (Integration)", () => {
         reportedBy: testUser.id,
       });
 
-      const mockFn = planNotification as ReturnType<typeof vi.fn>;
+      const mockFn = vi.mocked(planNotification);
       const mentionCalls = mockFn.mock.calls.filter(
-        ([payload]: [{ type?: string }]) => payload.type === "mentioned"
+        ([payload]) => payload.type === "mentioned"
       );
       expect(mentionCalls).toHaveLength(0);
     });
@@ -1046,6 +1046,86 @@ describe("Issue Service Functions (Integration)", () => {
         idempotencyKey: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
       });
       expect(b.comment.id).not.toBe(a.comment.id);
+    });
+
+    it("does not leak another user's comment via a reused idempotency key (cross-user/cross-issue)", async () => {
+      const db = await getTestDb();
+
+      // User B is distinct from testUser (User A).
+      const [userB] = await db
+        .insert(userProfiles)
+        .values(
+          createTestUser({
+            id: "00000000-0000-0000-0000-0000000000b2",
+            role: "member",
+          })
+        )
+        .returning();
+
+      // A separate issue, reported by User B.
+      const [issueB] = await db
+        .insert(issues)
+        .values({
+          title: "User B Issue",
+          machineInitials: testMachine.initials,
+          issueNumber: 2,
+          severity: "minor",
+          priority: "low",
+          frequency: "intermittent",
+          status: "new",
+          reportedBy: userB.id,
+        })
+        .returning();
+
+      const sharedKey = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+
+      // User B records a private comment under the shared key on B's issue.
+      const { comment: bComment } = await addIssueComment({
+        issueId: issueB.id,
+        content: plainTextToDoc("User B private content"),
+        userId: userB.id,
+        idempotencyKey: sharedKey,
+      });
+      expect(bComment.authorId).toBe(userB.id);
+
+      // User A submits a comment to a DIFFERENT issue reusing B's key. The dedup
+      // lookups are scoped to (authorId, issueId), so A's lookups never match
+      // B's row. Because the idempotency_key unique index is global, A's insert
+      // collides and the scoped race-winner lookup finds nothing for A, so the
+      // call rejects rather than returning B's content. Security invariant:
+      // either A gets its own distinct row OR the call throws — B's content is
+      // never returned to A.
+      let aComment:
+        | Awaited<ReturnType<typeof addIssueComment>>["comment"]
+        | undefined;
+      let threw = false;
+      try {
+        const res = await addIssueComment({
+          issueId: testIssue.id,
+          content: plainTextToDoc("User A content"),
+          userId: testUser.id,
+          idempotencyKey: sharedKey,
+        });
+        aComment = res.comment;
+      } catch {
+        threw = true;
+      }
+
+      if (aComment) {
+        expect(aComment.id).not.toBe(bComment.id);
+        expect(aComment.authorId).toBe(testUser.id);
+        expect(aComment.content).not.toEqual(bComment.content);
+      } else {
+        expect(threw).toBe(true);
+      }
+
+      // B's row is untouched and remains the sole owner of the key.
+      const rows = await db.query.issueComments.findMany({
+        where: eq(issueComments.idempotencyKey, sharedKey),
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.id).toBe(bComment.id);
+      expect(rows[0]?.authorId).toBe(userB.id);
     });
 
     it("null key skips dedup: two submissions create two rows", async () => {

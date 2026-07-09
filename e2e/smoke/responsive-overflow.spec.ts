@@ -14,20 +14,21 @@ import {
 } from "../support/actions.js";
 import {
   seededMachines,
-  seededIssues,
+  seededIssue,
   seededMember,
 } from "../support/constants.js";
 import { getUserIdByEmail } from "../support/supabase-admin.js";
 
 // Build routes from seeded data so they don't break if seed data changes
 const machineInitials = seededMachines.addamsFamily.initials;
-const issueNum = seededIssues.TAF[0].num;
+const issueNum = seededIssue("TAF").num;
 
 const authenticatedRoutes = [
   "/dashboard",
   "/issues",
   "/m",
   `/m/${machineInitials}`,
+  `/m/${machineInitials}/settings`,
   `/m/${machineInitials}/maintenance`,
   `/m/${machineInitials}/timeline`,
   `/m/${machineInitials}/i/${issueNum}`,

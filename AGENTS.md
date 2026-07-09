@@ -3,6 +3,7 @@
 ## 1. User & Mission
 
 **User**: Tim (timothyfroehlich). **Project**: PinPoint, a pinball issue tracker for Austin Pinball Collective. **Phase**: In active production use by 20+ members; MVP+ polish and hardening.
+**Scale**: PinPoint is meant to support collections of 100+ machines spanning all eras — 1940s EMs through early solid state, DMD-era Bally/Williams, and modern Stern/JJP/Multimorphic. Don't design features that assume "modern games only."
 **Style**: Explain pros/cons, teach. PR reviews are AI-generated — apply critical thinking.
 
 ## 2. Critical Non-Negotiables
@@ -22,7 +23,7 @@
 9. **Test at the cheapest layer** (CORE-TEST-005): E2E for multi-step journeys; integration (PGlite + direct action) for server-action wiring, permissions, query correctness; RTL unit for form-state and UI logic. Smoke E2E is for "renders without 500" only. Bug-class table: `pinpoint-testing` skill.
 10. **Email privacy** (CORE-SEC-007): user emails only in admin views and the user's own settings page. Everywhere else: names, "Anonymous", or roles.
 11. **Permissions go through the matrix** (CORE-ARCH-008): all checks via `checkPermission()` from `~/lib/permissions/helpers`. The help page auto-generates from the matrix — keep enforcement and matrix in sync.
-12. **Two-layer responsive** (CORE-RESP-001..004): viewport breakpoints (`md:`, `lg:`) for page structure; container queries (`@lg:`, `@xl:`) for component internals. No `useMediaQuery` / `window.innerWidth` — use CSS. Sole exception: `use-table-responsive-columns` (PP-rs9).
+12. **Two-layer responsive** (CORE-RESP-001..004): viewport breakpoints (`md:`, `lg:`) for page structure; container queries (`@lg:`, `@xl:`) for component internals. No `useMediaQuery` / `window.innerWidth` — use CSS. Sanctioned exceptions (behavior swaps CSS can't express): `use-table-responsive-columns` (PP-rs9), `use-is-mobile` (PP-43q3 row-edit sheet).
 13. **Test what we own** (CORE-TEST-006): mock third-party SDKs at their boundary; don't synthesize their internal state. Any production third-party hostname reachable from an E2E run is a class-J violation — delete the spec and add an SDK-boundary mock.
 14. **`localhost`, never `127.0.0.1`** (CORE-SEC-008): cookie host isolation breaks Supabase SSR auth across the two. Use `localhost` in config, `.env*`, Playwright `baseURL`, and any local URL.
 15. **Baseline Widely available is the UI floor** (CORE-UI-005, CORE-UI-006): reach for `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, etc. directly — no polyfills, no feature detection. Look up modern patterns via the `modern-web-guidance` plugin (`npx -y modern-web-guidance@latest search "<query>"` then `retrieve "<id>"`); each guide tags its Baseline status. Newly-available features (Popover API, View Transitions, anchor positioning, scroll-driven animations) require a per-feature opt-in documented in `pinpoint-design-bible` §19.
@@ -30,6 +31,7 @@
 17. **Accessibility floor** (CORE-A11Y-001..006): skip-to-main link, `motion-reduce:` paired with animations, `<th scope="col">` + `aria-sort` + accessible name on data tables, real `<button>` (never `<div role="button">`), `title` is not a tooltip, `inert` on background regions when a modal opens.
 18. **No side effects inside DB transactions** (CORE-ARCH-011): external/non-transactional effects (HTTP, email, Discord, blob, Vault RPC) never run inside `db.transaction` — fetch inputs before it, deliver effects after commit (`after()` + `planNotification`/`dispatchNotification`). A runtime tripwire throws `SideEffectInTransactionError` if violated. (The Doodle Bug, PP-2053.)
 19. **Respect PinballMap API conduct** (CORE-PBM-001): all PBM access goes through the `~/lib/pinballmap` client seam using the documented JSON API — one sync call/hour, store+reuse tokens (Vault), descriptive User-Agent, 429 backoff, attribution + link-back when rendering PBM data. Never crawl pinballmap.com or reach it from tests. Re-read `docs/external/pinballmap-*` before changing integration code.
+20. **Env vars: central registry + no secret coupling** (CORE-SEC-009): every production-required env var is declared in the `next.config.ts` build registry (`assertVercelDeploymentEnv`) so a missing value fails the Vercel build, not silently degrades. No secret reused as another's fallback; no secret prefixed `NEXT_PUBLIC_`. Catalog + scope matrix: `docs/ENV_VARS.md`.
 
 ### 2.2 Process rules
 
@@ -39,28 +41,33 @@
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md` and `.agents/rules/AGY.md`. (PP-46z, PP-bg45.)
 6. **Never `--no-verify`**, never `gh pr merge`, never wildcard tool permissions — without explicit user approval each time.
+7. **Beads: `team-maintainer` policy** (not the conservative default).
 
 ## 3. Agent Skills
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
-| Category    | Skill                     | When to use                                                             |
-| :---------- | :------------------------ | :---------------------------------------------------------------------- |
-| UI          | `pinpoint-ui`             | Components, shadcn/ui, forms, responsive design                         |
-| UI          | `pinpoint-design-bible`   | Design system, page archetypes, spacing, surfaces                       |
-| TypeScript  | `pinpoint-typescript`     | Type errors, generics, Drizzle types                                    |
-| Testing     | `pinpoint-testing`        | Writing tests, PGlite, test-layer decisions                             |
-| Testing     | `pinpoint-e2e`            | E2E tests, worker isolation, Playwright stability                       |
-| Security    | `pinpoint-security`       | Auth, CSP, Zod, Supabase SSR                                            |
-| Patterns    | `pinpoint-patterns`       | Server Actions, data fetching, architecture                             |
-| Workflow    | `pinpoint-prototype-mode` | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt |
-| Workflow    | `pinpoint-briefing`       | Session-start health review                                             |
-| Workflow    | `pinpoint-pr-workflow`    | Full PR lifecycle: commit, push, CI, merge                              |
-| Workflow    | `pinpoint-orchestrator`   | Parallel subagent work in worktrees: dispatch, monitor, follow-up       |
-| Workflow    | `pinpoint-huddle`         | Inter-session coordination via daily/monthly beads (the huddle hooks)   |
-| Antigravity | `pinpoint-agy-triage`     | Grooming: evaluate whether a bead is agy-ready/agy-ui                   |
-| Antigravity | `pinpoint-agy-dispatch`   | Emit an Antigravity copy-paste prompt for a chosen bead                 |
-| Antigravity | `pinpoint-agy-execute`    | Runbook for Antigravity to execute an agy-ready bead end-to-end         |
+| Category    | Skill                          | When to use                                                             |
+| :---------- | :----------------------------- | :---------------------------------------------------------------------- |
+| UI          | `pinpoint-ui`                  | Components, shadcn/ui, forms, responsive design                         |
+| UI          | `pinpoint-design-bible`        | Design system, page archetypes, spacing, surfaces                       |
+| TypeScript  | `pinpoint-typescript`          | Type errors, generics, Drizzle types                                    |
+| Testing     | `pinpoint-testing`             | Writing tests, PGlite, test-layer decisions                             |
+| Testing     | `pinpoint-e2e`                 | E2E tests, worker isolation, Playwright stability                       |
+| Security    | `pinpoint-security`            | Auth, CSP, Zod, Supabase SSR                                            |
+| Patterns    | `pinpoint-patterns`            | Server Actions, data fetching, architecture                             |
+| Workflow    | `pinpoint-prototype-mode`      | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt |
+| Workflow    | `pinpoint-briefing`            | Session-start health review                                             |
+| Workflow    | `pinpoint-pr-workflow`         | Full PR lifecycle: commit, push, CI, merge                              |
+| Workflow    | `pinpoint-orchestrator`        | Parallel subagent work in worktrees: dispatch, monitor, follow-up       |
+| Workflow    | `pinpoint-huddle`              | Inter-session coordination via daily/monthly beads (the huddle hooks)   |
+| Deployment  | `pinpoint-db-connections`      | Supabase/Postgres pooler & connection-string reference                  |
+| Deployment  | `pinpoint-migration-conflicts` | Resolving drizzle/meta conflicts on merge                               |
+| Deployment  | `pinpoint-preview-deployments` | On-demand TTL'd Supabase preview branches, `/preview` command           |
+| Deployment  | `pinpoint-audit-override`      | Per-PR `/audit-override` escape hatch for unrelated audit failures      |
+| Antigravity | `pinpoint-agy-triage`          | Grooming: evaluate whether a bead is agy-ready/agy-ui                   |
+| Antigravity | `pinpoint-agy-dispatch`        | Emit an Antigravity copy-paste prompt for a chosen bead                 |
+| Antigravity | `pinpoint-agy-execute`         | Runbook for Antigravity to execute an agy-ready bead end-to-end         |
 
 ## 4. Environment
 
@@ -116,6 +123,10 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                          |
 | `FORCE_MEM_PRECHECK=skip <command>`   | Bypass the memory-pressure gate for one run (e.g. when you know pressure is transient or acceptable).                                                                                                                            |
 
+### Type-check engine (TS 7 migration — in progress)
+
+The `typecheck` gate runs on the **Go-native compiler** (`tsgo`, from `@typescript/native-preview`, pinned to a nightly) — ~4–6× faster than `tsc`. **ESLint type-aware linting and `next build` still type-check on `typescript@6`** — they need the JS compiler API the native build omits until TS 7.1, so `typescript@6` stays installed; do not remove it. `pnpm run typecheck:tsc6` runs the old engine for A/B comparison. This is Phase 1 of `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PR #1586) — proven 0 divergences vs `tsc 6` on `tsconfig.json`. **When TS 7.0 GA lands (~July 2026), bump the pinned nightly to the GA release.** Later phases (type-check tests/e2e, type-aware lint on the Go engine, Next native build) are deferred follow-ups.
+
 ### Prototype mode (rapid iteration)
 
 When the user explicitly asks for "prototype mode" / "rapid iteration" / "just explore" **for UI/UX work**, load the `pinpoint-prototype-mode` skill and enter it. It's scoped to **presentation only** — layout, components, styling, page structure, interaction/flow — and explicitly **not** for backend/internal work (data layer, server-action logic, auth, permissions, migrations), which keep full rigor; stub data rather than building it. Within that scope it relaxes the §2 rigor (skip preflight/tests before showing work, defer lint/type fixes, defer coverage and DRY) while logging every skipped item to a `.prototype-mode` debt ledger. It changes **agent behavior only** — pre-commit and `preflight` hooks still run on any real commit, which is fine because prototype work stays local and uncommitted. Never self-elect into it; full rigor is the default. A `UserPromptSubmit`/`SessionStart` hook reminds the agent while the marker exists, so the mode survives compaction. Exit on "exit prototype mode" / "make this real" — then repay the ledger.
@@ -149,18 +160,7 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 
 ### Migration conflicts
 
-Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the prevId chain.
-
-**Protocol when meta conflicts on merge:**
-
-1. Take upstream's `drizzle/meta` (theirs).
-2. Delete your migration files (`.sql` + `_snapshot.json`).
-3. Resolve `schema.ts` manually.
-4. `pnpm db:generate` — Drizzle regenerates a fresh migration.
-5. Compare the new SQL to what you deleted; confirm intent preserved.
-6. `pnpm db:reset` to verify.
-
-Before merging any migration PR: every new `.sql` has a matching `_snapshot.json`; `pnpm db:generate` reports "No schema changes".
+Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the prevId chain. Full regenerate-don't-edit protocol: `pinpoint-migration-conflicts` skill.
 
 ### Review comments
 
@@ -188,7 +188,6 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 - **Polish before shipping — no "fast follow."** Get a change genuinely good before it merges; don't ship something rough on the promise of a later cleanup PR. There is no fast-follow culture here.
 - **Slice large work into smaller _complete_ features.** When something is too big to polish in one pass, split it into smaller features that each ship finished — not one big half-done change followed by patch-up PRs. Smaller-but-complete beats larger-but-rough.
-- **One bead = one PR.** A bead is a unit of shippable work that maps to a single PR. File a bead only for genuinely separate work that will become its own PR — a real follow-up, a discovered out-of-scope problem, or future work. Conversely, don't create slivers: if a task is too small to justify its own session/PR overhead, fold it into a related bead or add it to an existing unstarted bead where it fits.
 
 ## 7. Deployment
 
@@ -196,20 +195,7 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 - **`pinpoint-prod`** (Live, Pro plan): **real user data — strict safety.** Daily backups, 7-day retention.
 - **Local**: `db:reset` OK. **Prod: NEVER `db:reset`. Only `db:migrate`.**
-- **Connection**: app + scripts use `POSTGRES_URL` — the Supavisor **transaction** pooler (`…pooler.supabase.com:6543`, IPv4). In prod the Supabase↔Vercel integration injects `POSTGRES_URL_NON_POOLING` as the IPv4 **session** pooler (`…pooler.supabase.com:5432`) — the prepared-statement-capable, IPv4-reachable endpoint that `scripts/migrate-production.ts` uses for DDL on the IPv4-only Vercel build runner (verified 2026-06-18 via prod build logs + DNS, PP-xhqt). The **direct** connection (`db.<ref>.supabase.co:5432`) is **not** what NON_POOLING points to here: it is IPv6-only (prod's IPv4 add-on is **off**, confirmed — the host has no A record), so it is unreachable from CI/preview/Vercel; the session pooler is used instead.
-  Format: `postgresql://postgres.[ref]:password@aws-0-us-east-2.pooler.supabase.com:6543/postgres`
-
-  **Canonical endpoint reference** (Supabase docs, verified 2026-06-18):
-
-  | Endpoint                    | Mode                       | IP                      | Prepared statements           | Use for                                      |
-  | --------------------------- | -------------------------- | ----------------------- | ----------------------------- | -------------------------------------------- |
-  | `…pooler.supabase.com:6543` | Supavisor **transaction**  | IPv4 (always)           | **disable** (`prepare:false`) | reads, serverless, one-shot scripts          |
-  | `…pooler.supabase.com:5432` | Supavisor **session**      | IPv4 (always)           | supported                     | migrations / DDL / write transactions (IPv4) |
-  | `db.<ref>.supabase.co:5432` | **direct**                 | IPv6 (IPv4 with add-on) | supported                     | migrations from IPv6-capable hosts           |
-  | `db.<ref>.supabase.co:6543` | Dedicated PgBouncer (paid) | IPv6 (IPv4 with add-on) | no                            | high-perf app traffic                        |
-  - The shared Supavisor pooler is **already IPv4** on both ports, free, every tier — there is nothing to "enable". The paid **IPv4 add-on** is a separate thing that makes the _direct_ connection IPv4; PinPoint does not need it (the session pooler already gives an IPv4, prepared-statement-capable endpoint).
-  - **Transaction pooler (`:6543`) does not support prepared statements** — set `prepare:false` on **every** porsager client that connects there: one-shot scripts (`scripts/lib/pg-client.mjs`) **and the app runtime** (`src/server/db/index.ts`). This is the canonical Drizzle + postgres-js + Supabase serverless setting. `scripts/migrate-production.ts` also sets `prepare:false` as defense-in-depth: it normally runs over the `:5432` session pooler (prepared-statement-capable), but the option keeps it correct if it ever falls back to `:6543`, and it additionally **requires** `POSTGRES_URL_NON_POOLING` in production rather than silently falling back (PP-xhqt).
-  - ✅ **Write/transaction hazard (resolved, PP-d8l8):** multi-statement write transactions over the `:6543` transaction pooler with prepared statements caused **silent commit loss** in prod (the driver saw COMMIT succeed; nothing persisted — incident 2026-06-18). Root cause: the runtime client (`src/server/db/index.ts`) used postgres-js's default `prepare:true`. **Fixed by setting `prepare:false` on the runtime client** — one client-level option that covers all write transactions and standalone writes; no read/write split or session-pooler routing needed (the `:5432` session pooler is wrong for Vercel serverless — session mode exhausts connections under Fluid Compute). The app-layer read-back guard in `src/services/issues.ts` (PP-qk7s) remains as a tripwire until prod confirms the fix, then is removed in a follow-up. Do **not** reintroduce `prepare:true` on a `:6543` client.
+- **Connection**: app + scripts use `POSTGRES_URL` — the Supavisor **transaction** pooler (`…pooler.supabase.com:6543`, IPv4), with `prepare:false` set on every porsager client that connects there (`src/server/db/index.ts`, `scripts/lib/pg-client.mjs`) — the transaction pooler does not support prepared statements, and a resolved incident (PP-d8l8) traced silent prod commit loss to this exact setting missing on the runtime client. **Never reintroduce `prepare:true` on a `:6543` client.** Full pooler/endpoint reference, connection string format, and the incident writeup: `pinpoint-db-connections` skill.
 
 ### Vercel
 
@@ -218,25 +204,11 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 ### Preview deployments (on-demand, TTL'd Supabase branches)
 
-Native Supabase auto-branching is **disabled** — no PR gets a preview by default (zero branches, zero cost). Previews are created on demand via PR comment commands and torn down on a TTL.
-
-- **Control surface = PR comments** (from authors with write access only):
-  - `/preview` — create (or restart after expiry) a branch, migrate + seed it, wire creds into the Vercel preview, and post a sticky status comment with the live URL + 48h expiry.
-  - `/preview extend` — push expiry +48h (no DB work). `/preview stop` — tear down now.
-- **State**: one sticky bot comment per PR (keyed `<!-- pinpoint-preview-status -->`) holds the `Expires:` timestamp — the TTL source of truth.
-- **Reaper**: `Preview Reaper` runs hourly; deletes branches past expiry or on closed/merged PRs, and flips the sticky comment to "expired — comment `/preview` to restart."
-- **Implementation** (workflows, the Vercel git-integration wiring, and required secrets): `.github/workflows/preview-control.yaml`, `preview-reaper.yaml`, `scripts/workflow/preview/*.sh`.
+Native Supabase auto-branching is **disabled** — no PR gets a preview by default. Previews are created on demand via the `/preview` PR-comment command and torn down on a TTL by an hourly reaper. Full control-surface reference and implementation pointers: `pinpoint-preview-deployments` skill.
 
 ### Audit-gate override (per-PR `/audit-override`)
 
-When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **unrelated** to a PR's changes (a transitive dev-dep CVE, or a fix that's major-bump-only), the audit job cascades into CI Gate and blocks the PR. The proper fix is still a dependency-bump PR — but `/audit-override` is the escape hatch so an unrelated repo-wide advisory doesn't force an admin-merge.
-
-- **Control surface = PR comments** (from authors with write access only):
-  - `/audit-override <reason>` — bypass the `pnpm audit` gate for the PR's **current head commit**. Records a `pinpoint-audit-override` commit status + a sticky bot comment (who/when/why) and re-runs the failed CI so the gate re-evaluates immediately.
-  - `/audit-override clear` — re-arm the gate.
-- **Commit-bound, not PR-bound**: the override is a commit status on the head SHA. **Pushing a new commit drops it** — the gate re-fires and the override must be re-issued, so a newly-introduced real vulnerability is never silently masked. It only bypasses the audit gate; any other failing check stays red.
-- **Scope**: single PR only; never changes repo-wide audit policy or any other PR. No secrets required (default `GITHUB_TOKEN`).
-- **Implementation**: `.github/workflows/audit-override.yaml`, `scripts/workflow/audit-override/*.sh`; the consuming check is the `Run pnpm audit` step in `ci.yml` (`gate.sh check`).
+When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **unrelated** to a PR's changes, `/audit-override <reason>` is the escape hatch so it doesn't force an admin-merge — commit-bound, dropped on every new push. Full protocol: `pinpoint-audit-override` skill.
 
 ## 8. Documentation
 
@@ -249,9 +221,9 @@ Actionable, "what" and "how" only. Skills carry the deep dives.
 Work isn't done at "git push" — it's done when the change is **merged, deployed clean, and cleaned up**. The full pipeline (commit → PR → CI → merge) lives in the `pinpoint-pr-workflow` skill; the load-bearing rules are repeated here in case that skill isn't loaded.
 
 1. **Before you push:** `pnpm run check` is the floor (types, lint, format, unit). Run `pnpm run preflight` for non-trivial changes — migrations, security/auth, server actions, middleware, DB schema. Don't run the full E2E suite locally; CI owns it.
-2. **Push and open the PR ready-for-review** (draft only while iterating — see "Working style"). Sync with main by **merge, never rebase**; `git status` must show "up to date with origin".
+2. **Push and open the PR ready-for-review** (draft only while iterating — see "Working style"). Sync with main by **merge, never rebase**; `git status` must show "up to date with origin". "Ready" is not just "pushed": wait for Copilot to review the current head commit and resolve/decline its threads before you call the PR ready or done — `merge-pr.sh` re-enforces this (`currency` + `threads` gates) at merge time. See `pinpoint-pr-workflow` Phase 3.
 3. **Lean on CI for the full E2E suite** — don't run `e2e:full` locally; CI owns it once the PR is up. Do run **selected specs locally** while writing them or iterating on a feature they touch (`pnpm exec playwright test <spec> --project=chromium`).
-4. **The bead stays open until the PR merges.** Opening the PR does NOT close it — the bead stays `in_progress`, closed only after merge (`bd close <id> --reason="PR #N merged"`). Merge via `scripts/workflow/merge-pr.sh <PR>` — never `gh pr merge` or MCP merge directly.
+4. **Merge via `scripts/workflow/merge-pr.sh <PR>`** — never `gh pr merge` or MCP merge directly. (Bead close timing follows beads' defaults; there's no fixed at-merge rule.)
 5. **After merge, watch the deployment.** Don't walk away at merge — watch the production deploy land and confirm no build, migration, or runtime errors. A merge that breaks prod isn't done.
 6. **Cleanup — non-destructive now, destructive on confirmation.** Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
 7. **Hand off** for the next session, and post to the huddle daily bead if other sessions need to know what landed.

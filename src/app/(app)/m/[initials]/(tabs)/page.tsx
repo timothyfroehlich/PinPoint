@@ -91,19 +91,9 @@ export default async function MachineInfoTab({
     !!user &&
     (user.id === machine.ownerId || user.id === machine.invitedOwnerId);
 
-  const canEditOwnerNotes = checkPermission(
-    "machines.edit.ownerNotes",
-    accessLevel,
-    ownershipContext
-  );
   const canViewOwnerRequirements = checkPermission(
     "machines.view.ownerRequirements",
     accessLevel
-  );
-  const canViewOwnerNotes = checkPermission(
-    "machines.view.ownerNotes",
-    accessLevel,
-    ownershipContext
   );
   const canCompose = checkPermission(
     "machines.timeline.comment.add",
@@ -153,7 +143,7 @@ export default async function MachineInfoTab({
   });
   const qrDataUrl = await generateQrPngDataUrl(reportUrl);
 
-  const showOwnerFields = canViewOwnerRequirements || canViewOwnerNotes;
+  const showOwnerFields = canViewOwnerRequirements;
 
   const rail = (
     <InfoRail
@@ -204,11 +194,8 @@ export default async function MachineInfoTab({
             machineId={machine.id}
             description={machine.description}
             ownerRequirements={machine.ownerRequirements}
-            ownerNotes={machine.ownerNotes}
             canEditGeneral={canEdit}
-            canEditOwnerNotes={canEditOwnerNotes}
             canViewOwnerRequirements={canViewOwnerRequirements}
-            canViewOwnerNotes={canViewOwnerNotes}
             showDescription={false}
           />
         )}

@@ -38,12 +38,20 @@ vi.mock("~/server/db", async () => {
 });
 
 // Mock the text-field components to capture the permission props the page
-// computes. `MachineTextFields` (owner requirements/notes) only renders when
-// the viewer is allowed to see at least one owner-private field; the
-// description renders separately via `MachineDescriptionField`.
-const mockMachineTextFields = vi.fn(() => (
-  <div data-testid="machine-text-fields" />
-));
+// computes. `MachineTextFields` (owner requirements) only renders when the
+// viewer is allowed to see an owner-private field; the description renders
+// separately via `MachineDescriptionField`.
+interface MachineTextFieldsProps {
+  machineId: string;
+  description: string | null;
+  ownerRequirements: string | null;
+  canEditGeneral: boolean;
+  canViewOwnerRequirements: boolean;
+  showDescription?: boolean;
+}
+const mockMachineTextFields = vi.fn<
+  (props: MachineTextFieldsProps) => React.ReactElement
+>(() => <div data-testid="machine-text-fields" />);
 const mockMachineDescriptionField = vi.fn(() => (
   <div data-testid="machine-description" />
 ));
@@ -56,17 +64,7 @@ vi.mock("~/components/machines/timeline/MachineRecentActivity", () => ({
 }));
 
 vi.mock("~/app/(app)/m/[initials]/machine-text-fields", () => ({
-  MachineTextFields: (props: {
-    machineId: string;
-    description: string | null;
-    ownerRequirements: string | null;
-    ownerNotes: string | null;
-    canEditGeneral: boolean;
-    canEditOwnerNotes: boolean;
-    canViewOwnerRequirements: boolean;
-    canViewOwnerNotes: boolean;
-    showDescription?: boolean;
-  }) => {
+  MachineTextFields: (props: MachineTextFieldsProps) => {
     mockMachineTextFields(props);
     return <div data-testid="machine-text-fields" />;
   },
@@ -124,7 +122,7 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     expect(descProps.canEdit).toBe(false);
   });
 
-  it("allows ownerRequirements view to guest, but denies ownerNotes view/edit", async () => {
+  it("allows ownerRequirements view to guest", async () => {
     const db = await getTestDb();
 
     const guestId = randomUUID();
@@ -152,14 +150,12 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     expect(mockMachineTextFields).toHaveBeenCalled();
     const props = mockMachineTextFields.mock.calls[0][0];
 
-    // Guests can view requirements, but not view/edit owner notes
+    // Guests can view requirements
     expect(props.canViewOwnerRequirements).toBe(true);
-    expect(props.canViewOwnerNotes).toBe(false);
     expect(props.canEditGeneral).toBe(false);
-    expect(props.canEditOwnerNotes).toBe(false);
   });
 
-  it("allows ownerRequirements view to non-owner member, but denies ownerNotes view/edit", async () => {
+  it("allows ownerRequirements view to non-owner member", async () => {
     const db = await getTestDb();
 
     const memberId = randomUUID();
@@ -187,14 +183,12 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     expect(mockMachineTextFields).toHaveBeenCalled();
     const props = mockMachineTextFields.mock.calls[0][0];
 
-    // Non-owner member can view requirements, but not view/edit owner notes
+    // Non-owner member can view requirements
     expect(props.canViewOwnerRequirements).toBe(true);
-    expect(props.canViewOwnerNotes).toBe(false);
     expect(props.canEditGeneral).toBe(false);
-    expect(props.canEditOwnerNotes).toBe(false);
   });
 
-  it("allows ownerRequirements view AND ownerNotes view/edit to machine owner member", async () => {
+  it("allows ownerRequirements view to machine owner member", async () => {
     const db = await getTestDb();
 
     const ownerId = randomUUID();
@@ -228,14 +222,12 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     expect(mockMachineTextFields).toHaveBeenCalled();
     const props = mockMachineTextFields.mock.calls[0][0];
 
-    // Owner member has full view & edit of owner requirements and notes
+    // Owner member has full view & edit of owner requirements
     expect(props.canViewOwnerRequirements).toBe(true);
-    expect(props.canViewOwnerNotes).toBe(true);
     expect(props.canEditGeneral).toBe(true);
-    expect(props.canEditOwnerNotes).toBe(true);
   });
 
-  it("allows ownerRequirements view to admin, but denies ownerNotes view/edit if not the machine owner", async () => {
+  it("allows ownerRequirements view to admin", async () => {
     const db = await getTestDb();
 
     const adminId = randomUUID();
@@ -280,8 +272,6 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     const props = mockMachineTextFields.mock.calls[0][0];
 
     expect(props.canViewOwnerRequirements).toBe(true);
-    expect(props.canViewOwnerNotes).toBe(false);
     expect(props.canEditGeneral).toBe(true);
-    expect(props.canEditOwnerNotes).toBe(false);
   });
 });

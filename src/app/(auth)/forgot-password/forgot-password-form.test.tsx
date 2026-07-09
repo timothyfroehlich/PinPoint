@@ -20,7 +20,7 @@ describe("ForgotPasswordForm", () => {
   it("should call action on submit", async () => {
     const user = userEvent.setup();
     // Mock response
-    forgotPasswordActionSpy.mockResolvedValue({ ok: true, data: undefined });
+    forgotPasswordActionSpy.mockResolvedValue({ ok: true, value: undefined });
 
     render(<ForgotPasswordForm />);
 

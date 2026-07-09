@@ -1,5 +1,4 @@
 import { Linter } from "eslint";
-// @ts-expect-error -- type-only parser import has no bundled declarations here
 import typescriptParser from "@typescript-eslint/parser";
 import { describe, expect, it } from "vitest";
 

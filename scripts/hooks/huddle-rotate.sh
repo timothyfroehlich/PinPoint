@@ -72,6 +72,29 @@ fi
 do_rotation() {
   set -euo pipefail
 
+  # Pull peer state before allocating any child id. A stale local child counter
+  # (this machine behind the remote) would mint a colliding daily id → an
+  # unmergeable Dolt conflict across machines (PP-1d51). So this pull is VERIFIED,
+  # not fail-open: if it FAILS on a merge conflict, refuse to rotate rather than
+  # mint the daily bead off a possibly-stale counter. Offline/unreachable stays
+  # fail-open — a single active machine cannot collide, and rotation must still
+  # work without a network.
+  #
+  # If another machine already rotated and pushed cleanly, this pull surfaces
+  # today's date and we no-op below — the cross-machine equivalent of the
+  # local-lock peer check.
+  #
+  # Note: --quiet is dropped deliberately so the conflict message is captured in
+  # pull_out for the conflict check below.
+  local pull_rc=0 pull_out
+  pull_out=$(bd dolt pull 2>&1) || pull_rc=$?
+  if [[ "$pull_rc" -ne 0 ]] && printf '%s' "$pull_out" | grep -qiE 'conflict|operator resolution'; then
+    printf 'huddle-rotate.sh: beads sync has unresolved merge conflicts — refusing to rotate.\n' >&2
+    printf 'Rotating now would allocate the daily bead off a possibly-stale child counter and collide across machines (see PP-1d51).\n' >&2
+    printf 'Resolve the beads Dolt conflict first (bd dolt pull), then re-run rotation.\n' >&2
+    exit 1
+  fi
+
   # Re-check date inside the lock (idempotency: a peer may have rotated first).
   # Reserve `exit 0` for the explicit "already up to date" case below. Anything
   # else (bd unreachable, root bead unreadable, notes corrupted) is a hard error
@@ -162,21 +185,33 @@ except Exception:
     month_rolled=1
   fi
 
-  # Create new daily bead (orphan until root notes are updated)
+  # Create new daily bead (orphan until root notes are updated), OR adopt one a
+  # peer machine already created for today — idempotent across machines. We
+  # queried after the pull above, so a peer's pushed daily is visible here.
   local new_today_id
-  new_today_id=$(bd create -t task \
-    --parent "$ROOT_ID" \
-    --title "Huddle daily $today" \
-    --description "Active coordination bead for $today. Agents post updates here. At midnight rotation this bead gets a categorized summary and closes." \
-    --silent)
+  new_today_id=$(bd children "$ROOT_ID" --json 2>/dev/null \
+    | jq -r --arg t "Huddle daily $today" \
+      '[ .[] | select(.title==$t and .status!="closed") ] | sort_by(.id) | (.[0].id // "")' 2>/dev/null || echo "")
+  if [[ -z "$new_today_id" ]]; then
+    new_today_id=$(bd create -t task \
+      --parent "$ROOT_ID" \
+      --title "Huddle daily $today" \
+      --description "Active coordination bead for $today. Agents post updates here. At midnight rotation this bead gets a categorized summary and closes." \
+      --silent)
+  fi
 
   local new_monthly_id="$old_monthly_id"
   if [[ "$month_rolled" -eq 1 ]]; then
-    new_monthly_id=$(bd create -t task \
-      --parent "$ROOT_ID" \
-      --title "Huddle monthly $current_month" \
-      --description "Monthly coordination summary for $current_month. Receives aggregated summaries of daily beads when they close." \
-      --silent)
+    new_monthly_id=$(bd children "$ROOT_ID" --json 2>/dev/null \
+      | jq -r --arg t "Huddle monthly $current_month" \
+        '[ .[] | select(.title==$t and .status!="closed") ] | sort_by(.id) | (.[0].id // "")' 2>/dev/null || echo "")
+    if [[ -z "$new_monthly_id" ]]; then
+      new_monthly_id=$(bd create -t task \
+        --parent "$ROOT_ID" \
+        --title "Huddle monthly $current_month" \
+        --description "Monthly coordination summary for $current_month. Receives aggregated summaries of daily beads when they close." \
+        --silent)
+    fi
   fi
 
   local now
@@ -209,6 +244,10 @@ print(json.dumps(notes))
 
   # ATOMIC: update root notes — after this the system is consistent
   bd update "$ROOT_ID" --notes "$new_notes"
+
+  # Push the new pointers so peer machines converge fast and don't double-rotate.
+  # Fail-open: a transient push failure doesn't abort (pre-push + next sync catch up).
+  bd dolt push --quiet >/dev/null 2>&1 || true
 
   # Post continuation comments on old beads (best-effort: failures do not abort)
   if [[ -n "$old_today_id" ]]; then
@@ -245,3 +284,15 @@ case "$LOCK_TOOL" in
     flock -x -w 60 "$LOCK_FILE" bash -c 'do_rotation'
     ;;
 esac
+
+# Safety-net dedup (runs in the parent shell, where huddle-lib.sh is sourced and
+# huddle_reconcile_today is defined). If a peer machine created a duplicate daily
+# for today inside the race window — both rotated before either pushed — collapse
+# to the deterministic canonical. Silent + fail-open; no-op in the common case.
+#
+# Pull once more first: in the "both machines created before either pushed" race,
+# the peer's duplicate may not be in our local DB yet, so without a fresh pull the
+# reconcile would just no-op. Rotation is rare, so the extra pull is cheap and
+# makes the safety-net materially more effective. Fail-open (offline → skip).
+bd dolt pull --quiet >/dev/null 2>&1 || true
+huddle_reconcile_today || true

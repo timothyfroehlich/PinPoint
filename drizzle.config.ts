@@ -79,6 +79,7 @@ export default defineConfig({
     "timeline_events",
     "timeline_event_people",
     "pinballmap_catalog",
+    "machine_settings_sets",
   ],
   schemaFilter: ["public"],
   verbose: true,

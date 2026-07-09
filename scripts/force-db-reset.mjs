@@ -27,6 +27,7 @@ const tables = [
   "notification_preferences",
   "timeline_event_people",
   "timeline_events",
+  "machine_settings_sets",
   "issues",
   "machines",
   "pinballmap_catalog",

@@ -229,38 +229,41 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
         },
       } as any);
 
-      // Spy on the real transaction to intercept the tx object
+      // Spy on the real transaction to intercept the tx object.
+      // Type the mock/callback with the transaction's own parameter types so
+      // the spy signature matches `db.transaction` exactly (the callback
+      // receives a PgTransaction, not the top-level db).
+      type TxCb = Parameters<typeof db.transaction>[0];
+      type Tx = Parameters<TxCb>[0];
       const originalTransaction = db.transaction.bind(db);
       const transactionSpy = vi
         .spyOn(db, "transaction")
-        .mockImplementationOnce(
-          async (callback: (tx: typeof db) => Promise<unknown>) => {
-            return originalTransaction(async (realTx: typeof db) => {
-              // Wrap the tx: let the first update (role promotion on userProfiles) go
-              // through, then throw on the second update (machines) to simulate a
-              // constraint violation or infrastructure failure mid-transaction.
-              let updateCallCount = 0;
-              const txProxy = new Proxy(realTx, {
-                get(target, prop, receiver) {
-                  if (prop === "update") {
-                    return (...args: Parameters<typeof target.update>) => {
-                      updateCallCount++;
-                      if (updateCallCount > 1) {
-                        // Simulate the machine update failing (e.g. constraint violation)
-                        throw new Error(
-                          "Simulated mid-transaction constraint violation on machines table"
-                        );
-                      }
-                      return target.update(...args);
-                    };
-                  }
-                  return Reflect.get(target, prop, receiver);
-                },
-              });
-              return callback(txProxy);
+        .mockImplementationOnce(async (callback: TxCb) => {
+          return originalTransaction(async (realTx: Tx) => {
+            // Wrap the tx: let the first update (role promotion on userProfiles) go
+            // through, then throw on the second update (machines) to simulate a
+            // constraint violation or infrastructure failure mid-transaction.
+            let updateCallCount = 0;
+            const txProxy = new Proxy(realTx, {
+              get(target, prop, receiver) {
+                if (prop === "update") {
+                  return (...args: Parameters<typeof target.update>) => {
+                    updateCallCount++;
+                    if (updateCallCount > 1) {
+                      // Simulate the machine update failing (e.g. constraint violation)
+                      throw new Error(
+                        "Simulated mid-transaction constraint violation on machines table"
+                      );
+                    }
+                    return target.update(...args);
+                  };
+                }
+                return Reflect.get(target, prop, receiver);
+              },
             });
-          }
-        );
+            return callback(txProxy);
+          });
+        });
 
       const formData = new FormData();
       formData.append("id", machine.id);
@@ -1286,7 +1289,6 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
     // Permission matrix reference:
     //   machines.edit: unauthenticated=false, guest=false, member="owner",
     //                  technician=true, admin=true
-    //   machines.edit.ownerNotes: all roles = "owner" (owner-only, even for admins)
     //   machines.edit.ownerRequirements: owner-scoped
 
     // A minimal valid ProseMirror doc for test payloads
@@ -1358,65 +1360,6 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       expect(machineAfter?.description).not.toBeNull();
     });
 
-    it("member-owner edits ownerNotes → ok, ownerNotes persisted in DB", async () => {
-      const { createClient } = await import("~/lib/supabase/server");
-      const { updateMachineOwnerNotes } = await import("~/app/(app)/m/actions");
-      const db = await getTestDb();
-
-      const ownerUser = await createUser("member");
-      const machine = await createMachine(ownerUser.id);
-
-      vi.mocked(createClient).mockResolvedValue({
-        auth: {
-          getUser: vi
-            .fn()
-            .mockResolvedValue({ data: { user: { id: ownerUser.id } } }),
-        },
-      } as any);
-
-      const result = await updateMachineOwnerNotes(machine.id, validDoc);
-
-      expect(result.ok).toBe(true);
-
-      // Persistence invariant: ownerNotes must be stored in DB
-      const machineAfter = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
-      });
-      expect(machineAfter?.ownerNotes).toBeDefined();
-      expect(machineAfter?.ownerNotes).not.toBeNull();
-    });
-
-    it("member NON-owner attempts ownerNotes → UNAUTHORIZED (owner-scoped), ownerNotes unchanged", async () => {
-      const { createClient } = await import("~/lib/supabase/server");
-      const { updateMachineOwnerNotes } = await import("~/app/(app)/m/actions");
-      const db = await getTestDb();
-
-      const ownerUser = await createUser("member");
-      const nonOwnerMember = await createUser("member");
-      const machine = await createMachine(ownerUser.id);
-
-      vi.mocked(createClient).mockResolvedValue({
-        auth: {
-          getUser: vi
-            .fn()
-            .mockResolvedValue({ data: { user: { id: nonOwnerMember.id } } }),
-        },
-      } as any);
-
-      const result = await updateMachineOwnerNotes(machine.id, validDoc);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.code).toBe("UNAUTHORIZED");
-      }
-
-      // Read-only invariant: ownerNotes must NOT have changed
-      const machineAfter = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
-      });
-      expect(machineAfter?.ownerNotes).toBeNull();
-    });
-
     it("technician NON-owner edits description → ok (machines.edit: technician=true), description persisted", async () => {
       // Key behavioral test: machines.edit grants technician=true unconditionally,
       // so a technician can edit description regardless of machine ownership.
@@ -1450,37 +1393,6 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       expect(machineAfter?.description).not.toBeNull();
     });
 
-    it("technician NON-owner attempts ownerNotes → UNAUTHORIZED (machines.edit.ownerNotes: technician='owner'), ownerNotes unchanged", async () => {
-      const { createClient } = await import("~/lib/supabase/server");
-      const { updateMachineOwnerNotes } = await import("~/app/(app)/m/actions");
-      const db = await getTestDb();
-
-      const ownerUser = await createUser("member");
-      const techUser = await createUser("technician");
-      const machine = await createMachine(ownerUser.id);
-
-      vi.mocked(createClient).mockResolvedValue({
-        auth: {
-          getUser: vi
-            .fn()
-            .mockResolvedValue({ data: { user: { id: techUser.id } } }),
-        },
-      } as any);
-
-      const result = await updateMachineOwnerNotes(machine.id, validDoc);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.code).toBe("UNAUTHORIZED");
-      }
-
-      // Read-only invariant: ownerNotes must NOT have changed
-      const machineAfter = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
-      });
-      expect(machineAfter?.ownerNotes).toBeNull();
-    });
-
     it("admin NON-owner edits description → ok (machines.edit: admin=true), description persisted", async () => {
       const { createClient } = await import("~/lib/supabase/server");
       const { updateMachineDescription } =
@@ -1510,39 +1422,6 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       });
       expect(machineAfter?.description).toBeDefined();
       expect(machineAfter?.description).not.toBeNull();
-    });
-
-    it("admin NON-owner attempts ownerNotes → UNAUTHORIZED (machines.edit.ownerNotes: admin='owner'), ownerNotes unchanged", async () => {
-      // Matrix: machines.edit.ownerNotes is "owner" for ALL roles, including admin.
-      // Even an admin cannot edit ownerNotes unless they are the machine owner.
-      const { createClient } = await import("~/lib/supabase/server");
-      const { updateMachineOwnerNotes } = await import("~/app/(app)/m/actions");
-      const db = await getTestDb();
-
-      const ownerUser = await createUser("member");
-      const adminUser = await createUser("admin");
-      const machine = await createMachine(ownerUser.id);
-
-      vi.mocked(createClient).mockResolvedValue({
-        auth: {
-          getUser: vi
-            .fn()
-            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
-        },
-      } as any);
-
-      const result = await updateMachineOwnerNotes(machine.id, validDoc);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.code).toBe("UNAUTHORIZED");
-      }
-
-      // Read-only invariant: ownerNotes must NOT have changed
-      const machineAfter = await db.query.machines.findFirst({
-        where: eq(machines.id, machine.id),
-      });
-      expect(machineAfter?.ownerNotes).toBeNull();
     });
 
     it("owner edits ownerRequirements → ok, ownerRequirements persisted in DB", async () => {

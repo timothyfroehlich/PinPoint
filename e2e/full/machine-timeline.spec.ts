@@ -25,12 +25,12 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { STORAGE_STATE } from "../support/auth-state";
-import { seededMachines, seededIssues } from "../support/constants";
+import { STORAGE_STATE } from "../support/auth-state.js";
+import { seededMachines, seededIssue } from "../support/constants.js";
 
 const machineA = seededMachines.addamsFamily.initials;
 const machineB = seededMachines.eightBallDeluxe.initials;
-const issueNumber = seededIssues.TAF[0].num;
+const issueNumber = seededIssue("TAF").num;
 
 const PREFIX = "E2E PP-0x98";
 
@@ -105,16 +105,16 @@ test.describe("Machine Timeline (PP-0x98)", () => {
       // events plus a "View all" link into the full timeline (PP-0x98.3).
       await page.goto(`/m/${machineA}`);
 
+      const recentActivity = page.getByRole("region", {
+        name: /recent activity/i,
+      });
       await expect(
-        page.getByRole("heading", { name: /recent activity/i })
+        recentActivity.getByRole("heading", { name: /recent activity/i })
       ).toBeVisible();
 
       // Scope to the Recent activity region — the player hero also has a
       // "View all on Service" link, so an unscoped /view all/ now matches two.
-      await page
-        .getByRole("region", { name: /recent activity/i })
-        .getByRole("link", { name: /view all/i })
-        .click();
+      await recentActivity.getByRole("link", { name: /view all/i }).click();
       await page.waitForURL(new RegExp(`/m/${machineA}/timeline$`), {
         timeout: 10_000,
       });
