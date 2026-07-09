@@ -40,8 +40,11 @@ marker="${MARKER_PREFIX} ${head_sha} -->"
 full_body="${marker}"$'\n'"Claude review of head ${short_sha} — ${summary}"
 
 # Find an existing sticky comment whose body starts with the marker prefix (any SHA).
+# Pipe to `jq -rs` (slurp) rather than gh's per-page `--jq`, so a marker that landed on
+# page 2+ of a busy PR is still found — otherwise a duplicate sticky marker gets posted.
 existing_id=$(gh api --paginate "repos/${repo}/issues/${pr}/comments" \
-  --jq "map(select(.body | startswith(\"${MARKER_PREFIX}\"))) | .[0].id // empty")
+  | jq -rs --arg prefix "$MARKER_PREFIX" \
+      '[.[] | flatten | .[] | select(.body | startswith($prefix))] | .[0].id // empty')
 
 if [[ -n "$existing_id" ]]; then
   echo "Updating Claude-review marker (id=${existing_id}) on PR #${pr} → head ${short_sha}"
