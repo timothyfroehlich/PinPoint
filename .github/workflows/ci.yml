@@ -123,7 +123,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Cache node_modules
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # ratchet:actions/cache@v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -619,7 +619,7 @@ jobs:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       - name: Cache Playwright browsers
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # ratchet:actions/cache@v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -701,7 +701,7 @@ jobs:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       - name: Cache Playwright browsers
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # ratchet:actions/cache@v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -783,7 +783,7 @@ jobs:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       - name: Cache Playwright browsers
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # ratchet:actions/cache@v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -866,7 +866,7 @@ jobs:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ github.token }}
 
       - name: Cache Playwright browsers
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # ratchet:actions/cache@v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
