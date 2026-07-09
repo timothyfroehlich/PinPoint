@@ -36,15 +36,65 @@ const EXPECTED_GUARD_HOOKS = [
   "block-main-worktree-branch-switch.cjs",
 ];
 
-function skip(reason) {
-  // Fail-open: a single one-line note, never a stack trace, never non-zero.
-  process.stderr.write(`verify-guard-stack: skipped (${reason})\n`);
-  process.exit(0);
+// --- Pure evaluator (unit-testable without fs / exit / printing) -------------
+// Given a parsed settings object, return the list of guard-stack problems as
+// human-readable strings. Empty array === healthy. No IO, no printing, no exit.
+//
+// Problems reported:
+//   - `missing PreToolUse hooks: <basename>, ...` when any EXPECTED_GUARD_HOOKS
+//     basename is absent from every wired PreToolUse command string.
+//   - `permissions.deny empty/absent` / `permissions.ask empty/absent` when
+//     either is not a non-empty array.
+function evaluateGuardStack(settings) {
+  const problems = [];
+
+  // Collect every wired PreToolUse command string.
+  const preToolUse = settings?.hooks?.PreToolUse;
+  const commands = [];
+  if (Array.isArray(preToolUse)) {
+    for (const entry of preToolUse) {
+      const inner = entry?.hooks;
+      if (!Array.isArray(inner)) continue;
+      for (const h of inner) {
+        if (typeof h?.command === "string") {
+          commands.push(h.command);
+        }
+      }
+    }
+  }
+
+  const missingHooks = EXPECTED_GUARD_HOOKS.filter(
+    (basename) => !commands.some((cmd) => cmd.includes(basename)),
+  );
+  if (missingHooks.length > 0) {
+    problems.push(`missing PreToolUse hooks: ${missingHooks.join(", ")}`);
+  }
+
+  // permissions.deny / permissions.ask must both be present, non-empty arrays.
+  const perms = settings?.permissions;
+  const denyOk = Array.isArray(perms?.deny) && perms.deny.length > 0;
+  const askOk = Array.isArray(perms?.ask) && perms.ask.length > 0;
+  if (!denyOk) problems.push("permissions.deny empty/absent");
+  if (!askOk) problems.push("permissions.ask empty/absent");
+
+  return problems;
 }
 
+// --- Hook entrypoint ---------------------------------------------------------
+// Does the IO: resolve path (incl. VERIFY_GUARD_SETTINGS override), read/parse
+// settings, call evaluateGuardStack, print one warning line on problems (else
+// silent), and fail open on any error. Always exits 0.
 function main() {
   const path = require("node:path");
   const fs = require("node:fs");
+
+  // Fail-open helper: a single one-line note, never a stack trace, never
+  // non-zero. Collapse any embedded line breaks so it stays one line.
+  const skip = (reason) => {
+    const oneLine = String(reason).replace(/\s*[\r\n]+\s*/g, " ");
+    process.stderr.write(`verify-guard-stack: skipped (${oneLine})\n`);
+    process.exit(0);
+  };
 
   const settingsPath =
     process.env.VERIFY_GUARD_SETTINGS ||
@@ -66,63 +116,36 @@ function main() {
     return;
   }
 
-  // Collect every wired PreToolUse command string.
-  const preToolUse = settings?.hooks?.PreToolUse;
-  const commands = [];
-  if (Array.isArray(preToolUse)) {
-    for (const entry of preToolUse) {
-      const inner = entry?.hooks;
-      if (!Array.isArray(inner)) continue;
-      for (const h of inner) {
-        if (typeof h?.command === "string") {
-          commands.push(h.command);
-        }
-      }
-    }
-  }
-
-  const missingHooks = EXPECTED_GUARD_HOOKS.filter(
-    (basename) => !commands.some((cmd) => cmd.includes(basename)),
-  );
-
-  // permissions.deny / permissions.ask must both be present, non-empty arrays.
-  const missingPerms = [];
-  const perms = settings?.permissions;
-  const denyOk = Array.isArray(perms?.deny) && perms.deny.length > 0;
-  const askOk = Array.isArray(perms?.ask) && perms.ask.length > 0;
-  if (!denyOk) missingPerms.push("permissions.deny empty/absent");
-  if (!askOk) missingPerms.push("permissions.ask empty/absent");
-
-  if (missingHooks.length === 0 && missingPerms.length === 0) {
+  const problems = evaluateGuardStack(settings);
+  if (problems.length === 0) {
     // Healthy — stay silent.
     process.exit(0);
-  }
-
-  const parts = [];
-  if (missingHooks.length > 0) {
-    parts.push(`missing PreToolUse hooks: ${missingHooks.join(", ")}`);
-  }
-  if (missingPerms.length > 0) {
-    parts.push(missingPerms.join("; "));
+    return;
   }
 
   process.stderr.write(
-    `⚠️  GUARD STACK DEGRADED — ${parts.join("; ")}. ` +
+    `⚠️  GUARD STACK DEGRADED — ${problems.join("; ")}. ` +
       `Restore .claude/settings.json from git before continuing.\n`,
   );
   process.exit(0);
 }
 
-try {
-  main();
-} catch (err) {
-  // Last-resort fail-open: a broken canary must never disrupt a session.
+module.exports = { evaluateGuardStack, main };
+
+// Only run as a hook when invoked directly (not when require()'d by a test).
+if (require.main === module) {
   try {
-    process.stderr.write(
-      `verify-guard-stack: skipped (${err && err.message ? err.message : "unexpected error"})\n`,
-    );
-  } catch {
-    /* ignore */
+    main();
+  } catch (err) {
+    // Last-resort fail-open: a broken canary must never disrupt a session.
+    // Collapse embedded line breaks so the skip note stays a single line.
+    try {
+      const reason = err && err.message ? err.message : "unexpected error";
+      const oneLine = String(reason).replace(/\s*[\r\n]+\s*/g, " ");
+      process.stderr.write(`verify-guard-stack: skipped (${oneLine})\n`);
+    } catch {
+      /* ignore */
+    }
+    process.exit(0);
   }
-  process.exit(0);
 }
