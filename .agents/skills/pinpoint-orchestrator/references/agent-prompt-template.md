@@ -13,7 +13,7 @@ Work bead {beads_id}. First run `bd show {beads_id}` && `bd update {beads_id} --
 
 ### Quality Gates
 
-Run `pnpm run check` before returning.
+Run `pnpm run check` before returning. Then self-review: run `/code-review` on your own diff (model-invocable **local** review — **not** `ultra`, which is user-triggered/billed and you cannot launch) and address serious findings. After your final push, if Copilot hasn't reviewed your head commit within ~10 min, run `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` so the `reviewed` merge gate passes.
 
 ### Environment Setup
 
@@ -34,6 +34,7 @@ If tests fail with `POSTGRES_URL is not set`:
 - **Branch**: {branch_name}
 - **PR**: #{number}
 - **CI**: passing/failing/pending
+- **Self-review**: findings addressed / marker posted?
 - **Blockers**: none or description
 ```
 
