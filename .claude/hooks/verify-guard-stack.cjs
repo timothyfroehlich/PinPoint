@@ -120,7 +120,6 @@ function main() {
   if (problems.length === 0) {
     // Healthy — stay silent.
     process.exit(0);
-    return;
   }
 
   process.stderr.write(
