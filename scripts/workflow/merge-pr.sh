@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # merge-pr.sh — composite gate-then-merge enforcer.
-# Re-evaluates all 4 PR gates at merge time (TOCTOU safety vs label-time gates),
+# Re-evaluates all 5 PR gates at merge time (TOCTOU safety vs label-time gates),
 # squash-merges with --match-head-commit if all pass, removes ready-for-review label on failure.
 #
 # Usage: merge-pr.sh <PR> [--dry-run] [--force] [--bypass-merge-requirements]
 #   --dry-run                     Print would-do summary, take no action.
-#   --force                       Bypass currency + threads gates.
+#   --force                       Bypass currency + threads + reviewed gates.
 #   --bypass-merge-requirements   Bypass ci gate AND pass --admin to gh pr merge
 #                                 (overrides GitHub branch-protection rules).
-#                                 Combine with --force to bypass currency + threads + ci together.
+#                                 Combine with --force to bypass currency + threads + reviewed + ci together.
 #
 # no_conflict gate is NEVER bypassable — GitHub rejects conflicting merges regardless of --admin.
 # Authorship gate has no bypass; this script operates only on PRs you authored OR PRs authored
@@ -68,7 +68,7 @@ echo "Target: PR #$PR — $PR_TITLE"
 echo "URL: $PR_URL"
 echo "Head SHA: $PR_HEAD_SHA"
 
-# --- Run all 4 gates, collect statuses ---
+# --- Run all 5 gates, collect statuses ---
 # Per-gate bypass kind: "none" (never bypassable), "force" (--force), "admin" (--bypass-merge-requirements).
 GATE_FAILURES=()
 
@@ -110,6 +110,7 @@ run_gate() {
 run_gate ci          check_ci                  admin
 run_gate currency    check_copilot_currency    force
 run_gate threads     check_unresolved_threads  force
+run_gate reviewed    check_review_happened     force
 run_gate no_conflict check_no_merge_conflict   none
 
 # --- Decide ---
