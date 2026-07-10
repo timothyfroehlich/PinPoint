@@ -578,6 +578,11 @@ export const machineSettingsSets = pgTable(
     onePreferredPerMachine: uniqueIndex("uniq_machine_settings_preferred")
       .on(t.machineId)
       .where(sql`${t.isPreferred}`),
+    // Indexes on the created_by and updated_by FK columns (PP-o60s.5): prod
+    // advisor flagged them as unindexed_foreign_keys. Both FK to user_profiles
+    // with ON DELETE SET NULL, so a profile delete scans this table on each FK.
+    createdByIdx: index("idx_machine_settings_sets_created_by").on(t.createdBy),
+    updatedByIdx: index("idx_machine_settings_sets_updated_by").on(t.updatedBy),
   })
 ).enableRLS();
 

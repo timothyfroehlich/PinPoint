@@ -1,5 +1,5 @@
 {
-  "id": "bc2da984-d763-4874-89c2-ed1bea2b37e4",
+  "id": "d459534e-b805-48fa-8207-d6400d68eee1",
   "prevId": "c928591a-a93c-4438-9ede-ad593679ddbd",
   "version": "7",
   "dialect": "postgresql",
@@ -1001,6 +1001,36 @@
           ],
           "isUnique": true,
           "where": "\"machine_settings_sets\".\"is_preferred\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_machine_settings_sets_created_by": {
+          "name": "idx_machine_settings_sets_created_by",
+          "columns": [
+            {
+              "expression": "created_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_machine_settings_sets_updated_by": {
+          "name": "idx_machine_settings_sets_updated_by",
+          "columns": [
+            {
+              "expression": "updated_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
