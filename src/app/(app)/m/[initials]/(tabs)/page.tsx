@@ -35,10 +35,10 @@ import { InfoRail } from "./info-rail";
  * (Tags / Owner / PinballMap) → recent-activity peek. Desktop is a main column
  * + 320px rail; mobile folds the rail inline after the hero.
  *
- * NOTE (PP-5sgt.3): the maintainer tools at the bottom — Edit dialog, QR code,
- * owner requirements/notes — are kept here temporarily. The Service-tab rework
- * relocates QR to Service and Edit/owner-fields to Settings/Service; remove
- * this block then.
+ * NOTE (PP-5sgt.3): the maintainer tools at the bottom — QR code and owner
+ * requirements/notes — are kept here temporarily. The Service-tab rework
+ * relocates both to the Service tab (the maintainer's workbench); remove this
+ * block then. (Edit already moved into the Details card.)
  */
 export default async function MachineInfoTab({
   params,
