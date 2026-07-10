@@ -149,6 +149,11 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/scripts/hooks/prototype-mode-poll.sh",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/verify-guard-stack.cjs",
+            "timeout": 5000
           }
         ]
       }
