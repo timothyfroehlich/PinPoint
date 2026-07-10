@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine, createTestUser } from "~/test/helpers/factories";
 import { machines, timelineEvents, userProfiles } from "~/server/db/schema";
 import {
@@ -37,7 +37,7 @@ describe("machine-events helpers (PGlite)", () => {
           eventData: { kind: "machine_added" },
           actorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
 
       const rows = await db
@@ -71,7 +71,7 @@ describe("machine-events helpers (PGlite)", () => {
           },
           actorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
 
       const [row] = await db.select().from(timelineEvents);
@@ -100,7 +100,7 @@ describe("machine-events helpers (PGlite)", () => {
       await createMachineComment(
         machine.id,
         { content: doc, tag: "cleaning", authorId: user.id },
-        db
+        asDbOrTx(db)
       );
 
       const [row] = await db.select().from(timelineEvents);
@@ -130,9 +130,9 @@ describe("machine-events helpers (PGlite)", () => {
         idempotencyKey,
       };
 
-      await createMachineComment(machine.id, args, db);
+      await createMachineComment(machine.id, args, asDbOrTx(db));
       // Retry with the SAME key — ON CONFLICT DO NOTHING drops the second insert.
-      await createMachineComment(machine.id, args, db);
+      await createMachineComment(machine.id, args, asDbOrTx(db));
 
       const rows = await db
         .select()
@@ -151,7 +151,7 @@ describe("machine-events helpers (PGlite)", () => {
           authorId: user.id,
           idempotencyKey: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
         },
-        db
+        asDbOrTx(db)
       );
       await createMachineComment(
         machine.id,
@@ -161,7 +161,7 @@ describe("machine-events helpers (PGlite)", () => {
           authorId: user.id,
           idempotencyKey: "ffffffff-ffff-4fff-8fff-ffffffffffff",
         },
-        db
+        asDbOrTx(db)
       );
 
       const rows = await db.select().from(timelineEvents);
@@ -171,8 +171,8 @@ describe("machine-events helpers (PGlite)", () => {
     it("null key skips dedup: two submissions create two rows", async () => {
       const { db, user, machine } = await seed();
       const args = { content: doc, tag: "note" as const, authorId: user.id };
-      await createMachineComment(machine.id, args, db);
-      await createMachineComment(machine.id, args, db);
+      await createMachineComment(machine.id, args, asDbOrTx(db));
+      await createMachineComment(machine.id, args, asDbOrTx(db));
 
       const rows = await db.select().from(timelineEvents);
       expect(rows).toHaveLength(2);
@@ -195,7 +195,7 @@ describe("machine-events helpers (PGlite)", () => {
           tag: "maintenance",
           authorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
       const [inserted] = await db.select().from(timelineEvents);
       // Fresh comments have never been edited.
@@ -210,7 +210,7 @@ describe("machine-events helpers (PGlite)", () => {
       await updateMachineComment(
         inserted.id,
         { content: newDoc, tag: "cleaning" },
-        db
+        asDbOrTx(db)
       );
 
       const [updated] = await db
@@ -231,15 +231,19 @@ describe("machine-events helpers (PGlite)", () => {
           tag: "maintenance",
           authorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
       const [inserted] = await db.select().from(timelineEvents);
-      await softDeleteMachineComment(inserted.id, { deletedBy: user.id }, db);
+      await softDeleteMachineComment(
+        inserted.id,
+        { deletedBy: user.id },
+        asDbOrTx(db)
+      );
 
       await updateMachineComment(
         inserted.id,
         { content: { type: "doc", content: [] }, tag: "cleaning" },
-        db
+        asDbOrTx(db)
       );
 
       const [row] = await db
@@ -264,11 +268,15 @@ describe("machine-events helpers (PGlite)", () => {
       await createMachineComment(
         machine.id,
         { content: doc, tag: "maintenance", authorId: user.id },
-        db
+        asDbOrTx(db)
       );
       const [inserted] = await db.select().from(timelineEvents);
 
-      await softDeleteMachineComment(inserted.id, { deletedBy: user.id }, db);
+      await softDeleteMachineComment(
+        inserted.id,
+        { deletedBy: user.id },
+        asDbOrTx(db)
+      );
 
       const [row] = await db
         .select()
@@ -292,11 +300,15 @@ describe("machine-events helpers (PGlite)", () => {
           eventData: { kind: "machine_added" },
           actorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
       const [system] = await db.select().from(timelineEvents);
 
-      await softDeleteMachineComment(system.id, { deletedBy: user.id }, db);
+      await softDeleteMachineComment(
+        system.id,
+        { deletedBy: user.id },
+        asDbOrTx(db)
+      );
 
       const [row] = await db
         .select()
@@ -325,7 +337,7 @@ describe("machine-events helpers (PGlite)", () => {
           eventData: { kind: "machine_added" },
           actorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
       await createMachineComment(
         machine.id,
@@ -334,7 +346,7 @@ describe("machine-events helpers (PGlite)", () => {
           tag: "maintenance",
           authorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
       await createMachineTimelineEvent(
         otherMachine.id,
@@ -343,7 +355,7 @@ describe("machine-events helpers (PGlite)", () => {
           tag: "lifecycle",
           eventData: { kind: "machine_added" },
         },
-        db
+        asDbOrTx(db)
       );
 
       // Pin the timestamps: lifecycle older than comment so newest-first
@@ -367,7 +379,9 @@ describe("machine-events helpers (PGlite)", () => {
           )
         );
 
-      const rows = await getMachineTimeline(db, { machineId: machine.id });
+      const rows = await getMachineTimeline(asDbOrTx(db), {
+        machineId: machine.id,
+      });
 
       expect(rows).toHaveLength(2);
       expect(rows[0].sourceType).toBe("comment");
@@ -384,7 +398,7 @@ describe("machine-events helpers (PGlite)", () => {
           tag: "maintenance",
           authorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
       await createMachineComment(
         machine.id,
@@ -393,10 +407,10 @@ describe("machine-events helpers (PGlite)", () => {
           tag: "cleaning",
           authorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
 
-      const rows = await getMachineTimeline(db, {
+      const rows = await getMachineTimeline(asDbOrTx(db), {
         machineId: machine.id,
         tags: ["maintenance"],
       });
@@ -415,12 +429,14 @@ describe("machine-events helpers (PGlite)", () => {
             tag,
             authorId: user.id,
           },
-          db
+          asDbOrTx(db)
         );
       }
 
-      const omitted = await getMachineTimeline(db, { machineId: machine.id });
-      const withDefault = await getMachineTimeline(db, {
+      const omitted = await getMachineTimeline(asDbOrTx(db), {
+        machineId: machine.id,
+      });
+      const withDefault = await getMachineTimeline(asDbOrTx(db), {
         machineId: machine.id,
         tags: [...DEFAULT_TIMELINE_TAGS],
       });
@@ -438,12 +454,18 @@ describe("machine-events helpers (PGlite)", () => {
           tag: "maintenance",
           authorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
       const [row] = await db.select().from(timelineEvents);
-      await softDeleteMachineComment(row.id, { deletedBy: user.id }, db);
+      await softDeleteMachineComment(
+        row.id,
+        { deletedBy: user.id },
+        asDbOrTx(db)
+      );
 
-      const rows = await getMachineTimeline(db, { machineId: machine.id });
+      const rows = await getMachineTimeline(asDbOrTx(db), {
+        machineId: machine.id,
+      });
       expect(rows).toHaveLength(1);
       expect(rows[0].deletedAt).toBeInstanceOf(Date);
     });
@@ -457,12 +479,18 @@ describe("machine-events helpers (PGlite)", () => {
           tag: "maintenance",
           authorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
       const [inserted] = await db.select().from(timelineEvents);
-      await softDeleteMachineComment(inserted.id, { deletedBy: user.id }, db);
+      await softDeleteMachineComment(
+        inserted.id,
+        { deletedBy: user.id },
+        asDbOrTx(db)
+      );
 
-      const rows = await getMachineTimeline(db, { machineId: machine.id });
+      const rows = await getMachineTimeline(asDbOrTx(db), {
+        machineId: machine.id,
+      });
       const expectedName = `${user.firstName} ${user.lastName}`;
       expect(rows[0].authorName).toBe(expectedName);
       expect(rows[0].deletedByName).toBe(expectedName);
@@ -483,10 +511,12 @@ describe("machine-events helpers (PGlite)", () => {
           tag: "maintenance",
           authorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
 
-      const rows = await getMachineTimeline(db, { machineId: machine.id });
+      const rows = await getMachineTimeline(asDbOrTx(db), {
+        machineId: machine.id,
+      });
       expect(rows[0].authorAvatarUrl).toBe(
         "https://cdn.example.com/avatar.png"
       );
@@ -501,17 +531,19 @@ describe("machine-events helpers (PGlite)", () => {
           tag: "maintenance",
           authorId: user.id,
         },
-        db
+        asDbOrTx(db)
       );
-      let rows = await getMachineTimeline(db, { machineId: machine.id });
+      let rows = await getMachineTimeline(asDbOrTx(db), {
+        machineId: machine.id,
+      });
       expect(rows[0].editedAt).toBeNull();
 
       await updateMachineComment(
         rows[0].id,
         { content: { type: "doc", content: [] }, tag: "cleaning" },
-        db
+        asDbOrTx(db)
       );
-      rows = await getMachineTimeline(db, { machineId: machine.id });
+      rows = await getMachineTimeline(asDbOrTx(db), { machineId: machine.id });
       expect(rows[0].editedAt).toBeInstanceOf(Date);
     });
 
@@ -533,7 +565,7 @@ describe("machine-events helpers (PGlite)", () => {
             eventData: { kind: "name_changed", from: "x", to: label },
             actorId: user.id,
           },
-          db
+          asDbOrTx(db)
         );
       }
 
@@ -558,7 +590,7 @@ describe("machine-events helpers (PGlite)", () => {
       }
 
       // limit=3 → newest 3 (e5, e4, e3)
-      const firstPage = await getMachineTimeline(db, {
+      const firstPage = await getMachineTimeline(asDbOrTx(db), {
         machineId: machine.id,
         limit: 3,
       });
@@ -571,7 +603,7 @@ describe("machine-events helpers (PGlite)", () => {
 
       // offset=2, limit=10 → skip the newest 2, return the remaining 3
       // oldest in newest-first order (e3, e2, e1).
-      const secondPage = await getMachineTimeline(db, {
+      const secondPage = await getMachineTimeline(asDbOrTx(db), {
         machineId: machine.id,
         offset: 2,
         limit: 10,
@@ -582,7 +614,7 @@ describe("machine-events helpers (PGlite)", () => {
       );
 
       // limit=6 (one more than available) → all 5 rows, no error.
-      const allWithSlack = await getMachineTimeline(db, {
+      const allWithSlack = await getMachineTimeline(asDbOrTx(db), {
         machineId: machine.id,
         limit: 6,
       });
@@ -613,10 +645,12 @@ describe("machine-events helpers (PGlite)", () => {
             title: "Migrated issue",
           },
         },
-        db
+        asDbOrTx(db)
       );
 
-      const rows = await getMachineTimeline(db, { machineId: machineA.id });
+      const rows = await getMachineTimeline(asDbOrTx(db), {
+        machineId: machineA.id,
+      });
       expect(rows).toHaveLength(1);
       const ref = rows[0].machineRefs[machineB.id];
       expect(ref).toBeDefined();

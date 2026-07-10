@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine, createTestUser } from "~/test/helpers/factories";
 import { machines, timelineEvents, userProfiles } from "~/server/db/schema";
 import { getLatestTimelineEventPerMachine } from "~/lib/collections/latest-activity";
@@ -52,7 +52,10 @@ describe("getLatestTimelineEventPerMachine", () => {
       },
     ]);
 
-    const latest = await getLatestTimelineEventPerMachine(db, [m1.id, m2.id]);
+    const latest = await getLatestTimelineEventPerMachine(asDbOrTx(db), [
+      m1.id,
+      m2.id,
+    ]);
     expect(latest.get(m1.id)?.tag).toBe("maintenance");
     expect(latest.get(m1.id)?.createdAt).toEqual(newer);
     expect(latest.get(m2.id)?.tag).toBe("lifecycle");
@@ -62,7 +65,11 @@ describe("getLatestTimelineEventPerMachine", () => {
     const db = await getTestDb();
     const m1 = createTestMachine({ initials: "CC", name: "Gamma" });
     await db.insert(machines).values(m1);
-    expect((await getLatestTimelineEventPerMachine(db, [m1.id])).size).toBe(0);
-    expect((await getLatestTimelineEventPerMachine(db, [])).size).toBe(0);
+    expect(
+      (await getLatestTimelineEventPerMachine(asDbOrTx(db), [m1.id])).size
+    ).toBe(0);
+    expect(
+      (await getLatestTimelineEventPerMachine(asDbOrTx(db), [])).size
+    ).toBe(0);
   });
 });

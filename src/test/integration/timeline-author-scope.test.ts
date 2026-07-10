@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { userProfiles, machines } from "~/server/db/schema";
 import { createTestUser, createTestMachine } from "~/test/helpers/factories";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -47,23 +47,23 @@ describe("getMachineTimeline author scope", () => {
     await createMachineComment(
       m1,
       { content: doc("alice on A"), tag: "note", authorId: ALICE },
-      db
+      asDbOrTx(db)
     );
     await createMachineComment(
       m2,
       { content: doc("alice on B"), tag: "note", authorId: ALICE },
-      db
+      asDbOrTx(db)
     );
     await createMachineComment(
       m1,
       { content: doc("bob on A"), tag: "note", authorId: BOB },
-      db
+      asDbOrTx(db)
     );
   });
 
   it("returns only the author's events, across machines", async () => {
     const db = await getTestDb();
-    const rows = await getMachineTimeline(db, { authorId: ALICE });
+    const rows = await getMachineTimeline(asDbOrTx(db), { authorId: ALICE });
     expect(rows).toHaveLength(2);
     expect(rows.every((r) => r.authorId === ALICE)).toBe(true);
     expect(new Set(rows.map((r) => r.machineId))).toEqual(new Set([m1, m2]));
@@ -71,13 +71,13 @@ describe("getMachineTimeline author scope", () => {
 
   it("machineId scope still works unchanged", async () => {
     const db = await getTestDb();
-    const rows = await getMachineTimeline(db, { machineId: m1 });
+    const rows = await getMachineTimeline(asDbOrTx(db), { machineId: m1 });
     expect(rows).toHaveLength(2); // alice + bob on A
   });
 
   it("returns [] when no scope is given", async () => {
     const db = await getTestDb();
-    const rows = await getMachineTimeline(db, {});
+    const rows = await getMachineTimeline(asDbOrTx(db), {});
     expect(rows).toEqual([]);
   });
 });
