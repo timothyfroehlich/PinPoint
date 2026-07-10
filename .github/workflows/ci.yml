@@ -168,6 +168,9 @@ jobs:
       - name: Run type checking
         run: pnpm run typecheck
 
+      - name: Run test type checking (baseline gate)
+        run: pnpm run typecheck:tests
+
   lint:
     name: ESLint
     runs-on: ubuntu-latest
