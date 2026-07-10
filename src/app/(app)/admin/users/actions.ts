@@ -26,7 +26,6 @@ type AdminListUsersResult =
   | {
       data: {
         users: { id: string; email?: string | null | undefined }[];
-        nextPage?: number | null;
       };
       error: null;
     }
@@ -75,16 +74,16 @@ function getAdminClient(): AdminClientSubset {
 
               // Simulate GoTrue's server-side per-page cap so callers are
               // forced to paginate — mirrors the real Admin API contract that
-              // motivated PP-a4st (a single unpaginated call can miss users).
+              // motivated PP-a4st (a single unpaginated call can miss users,
+              // and a short-but-non-empty page does not mean "last page").
               const MAX_PER_PAGE = 50;
               const perPage = Math.min(params?.perPage ?? 50, MAX_PER_PAGE);
               const page = params?.page ?? 1;
               const start = (page - 1) * perPage;
               const slice = all.slice(start, start + perPage);
-              const nextPage = start + perPage < all.length ? page + 1 : null;
 
               return {
-                data: { users: slice, nextPage },
+                data: { users: slice },
                 error: null,
               };
             } catch (err) {
@@ -101,15 +100,30 @@ function getAdminClient(): AdminClientSubset {
   return createAdminClient();
 }
 
+// Page size requested from the Admin API. GoTrue caps `per_page` server-side,
+// so the effective page may be smaller — we rely on the returned row count, not
+// this value, to decide when to stop.
+const AUTH_USERS_PER_PAGE = 1000;
+// Hard safety cap on pages scanned, so a misbehaving API (e.g. one that ignores
+// the `page` param and returns a full page forever) can't loop unboundedly.
+// 1000 pages × 1000 rows = 1,000,000 users — far beyond any realistic org.
+const AUTH_USERS_MAX_PAGES = 1000;
+
 /**
  * Look up an auth user by email across ALL pages of the Admin API.
  *
  * The Supabase Admin API (@supabase/auth-js) exposes no `getUserByEmail`, and
  * `listUsers()` is paginated (GoTrue defaults to 50 per page). A single
  * unpaginated call therefore misses a matching email that lands on page 2+,
- * which previously let a duplicate invite slip through. We request a large
- * page and follow `nextPage` until exhausted so the duplicate check is
- * complete regardless of user count. (PP-a4st)
+ * which previously let a duplicate invite slip through. (PP-a4st)
+ *
+ * Termination is **count-based and independent of `nextPage`**: the client
+ * derives `nextPage` from an HTTP `Link` header, which is absent when the
+ * server omits it and is mis-parsed for page numbers >= 10 (a known auth-js
+ * bug — it reads only the first digit). We instead page until the API returns
+ * an empty page. We deliberately do NOT stop on a short-but-non-empty page,
+ * because GoTrue caps `per_page` server-side, so a page smaller than requested
+ * does not imply the last page.
  *
  * `email` must already be normalized (lowercased/trimmed) — the invite schema
  * applies `.trim().toLowerCase()` before this runs.
@@ -118,14 +132,17 @@ async function findAuthUserByEmail(
   adminClient: AdminClientSubset,
   email: string
 ): Promise<{ id: string } | undefined> {
-  let page: number | null = 1;
-  while (page !== null) {
+  for (let page = 1; page <= AUTH_USERS_MAX_PAGES; page++) {
     const { data, error } = await adminClient.auth.admin.listUsers({
       page,
-      perPage: 1000,
+      perPage: AUTH_USERS_PER_PAGE,
     });
 
     if (error) {
+      log.error(
+        { action: "inviteUser", page, err: error.message },
+        "Failed to list auth users during validation"
+      );
       throw error;
     }
 
@@ -134,10 +151,19 @@ async function findAuthUserByEmail(
       return match;
     }
 
-    page = data.nextPage ?? null;
+    // An empty page means we've paged past the end — stop.
+    if (data.users.length === 0) {
+      return undefined;
+    }
   }
 
-  return undefined;
+  // Reached the page cap without an empty page: fail loud rather than silently
+  // treating the email as unique on an incomplete scan.
+  log.error(
+    { action: "inviteUser", maxPages: AUTH_USERS_MAX_PAGES },
+    "Aborting auth-user email scan: exceeded page cap"
+  );
+  throw new Error("Failed to verify email uniqueness against existing users");
 }
 
 async function verifyAdmin(userId: string): Promise<void> {
