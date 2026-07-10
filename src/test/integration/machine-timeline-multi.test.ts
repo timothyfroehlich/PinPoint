@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine } from "~/test/helpers/factories";
 import { machines, timelineEvents } from "~/server/db/schema";
 import { getMachineTimeline } from "~/lib/timeline/machine-events";
@@ -38,7 +38,7 @@ describe("getMachineTimeline — machine-id list (PP-slrd.1)", () => {
       },
     ]);
 
-    const rows = await getMachineTimeline(db, {
+    const rows = await getMachineTimeline(asDbOrTx(db), {
       machineId: [m1.id, m2.id],
     });
     expect(rows.map((r) => r.machineId)).toEqual([m2.id, m1.id]);
@@ -54,13 +54,13 @@ describe("getMachineTimeline — machine-id list (PP-slrd.1)", () => {
       tag: "lifecycle",
       eventData: { kind: "machine_added" },
     });
-    const rows = await getMachineTimeline(db, { machineId: m1.id });
+    const rows = await getMachineTimeline(asDbOrTx(db), { machineId: m1.id });
     expect(rows).toHaveLength(1);
   });
 
   it("returns [] for an empty id list without querying", async () => {
     const db = await getTestDb();
-    const rows = await getMachineTimeline(db, { machineId: [] });
+    const rows = await getMachineTimeline(asDbOrTx(db), { machineId: [] });
     expect(rows).toEqual([]);
   });
 });

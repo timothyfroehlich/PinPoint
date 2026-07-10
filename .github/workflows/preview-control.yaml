@@ -114,7 +114,8 @@ jobs:
       - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
         if: steps.parse.outputs.action == 'start' || steps.parse.outputs.action == 'stop'
         with:
-          version: latest
+          # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
+          version: 2.109.1
 
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061  # ratchet:pnpm/action-setup@v4.2.0
         if: steps.parse.outputs.action == 'start'

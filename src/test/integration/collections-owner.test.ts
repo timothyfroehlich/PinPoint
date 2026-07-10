@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   createTestIssue,
   createTestMachine,
@@ -50,7 +50,7 @@ describe("getOwnerCollection", () => {
       }),
     ]);
 
-    const collection = await getOwnerCollection(db, owner.id);
+    const collection = await getOwnerCollection(asDbOrTx(db), owner.id);
     expect(collection).not.toBeNull();
     expect(collection?.owner).toEqual({ id: owner.id, name: "Alice Owner" });
     expect(collection?.machines.map((m) => m.initials)).toEqual(["AA", "ZZ"]);
@@ -67,13 +67,13 @@ describe("getOwnerCollection", () => {
     const owner = createTestUser();
     await db.insert(userProfiles).values(owner);
 
-    const collection = await getOwnerCollection(db, owner.id);
+    const collection = await getOwnerCollection(asDbOrTx(db), owner.id);
     expect(collection?.machines).toEqual([]);
   });
 
   it("returns null for unknown or malformed user ids", async () => {
     const db = await getTestDb();
-    expect(await getOwnerCollection(db, randomUUID())).toBeNull();
-    expect(await getOwnerCollection(db, "not-a-uuid")).toBeNull();
+    expect(await getOwnerCollection(asDbOrTx(db), randomUUID())).toBeNull();
+    expect(await getOwnerCollection(asDbOrTx(db), "not-a-uuid")).toBeNull();
   });
 });

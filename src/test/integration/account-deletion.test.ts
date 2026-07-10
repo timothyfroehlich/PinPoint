@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDb, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   userProfiles,
   machines,
@@ -152,7 +152,7 @@ describe("Account Deletion Anonymization (PGlite)", () => {
     });
 
     // 3. Run Anonymization (without reassignment)
-    await anonymizeUserReferences(userToDeleteId, null, db);
+    await anonymizeUserReferences(userToDeleteId, null, asDb(db));
 
     // 4. Verify Anonymization
     const anonymizedIssues = await db.query.issues.findMany({
@@ -203,7 +203,7 @@ describe("Account Deletion Anonymization (PGlite)", () => {
     await db.insert(machines).values(machine);
 
     // 3. Run Anonymization with Reassignment
-    await anonymizeUserReferences(userToDeleteId, newOwnerId, db);
+    await anonymizeUserReferences(userToDeleteId, newOwnerId, asDb(db));
 
     // 4. Verify Reassignment
     const updatedMachine = await db.query.machines.findFirst({
@@ -222,9 +222,9 @@ describe("Account Deletion Anonymization (PGlite)", () => {
       .values(createTestUser({ id: adminId, role: "admin" }));
 
     // 2. Attempt Anonymization
-    await expect(anonymizeUserReferences(adminId, null, db)).rejects.toThrow(
-      "Sole admin cannot delete their account"
-    );
+    await expect(
+      anonymizeUserReferences(adminId, null, asDb(db))
+    ).rejects.toThrow("Sole admin cannot delete their account");
   });
 
   it("should allow admin deletion if another admin exists", async () => {
@@ -249,7 +249,7 @@ describe("Account Deletion Anonymization (PGlite)", () => {
 
     // 2. Attempt Anonymization
     await expect(
-      anonymizeUserReferences(adminToDeleteId, null, db)
+      anonymizeUserReferences(adminToDeleteId, null, asDb(db))
     ).resolves.not.toThrow();
   });
 });
@@ -306,7 +306,10 @@ describe("Account Deletion Reassign Picker — guest filter (PP-hci / PP-aby)", 
 
     // Call the production helper directly — drift in the role filter will
     // fail this assertion.
-    const membersResult = await getReassignmentTargets(deletingUserId, db);
+    const membersResult = await getReassignmentTargets(
+      deletingUserId,
+      asDb(db)
+    );
     const resultIds = membersResult.map((r) => r.id);
 
     // Guest must NOT appear

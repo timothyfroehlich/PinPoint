@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { userProfiles, machines } from "~/server/db/schema";
 import { createTestUser, createTestMachine } from "~/test/helpers/factories";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -38,7 +38,7 @@ describe("profile feed queries", () => {
       await createMachineComment(
         m1,
         { content: doc(`n${i}`), tag: "note", authorId: USER },
-        db
+        asDbOrTx(db)
       );
     }
   });
