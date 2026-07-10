@@ -46,7 +46,7 @@ Everything above happens **in a worktree** — the root checkout is read-only (A
 
 ### `using-git-worktrees`
 
-- PinPoint has native worktree tooling — **use `EnterWorktree`** (or `Agent(isolation:"worktree")`), never raw `git worktree add`. The `post-checkout` hook wires ports/env/config. 6.1.x already prefers native tools; this just names ours.
+- PinPoint has native worktree tooling — **prefer `EnterWorktree`** (or `Agent(isolation:"worktree")`) over raw `git worktree add`. Either way the `post-checkout` hook wires ports/env/config, so when you do need a manual worktree, `git worktree add /path -b branch origin/main` (AGENTS.md §4) is the supported fallback. 6.1.x already prefers native tools; this just names ours.
 - **Dispatch `Agent(isolation:"worktree")` only from the main worktree** (upstream bug #47548). See CLAUDE.md "Worktree Dispatch Safety".
 
 ### `writing-plans`
@@ -56,14 +56,14 @@ Everything above happens **in a worktree** — the root checkout is read-only (A
 
 ### `subagent-driven-development`
 
-- Superpowers says "never pause between tasks, dispatch a fresh subagent per task." PinPoint gates multi-agent orchestration: **before launching, state the subagent count + rough cost and get Tim's explicit yes** (CLAUDE.md "Multi-Agent Workflows scale gate"). The built-in `/code-review` workflow is the only exemption.
+- Superpowers says "never pause between tasks, dispatch a fresh subagent per task." PinPoint gates multi-agent orchestration: **before launching, state the subagent count + rough cost and get Tim's explicit yes** — including worst-case fan-out. The built-in `/code-review` workflow is the only exemption.
 - Caps: ~2–4 subagents per task; **simple PRs (<5 files) ≤ 2 subagents** (CLAUDE.md). Don't fan out on straightforward work.
 - After the gate clears, run SDD's fresh-subagent-per-task + between-task review as written.
 
 ### `requesting-code-review` / `receiving-code-review`
 
 - Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** review gate is **CI Gate + `/code-review`** (see `pinpoint-pr-workflow`), not a plugin subagent.
-- **Reply to review comments via MCP** (`add_reply_to_pull_request_comment` + resolve the thread with `pull_request_review_write method:"resolve_thread"`), **signed `—Claude`** (AGENTS.md §5 "Review comments"). Declined comments still get a one-sentence reply — no silent ignores. Do not use the plugin's own reply flow.
+- **Reply to review comments via MCP** (`add_reply_to_pull_request_comment` + resolve the thread with `pull_request_review_write method:"resolve_thread"`), **signed with your agent name** (`—Claude` / `—Gemini` / `—Codex` / `—Antigravity`, per AGENTS.md §5 "Review comments"). Declined comments still get a one-sentence reply — no silent ignores. Do not use the plugin's own reply flow.
 
 ### `finishing-a-development-branch` — the biggest override
 
@@ -71,7 +71,7 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 
 - **Never merge locally, never push/merge to `main`.** Ship through a PR: push the branch, open it **ready-for-review**, let **CI** run the full suite, then merge **only** via `scripts/workflow/merge-pr.sh <PR>` (never `gh pr merge` / MCP merge). Full pipeline: `pinpoint-pr-workflow` + landing-the-plane (AGENTS.md §9).
 - **Tests:** use PinPoint's tiered commands (`pnpm run check` floor; `pnpm run preflight` for migrations/auth/server-actions/middleware/schema; `pnpm run smoke` for UI) — **not** `npm test` / `pytest`. Don't run the full E2E suite locally; CI owns it.
-- **Worktree cleanup is destructive → wait for explicit confirmation** (AGENTS.md §9.6). When confirmed, cleanup goes through the `WorktreeRemove` hook / `scripts/worktree_cleanup.py` (dealloc slot + Docker volumes) — **never raw `git worktree remove`/`rm -rf`**, which leaks the slot manifest and volumes.
+- **Worktree cleanup is destructive → wait for explicit confirmation** (AGENTS.md §9 "Landing the plane", step 6). When confirmed, cleanup goes through the `WorktreeRemove` hook / `scripts/worktree_cleanup.py` (dealloc slot + Docker volumes) — **never raw `git worktree remove`/`rm -rf`**, which leaks the slot manifest and volumes.
 - **"Discard" is not a routine option.** Abandoning work is a deliberate, confirmed action, not a menu pick.
 - **Close the bead only after merge** (landing-the-plane) — not at push, not at PR-open.
 
@@ -79,17 +79,17 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 
 ## 4. Quick reference
 
-| Superpowers step         | PinPoint override                                                   |
-| :----------------------- | :------------------------------------------------------------------ |
-| Spec written             | + create bead with `--spec-id` + `--acceptance` (§2)                |
-| Plan written             | record path + branch in `--design` (§1)                             |
-| Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`, from main worktree |
-| SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                |
-| Code review              | CI Gate + `/code-review`; replies via MCP, signed `—Claude`         |
-| Finish: "merge locally"  | ❌ prohibited → PR + `merge-pr.sh` + landing-the-plane              |
-| Finish: tests            | tiered `pnpm run check`/`preflight`/`smoke`, not `npm test`         |
-| Finish: worktree cleanup | `WorktreeRemove` hook / `worktree_cleanup.py`, on confirmation      |
-| Close bead               | only after merge                                                    |
+| Superpowers step         | PinPoint override                                                      |
+| :----------------------- | :--------------------------------------------------------------------- |
+| Spec written             | + create bead with `--spec-id` + `--acceptance` (§2)                   |
+| Plan written             | record path + branch in `--design` (§1)                                |
+| Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`, from main worktree    |
+| SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                   |
+| Code review              | CI Gate + `/code-review`; replies via MCP, signed with your agent name |
+| Finish: "merge locally"  | ❌ prohibited → PR + `merge-pr.sh` + landing-the-plane                 |
+| Finish: tests            | tiered `pnpm run check`/`preflight`/`smoke`, not `npm test`            |
+| Finish: worktree cleanup | `WorktreeRemove` hook / `worktree_cleanup.py`, on confirmation         |
+| Close bead               | only after merge                                                       |
 
 ## Red flags — stop if you catch yourself
 
