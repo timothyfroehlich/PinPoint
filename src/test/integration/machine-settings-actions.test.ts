@@ -240,6 +240,7 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
       ],
     });
     expect(updated.success).toBe(true);
+    if (!updated.success) return;
     expect(updated.changed).toBe(true);
 
     // The persisted state reflects both changes from the single auto-save call.

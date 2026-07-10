@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestUser } from "~/test/helpers/factories";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 import {
   issues,
   machines,
@@ -53,10 +54,10 @@ describe("Issues CRUD Operations (PGlite)", () => {
         .insert(issues)
         .values({
           title: "Test Issue",
-          description: "Test description",
+          description: plainTextToDoc("Test description"),
           machineInitials: testMachine.initials,
           issueNumber: 1,
-          severity: "playable",
+          severity: "major",
           reportedBy: testUser.id,
           status: "new",
         })
@@ -64,10 +65,10 @@ describe("Issues CRUD Operations (PGlite)", () => {
 
       expect(issue).toBeDefined();
       expect(issue.title).toBe("Test Issue");
-      expect(issue.description).toBe("Test description");
+      expect(issue.description).toEqual(plainTextToDoc("Test description"));
       expect(issue.machineInitials).toBe(testMachine.initials);
       expect(issue.issueNumber).toBe(1);
-      expect(issue.severity).toBe("playable");
+      expect(issue.severity).toBe("major");
       expect(issue.status).toBe("new");
       expect(issue.reportedBy).toBe(testUser.id);
     });
@@ -77,9 +78,10 @@ describe("Issues CRUD Operations (PGlite)", () => {
 
       // Attempt to create issue without machineInitials should fail
       await expect(
+        // @ts-expect-error - deliberately passing null for a NOT NULL column to
+        // assert the runtime constraint rejection (the call has no matching overload).
         db.insert(issues).values({
           title: "Test Issue",
-          // @ts-expect-error - Testing validation
           machineInitials: null,
           issueNumber: 1,
           severity: "minor",
@@ -140,7 +142,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
           title: "Issue 2",
           machineInitials: testMachine.initials,
           issueNumber: 2,
-          severity: "playable",
+          severity: "major",
           status: "in_progress",
           reportedBy: testUser.id,
         },
@@ -222,7 +224,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
           title: "Test Issue",
           machineInitials: testMachine.initials,
           issueNumber: 1,
-          severity: "playable",
+          severity: "major",
           status: "new",
           reportedBy: testUser.id,
         })
@@ -309,7 +311,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
           title: "Test Issue",
           machineInitials: testMachine.initials,
           issueNumber: 1,
-          severity: "playable",
+          severity: "major",
           reportedBy: testUser.id,
         })
         .returning();
@@ -352,7 +354,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
       // Create regular comment (for future feature)
       await db.insert(issueComments).values({
         issueId: testIssue.id,
-        content: "This is a comment",
+        content: plainTextToDoc("This is a comment"),
         isSystem: false,
         authorId: testUser.id,
       });
@@ -457,7 +459,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
           title: "Member Issue",
           machineInitials: testMachine.initials,
           issueNumber: 1,
-          severity: "playable",
+          severity: "major",
           reportedBy: testUser.id,
         },
         {

@@ -25,12 +25,12 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { STORAGE_STATE } from "../support/auth-state";
-import { seededMachines, seededIssues } from "../support/constants";
+import { STORAGE_STATE } from "../support/auth-state.js";
+import { seededMachines, seededIssue } from "../support/constants.js";
 
 const machineA = seededMachines.addamsFamily.initials;
 const machineB = seededMachines.eightBallDeluxe.initials;
-const issueNumber = seededIssues.TAF[0].num;
+const issueNumber = seededIssue("TAF").num;
 
 const PREFIX = "E2E PP-0x98";
 

@@ -13,12 +13,12 @@ import type {
   issues,
   issueComments,
 } from "~/server/db/schema";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 
 export function createTestUser(
   overrides?: Partial<InferInsertModel<typeof userProfiles>>
-): InferInsertModel<typeof userProfiles> {
+): InferInsertModel<typeof userProfiles> & { id: string } {
   return {
-    id: randomUUID(),
     email: `test-${randomUUID()}@example.com`,
     firstName: "Test",
     lastName: "User",
@@ -26,6 +26,7 @@ export function createTestUser(
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
+    id: overrides?.id ?? randomUUID(),
   };
 }
 
@@ -34,14 +35,14 @@ export function createTestUser(
  */
 export function createTestMachine(
   overrides?: Partial<InferInsertModel<typeof machines>>
-): InferInsertModel<typeof machines> {
+): InferInsertModel<typeof machines> & { id: string } {
   return {
-    id: randomUUID(),
     initials: "TM",
     name: "Test Machine",
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
+    id: overrides?.id ?? randomUUID(),
   };
 }
 
@@ -51,13 +52,12 @@ export function createTestMachine(
 export function createTestIssue(
   machineInitials: string,
   overrides?: Partial<InferInsertModel<typeof issues>>
-): InferInsertModel<typeof issues> {
+): InferInsertModel<typeof issues> & { id: string } {
   return {
-    id: randomUUID(),
     machineInitials,
     issueNumber: 1,
     title: "Test Issue",
-    description: "Test description",
+    description: plainTextToDoc("Test description"),
     status: "new",
     severity: "minor",
     priority: "low",
@@ -67,6 +67,7 @@ export function createTestIssue(
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
+    id: overrides?.id ?? randomUUID(),
   };
 }
 
@@ -76,15 +77,15 @@ export function createTestIssue(
 export function createTestComment(
   issueId: string,
   overrides?: Partial<InferInsertModel<typeof issueComments>>
-): InferInsertModel<typeof issueComments> {
+): InferInsertModel<typeof issueComments> & { id: string } {
   return {
-    id: randomUUID(),
     issueId,
     authorId: null,
-    content: "Test comment",
+    content: plainTextToDoc("Test comment"),
     isSystem: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
+    id: overrides?.id ?? randomUUID(),
   };
 }

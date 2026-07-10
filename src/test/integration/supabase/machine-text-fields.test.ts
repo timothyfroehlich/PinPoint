@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestUser, createTestMachine } from "~/test/helpers/factories";
 import { machines, userProfiles } from "~/server/db/schema";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 
 describe("Machine Text Fields (PGlite)", () => {
   setupTestDb();
@@ -62,14 +63,18 @@ describe("Machine Text Fields (PGlite)", () => {
 
       await db
         .update(machines)
-        .set({ description: "A classic pinball machine from 1979" })
+        .set({
+          description: plainTextToDoc("A classic pinball machine from 1979"),
+        })
         .where(eq(machines.id, testMachine.id));
 
       const updated = await db.query.machines.findFirst({
         where: eq(machines.id, testMachine.id),
       });
 
-      expect(updated?.description).toBe("A classic pinball machine from 1979");
+      expect(updated?.description).toEqual(
+        plainTextToDoc("A classic pinball machine from 1979")
+      );
     });
 
     it("should update ownerRequirements field", async () => {
@@ -77,14 +82,18 @@ describe("Machine Text Fields (PGlite)", () => {
 
       await db
         .update(machines)
-        .set({ ownerRequirements: "Please use soft plunge only" })
+        .set({
+          ownerRequirements: plainTextToDoc("Please use soft plunge only"),
+        })
         .where(eq(machines.id, testMachine.id));
 
       const updated = await db.query.machines.findFirst({
         where: eq(machines.id, testMachine.id),
       });
 
-      expect(updated?.ownerRequirements).toBe("Please use soft plunge only");
+      expect(updated?.ownerRequirements).toEqual(
+        plainTextToDoc("Please use soft plunge only")
+      );
     });
 
     it("should update all text fields simultaneously", async () => {
@@ -93,8 +102,8 @@ describe("Machine Text Fields (PGlite)", () => {
       await db
         .update(machines)
         .set({
-          description: "Desc",
-          ownerRequirements: "Requirements",
+          description: plainTextToDoc("Desc"),
+          ownerRequirements: plainTextToDoc("Requirements"),
         })
         .where(eq(machines.id, testMachine.id));
 
@@ -102,8 +111,10 @@ describe("Machine Text Fields (PGlite)", () => {
         where: eq(machines.id, testMachine.id),
       });
 
-      expect(updated?.description).toBe("Desc");
-      expect(updated?.ownerRequirements).toBe("Requirements");
+      expect(updated?.description).toEqual(plainTextToDoc("Desc"));
+      expect(updated?.ownerRequirements).toEqual(
+        plainTextToDoc("Requirements")
+      );
     });
 
     it("should allow clearing a text field by setting to null", async () => {
@@ -112,7 +123,7 @@ describe("Machine Text Fields (PGlite)", () => {
       // First set a value
       await db
         .update(machines)
-        .set({ description: "Some description" })
+        .set({ description: plainTextToDoc("Some description") })
         .where(eq(machines.id, testMachine.id));
 
       // Then clear it

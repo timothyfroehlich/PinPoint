@@ -38,17 +38,18 @@ vi.mock("~/server/db", async () => {
 });
 
 // Mock MachineTextFields to capture props passed down
-const mockMachineTextFields = vi.fn(() => (
-  <div data-testid="machine-text-fields" />
-));
+interface MachineTextFieldsProps {
+  machineId: string;
+  description: string | null;
+  ownerRequirements: string | null;
+  canEditGeneral: boolean;
+  canViewOwnerRequirements: boolean;
+}
+const mockMachineTextFields = vi.fn<
+  (props: MachineTextFieldsProps) => React.ReactElement
+>(() => <div data-testid="machine-text-fields" />);
 vi.mock("~/app/(app)/m/[initials]/machine-text-fields", () => ({
-  MachineTextFields: (props: {
-    machineId: string;
-    description: string | null;
-    ownerRequirements: string | null;
-    canEditGeneral: boolean;
-    canViewOwnerRequirements: boolean;
-  }) => {
+  MachineTextFields: (props: MachineTextFieldsProps) => {
     mockMachineTextFields(props);
     return <div data-testid="machine-text-fields" />;
   },

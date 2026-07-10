@@ -19,6 +19,7 @@ import { describe, it, expect, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   authUsers,
   invitedUsers,
@@ -565,12 +566,12 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
       const machine = await makeMachine(owner.id);
       const action = await c.load();
 
-      const doc = {
+      const doc: ProseMirrorDoc = {
         type: "doc",
         content: [
           { type: "paragraph", content: [{ type: "text", text: "x" }] },
         ],
-      } as const;
+      };
 
       const result = await action(machine.id, doc);
       expect(result.ok).toBe(true);
@@ -597,12 +598,12 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
       const machine = await makeMachine(owner.id);
       const action = await c.load();
 
-      const doc = {
+      const doc: ProseMirrorDoc = {
         type: "doc",
         content: [
           { type: "paragraph", content: [{ type: "text", text: "x" }] },
         ],
-      } as const;
+      };
 
       const result = await action(machine.id, doc);
       expect(result.ok).toBe(true);
@@ -626,10 +627,10 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
     const { updateMachineOwnerRequirements } =
       await import("~/app/(app)/m/actions");
 
-    const doc = {
+    const doc: ProseMirrorDoc = {
       type: "doc",
       content: [{ type: "paragraph", content: [{ type: "text", text: "x" }] }],
-    } as const;
+    };
 
     // First edit: sets initial value, emits one event.
     const first = await updateMachineOwnerRequirements(machine.id, doc);

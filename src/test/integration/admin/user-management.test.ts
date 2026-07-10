@@ -142,7 +142,7 @@ describe("Admin User Management Integration", () => {
     // Mock as Target User
     mockGetUser.mockResolvedValue({ data: { user: targetUser! } });
 
-    await expect(updateUserRole(adminUser!.id, "user")).rejects.toThrow(
+    await expect(updateUserRole(adminUser!.id, "member")).rejects.toThrow(
       "Forbidden: Only admins can perform this action"
     );
   });

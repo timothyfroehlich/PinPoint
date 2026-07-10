@@ -47,7 +47,10 @@ describe("NotificationPreferencesForm", () => {
 
   it("should call action on save", async () => {
     const user = userEvent.setup();
-    updatePreferencesSpy.mockResolvedValue({ ok: true });
+    updatePreferencesSpy.mockResolvedValue({
+      ok: true,
+      value: { success: true },
+    });
 
     render(<NotificationPreferencesForm preferences={defaultPreferences} />);
 

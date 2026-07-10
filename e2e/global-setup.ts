@@ -102,7 +102,11 @@ function checkDocker(): void {
       timeout: 5000,
     });
 
-    if (result.error?.code === "ENOENT") {
+    if (
+      result.error &&
+      "code" in result.error &&
+      result.error.code === "ENOENT"
+    ) {
       throw new Error(
         "Docker is not installed.\n" +
           "  Install OrbStack, Docker Desktop, or Docker Engine (whichever your platform supports).\n" +
@@ -152,7 +156,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   console.log("🔍 Checking Docker daemon...");
   checkDocker();
 
-  if (process.env.SKIP_SUPABASE_RESET === "true") {
+  if (process.env["SKIP_SUPABASE_RESET"] === "true") {
     console.log("⏭️  SKIP_SUPABASE_RESET=true, skipping database setup.");
     return;
   }
@@ -160,9 +164,9 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   // ── Pre-flight checks ──────────────────────────────────────────────
 
   const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost:54321";
+    process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? "http://localhost:54321";
   const postgresUrl =
-    process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
+    process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
 
   // 1. Supabase API health
   console.log("🔍 Checking Supabase...");

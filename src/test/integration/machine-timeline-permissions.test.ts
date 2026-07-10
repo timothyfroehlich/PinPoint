@@ -417,8 +417,6 @@ describe("Machine timeline comment Server Actions (PP-0x98)", () => {
 
       const result = await editMachineCommentAction({
         id: comment.id,
-        // @ts-expect-error — userTagSchema rejects this at runtime; we want
-        // to exercise that path.
         tag: "lifecycle",
         contentJson: EDITED_DOC_JSON,
       });

@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import {
   TEST_USERS,
-  seededIssues,
+  seededIssue,
   seededMachines,
 } from "../support/constants.js";
 import { fillReportForm } from "../support/page-helpers.js";
@@ -150,7 +150,7 @@ test.describe("Issue List Features - Extended", () => {
 
     // 2. Click on an issue title link to navigate to detail page
     const issueLink = page.getByRole("link", {
-      name: seededIssues.TAF[0].title,
+      name: seededIssue("TAF").title,
     });
     await issueLink.click();
 

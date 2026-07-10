@@ -47,24 +47,28 @@
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
-| Category    | Skill                         | When to use                                                                                                                              |
-| :---------- | :---------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
-| UI          | `pinpoint-ui`                 | Components, shadcn/ui, forms, responsive design                                                                                          |
-| UI          | `pinpoint-design-bible`       | Design system, page archetypes, spacing, surfaces                                                                                        |
-| TypeScript  | `pinpoint-typescript`         | Type errors, generics, Drizzle types                                                                                                     |
-| Testing     | `pinpoint-testing`            | Writing tests, PGlite, test-layer decisions                                                                                              |
-| Testing     | `pinpoint-e2e`                | E2E tests, worker isolation, Playwright stability                                                                                        |
-| Security    | `pinpoint-security`           | Auth, CSP, Zod, Supabase SSR                                                                                                             |
-| Patterns    | `pinpoint-patterns`           | Server Actions, data fetching, architecture                                                                                              |
-| Workflow    | `pinpoint-prototype-mode`     | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt                                                                  |
-| Workflow    | `pinpoint-briefing`           | Session-start health review                                                                                                              |
-| Workflow    | `pinpoint-pr-workflow`        | Full PR lifecycle: commit, push, CI, merge                                                                                               |
-| Workflow    | `pinpoint-orchestrator`       | Parallel subagent work in worktrees: dispatch, monitor, follow-up                                                                        |
-| Workflow    | `pinpoint-huddle`             | Inter-session coordination via daily/monthly beads (the huddle hooks)                                                                    |
-| Workflow    | `pinpoint-superpowers-bridge` | Running the superpowers lifecycle in PinPoint: bead field pointers + overrides for the conflicting finish/worktree/review/subagent steps |
-| Antigravity | `pinpoint-agy-triage`         | Grooming: evaluate whether a bead is agy-ready/agy-ui                                                                                    |
-| Antigravity | `pinpoint-agy-dispatch`       | Emit an Antigravity copy-paste prompt for a chosen bead                                                                                  |
-| Antigravity | `pinpoint-agy-execute`        | Runbook for Antigravity to execute an agy-ready bead end-to-end                                                                          |
+| Category    | Skill                          | When to use                                                                                                                              |
+| :---------- | :----------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| UI          | `pinpoint-ui`                  | Components, shadcn/ui, forms, responsive design                                                                                          |
+| UI          | `pinpoint-design-bible`        | Design system, page archetypes, spacing, surfaces                                                                                        |
+| TypeScript  | `pinpoint-typescript`          | Type errors, generics, Drizzle types                                                                                                     |
+| Testing     | `pinpoint-testing`             | Writing tests, PGlite, test-layer decisions                                                                                              |
+| Testing     | `pinpoint-e2e`                 | E2E tests, worker isolation, Playwright stability                                                                                        |
+| Security    | `pinpoint-security`            | Auth, CSP, Zod, Supabase SSR                                                                                                             |
+| Patterns    | `pinpoint-patterns`            | Server Actions, data fetching, architecture                                                                                              |
+| Workflow    | `pinpoint-prototype-mode`      | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt                                                                  |
+| Workflow    | `pinpoint-briefing`            | Session-start health review                                                                                                              |
+| Workflow    | `pinpoint-pr-workflow`         | Full PR lifecycle: commit, push, CI, merge                                                                                               |
+| Workflow    | `pinpoint-orchestrator`        | Parallel subagent work in worktrees: dispatch, monitor, follow-up                                                                        |
+| Workflow    | `pinpoint-huddle`              | Inter-session coordination via daily/monthly beads (the huddle hooks)                                                                    |
+| Workflow    | `pinpoint-superpowers-bridge`  | Running the superpowers lifecycle in PinPoint: bead field pointers + overrides for the conflicting finish/worktree/review/subagent steps |
+| Deployment  | `pinpoint-db-connections`      | Supabase/Postgres pooler & connection-string reference                                                                                   |
+| Deployment  | `pinpoint-migration-conflicts` | Resolving drizzle/meta conflicts on merge                                                                                                |
+| Deployment  | `pinpoint-preview-deployments` | On-demand TTL'd Supabase preview branches, `/preview` command                                                                            |
+| Deployment  | `pinpoint-audit-override`      | Per-PR `/audit-override` escape hatch for unrelated audit failures                                                                       |
+| Antigravity | `pinpoint-agy-triage`          | Grooming: evaluate whether a bead is agy-ready/agy-ui                                                                                    |
+| Antigravity | `pinpoint-agy-dispatch`        | Emit an Antigravity copy-paste prompt for a chosen bead                                                                                  |
+| Antigravity | `pinpoint-agy-execute`         | Runbook for Antigravity to execute an agy-ready bead end-to-end                                                                          |
 
 ## 4. Environment
 
@@ -157,18 +161,7 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 
 ### Migration conflicts
 
-Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the prevId chain.
-
-**Protocol when meta conflicts on merge:**
-
-1. Take upstream's `drizzle/meta` (theirs).
-2. Delete your migration files (`.sql` + `_snapshot.json`).
-3. Resolve `schema.ts` manually.
-4. `pnpm db:generate` — Drizzle regenerates a fresh migration.
-5. Compare the new SQL to what you deleted; confirm intent preserved.
-6. `pnpm db:reset` to verify.
-
-Before merging any migration PR: every new `.sql` has a matching `_snapshot.json`; `pnpm db:generate` reports "No schema changes".
+Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the prevId chain. Full regenerate-don't-edit protocol: `pinpoint-migration-conflicts` skill.
 
 ### Review comments
 
@@ -214,20 +207,7 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 - **`pinpoint-prod`** (Live, Pro plan): **real user data — strict safety.** Daily backups, 7-day retention.
 - **Local**: `db:reset` OK. **Prod: NEVER `db:reset`. Only `db:migrate`.**
-- **Connection**: app + scripts use `POSTGRES_URL` — the Supavisor **transaction** pooler (`…pooler.supabase.com:6543`, IPv4). In prod the Supabase↔Vercel integration injects `POSTGRES_URL_NON_POOLING` as the IPv4 **session** pooler (`…pooler.supabase.com:5432`) — the prepared-statement-capable, IPv4-reachable endpoint that `scripts/migrate-production.ts` uses for DDL on the IPv4-only Vercel build runner (verified 2026-06-18 via prod build logs + DNS, PP-xhqt). The **direct** connection (`db.<ref>.supabase.co:5432`) is **not** what NON_POOLING points to here: it is IPv6-only (prod's IPv4 add-on is **off**, confirmed — the host has no A record), so it is unreachable from CI/preview/Vercel; the session pooler is used instead.
-  Format: `postgresql://postgres.[ref]:password@aws-0-us-east-2.pooler.supabase.com:6543/postgres`
-
-  **Canonical endpoint reference** (Supabase docs, verified 2026-06-18):
-
-  | Endpoint                    | Mode                       | IP                      | Prepared statements           | Use for                                      |
-  | --------------------------- | -------------------------- | ----------------------- | ----------------------------- | -------------------------------------------- |
-  | `…pooler.supabase.com:6543` | Supavisor **transaction**  | IPv4 (always)           | **disable** (`prepare:false`) | reads, serverless, one-shot scripts          |
-  | `…pooler.supabase.com:5432` | Supavisor **session**      | IPv4 (always)           | supported                     | migrations / DDL / write transactions (IPv4) |
-  | `db.<ref>.supabase.co:5432` | **direct**                 | IPv6 (IPv4 with add-on) | supported                     | migrations from IPv6-capable hosts           |
-  | `db.<ref>.supabase.co:6543` | Dedicated PgBouncer (paid) | IPv6 (IPv4 with add-on) | no                            | high-perf app traffic                        |
-  - The shared Supavisor pooler is **already IPv4** on both ports, free, every tier — there is nothing to "enable". The paid **IPv4 add-on** is a separate thing that makes the _direct_ connection IPv4; PinPoint does not need it (the session pooler already gives an IPv4, prepared-statement-capable endpoint).
-  - **Transaction pooler (`:6543`) does not support prepared statements** — set `prepare:false` on **every** porsager client that connects there: one-shot scripts (`scripts/lib/pg-client.mjs`) **and the app runtime** (`src/server/db/index.ts`). This is the canonical Drizzle + postgres-js + Supabase serverless setting. `scripts/migrate-production.ts` also sets `prepare:false` as defense-in-depth: it normally runs over the `:5432` session pooler (prepared-statement-capable), but the option keeps it correct if it ever falls back to `:6543`, and it additionally **requires** `POSTGRES_URL_NON_POOLING` in production rather than silently falling back (PP-xhqt).
-  - ✅ **Write/transaction hazard (resolved, PP-d8l8):** multi-statement write transactions over the `:6543` transaction pooler with prepared statements caused **silent commit loss** in prod (the driver saw COMMIT succeed; nothing persisted — incident 2026-06-18). Root cause: the runtime client (`src/server/db/index.ts`) used postgres-js's default `prepare:true`. **Fixed by setting `prepare:false` on the runtime client** — one client-level option that covers all write transactions and standalone writes; no read/write split or session-pooler routing needed (the `:5432` session pooler is wrong for Vercel serverless — session mode exhausts connections under Fluid Compute). The app-layer read-back guard in `src/services/issues.ts` (PP-qk7s) remains as a tripwire until prod confirms the fix, then is removed in a follow-up. Do **not** reintroduce `prepare:true` on a `:6543` client.
+- **Connection**: app + scripts use `POSTGRES_URL` — the Supavisor **transaction** pooler (`…pooler.supabase.com:6543`, IPv4), with `prepare:false` set on every porsager client that connects there (`src/server/db/index.ts`, `scripts/lib/pg-client.mjs`) — the transaction pooler does not support prepared statements, and a resolved incident (PP-d8l8) traced silent prod commit loss to this exact setting missing on the runtime client. **Never reintroduce `prepare:true` on a `:6543` client.** Full pooler/endpoint reference, connection string format, and the incident writeup: `pinpoint-db-connections` skill.
 
 ### Vercel
 
@@ -236,25 +216,11 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 ### Preview deployments (on-demand, TTL'd Supabase branches)
 
-Native Supabase auto-branching is **disabled** — no PR gets a preview by default (zero branches, zero cost). Previews are created on demand via PR comment commands and torn down on a TTL.
-
-- **Control surface = PR comments** (from authors with write access only):
-  - `/preview` — create (or restart after expiry) a branch, migrate + seed it, wire creds into the Vercel preview, and post a sticky status comment with the live URL + 48h expiry.
-  - `/preview extend` — push expiry +48h (no DB work). `/preview stop` — tear down now.
-- **State**: one sticky bot comment per PR (keyed `<!-- pinpoint-preview-status -->`) holds the `Expires:` timestamp — the TTL source of truth.
-- **Reaper**: `Preview Reaper` runs hourly; deletes branches past expiry or on closed/merged PRs, and flips the sticky comment to "expired — comment `/preview` to restart."
-- **Implementation** (workflows, the Vercel git-integration wiring, and required secrets): `.github/workflows/preview-control.yaml`, `preview-reaper.yaml`, `scripts/workflow/preview/*.sh`.
+Native Supabase auto-branching is **disabled** — no PR gets a preview by default. Previews are created on demand via the `/preview` PR-comment command and torn down on a TTL by an hourly reaper. Full control-surface reference and implementation pointers: `pinpoint-preview-deployments` skill.
 
 ### Audit-gate override (per-PR `/audit-override`)
 
-When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **unrelated** to a PR's changes (a transitive dev-dep CVE, or a fix that's major-bump-only), the audit job cascades into CI Gate and blocks the PR. The proper fix is still a dependency-bump PR — but `/audit-override` is the escape hatch so an unrelated repo-wide advisory doesn't force an admin-merge.
-
-- **Control surface = PR comments** (from authors with write access only):
-  - `/audit-override <reason>` — bypass the `pnpm audit` gate for the PR's **current head commit**. Records a `pinpoint-audit-override` commit status + a sticky bot comment (who/when/why) and re-runs the failed CI so the gate re-evaluates immediately.
-  - `/audit-override clear` — re-arm the gate.
-- **Commit-bound, not PR-bound**: the override is a commit status on the head SHA. **Pushing a new commit drops it** — the gate re-fires and the override must be re-issued, so a newly-introduced real vulnerability is never silently masked. It only bypasses the audit gate; any other failing check stays red.
-- **Scope**: single PR only; never changes repo-wide audit policy or any other PR. No secrets required (default `GITHUB_TOKEN`).
-- **Implementation**: `.github/workflows/audit-override.yaml`, `scripts/workflow/audit-override/*.sh`; the consuming check is the `Run pnpm audit` step in `ci.yml` (`gate.sh check`).
+When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **unrelated** to a PR's changes, `/audit-override <reason>` is the escape hatch so it doesn't force an admin-merge — commit-bound, dropped on every new push. Full protocol: `pinpoint-audit-override` skill.
 
 ## 8. Documentation
 
@@ -267,7 +233,7 @@ Actionable, "what" and "how" only. Skills carry the deep dives.
 Work isn't done at "git push" — it's done when the change is **merged, deployed clean, and cleaned up**. The full pipeline (commit → PR → CI → merge) lives in the `pinpoint-pr-workflow` skill; the load-bearing rules are repeated here in case that skill isn't loaded.
 
 1. **Before you push:** `pnpm run check` is the floor (types, lint, format, unit). Run `pnpm run preflight` for non-trivial changes — migrations, security/auth, server actions, middleware, DB schema. Don't run the full E2E suite locally; CI owns it.
-2. **Push and open the PR ready-for-review** (draft only while iterating — see "Working style"). Sync with main by **merge, never rebase**; `git status` must show "up to date with origin".
+2. **Push and open the PR ready-for-review** (draft only while iterating — see "Working style"). Sync with main by **merge, never rebase**; `git status` must show "up to date with origin". "Ready" is not just "pushed": wait for Copilot to review the current head commit and resolve/decline its threads before you call the PR ready or done — `merge-pr.sh` re-enforces this (`currency` + `threads` gates) at merge time. See `pinpoint-pr-workflow` Phase 3.
 3. **Lean on CI for the full E2E suite** — don't run `e2e:full` locally; CI owns it once the PR is up. Do run **selected specs locally** while writing them or iterating on a feature they touch (`pnpm exec playwright test <spec> --project=chromium`).
 4. **Merge via `scripts/workflow/merge-pr.sh <PR>`** — never `gh pr merge` or MCP merge directly. (Bead close timing follows beads' defaults; there's no fixed at-merge rule.)
 5. **After merge, watch the deployment.** Don't walk away at merge — watch the production deploy land and confirm no build, migration, or runtime errors. A merge that breaks prod isn't done.

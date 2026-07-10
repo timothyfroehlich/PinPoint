@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const execSyncMock = vi.fn();
 // spawnSync is used by the Docker preflight check. Default to success.
-const spawnSyncMock = vi.fn(() => ({ status: 0, error: null }));
+const spawnSyncMock = vi.fn(
+  (): { status: number | null; error: Error | null } => ({
+    status: 0,
+    error: null,
+  })
+);
 
 // existsSync is used by the browser-binary preflight check. Default to true
 // (binary present) so non-browser tests are unaffected.

@@ -46,11 +46,11 @@ describe("getCleanupOrder", () => {
           const tableConfig = getTableConfig(table);
           const referencedConfig = getTableConfig(referenced);
 
-          expect(referencerIdx).toBeLessThan(
-            referencedIdx,
+          expect(
+            referencerIdx,
             `"${tableConfig.name}" (idx ${referencerIdx}) must appear before` +
               ` "${referencedConfig.name}" (idx ${referencedIdx}) because it references it`
-          );
+          ).toBeLessThan(referencedIdx);
         }
       }
     }
