@@ -317,8 +317,8 @@ export const issues = pgTable(
     ),
     // Index on severity to optimize "Unplayable Machines" dashboard query and issues filtering
     severityIdx: index("idx_issues_severity").on(t.severity),
-    // Index on priority to optimize issues list filtering
-    priorityIdx: index("idx_issues_priority").on(t.priority),
+    // idx_issues_priority dropped 2026-07-09 (PP-o60s.5): flagged unused_index by prod
+    // advisor and never used in queries. Re-add if priority filtering becomes hot.
   })
 );
 
@@ -629,6 +629,11 @@ export const issueImages = pgTable(
     issueIdIdx: index("idx_issue_images_issue_id").on(t.issueId),
     uploadedByIdx: index("idx_issue_images_uploaded_by").on(t.uploadedBy),
     deletedAtIdx: index("idx_issue_images_deleted_at").on(t.deletedAt),
+    // Covering indexes for the comment_id and deleted_by FKs (PP-o60s.5): prod
+    // advisor flagged them as unindexed_foreign_keys. Needed for cascade deletes
+    // (comment removal) and soft-delete-by-user lookups.
+    commentIdIdx: index("idx_issue_images_comment_id").on(t.commentId),
+    deletedByIdx: index("idx_issue_images_deleted_by").on(t.deletedBy),
   })
 );
 
@@ -774,10 +779,10 @@ export const notificationPreferences = pgTable(
       withTimezone: true,
     }),
   },
-  (t) => ({
-    globalWatchEmailIdx: index("idx_notif_prefs_global_watch_email").on(
-      t.emailWatchNewIssuesGlobal
-    ),
+  (_t) => ({
+    // idx_notif_prefs_global_watch_email dropped 2026-07-09 (PP-o60s.5): flagged
+    // unused_index by prod advisor and never used in queries. The global-watch
+    // fan-out query scans this small table without needing an index.
   })
 );
 
