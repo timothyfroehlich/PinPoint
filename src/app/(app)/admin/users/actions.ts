@@ -17,23 +17,32 @@ import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 import { log } from "~/lib/logger";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
+interface AdminListUsersParams {
+  page?: number;
+  perPage?: number;
+}
+
+type AdminListUsersResult =
+  | {
+      data: {
+        users: { id: string; email?: string | null | undefined }[];
+        nextPage?: number | null;
+      };
+      error: null;
+    }
+  | {
+      data: {
+        users: [];
+      };
+      error: Error;
+    };
+
 interface AdminClientSubset {
   auth: {
     admin: {
-      listUsers: () => Promise<
-        | {
-            data: {
-              users: { id: string; email?: string | null | undefined }[];
-            };
-            error: null;
-          }
-        | {
-            data: {
-              users: [];
-            };
-            error: Error;
-          }
-      >;
+      listUsers: (
+        params?: AdminListUsersParams
+      ) => Promise<AdminListUsersResult>;
     };
   };
 }
@@ -43,10 +52,10 @@ function getAdminClient(): AdminClientSubset {
     return {
       auth: {
         admin: {
-          listUsers: async () => {
+          listUsers: async (params) => {
             try {
               const result = (await db.execute(
-                sql`SELECT id, email FROM auth.users`
+                sql`SELECT id, email FROM auth.users ORDER BY email`
               )) as unknown;
               const rows = (
                 Array.isArray(result)
@@ -59,13 +68,23 @@ function getAdminClient(): AdminClientSubset {
                     : []
               ) as { id: string; email: string | null }[];
 
+              const all = rows.map((row) => ({
+                id: row.id,
+                email: row.email ?? undefined,
+              }));
+
+              // Simulate GoTrue's server-side per-page cap so callers are
+              // forced to paginate — mirrors the real Admin API contract that
+              // motivated PP-a4st (a single unpaginated call can miss users).
+              const MAX_PER_PAGE = 50;
+              const perPage = Math.min(params?.perPage ?? 50, MAX_PER_PAGE);
+              const page = params?.page ?? 1;
+              const start = (page - 1) * perPage;
+              const slice = all.slice(start, start + perPage);
+              const nextPage = start + perPage < all.length ? page + 1 : null;
+
               return {
-                data: {
-                  users: rows.map((row) => ({
-                    id: row.id,
-                    email: row.email ?? undefined,
-                  })),
-                },
+                data: { users: slice, nextPage },
                 error: null,
               };
             } catch (err) {
@@ -80,6 +99,45 @@ function getAdminClient(): AdminClientSubset {
     };
   }
   return createAdminClient();
+}
+
+/**
+ * Look up an auth user by email across ALL pages of the Admin API.
+ *
+ * The Supabase Admin API (@supabase/auth-js) exposes no `getUserByEmail`, and
+ * `listUsers()` is paginated (GoTrue defaults to 50 per page). A single
+ * unpaginated call therefore misses a matching email that lands on page 2+,
+ * which previously let a duplicate invite slip through. We request a large
+ * page and follow `nextPage` until exhausted so the duplicate check is
+ * complete regardless of user count. (PP-a4st)
+ *
+ * `email` must already be normalized (lowercased/trimmed) — the invite schema
+ * applies `.trim().toLowerCase()` before this runs.
+ */
+async function findAuthUserByEmail(
+  adminClient: AdminClientSubset,
+  email: string
+): Promise<{ id: string } | undefined> {
+  let page: number | null = 1;
+  while (page !== null) {
+    const { data, error } = await adminClient.auth.admin.listUsers({
+      page,
+      perPage: 1000,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const match = data.users.find((u) => u.email?.toLowerCase() === email);
+    if (match) {
+      return match;
+    }
+
+    page = data.nextPage ?? null;
+  }
+
+  return undefined;
 }
 
 async function verifyAdmin(userId: string): Promise<void> {
@@ -205,20 +263,12 @@ export async function inviteUser(
 
     // Check both auth.users and user_profiles — a user could exist in
     // auth.users without a profile row if the handle_new_user trigger failed.
+    // listUsers is paginated and there is no getUserByEmail, so scan every
+    // page: an unpaginated call misses collisions on page 2+. (PP-a4st)
     const adminClient = getAdminClient();
-    const { data: authUsersData, error: listError } =
-      await adminClient.auth.admin.listUsers();
-
-    if (listError) {
-      log.error(
-        { action: "inviteUser", err: listError.message },
-        "Failed to list auth users during validation"
-      );
-      throw listError;
-    }
-
-    const existingAuthUser = authUsersData.users.find(
-      (u) => u.email?.toLowerCase() === validated.email
+    const existingAuthUser = await findAuthUserByEmail(
+      adminClient,
+      validated.email
     );
 
     if (existingAuthUser) {
