@@ -26,6 +26,7 @@ import {
   machineWatchers,
   authUsers,
 } from "~/server/db/schema";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 
 // Mock the database to use the PGlite instance for server action tests
 vi.mock("~/server/db", async () => {
@@ -1180,6 +1181,311 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
         where: eq(machines.id, machine.id),
       });
       expect(machineAfter?.ownerId).toBe(adminUser.id);
+    });
+  });
+
+  describe("updateMachineAction — description column (ProseMirror)", () => {
+    // Exercises parseDescriptionFormField (actions.ts ~655-756) end-to-end via
+    // updateMachineAction. The Edit Machine dialog carries the description as a
+    // serialized ProseMirror doc in FormData under the "description" key.
+    //
+    // Field-presence semantics:
+    //   absent           → column untouched
+    //   ""               → column set to null
+    //   whitespace doc   → normalizes to null
+    //   valid doc        → column set to the parsed doc
+    //   malformed JSON   → VALIDATION, column untouched
+    //   schema-invalid   → VALIDATION, column untouched
+    //   oversized (>10k) → VALIDATION, column untouched
+
+    // Helper: seed a machine (unowned) that already has a non-null description,
+    // so "untouched" / "unchanged" assertions have something to compare against.
+    const seededDescription = plainTextToDoc("Pre-existing description text.");
+    const seedMachineWithDescription = async () => {
+      const db = await getTestDb();
+      const machine = await createMachine();
+      await db
+        .update(machines)
+        .set({ description: seededDescription })
+        .where(eq(machines.id, machine.id));
+      return machine;
+    };
+
+    it("sets description from a valid serialized ProseMirror doc in FormData", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const machine = await createMachine();
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      const doc = plainTextToDoc("A rich description of the machine.");
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("description", JSON.stringify(doc));
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.description).toEqual(doc);
+    });
+
+    it("leaves description untouched when the field is absent from FormData", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const machine = await seedMachineWithDescription();
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      // Update only the name — no "description" key in FormData.
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", "Renamed But Description Intact");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.name).toBe("Renamed But Description Intact");
+      // Column untouched: still the seeded doc.
+      expect(machineAfter?.description).toEqual(seededDescription);
+    });
+
+    it("clears description to null when the field is an empty string", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const machine = await seedMachineWithDescription();
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("description", "");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.description).toBeNull();
+    });
+
+    it("normalizes a whitespace-only doc to null", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const machine = await seedMachineWithDescription();
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      // Valid ProseMirror doc whose text content is only whitespace.
+      const whitespaceDoc = plainTextToDoc("   ");
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("description", JSON.stringify(whitespaceDoc));
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.description).toBeNull();
+    });
+
+    it("returns VALIDATION and leaves description unchanged for malformed JSON", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const machine = await seedMachineWithDescription();
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("description", "{not valid json");
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.description).toEqual(seededDescription);
+    });
+
+    it("returns VALIDATION and leaves description unchanged for a schema-invalid doc", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const machine = await seedMachineWithDescription();
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      // Valid JSON, but not a ProseMirror doc (missing type: "doc").
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("description", JSON.stringify({ foo: "bar" }));
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.description).toEqual(seededDescription);
+    });
+
+    it("returns VALIDATION and leaves description unchanged when plaintext exceeds 10k chars", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const machine = await seedMachineWithDescription();
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      // Valid doc whose plaintext content exceeds the 10_000-char cap.
+      const oversizedDoc = plainTextToDoc("x".repeat(10_001));
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("description", JSON.stringify(oversizedDoc));
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("VALIDATION");
+      }
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.description).toEqual(seededDescription);
+    });
+
+    it("persists description supplied through the forcePromoteUserId promote path", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const guestUser = await createUser("guest");
+      const machine = await createMachine(adminUser.id);
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      const doc = plainTextToDoc("Description carried on the promote path.");
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("name", machine.name);
+      formData.append("ownerId", guestUser.id);
+      formData.append("forcePromoteUserId", guestUser.id);
+      formData.append("description", JSON.stringify(doc));
+
+      const result = await updateMachineAction(undefined, formData);
+
+      expect(result.ok).toBe(true);
+
+      // Promotion + ownership happened (proves we exercised the promote path).
+      const promotedUser = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, guestUser.id),
+      });
+      expect(promotedUser?.role).toBe("member");
+
+      const machineAfter = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(machineAfter?.ownerId).toBe(guestUser.id);
+      // Description applied at the promote-path tx.update site (not dropped).
+      expect(machineAfter?.description).toEqual(doc);
     });
   });
 

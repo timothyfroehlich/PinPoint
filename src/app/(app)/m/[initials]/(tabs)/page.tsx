@@ -13,10 +13,8 @@ import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { EditButtonWithTooltip } from "../edit-button-tooltip";
 import { EditMachineDialog } from "../update-machine-form";
 import { QrCodeDialog } from "../qr-code-dialog";
-import {
-  MachineDescriptionField,
-  MachineTextFields,
-} from "../machine-text-fields";
+import { MachineTextFields } from "../machine-text-fields";
+import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
 import {
   getAccessLevel,
@@ -145,11 +143,52 @@ export default async function MachineInfoTab({
 
   const showOwnerFields = canViewOwnerRequirements;
 
+  // Description renders read-only inside the Details card; editing happens in
+  // the Edit Machine dialog (not inline). RichTextDisplay returns null for an
+  // empty/absent description.
+  const descriptionSlot =
+    machine.description !== null ? (
+      <RichTextDisplay content={machine.description} />
+    ) : null;
+
+  // Edit-machine control lives in the owner card. PP-o355.2 PinballMap fields
+  // are wired through the dialog for users who may link.
+  const editControl =
+    canEdit && user ? (
+      <EditMachineDialog
+        machine={{
+          id: machine.id,
+          name: machine.name,
+          initials: machine.initials,
+          presenceStatus: machine.presenceStatus,
+          ownerId: machine.ownerId,
+          invitedOwnerId: machine.invitedOwnerId,
+          owner: machine.owner ? { name: machine.owner.name } : null,
+          invitedOwner: machine.invitedOwner
+            ? { name: machine.invitedOwner.name }
+            : null,
+          pinballmapMachineId: machine.pinballmapMachineId,
+          pinballmapExcluded: machine.pinballmapExcluded,
+          pinballmapExcludedReason: machine.pinballmapExcludedReason,
+          pinballmapTitleName,
+          description: machine.description,
+        }}
+        allUsers={allUsers}
+        canEditAnyMachine={canEditAnyMachine}
+        isOwner={isOwner}
+        canLink={canLink}
+      />
+    ) : user && editDeniedReason !== null ? (
+      <EditButtonWithTooltip reason={editDeniedReason} />
+    ) : null;
+
   const rail = (
     <InfoRail
       owner={machine.owner}
       invitedOwner={machine.invitedOwner}
       addedAt={machine.createdAt}
+      descriptionSlot={descriptionSlot}
+      editSlot={editControl}
     />
   );
 
@@ -160,12 +199,6 @@ export default async function MachineInfoTab({
   // auto-flows down column 1. Rendered once so test ids stay unique.
   return (
     <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-6">
-      <MachineDescriptionField
-        machineId={machine.id}
-        description={machine.description}
-        canEdit={canEdit}
-      />
-
       <InfoHero
         machineInitials={machine.initials}
         machineStatus={machineStatus}
@@ -186,8 +219,11 @@ export default async function MachineInfoTab({
         canCompose={canCompose}
       />
 
-      {/* Maintainer tools (QR shown to everyone, matching pre-redesign
-          behavior; Edit + owner fields are permission-gated). */}
+      {/* Maintainer tools. QR is shown to everyone (matching pre-redesign
+          behavior); owner requirements/notes are permission-gated. Edit moved
+          into the owner card. NOTE (PP-5sgt.3): owner requirements/notes
+          relocate to the Service tab; QR relocates there too. Remove this block
+          then. */}
       <div className="space-y-4 border-t border-outline-variant pt-6">
         {showOwnerFields && (
           <MachineTextFields
@@ -200,32 +236,6 @@ export default async function MachineInfoTab({
           />
         )}
         <div className="flex flex-wrap gap-3">
-          {canEdit && user ? (
-            <EditMachineDialog
-              machine={{
-                id: machine.id,
-                name: machine.name,
-                initials: machine.initials,
-                presenceStatus: machine.presenceStatus,
-                ownerId: machine.ownerId,
-                invitedOwnerId: machine.invitedOwnerId,
-                owner: machine.owner ? { name: machine.owner.name } : null,
-                invitedOwner: machine.invitedOwner
-                  ? { name: machine.invitedOwner.name }
-                  : null,
-                pinballmapMachineId: machine.pinballmapMachineId,
-                pinballmapExcluded: machine.pinballmapExcluded,
-                pinballmapExcludedReason: machine.pinballmapExcludedReason,
-                pinballmapTitleName,
-              }}
-              allUsers={allUsers}
-              canEditAnyMachine={canEditAnyMachine}
-              isOwner={isOwner}
-              canLink={canLink}
-            />
-          ) : user && editDeniedReason !== null ? (
-            <EditButtonWithTooltip reason={editDeniedReason} />
-          ) : null}
           <QrCodeDialog
             machineName={machine.name}
             machineInitials={machine.initials}

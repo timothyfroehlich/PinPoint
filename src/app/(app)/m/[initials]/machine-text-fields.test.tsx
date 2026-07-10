@@ -1,10 +1,7 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import {
-  MachineDescriptionField,
-  MachineTextFields,
-} from "./machine-text-fields";
+import { MachineTextFields } from "./machine-text-fields";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 
 interface MockInlineEditableFieldProps {
@@ -40,7 +37,7 @@ const defaultProps = {
 };
 
 describe("MachineTextFields", () => {
-  it("renders description, which is always present in layout", () => {
+  it("renders the inline description field when showDescription defaults to true", () => {
     render(<MachineTextFields {...defaultProps} />);
     expect(screen.getByTestId("machine-description")).toBeInTheDocument();
   });
@@ -70,18 +67,5 @@ describe("MachineTextFields", () => {
     expect(
       screen.getByTestId("machine-owner-requirements")
     ).toBeInTheDocument();
-  });
-});
-
-describe("MachineDescriptionField", () => {
-  it("renders the description field", () => {
-    render(
-      <MachineDescriptionField
-        machineId="mach-123"
-        description={mockDoc}
-        canEdit
-      />
-    );
-    expect(screen.getByTestId("machine-description")).toBeInTheDocument();
   });
 });

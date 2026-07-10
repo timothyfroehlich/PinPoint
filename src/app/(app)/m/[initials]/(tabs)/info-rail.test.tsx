@@ -43,6 +43,47 @@ describe("InfoRail", () => {
     expect(screen.getByText(/no owner assigned/i)).toBeInTheDocument();
   });
 
+  it("renders description and edit slots inside the Details card", () => {
+    render(
+      <InfoRail
+        owner={{ id: "u1", name: "Tim Froehlich", avatarUrl: null }}
+        invitedOwner={null}
+        addedAt={addedAt}
+        descriptionSlot={<p>A classic widebody.</p>}
+        editSlot={<button type="button">Edit machine</button>}
+      />
+    );
+    const card = screen.getByTestId("machine-owner-card");
+    expect(within(card).getByText("Details")).toBeInTheDocument();
+    expect(within(card).getByText("A classic widebody.")).toBeInTheDocument();
+    expect(
+      within(card).getByRole("button", { name: /edit machine/i })
+    ).toBeInTheDocument();
+  });
+
+  it("adds the owner-block divider only when a description is present", () => {
+    const { rerender } = render(
+      <InfoRail
+        owner={{ id: "u1", name: "Tim Froehlich", avatarUrl: null }}
+        invitedOwner={null}
+        addedAt={addedAt}
+        descriptionSlot={<p>A classic widebody.</p>}
+      />
+    );
+    // With a description above, the owner block gets a top-border divider.
+    expect(screen.getByTestId("owner-block")).toHaveClass("border-t");
+
+    // Without a description, the divider must be absent (prop-threading guard).
+    rerender(
+      <InfoRail
+        owner={{ id: "u1", name: "Tim Froehlich", avatarUrl: null }}
+        invitedOwner={null}
+        addedAt={addedAt}
+      />
+    );
+    expect(screen.getByTestId("owner-block")).not.toHaveClass("border-t");
+  });
+
   it("renders the Tags and PinballMap reserved-slot placeholders", () => {
     render(<InfoRail owner={null} invitedOwner={null} addedAt={addedAt} />);
     expect(screen.getByTestId("machine-tags-placeholder")).toBeInTheDocument();

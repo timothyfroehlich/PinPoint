@@ -645,9 +645,52 @@ export async function createMachineAction(
 }
 
 /**
+ * Parse the optional machine `description` carried by the Edit Machine dialog
+ * as a serialized ProseMirror doc (same hidden-field + JSON pattern as the
+ * report form). Presence of the field is the marker: absent → leave the column
+ * untouched; empty (or semantically-empty) → clear to null; otherwise the
+ * validated doc. Size caps match the description column's inline-edit path
+ * (`updateMachineTextField`): 10k plaintext / 100k serialized JSON.
+ */
+function parseDescriptionFormField(
+  formData: FormData
+):
+  | { ok: true; value: ProseMirrorDoc | null | undefined }
+  | { ok: false; message: string } {
+  const raw = formData.get("description");
+  // Field absent — this edit surface doesn't own the description column.
+  if (raw === null) {
+    return { ok: true, value: undefined };
+  }
+  if (typeof raw !== "string" || raw.length === 0) {
+    return { ok: true, value: null };
+  }
+  let doc: ProseMirrorDoc;
+  try {
+    doc = JSON.parse(raw) as ProseMirrorDoc;
+  } catch {
+    return { ok: false, message: "Invalid description format." };
+  }
+  if (!proseMirrorDocSchema.safeParse(doc).success) {
+    return { ok: false, message: "Invalid description format." };
+  }
+  const plainText = docToPlainText(doc);
+  if (plainText.length > 10_000 || JSON.stringify(doc).length > 100_000) {
+    return { ok: false, message: "Description is too long." };
+  }
+  // Normalize a whitespace-only doc to null so the DB stores NULL rather than a
+  // semantically-empty JSON blob.
+  if (plainText.trim().length === 0) {
+    return { ok: true, value: null };
+  }
+  return { ok: true, value: doc };
+}
+
+/**
  * Update Machine Action
  *
- * Updates a machine's name.
+ * Updates a machine's name, availability, owner, PinballMap link, and
+ * description.
  * Requires authentication.
  *
  * @param _prevState - The previous state of the form.
@@ -702,6 +745,14 @@ export async function updateMachineAction(
   // Only the form that renders the PBM picker carries this marker; other edit
   // surfaces (e.g. inline field saves) omit it so they never touch link columns.
   const pbmFormPresent = formData.get("pbmLinkPresent") === "1";
+
+  // Description is carried by the Edit Machine dialog only; `undefined` means
+  // "leave the column untouched" so other edit surfaces never clear it.
+  const descriptionResult = parseDescriptionFormField(formData);
+  if (!descriptionResult.ok) {
+    return err("VALIDATION", descriptionResult.message);
+  }
+  const descriptionColumn = descriptionResult.value;
 
   const validation = updateMachineSchema.safeParse(rawData);
   if (!validation.success) {
@@ -828,6 +879,9 @@ export async function updateMachineAction(
             ownerId: machineOwnerId ?? null,
             invitedOwnerId: machineInvitedOwnerId ?? null,
             ...(pbmColumns ?? {}),
+            ...(descriptionColumn !== undefined && {
+              description: descriptionColumn,
+            }),
           })
           .where(eq(machines.id, id))
           .returning();
@@ -1015,6 +1069,9 @@ export async function updateMachineAction(
             invitedOwnerId: finalInvitedOwnerId,
           }),
           ...(pbmColumns ?? {}),
+          ...(descriptionColumn !== undefined && {
+            description: descriptionColumn,
+          }),
         })
         .where(eq(machines.id, id))
         .returning();

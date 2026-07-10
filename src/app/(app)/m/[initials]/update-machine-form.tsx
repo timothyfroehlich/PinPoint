@@ -26,6 +26,8 @@ import {
 import { cn } from "~/lib/utils";
 import { OwnerSelect } from "~/components/machines/OwnerSelect";
 import { PinballMapLinkField } from "~/components/machines/PinballMapLinkField";
+import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   VALID_MACHINE_PRESENCE_STATUSES,
   getMachinePresenceLabel,
@@ -76,6 +78,8 @@ interface EditMachineDialogProps {
     pinballmapExcludedReason: string | null;
     /** Linked catalog title's display name, resolved server-side from the mirror. */
     pinballmapTitleName: string | null;
+    /** Machine description (rich text), edited via the editor in this dialog. */
+    description: ProseMirrorDoc | null;
   };
   allUsers: OwnerSelectUser[];
   canEditAnyMachine: boolean;
@@ -99,6 +103,13 @@ export function EditMachineDialog({
     machine.ownerId ?? machine.invitedOwnerId ?? ""
   );
   const currentOwnerId = machine.ownerId ?? machine.invitedOwnerId ?? "";
+
+  // Description draft — the RichTextEditor is uncontrolled after mount (content
+  // is an initial prop), so we mirror its doc here to serialize into the hidden
+  // form field. Reset on each open so a cancel doesn't leak a stale draft.
+  const [descriptionDoc, setDescriptionDoc] = useState<ProseMirrorDoc | null>(
+    machine.description
+  );
 
   // Promote dialog state — populated when server returns ASSIGNEE_NOT_MEMBER
   const [promoteAssignee, setPromoteAssignee] = useState<
@@ -140,11 +151,12 @@ export function EditMachineDialog({
   useEffect(() => {
     if (open) {
       setSelectedOwnerId(currentOwnerId);
+      setDescriptionDoc(machine.description);
       transferConfirmedRef.current = false;
       setPromoteAssignee(null);
       setIsPromoteOpen(false);
     }
-  }, [open, currentOwnerId]);
+  }, [open, currentOwnerId, machine.description]);
 
   // Find the selected owner's name for the transfer confirmation dialog
   const selectedOwnerName =
@@ -269,9 +281,6 @@ export function EditMachineDialog({
                 placeholder="e.g., Medieval Madness"
                 className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
               />
-              <p className="text-xs text-muted-foreground">
-                Enter the full name of the pinball machine
-              </p>
             </div>
 
             {/* Model — PinballMap catalog model/edition, right after the name
@@ -284,6 +293,29 @@ export function EditMachineDialog({
                 defaultExcludedReason={machine.pinballmapExcludedReason}
               />
             )}
+
+            {/* Description — rich text shown to anyone viewing the machine. The
+                editor is uncontrolled (content is an initial prop); its current
+                doc is mirrored into the hidden field below for submission. */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-description" className="text-foreground">
+                Description
+              </Label>
+              <RichTextEditor
+                content={machine.description}
+                onChange={setDescriptionDoc}
+                mentionsEnabled={false}
+                placeholder="Add a description for this machine..."
+                ariaLabel="Machine description"
+                compact={false}
+                className="min-h-[120px]"
+              />
+              <input
+                type="hidden"
+                name="description"
+                value={descriptionDoc ? JSON.stringify(descriptionDoc) : ""}
+              />
+            </div>
 
             {/* Availability */}
             <div className="space-y-2">
@@ -308,9 +340,6 @@ export function EditMachineDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Whether this machine is currently available on the floor
-              </p>
             </div>
 
             {/* Machine Owner - show for admin/technician AND machine owner */}
@@ -343,10 +372,6 @@ export function EditMachineDialog({
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  The owner receives notifications for new issues on this
-                  machine.
-                </p>
               </div>
             )}
 

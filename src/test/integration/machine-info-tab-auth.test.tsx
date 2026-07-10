@@ -37,10 +37,10 @@ vi.mock("~/server/db", async () => {
   return { db };
 });
 
-// Mock the text-field components to capture the permission props the page
+// Mock the text-field component to capture the permission props the page
 // computes. `MachineTextFields` (owner requirements) only renders when the
-// viewer is allowed to see an owner-private field; the description renders
-// separately via `MachineDescriptionField`.
+// viewer is allowed to see an owner-private field. The description is now
+// read-only (RichTextDisplay), edited via the Edit Machine dialog.
 interface MachineTextFieldsProps {
   machineId: string;
   description: string | null;
@@ -52,9 +52,6 @@ interface MachineTextFieldsProps {
 const mockMachineTextFields = vi.fn<
   (props: MachineTextFieldsProps) => React.ReactElement
 >(() => <div data-testid="machine-text-fields" />);
-const mockMachineDescriptionField = vi.fn(() => (
-  <div data-testid="machine-description" />
-));
 // MachineRecentActivity is an async server component; left unmocked it
 // suspends during the RTL render and prevents later siblings (the maintainer
 // tools block, which holds MachineTextFields) from rendering. This test only
@@ -67,14 +64,6 @@ vi.mock("~/app/(app)/m/[initials]/machine-text-fields", () => ({
   MachineTextFields: (props: MachineTextFieldsProps) => {
     mockMachineTextFields(props);
     return <div data-testid="machine-text-fields" />;
-  },
-  MachineDescriptionField: (props: {
-    machineId: string;
-    description: string | null;
-    canEdit: boolean;
-  }) => {
-    mockMachineDescriptionField(props);
-    return <div data-testid="machine-description" />;
   },
 }));
 
@@ -115,11 +104,6 @@ describe("MachineInfoTab Page-Level Auth Integration", () => {
     // Anonymous viewers can see neither requirements nor notes, so the
     // owner-fields block is not rendered at all (privacy by omission).
     expect(mockMachineTextFields).not.toHaveBeenCalled();
-
-    // The description still renders, read-only (cannot edit).
-    expect(mockMachineDescriptionField).toHaveBeenCalled();
-    const descProps = mockMachineDescriptionField.mock.calls[0][0];
-    expect(descProps.canEdit).toBe(false);
   });
 
   it("allows ownerRequirements view to guest", async () => {

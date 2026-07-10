@@ -7,8 +7,9 @@ import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge
 import { cn } from "~/lib/utils";
 import { formatIssueId } from "~/lib/issues/utils";
 import {
-  SEVERITY_CONFIG,
+  SEVERITY_STYLES,
   STATUS_STYLES,
+  getIssueSeverityLabel,
   getIssueStatusLabel,
 } from "~/lib/issues/status";
 import {
@@ -115,40 +116,40 @@ export function InfoHero({
               Known issues · {openCount} open
             </h3>
             <ul className="flex flex-col">
-              {peek.map((issue) => {
-                const sev = SEVERITY_CONFIG[issue.severity];
-                return (
-                  <li
-                    key={issue.id}
-                    className="border-b border-dashed border-outline-variant/60 last:border-b-0"
+              {peek.map((issue) => (
+                <li
+                  key={issue.id}
+                  className="border-b border-dashed border-outline-variant/60 last:border-b-0"
+                >
+                  <Link
+                    href={`/m/${machineInitials}/i/${issue.issueNumber}`}
+                    className="flex items-center gap-2.5 py-2 text-sm transition-colors duration-150 hover:text-primary"
                   >
-                    <Link
-                      href={`/m/${machineInitials}/i/${issue.issueNumber}`}
-                      className="flex items-center gap-2.5 py-2 text-sm transition-colors duration-150 hover:text-primary"
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                      {formatIssueId(machineInitials, issue.issueNumber)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {issue.title}
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium",
+                        STATUS_STYLES[issue.status]
+                      )}
                     >
-                      <sev.icon
-                        className={cn("size-3.5 shrink-0", sev.iconColor)}
-                        aria-hidden="true"
-                      />
-                      <span className="sr-only">{sev.label} severity</span>
-                      <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                        {formatIssueId(machineInitials, issue.issueNumber)}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate">
-                        {issue.title}
-                      </span>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium",
-                          STATUS_STYLES[issue.status]
-                        )}
-                      >
-                        {getIssueStatusLabel(issue.status)}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
+                      {getIssueStatusLabel(issue.status)}
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium",
+                        SEVERITY_STYLES[issue.severity]
+                      )}
+                    >
+                      {getIssueSeverityLabel(issue.severity)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
             </ul>
             <Link
               href={serviceHref}
