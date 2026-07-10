@@ -193,10 +193,14 @@ except Exception:
     | jq -r --arg t "Huddle daily $today" \
       '[ .[] | select(.title==$t and .status!="closed") ] | sort_by(.id) | (.[0].id // "")' 2>/dev/null || echo "")
   if [[ -z "$new_today_id" ]]; then
+    # Ephemeral wisp (PP-140e.4): a daily is a rotating log, not a permanent
+    # artifact — closed dailies stay queryable (recent_dailies reads their
+    # description) but are now eligible for `bd purge` if that's ever run.
     new_today_id=$(bd create -t task \
       --parent "$ROOT_ID" \
       --title "Huddle daily $today" \
       --description "Active coordination bead for $today. Agents post updates here. At midnight rotation this bead gets a categorized summary and closes." \
+      --ephemeral --wisp-type patrol \
       --silent)
   fi
 
