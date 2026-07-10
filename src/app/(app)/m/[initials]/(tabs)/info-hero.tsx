@@ -71,7 +71,7 @@ export function InfoHero({
     <section
       aria-label="Machine health and reporting"
       data-testid="machine-info-hero"
-      className="rounded-xl border border-primary/40 bg-card p-4 sm:p-5"
+      className="@container rounded-xl border border-primary/40 bg-card p-4 sm:p-5"
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-center">
         <div className="flex flex-wrap items-center gap-3">
@@ -131,9 +131,17 @@ export function InfoHero({
                     <span className="min-w-0 flex-1 truncate">
                       {issue.title}
                     </span>
+                    {/* The peek only ever lists OPEN issues, so the specific
+                        open status is low-value on a cramped phone row — hide
+                        it below the @lg container tier (keeps ID + title +
+                        severity), and bring it back once the hero has room.
+                        Container query, not viewport: at the md grid layout
+                        the 320px rail makes this column narrow even on larger
+                        screens, so we key off the hero's own width. */}
                     <span
+                      data-testid="hero-peek-status"
                       className={cn(
-                        "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium",
+                        "hidden shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium @lg:inline-block",
                         STATUS_STYLES[issue.status]
                       )}
                     >

@@ -64,6 +64,20 @@ describe("InfoHero", () => {
     expect(ids).toEqual(["TAF-07", "TAF-05"]);
   });
 
+  it("hides the per-issue status badge below the @lg tier, keeping severity", () => {
+    render(<InfoHero {...baseProps} openIssues={openIssues} />);
+    const statuses = screen.getAllByTestId("hero-peek-status");
+    expect(statuses).toHaveLength(openIssues.length);
+    // Status is CSS-hidden on narrow rows (open-only peek → redundant) and
+    // reappears once the hero container reaches the @lg tier.
+    for (const badge of statuses) {
+      expect(badge).toHaveClass("hidden", "@lg:inline-block");
+    }
+    // Severity is never hidden — worst-severity-first is the point of the peek.
+    expect(screen.getByText(/major/i)).toBeInTheDocument();
+    expect(screen.getByText(/minor/i)).toBeInTheDocument();
+  });
+
   it("shows a healthy state and no peek when there are no open issues", () => {
     render(<InfoHero {...baseProps} openIssues={[]} />);
     expect(screen.getByText(/this machine is healthy/i)).toBeInTheDocument();
