@@ -24,7 +24,7 @@ import {
   type SettingsSetPayload,
   settingsSetPayloadSchema,
 } from "~/lib/machines/settings-types";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -173,7 +173,7 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
     if (!created.success) return;
 
     const db = await getTestDb();
-    const sets = await getMachineSettingsSets(db, machine.id);
+    const sets = await getMachineSettingsSets(asDbOrTx(db), machine.id);
     expect(sets).toHaveLength(1);
     const section = sets[0].sections[0];
     expect(section.kind).toBe("table");
@@ -244,7 +244,7 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
     expect(updated.changed).toBe(true);
 
     // The persisted state reflects both changes from the single auto-save call.
-    const sets = await getMachineSettingsSets(db, machine.id);
+    const sets = await getMachineSettingsSets(asDbOrTx(db), machine.id);
     expect(sets).toHaveLength(1);
     const section = sets[0].sections[0];
     expect(section.kind).toBe("software");

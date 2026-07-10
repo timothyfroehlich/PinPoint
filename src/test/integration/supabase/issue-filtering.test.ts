@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { issues, machines, userProfiles } from "~/server/db/schema";
 import { buildWhereConditions } from "~/lib/issues/filters-queries";
 import { and, type SQL, type InferSelectModel } from "drizzle-orm";
@@ -144,7 +144,7 @@ describe("Issue Filtering Integration", () => {
     const db = await getTestDb();
     const conditions = buildWhereConditions(
       { status: ["new", "confirmed"] },
-      db
+      asDbOrTx(db)
     );
     const results = await queryIssues(conditions);
     expect(results).toHaveLength(2);
@@ -154,7 +154,7 @@ describe("Issue Filtering Integration", () => {
 
   it("filters by search query (title match)", async () => {
     const db = await getTestDb();
-    const where = buildWhereConditions({ q: "Gumball" }, db);
+    const where = buildWhereConditions({ q: "Gumball" }, asDbOrTx(db));
     const results = await queryIssues(where);
     expect(results).toHaveLength(1);
     expect(results[0]?.id).toBe(ISSUE_2_ID);
@@ -162,14 +162,14 @@ describe("Issue Filtering Integration", () => {
 
   it("filters by search query (issue number match)", async () => {
     const db = await getTestDb();
-    const where = buildWhereConditions({ q: "1" }, db);
+    const where = buildWhereConditions({ q: "1" }, asDbOrTx(db));
     const results = await queryIssues(where);
     expect(results.some((i) => i.id === ISSUE_1_ID)).toBe(true);
   });
 
   it("filters by search query (machine initials match)", async () => {
     const db = await getTestDb();
-    const where = buildWhereConditions({ q: "AFM" }, db);
+    const where = buildWhereConditions({ q: "AFM" }, asDbOrTx(db));
     const results = await queryIssues(where);
     expect(results).toHaveLength(2);
     expect(results.map((i: Issue) => i.id)).toContain(ISSUE_1_ID);
@@ -178,7 +178,7 @@ describe("Issue Filtering Integration", () => {
 
   it("defaults to open statuses when status is undefined", async () => {
     const db = await getTestDb();
-    const where = buildWhereConditions({}, db);
+    const where = buildWhereConditions({}, asDbOrTx(db));
     const results = await queryIssues(where);
     // ISSUE_1 (new), ISSUE_2 (confirmed) are open. ISSUE_3 (in_progress) is also open.
     // Wait, let's check OPEN_STATUSES definition.
@@ -192,7 +192,7 @@ describe("Issue Filtering Integration", () => {
 
   it("shows all statuses when status is empty array (all)", async () => {
     const db = await getTestDb();
-    const where = buildWhereConditions({ status: [] }, db);
+    const where = buildWhereConditions({ status: [] }, asDbOrTx(db));
     const results = await queryIssues(where);
     // Should include all 3 issues regardless of status
     expect(results).toHaveLength(3);
@@ -205,7 +205,7 @@ describe("Issue Filtering Integration", () => {
         status: ["new"],
         machine: ["AFM"],
       },
-      db
+      asDbOrTx(db)
     );
     const results = await queryIssues(where);
     expect(results).toHaveLength(1);
@@ -219,7 +219,7 @@ describe("Issue Filtering Integration", () => {
         severity: ["major"],
         priority: ["high"],
       },
-      db
+      asDbOrTx(db)
     );
     const results = await queryIssues(where);
     expect(results).toHaveLength(1);
@@ -232,7 +232,7 @@ describe("Issue Filtering Integration", () => {
       {
         owner: [ALICE_ID],
       },
-      db
+      asDbOrTx(db)
     );
     const results = await queryIssues(where);
     expect(results).toHaveLength(2);
@@ -243,7 +243,7 @@ describe("Issue Filtering Integration", () => {
 
   it("excludes issues from inactive machines by default", async () => {
     const db = await getTestDb();
-    const where = buildWhereConditions({ status: [] }, db);
+    const where = buildWhereConditions({ status: [] }, asDbOrTx(db));
     const results = await queryIssues(where);
 
     expect(results.map((i) => i.id)).not.toContain(ISSUE_4_ID);
@@ -254,7 +254,7 @@ describe("Issue Filtering Integration", () => {
     const db = await getTestDb();
     const where = buildWhereConditions(
       { status: [], includeInactiveMachines: true },
-      db
+      asDbOrTx(db)
     );
     const results = await queryIssues(where);
 

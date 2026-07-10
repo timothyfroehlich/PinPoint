@@ -18,7 +18,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   authUsers,
@@ -266,7 +266,9 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
       .where(eq(machines.initials, "SEQ"));
     const { getMachineTimeline } =
       await import("~/lib/timeline/machine-events");
-    const timeline = await getMachineTimeline(db, { machineId: machine.id });
+    const timeline = await getMachineTimeline(asDbOrTx(db), {
+      machineId: machine.id,
+    });
 
     // Both events share created_at (one transaction); newest-first ordering is
     // by sequence, so owner_set (emitted second, higher sequence) comes first

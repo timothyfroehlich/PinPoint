@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine, createTestIssue } from "~/test/helpers/factories";
 import {
   machines,
@@ -249,7 +249,7 @@ describe("Database Queries (PGlite)", () => {
           issueTitle: "Test Issue",
           machineName: "Test Machine",
         },
-        db
+        asDbOrTx(db)
       );
       await dispatchNotification(plan);
 

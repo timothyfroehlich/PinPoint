@@ -27,7 +27,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   userProfiles,
   machines,
@@ -171,7 +171,7 @@ describe("Doodle Bug regression — notifications deliver strictly post-commit (
           .returning();
         if (!issue) throw new Error("seed failed");
 
-        await emitIssueOpened(tx, {
+        await emitIssueOpened(asDbOrTx(tx), {
           machineId: machine.id,
           issueId: issue.id,
           issueNumber: issue.issueNumber,
@@ -189,7 +189,7 @@ describe("Doodle Bug regression — notifications deliver strictly post-commit (
             machineName: machine.name,
             formattedIssueId: "DBG-01",
           },
-          tx,
+          asDbOrTx(tx),
           channels
         );
 

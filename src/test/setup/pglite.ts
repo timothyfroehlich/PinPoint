@@ -16,6 +16,7 @@ import { citext } from "@electric-sql/pglite/contrib/citext";
 import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { beforeAll, afterEach } from "vitest";
+import type { Db, DbOrTx } from "~/server/db";
 import * as schema from "~/server/db/schema";
 import { runInTransactionContext } from "~/server/db/transaction-context";
 import { cleanupTestDb as runSchemaCleanup } from "~/test/setup/cleanup";
@@ -70,6 +71,43 @@ export async function getTestDb(): Promise<PgliteDatabase<typeof schema>> {
   await pgliteInstance.exec(schemaSql);
 
   return testDb;
+}
+
+/** The transaction handle a worker-scoped PGlite `db.transaction(tx => …)` yields. */
+type PgliteTx = Parameters<
+  Parameters<PgliteDatabase<typeof schema>["transaction"]>[0]
+>[0];
+
+/**
+ * Adapt a worker-scoped PGlite handle (the database or a transaction from it) to
+ * the prod `DbOrTx` type, so service/query functions under test accept it.
+ *
+ * SANCTIONED EXCEPTION to CORE-TS-007's ban on `as unknown as`. Prod service and
+ * query signatures take `DbOrTx` (or `Db`, see {@link asDb}) — `PostgresJsDatabase`
+ * / `PgTransaction` branded with the postgres-js query-result HKT. Integration
+ * tests run against a PGlite handle instead, which is structurally valid at
+ * runtime (same Drizzle query builder, same schema) but a different, incompatible
+ * driver HKT to the type system, so the assignment cannot be expressed safely.
+ * Rather than widen the prod `DbOrTx` union to admit a dev-dependency type
+ * (leaking PGlite into every prod signature) or scatter one `as unknown as` per
+ * call site, the whole PGlite↔postgres-js impedance mismatch is confined to this
+ * one named, documented test-infra seam — the only unsafe casts live here and
+ * nowhere else. Precedent for a confined, commented exception: `use-is-mobile` /
+ * `use-table-responsive-columns` (the sanctioned CORE-RESP exceptions).
+ */
+export function asDbOrTx(db: PgliteDatabase<typeof schema> | PgliteTx): DbOrTx {
+  return db as unknown as DbOrTx;
+}
+
+/**
+ * Like {@link asDbOrTx}, but for the handful of prod signatures that require the
+ * full database (`Db`, with its `$client`) rather than the `Db | Tx` union — e.g.
+ * `anonymizeUserReferences` / `getReassignmentTargets` in account-deletion. Same
+ * sanctioned CORE-TS-007 exception and rationale as `asDbOrTx`; kept as a
+ * distinct helper so each call site declares which prod type it targets.
+ */
+export function asDb(db: PgliteDatabase<typeof schema>): Db {
+  return db as unknown as Db;
 }
 
 /**
