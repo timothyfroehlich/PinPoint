@@ -217,6 +217,7 @@ TODAY_ID=$(bd create -t task \
   --parent "$ROOT_ID" \
   --title "Huddle daily $TODAY" \
   --description "Active coordination bead for $TODAY. Agents post updates here with their sign-off (e.g. —Claude-WorktreeFix). At midnight rotation, this bead gets a categorized summary in its description and a raw archive in its notes, then closes." \
+  --ephemeral --wisp-type patrol \
   --silent)
 printf '  Today daily:   %s\n' "$TODAY_ID"
 
