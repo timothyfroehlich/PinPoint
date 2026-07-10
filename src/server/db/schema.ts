@@ -629,7 +629,7 @@ export const issueImages = pgTable(
     issueIdIdx: index("idx_issue_images_issue_id").on(t.issueId),
     uploadedByIdx: index("idx_issue_images_uploaded_by").on(t.uploadedBy),
     deletedAtIdx: index("idx_issue_images_deleted_at").on(t.deletedAt),
-    // Covering indexes for the comment_id and deleted_by FKs (PP-o60s.5): prod
+    // Indexes on the comment_id and deleted_by FK columns (PP-o60s.5): prod
     // advisor flagged them as unindexed_foreign_keys. Needed for cascade deletes
     // (comment removal) and soft-delete-by-user lookups.
     commentIdIdx: index("idx_issue_images_comment_id").on(t.commentId),
