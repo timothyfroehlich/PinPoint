@@ -6,22 +6,32 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/index";
-import { IssuesExpando } from "~/app/(app)/m/[initials]/issues-expando";
-import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
+import { MachineIssuesCard } from "~/app/(app)/m/[initials]/machine-issues-card";
+import {
+  getMachineForLayout,
+  getMachineAllIssues,
+} from "~/app/(app)/m/[initials]/_data";
 
 /**
- * Machine Maintenance Tab (/m/[initials]/maintenance)
+ * Machine Maintenance / Service Tab (/m/[initials]/maintenance) — the
+ * maintainer's workbench (redesign PP-5sgt.3).
  *
- * Hosts the open-issues list (and, in future iterations, full issue history +
- * scheduled maintenance). The data fetch shares a `cache()`-wrapped query with
- * the sibling layout so this is a free read within the same request.
+ * Open Issues card (default) with a ⋯ menu (Open/All toggle, View-all link,
+ * Export). The `?view=` search param drives the in-card list so the choice is
+ * shareable and survives a reload. The data fetch shares a `cache()`-wrapped
+ * query with the sibling layout so the open-issue read is free within the
+ * request; the all-issues read is loaded lazily only when `?view=all`.
  */
 export default async function MachineMaintenanceTab({
   params,
+  searchParams,
 }: {
   params: Promise<{ initials: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<React.JSX.Element> {
   const { initials } = await params;
+  const { view: viewParam } = await searchParams;
+  const view = viewParam === "all" ? "all" : "open";
 
   const supabase = await createClient();
   const {
@@ -57,15 +67,20 @@ export default async function MachineMaintenanceTab({
     />
   ) : null;
 
-  // `machine.issues` is open-only (filtered at the DB layer in `_data.ts`).
-  // Closed-issue visibility returns when the filter bar lands (bead PP-0kta).
+  // Open is the default; the All view is loaded lazily only when requested.
+  const issuesToShow =
+    view === "all" ? await getMachineAllIssues(initials) : machine.issues;
+
   return (
     <div className="space-y-6">
-      <IssuesExpando
-        issues={machine.issues}
+      {watchButton ? (
+        <div className="flex justify-end">{watchButton}</div>
+      ) : null}
+      <MachineIssuesCard
+        issues={issuesToShow}
         machineName={machine.name}
         machineInitials={machine.initials}
-        watchButton={watchButton}
+        view={view}
       />
     </div>
   );

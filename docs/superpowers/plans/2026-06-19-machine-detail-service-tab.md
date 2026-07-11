@@ -5,6 +5,12 @@
 **Bead:** `PP-5sgt.3` (epic `PP-5sgt`). **Depends on `PP-5sgt.1`** (enriched header). **Folds in `PP-0kta`, `PP-7mjy`, `PP-dnk8`.**
 **Spec:** `…/specs/2026-06-19-machine-detail-info-service-redesign/design.md` §4–§5. **Visual source of truth:** `…/mockups/service-desktop.html`, `service-mobile.html`.
 
+> **Amendments since original plan (2026-07-11, after `PP-5sgt.1` + `.2` merged):**
+>
+> - **Settings tab (`PP-43q3`) has shipped** (#1388, closed 2026-07-05). The design's "assume Settings ships" basis is now resolved TRUE; the tab strip is `Info / Settings / Service / Timeline` as drawn. No design change.
+> - **Relocate owner-private config off the Info tab (`.2` handoff).** The Info tab still renders a temporary "Machine tools" block (`(tabs)/page.tsx`) holding the **QR dialog** (`QrCodeDialog`) and **`MachineTextFields`** (Description + **Owner's Requirements**). As part of this bead: move **Owner's Requirements** into the Service right-rail Machine box (Task 5) and **QR** into the Service QR card (Task 6), then **delete the Info-tab Machine-tools block** (Task 6). **Description stays on the Info tab** (player-facing, per design §3) — only the owner-private field moves.
+> - **Owner's Requirements home decided (Tim, 2026-07-11):** Service right rail (Machine box), **not** the Settings tab — keeps `PP-5sgt.3` self-contained, no cross-tab scope. Gated by `machines.view.ownerRequirements` as today.
+
 **Goal:** Rebuild the Service (maintenance) tab as the maintainer's workbench — Open Issues (default) with a ⋯ menu (Open/All toggle, View all, Export), an Activity feed mirroring the real machine timeline with "+ Add note", and a machine-ops rail (derived status, 5-state presence select, single Watch toggle) + a printable QR card.
 
 **Architecture:** Server component page (`maintenance/page.tsx`) for data; the ⋯ menu and the presence select are small client leaves (shadcn `DropdownMenu` / select). Issue rows reuse `IssueCard`/`IssueBadgeGrid`. The Activity feed reuses the existing `TimelineRow` family (`MachineTimelineCommentRow`/`IssueRow`/`SystemRow`) capped to a recent peek. "+ Add note" reuses `MachineTimelineComposer` — **factor its server action to be reusable for `PP-slrd.2`**.
@@ -106,31 +112,34 @@
 
 **Interfaces:**
 
-- Produces: a Machine card — read-only derived status (with a one-line "derived from open issues" note), a 5-state presence `<select>` (`getMachinePresenceLabel` for labels), and the existing single Watch toggle (same control for everyone incl. owners — `PP-71ye` resolved; optionally one line of subtext that watching ≠ ownership). A presence change emits a `presence_changed` lifecycle event (shows in Activity).
+- Produces: a Machine card — read-only derived status (with a one-line "derived from open issues" note), a 5-state presence `<select>` (`getMachinePresenceLabel` for labels), the existing single Watch toggle (same control for everyone incl. owners — `PP-71ye` resolved; optionally one line of subtext that watching ≠ ownership), and the **Owner's Requirements** field relocated from the Info tab's `MachineTextFields` (gated by `machines.view.ownerRequirements` / `canEditGeneral` as today, via `updateMachineOwnerRequirements`). A presence change emits a `presence_changed` lifecycle event (shows in Activity).
 
-- [ ] **Step 1: Write failing tests:** (a) status renders read-only (no control to change it); (b) presence select offers all 5 states with correct labels; (c) changing presence calls the presence action and the resulting lifecycle event appears.
+- [ ] **Step 1: Write failing tests:** (a) status renders read-only (no control to change it); (b) presence select offers all 5 states with correct labels; (c) changing presence calls the presence action and the resulting lifecycle event appears; (d) Owner's Requirements renders in the Machine box for a permitted viewer and is editable via the existing action.
 - [ ] **Step 2: Run** — FAIL.
-- [ ] **Step 3: Implement** the rail; reuse `WatchMachineButton` unchanged; presence select wired to the existing presence-update action (emits lifecycle event after commit).
+- [ ] **Step 3: Implement** the rail; reuse `WatchMachineButton` unchanged; presence select wired to the existing presence-update action (emits lifecycle event after commit); render Owner's Requirements via `InlineEditableField` + `updateMachineOwnerRequirements`, gated as today (do NOT bring the Description field — it stays on Info).
 - [ ] **Step 4: Run tests + `pnpm run check`** — PASS/green.
-- [ ] **Step 5: Commit.** `git commit -am "feat(machine-service): machine-ops rail — derived status, presence select, watch (PP-5sgt.3)"`
+- [ ] **Step 5: Commit.** `git commit -am "feat(machine-service): machine-ops rail — derived status, presence select, watch, owner requirements (PP-5sgt.3)"`
 
 ### Task 6: QR code card + responsive layout + overflow + preflight
 
 **Files:**
 
 - Modify: `maintenance/page.tsx`
-- Create: a QR card (generate/display the machine-page URL QR; print/download)
+- Create: a QR card (generate/display the machine-page URL QR; print/download) — reuse `QrCodeDialog` / `~/lib/machines/qr.ts` (`generateQrPngDataUrl`) currently mounted on the Info tab.
+- Modify: `(tabs)/page.tsx` (Info tab) — **delete the temporary "Machine tools" block** once QR + Owner's Requirements have moved (keep Description on Info, relocated per design §3).
 - Modify: `e2e/smoke/responsive-overflow.spec.ts`
 
 **Interfaces:**
 
-- Produces: a QR card encoding the machine page URL (the "show QR" action relocated off the header), with Print/Download. Desktop: ops + QR in the right rail. Mobile order: status+presence strip → Watch → Open Issues(⋯) → Activity(+Add note) → QR.
+- Produces: a QR card encoding the machine page URL (the existing `QrCodeDialog`/`qr.ts` helper relocated from the Info tab body), with Print/Download. Desktop: ops + QR in the right rail. Mobile order: status+presence strip → Watch → Open Issues(⋯) → Activity(+Add note) → QR.
+- **Cleanup:** after QR (Task 6) and Owner's Requirements (Task 5) live on Service, remove the Info-tab Machine-tools block (`QrCodeDialog` + `MachineTextFields` mount) so the Info tab no longer carries maintainer/owner-private config. Description stays on Info; drop `MachineTextFields`'s owner-requirements usage there.
 
-- [ ] **Step 1:** Implement the QR card (use a vetted QR lib or an existing helper; encode `/m/[initials]` absolute URL). Print/Download actions.
-- [ ] **Step 2:** Apply desktop main+rail grid and the mobile stack order from §4.
-- [ ] **Step 3:** Ensure `/m/[initials]/maintenance` overflow coverage at 375px + 1024px; mobile badge strip ≤2 badges.
-- [ ] **Step 4:** `pnpm run smoke` + overflow spec — green. Because this touches server actions + queries, run `pnpm run preflight` before opening the PR.
-- [ ] **Step 5: Commit.** `git commit -am "feat(machine-service): QR card + responsive workbench layout (PP-5sgt.3)"`
+- [ ] **Step 1:** Implement the QR card by relocating `QrCodeDialog` + `generateQrPngDataUrl` off the Info tab into the Service rail (encode `/m/[initials]` absolute URL). Print/Download actions.
+- [ ] **Step 2:** Delete the Info-tab "Machine tools" block; confirm Description still renders on Info and no owner-private field (Requirements/QR) remains there. Update `machine-info-tab-auth` integration test accordingly.
+- [ ] **Step 3:** Apply desktop main+rail grid and the mobile stack order from §4.
+- [ ] **Step 4:** Ensure `/m/[initials]/maintenance` overflow coverage at 375px + 1024px; mobile badge strip ≤2 badges.
+- [ ] **Step 5:** `pnpm run smoke` + overflow spec — green. Because this touches server actions + queries, run `pnpm run preflight` before opening the PR.
+- [ ] **Step 6: Commit.** `git commit -am "feat(machine-service): QR card + responsive layout; retire Info-tab Machine-tools block (PP-5sgt.3)"`
 
 ---
 
