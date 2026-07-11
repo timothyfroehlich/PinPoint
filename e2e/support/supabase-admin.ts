@@ -27,50 +27,6 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 /**
- * Auto-confirm a user's email using Supabase Admin API
- *
- * This bypasses the email confirmation flow for E2E tests.
- * The user must already exist (created via signup).
- *
- * **Note**: This helper lists all users to find by email, which is inefficient
- * and won't scale. This is acceptable for E2E tests against local Supabase
- * with a small number of users. For integration tests where the User object
- * is available, use the helper in `src/test/helpers/supabase.ts` instead.
- *
- * @param email - Email address of the user to confirm
- * @throws Error if user not found or confirmation fails
- */
-export async function confirmUserEmail(email: string): Promise<void> {
-  // Get user by email
-  const { data: users, error: listError } =
-    await supabaseAdmin.auth.admin.listUsers();
-
-  if (listError) {
-    throw new Error(`Failed to list users: ${listError.message}`);
-  }
-
-  const user = users.users.find((u) => u.email === email);
-
-  if (!user) {
-    throw new Error(`User not found: ${email}`);
-  }
-
-  // Update user to confirm email
-  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-    user.id,
-    {
-      email_confirm: true,
-    }
-  );
-
-  if (updateError) {
-    throw new Error(
-      `Failed to confirm email for ${email}: ${updateError.message}`
-    );
-  }
-}
-
-/**
  * Create a test user with verified email
  */
 export async function createTestUser(
@@ -382,21 +338,13 @@ export async function clearMachineField(
 }
 
 /**
- * Get the Supabase auth user ID for a given email address.
- */
-export async function getUserIdByEmail(email: string): Promise<string> {
-  const { data: users, error } = await supabaseAdmin.auth.admin.listUsers();
-  if (error) throw error;
-  const user = users.users.find((u) => u.email === email);
-  if (!user) throw new Error(`User not found: ${email}`);
-  return user.id;
-}
-
-/**
- * Get a user_profiles id by email via a direct DB read. Unlike
- * `getUserIdByEmail` (which pages through the auth admin API and can miss users
- * beyond the first page once the seed grows), this is an exact single-row query
- * against the profiles table.
+ * Get a user_profiles id by email via a direct DB read.
+ *
+ * `user_profiles.id` is the same UUID as the Supabase `auth.users.id` (enforced
+ * by a cross-schema FK), so this returns the auth user id too — use it anywhere
+ * an auth user id is needed. Being an exact single-row query against the profiles
+ * table, it never misses a user regardless of how large `auth.users` grows,
+ * unlike an unpaginated `auth.admin.listUsers()` scan (PP-ph46).
  */
 export async function getProfileIdByEmail(email: string): Promise<string> {
   const { data, error } = await supabaseAdmin
@@ -406,6 +354,65 @@ export async function getProfileIdByEmail(email: string): Promise<string> {
     .single();
   if (error) throw error;
   return data.id;
+}
+
+/**
+ * Delete throwaway invite-signup auth users (emails ending in `@example.com`)
+ * that accumulate in `auth.users` across E2E runs.
+ *
+ * Neither `db:fast-reset` nor the `/api/test-data/cleanup` endpoint can remove
+ * `auth.users` rows — the Postgres role can't DELETE from the auth schema, so
+ * only the Admin API can. Left unswept, these rows pile up unbounded and once
+ * `auth.users` exceeds a page (~50) they broke unpaginated `listUsers()` email
+ * lookups (PP-ph46). Seed users are `@test.com` / `@pinpoint.internal`, so the
+ * `@example.com` filter never touches them.
+ *
+ * Pagination is count-based — we page until an empty page rather than trusting
+ * the auth-js `nextPage`/Link-header derivation, which is unreliable (PP-a4st,
+ * the same bug class fixed in prod as #1634). GoTrue caps per_page server-side,
+ * so a short-but-non-empty page is NOT necessarily the last one; only an empty
+ * page ends the scan. If the scan hits the hard page cap without ever seeing an
+ * empty page it throws rather than proceed silently — exhausting the cap means
+ * the scan is incomplete, which would leave the DB dirty and hide a pagination/
+ * API fault (reintroducing the exact flake this fixes). Returns the number of
+ * users deleted.
+ */
+export async function cleanupInviteSignupUsers(): Promise<number> {
+  const perPage = 1000;
+  const maxPages = 1000;
+  const idsToDelete: string[] = [];
+  let scanComplete = false;
+
+  for (let page = 1; page <= maxPages; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+    if (error) throw error;
+    if (data.users.length === 0) {
+      scanComplete = true;
+      break;
+    }
+    for (const user of data.users) {
+      if (user.email?.toLowerCase().endsWith("@example.com")) {
+        idsToDelete.push(user.id);
+      }
+    }
+  }
+
+  if (!scanComplete) {
+    throw new Error(
+      `cleanupInviteSignupUsers: auth.users scan hit the ${maxPages}-page cap ` +
+        `without reaching an empty page — scan incomplete, aborting to avoid a ` +
+        `partial sweep. Check the Admin API / pagination.`
+    );
+  }
+
+  for (const id of idsToDelete) {
+    await deleteTestUser(id);
+  }
+
+  return idsToDelete.length;
 }
 
 /**

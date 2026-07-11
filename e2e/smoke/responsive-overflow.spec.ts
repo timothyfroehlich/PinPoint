@@ -17,7 +17,7 @@ import {
   seededIssue,
   seededMember,
 } from "../support/constants.js";
-import { getUserIdByEmail } from "../support/supabase-admin.js";
+import { getProfileIdByEmail } from "../support/supabase-admin.js";
 
 // Build routes from seeded data so they don't break if seed data changes
 const machineInitials = seededMachines.addamsFamily.initials;
@@ -57,7 +57,7 @@ test.describe("Responsive: no horizontal overflow", () => {
     test.describe("collection pages", () => {
       let collectionBase = "";
       test.beforeAll(async () => {
-        const memberId = await getUserIdByEmail(seededMember.email);
+        const memberId = await getProfileIdByEmail(seededMember.email);
         collectionBase = `/c/owner/${memberId}`;
       });
 
