@@ -17,23 +17,31 @@ import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 import { log } from "~/lib/logger";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
+interface AdminListUsersParams {
+  page?: number;
+  perPage?: number;
+}
+
+type AdminListUsersResult =
+  | {
+      data: {
+        users: { id: string; email?: string | null | undefined }[];
+      };
+      error: null;
+    }
+  | {
+      data: {
+        users: [];
+      };
+      error: Error;
+    };
+
 interface AdminClientSubset {
   auth: {
     admin: {
-      listUsers: () => Promise<
-        | {
-            data: {
-              users: { id: string; email?: string | null | undefined }[];
-            };
-            error: null;
-          }
-        | {
-            data: {
-              users: [];
-            };
-            error: Error;
-          }
-      >;
+      listUsers: (
+        params?: AdminListUsersParams
+      ) => Promise<AdminListUsersResult>;
     };
   };
 }
@@ -43,10 +51,10 @@ function getAdminClient(): AdminClientSubset {
     return {
       auth: {
         admin: {
-          listUsers: async () => {
+          listUsers: async (params) => {
             try {
               const result = (await db.execute(
-                sql`SELECT id, email FROM auth.users`
+                sql`SELECT id, email FROM auth.users ORDER BY email`
               )) as unknown;
               const rows = (
                 Array.isArray(result)
@@ -59,13 +67,23 @@ function getAdminClient(): AdminClientSubset {
                     : []
               ) as { id: string; email: string | null }[];
 
+              const all = rows.map((row) => ({
+                id: row.id,
+                email: row.email ?? undefined,
+              }));
+
+              // Simulate GoTrue's server-side per-page cap so callers are
+              // forced to paginate — mirrors the real Admin API contract that
+              // motivated PP-a4st (a single unpaginated call can miss users,
+              // and a short-but-non-empty page does not mean "last page").
+              const MAX_PER_PAGE = 50;
+              const perPage = Math.min(params?.perPage ?? 50, MAX_PER_PAGE);
+              const page = params?.page ?? 1;
+              const start = (page - 1) * perPage;
+              const slice = all.slice(start, start + perPage);
+
               return {
-                data: {
-                  users: rows.map((row) => ({
-                    id: row.id,
-                    email: row.email ?? undefined,
-                  })),
-                },
+                data: { users: slice },
                 error: null,
               };
             } catch (err) {
@@ -80,6 +98,72 @@ function getAdminClient(): AdminClientSubset {
     };
   }
   return createAdminClient();
+}
+
+// Page size requested from the Admin API. GoTrue caps `per_page` server-side,
+// so the effective page may be smaller — we rely on the returned row count, not
+// this value, to decide when to stop.
+const AUTH_USERS_PER_PAGE = 1000;
+// Hard safety cap on pages scanned, so a misbehaving API (e.g. one that ignores
+// the `page` param and returns a full page forever) can't loop unboundedly.
+// 1000 pages × 1000 rows = 1,000,000 users — far beyond any realistic org.
+const AUTH_USERS_MAX_PAGES = 1000;
+
+/**
+ * Look up an auth user by email across ALL pages of the Admin API.
+ *
+ * The Supabase Admin API (@supabase/auth-js) exposes no `getUserByEmail`, and
+ * `listUsers()` is paginated (GoTrue defaults to 50 per page). A single
+ * unpaginated call therefore misses a matching email that lands on page 2+,
+ * which previously let a duplicate invite slip through. (PP-a4st)
+ *
+ * Termination is **count-based and independent of `nextPage`**: the client
+ * derives `nextPage` from an HTTP `Link` header, which is absent when the
+ * server omits it and is mis-parsed for page numbers >= 10 (a known auth-js
+ * bug — it reads only the first digit). We instead page until the API returns
+ * an empty page. We deliberately do NOT stop on a short-but-non-empty page,
+ * because GoTrue caps `per_page` server-side, so a page smaller than requested
+ * does not imply the last page.
+ *
+ * `email` must already be normalized (lowercased/trimmed) — the invite schema
+ * applies `.trim().toLowerCase()` before this runs.
+ */
+async function findAuthUserByEmail(
+  adminClient: AdminClientSubset,
+  email: string
+): Promise<{ id: string } | undefined> {
+  for (let page = 1; page <= AUTH_USERS_MAX_PAGES; page++) {
+    const { data, error } = await adminClient.auth.admin.listUsers({
+      page,
+      perPage: AUTH_USERS_PER_PAGE,
+    });
+
+    if (error) {
+      log.error(
+        { action: "inviteUser", page, err: error.message },
+        "Failed to list auth users during validation"
+      );
+      throw error;
+    }
+
+    const match = data.users.find((u) => u.email?.toLowerCase() === email);
+    if (match) {
+      return match;
+    }
+
+    // An empty page means we've paged past the end — stop.
+    if (data.users.length === 0) {
+      return undefined;
+    }
+  }
+
+  // Reached the page cap without an empty page: fail loud rather than silently
+  // treating the email as unique on an incomplete scan.
+  log.error(
+    { action: "inviteUser", maxPages: AUTH_USERS_MAX_PAGES },
+    "Aborting auth-user email scan: exceeded page cap"
+  );
+  throw new Error("Failed to verify email uniqueness against existing users");
 }
 
 async function verifyAdmin(userId: string): Promise<void> {
@@ -205,20 +289,12 @@ export async function inviteUser(
 
     // Check both auth.users and user_profiles — a user could exist in
     // auth.users without a profile row if the handle_new_user trigger failed.
+    // listUsers is paginated and there is no getUserByEmail, so scan every
+    // page: an unpaginated call misses collisions on page 2+. (PP-a4st)
     const adminClient = getAdminClient();
-    const { data: authUsersData, error: listError } =
-      await adminClient.auth.admin.listUsers();
-
-    if (listError) {
-      log.error(
-        { action: "inviteUser", err: listError.message },
-        "Failed to list auth users during validation"
-      );
-      throw listError;
-    }
-
-    const existingAuthUser = authUsersData.users.find(
-      (u) => u.email?.toLowerCase() === validated.email
+    const existingAuthUser = await findAuthUserByEmail(
+      adminClient,
+      validated.email
     );
 
     if (existingAuthUser) {

@@ -5,7 +5,27 @@
  */
 
 import { vi } from "vitest";
+import type { Mock } from "vitest";
 import type { User, AuthError, Session } from "@supabase/supabase-js";
+
+// Explicit, portable shapes for the Supabase mock. Without these, the inferred
+// return types reference vitest's private `Procedure` type, which the `composite`
+// tsconfig.tests.json project flags as non-portable (TS2883) — visible as editor
+// noise once test files are owned by that project. See PP-4k76.
+interface MockSupabaseAuth {
+  getUser: Mock;
+  getSession: Mock;
+  signInWithPassword: Mock;
+  signUp: Mock;
+  signOut: Mock;
+  exchangeCodeForSession: Mock;
+  resetPasswordForEmail: Mock;
+  updateUser: Mock;
+}
+interface MockSupabaseClient {
+  auth: MockSupabaseAuth;
+  from: Mock;
+}
 
 /**
  * Mock Supabase user for testing
@@ -68,7 +88,7 @@ export function createMockSupabaseClient(
     signUpError?: AuthError;
     signOutError?: AuthError;
   } = {}
-) {
+): MockSupabaseClient {
   const session = user ? createMockSession(user) : null;
 
   return {
@@ -182,7 +202,7 @@ export function createMockSupabaseClient(
  * }));
  * ```
  */
-export function mockCreateClient(user: User | null = null) {
+export function mockCreateClient(user: User | null = null): Mock {
   return vi.fn().mockResolvedValue(createMockSupabaseClient(user));
 }
 
@@ -200,7 +220,7 @@ export function mockCreateClient(user: User | null = null) {
  */
 export function mockNextCookies(
   initialCookies: { name: string; value: string }[] = []
-) {
+): Mock {
   return vi.fn(() =>
     Promise.resolve({
       getAll: vi.fn(() => initialCookies),

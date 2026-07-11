@@ -2,8 +2,9 @@
  * Drops PinPoint-owned database objects in the local Supabase environment.
  *
  * This script is used by `pnpm run db:reset` (and preflight) to ensure a clean
- * slate before reapplying the Drizzle schema. It drops public-schema tables
- * and trigger-helper functions; the auth.users table and its data remain
+ * slate before reapplying the Drizzle schema. It drops every public-schema
+ * table (discovered dynamically from pg_tables) plus PinPoint's trigger-helper
+ * functions; the auth.users table and its data remain
  * intact. (CASCADE on `handle_new_user` does remove our trigger attached to
  * auth.users — that trigger is PinPoint's, not Supabase's.)
  */
@@ -16,26 +17,6 @@ import { assertLocalDatabase } from "./assert-local-db.mjs";
 
 const databaseUrl = resolveScriptDatabaseUrl();
 assertLocalDatabase(databaseUrl);
-
-// Tables live in the public schema; order ensures dependent tables drop first.
-const tables = [
-  "issue_images",
-  "issue_comments",
-  "issue_watchers",
-  "machine_watchers",
-  "notifications",
-  "notification_preferences",
-  "timeline_event_people",
-  "timeline_events",
-  "machine_settings_sets",
-  "issues",
-  "machines",
-  "pinballmap_catalog",
-  "user_profiles",
-  "invited_users",
-  "unconfirmed_users",
-  "discord_integration_config",
-];
 
 // Trigger/helper functions PinPoint creates in the public schema. CASCADE
 // removes dependent triggers — including handle_new_user's trigger on
@@ -50,9 +31,25 @@ const client = createScriptClient(databaseUrl);
 async function dropApplicationObjects() {
   console.log("🧹 Dropping application tables and functions (public schema)...");
 
-  for (const table of tables) {
-    // Use unsafe here only for static table names defined above
-    await client.unsafe(`DROP TABLE IF EXISTS "${table}" CASCADE;`);
+  // Discover every table in the public schema dynamically instead of tracking a
+  // hardcoded list. A static list silently rots: a newly-added table that isn't
+  // on the list survives the drop, then the next fresh migration collides with
+  // it and fails with 42P07 (duplicate_table). (PP-wv4p.)
+  //
+  // Strictly scoped to schemaname = 'public' — Supabase-managed schemas (auth,
+  // storage, realtime, extensions, …) are never touched. CASCADE handles
+  // inter-table dependencies, so drop order does not matter.
+  const publicTables = await client`
+    SELECT tablename
+    FROM pg_tables
+    WHERE schemaname = 'public'
+  `;
+
+  for (const { tablename } of publicTables) {
+    // tablename comes from pg_catalog (our own tables); quote it defensively so
+    // any identifier that needs escaping is handled correctly.
+    const quoted = `"${String(tablename).replace(/"/g, '""')}"`;
+    await client.unsafe(`DROP TABLE IF EXISTS public.${quoted} CASCADE;`);
   }
 
   for (const fn of functions) {

@@ -1,0 +1,16 @@
+{
+  // Gate view of the test project (PP-4k76). The real tsconfig.tests.json is
+  // `composite` + `references: [tsconfig.app.json]` so the editor's language
+  // server can own test files. But a batch `tsc -p` over a composite project
+  // resolves references to their *built* .d.ts outputs, which we never emit —
+  // producing spurious TS6305 ("output file has not been built"). Since
+  // `references` is NOT inherited through `extends`, this derived config drops
+  // the reference and turns composite off, giving a plain source-based
+  // type-check of the test files (identical to the pre-split behavior). This is
+  // what `pnpm run typecheck:tests` runs; it emits nothing.
+  "extends": "./tsconfig.tests.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true
+  }
+}
