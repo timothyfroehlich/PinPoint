@@ -31,10 +31,11 @@ import { InfoRail } from "./info-rail";
  * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
  * player's landing (redesign PP-5sgt.2).
  *
- * Reading order (both breakpoints): Description (plain prose, no label) → Hero
- * (status + presence + Report button + known-issues peek) → reference cluster
- * (Tags / Owner / PinballMap) → recent-activity peek. Desktop is a main column
- * + 320px rail; mobile folds the rail inline after the hero.
+ * Reading order (both breakpoints): Hero (status + presence + Report button +
+ * known-issues peek) → reference cluster (Details card: machine description +
+ * owner, then Tags / PinballMap placeholders) → recent-activity peek →
+ * maintainer tools. Desktop is a main column + 320px rail; mobile folds the
+ * rail inline after the hero.
  *
  * NOTE (PP-5sgt.3): the maintainer tools at the bottom — QR code and owner
  * requirements/notes — are kept here temporarily. The Service-tab rework
@@ -203,11 +204,12 @@ export default async function MachineInfoTab({
     />
   );
 
-  // Single grid in DOM reading order: Description → Hero → reference rail →
-  // recent activity → maintainer tools. On mobile it's one flex column (the
-  // rail folds inline after the hero). On desktop the rail is pinned to the
-  // 320px right column, spanning the main column's rows; everything else
-  // auto-flows down column 1. Rendered once so test ids stay unique.
+  // Single grid in DOM reading order: Hero → reference rail (Details card:
+  // description + owner, then Tags / PinballMap) → recent activity → maintainer
+  // tools. On mobile it's one flex column (the rail folds inline after the
+  // hero). On desktop the rail is pinned to the 320px right column, spanning the
+  // main column's rows; everything else auto-flows down column 1. Rendered once
+  // so test ids stay unique.
   return (
     <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-6">
       <InfoHero

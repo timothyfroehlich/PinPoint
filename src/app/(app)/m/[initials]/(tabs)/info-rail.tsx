@@ -8,7 +8,7 @@ interface InfoRailProps {
   invitedOwner: { name: string } | null;
   addedAt: Date;
   /**
-   * Machine description, rendered inside the owner card below the owner row.
+   * Machine description, rendered inside the Details card above the owner row.
    * Pass `null` to omit the Description section entirely (empty + non-editable).
    */
   descriptionSlot?: React.ReactNode;
