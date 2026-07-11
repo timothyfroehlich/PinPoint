@@ -46,7 +46,11 @@ only). Add:
 | `release-assets.githubusercontent.com` | GitHub release-asset CDN (the binary blobs)                |
 | `doltremoteapi.dolthub.com`            | DoltHub API — credential auth, signed-URL issuance         |
 | `*.cloudfront.net`                     | DoltHub **clone/read** — CDN blob fetch                    |
-| `*.amazonaws.com`                      | DoltHub **push/write** — S3 blob upload                    |
+| `*.s3.amazonaws.com`                   | DoltHub **push/write** — S3 blob upload                    |
+
+If a push 403s, DoltHub may be using region-scoped upload hosts — widen to
+`*.s3.<region>.amazonaws.com` (confirm the exact host from the proxy status log,
+see Reproducing / debugging). Avoid the broad `*.amazonaws.com`.
 
 Do **not** rely on `api.github.com` — it is rate-limited on shared cloud egress
 IPs (returns 403) and may not be allowlisted. Resolve the latest version off the
@@ -101,7 +105,7 @@ echo "=== VERSIONS ==="
 dolt version
 if ! bd version; then
   echo "bd failed to link — installing libicu"
-  apt-get update -qq && apt-get install -y libicu74
+  apt-get update -qq && apt-get install -y libicu-dev
   bd version
 fi
 ```
@@ -140,7 +144,7 @@ named `<handle>.jwk` and `user.creds` matches it.
 mkdir -p ~/.dolt/creds
 printf '%s' "$DOLT_CREDS_JWK" > ~/.dolt/creds/"$DOLT_CREDS_PUB".jwk
 chmod 600 ~/.dolt/creds/"$DOLT_CREDS_PUB".jwk
-printf '{"user.creds":"%s","user.email":"timothyfroehlich@gmail.com","user.name":"advacar"}' \
+printf '{"user.creds":"%s","user.email":"<dolthub-account-email>","user.name":"advacar"}' \
   "$DOLT_CREDS_PUB" > ~/.dolt/config_global.json
 
 # Clone + persist sync.remote in one step (no hand-seeded .beads/config.yaml):
@@ -150,6 +154,9 @@ bd init --remote "$BEADS_SYNC_REMOTE" --prefix PP --non-interactive
 # ... do work: bd ready / bd create / bd update ...
 bd dolt push
 ```
+
+`user.email` is Dolt commit metadata only (not used for authentication — the JWK
+handles that); use your DoltHub account email or any non-personal address.
 
 ## Guardrails
 
