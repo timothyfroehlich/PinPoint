@@ -215,8 +215,10 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   // Sweep throwaway invite-signup users (…@example.com) that accumulate in
   // auth.users across runs. Neither db:fast-reset nor /api/test-data/cleanup
   // can delete auth.users rows (the Postgres role lacks the privilege), so
-  // without this they grow unbounded and eventually break paginated auth
-  // lookups (PP-ph46). Non-fatal: a sweep hiccup shouldn't block the suite.
+  // without this they grow unbounded. Once auth.users exceeds one Admin-API
+  // page (GoTrue defaults to 50/page), any *unpaginated* listUsers() email
+  // lookup misses real seed users that fall onto page 2+ (PP-ph46). Non-fatal:
+  // a sweep hiccup shouldn't block the suite.
   //
   // Dynamic import (not static) on purpose: supabase-admin.ts throws at module
   // load if SUPABASE_SERVICE_ROLE_KEY / NEXT_PUBLIC_SUPABASE_URL are unset, and

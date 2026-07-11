@@ -371,13 +371,17 @@ export async function getProfileIdByEmail(email: string): Promise<string> {
  * the auth-js `nextPage`/Link-header derivation, which is unreliable (PP-a4st,
  * the same bug class fixed in prod as #1634). GoTrue caps per_page server-side,
  * so a short-but-non-empty page is NOT necessarily the last one; only an empty
- * page ends the scan. A hard page cap guards against a misbehaving API looping
- * forever. Returns the number of users deleted.
+ * page ends the scan. If the scan hits the hard page cap without ever seeing an
+ * empty page it throws rather than proceed silently — exhausting the cap means
+ * the scan is incomplete, which would leave the DB dirty and hide a pagination/
+ * API fault (reintroducing the exact flake this fixes). Returns the number of
+ * users deleted.
  */
 export async function cleanupInviteSignupUsers(): Promise<number> {
   const perPage = 1000;
   const maxPages = 1000;
   const idsToDelete: string[] = [];
+  let scanComplete = false;
 
   for (let page = 1; page <= maxPages; page++) {
     const { data, error } = await supabaseAdmin.auth.admin.listUsers({
@@ -385,12 +389,23 @@ export async function cleanupInviteSignupUsers(): Promise<number> {
       perPage,
     });
     if (error) throw error;
-    if (data.users.length === 0) break;
+    if (data.users.length === 0) {
+      scanComplete = true;
+      break;
+    }
     for (const user of data.users) {
       if (user.email?.toLowerCase().endsWith("@example.com")) {
         idsToDelete.push(user.id);
       }
     }
+  }
+
+  if (!scanComplete) {
+    throw new Error(
+      `cleanupInviteSignupUsers: auth.users scan hit the ${maxPages}-page cap ` +
+        `without reaching an empty page — scan incomplete, aborting to avoid a ` +
+        `partial sweep. Check the Admin API / pagination.`
+    );
   }
 
   for (const id of idsToDelete) {
