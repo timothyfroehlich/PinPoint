@@ -15,7 +15,7 @@ import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
 import { getSignupLink } from "../support/mailpit.js";
 import {
-  getUserIdByEmail,
+  getProfileIdByEmail,
   setMachineOwner,
 } from "../support/supabase-admin.js";
 
@@ -37,7 +37,7 @@ test.describe("User Invitation & Signup Flow", () => {
     // Restore HD machine owner to admin before deleting the test user so the
     // foreign key is valid when the user row is removed.
     if (hdOwnerChanged) {
-      const adminId = await getUserIdByEmail(TEST_USERS.admin.email);
+      const adminId = await getProfileIdByEmail(TEST_USERS.admin.email);
       await setMachineOwner(seededMachines.humptyDumpty.initials, adminId);
       hdOwnerChanged = false;
     }

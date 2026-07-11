@@ -212,6 +212,27 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
 
   console.log("✅ Pre-flight checks passed");
 
+  // Sweep throwaway invite-signup users (…@example.com) that accumulate in
+  // auth.users across runs. Neither db:fast-reset nor /api/test-data/cleanup
+  // can delete auth.users rows (the Postgres role lacks the privilege), so
+  // without this they grow unbounded and eventually break paginated auth
+  // lookups (PP-ph46). Non-fatal: a sweep hiccup shouldn't block the suite.
+  //
+  // Dynamic import (not static) on purpose: supabase-admin.ts throws at module
+  // load if SUPABASE_SERVICE_ROLE_KEY / NEXT_PUBLIC_SUPABASE_URL are unset, and
+  // the SKIP_SUPABASE_RESET=true path returns early above without ever needing
+  // it — a top-level import would defeat that skip. Don't convert to static.
+  try {
+    const { cleanupInviteSignupUsers } =
+      await import("./support/supabase-admin.js");
+    const removed = await cleanupInviteSignupUsers();
+    if (removed > 0) {
+      console.log(`🧹 Swept ${removed} throwaway @example.com auth user(s).`);
+    }
+  } catch (error) {
+    console.warn("⚠️  Failed to sweep throwaway auth users:", error);
+  }
+
   // ── Database setup ─────────────────────────────────────────────────
   // All commands below are static strings (no user input) — execSync is safe here.
 
