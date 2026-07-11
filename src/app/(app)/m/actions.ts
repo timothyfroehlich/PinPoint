@@ -645,9 +645,101 @@ export async function createMachineAction(
 }
 
 /**
+ * Shared ProseMirror payload validation for the machine text columns. Both the
+ * dialog's `parseDescriptionFormField` and the inline `updateMachineTextField`
+ * call this so the two edit surfaces can't drift on what counts as a
+ * valid/oversized/empty doc. Returns a discriminant the caller maps to its own
+ * error shape and copy. Size caps: 10k plaintext / 100k serialized JSON.
+ * `"empty"` = whitespace-only (caller normalizes to null so the DB stores NULL,
+ * not a semantically-empty JSON blob).
+ */
+type ProseMirrorValidation =
+  | { status: "invalid" }
+  | { status: "too-long" }
+  | { status: "empty" }
+  | { status: "ok"; doc: ProseMirrorDoc };
+
+function validateProseMirrorDoc(value: unknown): ProseMirrorValidation {
+  // Validate the untrusted value at runtime BEFORE treating it as a doc — the
+  // raw parse result is `unknown`, and only a successful safeParse licenses the
+  // narrow below (CORE-TS-007: no unsafe cast of unvalidated input).
+  if (!proseMirrorDocSchema.safeParse(value).success) {
+    return { status: "invalid" };
+  }
+  // Shape confirmed (`type: "doc"`); narrow the validated `unknown` to the app's
+  // doc type.
+  const doc = value as ProseMirrorDoc;
+  const plainText = docToPlainText(doc);
+  if (plainText.length > 10_000 || JSON.stringify(doc).length > 100_000) {
+    return { status: "too-long" };
+  }
+  if (plainText.trim().length === 0) {
+    return { status: "empty" };
+  }
+  return { status: "ok", doc };
+}
+
+/**
+ * Parse the optional machine `description` carried by the Edit Machine dialog
+ * as a serialized ProseMirror doc (same hidden-field + JSON pattern as the
+ * report form). Presence of the field is the marker: absent → leave the column
+ * untouched; empty (or semantically-empty) → clear to null; otherwise the
+ * validated doc. Size caps match the description column's inline-edit path
+ * (`updateMachineTextField`): 10k plaintext / 100k serialized JSON.
+ */
+function parseDescriptionFormField(
+  formData: FormData
+):
+  | { ok: true; value: ProseMirrorDoc | null | undefined }
+  | { ok: false; message: string } {
+  const raw = formData.get("description");
+  // Field absent — this edit surface doesn't own the description column.
+  if (raw === null) {
+    return { ok: true, value: undefined };
+  }
+  // A non-string value (a File from a malformed/malicious multipart submission)
+  // is never a legitimate payload — reject it rather than silently clearing the
+  // column. An empty string is the intended "clear to null" signal: the hidden
+  // field submits "" when the editor is empty.
+  if (typeof raw !== "string") {
+    return { ok: false, message: "Invalid description format." };
+  }
+  if (raw.length === 0) {
+    return { ok: true, value: null };
+  }
+  // Enforce the serialized-JSON size cap on the raw string BEFORE parsing, so an
+  // oversized untrusted payload is rejected without running JSON.parse over it.
+  // (validateProseMirrorDoc re-checks the cap for the inline-edit path, which
+  // receives an already-parsed doc rather than a raw string.)
+  if (raw.length > 100_000) {
+    return { ok: false, message: "Description is too long." };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, message: "Invalid description format." };
+  }
+  const result = validateProseMirrorDoc(parsed);
+  if (result.status === "invalid") {
+    return { ok: false, message: "Invalid description format." };
+  }
+  if (result.status === "too-long") {
+    return { ok: false, message: "Description is too long." };
+  }
+  // Normalize a whitespace-only doc to null so the DB stores NULL rather than a
+  // semantically-empty JSON blob.
+  if (result.status === "empty") {
+    return { ok: true, value: null };
+  }
+  return { ok: true, value: result.doc };
+}
+
+/**
  * Update Machine Action
  *
- * Updates a machine's name.
+ * Updates a machine's name, availability, owner, PinballMap link, and
+ * description.
  * Requires authentication.
  *
  * @param _prevState - The previous state of the form.
@@ -702,6 +794,14 @@ export async function updateMachineAction(
   // Only the form that renders the PBM picker carries this marker; other edit
   // surfaces (e.g. inline field saves) omit it so they never touch link columns.
   const pbmFormPresent = formData.get("pbmLinkPresent") === "1";
+
+  // Description is carried by the Edit Machine dialog only; `undefined` means
+  // "leave the column untouched" so other edit surfaces never clear it.
+  const descriptionResult = parseDescriptionFormField(formData);
+  if (!descriptionResult.ok) {
+    return err("VALIDATION", descriptionResult.message);
+  }
+  const descriptionColumn = descriptionResult.value;
 
   const validation = updateMachineSchema.safeParse(rawData);
   if (!validation.success) {
@@ -828,6 +928,9 @@ export async function updateMachineAction(
             ownerId: machineOwnerId ?? null,
             invitedOwnerId: machineInvitedOwnerId ?? null,
             ...(pbmColumns ?? {}),
+            ...(descriptionColumn !== undefined && {
+              description: descriptionColumn,
+            }),
           })
           .where(eq(machines.id, id))
           .returning();
@@ -1015,6 +1118,9 @@ export async function updateMachineAction(
             invitedOwnerId: finalInvitedOwnerId,
           }),
           ...(pbmColumns ?? {}),
+          ...(descriptionColumn !== undefined && {
+            description: descriptionColumn,
+          }),
         })
         .where(eq(machines.id, id))
         .returning();
@@ -1255,22 +1361,18 @@ async function updateMachineTextField(
     return err("VALIDATION", "Invalid machine ID");
   }
 
-  // Validate ProseMirror payload: must be null or a well-formed doc with type:"doc"
+  // Validate ProseMirror payload: must be null or a well-formed doc with type:"doc".
   // Normalize empty docs to null so the DB stores NULL rather than a semantically-empty JSON blob.
   let normalizedValue: ProseMirrorDoc | null = value;
   if (value !== null) {
-    if (!proseMirrorDocSchema.safeParse(value).success) {
+    const result = validateProseMirrorDoc(value);
+    if (result.status === "invalid") {
       return err("VALIDATION", "Invalid rich text payload.");
     }
-    const plainText = docToPlainText(value);
-    if (plainText.length > 10_000) {
+    if (result.status === "too-long") {
       return err("VALIDATION", "Text is too long.");
     }
-    if (JSON.stringify(value).length > 100_000) {
-      return err("VALIDATION", "Text is too long.");
-    }
-    // Normalize empty doc to null
-    if (plainText.trim().length === 0) {
+    if (result.status === "empty") {
       normalizedValue = null;
     }
   }

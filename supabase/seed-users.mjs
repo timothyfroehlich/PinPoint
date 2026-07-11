@@ -272,6 +272,11 @@ async function seedUsersAndData() {
       SET owner_requirements = ${wrapTextInProseMirror("Check the bridge lock opto alignment before opening the building assembly. Document any broken plastics with a photo.")}
       WHERE initials = 'GDZ'
     `;
+    await sql`
+      UPDATE machines
+      SET description = ${wrapTextInProseMirror("Bally 1995 DMD-era classic — blow up the mothership, rescue the cows, and save the planets across a fast, flowing layout. On free play; the left-ramp diverter can stick now and then, so give it a firm, committed shot.")}
+      WHERE initials = 'AFM'
+    `;
     console.log("✅ Machines seeded with distributed ownership.");
 
     // 3. Seed Issues (18 issues with comprehensive permutations)

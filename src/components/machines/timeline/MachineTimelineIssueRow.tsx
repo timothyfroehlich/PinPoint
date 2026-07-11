@@ -9,7 +9,10 @@ import {
 } from "./MachineAttributionLine";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import { RelativeTime } from "~/components/issues/RelativeTime";
-import { useTimelineRowDensity } from "~/hooks/use-timeline-row-density";
+import {
+  useTimelineRowDensity,
+  type TimelineRowDensity,
+} from "~/hooks/use-timeline-row-density";
 import { formatIssueId } from "~/lib/issues/utils";
 import { STATUS_CONFIG } from "~/lib/issues/status";
 import { MACHINE_EVENT_ICONS } from "~/lib/timeline/machine-event-icons";
@@ -123,21 +126,32 @@ export function MachineTimelineIssueRow({
         >
           {/* Line 1 reading order: ID (link) · verb · by Actor · badges
               · ‹spacer› · time. ID is the only link in this line — the
-              title link lives on line 2. */}
-          <span className="inline-flex min-w-0 items-baseline gap-1.5">
-            {issueHref ? (
-              <Link
-                href={issueHref}
-                className="shrink-0 font-mono font-semibold text-foreground hover:text-primary hover:underline"
-              >
-                {issueIdText}
-              </Link>
-            ) : (
-              <span className="shrink-0 font-mono font-semibold text-foreground">
-                {issueIdText}
-              </span>
-            )}
-            <span className="truncate text-muted-foreground">{verbClause}</span>
+              title link lives on line 2.
+
+              The ID is a *direct* shrink-0 flex child, not nested inside the
+              shrinkable verb group: a min-w-0 wrapper can collapse below its
+              own shrink-0 child, which paints the ID on top of the following
+              badge on narrow rows. Keeping the ID at the top level reserves
+              its width so it can never overlap the badges. */}
+          {issueHref ? (
+            <Link
+              href={issueHref}
+              className="shrink-0 font-mono font-semibold text-foreground hover:text-primary hover:underline"
+            >
+              {issueIdText}
+            </Link>
+          ) : (
+            <span className="shrink-0 font-mono font-semibold text-foreground">
+              {issueIdText}
+            </span>
+          )}
+          <span className="flex min-w-0 items-baseline gap-1.5">
+            {/* min-w-0 + flex-1: a flex child's default min-width:auto blocks
+                shrinking, so `truncate` alone would overflow instead of
+                clipping. Let the verb take the remaining space and ellipsize. */}
+            <span className="min-w-0 flex-1 truncate text-muted-foreground">
+              {verbClause}
+            </span>
             {actor && density === "full" ? (
               <span className="shrink-0 text-muted-foreground">
                 by{" "}
@@ -148,7 +162,7 @@ export function MachineTimelineIssueRow({
               </span>
             ) : null}
           </span>
-          <IssueRowBadges eventData={row.eventData} />
+          <IssueRowBadges eventData={row.eventData} density={density} />
           {rightMeta ? (
             <span className="ml-auto shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
               {rightMeta}
@@ -240,10 +254,12 @@ function formatStatusLabel(value: string): string {
 
 interface IssueRowBadgesProps {
   eventData: IssueEventData;
+  density: TimelineRowDensity;
 }
 
 function IssueRowBadges({
   eventData,
+  density,
 }: IssueRowBadgesProps): React.JSX.Element | null {
   if (eventData.kind === "issue_opened") {
     const badges: React.JSX.Element[] = [];
@@ -257,7 +273,10 @@ function IssueRowBadges({
         />
       );
     }
-    if (eventData.frequency) {
+    // Frequency is the secondary badge — dropped on the narrow (compact) tier
+    // so Severity + ID + timestamp fit a ~360px row without overlapping.
+    // Mirrors PP-dnk8's "mobile badge-wrap caps to Status+Severity".
+    if (eventData.frequency && density !== "compact") {
       badges.push(
         <IssueBadge
           key="frequency"

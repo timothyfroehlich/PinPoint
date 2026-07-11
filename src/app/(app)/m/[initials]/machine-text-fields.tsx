@@ -33,6 +33,12 @@ interface MachineTextFieldsProps {
   ownerRequirements: ProseMirrorDoc | null;
   canEditGeneral: boolean;
   canViewOwnerRequirements: boolean;
+  /**
+   * Render the Description field inline. Defaults to true for backward
+   * compatibility; the Info tab passes `false` because the description renders
+   * read-only in the Details card and is edited via the Edit Machine dialog.
+   */
+  showDescription?: boolean;
 }
 
 export function MachineTextFields({
@@ -41,18 +47,21 @@ export function MachineTextFields({
   ownerRequirements,
   canEditGeneral,
   canViewOwnerRequirements,
+  showDescription = true,
 }: MachineTextFieldsProps): React.JSX.Element {
   return (
     <div className="space-y-4">
-      <InlineEditableField
-        label="Description"
-        value={description}
-        onSave={wrapAction(updateMachineDescription)}
-        machineId={machineId}
-        canEdit={canEditGeneral}
-        placeholder="Add a description for this machine..."
-        testId="machine-description"
-      />
+      {showDescription && (
+        <InlineEditableField
+          label="Description"
+          value={description}
+          onSave={wrapAction(updateMachineDescription)}
+          machineId={machineId}
+          canEdit={canEditGeneral}
+          placeholder="Add a description for this machine..."
+          testId="machine-description"
+        />
+      )}
 
       {canViewOwnerRequirements && (
         <InlineEditableField

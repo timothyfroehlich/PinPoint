@@ -37,7 +37,7 @@ const defaultProps = {
 };
 
 describe("MachineTextFields", () => {
-  it("renders description, which is always present in layout", () => {
+  it("renders the inline description field when showDescription defaults to true", () => {
     render(<MachineTextFields {...defaultProps} />);
     expect(screen.getByTestId("machine-description")).toBeInTheDocument();
   });
@@ -58,5 +58,14 @@ describe("MachineTextFields", () => {
     expect(
       screen.queryByTestId("machine-owner-requirements")
     ).not.toBeInTheDocument();
+  });
+
+  it("omits the description when showDescription is false", () => {
+    render(<MachineTextFields {...defaultProps} showDescription={false} />);
+    expect(screen.queryByTestId("machine-description")).not.toBeInTheDocument();
+    // Owner fields still render.
+    expect(
+      screen.getByTestId("machine-owner-requirements")
+    ).toBeInTheDocument();
   });
 });

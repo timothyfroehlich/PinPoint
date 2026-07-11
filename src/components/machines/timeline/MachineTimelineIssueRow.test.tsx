@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { createRef, type ReactElement, type RefObject } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
 import type { MachineIssueEventData } from "~/lib/timeline/machine-event-types";
@@ -19,17 +19,21 @@ function renderRow(ui: ReactElement): ReturnType<typeof render> {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
 }
 
-// The density hook starts as `"no-actor"` and only flips to `"full"` after a
-// ResizeObserver sees the row body widen past the threshold. jsdom has no real
-// layout, so observe never fires — we mock the hook to return `"full"` so
-// actor-rendering assertions exercise that branch. (The "no-actor" branch is
-// covered by a single test that does not mock the hook.)
+// The density hook starts as `"compact"` and only widens after a
+// ResizeObserver sees the row body pass a threshold. jsdom has no real layout,
+// so observe never fires — we mock the hook and drive `density` per-test via
+// this hoisted holder (default `"full"` so actor + both-badge assertions
+// exercise the widest branch). Tests that care about narrow behaviour set
+// `densityMock.value` before rendering and reset it afterwards.
+const densityMock = vi.hoisted<{
+  value: "full" | "no-actor" | "compact";
+}>(() => ({ value: "full" }));
 vi.mock("~/hooks/use-timeline-row-density", () => ({
   useTimelineRowDensity: (): {
-    density: "full" | "no-actor";
+    density: "full" | "no-actor" | "compact";
     containerRef: RefObject<HTMLDivElement | null>;
   } => ({
-    density: "full",
+    density: densityMock.value,
     containerRef: createRef<HTMLDivElement | null>(),
   }),
 }));
@@ -313,6 +317,10 @@ describe("MachineTimelineIssueRow", () => {
   });
 
   describe("badges", () => {
+    afterEach(() => {
+      densityMock.value = "full";
+    });
+
     it("issue_opened with severity renders a severity badge", () => {
       const row = makeRow({
         kind: "issue_opened",
@@ -336,6 +344,38 @@ describe("MachineTimelineIssueRow", () => {
         frequency: "frequent",
       });
       renderRow(<MachineTimelineIssueRow row={row} machineInitials="AFM" />);
+      expect(screen.getByText(/frequent/i)).toBeInTheDocument();
+    });
+
+    it("drops the frequency badge on the compact (narrow) tier, keeping severity", () => {
+      densityMock.value = "compact";
+      const row = makeRow({
+        kind: "issue_opened",
+        issueId: ISSUE_ID,
+        issueNumber: 3,
+        title: "Broken flipper",
+        severity: "major",
+        frequency: "frequent",
+      });
+      renderRow(<MachineTimelineIssueRow row={row} machineInitials="AFM" />);
+      // Severity stays; frequency is shed so ID + severity + timestamp fit a
+      // narrow phone row without overlapping (PP-dnk8 mobile badge cap).
+      expect(screen.getByText(/major/i)).toBeInTheDocument();
+      expect(screen.queryByText(/frequent/i)).not.toBeInTheDocument();
+    });
+
+    it("keeps both badges on the no-actor (mid) tier", () => {
+      densityMock.value = "no-actor";
+      const row = makeRow({
+        kind: "issue_opened",
+        issueId: ISSUE_ID,
+        issueNumber: 3,
+        title: "Broken flipper",
+        severity: "major",
+        frequency: "frequent",
+      });
+      renderRow(<MachineTimelineIssueRow row={row} machineInitials="AFM" />);
+      expect(screen.getByText(/major/i)).toBeInTheDocument();
       expect(screen.getByText(/frequent/i)).toBeInTheDocument();
     });
 
