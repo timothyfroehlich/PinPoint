@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useActionState, useCallback, useState } from "react";
+import { useActionState, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { PasswordInput } from "~/components/ui/password-input";
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "~/components/ui/alert";
 import { PasswordMismatch } from "~/components/password-mismatch";
 import { PasswordStrength } from "~/components/password-strength";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
+import { useTurnstileGate } from "~/components/security/useTurnstileGate";
 import {
   resetPasswordAction,
   type ResetPasswordResult,
@@ -21,13 +22,7 @@ export function ResetPasswordForm(): React.JSX.Element {
   >(resetPasswordAction, undefined);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const hasTurnstile = Boolean(process.env["NEXT_PUBLIC_TURNSTILE_SITE_KEY"]);
-  const enforceCaptcha = hasTurnstile && process.env.NODE_ENV !== "test";
-
-  const handleTurnstileVerify = useCallback((token: string) => {
-    setTurnstileToken(token);
-  }, []);
+  const turnstile = useTurnstileGate();
 
   return (
     <form action={formAction} className="space-y-4">
@@ -90,11 +85,20 @@ export function ResetPasswordForm(): React.JSX.Element {
         />
       </div>
 
-      <input type="hidden" name="captchaToken" value={turnstileToken} />
+      <input type="hidden" name="captchaToken" value={turnstile.token} />
       <TurnstileWidget
-        onVerify={handleTurnstileVerify}
-        onExpire={() => setTurnstileToken("")}
+        onVerify={turnstile.onVerify}
+        onExpire={turnstile.onExpire}
+        onError={turnstile.onError}
       />
+      {turnstile.statusMessage && (
+        <p
+          aria-live="polite"
+          className="text-sm text-muted-foreground text-center"
+        >
+          {turnstile.statusMessage}
+        </p>
+      )}
 
       {/* Submit button */}
       <Button
@@ -102,7 +106,7 @@ export function ResetPasswordForm(): React.JSX.Element {
         className="w-full"
         size="lg"
         loading={isPending}
-        disabled={isPending || (enforceCaptcha && !turnstileToken)}
+        disabled={isPending || turnstile.submitDisabled}
       >
         Update Password
       </Button>

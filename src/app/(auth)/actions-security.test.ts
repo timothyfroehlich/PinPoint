@@ -44,15 +44,17 @@ vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
-// Mock Turnstile — default to passing so existing tests are unaffected.
-// Individual tests can override with mockResolvedValueOnce(false) to test
-// the CAPTCHA-failure branch.
+// Mock Turnstile — auth forms use the fail-open verifier, which by design
+// always allows the submission through (PP-20yy). Default the mock to the
+// happy "verified" outcome; individual tests can override the reason.
 vi.mock("~/lib/security/turnstile", () => ({
-  verifyTurnstileToken: vi.fn().mockResolvedValue(true),
+  verifyTurnstileFailOpen: vi
+    .fn()
+    .mockResolvedValue({ allowed: true, reason: "verified" }),
 }));
 
 import { createClient } from "~/lib/supabase/server";
-import { verifyTurnstileToken } from "~/lib/security/turnstile";
+import { verifyTurnstileFailOpen } from "~/lib/security/turnstile";
 
 describe("Auth Actions Security - Error Handling", () => {
   beforeEach(() => {
@@ -351,37 +353,50 @@ describe("Auth Actions Security - Error Handling", () => {
     }
   });
 
-  it("resetPasswordAction should return CAPTCHA error when verification fails", async () => {
-    vi.mocked(verifyTurnstileToken).mockResolvedValueOnce(false);
+  it("resetPasswordAction fails open: still updates the password when the token is unverifiable", async () => {
+    // PP-20yy: the captcha gate fails open. verifyTurnstileFailOpen never
+    // blocks — a missing/unverifiable token yields allowed:true — so the action
+    // must proceed to updateUser rather than returning a CAPTCHA error.
+    vi.mocked(verifyTurnstileFailOpen).mockResolvedValueOnce({
+      allowed: true,
+      reason: "missing-token",
+    });
 
-    const updateUserMock = vi.fn();
+    const updateUserMock = vi.fn().mockResolvedValue({ error: null });
+    const signOutMock = vi.fn().mockResolvedValue({ error: null });
     vi.mocked(createClient).mockResolvedValue({
       auth: {
         getUser: vi
           .fn()
           .mockResolvedValue({ data: { user: { id: "user-123" } } }),
         updateUser: updateUserMock,
-        signOut: vi.fn(),
+        signOut: signOutMock,
       },
     } as any);
 
     const formData = new FormData();
     formData.set("password", "NewPassword123!");
     formData.set("confirmPassword", "NewPassword123!");
-    formData.set("captchaToken", "invalid-token");
+    // No captchaToken at all — the transient-Turnstile-failure case.
 
-    const result = await resetPasswordAction(undefined, formData);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("CAPTCHA");
-      expect(result.message).toContain("Verification failed");
+    // resetPasswordAction calls redirect("/login") on success, which throws
+    // a NEXT_REDIRECT error in tests.
+    try {
+      await resetPasswordAction(undefined, formData);
+    } catch {
+      // redirect() throws — expected.
     }
-    expect(updateUserMock).not.toHaveBeenCalled();
+
+    expect(updateUserMock).toHaveBeenCalledWith({
+      password: "NewPassword123!",
+    });
   });
 
   it("resetPasswordAction should call updateUser when CAPTCHA verification passes", async () => {
-    vi.mocked(verifyTurnstileToken).mockResolvedValueOnce(true);
+    vi.mocked(verifyTurnstileFailOpen).mockResolvedValueOnce({
+      allowed: true,
+      reason: "verified",
+    });
 
     const updateUserMock = vi.fn().mockResolvedValue({ error: null });
     const signOutMock = vi.fn().mockResolvedValue({ error: null });

@@ -1,25 +1,20 @@
 "use client";
 
-import React, { useActionState, useState, useCallback } from "react";
+import React, { useActionState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { forgotPasswordAction } from "~/app/(auth)/actions";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
+import { useTurnstileGate } from "~/components/security/useTurnstileGate";
 
 export function ForgotPasswordForm(): React.JSX.Element {
   const [state, formAction, isPending] = useActionState(
     forgotPasswordAction,
     undefined
   );
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const hasTurnstile = Boolean(process.env["NEXT_PUBLIC_TURNSTILE_SITE_KEY"]);
-  const enforceCaptcha = hasTurnstile && process.env.NODE_ENV !== "test";
-
-  const handleTurnstileVerify = useCallback((token: string) => {
-    setTurnstileToken(token);
-  }, []);
+  const turnstile = useTurnstileGate();
 
   return (
     <form action={formAction} className="space-y-4">
@@ -61,18 +56,27 @@ export function ForgotPasswordForm(): React.JSX.Element {
         />
       </div>
 
-      <input type="hidden" name="captchaToken" value={turnstileToken} />
+      <input type="hidden" name="captchaToken" value={turnstile.token} />
       <TurnstileWidget
-        onVerify={handleTurnstileVerify}
-        onExpire={() => setTurnstileToken("")}
+        onVerify={turnstile.onVerify}
+        onExpire={turnstile.onExpire}
+        onError={turnstile.onError}
       />
+      {turnstile.statusMessage && (
+        <p
+          aria-live="polite"
+          className="text-sm text-muted-foreground text-center"
+        >
+          {turnstile.statusMessage}
+        </p>
+      )}
 
       <Button
         type="submit"
         className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
         size="lg"
         loading={isPending}
-        disabled={isPending || (enforceCaptcha && !turnstileToken)}
+        disabled={isPending || turnstile.submitDisabled}
       >
         Send Reset Link
       </Button>

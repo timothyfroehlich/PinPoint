@@ -33,7 +33,7 @@ import {
   extractCaptchaToken,
   getUserMessageForAuthError,
 } from "~/lib/auth/errors";
-import { verifyTurnstileToken } from "~/lib/security/turnstile";
+import { verifyTurnstileFailOpen } from "~/lib/security/turnstile";
 
 /**
  * Result Types
@@ -145,10 +145,17 @@ export async function loginAction(
       );
     }
 
-    const supabase = await createClient();
-
-    // Extract Turnstile CAPTCHA token for Supabase built-in verification
+    // Verify Turnstile CAPTCHA ourselves (fail-open) rather than delegating to
+    // Supabase's built-in captcha protection. See verifyTurnstileFailOpen for
+    // the intentional availability > strict-captcha tradeoff (PP-20yy).
+    // NOTE: Supabase project-level captcha protection MUST stay disabled for
+    // this path — with it enabled, Supabase would reject the tokenless
+    // submissions this fail-open gate is designed to let through, and it would
+    // also double-spend the single-use token we consume here.
     const captchaToken = extractCaptchaToken(formData);
+    await verifyTurnstileFailOpen(captchaToken ?? "", ip, "login");
+
+    const supabase = await createClient();
 
     // Sign in with Supabase Auth
     // Note: Remember Me is for UX only - SSR sessions persist via cookies
@@ -156,7 +163,6 @@ export async function loginAction(
     const { data, error } = await supabase.auth.signInWithPassword({
       email: authEmail,
       password,
-      ...(captchaToken ? { options: { captchaToken } } : {}),
     });
 
     // Defensive check - Supabase types guarantee user exists if no error,
@@ -297,10 +303,14 @@ export async function signupAction(
       );
     }
 
-    const supabase = await createClient();
-
-    // Extract Turnstile CAPTCHA token for Supabase built-in verification
+    // Fail-open Turnstile verification (PP-20yy). We own verification rather
+    // than delegating to Supabase's built-in captcha protection — see the login
+    // action and verifyTurnstileFailOpen for the tradeoff and the Supabase
+    // config requirement.
     const captchaToken = extractCaptchaToken(formData);
+    await verifyTurnstileFailOpen(captchaToken ?? "", ip, "signup");
+
+    const supabase = await createClient();
 
     // Create user with Supabase Auth
     const { data, error } = await supabase.auth.signUp({
@@ -311,7 +321,6 @@ export async function signupAction(
           first_name: firstName,
           last_name: lastName,
         },
-        ...(captchaToken ? { captchaToken } : {}),
       },
     });
 
@@ -518,10 +527,19 @@ export async function forgotPasswordAction(
       return ok(undefined);
     }
 
-    const supabase = await createClient();
-
-    // Extract Turnstile CAPTCHA token for Supabase built-in verification
+    // Fail-open Turnstile verification (PP-20yy). We own verification rather
+    // than delegating to Supabase's built-in captcha protection — see the login
+    // action and verifyTurnstileFailOpen for the tradeoff and the Supabase
+    // config requirement. (No client IP here: this flow is keyed on email, and
+    // `remoteip` is only an optional additive check for Cloudflare.)
     const captchaToken = extractCaptchaToken(formData);
+    await verifyTurnstileFailOpen(
+      captchaToken ?? "",
+      undefined,
+      "forgot-password"
+    );
+
+    const supabase = await createClient();
 
     const siteUrl = requireSiteUrl("forgot-password");
 
@@ -531,7 +549,6 @@ export async function forgotPasswordAction(
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo,
-      ...(captchaToken ? { captchaToken } : {}),
     });
 
     if (error) {
@@ -597,24 +614,16 @@ export async function resetPasswordAction(
   const { password } = parsed.data;
 
   try {
-    // Verify Turnstile CAPTCHA. Unlike signUp/signInWithPassword/resetPasswordForEmail,
-    // Supabase's auth.updateUser() does not accept a captchaToken option, so we must
-    // verify the token ourselves before calling it.
+    // Fail-open Turnstile verification (PP-20yy). Supabase's auth.updateUser()
+    // has no captchaToken option, so this action always verified the token
+    // itself. It now fails open (never blocks) rather than returning a CAPTCHA
+    // error — see verifyTurnstileFailOpen for the availability tradeoff.
     const captchaToken = extractCaptchaToken(formData);
-    const captchaValid = await verifyTurnstileToken(
+    await verifyTurnstileFailOpen(
       captchaToken ?? "",
-      await getClientIp()
+      await getClientIp(),
+      "reset-password"
     );
-    if (!captchaValid) {
-      log.warn(
-        { action: "reset-password" },
-        "Turnstile CAPTCHA verification failed"
-      );
-      return err(
-        "CAPTCHA",
-        "Verification failed. Please refresh the page and try again."
-      );
-    }
 
     const supabase = await createClient();
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { verifyTurnstileToken } from "./turnstile";
+import { verifyTurnstileToken, verifyTurnstileFailOpen } from "./turnstile";
+import * as Sentry from "@sentry/nextjs";
 
 // Mock server-only (no-op in test environment)
 vi.mock("server-only", () => ({}));
@@ -11,6 +12,11 @@ vi.mock("~/lib/logger", () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+// Mock Sentry — assert fail-open observability without a real transport.
+vi.mock("@sentry/nextjs", () => ({
+  captureMessage: vi.fn(),
 }));
 
 describe("verifyTurnstileToken", () => {
@@ -141,5 +147,122 @@ describe("verifyTurnstileToken", () => {
     const callArgs = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = callArgs[1].body as string;
     expect(body).not.toContain("remoteip");
+  });
+});
+
+describe("verifyTurnstileFailOpen", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    vi.restoreAllMocks();
+    vi.mocked(Sentry.captureMessage).mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    process.env = originalEnv;
+  });
+
+  it("allows through a valid token (reason: verified) without a fail-open breadcrumb", async () => {
+    process.env.TURNSTILE_SECRET_KEY = "test-secret";
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ success: true }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await verifyTurnstileFailOpen(
+      "valid-token",
+      "1.2.3.4",
+      "login"
+    );
+
+    expect(result).toEqual({ allowed: true, reason: "verified" });
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it("FAILS OPEN on a missing token and records observability", async () => {
+    process.env.TURNSTILE_SECRET_KEY = "test-secret";
+
+    const result = await verifyTurnstileFailOpen("", "1.2.3.4", "login");
+
+    expect(result.allowed).toBe(true);
+    expect(result.reason).toBe("missing-token");
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      "turnstile.fail_open",
+      expect.objectContaining({
+        level: "warning",
+        tags: expect.objectContaining({
+          action: "login",
+          turnstileOutcome: "missing-token",
+        }),
+      })
+    );
+  });
+
+  it("FAILS OPEN when Cloudflare rejects the token as invalid", async () => {
+    process.env.TURNSTILE_SECRET_KEY = "test-secret";
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          success: false,
+          "error-codes": ["invalid-input-response"],
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await verifyTurnstileFailOpen(
+      "bad-token",
+      undefined,
+      "signup"
+    );
+
+    expect(result.allowed).toBe(true);
+    expect(result.reason).toBe("invalid-token");
+    expect(Sentry.captureMessage).toHaveBeenCalledOnce();
+  });
+
+  it("FAILS OPEN when the verification request throws (network blip)", async () => {
+    process.env.TURNSTILE_SECRET_KEY = "test-secret";
+    const mockFetch = vi.fn().mockRejectedValue(new Error("Network error"));
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await verifyTurnstileFailOpen(
+      "some-token",
+      undefined,
+      "reset-password"
+    );
+
+    expect(result.allowed).toBe(true);
+    expect(result.reason).toBe("unverifiable");
+    expect(Sentry.captureMessage).toHaveBeenCalledOnce();
+  });
+
+  it("FAILS OPEN when the secret key is missing in production", async () => {
+    delete process.env.TURNSTILE_SECRET_KEY;
+    vi.stubEnv("NODE_ENV", "production");
+
+    const result = await verifyTurnstileFailOpen(
+      "some-token",
+      undefined,
+      "forgot-password"
+    );
+
+    expect(result.allowed).toBe(true);
+    expect(result.reason).toBe("unverifiable");
+    expect(Sentry.captureMessage).toHaveBeenCalledOnce();
+  });
+
+  it("skips (reason: skipped) without a breadcrumb when no secret key in dev/test", async () => {
+    delete process.env.TURNSTILE_SECRET_KEY;
+    vi.stubEnv("NODE_ENV", "test");
+
+    const result = await verifyTurnstileFailOpen("", undefined, "login");
+
+    expect(result).toEqual({ allowed: true, reason: "skipped" });
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
   });
 });
