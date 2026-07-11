@@ -70,6 +70,24 @@ describe("useTurnstileGate", () => {
     expect(result.current.submitDisabled).toBe(false);
   });
 
+  it("after a successful verify, a later expiry does not re-disable the button (one-way latch)", () => {
+    const { result } = renderHook(() => useTurnstileGate());
+
+    act(() => {
+      result.current.onVerify("tok-123");
+    });
+    expect(result.current.submitDisabled).toBe(false);
+
+    // Token expires minutes later: the freshest value is cleared, but the gate
+    // stays open so submit is never re-disabled (the bug Copilot flagged).
+    act(() => {
+      result.current.onExpire();
+    });
+    expect(result.current.token).toBe("");
+    expect(result.current.submitDisabled).toBe(false);
+    expect(result.current.statusMessage).toBeNull();
+  });
+
   it("once failed open, a later expiry does not re-disable the button (one-way latch)", () => {
     const { result } = renderHook(() => useTurnstileGate());
 

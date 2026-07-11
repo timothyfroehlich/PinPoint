@@ -17,8 +17,9 @@ export interface TurnstileGate {
   /**
    * Whether the submit button should be disabled *for captcha reasons*.
    * Callers OR this with their own `isPending`. Only ever true during the
-   * initial resilience window — once a token arrives OR the window elapses
-   * (fail-open latch), this is false forever, so the button never dies.
+   * initial resilience window: the gate is a one-way latch that opens the
+   * first time a token arrives OR the window elapses, and never re-closes — so
+   * a later token expiry can't re-disable the button.
    */
   submitDisabled: boolean;
   /** Optional user-facing status while waiting; null when nothing to show. */
@@ -46,9 +47,14 @@ export interface TurnstileGate {
  *  1. Never clears the token on error (`onError` is a no-op for token state);
  *     the widget auto-retries (`retry: "auto"`, `refreshExpired: "auto"`).
  *  2. Runs a bounded resilience window: transient blips that recover within
- *     {@link FAIL_OPEN_TIMEOUT_MS} enable submit *with* a real token.
- *  3. Fails open as a last resort: once the window elapses with no token, a
- *     one-way latch enables submit anyway and emits a Sentry breadcrumb.
+ *     {@link FAIL_OPEN_TIMEOUT_MS} open the gate *with* a real token.
+ *  3. Fails open as a last resort: if the window elapses before any token
+ *     arrives, the gate opens anyway and a Sentry breadcrumb is emitted.
+ *
+ * The gate is a one-way latch: it opens the first time a token arrives OR the
+ * window elapses, and never re-closes. That means a later token expiry (which
+ * clears `token` so the freshest value is sent) can't re-disable the button —
+ * closing the gap Copilot flagged where a post-verify expiry briefly re-gated.
  *
  * The server mirrors this via `verifyTurnstileFailOpen` — both sides must stay
  * consistent (see that function's doc comment).
@@ -58,17 +64,18 @@ export function useTurnstileGate(): TurnstileGate {
   const enforceCaptcha = hasTurnstile && process.env.NODE_ENV !== "test";
 
   const [token, setToken] = useState("");
-  const [failedOpen, setFailedOpen] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
 
-  // Fail-open latch: after a bounded window with no token, enable submit anyway.
-  // The latch is one-way — once open it never re-disables, so a later expiry or
-  // error can't resurrect the dead-button bug.
+  // Fail-open path: if the gate is still closed after a bounded window (i.e. no
+  // token has arrived), open it anyway and record the client fail-open. Once
+  // the gate is open the effect short-circuits, so this only fires on a genuine
+  // no-token timeout — never after a successful verify.
   useEffect(() => {
-    if (!enforceCaptcha || token || failedOpen) {
+    if (!enforceCaptcha || gateOpen) {
       return;
     }
     const timer = setTimeout(() => {
-      setFailedOpen(true);
+      setGateOpen(true);
       Sentry.addBreadcrumb({
         category: "turnstile",
         level: "warning",
@@ -79,10 +86,14 @@ export function useTurnstileGate(): TurnstileGate {
     return () => {
       clearTimeout(timer);
     };
-  }, [enforceCaptcha, token, failedOpen]);
+  }, [enforceCaptcha, gateOpen]);
 
   const onVerify = useCallback((next: string) => {
     setToken(next);
+    // A real token permanently opens the gate — a subsequent expiry must not
+    // re-disable submit (the widget auto-refreshes a new token in the
+    // background, and the server fails open on the interim empty token).
+    setGateOpen(true);
   }, []);
 
   // Resilience: intentionally do NOT clear the token on error. The widget
@@ -95,7 +106,7 @@ export function useTurnstileGate(): TurnstileGate {
     setToken("");
   }, []);
 
-  const waiting = enforceCaptcha && !token && !failedOpen;
+  const waiting = enforceCaptcha && !gateOpen;
 
   return {
     token,
