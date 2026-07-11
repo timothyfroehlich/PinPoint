@@ -652,6 +652,31 @@ export async function createMachineAction(
  * validated doc. Size caps match the description column's inline-edit path
  * (`updateMachineTextField`): 10k plaintext / 100k serialized JSON.
  */
+/**
+ * Shared ProseMirror payload validation for the machine text columns. Both the
+ * dialog's `parseDescriptionFormField` and the inline `updateMachineTextField`
+ * call this so the two edit surfaces can't drift on what counts as a
+ * valid/oversized/empty doc. Returns a discriminant the caller maps to its own
+ * error shape and copy. Size caps: 10k plaintext / 100k serialized JSON.
+ * `"empty"` = whitespace-only (caller normalizes to null so the DB stores NULL,
+ * not a semantically-empty JSON blob).
+ */
+function validateProseMirrorDoc(
+  doc: ProseMirrorDoc
+): "invalid" | "too-long" | "empty" | "ok" {
+  if (!proseMirrorDocSchema.safeParse(doc).success) {
+    return "invalid";
+  }
+  const plainText = docToPlainText(doc);
+  if (plainText.length > 10_000 || JSON.stringify(doc).length > 100_000) {
+    return "too-long";
+  }
+  if (plainText.trim().length === 0) {
+    return "empty";
+  }
+  return "ok";
+}
+
 function parseDescriptionFormField(
   formData: FormData
 ):
@@ -671,16 +696,16 @@ function parseDescriptionFormField(
   } catch {
     return { ok: false, message: "Invalid description format." };
   }
-  if (!proseMirrorDocSchema.safeParse(doc).success) {
+  const verdict = validateProseMirrorDoc(doc);
+  if (verdict === "invalid") {
     return { ok: false, message: "Invalid description format." };
   }
-  const plainText = docToPlainText(doc);
-  if (plainText.length > 10_000 || JSON.stringify(doc).length > 100_000) {
+  if (verdict === "too-long") {
     return { ok: false, message: "Description is too long." };
   }
   // Normalize a whitespace-only doc to null so the DB stores NULL rather than a
   // semantically-empty JSON blob.
-  if (plainText.trim().length === 0) {
+  if (verdict === "empty") {
     return { ok: true, value: null };
   }
   return { ok: true, value: doc };
@@ -1312,22 +1337,18 @@ async function updateMachineTextField(
     return err("VALIDATION", "Invalid machine ID");
   }
 
-  // Validate ProseMirror payload: must be null or a well-formed doc with type:"doc"
+  // Validate ProseMirror payload: must be null or a well-formed doc with type:"doc".
   // Normalize empty docs to null so the DB stores NULL rather than a semantically-empty JSON blob.
   let normalizedValue: ProseMirrorDoc | null = value;
   if (value !== null) {
-    if (!proseMirrorDocSchema.safeParse(value).success) {
+    const verdict = validateProseMirrorDoc(value);
+    if (verdict === "invalid") {
       return err("VALIDATION", "Invalid rich text payload.");
     }
-    const plainText = docToPlainText(value);
-    if (plainText.length > 10_000) {
+    if (verdict === "too-long") {
       return err("VALIDATION", "Text is too long.");
     }
-    if (JSON.stringify(value).length > 100_000) {
-      return err("VALIDATION", "Text is too long.");
-    }
-    // Normalize empty doc to null
-    if (plainText.trim().length === 0) {
+    if (verdict === "empty") {
       normalizedValue = null;
     }
   }

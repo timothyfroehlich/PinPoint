@@ -41,13 +41,6 @@ export interface InlineEditSaveResult {
 interface InlineEditableFieldProps {
   /** The field label displayed above the content */
   label: string;
-  /**
-   * Visually hide the label heading (kept for accessibility — `aria-label`,
-   * placeholder fallback, and the editor's `ariaLabel` still use it). Used by
-   * the Info-tab Description, which renders as standalone prose with no
-   * "Description" heading per the player-landing redesign.
-   */
-  hideLabel?: boolean;
   /** Current value (null/undefined/empty treated as empty) */
   value: ProseMirrorDoc | null | undefined;
   /** Server action to save the updated value */
@@ -106,7 +99,6 @@ interface InlineEditableFieldProps {
 
 export function InlineEditableField({
   label,
-  hideLabel = false,
   value,
   onSave,
   machineId,
@@ -308,15 +300,12 @@ export function InlineEditableField({
           filled content; the only no-heading case is empty + viewer, handled by
           the early return above. `headingProminent` swaps the tiny uppercase
           field-label style for a 14px bold section title with an optional
-          leading icon (the machine-wide callout blocks). `hideLabel` (Info-tab
-          Description) keeps the heading in the a11y tree but visually hidden. */}
+          leading icon (the machine-wide callout blocks). */}
       <p
         className={
-          hideLabel
-            ? "sr-only"
-            : headingProminent
-              ? "flex items-center gap-2 text-sm font-bold text-foreground"
-              : "text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+          headingProminent
+            ? "flex items-center gap-2 text-sm font-bold text-foreground"
+            : "text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
         }
       >
         {headingProminent && icon}

@@ -73,7 +73,7 @@ export function InfoHero({
       data-testid="machine-info-hero"
       className="@container rounded-xl border border-primary/40 bg-card p-4 sm:p-5"
     >
-      <div className="flex flex-col gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col gap-4 @lg:flex-row @lg:items-center">
         <div className="flex flex-wrap items-center gap-3">
           <span
             className="inline-flex items-center gap-2 text-lg font-bold text-foreground"
@@ -94,7 +94,7 @@ export function InfoHero({
         <Button
           asChild
           size="lg"
-          className="w-full font-bold md:ml-auto md:w-auto"
+          className="w-full font-bold @lg:ml-auto @lg:w-auto"
         >
           <Link href={reportHref} data-testid="machine-info-report-link">
             <CircleAlert className="size-4" aria-hidden="true" />

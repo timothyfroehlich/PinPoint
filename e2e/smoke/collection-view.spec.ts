@@ -52,7 +52,10 @@ test.describe("Collection view (PP-slrd.1)", () => {
   }) => {
     // AFM is owned by the member user (seed-users.mjs ownerMap).
     await page.goto(`/m/${seededMachines.attackFromMars.initials}`);
-    await page.getByTestId("machine-owner-card").getByRole("link").click();
+    // Scope to the owner block: the owner card can also contain a description
+    // above the owner row, and a description with links would make a bare
+    // getByRole("link") ambiguous.
+    await page.getByTestId("owner-block").getByRole("link").click();
     await expect(page).toHaveURL(/\/u\//);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });

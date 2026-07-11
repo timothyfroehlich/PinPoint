@@ -15,6 +15,7 @@ import { EditMachineDialog } from "../update-machine-form";
 import { QrCodeDialog } from "../qr-code-dialog";
 import { MachineTextFields } from "../machine-text-fields";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
+import { docIsEmpty } from "~/lib/tiptap/types";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
 import {
   getAccessLevel,
@@ -106,30 +107,6 @@ export default async function MachineInfoTab({
     accessLevel,
     ownershipContext
   );
-  let pinballmapTitleName: string | null = null;
-  if (canLink && machine.pinballmapMachineId !== null) {
-    const linkedTitle = await db.query.pinballmapCatalog.findFirst({
-      where: eq(
-        pinballmapCatalog.pinballmapMachineId,
-        machine.pinballmapMachineId
-      ),
-      columns: { name: true },
-    });
-    pinballmapTitleName = linkedTitle?.name ?? null;
-  }
-
-  const allUsersRaw = canEdit
-    ? await getUnifiedUsers({ includeEmails: false })
-    : [];
-  const allUsers = allUsersRaw.map((u) => ({
-    id: u.id,
-    name: u.name,
-    lastName: u.lastName,
-    machineCount: u.machineCount,
-    status: u.status,
-    role: u.role,
-  }));
-
   const machineStatus = deriveMachineStatus(openIssues);
 
   const headersList = await headers();
@@ -139,17 +116,51 @@ export default async function MachineInfoTab({
     machineInitials: machine.initials,
     source: "qr",
   });
-  const qrDataUrl = await generateQrPngDataUrl(reportUrl);
+
+  // These three are independent of one another — resolve them concurrently
+  // rather than serially so the QR-scan landing doesn't stack a PinballMap
+  // lookup, the unified-user list, and the QR PNG encode back-to-back on the
+  // render path.
+  const pinballmapTitlePromise: Promise<string | null> =
+    canLink && machine.pinballmapMachineId !== null
+      ? db.query.pinballmapCatalog
+          .findFirst({
+            where: eq(
+              pinballmapCatalog.pinballmapMachineId,
+              machine.pinballmapMachineId
+            ),
+            columns: { name: true },
+          })
+          .then((linkedTitle) => linkedTitle?.name ?? null)
+      : Promise.resolve(null);
+  const allUsersPromise: Promise<Awaited<ReturnType<typeof getUnifiedUsers>>> =
+    canEdit ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]);
+
+  const [pinballmapTitleName, allUsersRaw, qrDataUrl] = await Promise.all([
+    pinballmapTitlePromise,
+    allUsersPromise,
+    generateQrPngDataUrl(reportUrl),
+  ]);
+  const allUsers = allUsersRaw.map((u) => ({
+    id: u.id,
+    name: u.name,
+    lastName: u.lastName,
+    machineCount: u.machineCount,
+    status: u.status,
+    role: u.role,
+  }));
 
   const showOwnerFields = canViewOwnerRequirements;
 
   // Description renders read-only inside the Details card; editing happens in
-  // the Edit Machine dialog (not inline). RichTextDisplay returns null for an
-  // empty/absent description.
-  const descriptionSlot =
-    machine.description !== null ? (
-      <RichTextDisplay content={machine.description} />
-    ) : null;
+  // the Edit Machine dialog (not inline). Gate on docIsEmpty rather than just
+  // `!== null`: a legacy or semantically-empty ProseMirror doc renders nothing
+  // in RichTextDisplay, but a truthy slot still paints an empty prose block and
+  // a stray divider above the owner row. docIsEmpty covers null, undefined, and
+  // whitespace-only docs.
+  const descriptionSlot = !docIsEmpty(machine.description) ? (
+    <RichTextDisplay content={machine.description} />
+  ) : null;
 
   // Edit-machine control lives in the owner card. PP-o355.2 PinballMap fields
   // are wired through the dialog for users who may link.

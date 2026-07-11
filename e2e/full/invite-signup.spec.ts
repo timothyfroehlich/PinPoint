@@ -201,7 +201,10 @@ test.describe("User Invitation & Signup Flow", () => {
     // Note: User is a member now, so they see the read-only owner display
     const ownerDisplay = page.getByTestId("machine-owner-card");
     await expect(ownerDisplay).toContainText("Owner Transfer");
-    // After signup, the user is no longer "invited" - they're a real user
-    await expect(ownerDisplay).not.toContainText("(Invited)");
+    // After signup, the user is no longer "invited" - they're a real user.
+    // Match case-insensitively: the redesigned owner card renders the marker
+    // lowercase ("(invited)"), so a case-sensitive "(Invited)" check would pass
+    // vacuously even if the marker leaked through.
+    await expect(ownerDisplay).not.toContainText(/\(invited\)/i);
   });
 });
