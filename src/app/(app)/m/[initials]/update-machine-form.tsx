@@ -298,9 +298,10 @@ export function EditMachineDialog({
                 editor is uncontrolled (content is an initial prop); its current
                 doc is mirrored into the hidden field below for submission. */}
             <div className="space-y-2">
-              <Label htmlFor="edit-description" className="text-foreground">
-                Description
-              </Label>
+              {/* No htmlFor: RichTextEditor is a contenteditable widget with no
+                  focusable `id` to associate. Its accessible name comes from
+                  `ariaLabel` below; this is the visible caption. */}
+              <Label className="text-foreground">Description</Label>
               <RichTextEditor
                 content={machine.description}
                 onChange={setDescriptionDoc}

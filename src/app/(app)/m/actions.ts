@@ -645,14 +645,6 @@ export async function createMachineAction(
 }
 
 /**
- * Parse the optional machine `description` carried by the Edit Machine dialog
- * as a serialized ProseMirror doc (same hidden-field + JSON pattern as the
- * report form). Presence of the field is the marker: absent → leave the column
- * untouched; empty (or semantically-empty) → clear to null; otherwise the
- * validated doc. Size caps match the description column's inline-edit path
- * (`updateMachineTextField`): 10k plaintext / 100k serialized JSON.
- */
-/**
  * Shared ProseMirror payload validation for the machine text columns. Both the
  * dialog's `parseDescriptionFormField` and the inline `updateMachineTextField`
  * call this so the two edit surfaces can't drift on what counts as a
@@ -677,6 +669,14 @@ function validateProseMirrorDoc(
   return "ok";
 }
 
+/**
+ * Parse the optional machine `description` carried by the Edit Machine dialog
+ * as a serialized ProseMirror doc (same hidden-field + JSON pattern as the
+ * report form). Presence of the field is the marker: absent → leave the column
+ * untouched; empty (or semantically-empty) → clear to null; otherwise the
+ * validated doc. Size caps match the description column's inline-edit path
+ * (`updateMachineTextField`): 10k plaintext / 100k serialized JSON.
+ */
 function parseDescriptionFormField(
   formData: FormData
 ):
@@ -687,7 +687,14 @@ function parseDescriptionFormField(
   if (raw === null) {
     return { ok: true, value: undefined };
   }
-  if (typeof raw !== "string" || raw.length === 0) {
+  // A non-string value (a File from a malformed/malicious multipart submission)
+  // is never a legitimate payload — reject it rather than silently clearing the
+  // column. An empty string is the intended "clear to null" signal: the hidden
+  // field submits "" when the editor is empty.
+  if (typeof raw !== "string") {
+    return { ok: false, message: "Invalid description format." };
+  }
+  if (raw.length === 0) {
     return { ok: true, value: null };
   }
   let doc: ProseMirrorDoc;
