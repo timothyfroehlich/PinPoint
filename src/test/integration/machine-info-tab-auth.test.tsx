@@ -41,10 +41,16 @@ vi.mock("~/server/db", async () => {
 // computes. `MachineTextFields` (owner requirements) only renders when the
 // viewer is allowed to see an owner-private field. The description is now
 // read-only (RichTextDisplay), edited via the Edit Machine dialog.
+//
+// NOTE: `description`/`ownerRequirements` are `ProseMirrorDoc | null` on the
+// real component, but this mock captures only the permission props, so they're
+// typed loosely here. Importing ProseMirrorDoc trips a false
+// no-redundant-type-constituents error in the incremental pre-commit lint
+// (referenced projects aren't built) post-PP-4k76 — see follow-up bead.
 interface MachineTextFieldsProps {
   machineId: string;
-  description: string | null;
-  ownerRequirements: string | null;
+  description: unknown;
+  ownerRequirements: unknown;
   canEditGeneral: boolean;
   canViewOwnerRequirements: boolean;
   showDescription?: boolean;
