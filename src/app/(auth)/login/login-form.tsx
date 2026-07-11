@@ -2,7 +2,7 @@
 
 import type React from "react";
 import Link from "next/link";
-import { useActionState, useState, useCallback } from "react";
+import { useActionState, useState } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -12,6 +12,7 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { loginAction, type LoginResult } from "~/app/(auth)/actions";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
+import { useTurnstileGate } from "~/components/security/useTurnstileGate";
 
 // Lazily load TestAdminButton to prevent including test credentials in the production bundle
 const TestAdminButton = dynamic(() =>
@@ -31,14 +32,8 @@ export function LoginForm({
     LoginResult | undefined,
     FormData
   >(loginAction, undefined);
-  const [turnstileToken, setTurnstileToken] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
-  const hasTurnstile = Boolean(process.env["NEXT_PUBLIC_TURNSTILE_SITE_KEY"]);
-  const enforceCaptcha = hasTurnstile && process.env.NODE_ENV !== "test";
-
-  const handleTurnstileVerify = useCallback((token: string) => {
-    setTurnstileToken(token);
-  }, []);
+  const turnstile = useTurnstileGate();
 
   return (
     <>
@@ -119,11 +114,20 @@ export function LoginForm({
           </Label>
         </div>
 
-        <input type="hidden" name="captchaToken" value={turnstileToken} />
+        <input type="hidden" name="captchaToken" value={turnstile.token} />
         <TurnstileWidget
-          onVerify={handleTurnstileVerify}
-          onExpire={() => setTurnstileToken("")}
+          onVerify={turnstile.onVerify}
+          onExpire={turnstile.onExpire}
+          onError={turnstile.onError}
         />
+        {turnstile.statusMessage && (
+          <p
+            aria-live="polite"
+            className="text-sm text-muted-foreground text-center"
+          >
+            {turnstile.statusMessage}
+          </p>
+        )}
 
         {/* Submit button */}
         <Button
@@ -131,7 +135,7 @@ export function LoginForm({
           className="w-full"
           size="lg"
           loading={isPending}
-          disabled={isPending || (enforceCaptcha && !turnstileToken)}
+          disabled={isPending || turnstile.submitDisabled}
         >
           Sign In
         </Button>
