@@ -220,6 +220,14 @@ trigger: always_on
 - **Do:** Use `localhost` in `supabase/config.toml`, `.env*`, Playwright `baseURL`, health-check scripts, and any local HTTP endpoint.
 - **Don't:** Use `127.0.0.1:NNNN` for any local URL agents or the dev stack will read. CSP rules and validation checks that intentionally cover both forms are the only exception.
 
+**CORE-SEC-009:** Production-required env vars go in the central build registry; no secret coupling
+
+- **Severity:** High
+- **Why:** A required env var that only logs or degrades when missing ships a broken feature to production undetected (the unsubscribe-link / CAN-SPAM incident, PP-7xt). Reusing one secret as another's fallback means rotating it silently breaks the borrower (the `UNSUBSCRIBE_SIGNING_SECRET` ↔ `SUPABASE_SERVICE_ROLE_KEY` coupling).
+- **Do:** Declare every production-required env var in the registry in `next.config.ts` (`assertVercelDeploymentEnv`) so a missing value **fails the Vercel build**. Give each secret its own value. Catalog every new var in `docs/ENV_VARS.md` with its scope and sensitivity.
+- **Don't:** Rely on runtime logs/graceful degradation for a var that must exist in prod; reuse one secret as a fallback for a different purpose; prefix a secret `NEXT_PUBLIC_` (it inlines into the client bundle). Same-value alias _names_ (e.g. `SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_SECRET_KEY`) are fine.
+- **Reference:** `docs/ENV_VARS.md` — full catalog, scope matrix, and "adding a new env var" checklist.
+
 ---
 
 ## Performance & Caching
@@ -429,6 +437,7 @@ trigger: always_on
 - **Why:** JS viewport checks create hydration mismatches, add resize listeners, and duplicate CSS's job
 - **Do:** Use Tailwind breakpoint classes or container queries
 - **Don't:** `window.innerWidth`, `window.matchMedia`, `useMediaQuery` hooks
+- **Sanctioned exceptions** (behavior swaps CSS can't express, not styling): `use-table-responsive-columns` (PP-rs9), `use-is-mobile` (PP-43q3 — swaps inline cell editing for a bottom-sheet editor on mobile)
 
 **CORE-RESP-003:** sm: is padding only
 

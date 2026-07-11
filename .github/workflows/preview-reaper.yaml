@@ -46,13 +46,14 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}  # zizmor: ignore[secrets-outside-env]
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}  # zizmor: ignore[secrets-outside-env]
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # ratchet:actions/checkout@v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # ratchet:actions/checkout@v7.0.0
         with:
           persist-credentials: false
 
       - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
         with:
-          version: latest
+          # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
+          version: 2.109.1
 
       - name: Reap preview branches
         run: bash scripts/workflow/preview/preview-reap.sh

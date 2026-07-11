@@ -61,6 +61,7 @@ describe("updateSession autologin", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     process.env = envBackup;
   });
 
@@ -148,7 +149,7 @@ describe("updateSession autologin", () => {
   });
 
   it("never attempts autologin in production", async () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     process.env.DEV_AUTOLOGIN_ENABLED = "true";
 
     const supabase = createSupabaseAuthMocks(null, null);

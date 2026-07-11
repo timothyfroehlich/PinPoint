@@ -1,36 +1,29 @@
 {
-  "extends": ["./tsconfig.base.json", "@tsconfig/strictest/tsconfig.json"],
-  "compilerOptions": {
-    // Additional settings beyond @tsconfig/strictest
-    "noEmit": true, // We only use tsc for type checking, not emitting
-    "strictNullChecks": true, // Explicit for emphasis (part of "strict")
-    "forceConsistentCasingInFileNames": true // Cross-platform safety
-  },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    "src/**/*",
-    "middleware.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    ".next",
-    "out",
-    "dist",
-    ".archived_v1",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.spec.ts",
-    "**/*.spec.tsx",
-    "src/test/**/*",
-    "e2e/**/*",
-    "playwright.config.ts",
-    "vitest.config.ts",
-    "drizzle.config.ts",
-    "postcss.config.mjs",
-    "src/app/(app)/mockup/**/*",
-    "src/components/mockups/**/*"
+  // Solution-style root config (PP-4k76). It owns no files itself — it only
+  // wires the concrete projects together so the TypeScript language server can
+  // resolve a real owner for EVERY file it opens:
+  //   - production source  -> tsconfig.app.json
+  //   - test / spec files  -> tsconfig.tests.json
+  // Without this, opening a colocated test file landed it in an INFERRED project
+  // with no path aliases (=> spurious TS2307 on `~/...`), no node types
+  // (=> TS2591 on `node:crypto`), and spurious implicit-any — none of which the
+  // real gates (`tsc`, vitest, ESLint) ever saw. See PP-4k76 DESIGN.
+  //
+  // The typecheck scripts point at the concrete projects directly
+  // (`-p tsconfig.app.json`, `-p tsconfig.tests.json`); `next build` reads
+  // tsconfig.app.json via next.config.ts `typescript.tsconfigPath`. This root
+  // exists for tsserver's benefit, not the CLI gates.
+  //
+  // It still `extends` the base config (and therefore keeps `compilerOptions`
+  // with the `~/` path mappings) even though `files: []` means it compiles
+  // nothing: tools that auto-discover the root tsconfig.json for path
+  // resolution — notably `drizzle-kit` (`resolveTsPaths`) — read `paths` from
+  // here. Dropping the base extend broke `drizzle-kit export` with
+  // "Cannot find module '~/server/db/citext'".
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.tests.json" }
   ]
 }

@@ -45,7 +45,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}  # zizmor: ignore[secrets-outside-env]
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}  # zizmor: ignore[secrets-outside-env]
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # ratchet:actions/checkout@v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # ratchet:actions/checkout@v7.0.0
         with:
           # PR head, so the PR's migrations, seed files, and the shared
           # preview-migrate-seed.sh are the ones that run.
@@ -54,7 +54,8 @@ jobs:
 
       - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
         with:
-          version: latest
+          # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
+          version: 2.109.1
 
       - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061  # ratchet:pnpm/action-setup@v4.2.0
         with:

@@ -10,7 +10,7 @@ import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
 import type * as ReportErrorModule from "~/lib/observability/report-error";
 import type { DeliveryResult } from "~/lib/notifications/channels/types";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   userProfiles,
   notificationPreferences,
@@ -86,7 +86,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           includeActor: false, // Explicitly test actor exclusion
           commentContent: "Test comment",
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -134,7 +134,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           actorId: actor.id,
           commentContent: "Test comment",
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -200,7 +200,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           includeActor: false, // Exclude actor to test recipient preferences
           commentContent: "Test comment",
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -262,7 +262,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           includeActor: false, // Exclude actor to test recipient granular toggles
           commentContent: "Test comment",
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -323,7 +323,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           actorId: actor.id,
           commentContent: "Test comment",
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -384,7 +384,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           issueTitle: "Test Issue",
           machineName: machine.name,
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -434,7 +434,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           issueTitle: "Test Issue",
           machineName: machine.name,
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -487,7 +487,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           includeActor: true,
           commentContent: "Test comment",
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -538,7 +538,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           includeActor: true,
           commentContent: "Test comment",
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -591,7 +591,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           issueTitle: "New Machine Issue",
           machineName: machine.name,
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -647,7 +647,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           issueTitle: issue.title,
           machineName: machine.name,
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -696,7 +696,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           newStatus: "added",
           additionalRecipientIds: [recipient.id],
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -754,7 +754,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           newStatus: "added",
           additionalRecipientIds: [newOwner.id],
         },
-        db
+        asDbOrTx(db)
       )
     );
 
@@ -805,7 +805,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
             machineName: machine.name,
             formattedIssueId: "MN-01",
           },
-          db
+          asDbOrTx(db)
         )
       );
 
@@ -858,7 +858,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
             machineName: machine.name,
             formattedIssueId: "MP-01",
           },
-          db
+          asDbOrTx(db)
         )
       );
 
@@ -920,7 +920,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           includeActor: false,
           commentContent: "Test comment",
         },
-        db
+        asDbOrTx(db)
       );
 
       // The transactional write happened during planning...
@@ -982,7 +982,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
           includeActor: false,
           commentContent: "Test comment",
         },
-        db
+        asDbOrTx(db)
       );
 
       expect(sendEmail).not.toHaveBeenCalled();
@@ -1082,7 +1082,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
             commentContent: "First comment",
             eventId: "comment-uuid-aaa",
           },
-          db
+          asDbOrTx(db)
         )
       );
 
@@ -1096,7 +1096,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
             commentContent: "Second comment",
             eventId: "comment-uuid-bbb",
           },
-          db
+          asDbOrTx(db)
         )
       );
 
@@ -1153,7 +1153,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
             commentContent: "Same comment, first attempt",
             eventId: SAME_EVENT_ID,
           },
-          db
+          asDbOrTx(db)
         )
       );
       await dispatchNotification(
@@ -1165,7 +1165,7 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
             commentContent: "Same comment, retry attempt",
             eventId: SAME_EVENT_ID,
           },
-          db
+          asDbOrTx(db)
         )
       );
 

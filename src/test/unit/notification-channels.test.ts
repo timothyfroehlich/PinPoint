@@ -23,6 +23,14 @@ function prefs(
     inAppNotifyOnNewIssue: false,
     emailWatchNewIssuesGlobal: false,
     inAppWatchNewIssuesGlobal: false,
+    discordEnabled: true,
+    discordNotifyOnAssigned: true,
+    discordNotifyOnStatusChange: false,
+    discordNotifyOnNewComment: false,
+    discordNotifyOnMentioned: true,
+    discordNotifyOnNewIssue: true,
+    discordWatchNewIssuesGlobal: false,
+    discordDmBlockedAt: null,
     ...overrides,
   };
 }

@@ -32,15 +32,12 @@ const defaultProps = {
   machineId: "mach-123",
   description: mockDoc,
   ownerRequirements: mockDoc,
-  ownerNotes: mockDoc,
   canEditGeneral: true,
-  canEditOwnerNotes: true,
   canViewOwnerRequirements: true,
-  canViewOwnerNotes: true,
 };
 
 describe("MachineTextFields", () => {
-  it("renders description, which is always present in layout", () => {
+  it("renders the inline description field when showDescription defaults to true", () => {
     render(<MachineTextFields {...defaultProps} />);
     expect(screen.getByTestId("machine-description")).toBeInTheDocument();
   });
@@ -63,13 +60,12 @@ describe("MachineTextFields", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders owner notes if canViewOwnerNotes is true", () => {
-    render(<MachineTextFields {...defaultProps} canViewOwnerNotes={true} />);
-    expect(screen.getByTestId("machine-owner-notes")).toBeInTheDocument();
-  });
-
-  it("does not render owner notes if canViewOwnerNotes is false", () => {
-    render(<MachineTextFields {...defaultProps} canViewOwnerNotes={false} />);
-    expect(screen.queryByTestId("machine-owner-notes")).not.toBeInTheDocument();
+  it("omits the description when showDescription is false", () => {
+    render(<MachineTextFields {...defaultProps} showDescription={false} />);
+    expect(screen.queryByTestId("machine-description")).not.toBeInTheDocument();
+    // Owner fields still render.
+    expect(
+      screen.getByTestId("machine-owner-requirements")
+    ).toBeInTheDocument();
   });
 });

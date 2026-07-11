@@ -63,9 +63,9 @@ const { chain, dbMock } = vi.hoisted(() => {
   chain.onConflictDoNothing.mockReturnValue(chain);
 
   const dbMock = {
-    insert: vi.fn(() => chain),
-    update: vi.fn(() => chain),
-    delete: vi.fn(() => chain),
+    insert: vi.fn((..._args: unknown[]) => chain),
+    update: vi.fn((..._args: unknown[]) => chain),
+    delete: vi.fn((..._args: unknown[]) => chain),
     transaction: vi.fn(),
     query: {
       userProfiles: { findFirst: vi.fn() },
@@ -216,7 +216,6 @@ describe("updateMachineAction", () => {
 // Permission matrix for reference:
 //   machines.edit: unauthenticated=false, guest=false, member="owner",
 //                  technician=true, admin=true
-//   machines.edit.ownerNotes: all roles = "owner" (owner-only, even for admins)
 //
 // Blocks 4–11 and 13–14 have been RECLASS'd to machine-owner-promotion.test.ts
 // (Wave 3 RECLASS, PP-x4li.1.3). Only pre-permission gate tests remain here:

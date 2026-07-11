@@ -168,6 +168,13 @@ source "$LIB_SCRIPT"
 STATE_DIR=$(huddle_state_dir) || exit 0
 mkdir -p "$STATE_DIR"
 
+# --- Per-machine Dolt sync (throttled, fail-open) ---
+# Push local coordination posts and pull peer machines' updates before reading
+# root notes, so this session sees the freshest cross-machine state. Throttled
+# per-machine (shared marker in STATE_DIR) so many concurrent sessions trigger
+# at most one sync per interval. Never blocks the prompt — fully fail-open.
+huddle_sync
+
 # --- Bootstrap check ---
 # If config.json is missing, the system hasn't been bootstrapped yet.
 # Exit silently — huddle-session-start.sh emits the user-visible bootstrap notice.

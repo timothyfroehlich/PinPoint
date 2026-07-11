@@ -23,6 +23,7 @@ import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-type
 import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type LocationSnapshot } from "~/lib/pinballmap/types";
+import { type SettingsSection } from "~/lib/machines/settings-types";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -137,7 +138,22 @@ export const machines = pgTable(
       .defaultNow(),
     description: jsonb("description").$type<ProseMirrorDoc>(),
     ownerRequirements: jsonb("owner_requirements").$type<ProseMirrorDoc>(),
-    ownerNotes: jsonb("owner_notes").$type<ProseMirrorDoc>(),
+    // Machine-level "Before you change anything": the owner's honor-system
+    // requests for how people should handle THIS machine's settings ("ask me
+    // first", "change individually — don't standard-reset", "techs only"). NOT
+    // enforced (PinPoint can't gate a physical coin door); free text by design,
+    // framed as a request rather than a rule — see PP-8a5r for the governance-
+    // neutrality rationale (the structured/enforced variant is PP-kjob). Rendered
+    // FIRST at the top of the Settings tab, above "How to change settings".
+    // Edited under `machines.settings.manage`. Mirrors settingsInstructions.
+    settingsRequests: jsonb("settings_requests").$type<ProseMirrorDoc>(),
+    // Machine-level "How to change settings": how to reach/navigate this
+    // machine's settings (coin-door buttons, DIP-switch locations, the P3
+    // launch-button procedure, …). Shared by every settings set; rendered at
+    // the top of the Settings tab. Edited under `machines.settings.manage`.
+    settingsInstructions: jsonb(
+      "settings_instructions"
+    ).$type<ProseMirrorDoc>(),
     presenceStatus: text("presence_status", {
       enum: [
         "on_the_floor",
@@ -216,7 +232,7 @@ export const pinballmapCatalog = pgTable(
     // Edition lookup for a selected family.
     groupIdx: index("idx_pinballmap_catalog_group").on(t.machineGroupId),
   })
-);
+).enableRLS();
 
 /**
  * PinballMap integration state (singleton; mirrors discordIntegrationConfig).
@@ -348,8 +364,8 @@ export const issues = pgTable(
     ),
     // Index on severity to optimize "Unplayable Machines" dashboard query and issues filtering
     severityIdx: index("idx_issues_severity").on(t.severity),
-    // Index on priority to optimize issues list filtering
-    priorityIdx: index("idx_issues_priority").on(t.priority),
+    // idx_issues_priority dropped 2026-07-09 (PP-o60s.5): flagged unused_index by prod
+    // advisor and never used in queries. Re-add if priority filtering becomes hot.
   })
 );
 
@@ -565,6 +581,59 @@ export const timelineEventPeople = pgTable(
 ).enableRLS();
 
 /**
+ * Machine Settings Sets (PP-43q3)
+ *
+ * Owner-defined sets capturing how a machine is configured (software
+ * adjustments, DIP banks, rubbers, post positions, notes). The whole ordered
+ * body lives in one `sections` JSONB array (a discriminated union — see
+ * `~/lib/machines/settings-types`) so sections of any kind reorder freely;
+ * `description` is a ProseMirror doc. At most one set per machine may be
+ * `is_preferred`, enforced by a partial unique index.
+ */
+export const machineSettingsSets = pgTable(
+  "machine_settings_sets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    machineId: uuid("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: jsonb("description").$type<ProseMirrorDoc>(),
+    sections: jsonb("sections")
+      .$type<SettingsSection[]>()
+      .notNull()
+      .default([]),
+    isPreferred: boolean("is_preferred").notNull().default(false),
+    createdBy: uuid("created_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+    updatedBy: uuid("updated_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // No Drizzle $onUpdate — every UPDATE sets this explicitly in the action.
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    machineIdx: index("idx_machine_settings_sets_machine").on(t.machineId),
+    // At most one preferred set per machine — the DB backstop for the
+    // exclusive-Preferred guarantee (the action also clears-then-sets).
+    onePreferredPerMachine: uniqueIndex("uniq_machine_settings_preferred")
+      .on(t.machineId)
+      .where(sql`${t.isPreferred}`),
+    // Indexes on the created_by and updated_by FK columns (PP-o60s.5): prod
+    // advisor flagged them as unindexed_foreign_keys. Both FK to user_profiles
+    // with ON DELETE SET NULL, so a profile delete scans this table on each FK.
+    createdByIdx: index("idx_machine_settings_sets_created_by").on(t.createdBy),
+    updatedByIdx: index("idx_machine_settings_sets_updated_by").on(t.updatedBy),
+  })
+).enableRLS();
+
+/**
  * Issue Images Table
  *
  * Images attached to issues and comments with soft-delete support.
@@ -612,6 +681,11 @@ export const issueImages = pgTable(
     issueIdIdx: index("idx_issue_images_issue_id").on(t.issueId),
     uploadedByIdx: index("idx_issue_images_uploaded_by").on(t.uploadedBy),
     deletedAtIdx: index("idx_issue_images_deleted_at").on(t.deletedAt),
+    // Indexes on the comment_id and deleted_by FK columns (PP-o60s.5): prod
+    // advisor flagged them as unindexed_foreign_keys. Needed for cascade deletes
+    // (comment removal) and soft-delete-by-user lookups.
+    commentIdIdx: index("idx_issue_images_comment_id").on(t.commentId),
+    deletedByIdx: index("idx_issue_images_deleted_by").on(t.deletedBy),
   })
 );
 
@@ -757,10 +831,10 @@ export const notificationPreferences = pgTable(
       withTimezone: true,
     }),
   },
-  (t) => ({
-    globalWatchEmailIdx: index("idx_notif_prefs_global_watch_email").on(
-      t.emailWatchNewIssuesGlobal
-    ),
+  (_t) => ({
+    // idx_notif_prefs_global_watch_email dropped 2026-07-09 (PP-o60s.5): flagged
+    // unused_index by prod advisor and never used in queries. The global-watch
+    // fan-out query scans this small table without needing an index.
   })
 );
 
@@ -799,7 +873,22 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
     relationName: "invited_owner",
   }),
   watchers: many(machineWatchers),
+  settingsSets: many(machineSettingsSets),
 }));
+
+export const machineSettingsSetsRelations = relations(
+  machineSettingsSets,
+  ({ one }) => ({
+    machine: one(machines, {
+      fields: [machineSettingsSets.machineId],
+      references: [machines.id],
+    }),
+    updatedByUser: one(userProfiles, {
+      fields: [machineSettingsSets.updatedBy],
+      references: [userProfiles.id],
+    }),
+  })
+);
 
 export const issuesRelations = relations(issues, ({ one, many }) => ({
   machine: one(machines, {

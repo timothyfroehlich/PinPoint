@@ -58,6 +58,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine, createTestUser } from "~/test/helpers/factories";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   authUsers,
   issueComments,
@@ -135,7 +136,7 @@ async function mockAuth(userId: string | null) {
 // ---------------------------------------------------------------------------
 // Minimal ProseMirror doc with non-empty content (docToPlainText returns "Hello world")
 // ---------------------------------------------------------------------------
-const validCommentDoc = {
+const validCommentDoc: ProseMirrorDoc = {
   type: "doc",
   content: [
     {
@@ -490,7 +491,7 @@ describe("editCommentAction — integration (PP-x4li.1.4)", () => {
   let issueId: string;
   let commentId: string;
 
-  const originalDoc = {
+  const originalDoc: ProseMirrorDoc = {
     type: "doc",
     content: [
       {
@@ -500,7 +501,7 @@ describe("editCommentAction — integration (PP-x4li.1.4)", () => {
     ],
   };
 
-  const updatedDoc = {
+  const updatedDoc: ProseMirrorDoc = {
     type: "doc",
     content: [
       {

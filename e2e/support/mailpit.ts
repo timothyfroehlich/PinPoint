@@ -32,8 +32,8 @@ export class MailpitClient {
 
   constructor() {
     const port =
-      process.env.MAILPIT_PORT ?? process.env.INBUCKET_PORT ?? "54324";
-    this.apiUrl = `http://127.0.0.1:${port}/api/v1`;
+      process.env["MAILPIT_PORT"] ?? process.env["INBUCKET_PORT"] ?? "54324";
+    this.apiUrl = `http://localhost:${port}/api/v1`;
   }
 
   /**
@@ -135,9 +135,9 @@ export class MailpitClient {
       // and match the other criteria. This is extra defensive against Mailpit
       // query broadness.
       const match = allMessages.find((msg) => {
-        const isToRecipient = msg.to.some(
-          (addr) => addr.toLowerCase() === email.toLowerCase()
-        );
+        const isToRecipient =
+          msg.to?.some((addr) => addr.toLowerCase() === email.toLowerCase()) ??
+          false;
         if (!isToRecipient) return false;
 
         if (criteria.subject && msg.Subject !== criteria.subject) {

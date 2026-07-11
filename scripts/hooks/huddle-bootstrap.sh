@@ -170,6 +170,25 @@ print(json.dumps(notes))
   fi
 fi
 
+# --- Discover-and-adopt: never fork a duplicate root across machines ---
+# Before creating a fresh root, check the synced beads DB for an existing
+# "Huddle coordination root" epic (huddle_discover_root pulls first). On a
+# second machine or a re-clone the root already exists remotely; adopt it by
+# writing config.json instead of creating a duplicate. Only fall through to
+# creation when discovery genuinely finds none (true first-ever bootstrap).
+# After adopting, re-run this script to validate/self-heal the adopted root's
+# notes via the idempotency path above.
+EXISTING_ROOT=$(huddle_discover_root 2>/dev/null) || EXISTING_ROOT=""
+if [[ -n "$EXISTING_ROOT" ]]; then
+  printf 'Found existing huddle root %s in the synced beads DB — adopting it (no duplicate created).\n' "$EXISTING_ROOT"
+  python3 -c "
+import json, sys
+print(json.dumps({'schema_version': 1, 'root_bead_id': sys.argv[1]}, indent=2))
+" "$EXISTING_ROOT" > "$CONFIG_FILE"
+  printf 'Wrote %s → %s. Re-run this script to validate the adopted root'\''s notes.\n' "$CONFIG_FILE" "$EXISTING_ROOT"
+  exit 0
+fi
+
 TODAY=$(date +%F)
 MONTH=$(date +%Y-%m)
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -198,6 +217,7 @@ TODAY_ID=$(bd create -t task \
   --parent "$ROOT_ID" \
   --title "Huddle daily $TODAY" \
   --description "Active coordination bead for $TODAY. Agents post updates here with their sign-off (e.g. —Claude-WorktreeFix). At midnight rotation, this bead gets a categorized summary in its description and a raw archive in its notes, then closes." \
+  --ephemeral --wisp-type patrol \
   --silent)
 printf '  Today daily:   %s\n' "$TODAY_ID"
 

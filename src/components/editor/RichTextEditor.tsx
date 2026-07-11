@@ -29,9 +29,15 @@ export interface RichTextEditorHandle {
   focus: () => void;
 }
 
-interface RichTextEditorProps {
+export interface RichTextEditorProps {
   content: ProseMirrorDoc | null;
   onChange: (doc: ProseMirrorDoc) => void;
+  /**
+   * Fired when the editor loses focus. The Settings tab uses this to flush its
+   * auto-save debounce on blur (symmetric with its plain-text inputs). Optional
+   * and backward-compatible — existing callers are unaffected.
+   */
+  onBlur?: (() => void) | undefined;
   mentionsEnabled?: boolean | undefined;
   placeholder?: string | undefined;
   compact?: boolean | undefined;
@@ -56,6 +62,7 @@ export const RichTextEditor = forwardRef<
   {
     content,
     onChange,
+    onBlur,
     mentionsEnabled = false,
     placeholder = "Write something...",
     compact = false,
@@ -164,14 +171,19 @@ export const RichTextEditor = forwardRef<
     onUpdate: ({ editor }) => {
       onChange(editor.getJSON() as ProseMirrorDoc);
     },
+    onBlur: () => {
+      onBlur?.();
+    },
     editorProps: {
       attributes: {
         class: cn(
           "prose prose-sm prose-invert focus:outline-none max-w-none px-3 py-2",
           // One line in compact mode, ~3 lines otherwise. Mutually exclusive
           // so the arbitrary-value min-heights never both apply (which made
-          // the winner depend on stylesheet order).
-          compact ? "min-h-[40px]" : "min-h-[100px]"
+          // the winner depend on stylesheet order). Compact is "jot" mode, so
+          // it also drops prose's airy rhythm (1.71 leading + tall paragraph
+          // margins) for snug utility-text spacing.
+          compact ? "min-h-[40px] !leading-snug [&_p]:!my-1" : "min-h-[100px]"
         ),
         "aria-label": ariaLabel ?? placeholder,
       },

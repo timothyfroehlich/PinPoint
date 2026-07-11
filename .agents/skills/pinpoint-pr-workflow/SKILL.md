@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, review-comment handling (via MCP), readiness labeling, gate-enforced merge. Use when committing changes, opening PRs, watching CI, addressing review comments, or merging.
+description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, Copilot + human review handling (via MCP), readiness labeling, gate-enforced merge. Use when committing changes, opening PRs, watching CI, addressing review comments, or merging.
 ---
 
 # PinPoint PR Workflow
@@ -90,7 +90,7 @@ Closes #N (if applicable)
 
 ---
 
-## Phase 3: Review (CI + label)
+## Phase 3: Review (CI + Copilot + label)
 
 ### 3.1 Watch CI
 
@@ -105,7 +105,7 @@ timeout_ms: 3600000
 )
 ```
 
-Exit 0 = all passed. Exit 1 = failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
+Exit 0 = all passed, or stopped for a new Copilot review. Exit 1 = failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
 
 ### 3.2 Check for review comments
 
@@ -163,9 +163,30 @@ pullNumber: <PR>
 
 Sign replies with your agent name (`—Claude-Plunger`, `—Claude-Spinner`, etc.).
 
-### 3.4 Apply `ready-for-review` label
+Copilot review threads count here too — a PR is not ready while Copilot has open threads. Resolve or decline each one (per 3.3) before moving on.
 
-Once CI green + zero unresolved review threads + no merge conflict:
+### 3.4 Verify Copilot reviewed the latest commit
+
+A PR isn't "ready for review" — and you must not declare it done — until Copilot has actually reviewed the **current head commit**. This catches the silent-skip case where `update_pull_request_branch` or merge-from-main commits don't trigger Copilot's `review_requested` event (per PR #1342 case).
+
+Compare:
+
+- `pull_request_read(method: "get_reviews")` → latest `submitted_at` for a `copilot-pull-request-reviewer` / `copilot-pull-request-reviewer[bot]` review
+- `get_commit(sha: <head_sha>)` → `commit.committer.date`
+
+If head is newer than the latest Copilot review:
+
+- Elapsed < 600s → wait, Copilot may still be reviewing.
+- Elapsed >= 600s (or `request_copilot_review` yields nothing after another 60s) → **run a Claude fallback review instead of proceeding unreviewed.** Copilot silently skips `review_requested` events often enough that "no review" cannot be a merge path (per PR #1342 / #1326). The fallback:
+  1. Run `/code-review` against the PR diff (model-invocable local review — **not** `ultra`, which is user-triggered, billed, and the agent cannot launch).
+  2. Address serious findings the same way you handle Copilot threads: fix → push → re-review. A fix changes the head SHA and re-arms the `reviewed` gate. Consciously decline the rest.
+  3. `bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings summary>"` — posts the SHA-pinned sticky marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
+
+`merge-pr.sh` enforces this at merge time via the `reviewed` gate (PASSes on a Copilot review OR a SHA-matched Claude marker; WAITs inside the 600s window; FAILs after it with no review of either kind). Unlike the older `currency` gate — which WARN-proceeds on a stale/absent Copilot review — `reviewed` blocks the merge, so the Claude fallback is the way past it, not a bypass. Don't tell Tim a PR is "ready" or "done" while head is still unreviewed — making a review happen is part of finishing the PR, not an optional extra.
+
+### 3.5 Apply `ready-for-review` label
+
+Once CI green + zero unresolved review threads (including Copilot) + Copilot reviewed head commit + no merge conflict:
 
 1. Read current labels via `pull_request_read(method: "get")` and extract `.labels[]`.
 2. Build new labels array: existing labels + `"ready-for-review"`.
@@ -200,10 +221,14 @@ bash scripts/workflow/merge-pr.sh <PR>
 Flags (stackable, order-independent):
 
 - `--dry-run` — preview only, no action.
+- `--force` — bypass `currency` + `threads` + `reviewed` (review-state) gates. Requires manual permission approval.
 - `--bypass-merge-requirements` — bypass `ci` gate AND pass `--admin` to `gh pr merge`,
   overriding GitHub branch-protection rules. Requires manual permission approval.
 
+Combine `--force --bypass-merge-requirements` to bypass `currency` + `threads` + `reviewed` + `ci` together.
 The `no_conflict` gate is NEVER bypassable — GitHub rejects conflicting merges regardless of `--admin`.
+
+`merge-pr.sh` evaluates **5 gates**: `ci`, `currency`, `threads`, `reviewed`, `no_conflict`. The `reviewed` gate is the hard backstop that no head commit merges unreviewed — prefer running the Claude fallback (Phase 3.4) to satisfy it over `--force`-bypassing it.
 
 ### 4.2 Interpret output
 
@@ -215,6 +240,8 @@ Script emits structured status tokens:
 | `FAIL: <gate>: <state>`  | Gate failed                                            | Fix underlying issue, push, retry     |
 | `WAIT: <gate>: <state>`  | Transient (e.g., GitHub computing mergeable)           | Retry merge-pr.sh after a few seconds |
 | `BLOCK: <gate>: <state>` | State mismatch requiring action (e.g., merge conflict) | Resolve, push, retry                  |
+| `WARN: <gate>: <state>`  | Permitted to proceed with notice                       | Continue, but be informed             |
+| `SKIP: <gate>: <reason>` | Gate doesn't apply                                     | Continue                              |
 
 On any FAIL: script removes `ready-for-review` label if present (the label's contract is "click-merge-without-thinking"; if a gate fails at merge time, that contract is broken). Exit 1.
 
@@ -222,16 +249,25 @@ On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --match-
 
 ### 4.3 Escape hatches
 
+**`--force`** — for Copilot/review-state issues (bypasses `currency` + `threads` + `reviewed`):
+
+- API failure on the `threads`, `currency`, or `reviewed` gate where you've manually verified the underlying state is fine
+- Copilot has silently-skipped a merge-from-main commit AND you've reviewed the diff manually
+- You're aware the `threads` / `currency` / `reviewed` gates would fail and you're explicitly accepting
+
+Prefer the Claude fallback (Phase 3.4 — run `/code-review` + `mark-claude-review.sh`) over `--force` for a `reviewed`-gate failure: the fallback makes the guarantee true rather than skipping it.
+
 **`--bypass-merge-requirements`** — for CI/branch-protection issues:
 
 - A required check is failing for known-irrelevant reasons (infrastructure flake, unrelated job)
   AND you've manually verified the change is safe
 - An emergency hotfix where waiting for CI is not acceptable
+- Combine with `--force` when both review-state and CI gates need to be skipped
 
 Do NOT bypass when:
 
 - Merge conflict exists (`no_conflict` gate is never bypassable; conflicts can't be ignored)
-- You haven't manually verified the underlying state. The flag requires manual permission approval
+- You haven't manually verified the underlying state. Both flags require manual permission approval
   in the chat — treat the approval prompt as a "are you sure?" checkpoint.
 
 ### 4.4 Bypass the hook (emergency only)

@@ -142,7 +142,7 @@ describe("Admin User Management Integration", () => {
     // Mock as Target User
     mockGetUser.mockResolvedValue({ data: { user: targetUser! } });
 
-    await expect(updateUserRole(adminUser!.id, "user")).rejects.toThrow(
+    await expect(updateUserRole(adminUser!.id, "member")).rejects.toThrow(
       "Forbidden: Only admins can perform this action"
     );
   });
@@ -227,6 +227,54 @@ describe("Admin User Management Integration", () => {
       await expect(inviteUser(formData)).rejects.toThrow(
         "A user with this email already exists and is active."
       );
+    });
+
+    it("should reject invite when the email exists in auth.users beyond the first page (PP-a4st)", async () => {
+      mockGetUser.mockResolvedValue({ data: { user: adminUser! } });
+
+      // Seed enough auth.users rows that the collision sorts onto page 2+.
+      // The admin API pages at 50 users; the getAdminClient() test stub
+      // mirrors that cap. Fillers sort before the collision (emails are
+      // ordered), so the colliding address lands past the first page — the
+      // exact scenario an unpaginated listUsers() call would miss.
+      const collisionEmail = "zzz-page2-collision@test.com";
+      for (let i = 0; i < 60; i++) {
+        const fillerId = randomUUID();
+        const fillerEmail = `filler-${String(i).padStart(3, "0")}@test.com`;
+        await (
+          await getTestDb()
+        ).execute(
+          `INSERT INTO auth.users (id, email) VALUES ('${fillerId}', '${fillerEmail}')`
+        );
+      }
+
+      // The collision exists ONLY in auth.users (no user_profiles / invitedUsers
+      // row), so the auth.users pagination scan is the sole check that can catch
+      // it — isolating the fix under test.
+      const collisionId = randomUUID();
+      await (
+        await getTestDb()
+      ).execute(
+        `INSERT INTO auth.users (id, email) VALUES ('${collisionId}', '${collisionEmail}')`
+      );
+
+      const formData = new FormData();
+      formData.append("firstName", "Page");
+      formData.append("lastName", "Two");
+      formData.append("email", collisionEmail);
+      formData.append("role", "member");
+
+      await expect(inviteUser(formData)).rejects.toThrow(
+        "A user with this email already exists and is active."
+      );
+
+      // And no invited row was created as a side effect.
+      const leaked = await (
+        await getTestDb()
+      ).query.invitedUsers.findFirst({
+        where: eq(invitedUsers.email, collisionEmail),
+      });
+      expect(leaked).toBeUndefined();
     });
 
     it("should reject invite for already invited user", async () => {

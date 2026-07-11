@@ -1,23 +1,21 @@
 import type React from "react";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { eq } from "drizzle-orm";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
-import { Calendar } from "lucide-react";
 import { deriveMachineStatus } from "~/lib/machines/status";
-import { MachineStatusBadge } from "~/components/machines/MachineStatusBadge";
-import { MachinePresenceBadge } from "~/components/machines/MachinePresenceBadge";
-import { formatDate } from "~/lib/dates";
-import { headers } from "next/headers";
 import { resolveRequestUrl } from "~/lib/url";
+import { buildMachineReportUrl } from "~/lib/machines/report-url";
+import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { EditButtonWithTooltip } from "../edit-button-tooltip";
 import { EditMachineDialog } from "../update-machine-form";
 import { QrCodeDialog } from "../qr-code-dialog";
-import { buildMachineReportUrl } from "~/lib/machines/report-url";
-import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { MachineTextFields } from "../machine-text-fields";
+import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
+import { docIsEmpty } from "~/lib/tiptap/types";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
 import {
   getAccessLevel,
@@ -26,14 +24,23 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
-import { PersonHoverCard } from "~/components/people/PersonHoverCard";
+import { InfoHero } from "./info-hero";
+import { InfoRail } from "./info-rail";
 
 /**
- * Machine Info Tab (default route for /m/[initials]/)
+ * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
+ * player's landing (redesign PP-5sgt.2).
  *
- * Renders the machine info card with metadata and text fields. The persistent
- * header zone + tab strip live in the sibling layout.tsx, and the open-issues
- * list lives in the sibling Maintenance tab (`./maintenance/page.tsx`).
+ * Reading order (both breakpoints): Hero (status + presence + Report button +
+ * known-issues peek) → reference cluster (Details card: machine description +
+ * owner, then Tags / PinballMap placeholders) → recent-activity peek →
+ * maintainer tools. Desktop is a main column + 320px rail; mobile folds the
+ * rail inline after the hero.
+ *
+ * NOTE (PP-5sgt.3): the maintainer tools at the bottom — QR code and owner
+ * requirements/notes — are kept here temporarily. The Service-tab rework
+ * relocates both to the Service tab (the maintainer's workbench); remove this
+ * block then. (Edit already moved into the Details card.)
  */
 export default async function MachineInfoTab({
   params,
@@ -56,7 +63,7 @@ export default async function MachineInfoTab({
 
   const accessLevel = getAccessLevel(currentUserProfile?.role);
 
-  const { machine, totalIssuesCount } = await getMachineForLayout(initials);
+  const { machine } = await getMachineForLayout(initials);
   if (!machine) {
     notFound();
   }
@@ -84,19 +91,9 @@ export default async function MachineInfoTab({
     !!user &&
     (user.id === machine.ownerId || user.id === machine.invitedOwnerId);
 
-  const canEditOwnerNotes = checkPermission(
-    "machines.edit.ownerNotes",
-    accessLevel,
-    ownershipContext
-  );
   const canViewOwnerRequirements = checkPermission(
     "machines.view.ownerRequirements",
     accessLevel
-  );
-  const canViewOwnerNotes = checkPermission(
-    "machines.view.ownerNotes",
-    accessLevel,
-    ownershipContext
   );
   const canCompose = checkPermission(
     "machines.timeline.comment.add",
@@ -111,30 +108,6 @@ export default async function MachineInfoTab({
     accessLevel,
     ownershipContext
   );
-  let pinballmapTitleName: string | null = null;
-  if (canLink && machine.pinballmapMachineId !== null) {
-    const linkedTitle = await db.query.pinballmapCatalog.findFirst({
-      where: eq(
-        pinballmapCatalog.pinballmapMachineId,
-        machine.pinballmapMachineId
-      ),
-      columns: { name: true },
-    });
-    pinballmapTitleName = linkedTitle?.name ?? null;
-  }
-
-  const allUsersRaw = canEdit
-    ? await getUnifiedUsers({ includeEmails: false })
-    : [];
-  const allUsers = allUsersRaw.map((u) => ({
-    id: u.id,
-    name: u.name,
-    lastName: u.lastName,
-    machineCount: u.machineCount,
-    status: u.status,
-    role: u.role,
-  }));
-
   const machineStatus = deriveMachineStatus(openIssues);
 
   const headersList = await headers();
@@ -144,177 +117,150 @@ export default async function MachineInfoTab({
     machineInitials: machine.initials,
     source: "qr",
   });
-  const qrDataUrl = await generateQrPngDataUrl(reportUrl);
 
+  // These three are independent of one another — resolve them concurrently
+  // rather than serially so the QR-scan landing doesn't stack a PinballMap
+  // lookup, the unified-user list, and the QR PNG encode back-to-back on the
+  // render path.
+  const pinballmapTitlePromise: Promise<string | null> =
+    canLink && machine.pinballmapMachineId !== null
+      ? db.query.pinballmapCatalog
+          .findFirst({
+            where: eq(
+              pinballmapCatalog.pinballmapMachineId,
+              machine.pinballmapMachineId
+            ),
+            columns: { name: true },
+          })
+          .then((linkedTitle) => linkedTitle?.name ?? null)
+      : Promise.resolve(null);
+  const allUsersPromise: Promise<Awaited<ReturnType<typeof getUnifiedUsers>>> =
+    canEdit ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]);
+
+  const [pinballmapTitleName, allUsersRaw, qrDataUrl] = await Promise.all([
+    pinballmapTitlePromise,
+    allUsersPromise,
+    generateQrPngDataUrl(reportUrl),
+  ]);
+  const allUsers = allUsersRaw.map((u) => ({
+    id: u.id,
+    name: u.name,
+    lastName: u.lastName,
+    machineCount: u.machineCount,
+    status: u.status,
+    role: u.role,
+  }));
+
+  const showOwnerFields = canViewOwnerRequirements;
+
+  // Description renders read-only inside the Details card; editing happens in
+  // the Edit Machine dialog (not inline). Gate on docIsEmpty rather than just
+  // `!== null`: a legacy or semantically-empty ProseMirror doc renders nothing
+  // in RichTextDisplay, but a truthy slot still paints an empty prose block and
+  // a stray divider above the owner row. docIsEmpty covers null, undefined, and
+  // whitespace-only docs.
+  const descriptionSlot = !docIsEmpty(machine.description) ? (
+    <RichTextDisplay content={machine.description} />
+  ) : null;
+
+  // Edit-machine control lives in the owner card. PP-o355.2 PinballMap fields
+  // are wired through the dialog for users who may link.
+  const editControl =
+    canEdit && user ? (
+      <EditMachineDialog
+        machine={{
+          id: machine.id,
+          name: machine.name,
+          initials: machine.initials,
+          presenceStatus: machine.presenceStatus,
+          ownerId: machine.ownerId,
+          invitedOwnerId: machine.invitedOwnerId,
+          owner: machine.owner ? { name: machine.owner.name } : null,
+          invitedOwner: machine.invitedOwner
+            ? { name: machine.invitedOwner.name }
+            : null,
+          pinballmapMachineId: machine.pinballmapMachineId,
+          pinballmapExcluded: machine.pinballmapExcluded,
+          pinballmapExcludedReason: machine.pinballmapExcludedReason,
+          pinballmapTitleName,
+          description: machine.description,
+        }}
+        allUsers={allUsers}
+        canEditAnyMachine={canEditAnyMachine}
+        isOwner={isOwner}
+        canLink={canLink}
+      />
+    ) : user && editDeniedReason !== null ? (
+      <EditButtonWithTooltip reason={editDeniedReason} />
+    ) : null;
+
+  const rail = (
+    <InfoRail
+      owner={machine.owner}
+      invitedOwner={machine.invitedOwner}
+      addedAt={machine.createdAt}
+      descriptionSlot={descriptionSlot}
+      editSlot={editControl}
+    />
+  );
+
+  // Single grid in DOM reading order: Hero → reference rail (Details card:
+  // description + owner, then Tags / PinballMap) → recent activity → maintainer
+  // tools. On mobile it's one flex column (the rail folds inline after the
+  // hero). On desktop the rail is pinned to the 320px right column, spanning the
+  // main column's rows; everything else auto-flows down column 1. Rendered once
+  // so test ids stay unique.
   return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          {/* All identity + stats in one 2-col grid: Owner / Added Date,
-            Availability / Status, Open Issues / Total Issues. */}
-          <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-            <div data-testid="owner-display">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Machine Owner
-              </p>
-              {machine.owner || machine.invitedOwner ? (
-                <div className="flex items-center gap-2">
-                  {/* Activated owners link to their collection view
-                      (PP-slrd.1); invited owners have no userProfile, so
-                      no collection page exists for them yet. */}
-                  {machine.owner ? (
-                    <PersonHoverCard
-                      userId={machine.owner.id}
-                      displayName={machine.owner.name}
-                      className="text-sm font-medium text-foreground hover:text-primary hover:underline"
-                    />
-                  ) : (
-                    <p className="text-sm font-medium text-foreground">
-                      {machine.invitedOwner?.name}
-                    </p>
-                  )}
-                  {machine.invitedOwner && !machine.owner && (
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      (Invited)
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No owner assigned
-                </p>
-              )}
-            </div>
+    <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-6">
+      <InfoHero
+        machineInitials={machine.initials}
+        machineStatus={machineStatus}
+        presenceStatus={machine.presenceStatus}
+        openIssues={openIssues}
+        reportHref={`/report?machine=${machine.initials}`}
+        serviceHref={`/m/${machine.initials}/maintenance`}
+      />
 
-            <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Added Date
-              </p>
-              <div className="flex items-center gap-1.5 text-foreground">
-                <Calendar className="size-3 text-muted-foreground" />
-                <p className="text-sm font-medium">
-                  {formatDate(machine.createdAt)}
-                </p>
-              </div>
-            </div>
+      <aside className="flex flex-col gap-6 md:col-start-2 md:row-start-1 md:row-span-6">
+        {rail}
+      </aside>
 
-            {machine.manufacturer && (
-              <div>
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Manufacturer
-                </p>
-                <p className="text-sm font-medium text-foreground">
-                  {machine.manufacturer}
-                </p>
-              </div>
-            )}
-
-            {machine.year !== null && (
-              <div>
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Year
-                </p>
-                <p className="text-sm font-medium text-foreground">
-                  {machine.year}
-                </p>
-              </div>
-            )}
-
-            <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Availability
-              </p>
-              <MachinePresenceBadge status={machine.presenceStatus} size="sm" />
-            </div>
-
-            <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Status
-              </p>
-              <MachineStatusBadge status={machineStatus} size="xs" />
-            </div>
-
-            <div data-testid="detail-open-issues">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Open Issues
-              </p>
-              <p
-                className="text-xl font-bold text-foreground"
-                data-testid="detail-open-issues-count"
-              >
-                {openIssues.length}
-              </p>
-            </div>
-
-            <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Total Issues
-              </p>
-              <p className="text-xl font-bold text-foreground">
-                {totalIssuesCount}
-              </p>
-            </div>
-          </div>
-
-          {/* Machine actions — Edit + QR. Sit at the bottom of the left column
-            so identity + stats read first. QR shows for everyone; Edit shows
-            as enabled for owner/admin, or as a disabled tooltip for other
-            auth'd users (guest / non-owner member). */}
-          <div className="space-y-3">
-            {canEdit && user ? (
-              <EditMachineDialog
-                machine={{
-                  id: machine.id,
-                  name: machine.name,
-                  initials: machine.initials,
-                  presenceStatus: machine.presenceStatus,
-                  ownerId: machine.ownerId,
-                  invitedOwnerId: machine.invitedOwnerId,
-                  owner: machine.owner ? { name: machine.owner.name } : null,
-                  invitedOwner: machine.invitedOwner
-                    ? { name: machine.invitedOwner.name }
-                    : null,
-                  pinballmapMachineId: machine.pinballmapMachineId,
-                  pinballmapExcluded: machine.pinballmapExcluded,
-                  pinballmapExcludedReason: machine.pinballmapExcludedReason,
-                  pinballmapTitleName,
-                }}
-                allUsers={allUsers}
-                canEditAnyMachine={canEditAnyMachine}
-                isOwner={isOwner}
-                canLink={canLink}
-              />
-            ) : user && editDeniedReason !== null ? (
-              <EditButtonWithTooltip reason={editDeniedReason} />
-            ) : null}
-            <QrCodeDialog
-              machineName={machine.name}
-              machineInitials={machine.initials}
-              qrDataUrl={qrDataUrl}
-              reportUrl={reportUrl}
-            />
-          </div>
-        </div>
-
-        <div className="border-t border-outline-variant/50 pt-4 lg:border-t-0 lg:pt-0">
-          <MachineTextFields
-            machineId={machine.id}
-            description={machine.description}
-            ownerRequirements={machine.ownerRequirements}
-            ownerNotes={machine.ownerNotes}
-            canEditGeneral={canEdit}
-            canEditOwnerNotes={canEditOwnerNotes}
-            canViewOwnerRequirements={canViewOwnerRequirements}
-            canViewOwnerNotes={canViewOwnerNotes}
-          />
-        </div>
-      </div>
       <MachineRecentActivity
         machineId={machine.id}
         machineInitials={machine.initials}
         machineName={machine.name}
         canCompose={canCompose}
       />
+
+      {/* Maintainer tools. QR is shown to everyone (matching pre-redesign
+          behavior); owner requirements/notes are permission-gated. Edit moved
+          into the owner card. NOTE (PP-5sgt.3): owner requirements/notes
+          relocate to the Service tab; QR relocates there too. Remove this block
+          then. */}
+      <div className="space-y-4 border-t border-outline-variant pt-6">
+        {showOwnerFields && (
+          <MachineTextFields
+            machineId={machine.id}
+            // showDescription={false} → the description is never rendered here,
+            // so don't ship the ProseMirror doc across the RSC→client boundary
+            // (CORE-SEC-006 minimal client payload); it already crosses once via
+            // the Edit dialog where it's actually needed.
+            description={null}
+            ownerRequirements={machine.ownerRequirements}
+            canEditGeneral={canEdit}
+            canViewOwnerRequirements={canViewOwnerRequirements}
+            showDescription={false}
+          />
+        )}
+        <div className="flex flex-wrap gap-3">
+          <QrCodeDialog
+            machineName={machine.name}
+            machineInitials={machine.initials}
+            qrDataUrl={qrDataUrl}
+            reportUrl={reportUrl}
+          />
+        </div>
+      </div>
     </div>
   );
 }

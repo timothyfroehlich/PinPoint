@@ -205,27 +205,29 @@ Sign with `—<YourFullRegisteredName>` (em-dash + your registered name). The se
 
 ## Scripts
 
-| Script                                   | Trigger                                                  | Purpose                                                             |
-| ---------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------- |
-| `scripts/hooks/huddle-bootstrap.sh`      | manual (one-time)                                        | Init root epic + daily + monthly + config.json                      |
-| `scripts/hooks/huddle-rotate.sh`         | rotation subagent                                        | Phase A: atomic create-and-pointer-update; outputs OLD/NEW bead IDs |
-| `scripts/hooks/huddle-poll.sh`           | UserPromptSubmit + PostToolUse (throttled)               | Inject new today_bead comments since last_seen                      |
-| `scripts/hooks/huddle-session-start.sh`  | SessionStart                                             | Bootstrap notice, rotation notice, identity, summary injection      |
-| `scripts/hooks/huddle-pr-announce.sh`    | PostToolUse (`Bash`\|`mcp__github__create_pull_request`) | Auto-post PR-open notice; dedup + fail-open                         |
-| `scripts/hooks/huddle-whoami.sh`         | manual                                                   | Register/lookup/list/discover session→name mappings                 |
-| `scripts/hooks/huddle-rotation-check.sh` | sourced by both hooks                                    | Date-compare: returns 0 if today_bead.date < today                  |
-| `scripts/hooks/huddle-lib.sh`            | sourced by all hooks                                     | Shared helpers (state-dir resolver, today-bead ID resolver)         |
+| Script                                   | Trigger                                                  | Purpose                                                                                                                                                                                           |
+| ---------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/hooks/huddle-bootstrap.sh`      | manual (one-time)                                        | Init root epic + daily + monthly + config.json                                                                                                                                                    |
+| `scripts/hooks/huddle-rotate.sh`         | rotation subagent                                        | Phase A: atomic create-and-pointer-update; outputs OLD/NEW bead IDs                                                                                                                               |
+| `scripts/hooks/huddle-poll.sh`           | UserPromptSubmit + PostToolUse (throttled)               | Inject new today_bead comments since last_seen                                                                                                                                                    |
+| `scripts/hooks/huddle-session-start.sh`  | SessionStart                                             | Bootstrap notice, rotation notice, identity, summary injection                                                                                                                                    |
+| `scripts/hooks/huddle-pr-announce.sh`    | PostToolUse (`Bash`\|`mcp__github__create_pull_request`) | Auto-post PR-open notice; dedup + fail-open                                                                                                                                                       |
+| `scripts/hooks/huddle-whoami.sh`         | manual                                                   | Register/lookup/list/discover session→name mappings                                                                                                                                               |
+| `scripts/hooks/huddle-rotation-check.sh` | sourced by both hooks                                    | Date-compare: returns 0 if today_bead.date < today                                                                                                                                                |
+| `scripts/hooks/huddle-lib.sh`            | sourced by all hooks                                     | Shared helpers: state-dir + today-bead resolvers; `huddle_sync` (per-machine throttled Dolt push+pull), `huddle_discover_root` (fork-proof adopt), `huddle_reconcile_today` (cross-machine dedup) |
 
 ## State files
 
 All under `<main-worktree>/.agents/huddle/` (shared across all linked worktrees via `git rev-parse --git-common-dir`). Git-ignored — machine-local.
 
-| File                    | Purpose                                                 |
-| ----------------------- | ------------------------------------------------------- |
-| `config.json`           | `{"root_bead_id": "PP-xxx"}` — written by bootstrap     |
-| `session-names.json`    | `{session_id: name}` map (canonical for self-filter)    |
-| `last-seen-<path-hash>` | Per-checkout poll cursor (newest injected `created_at`) |
-| `rotation.lock`         | flock/lockf target for rotation serialization           |
+| File                    | Purpose                                                                                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config.json`           | `{"root_bead_id": "PP-xxx"}` — written by bootstrap, or auto-adopted on a fresh machine (see Multi-machine)                                                                           |
+| `session-names.json`    | `{session_id: name}` map (canonical for self-filter). **Intentionally machine-local** — a session lives on one machine, and a peer machine's posts must NOT be self-filtered on yours |
+| `last-seen-<path-hash>` | Per-checkout poll cursor (newest injected `created_at`)                                                                                                                               |
+| `last-pull`             | **Per-machine** Dolt-sync throttle marker (epoch seconds). Shared across all worktrees/sessions of the clone so one sync per interval serves them all                                 |
+| `pull.lock`             | Non-blocking flock/lockf target so exactly one session syncs when many fire at once                                                                                                   |
+| `rotation.lock`         | flock/lockf target for same-machine rotation serialization                                                                                                                            |
 
 Plus one per-worktree file outside the shared state dir:
 
@@ -246,6 +248,37 @@ Huddle Root  (epic, never closes)                   ── PP-XXXX
   ├── Monthly 2026-05   ── PP-BBBB  (open until month rolls)
   └── Monthly 2026-04   ── PP-EEEE  (closed; rollup summary)
 ```
+
+## Multi-machine (sync across Tim's machines)
+
+The huddle works across multiple machines (Mac + Bazzite) with many concurrent
+sessions per machine. It rides the beads sync backbone: beads is **Dolt embedded
+plus a DoltHub remote** (`sync.remote` in `.beads/config.yaml`), so the root bead,
+its `notes` pointers, the daily/monthly beads, and all comments already sync via
+`bd dolt push` / `bd dolt pull`. Three machine-local mechanisms make that
+seamless:
+
+- **Throttled per-machine sync.** `huddle_sync` (in `huddle-lib.sh`, called by
+  the session-start and poll hooks) does `bd dolt push` then `pull`, gated by the
+  shared `last-pull` marker + non-blocking `pull.lock`. One sync per
+  `HUDDLE_SYNC_SECONDS` (default 180) per machine serves **every** session on it
+  — not one-per-session. Fully fail-open: offline or bd errors never block a
+  prompt; local coordination keeps working, and the next successful sync catches
+  up. Peer posts land in your context within one interval.
+- **Fresh-machine auto-adopt (no fork).** `config.json` (the `root_bead_id`
+  pointer) is machine-local. On a machine that cloned + synced the beads but
+  never ran bootstrap, session-start calls `huddle_discover_root` — finds the
+  existing "Huddle coordination root" epic in the synced DB and **adopts** it
+  (writes `config.json`) instead of nagging or forking a duplicate root.
+  `huddle-bootstrap.sh` does the same discover-and-adopt before ever creating a
+  root, so it's safe to run on any machine.
+- **Idempotent cross-machine rotation.** `huddle-rotate.sh` pulls first (so a
+  peer that already rotated is seen and this machine no-ops), then **adopts** an
+  existing "Huddle daily `<today>`" instead of creating a duplicate, then pushes.
+  A deterministic `huddle_reconcile_today` safety-net (run at end of rotation and
+  once per session-start) collapses any rare double-create to the canonical
+  (lowest id), closing the loser — every machine picks the same winner, so they
+  converge.
 
 ## Self-filter rules
 

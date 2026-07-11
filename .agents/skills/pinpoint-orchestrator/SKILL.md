@@ -34,8 +34,9 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 
 # Readiness label + merge: pinpoint-pr-workflow skill Phases 3.4 + 4
 # Apply label via mcp__github__issue_write or `gh pr edit --add-label`
-bash scripts/workflow/merge-pr.sh <PR>                   # Composite gate-then-merge enforcer (--dry-run)
+bash scripts/workflow/merge-pr.sh <PR>                   # Composite gate-then-merge enforcer; 5 gates incl. `reviewed` (--dry-run)
 bash scripts/workflow/merge-pr.sh <PR> --dry-run         # Preview gate evaluation without merging
+bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"  # Post SHA-pinned Claude-review marker (satisfies the `reviewed` gate when Copilot skips)
 
 # Worktree health — covers manually created ../pinpoint-worktrees/* ONLY;
 # agent-created .claude/worktrees/* are handled by the WorktreeRemove hook and not scanned here
@@ -129,7 +130,7 @@ Work bead <ID>. First run `bd show <ID>` && `bd update <ID> --claim` — the bea
 
 ## Quality Gates
 
-Run `pnpm run check` before returning.
+Run `pnpm run check` before returning. Then self-review: run `/code-review` on your own diff (the model-invocable local review — **not** `ultra`, which is user-triggered/billed and you cannot launch) and address serious findings. After your final push, if Copilot hasn't reviewed your head commit within ~10 min, run `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` so the `reviewed` merge gate passes.
 
 ## Return Format
 
@@ -138,6 +139,7 @@ Report back with:
 - **Branch**: <branch name>
 - **PR**: #<number>
 - **CI**: passing/failing/pending
+- **Self-review**: findings addressed / marker posted?
 - **Blockers**: none or description
 ```
 
@@ -193,6 +195,16 @@ mcp__github__issue_write(method: "update", owner, repo, issue_number: <PR>, labe
 ```
 
 Or fallback: `gh pr edit <PR> --add-label ready-for-review`.
+
+### Ensure every PR is reviewed (lead backstop)
+
+The subagent self-reviews its own diff (Phase 3 template), but that can be skipped or Copilot can silently miss the head commit — so the lead re-checks at the merge boundary. Before applying `ready-for-review` or handing a PR to `merge-pr.sh`, confirm the head commit is covered by **either** a Copilot review **or** a SHA-pinned Claude marker (`<!-- pinpoint-claude-review: <head_sha> -->`). If neither covers head:
+
+1. Run `/code-review` on the PR diff — the model-invocable **local** review. (`ultra` is the cloud multi-agent review; it is user-triggered and billed, so the agent cannot launch it.)
+2. Address serious findings (fix → have the subagent push → re-review; a fix re-arms the gate). Decline the rest.
+3. `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` to post the marker.
+
+The `reviewed` gate in `merge-pr.sh` is the hard enforcement — it FAILs the merge if the head commit has no Copilot or Claude review once the 600s Copilot window has elapsed. Running the fallback is how you satisfy it; `--force`-bypassing it defeats the guarantee.
 
 ---
 

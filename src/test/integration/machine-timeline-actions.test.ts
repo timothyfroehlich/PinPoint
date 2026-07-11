@@ -18,7 +18,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   authUsers,
   invitedUsers,
@@ -265,7 +266,9 @@ describe("createMachineAction — timeline event emission (PP-0x98)", () => {
       .where(eq(machines.initials, "SEQ"));
     const { getMachineTimeline } =
       await import("~/lib/timeline/machine-events");
-    const timeline = await getMachineTimeline(db, { machineId: machine.id });
+    const timeline = await getMachineTimeline(asDbOrTx(db), {
+      machineId: machine.id,
+    });
 
     // Both events share created_at (one transaction); newest-first ordering is
     // by sequence, so owner_set (emitted second, higher sequence) comes first
@@ -530,9 +533,9 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
     return machine;
   }
 
-  // Use the member-who-is-also-owner pattern: passes both `machines.edit`
-  // (owner condition) and `machines.edit.ownerNotes` (owner-only) so all four
-  // prose-field actions are authorized by the same test user.
+  // Use the member-who-is-also-owner pattern: passes `machines.edit`
+  // (owner condition) so the prose-field actions are authorized by the same
+  // test user.
   //
   // Only the owner-facing prose fields emit a marker timeline event. The
   // public `description` field is intentionally SILENT on edit (PP-0x98 V2
@@ -546,12 +549,6 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
         import("~/app/(app)/m/actions").then(
           (m) => m.updateMachineOwnerRequirements
         ),
-    },
-    {
-      label: "ownerNotes",
-      kind: "owner_notes_updated" as const,
-      load: () =>
-        import("~/app/(app)/m/actions").then((m) => m.updateMachineOwnerNotes),
     },
   ];
 
@@ -571,12 +568,12 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
       const machine = await makeMachine(owner.id);
       const action = await c.load();
 
-      const doc = {
+      const doc: ProseMirrorDoc = {
         type: "doc",
         content: [
           { type: "paragraph", content: [{ type: "text", text: "x" }] },
         ],
-      } as const;
+      };
 
       const result = await action(machine.id, doc);
       expect(result.ok).toBe(true);
@@ -603,12 +600,12 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
       const machine = await makeMachine(owner.id);
       const action = await c.load();
 
-      const doc = {
+      const doc: ProseMirrorDoc = {
         type: "doc",
         content: [
           { type: "paragraph", content: [{ type: "text", text: "x" }] },
         ],
-      } as const;
+      };
 
       const result = await action(machine.id, doc);
       expect(result.ok).toBe(true);
@@ -629,19 +626,20 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
     const owner = await makeUser("member");
     await mockAuth(owner.id);
     const machine = await makeMachine(owner.id);
-    const { updateMachineOwnerNotes } = await import("~/app/(app)/m/actions");
+    const { updateMachineOwnerRequirements } =
+      await import("~/app/(app)/m/actions");
 
-    const doc = {
+    const doc: ProseMirrorDoc = {
       type: "doc",
       content: [{ type: "paragraph", content: [{ type: "text", text: "x" }] }],
-    } as const;
+    };
 
     // First edit: sets initial value, emits one event.
-    const first = await updateMachineOwnerNotes(machine.id, doc);
+    const first = await updateMachineOwnerRequirements(machine.id, doc);
     expect(first.ok).toBe(true);
 
     // Second edit: same content, should emit NOTHING extra.
-    const second = await updateMachineOwnerNotes(machine.id, doc);
+    const second = await updateMachineOwnerRequirements(machine.id, doc);
     expect(second.ok).toBe(true);
 
     const rows = await db
@@ -650,7 +648,8 @@ describe("prose-field actions emit marker events (PP-0x98)", () => {
       .where(eq(timelineEvents.machineId, machine.id));
     const markers = rows.filter(
       (r) =>
-        (r.eventData as { kind: string } | null)?.kind === "owner_notes_updated"
+        (r.eventData as { kind: string } | null)?.kind ===
+        "owner_requirements_updated"
     );
     expect(markers).toHaveLength(1);
   });

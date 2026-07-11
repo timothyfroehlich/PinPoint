@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDb, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   userProfiles,
   machines,
@@ -24,6 +24,7 @@ import {
   anonymizeUserReferences,
   getReassignmentTargets,
 } from "~/app/(app)/settings/account-deletion";
+import { plainTextToDoc } from "~/lib/tiptap/types";
 import { randomUUID } from "node:crypto";
 
 // ---------------------------------------------------------------------------
@@ -137,7 +138,7 @@ describe("Account Deletion Anonymization (PGlite)", () => {
       .values({
         issueId: issueReported.id,
         authorId: userToDeleteId,
-        content: "I am leaving",
+        content: plainTextToDoc("I am leaving"),
       })
       .returning();
 
@@ -151,7 +152,7 @@ describe("Account Deletion Anonymization (PGlite)", () => {
     });
 
     // 3. Run Anonymization (without reassignment)
-    await anonymizeUserReferences(userToDeleteId, null, db);
+    await anonymizeUserReferences(userToDeleteId, null, asDb(db));
 
     // 4. Verify Anonymization
     const anonymizedIssues = await db.query.issues.findMany({
@@ -169,7 +170,7 @@ describe("Account Deletion Anonymization (PGlite)", () => {
     });
     expect(anonymizedComment?.authorId).toBeNull();
     // Content should remain
-    expect(anonymizedComment?.content).toBe("I am leaving");
+    expect(anonymizedComment?.content).toEqual(plainTextToDoc("I am leaving"));
 
     const anonymizedImage = await db.query.issueImages.findFirst({
       where: eq(issueImages.issueId, issueReported.id),
@@ -202,7 +203,7 @@ describe("Account Deletion Anonymization (PGlite)", () => {
     await db.insert(machines).values(machine);
 
     // 3. Run Anonymization with Reassignment
-    await anonymizeUserReferences(userToDeleteId, newOwnerId, db);
+    await anonymizeUserReferences(userToDeleteId, newOwnerId, asDb(db));
 
     // 4. Verify Reassignment
     const updatedMachine = await db.query.machines.findFirst({
@@ -221,9 +222,9 @@ describe("Account Deletion Anonymization (PGlite)", () => {
       .values(createTestUser({ id: adminId, role: "admin" }));
 
     // 2. Attempt Anonymization
-    await expect(anonymizeUserReferences(adminId, null, db)).rejects.toThrow(
-      "Sole admin cannot delete their account"
-    );
+    await expect(
+      anonymizeUserReferences(adminId, null, asDb(db))
+    ).rejects.toThrow("Sole admin cannot delete their account");
   });
 
   it("should allow admin deletion if another admin exists", async () => {
@@ -248,7 +249,7 @@ describe("Account Deletion Anonymization (PGlite)", () => {
 
     // 2. Attempt Anonymization
     await expect(
-      anonymizeUserReferences(adminToDeleteId, null, db)
+      anonymizeUserReferences(adminToDeleteId, null, asDb(db))
     ).resolves.not.toThrow();
   });
 });
@@ -305,7 +306,10 @@ describe("Account Deletion Reassign Picker — guest filter (PP-hci / PP-aby)", 
 
     // Call the production helper directly — drift in the role filter will
     // fail this assertion.
-    const membersResult = await getReassignmentTargets(deletingUserId, db);
+    const membersResult = await getReassignmentTargets(
+      deletingUserId,
+      asDb(db)
+    );
     const resultIds = membersResult.map((r) => r.id);
 
     // Guest must NOT appear
@@ -379,7 +383,11 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
 
     const [comment] = await db
       .insert(issueComments)
-      .values({ issueId: issue.id, authorId: userId, content: "goodbye" })
+      .values({
+        issueId: issue.id,
+        authorId: userId,
+        content: plainTextToDoc("goodbye"),
+      })
       .returning();
 
     // Call the real action — DB hits PGlite, external SDKs are mocked
@@ -404,7 +412,7 @@ describe("deleteAccountAction — DB integration (PGlite)", () => {
       where: eq(issueComments.id, comment.id),
     });
     expect(updatedComment?.authorId).toBeNull();
-    expect(updatedComment?.content).toBe("goodbye"); // content preserved
+    expect(updatedComment?.content).toEqual(plainTextToDoc("goodbye")); // content preserved
 
     const updatedMachine = await db.query.machines.findFirst({
       where: eq(machines.id, machine.id),

@@ -26,12 +26,14 @@ describe("isUserMachineOwner", () => {
       reporterName: null,
       reporterEmail: null,
       assignedTo: null,
+      idempotencyKey: null,
       closedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       machine: {
         id: "machine-1",
         name: "Medieval Madness",
+        ownerRequirements: null,
         owner: ownerId ? { id: ownerId, name: "Test Owner" } : null,
         invitedOwner: invitedOwnerId
           ? { id: invitedOwnerId, name: "Invited Owner" }
@@ -94,12 +96,14 @@ describe("getMachineOwnerName", () => {
       reporterName: null,
       reporterEmail: null,
       assignedTo: null,
+      idempotencyKey: null,
       closedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       machine: {
         id: "machine-1",
         name: "Medieval Madness",
+        ownerRequirements: null,
         owner: ownerName ? { id: "owner-id", name: ownerName } : null,
         invitedOwner: invitedOwnerName
           ? { id: "invited-id", name: invitedOwnerName }
@@ -152,12 +156,14 @@ describe("getMachineOwnerId", () => {
       reporterName: null,
       reporterEmail: null,
       assignedTo: null,
+      idempotencyKey: null,
       closedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       machine: {
         id: "machine-1",
         name: "Medieval Madness",
+        ownerRequirements: null,
         owner: ownerId ? { id: ownerId, name: "Test Owner" } : null,
         invitedOwner: invitedOwnerId
           ? { id: invitedOwnerId, name: "Invited Owner" }

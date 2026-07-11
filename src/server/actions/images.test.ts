@@ -124,9 +124,11 @@ describe("uploadIssueImage", () => {
 
     vi.mocked(blobClient.uploadToBlob).mockResolvedValue({
       url: "https://blob.com/test.jpg",
+      downloadUrl: "https://blob.com/test.jpg?download=1",
       pathname: "issue-images/pending/test.jpg",
-      size: 1024,
-      uploadedAt: new Date(),
+      contentType: "image/jpeg",
+      contentDisposition: 'inline; filename="test.jpg"',
+      etag: "test-etag",
     });
 
     const formData = new FormData();
@@ -179,9 +181,11 @@ describe("uploadIssueImage", () => {
 
     vi.mocked(blobClient.uploadToBlob).mockResolvedValue({
       url: "https://blob.com/test.jpg",
+      downloadUrl: "https://blob.com/test.jpg?download=1",
       pathname: "issue-images/test-issue/test.jpg",
-      size: 1024,
-      uploadedAt: new Date(),
+      contentType: "image/jpeg",
+      contentDisposition: 'inline; filename="test.jpg"',
+      etag: "test-etag",
     });
 
     vi.mocked(db.insert).mockImplementation(() => {

@@ -1,5 +1,5 @@
 {
-  "id": "e4fe969a-d459-43e1-8d6e-69c07edda856",
+  "id": "72728344-8828-4e90-adcb-962eb2a64a18",
   "prevId": "f826e4d6-3025-4e90-a677-8c95c0d4764d",
   "version": "7",
   "dialect": "postgresql",
@@ -1581,100 +1581,7 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.pinballmap_state": {
-      "name": "pinballmap_state",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "'singleton'"
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "location_id": {
-          "name": "location_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 26454
-        },
-        "snapshot_json": {
-          "name": "snapshot_json",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_synced_at": {
-          "name": "last_synced_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_sync_status": {
-          "name": "last_sync_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'unknown'"
-        },
-        "last_sync_error": {
-          "name": "last_sync_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "outbound_email": {
-          "name": "outbound_email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "outbound_token_vault_id": {
-          "name": "outbound_token_vault_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "pinballmap_state_singleton": {
-          "name": "pinballmap_state_singleton",
-          "value": "id = 'singleton'"
-        },
-        "pinballmap_state_sync_status_check": {
-          "name": "pinballmap_state_sync_status_check",
-          "value": "last_sync_status IN ('unknown', 'ok', 'error')"
-        }
-      },
-      "isRLSEnabled": false
+      "isRLSEnabled": true
     },
     "public.timeline_event_people": {
       "name": "timeline_event_people",

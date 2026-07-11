@@ -2,22 +2,55 @@ import { withSentryConfig } from "@sentry/nextjs";
 import createMDX from "@next/mdx";
 import type { NextConfig } from "next";
 
-// Fail the Vercel build (rather than deploy and 500 at runtime) when a
-// required production secret is missing. Skipped on local builds and
-// vercel-dev because VERCEL_ENV is only set in Vercel build/runtime
-// environments. Preview deploys are also validated since Tim sets prod
-// secrets in both Production and Preview scopes.
+// Central registry of production-required env vars (CORE-SEC-009). Fails the
+// Vercel build (rather than deploy and 500 / silently degrade at runtime) when
+// a required secret is missing. Skipped on local builds and vercel-dev because
+// VERCEL_ENV is only set in Vercel build/runtime environments. Preview deploys
+// are validated too because Tim mirrors prod secrets into both Production and
+// Preview scopes.
+//
+// Each entry is a group of one or more names that is satisfied if ANY of its
+// names is present — this models the documented alias pairs (Supabase docs vs
+// the Vercel integration naming) without false-failing when the alias is the
+// one that's set. Full catalog + scope matrix: docs/ENV_VARS.md.
+//
+// When you add a new production-required env var, add it here (CORE-SEC-009).
+type RequiredEnvGroup = readonly [primary: string, ...aliases: string[]];
+
+// Required in every deployment scope (Production AND Preview).
+const REQUIRED_ALL_DEPLOYMENTS: readonly RequiredEnvGroup[] = [
+  ["UNSUBSCRIBE_SIGNING_SECRET"],
+  ["POSTGRES_URL"],
+  ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"],
+  ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_URL"],
+  ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+];
+
+// Required in Production only. Preview resolves the canonical site URL from
+// VERCEL_URL (see src/lib/url.ts getSiteUrl), so it is not required there.
+const REQUIRED_PRODUCTION_ONLY: readonly RequiredEnvGroup[] = [
+  ["NEXT_PUBLIC_SITE_URL"],
+];
+
 function assertVercelDeploymentEnv(): void {
   const env = process.env["VERCEL_ENV"];
   if (env !== "production" && env !== "preview") return;
 
-  const required = ["UNSUBSCRIBE_SIGNING_SECRET"];
-  const missing = required.filter((name) => !process.env[name]);
+  const groups =
+    env === "production"
+      ? [...REQUIRED_ALL_DEPLOYMENTS, ...REQUIRED_PRODUCTION_ONLY]
+      : REQUIRED_ALL_DEPLOYMENTS;
+
+  // A group is missing only when NONE of its alias names is set.
+  const missing = groups
+    .filter((group) => !group.some((name) => process.env[name]))
+    .map((group) => group.join(" | "));
   if (missing.length === 0) return;
 
   throw new Error(
     `Deployment aborted: missing required ${env} env var(s): ${missing.join(", ")}. ` +
-      "Set them in Vercel → Project Settings → Environment Variables for the affected scope."
+      "Set them in Vercel → Project Settings → Environment Variables for the affected scope. " +
+      "See docs/ENV_VARS.md (CORE-SEC-009)."
   );
 }
 
@@ -35,7 +68,9 @@ const nextConfig: NextConfig = {
     },
   },
   typescript: {
-    tsconfigPath: "./tsconfig.json",
+    // App-source project. The root tsconfig.json is references-only after the
+    // PP-4k76 solution-style split, so Next reads the concrete app config here.
+    tsconfigPath: "./tsconfig.app.json",
   },
   // Keep pino and its worker dependency external so Turbopack doesn't try to bundle their test fixtures.
   serverExternalPackages: ["pino", "thread-stream"],

@@ -8,7 +8,6 @@ import {
 import {
   updateMachineDescription,
   updateMachineOwnerRequirements,
-  updateMachineOwnerNotes,
   type UpdateMachineFieldResult,
 } from "~/app/(app)/m/actions";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
@@ -32,34 +31,37 @@ interface MachineTextFieldsProps {
   machineId: string;
   description: ProseMirrorDoc | null;
   ownerRequirements: ProseMirrorDoc | null;
-  ownerNotes: ProseMirrorDoc | null;
   canEditGeneral: boolean;
-  canEditOwnerNotes: boolean;
   canViewOwnerRequirements: boolean;
-  canViewOwnerNotes: boolean;
+  /**
+   * Render the Description field inline. Defaults to true for backward
+   * compatibility; the Info tab passes `false` because the description renders
+   * read-only in the Details card and is edited via the Edit Machine dialog.
+   */
+  showDescription?: boolean;
 }
 
 export function MachineTextFields({
   machineId,
   description,
   ownerRequirements,
-  ownerNotes,
   canEditGeneral,
-  canEditOwnerNotes,
   canViewOwnerRequirements,
-  canViewOwnerNotes,
+  showDescription = true,
 }: MachineTextFieldsProps): React.JSX.Element {
   return (
     <div className="space-y-4">
-      <InlineEditableField
-        label="Description"
-        value={description}
-        onSave={wrapAction(updateMachineDescription)}
-        machineId={machineId}
-        canEdit={canEditGeneral}
-        placeholder="Add a description for this machine..."
-        testId="machine-description"
-      />
+      {showDescription && (
+        <InlineEditableField
+          label="Description"
+          value={description}
+          onSave={wrapAction(updateMachineDescription)}
+          machineId={machineId}
+          canEdit={canEditGeneral}
+          placeholder="Add a description for this machine..."
+          testId="machine-description"
+        />
+      )}
 
       {canViewOwnerRequirements && (
         <InlineEditableField
@@ -70,18 +72,6 @@ export function MachineTextFields({
           canEdit={canEditGeneral}
           placeholder="Add owner's requirements..."
           testId="machine-owner-requirements"
-        />
-      )}
-
-      {canViewOwnerNotes && (
-        <InlineEditableField
-          label="Owner's Notes"
-          value={ownerNotes}
-          onSave={wrapAction(updateMachineOwnerNotes)}
-          machineId={machineId}
-          canEdit={canEditOwnerNotes}
-          placeholder="Add private notes (only visible to you)..."
-          testId="machine-owner-notes"
         />
       )}
     </div>

@@ -15,7 +15,7 @@ import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
 import { getSignupLink } from "../support/mailpit.js";
 import {
-  getUserIdByEmail,
+  getProfileIdByEmail,
   setMachineOwner,
 } from "../support/supabase-admin.js";
 
@@ -37,7 +37,7 @@ test.describe("User Invitation & Signup Flow", () => {
     // Restore HD machine owner to admin before deleting the test user so the
     // foreign key is valid when the user row is removed.
     if (hdOwnerChanged) {
-      const adminId = await getUserIdByEmail(TEST_USERS.admin.email);
+      const adminId = await getProfileIdByEmail(TEST_USERS.admin.email);
       await setMachineOwner(seededMachines.humptyDumpty.initials, adminId);
       hdOwnerChanged = false;
     }
@@ -199,9 +199,12 @@ test.describe("User Invitation & Signup Flow", () => {
 
     // The owner display should show the real user name without "(Invited)" suffix
     // Note: User is a member now, so they see the read-only owner display
-    const ownerDisplay = page.getByTestId("owner-display");
+    const ownerDisplay = page.getByTestId("machine-owner-card");
     await expect(ownerDisplay).toContainText("Owner Transfer");
-    // After signup, the user is no longer "invited" - they're a real user
-    await expect(ownerDisplay).not.toContainText("(Invited)");
+    // After signup, the user is no longer "invited" - they're a real user.
+    // Match case-insensitively: the redesigned owner card renders the marker
+    // lowercase ("(invited)"), so a case-sensitive "(Invited)" check would pass
+    // vacuously even if the marker leaked through.
+    await expect(ownerDisplay).not.toContainText(/\(invited\)/i);
   });
 });

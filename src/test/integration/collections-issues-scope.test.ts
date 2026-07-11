@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { and } from "drizzle-orm";
-import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { asDbOrTx, getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
   createTestIssue,
   createTestMachine,
@@ -30,7 +30,7 @@ describe("collection issues scoping (PP-slrd.1)", () => {
         createTestIssue("BB", { title: "theirs issue" }),
       ]);
 
-    const where = buildWhereConditions({ machine: ["AA"] }, db);
+    const where = buildWhereConditions({ machine: ["AA"] }, asDbOrTx(db));
     const rows = await db.query.issues.findMany({ where: and(...where) });
     expect(rows.map((r) => r.title)).toEqual(["mine issue"]);
   });
@@ -41,7 +41,7 @@ describe("collection issues scoping (PP-slrd.1)", () => {
     await db.insert(machines).values(mine);
     await db.insert(issues).values(createTestIssue("CC", { title: "visible" }));
 
-    const where = buildWhereConditions({ machine: [] }, db);
+    const where = buildWhereConditions({ machine: [] }, asDbOrTx(db));
     const rows = await db.query.issues.findMany({ where: and(...where) });
     // Unscoped! The collection issues page must short-circuit to its empty
     // state instead of ever passing machine: [] to buildWhereConditions.

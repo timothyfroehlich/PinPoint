@@ -49,17 +49,16 @@ test.describe("Machine Details Redesign", () => {
     );
   });
 
-  test("Info tab renders owner + stats grid without horizontal overflow", async ({
+  test("Info tab renders the player hero + owner card without horizontal overflow", async ({
     page,
   }) => {
     await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
 
-    // Owner cell in the 2-col stats grid
-    await expect(page.getByTestId("owner-display")).toBeVisible();
+    // Player-landing hero (status + Report button + known-issues peek).
+    await expect(page.getByTestId("machine-info-hero")).toBeVisible();
 
-    // Stats grid cells
-    await expect(page.getByTestId("detail-open-issues")).toBeVisible();
-    await expect(page.getByTestId("detail-open-issues-count")).toBeVisible();
+    // Owner card in the reference cluster (replaced the old 2-col stats grid).
+    await expect(page.getByTestId("machine-owner-card")).toBeVisible();
 
     await assertNoHorizontalOverflow(page);
     await assertNoA11yViolations(page);
