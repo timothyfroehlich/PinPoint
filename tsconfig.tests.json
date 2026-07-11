@@ -1,10 +1,25 @@
 {
+  // Test/spec project (PP-4k76). Referenced by the root tsconfig.json so
+  // tsserver assigns test files to THIS project — giving them the path aliases
+  // (via tsconfig.base.json), node types, vitest globals, and jest-dom matchers
+  // they need — instead of an inferred project that has none.
+  //
+  // `composite: true` makes it referenceable from the root. The
+  // `references: [tsconfig.app.json]` is load-bearing: test files import
+  // production source, and without the reference a composite project would
+  // demand every such import be listed in its own `include` (TS6307).
+  // Referencing the app project lets those imports resolve to their real owner.
+  //
+  // `noEmit` is NOT set here (a referenced composite project may not disable
+  // emit — TS6310); emit is suppressed by the `--noEmit` flag in the
+  // typecheck:tests script. No output is ever produced.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true,
+    "composite": true,
     "strict": true,
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
+  "references": [{ "path": "./tsconfig.app.json" }],
   "include": [
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
