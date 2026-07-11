@@ -1,5 +1,6 @@
 import type React from "react";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
@@ -12,8 +13,12 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { deriveMachineStatus } from "~/lib/machines/status";
+import { resolveRequestUrl } from "~/lib/url";
+import { buildMachineReportUrl } from "~/lib/machines/report-url";
+import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { MachineIssuesCard } from "~/app/(app)/m/[initials]/machine-issues-card";
 import { MachineOpsBox } from "~/app/(app)/m/[initials]/machine-ops-box";
+import { MachineQrCard } from "~/app/(app)/m/[initials]/machine-qr-card";
 import {
   getMachineForLayout,
   getMachineAllIssues,
@@ -94,39 +99,71 @@ export default async function MachineMaintenanceTab({
 
   const machineStatus = deriveMachineStatus(machine.issues);
 
-  // Open is the default; the All view is loaded lazily only when requested.
-  const issuesToShow =
-    view === "all" ? await getMachineAllIssues(initials) : machine.issues;
+  // QR sticker → the machine's report page (relocated off the Info tab).
+  const headersList = await headers();
+  const reportUrl = buildMachineReportUrl({
+    siteUrl: resolveRequestUrl(headersList),
+    machineInitials: machine.initials,
+    source: "qr",
+  });
 
+  // Open is the default; the All view is loaded lazily only when requested.
+  // Resolve the QR PNG concurrently with the (optional) all-issues read.
+  const [qrDataUrl, issuesToShow] = await Promise.all([
+    generateQrPngDataUrl(reportUrl),
+    view === "all"
+      ? getMachineAllIssues(initials)
+      : Promise.resolve(machine.issues),
+  ]);
+
+  // Blocks in mobile reading order (design §4): Machine box (status / presence
+  // / Watch) → Open Issues → Activity → QR. On desktop the box + QR pin to the
+  // 320px right rail; Open Issues + Activity flow down the main column. Explicit
+  // column/row placement (not a spanning aside) so the box can lead on mobile
+  // while the QR sinks to the bottom.
   return (
-    <div className="space-y-6">
-      <MachineOpsBox
-        machineId={machine.id}
-        machineStatus={machineStatus}
-        presenceStatus={machine.presenceStatus}
-        canEditPresence={canEditGeneral}
-        watchButton={watchButton}
-        ownerRequirements={machine.ownerRequirements}
-        canViewOwnerRequirements={canViewOwnerRequirements}
-        canEditGeneral={canEditGeneral}
-      />
-      <MachineIssuesCard
-        issues={issuesToShow}
-        machineName={machine.name}
-        machineInitials={machine.initials}
-        view={view}
-      />
+    <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,1fr)_320px] md:items-start md:gap-6">
+      <div className="md:col-start-2 md:row-start-1">
+        <MachineOpsBox
+          machineId={machine.id}
+          machineStatus={machineStatus}
+          presenceStatus={machine.presenceStatus}
+          canEditPresence={canEditGeneral}
+          watchButton={watchButton}
+          ownerRequirements={machine.ownerRequirements}
+          canViewOwnerRequirements={canViewOwnerRequirements}
+          canEditGeneral={canEditGeneral}
+        />
+      </div>
+      <div className="md:col-start-1 md:row-start-1">
+        <MachineIssuesCard
+          issues={issuesToShow}
+          machineName={machine.name}
+          machineInitials={machine.initials}
+          view={view}
+        />
+      </div>
       {/* Activity feed (implements PP-7mjy) — reuses the real machine-timeline
           rows (comment / issue-event / lifecycle) and the "+ Add note"
           composer. The composer's server action (`addMachineCommentAction`) is
           already machine-id-parameterized, so it is reusable for the collection
           timeline (PP-slrd.2) without further factoring. */}
-      <MachineRecentActivity
-        machineId={machine.id}
-        machineInitials={machine.initials}
-        machineName={machine.name}
-        canCompose={canCompose}
-      />
+      <div className="md:col-start-1 md:row-start-2">
+        <MachineRecentActivity
+          machineId={machine.id}
+          machineInitials={machine.initials}
+          machineName={machine.name}
+          canCompose={canCompose}
+        />
+      </div>
+      <div className="md:col-start-2 md:row-start-2">
+        <MachineQrCard
+          machineName={machine.name}
+          machineInitials={machine.initials}
+          qrDataUrl={qrDataUrl}
+          reportUrl={reportUrl}
+        />
+      </div>
     </div>
   );
 }

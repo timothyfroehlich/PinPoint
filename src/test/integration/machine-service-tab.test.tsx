@@ -3,6 +3,7 @@ import React from "react";
 import { render } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { machines, issues, userProfiles } from "~/server/db/schema";
 import {
@@ -18,6 +19,10 @@ vi.mock("~/lib/supabase/server", () => ({
 }));
 
 vi.mock("next/navigation", () => ({ notFound: vi.fn() }));
+
+vi.mock("next/headers", () => ({
+  headers: () => Promise.resolve(new Headers([["host", "localhost:3000"]])),
+}));
 
 vi.mock("~/server/db", async () => {
   const { getTestDb } = await import("~/test/setup/pglite");
@@ -56,6 +61,21 @@ vi.mock("~/app/(app)/m/[initials]/machine-issues-card", () => ({
 }));
 vi.mock("~/components/machines/WatchMachineButton", () => ({
   WatchMachineButton: () => <div data-testid="watch-button" />,
+}));
+
+// Owner's Requirements + presence live in the ops box (relocated off the Info
+// tab, PP-5sgt.3). Stub it to capture the permission props the page computes —
+// this is where the Info tab's owner-private gating coverage now lives.
+interface OpsBoxProps {
+  canEditPresence: boolean;
+  canViewOwnerRequirements: boolean;
+  canEditGeneral: boolean;
+}
+const mockOpsBox = vi.fn<(p: OpsBoxProps) => React.ReactElement>(() => (
+  <div data-testid="machine-ops-box" />
+));
+vi.mock("~/app/(app)/m/[initials]/machine-ops-box", () => ({
+  MachineOpsBox: (p: OpsBoxProps) => mockOpsBox(p),
 }));
 
 const NO_PARAMS = Promise.resolve<Record<string, string | undefined>>({});
@@ -146,5 +166,80 @@ describe("Machine Service (maintenance) tab", () => {
     const props = mockIssuesCard.mock.calls[0][0];
     expect(props.view).toBe("all");
     expect(props.issues).toHaveLength(2);
+  });
+
+  // Owner-private field gating (relocated here from the Info tab).
+  it("hides Owner's Requirements from anonymous viewers", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+    render(
+      await MachineMaintenanceTab({
+        params: Promise.resolve({ initials: "GZ" }),
+        searchParams: NO_PARAMS,
+      })
+    );
+    const props = mockOpsBox.mock.calls[0][0];
+    expect(props.canViewOwnerRequirements).toBe(false);
+    expect(props.canEditGeneral).toBe(false);
+  });
+
+  it("lets a guest VIEW but not edit Owner's Requirements", async () => {
+    const guestId = randomUUID();
+    const db = await getTestDb();
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: guestId, role: "guest" }));
+    mockGetUser.mockResolvedValue({ data: { user: { id: guestId } } });
+
+    render(
+      await MachineMaintenanceTab({
+        params: Promise.resolve({ initials: "GZ" }),
+        searchParams: NO_PARAMS,
+      })
+    );
+    const props = mockOpsBox.mock.calls[0][0];
+    expect(props.canViewOwnerRequirements).toBe(true);
+    expect(props.canEditGeneral).toBe(false);
+  });
+
+  it("grants the machine owner edit of Owner's Requirements + presence", async () => {
+    const ownerId = randomUUID();
+    const db = await getTestDb();
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: ownerId, role: "member" }));
+    await db
+      .update(machines)
+      .set({ ownerId })
+      .where(eq(machines.id, machine.id));
+    mockGetUser.mockResolvedValue({ data: { user: { id: ownerId } } });
+
+    render(
+      await MachineMaintenanceTab({
+        params: Promise.resolve({ initials: "GZ" }),
+        searchParams: NO_PARAMS,
+      })
+    );
+    const props = mockOpsBox.mock.calls[0][0];
+    expect(props.canEditGeneral).toBe(true);
+    expect(props.canEditPresence).toBe(true);
+  });
+
+  it("grants an admin edit of Owner's Requirements", async () => {
+    const adminId = randomUUID();
+    const db = await getTestDb();
+    await db
+      .insert(userProfiles)
+      .values(createTestUser({ id: adminId, role: "admin" }));
+    mockGetUser.mockResolvedValue({ data: { user: { id: adminId } } });
+
+    render(
+      await MachineMaintenanceTab({
+        params: Promise.resolve({ initials: "GZ" }),
+        searchParams: NO_PARAMS,
+      })
+    );
+    const props = mockOpsBox.mock.calls[0][0];
+    expect(props.canViewOwnerRequirements).toBe(true);
+    expect(props.canEditGeneral).toBe(true);
   });
 });

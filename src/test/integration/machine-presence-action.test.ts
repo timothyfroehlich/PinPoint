@@ -24,7 +24,10 @@ vi.mock("~/server/db", async () => {
   return { db: await getTestDb() };
 });
 
-vi.mock("~/lib/supabase/server", () => ({ createClient: vi.fn() }));
+const mockGetUser = vi.fn();
+vi.mock("~/lib/supabase/server", () => ({
+  createClient: () => Promise.resolve({ auth: { getUser: mockGetUser } }),
+}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 describe("updateMachinePresenceAction (PP-5sgt.3)", () => {
@@ -65,14 +68,9 @@ describe("updateMachinePresenceAction (PP-5sgt.3)", () => {
     return machine;
   }
 
-  async function mockAuth(userId: string | null): Promise<void> {
-    const { createClient } = await import("~/lib/supabase/server");
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: userId ? { id: userId } : null },
-        }),
-      },
+  function mockAuth(userId: string | null): void {
+    mockGetUser.mockResolvedValue({
+      data: { user: userId ? { id: userId } : null },
     });
   }
 
@@ -87,7 +85,7 @@ describe("updateMachinePresenceAction (PP-5sgt.3)", () => {
   it("updates availability and emits a presence_changed lifecycle event", async () => {
     const adminId = await makeUser("admin");
     const machine = await makeMachine();
-    await mockAuth(adminId);
+    mockAuth(adminId);
 
     const { updateMachinePresenceAction } =
       await import("~/app/(app)/m/actions");
@@ -121,7 +119,7 @@ describe("updateMachinePresenceAction (PP-5sgt.3)", () => {
   it("lets the machine owner change availability", async () => {
     const ownerId = await makeUser("member");
     const machine = await makeMachine(ownerId);
-    await mockAuth(ownerId);
+    mockAuth(ownerId);
 
     const { updateMachinePresenceAction } =
       await import("~/app/(app)/m/actions");
@@ -133,7 +131,7 @@ describe("updateMachinePresenceAction (PP-5sgt.3)", () => {
     const ownerId = await makeUser("member");
     const strangerId = await makeUser("member");
     const machine = await makeMachine(ownerId);
-    await mockAuth(strangerId);
+    mockAuth(strangerId);
 
     const { updateMachinePresenceAction } =
       await import("~/app/(app)/m/actions");
@@ -153,7 +151,7 @@ describe("updateMachinePresenceAction (PP-5sgt.3)", () => {
   it("is a no-op (no event) when the value is unchanged", async () => {
     const adminId = await makeUser("admin");
     const machine = await makeMachine();
-    await mockAuth(adminId);
+    mockAuth(adminId);
 
     const { updateMachinePresenceAction } =
       await import("~/app/(app)/m/actions");
@@ -175,7 +173,7 @@ describe("updateMachinePresenceAction (PP-5sgt.3)", () => {
 
   it("rejects unauthenticated callers", async () => {
     const machine = await makeMachine();
-    await mockAuth(null);
+    mockAuth(null);
 
     const { updateMachinePresenceAction } =
       await import("~/app/(app)/m/actions");
