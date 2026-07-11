@@ -29,7 +29,7 @@ export interface RichTextEditorHandle {
   focus: () => void;
 }
 
-interface RichTextEditorProps {
+export interface RichTextEditorProps {
   content: ProseMirrorDoc | null;
   onChange: (doc: ProseMirrorDoc) => void;
   /**

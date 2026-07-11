@@ -68,7 +68,9 @@ const nextConfig: NextConfig = {
     },
   },
   typescript: {
-    tsconfigPath: "./tsconfig.json",
+    // App-source project. The root tsconfig.json is references-only after the
+    // PP-4k76 solution-style split, so Next reads the concrete app config here.
+    tsconfigPath: "./tsconfig.app.json",
   },
   // Keep pino and its worker dependency external so Turbopack doesn't try to bundle their test fixtures.
   serverExternalPackages: ["pino", "thread-stream"],

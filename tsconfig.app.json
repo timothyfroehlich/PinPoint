@@ -1,0 +1,52 @@
+{
+  // App (production source) project. Formerly the root tsconfig.json; split out
+  // as a leaf project reference for the solution-style layout (PP-4k76). The
+  // root tsconfig.json is now references-only so tsserver can assign every file
+  // (app + test) a concrete owner instead of falling back to an inferred project
+  // that lacks path aliases / node types.
+  //
+  // `composite: true` is required for this project to be referenceable by the
+  // root config and by tsconfig.tests.json. `noEmit` is intentionally NOT set
+  // here: a referenced composite project may not disable emit (TS6310). Emit is
+  // suppressed at the call site instead — the typecheck scripts pass `--noEmit`,
+  // and `next build` forces its own noEmit — so no output is ever produced.
+  "extends": ["./tsconfig.base.json", "@tsconfig/strictest/tsconfig.json"],
+  "compilerOptions": {
+    // Additional settings beyond @tsconfig/strictest
+    "composite": true, // Referenceable leaf project (PP-4k76)
+    "strictNullChecks": true, // Explicit for emphasis (part of "strict")
+    "forceConsistentCasingInFileNames": true // Cross-platform safety
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "src/**/*",
+    "middleware.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "out",
+    "dist",
+    ".archived_v1",
+    ".claude/worktrees/**/*",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "src/test/**/*",
+    "e2e/**/*",
+    // NOTE: playwright.config.ts is intentionally NOT excluded — it is imported
+    // by playwright.config.{full,smoke}.ts (both matched by the `**/*.ts`
+    // include), and under `composite: true` every file pulled into the program
+    // must be listed (TS6307). Leaving it included keeps all three playwright
+    // configs type-checked, exactly as before the PP-4k76 split.
+    "vitest.config.ts",
+    "drizzle.config.ts",
+    "postcss.config.mjs",
+    "src/app/(app)/mockup/**/*",
+    "src/components/mockups/**/*"
+  ]
+}

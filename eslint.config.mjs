@@ -37,7 +37,9 @@ export default [
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {
-        project: "./tsconfig.json",
+        // App-source project (was tsconfig.json before the PP-4k76 solution-style
+        // split; the root is now references-only and owns no files).
+        project: "./tsconfig.app.json",
         tsconfigRootDir: import.meta.dirname,
       },
     },
