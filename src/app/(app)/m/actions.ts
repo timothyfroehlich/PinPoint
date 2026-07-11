@@ -707,6 +707,13 @@ function parseDescriptionFormField(
   if (raw.length === 0) {
     return { ok: true, value: null };
   }
+  // Enforce the serialized-JSON size cap on the raw string BEFORE parsing, so an
+  // oversized untrusted payload is rejected without running JSON.parse over it.
+  // (validateProseMirrorDoc re-checks the cap for the inline-edit path, which
+  // receives an already-parsed doc rather than a raw string.)
+  if (raw.length > 100_000) {
+    return { ok: false, message: "Description is too long." };
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
