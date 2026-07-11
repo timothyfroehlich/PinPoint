@@ -5,6 +5,7 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
+import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/index";
 import { MachineIssuesCard } from "~/app/(app)/m/[initials]/machine-issues-card";
 import {
@@ -47,6 +48,10 @@ export default async function MachineMaintenanceTab({
 
   const accessLevel = getAccessLevel(currentUserProfile?.role);
   const canWatch = checkPermission("machines.watch", accessLevel);
+  const canCompose = checkPermission(
+    "machines.timeline.comment.add",
+    accessLevel
+  );
 
   const { machine } = await getMachineForLayout(initials);
   if (!machine) {
@@ -81,6 +86,17 @@ export default async function MachineMaintenanceTab({
         machineName={machine.name}
         machineInitials={machine.initials}
         view={view}
+      />
+      {/* Activity feed (implements PP-7mjy) — reuses the real machine-timeline
+          rows (comment / issue-event / lifecycle) and the "+ Add note"
+          composer. The composer's server action (`addMachineCommentAction`) is
+          already machine-id-parameterized, so it is reusable for the collection
+          timeline (PP-slrd.2) without further factoring. */}
+      <MachineRecentActivity
+        machineId={machine.id}
+        machineInitials={machine.initials}
+        machineName={machine.name}
+        canCompose={canCompose}
       />
     </div>
   );
