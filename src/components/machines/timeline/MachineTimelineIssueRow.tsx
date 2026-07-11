@@ -146,7 +146,12 @@ export function MachineTimelineIssueRow({
             </span>
           )}
           <span className="flex min-w-0 items-baseline gap-1.5">
-            <span className="truncate text-muted-foreground">{verbClause}</span>
+            {/* min-w-0 + flex-1: a flex child's default min-width:auto blocks
+                shrinking, so `truncate` alone would overflow instead of
+                clipping. Let the verb take the remaining space and ellipsize. */}
+            <span className="min-w-0 flex-1 truncate text-muted-foreground">
+              {verbClause}
+            </span>
             {actor && density === "full" ? (
               <span className="shrink-0 text-muted-foreground">
                 by{" "}
