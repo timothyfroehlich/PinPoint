@@ -43,8 +43,9 @@ const STATUS_DOT: Record<MachineStatus, string> = {
  * InfoHero — the QR-scanning player's whole answer on the Info tab: machine
  * health (derived status + presence), a prominent "Report a problem" button
  * routing to the report page, and a peek at the open issues with a link to the
- * Service tab for the full list. Reading-order position: directly below the
- * Description card.
+ * Service tab for the full list. Reading-order position: the top of the Info
+ * tab; the reference cluster (Details card with the machine description + owner,
+ * then Tags / PinballMap) follows.
  */
 export function InfoHero({
   machineInitials,
