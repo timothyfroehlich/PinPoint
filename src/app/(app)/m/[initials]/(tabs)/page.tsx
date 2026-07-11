@@ -241,7 +241,11 @@ export default async function MachineInfoTab({
         {showOwnerFields && (
           <MachineTextFields
             machineId={machine.id}
-            description={machine.description}
+            // showDescription={false} → the description is never rendered here,
+            // so don't ship the ProseMirror doc across the RSC→client boundary
+            // (CORE-SEC-006 minimal client payload); it already crosses once via
+            // the Edit dialog where it's actually needed.
+            description={null}
             ownerRequirements={machine.ownerRequirements}
             canEditGeneral={canEdit}
             canViewOwnerRequirements={canViewOwnerRequirements}

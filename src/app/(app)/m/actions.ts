@@ -653,20 +653,30 @@ export async function createMachineAction(
  * `"empty"` = whitespace-only (caller normalizes to null so the DB stores NULL,
  * not a semantically-empty JSON blob).
  */
-function validateProseMirrorDoc(
-  doc: ProseMirrorDoc
-): "invalid" | "too-long" | "empty" | "ok" {
-  if (!proseMirrorDocSchema.safeParse(doc).success) {
-    return "invalid";
+type ProseMirrorValidation =
+  | { status: "invalid" }
+  | { status: "too-long" }
+  | { status: "empty" }
+  | { status: "ok"; doc: ProseMirrorDoc };
+
+function validateProseMirrorDoc(value: unknown): ProseMirrorValidation {
+  // Validate the untrusted value at runtime BEFORE treating it as a doc — the
+  // raw parse result is `unknown`, and only a successful safeParse licenses the
+  // narrow below (CORE-TS-007: no unsafe cast of unvalidated input).
+  if (!proseMirrorDocSchema.safeParse(value).success) {
+    return { status: "invalid" };
   }
+  // Shape confirmed (`type: "doc"`); narrow the validated `unknown` to the app's
+  // doc type.
+  const doc = value as ProseMirrorDoc;
   const plainText = docToPlainText(doc);
   if (plainText.length > 10_000 || JSON.stringify(doc).length > 100_000) {
-    return "too-long";
+    return { status: "too-long" };
   }
   if (plainText.trim().length === 0) {
-    return "empty";
+    return { status: "empty" };
   }
-  return "ok";
+  return { status: "ok", doc };
 }
 
 /**
@@ -697,25 +707,25 @@ function parseDescriptionFormField(
   if (raw.length === 0) {
     return { ok: true, value: null };
   }
-  let doc: ProseMirrorDoc;
+  let parsed: unknown;
   try {
-    doc = JSON.parse(raw) as ProseMirrorDoc;
+    parsed = JSON.parse(raw);
   } catch {
     return { ok: false, message: "Invalid description format." };
   }
-  const verdict = validateProseMirrorDoc(doc);
-  if (verdict === "invalid") {
+  const result = validateProseMirrorDoc(parsed);
+  if (result.status === "invalid") {
     return { ok: false, message: "Invalid description format." };
   }
-  if (verdict === "too-long") {
+  if (result.status === "too-long") {
     return { ok: false, message: "Description is too long." };
   }
   // Normalize a whitespace-only doc to null so the DB stores NULL rather than a
   // semantically-empty JSON blob.
-  if (verdict === "empty") {
+  if (result.status === "empty") {
     return { ok: true, value: null };
   }
-  return { ok: true, value: doc };
+  return { ok: true, value: result.doc };
 }
 
 /**
@@ -1348,14 +1358,14 @@ async function updateMachineTextField(
   // Normalize empty docs to null so the DB stores NULL rather than a semantically-empty JSON blob.
   let normalizedValue: ProseMirrorDoc | null = value;
   if (value !== null) {
-    const verdict = validateProseMirrorDoc(value);
-    if (verdict === "invalid") {
+    const result = validateProseMirrorDoc(value);
+    if (result.status === "invalid") {
       return err("VALIDATION", "Invalid rich text payload.");
     }
-    if (verdict === "too-long") {
+    if (result.status === "too-long") {
       return err("VALIDATION", "Text is too long.");
     }
-    if (verdict === "empty") {
+    if (result.status === "empty") {
       normalizedValue = null;
     }
   }
