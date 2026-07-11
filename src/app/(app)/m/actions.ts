@@ -46,6 +46,10 @@ import {
 } from "~/lib/timeline/machine-lifecycle-helpers";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import { type MachineTimelineEventKind } from "~/lib/timeline/machine-event-types";
+import {
+  VALID_MACHINE_PRESENCE_STATUSES,
+  type MachinePresenceStatus,
+} from "~/lib/machines/presence";
 
 /**
  * Maps a prose-field column name to its marker lifecycle event kind.
@@ -1464,6 +1468,126 @@ async function updateMachineTextField(
       "SERVER",
       "Failed to update field. Please try again.",
       { action: "updateMachineTextField", field }
+    );
+  }
+}
+
+// --- Machine Presence (availability) Update Action ---
+
+const presenceSchema = z.enum(VALID_MACHINE_PRESENCE_STATUSES);
+
+/**
+ * Update Machine Presence (availability) — the one manual machine control on
+ * the Service tab (design §4). Status stays read-only/derived; presence is a
+ * 5-state select. Editable by machine owner, technicians, and admins
+ * (`machines.edit`).
+ *
+ * Emits a `presence_changed` lifecycle event (via {@link emitMachineUpdated})
+ * atomically with the row update, so the change surfaces in the Activity feed.
+ * The emit only fires when the value actually changes.
+ */
+export async function updateMachinePresenceAction(
+  machineId: string,
+  presenceStatus: MachinePresenceStatus
+): Promise<UpdateMachineFieldResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return err("UNAUTHORIZED", "Unauthorized. Please log in.");
+  }
+
+  if (!z.string().uuid().safeParse(machineId).success) {
+    return err("VALIDATION", "Invalid machine ID");
+  }
+
+  const parsedPresence = presenceSchema.safeParse(presenceStatus);
+  if (!parsedPresence.success) {
+    return err("VALIDATION", "Invalid availability value.");
+  }
+
+  try {
+    const [profile, machine] = await Promise.all([
+      db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+        columns: { role: true },
+      }),
+      db.query.machines.findFirst({
+        where: eq(machines.id, machineId),
+        columns: {
+          id: true,
+          initials: true,
+          name: true,
+          ownerId: true,
+          invitedOwnerId: true,
+          presenceStatus: true,
+        },
+      }),
+    ]);
+
+    if (!profile) {
+      return err("UNAUTHORIZED", "User profile not found.");
+    }
+    if (!machine) {
+      return err("NOT_FOUND", "Machine not found.");
+    }
+
+    const accessLevel = getAccessLevel(profile.role);
+    if (
+      !checkPermission("machines.edit", accessLevel, {
+        userId: user.id,
+        machineOwnerId: machine.ownerId,
+      })
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "Only the machine owner, technicians, or admins can change availability."
+      );
+    }
+
+    // Atomic: update + lifecycle emit. `emitMachineUpdated` only emits a
+    // `presence_changed` event when the value actually differs; name/owner are
+    // passed unchanged so no spurious name/owner events fire.
+    await db.transaction(async (tx) => {
+      await tx
+        .update(machines)
+        .set({ presenceStatus: parsedPresence.data })
+        .where(eq(machines.id, machine.id));
+
+      await emitMachineUpdated(
+        tx,
+        {
+          id: machine.id,
+          name: machine.name,
+          owner: toMachineOwnerRef(machine.ownerId, machine.invitedOwnerId),
+          presenceStatus: machine.presenceStatus,
+        },
+        {
+          name: machine.name,
+          ownerChanged: false,
+          owner: toMachineOwnerRef(machine.ownerId, machine.invitedOwnerId),
+          presenceStatus: parsedPresence.data,
+        },
+        user.id
+      );
+    });
+
+    // Presence shows on both the Info and Service tabs (and the header), and a
+    // change emits a timeline row — revalidate the whole machine subtree.
+    revalidatePath(`/m/${machine.initials}`, "layout");
+
+    return ok({ machineId: machine.id });
+  } catch (error: unknown) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+    return serverActionError(
+      error,
+      "SERVER",
+      "Failed to update availability. Please try again.",
+      { action: "updateMachinePresenceAction" }
     );
   }
 }

@@ -6,8 +6,14 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/index";
+import {
+  checkPermission,
+  getAccessLevel,
+  type OwnershipContext,
+} from "~/lib/permissions/index";
+import { deriveMachineStatus } from "~/lib/machines/status";
 import { MachineIssuesCard } from "~/app/(app)/m/[initials]/machine-issues-card";
+import { MachineOpsBox } from "~/app/(app)/m/[initials]/machine-ops-box";
 import {
   getMachineForLayout,
   getMachineAllIssues,
@@ -58,6 +64,20 @@ export default async function MachineMaintenanceTab({
     notFound();
   }
 
+  const ownershipContext: OwnershipContext = {
+    userId: user?.id,
+    machineOwnerId: machine.ownerId ?? undefined,
+  };
+  const canEditGeneral = checkPermission(
+    "machines.edit",
+    accessLevel,
+    ownershipContext
+  );
+  const canViewOwnerRequirements = checkPermission(
+    "machines.view.ownerRequirements",
+    accessLevel
+  );
+
   const currentUserWatch = user
     ? machine.watchers.find((w) => w.userId === user.id)
     : undefined;
@@ -72,15 +92,24 @@ export default async function MachineMaintenanceTab({
     />
   ) : null;
 
+  const machineStatus = deriveMachineStatus(machine.issues);
+
   // Open is the default; the All view is loaded lazily only when requested.
   const issuesToShow =
     view === "all" ? await getMachineAllIssues(initials) : machine.issues;
 
   return (
     <div className="space-y-6">
-      {watchButton ? (
-        <div className="flex justify-end">{watchButton}</div>
-      ) : null}
+      <MachineOpsBox
+        machineId={machine.id}
+        machineStatus={machineStatus}
+        presenceStatus={machine.presenceStatus}
+        canEditPresence={canEditGeneral}
+        watchButton={watchButton}
+        ownerRequirements={machine.ownerRequirements}
+        canViewOwnerRequirements={canViewOwnerRequirements}
+        canEditGeneral={canEditGeneral}
+      />
       <MachineIssuesCard
         issues={issuesToShow}
         machineName={machine.name}
