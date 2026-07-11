@@ -1,10 +1,13 @@
 {
   // Extends base + strictest directly. Previously extended ../tsconfig.json,
-  // but after the PP-4k76 split that root is references-only (no compilerOptions
-  // / no `paths`), which would strip the `~/` alias and strict settings this
-  // config relies on. It intentionally does NOT extend ../tsconfig.app.json —
-  // that project is `composite`, and inheriting composite here would impose
-  // declaration-emit checks + file-listing rules on the e2e sources.
+  // but after the PP-4k76 split that root is references-only (`files: []`) and
+  // extends ONLY tsconfig.base.json — it no longer applies the app's
+  // `@tsconfig/strictest` ruleset. (The root does still carry `paths` via base,
+  // but not strictest.) Extending it would silently drop the strict settings
+  // this config relies on, so it extends base + strictest here directly. It
+  // intentionally does NOT extend ../tsconfig.app.json — that project is
+  // `composite`, and inheriting composite here would impose declaration-emit
+  // checks + file-listing rules on the e2e sources.
   "extends": ["../tsconfig.base.json", "@tsconfig/strictest/tsconfig.json"],
   "compilerOptions": {
     "noEmit": true,
