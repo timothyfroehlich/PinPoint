@@ -54,6 +54,8 @@ export function MachineIssuesCard({
               machine={{ name: machineName }}
               variant="compact"
               badgeLayout="strip"
+              showMachineName={false}
+              capNarrowBadges
             />
           ))}
         </div>
