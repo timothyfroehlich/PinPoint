@@ -5,13 +5,23 @@
 **Status:** TS 7.0 GA landed 2026-07-08 (7.0.2); the `@typescript/native-preview` nightlies are retired. Phase 1 now runs on the GA dual-install (PP-xu96): `@typescript/native` = `npm:typescript@^7` (native `tsc`, drives the typecheck gate), `typescript` = `npm:@typescript/typescript6@^6` (TS6 JS API for ESLint + `next build`, `tsc6` binary). Phases 2–4 deferred (tests/e2e engine move: PP-8mv1).
 **Branch:** `claude/typescript-7-upgrade-plan-o85h0g` (Phase 1 nightly shape: PR #1586; GA swap: PP-xu96)
 
+> **Update 2026-07-12:** TS 7.0 GA shipped 2026-07-08 (7.0.2), and the
+> `@typescript/native-preview` nightlies retired. PR #1650 (PP-xu96) implemented the
+> dual-install: `typescript` → `npm:@typescript/typescript6@^6` (TS6 JS API + `tsc6`
+> binary) and `@typescript/native` → `npm:typescript@^7` (native `tsc`). **The TL;DR
+> and sections below are the original 2026-06-27 pre-GA analysis, preserved as the
+> decision record.** Where they say "GA is ~1 month out" or "add
+> `@typescript/native-preview` (`tsgo`)", the GA equivalents above are what actually
+> shipped — the native binary is now `tsc` (from `@typescript/native`), not `tsgo`.
+
 ---
 
 ## TL;DR
 
 - **TypeScript 7 = the Go-native rewrite of `tsc`** ("Project Corsa"). It is a new
   _binary_, not a new language version. **7.0 RC shipped 2026-06-18; GA is ~1 month
-  out.** Type-checking semantics are ~identical to TS 6.
+  out.** _(GA landed 2026-07-08 — see the Update note above.)_ Type-checking semantics
+  are ~identical to TS 6.
 - **This is NOT a "replace `typescript`" upgrade.** TS 7.0 ships the native `tsc`
   binary but **does not ship a stable JavaScript compiler API ("Strada") until 7.1**
   (several months out). typescript-eslint's type-aware linting and Next.js's build
@@ -19,6 +29,9 @@
 - **The correct shape is side-by-side:** keep `typescript@6.x` for ESLint + Next,
   **add `@typescript/native-preview` (`tsgo`)** as a devDependency, and **repoint only
   the `typecheck` script** (and its CI job) at the native binary. One-line revert.
+  _(At GA this became: `typescript` → `@typescript/typescript6`, add
+  `@typescript/native` (native `tsc`, not `tsgo`); same side-by-side principle. See the
+  Update note above.)_
 - **I validated this against the real codebase today.** Native compiler
   `7.0.0-dev.20260627.2`:
   - **Production `tsconfig.json`: 0 errors — perfect parity with tsc 6.0.3.**
