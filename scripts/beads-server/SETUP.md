@@ -106,6 +106,7 @@ cd ~/.beads-server/dolt
 # won't persist into it.
 dolt sql-server --host 127.0.0.1 --port 3306 \
   --data-dir ~/.beads-server/dolt --privilege-file ~/.beads-server/privileges.db &
+THROWAWAY_PID=$!
 sleep 5
 # dolt's connection flags are GLOBAL — they go BEFORE the `sql` subcommand (the form
 # `dolt sql --host …` errors with "unknown option host"). Passwordless root needs an
@@ -113,7 +114,7 @@ sleep 5
 # first boot.
 dolt --host 127.0.0.1 --port 3306 --user root --password "" --no-tls sql -q \
   "CREATE USER 'beads'@'%' IDENTIFIED BY '<PASSWORD>'; GRANT ALL PRIVILEGES ON *.* TO 'beads'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;"
-kill %1   # stop the throwaway localhost server
+kill "$THROWAWAY_PID"   # stop the throwaway localhost server (PID, not %1 — job control isn't reliable in scripts)
 ```
 
 `beads` gets `ALL PRIVILEGES ON *.*` (not just `PP.*`): the bridge's `bd dolt
