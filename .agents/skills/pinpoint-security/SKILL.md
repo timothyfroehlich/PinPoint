@@ -23,7 +23,7 @@ Use this skill when:
 
 ### Critical Security Rules
 
-1. **Permissions Go Through the Matrix (CORE-ARCH-008)**: All permission checks that gate a request or enforce authorization MUST go through `checkPermission()` (server-side) or `usePermission()` (client-side) from `~/lib/permissions/helpers` and `hooks`. Hardcoded role checks (e.g., `role === "admin"`) as auth gates are strictly forbidden. Limited role comparisons are allowed for non-gating logic — SQL/query row filtering (e.g., an `isAdmin` flag driving a `where` clause), UI display flags/badges, business-logic preconditions — but each such usage must be annotated with `// permissions-audit-allow: <reason>` so the matrix audit recognizes the exception. The matrix at `src/lib/permissions/matrix.ts` is the single source of truth and must remain perfectly synced with actual enforcement.
+1. **Permissions Go Through the Matrix (CORE-ARCH-008)**: All permission checks that gate a request or enforce authorization MUST go through `checkPermission()` / `getPermissionState()` from `~/lib/permissions/helpers` — these are pure functions, so the same helpers run in Server Components, Server Actions, and Client Components (there are no permission React hooks). Hardcoded role checks (e.g., `role === "admin"`) as auth gates are strictly forbidden. Limited role comparisons are allowed for non-gating logic — SQL/query row filtering (e.g., an `isAdmin` flag driving a `where` clause), UI display flags/badges, business-logic preconditions — but each such usage must be annotated with `// permissions-audit-allow: <reason>` so the matrix audit recognizes the exception. The matrix at `src/lib/permissions/matrix.ts` is the single source of truth and must remain perfectly synced with actual enforcement.
 2. **Supabase SSR Contract (CORE-SSR-001/002)**: Use `~/lib/supabase/server`'s `createClient()` for user-scoped server work. Always call `await supabase.auth.getUser()` immediately after client creation, with **no logic in between**. Do not hand-build a user-scoped SSR client from `@supabase/supabase-js` — go through `~/lib/supabase/server`. Importing types or specific utilities from `@supabase/supabase-js` is fine, and `src/lib/supabase/admin.ts` legitimately uses `createClient` from `@supabase/supabase-js` to build the server-only, service-role admin client.
 3. **Validate ALL Inputs (CORE-SEC-002)**: Use Zod for all form data and user inputs. Never trust `FormData` or query parameters without validation.
 4. **CSP with Nonces (CORE-SEC-003/004)**: Dynamic nonces are generated via `middleware.ts` for script execution. Do not use `'unsafe-inline'` or `'unsafe-eval'` for scripts. Static security headers are set in `next.config.ts`.
@@ -94,7 +94,7 @@ Practical pattern: define a `XyzProps` interface listing only the fields the com
 
 ## 2. Authorization & Permissions Framework (CORE-ARCH-008)
 
-The permissions system is defined in `src/lib/permissions/matrix.ts` (single source of truth) and checked via helpers in `src/lib/permissions/helpers.ts` or React hooks in `src/lib/permissions/hooks.ts`.
+The permissions system is defined in `src/lib/permissions/matrix.ts` (single source of truth) and checked via the pure helpers in `src/lib/permissions/helpers.ts`, which run unchanged in both server and client code.
 
 The `permissions-audit-allow` annotation contract is **enforced**, not documentation. `scripts/audit/no-hardcoded-role-checks.sh` scans `src/` (excluding the permissions module and tests) for `role === "<role>"` comparisons and fails on any that lack `// permissions-audit-allow: <reason>` on the same line, the line directly above, or the line directly below. The audit is wired into `pnpm run check` as `audit:role-checks` — preflight will reject unannotated gates.
 
@@ -108,19 +108,11 @@ Always use the following functions for permission gating and auditing:
   - `checkPermissions(permissionIds, accessLevel, context)`: Returns true if all permissions are granted.
   - `checkAnyPermission(permissionIds, accessLevel, context)`: Returns true if any of the permissions are granted.
   - `getGrantedPermissions(accessLevel, context)`: Retrieves list of granted permission IDs.
-  - `getPermissionState(permissionId, accessLevel, context)`: Returns a discriminated union — `{ allowed: true }` or `{ allowed: false; reason: "unauthenticated" | "role" | "ownership" }`. Narrow on `allowed` before reading `reason`; it only exists on the denied branch. (The `usePermissionState` client hook flattens this to `{ allowed: boolean; reason: string | null }` for convenience.)
+  - `getPermissionState(permissionId, accessLevel, context)`: Returns a discriminated union — `{ allowed: true }` or `{ allowed: false; reason: "unauthenticated" | "role" | "ownership" }`. Narrow on `allowed` before reading `reason`; it only exists on the denied branch.
   - `getPermissionDeniedReason(permissionId, accessLevel, context)`: Returns a human-readable tooltip string for disabled actions.
   - `isConditionalPermission(permissionId, accessLevel)`: Checks if a permission's matrix value is conditional (`'own'`/`'owner'`) and therefore requires `OwnershipContext` to evaluate.
   - `getRawPermissionValue(permissionId, accessLevel)`: Returns the raw matrix value (`true`, `false`, `'own'`, or `'owner'`) before ownership resolution. Use this only when you need to introspect the matrix entry itself (e.g., to choose between two UI states); for actual access decisions, always go through `checkPermission` / `getPermissionState`.
-- **Client React Hooks (`src/lib/permissions/hooks.ts`)**:
-  - `usePermission(permissionId, user, context)`
-  - `usePermissionState(permissionId, user, context)`
-  - `usePermissions(permissionIds, user, context)`
-  - `usePermissionStates(permissionIds, user, context)`
-  - `useAccessLevel(user)`
-  - `useIsAuthenticated(user)`
-  - `useIsConditionalPermission(permissionId, user)`
-  - `useRawPermission(permissionId, user)`
+- **Client Components**: there are no permission-specific React hooks. Because the helpers above are pure (no server-only dependencies), client components call them directly — compute the `accessLevel` (`AccessLevel`) and `OwnershipContext` server-side, pass them down as props, then call `getPermissionState` / `getPermissionDeniedReason` inside the component. Keeping the derivation server-side also keeps the client payload minimal (CORE-SEC-006).
 
 ---
 
@@ -244,35 +236,50 @@ export async function updateIssueAction(formData: FormData) {
 }
 ```
 
-### Client Component with Hooks
+### Client Component (pure helpers, no hooks)
 
 ```typescript
 "use client";
 
-import { usePermissionState, type PermissionUser, type IssueContext } from "~/lib/permissions/hooks";
+import {
+  getPermissionDeniedReason,
+  getPermissionState,
+  type OwnershipContext,
+} from "~/lib/permissions/helpers";
+import { type AccessLevel } from "~/lib/permissions/matrix";
 
 interface IssueEditorProps {
-  user: PermissionUser;
-  issue: IssueContext;
+  // Derived server-side and passed down — keeps the client payload minimal (CORE-SEC-006).
+  accessLevel: AccessLevel;
+  ownershipContext: OwnershipContext;
 }
 
-export function IssueEditor({ user, issue }: IssueEditorProps) {
-  // Check permission state with tooltip reason if denied
-  const { allowed, reason } = usePermissionState("issues.update.reporting", user, {
-    issue,
-  });
+export function IssueEditor({ accessLevel, ownershipContext }: IssueEditorProps) {
+  // The helpers are pure, so they run directly in the client component — no hook needed.
+  const permissionState = getPermissionState(
+    "issues.update.reporting",
+    accessLevel,
+    ownershipContext
+  );
+  const deniedReason = permissionState.allowed
+    ? undefined
+    : getPermissionDeniedReason(
+        "issues.update.reporting",
+        accessLevel,
+        ownershipContext
+      );
 
   return (
     <div className="flex flex-col gap-2">
       <input
         type="text"
-        disabled={!allowed}
+        disabled={!permissionState.allowed}
         placeholder="Edit issue title..."
         className="border p-2 disabled:bg-gray-100 disabled:cursor-not-allowed"
-        title={reason ?? undefined}
+        title={deniedReason}
       />
-      {!allowed && reason && (
-        <span className="text-xs text-destructive">{reason}</span>
+      {!permissionState.allowed && deniedReason && (
+        <span className="text-xs text-destructive">{deniedReason}</span>
       )}
     </div>
   );
