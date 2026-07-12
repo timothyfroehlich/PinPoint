@@ -32,7 +32,11 @@ throttle_seconds=$((6 * 60 * 60))
 mkdir -p "$throttle_dir" 2>/dev/null || exit 0
 
 if [[ -f "$throttle_file" ]]; then
-  last=$(stat -f %m "$throttle_file" 2>/dev/null || stat -c %Y "$throttle_file" 2>/dev/null || echo 0)
+  # GNU stat first: GNU `-f` is a valid (different) flag that silently "succeeds"
+  # with unrelated filesystem-status text instead of erroring, so trying it first
+  # would poison $last on Linux. BSD stat has no `-c`, so it fails cleanly there,
+  # making this order safe on both.
+  last=$(stat -c %Y "$throttle_file" 2>/dev/null || stat -f %m "$throttle_file" 2>/dev/null || echo 0)
   now=$(date +%s)
   age=$((now - last))
   if (( age < throttle_seconds )); then
