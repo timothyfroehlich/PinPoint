@@ -90,7 +90,12 @@ contains the `PP` database directory).
 ### 3. First boot (localhost) to create the `beads` user
 
 Boot once WITHOUT `--skip-root-user-initialization` so the passwordless root can
-create the app user, bound to localhost only:
+create the app user, bound to loopback only. (We use `127.0.0.1` rather than the
+project-wide `localhost` convention on purpose here: this is a raw MySQL-protocol
+admin connection to a TCP-listening server, and `127.0.0.1` forces TCP —
+`localhost` can select a UNIX socket for MySQL clients. CORE-SEC-008's
+`localhost`-only rule is about Supabase SSR cookie isolation, which doesn't apply
+to a DB admin connection.)
 
 ```bash
 cd ~/.beads-server/dolt

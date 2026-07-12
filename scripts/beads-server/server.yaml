@@ -34,6 +34,8 @@ behavior:
   # pulls, so this must be ON. Also pinned in the server-side bd config
   # (dolt.auto-commit: on) — see SETUP.md.
   autocommit: true
-  # Do not auto-GC under the live server; storage reclaim is a manual `bd flatten`
-  # / `dolt gc` maintenance step during a quiet window.
+  # Multi-statement client queries left at dolt's default (not disabled); bd
+  # issues single statements, so this is informational only.
   disable_client_multi_statements: false
+  # NOTE: dolt sql-server does not auto-GC. Storage reclaim is a manual
+  # `dolt gc` / `bd flatten` step during a quiet window — see SETUP.md.
