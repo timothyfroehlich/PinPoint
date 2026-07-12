@@ -37,9 +37,18 @@ export default [
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {
-        // App-source project (was tsconfig.json before the PP-4k76 solution-style
-        // split; the root is now references-only and owns no files).
-        project: "./tsconfig.app.json",
+        // Project service (typescript-eslint v8 recommended) instead of the
+        // hand-maintained `project:` mappings this config used to carry (app /
+        // tests / e2e blocks each pointing at their tsconfig). The service
+        // resolves each linted file to its owning tsconfig the same way
+        // tsserver does — root tsconfig.json (solution-style, PP-4k76) →
+        // tsconfig.app.json / tsconfig.tests.json via references, and
+        // e2e/tsconfig.json as the nearest config for e2e files. Classic
+        // `project:` mode resolved cross-project imports through never-emitted
+        // composite declarations, which made `eslint --fix`'s re-parse see
+        // imported app types as error/any in test files and fail lint-staged
+        // pre-commit with false positives (PP-v2ne).
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -168,7 +177,8 @@ export default [
     },
   },
   {
-    // Test files use different tsconfig
+    // Test files (owned by tsconfig.tests.json; the project service in the
+    // main block resolves that automatically — no per-block parserOptions).
     files: [
       "**/*.test.ts",
       "**/*.test.tsx",
@@ -176,13 +186,6 @@ export default [
       "**/*.spec.tsx",
       "src/test/**/*",
     ],
-    languageOptions: {
-      parser: typescriptParser,
-      parserOptions: {
-        project: "./tsconfig.tests.json",
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
     rules: {
       // Allow any in tests for mocking
       "@typescript-eslint/no-explicit-any": "off",
@@ -211,20 +214,11 @@ export default [
   },
   {
     // E2E files use their own tsconfig (NodeNext resolution, separate from
-    // tsconfig.tests.json's bundler resolution) — see e2e/tsconfig.json.
-    // Dropped from tsconfig.tests.json's `include` in PP-d8uq; this block
-    // keeps ESLint's parserOptions.project in sync with that change so
-    // type-aware linting of e2e/**/* doesn't hit a "file not included in any
-    // tsconfig" parse error. Same rule relaxations as the test-files block
-    // above (mocking/test-data patterns are common to both).
+    // tsconfig.tests.json's bundler resolution) — see e2e/tsconfig.json,
+    // which the project service picks up as the nearest config for e2e
+    // files. Same rule relaxations as the test-files block above
+    // (mocking/test-data patterns are common to both).
     files: ["e2e/**/*"],
-    languageOptions: {
-      parser: typescriptParser,
-      parserOptions: {
-        project: "./e2e/tsconfig.json",
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-floating-promises": "off",
