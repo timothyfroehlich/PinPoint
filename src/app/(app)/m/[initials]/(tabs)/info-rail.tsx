@@ -14,6 +14,11 @@ interface InfoRailProps {
   descriptionSlot?: React.ReactNode;
   /** Edit-machine control (dialog trigger or denied tooltip), shown in the owner card footer. */
   editSlot?: React.ReactNode;
+  /**
+   * PinballMap status card (PP-o355.3). When provided it fills the reserved
+   * PinballMap slot; omit it to keep the "Coming soon!" placeholder.
+   */
+  pinballmapSlot?: React.ReactNode;
 }
 
 const CARD = "rounded-xl border border-outline-variant bg-card p-4";
@@ -29,9 +34,9 @@ const COMING_SOON = "text-sm text-muted-foreground";
  * rail and folds inline on mobile (the caller controls placement + gap; this
  * returns the cards as a fragment).
  *
- * Frame-first: Tags and PinballMap are reserved placeholder slots (Collections
- * and PP-o355.3 respectively fill them later). Only the Machine card shows live
- * data.
+ * Tags is still a reserved placeholder (Collections fills it later). PinballMap
+ * shows the live status card when the caller passes `pinballmapSlot`
+ * (PP-o355.3), else it keeps its "Coming soon!" placeholder.
  */
 export function InfoRail({
   owner,
@@ -39,6 +44,7 @@ export function InfoRail({
   addedAt,
   descriptionSlot,
   editSlot,
+  pinballmapSlot,
 }: InfoRailProps): React.JSX.Element {
   return (
     <>
@@ -103,17 +109,19 @@ export function InfoRail({
         <p className={COMING_SOON}>Coming soon!</p>
       </div>
 
-      {/* PinballMap — reserved slot; the status card + public link arrive with
-          PP-o355.3. */}
-      <div
-        className={PLACEHOLDER_CARD}
-        data-testid="machine-pinballmap-placeholder"
-      >
-        <p className={`mb-2 flex items-center gap-2 ${LABEL}`}>
-          <span className="text-secondary">◆</span> PinballMap
-        </p>
-        <p className={COMING_SOON}>Coming soon!</p>
-      </div>
+      {/* PinballMap — the PP-o355.3 status card fills this slot; until a caller
+          passes one, the reserved "Coming soon!" placeholder stands in. */}
+      {pinballmapSlot ?? (
+        <div
+          className={PLACEHOLDER_CARD}
+          data-testid="machine-pinballmap-placeholder"
+        >
+          <p className={`mb-2 flex items-center gap-2 ${LABEL}`}>
+            <span className="text-secondary">◆</span> PinballMap
+          </p>
+          <p className={COMING_SOON}>Coming soon!</p>
+        </div>
+      )}
     </>
   );
 }

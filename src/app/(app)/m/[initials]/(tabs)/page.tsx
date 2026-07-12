@@ -24,8 +24,12 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
+import { getPinballMapState } from "~/lib/pinballmap/sync";
+import { derivePbmMachineStatus } from "~/lib/pinballmap/status";
+import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
+import { MachinePinballmapCard } from "./machine-pinballmap-card";
 
 /**
  * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
@@ -118,10 +122,11 @@ export default async function MachineInfoTab({
     source: "qr",
   });
 
-  // These three are independent of one another — resolve them concurrently
-  // rather than serially so the QR-scan landing doesn't stack a PinballMap
-  // lookup, the unified-user list, and the QR PNG encode back-to-back on the
-  // render path.
+  // These are independent of one another — resolve them concurrently rather than
+  // serially so the QR-scan landing doesn't stack the linked-title lookup, the
+  // unified-user list, the QR PNG encode, and the PinballMap snapshot read
+  // back-to-back on the render path. The snapshot singleton feeds the Info-tab
+  // PinballMap status card below (PP-o355.3).
   const pinballmapTitlePromise: Promise<string | null> =
     canLink && machine.pinballmapMachineId !== null
       ? db.query.pinballmapCatalog
@@ -137,11 +142,13 @@ export default async function MachineInfoTab({
   const allUsersPromise: Promise<Awaited<ReturnType<typeof getUnifiedUsers>>> =
     canEdit ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]);
 
-  const [pinballmapTitleName, allUsersRaw, qrDataUrl] = await Promise.all([
-    pinballmapTitlePromise,
-    allUsersPromise,
-    generateQrPngDataUrl(reportUrl),
-  ]);
+  const [pinballmapTitleName, allUsersRaw, qrDataUrl, pinballmapStateRow] =
+    await Promise.all([
+      pinballmapTitlePromise,
+      allUsersPromise,
+      generateQrPngDataUrl(reportUrl),
+      getPinballMapState(),
+    ]);
   const allUsers = allUsersRaw.map((u) => ({
     id: u.id,
     name: u.name,
@@ -194,6 +201,42 @@ export default async function MachineInfoTab({
       <EditButtonWithTooltip reason={editDeniedReason} />
     ) : null;
 
+  // PinballMap status card (PP-o355.3): read-only, shown to everyone. The public
+  // link back to our PBM location satisfies CORE-PBM-001 attribution regardless
+  // of link state. When the singleton has never synced (no snapshot yet) we pass
+  // `status={null}` so a linked machine reads "pending next sync" rather than a
+  // misleading "Not listed" derived from an absent snapshot.
+  const snapshot = pinballmapStateRow?.snapshotJson ?? null;
+  const pinballmapLocationHref = pinballmapLocationUrl(
+    pinballmapStateRow?.locationId
+  );
+  const pinballmapCard = machine.pinballmapExcluded ? (
+    <MachinePinballmapCard
+      linkState="excluded"
+      excludedReason={machine.pinballmapExcludedReason}
+      locationUrl={pinballmapLocationHref}
+    />
+  ) : machine.pinballmapMachineId !== null ? (
+    <MachinePinballmapCard
+      linkState="linked"
+      status={
+        snapshot
+          ? derivePbmMachineStatus(
+              snapshot,
+              machine.pinballmapMachineId,
+              machine.presenceStatus
+            )
+          : null
+      }
+      locationUrl={pinballmapLocationHref}
+    />
+  ) : (
+    <MachinePinballmapCard
+      linkState="unlinked"
+      locationUrl={pinballmapLocationHref}
+    />
+  );
+
   const rail = (
     <InfoRail
       owner={machine.owner}
@@ -201,6 +244,7 @@ export default async function MachineInfoTab({
       addedAt={machine.createdAt}
       descriptionSlot={descriptionSlot}
       editSlot={editControl}
+      pinballmapSlot={pinballmapCard}
     />
   );
 

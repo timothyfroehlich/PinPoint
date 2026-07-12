@@ -91,4 +91,22 @@ describe("InfoRail", () => {
       screen.getByTestId("machine-pinballmap-placeholder")
     ).toBeInTheDocument();
   });
+
+  it("fills the PinballMap slot with the card when provided (PP-o355.3)", () => {
+    render(
+      <InfoRail
+        owner={null}
+        invitedOwner={null}
+        addedAt={addedAt}
+        pinballmapSlot={<div data-testid="pbm-card">PinballMap status</div>}
+      />
+    );
+    // The live card replaces the reserved placeholder, not stacks on top of it.
+    expect(screen.getByTestId("pbm-card")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("machine-pinballmap-placeholder")
+    ).not.toBeInTheDocument();
+    // Tags stays a placeholder — only PinballMap got wired.
+    expect(screen.getByTestId("machine-tags-placeholder")).toBeInTheDocument();
+  });
 });
