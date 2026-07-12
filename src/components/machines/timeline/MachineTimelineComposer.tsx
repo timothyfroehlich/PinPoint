@@ -113,7 +113,7 @@ export function MachineTimelineComposer({
   };
 
   return (
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- keyboard shortcut on form wrapper, PP-u4cp
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- keyboard shortcut on composer wrapper div, PP-u4cp
     <div
       className="@container rounded-md border bg-card p-3"
       onKeyDown={handleKeyDown}
