@@ -45,44 +45,33 @@ export function MachineOpsBox({
     <section
       className="rounded-xl border border-outline-variant bg-card p-4"
       data-testid="machine-ops-box"
-      aria-labelledby="machine-ops-heading"
+      aria-label="Machine"
     >
-      <h2 id="machine-ops-heading" className={`mb-3 ${LABEL}`}>
-        Machine
-      </h2>
-
       <div className="space-y-4">
-        {/* Status — derived from open issues, never manually set. */}
-        <div>
-          <p className={`mb-1 ${LABEL}`}>Status</p>
+        {/* Status — derived from open issues (read-only); inline row so the
+            badge sits beside its label rather than dropping to a new line. */}
+        <div className="flex items-center justify-between gap-3">
+          <span className={LABEL}>Status</span>
           <MachineStatusBadge status={machineStatus} size="xs" />
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            Derived from open issues — not set by hand.
-          </p>
         </div>
 
-        {/* Availability — the one manual control. */}
-        <div>
-          <p className={`mb-1 ${LABEL}`}>Availability</p>
+        {/* Availability — the one manual control; label left, control right. */}
+        <div className="flex items-center justify-between gap-3">
+          <span className={`${LABEL} shrink-0`}>Availability</span>
           {canEditPresence ? (
-            <MachinePresenceSelect
-              machineId={machineId}
-              value={presenceStatus}
-            />
+            <div className="min-w-0 flex-1">
+              <MachinePresenceSelect
+                machineId={machineId}
+                value={presenceStatus}
+              />
+            </div>
           ) : (
             <MachinePresenceBadge status={presenceStatus} size="sm" />
           )}
         </div>
 
         {/* Watch — one toggle for everyone, owners included. */}
-        {watchButton ? (
-          <div>
-            {watchButton}
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Watching sends you updates — it isn&apos;t the same as owning.
-            </p>
-          </div>
-        ) : null}
+        {watchButton ? <div>{watchButton}</div> : null}
 
         {/* Owner&apos;s Requirements — owner-private, relocated from the Info tab.
             Description stays on Info, so it is never rendered here. */}

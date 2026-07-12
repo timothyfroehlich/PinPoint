@@ -37,7 +37,7 @@ const base = {
 };
 
 describe("MachineOpsBox", () => {
-  it("renders status read-only (badge + derived note, no control)", () => {
+  it("renders status read-only (badge, no control)", () => {
     render(
       <MachineOpsBox
         {...base}
@@ -46,10 +46,10 @@ describe("MachineOpsBox", () => {
         canEditGeneral={false}
       />
     );
-    // Derived status label is shown as a badge…
+    // Derived status is shown as a read-only badge beside its "Status" label…
     expect(screen.getByText("Needs Service")).toBeInTheDocument();
-    // …with the "derived, not manual" explanation.
-    expect(screen.getByText(/derived from open issues/i)).toBeInTheDocument();
+    // …with no control to change it by hand.
+    expect(screen.queryByTestId("presence-select")).not.toBeInTheDocument();
   });
 
   it("shows the presence SELECT to editors and a read-only badge to others", () => {
@@ -77,7 +77,7 @@ describe("MachineOpsBox", () => {
     expect(screen.queryByTestId("presence-select")).not.toBeInTheDocument();
   });
 
-  it("renders the Watch toggle + clarifying subtext when provided", () => {
+  it("renders the Watch toggle when provided", () => {
     render(
       <MachineOpsBox
         {...base}
@@ -88,7 +88,6 @@ describe("MachineOpsBox", () => {
       />
     );
     expect(screen.getByRole("button", { name: "Watch" })).toBeInTheDocument();
-    expect(screen.getByText(/isn.t the same as owning/i)).toBeInTheDocument();
   });
 
   it("renders Owner's Requirements (description suppressed) for permitted viewers only", () => {

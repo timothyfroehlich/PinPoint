@@ -116,14 +116,36 @@ export default async function MachineMaintenanceTab({
       : Promise.resolve(machine.issues),
   ]);
 
-  // Blocks in mobile reading order (design §4): Machine box (status / presence
-  // / Watch) → Open Issues → Activity → QR. On desktop the box + QR pin to the
-  // 320px right rail; Open Issues + Activity flow down the main column. Explicit
-  // column/row placement (not a spanning aside) so the box can lead on mobile
-  // while the QR sinks to the bottom.
+  // Two independent columns (design §4 / service-desktop mockup `.col`s): the
+  // main column flows Open Issues → Activity; the 320px right rail stacks the
+  // Machine box → QR. Each column sizes to its own content, so a short Open
+  // Issues card no longer stretches to the tall Machine box — the previous 2×2
+  // grid placed all four cards on shared rows, coupling their heights and
+  // leaving dead space below the shorter card. On mobile the two columns
+  // collapse into one flex stack in DOM reading order: Open Issues → Activity →
+  // Machine box → QR.
   return (
     <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,1fr)_320px] md:items-start md:gap-6">
-      <div className="md:col-start-2 md:row-start-1">
+      <div className="flex flex-col gap-6 md:col-start-1">
+        <MachineIssuesCard
+          issues={issuesToShow}
+          machineName={machine.name}
+          machineInitials={machine.initials}
+          view={view}
+        />
+        {/* Activity feed (implements PP-7mjy) — reuses the real machine-timeline
+            rows (comment / issue-event / lifecycle) and the "+ Add note"
+            composer. The composer's server action (`addMachineCommentAction`) is
+            already machine-id-parameterized, so it is reusable for the
+            collection timeline (PP-slrd.2) without further factoring. */}
+        <MachineRecentActivity
+          machineId={machine.id}
+          machineInitials={machine.initials}
+          machineName={machine.name}
+          canCompose={canCompose}
+        />
+      </div>
+      <div className="flex flex-col gap-6 md:col-start-2">
         <MachineOpsBox
           machineId={machine.id}
           machineStatus={machineStatus}
@@ -134,29 +156,6 @@ export default async function MachineMaintenanceTab({
           canViewOwnerRequirements={canViewOwnerRequirements}
           canEditGeneral={canEditGeneral}
         />
-      </div>
-      <div className="md:col-start-1 md:row-start-1">
-        <MachineIssuesCard
-          issues={issuesToShow}
-          machineName={machine.name}
-          machineInitials={machine.initials}
-          view={view}
-        />
-      </div>
-      {/* Activity feed (implements PP-7mjy) — reuses the real machine-timeline
-          rows (comment / issue-event / lifecycle) and the "+ Add note"
-          composer. The composer's server action (`addMachineCommentAction`) is
-          already machine-id-parameterized, so it is reusable for the collection
-          timeline (PP-slrd.2) without further factoring. */}
-      <div className="md:col-start-1 md:row-start-2">
-        <MachineRecentActivity
-          machineId={machine.id}
-          machineInitials={machine.initials}
-          machineName={machine.name}
-          canCompose={canCompose}
-        />
-      </div>
-      <div className="md:col-start-2 md:row-start-2">
         <MachineQrCard
           machineName={machine.name}
           machineInitials={machine.initials}
