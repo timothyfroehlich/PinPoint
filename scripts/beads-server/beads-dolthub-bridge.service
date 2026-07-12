@@ -18,7 +18,12 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# REQUIRED: run from the project so `bd` resolves .beads (the server config).
+# Without this the bridge runs from $HOME and every `bd dolt` call fails.
+WorkingDirectory=%h/Code/PinPoint
 Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
 # Secret lives here, mode 600, outside git. See SETUP.md.
 EnvironmentFile=%h/.beads-server/bridge.env
-ExecStart=/home/linuxbrew/.linuxbrew/bin/bash %h/.beads-server/beads-dolthub-bridge.sh
+# System bash (brew bash is not guaranteed installed); script is invoked via bash
+# so its +x bit is optional.
+ExecStart=/usr/bin/bash %h/.beads-server/beads-dolthub-bridge.sh
