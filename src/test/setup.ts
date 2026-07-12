@@ -95,7 +95,9 @@ if (typeof window !== "undefined") {
         return;
       }
       for (const forward of forwarders) {
-        forward(...args);
+        // Preserve the original `this === virtualConsole` binding that
+        // EventEmitter gives listeners; a captured forwarder may rely on it.
+        forward.apply(virtualConsole, args);
       }
     });
   }
