@@ -52,6 +52,7 @@ export function EditorToolbar({
 
   return (
     <div
+      role="toolbar"
       className="flex flex-wrap items-center gap-1 border-b p-1 bg-muted/30"
       onMouseDown={(e) => e.preventDefault()}
     >

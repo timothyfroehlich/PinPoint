@@ -36,6 +36,7 @@ function CardHeader({
 
 function CardTitle({
   className,
+  children,
   ...props
 }: React.ComponentProps<"h2">): React.JSX.Element {
   return (
@@ -43,7 +44,9 @@ function CardTitle({
       data-slot="card-title"
       className={cn("text-balance leading-none font-semibold", className)}
       {...props}
-    />
+    >
+      {children}
+    </h2>
   );
 }
 
