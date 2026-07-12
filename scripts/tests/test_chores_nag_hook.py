@@ -129,6 +129,20 @@ def test_due_today_when_less_than_a_day_over(mock_bd: dict, tmp_path: Path) -> N
     assert "overdue" not in out
 
 
+def test_dormant_first_does_not_suppress_overdue(mock_bd: dict, tmp_path: Path) -> None:
+    # A dormant (future-defer) bead ordered before an overdue one must NOT
+    # suppress the nag — the loop must scan past it (continue, not break).
+    mock_bd["set_beads"](
+        [
+            _chore_bead(defer_until=_iso(_now() + datetime.timedelta(days=4))),
+            _chore_bead(defer_until=_iso(_now() - datetime.timedelta(days=2, hours=2))),
+        ]
+    )
+    rc, out, err = run_hook(STDIN, mock_bd, tmp_path)
+    assert rc == 0, err
+    assert "2 days overdue" in out
+
+
 def test_dormant_future_defer_is_silent(mock_bd: dict, tmp_path: Path) -> None:
     mock_bd["set_beads"](
         [_chore_bead(defer_until=_iso(_now() + datetime.timedelta(days=4)))]

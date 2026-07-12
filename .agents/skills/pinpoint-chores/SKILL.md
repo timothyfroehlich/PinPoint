@@ -64,8 +64,9 @@ When chores are done, **re-defer the bead one week out** so it goes dormant and 
 `<next Saturday>` = the next Saturday's date in `YYYY-MM-DD` (e.g. `bd defer --until=2026-07-18 PP-qehv`). Optionally leave a run summary comment first:
 
     bd comments add <chores-bead> "Chores done <date>: <one-line summary of what was reviewed / filed>."
-    bd update <chores-bead> --status open   # (defer sets status=deferred; the bead stays open-not-closed between cycles)
 
-Do **not** close the bead — it's a recurring holder. Deferring it (status `deferred`, future `defer_until`) is what makes it dormant. The nag stays silent until that date passes.
+Do **not** close the bead — it's a recurring holder. Deferring it (status `deferred`, future `defer_until`) is what makes it dormant; nothing else is needed — don't flip it back to `open`. The nag stays silent until that date passes.
+
+> **Note:** `bd defer --until=<date>` is interpreted as **UTC midnight** of that date. In US-Central that's the evening before, so a "next Saturday" re-arm actually becomes due Friday evening local — the nag's day-count boundary flips then, not at local Saturday midnight. Close enough for a weekly cadence; just don't expect the count to tick over exactly at local midnight.
 
 > Beads sync note: `bd` writes locally; the lead handles `bd dolt push`. Don't push beads from a chores session unless you're the lead.

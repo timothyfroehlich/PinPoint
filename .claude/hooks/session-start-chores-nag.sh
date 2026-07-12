@@ -88,8 +88,9 @@ for b in beads:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=datetime.timezone.utc)
     if now <= dt:
-        # Still dormant — chores not due yet.
-        break
+        # This bead is still dormant — keep scanning; another weekly-chore bead
+        # (e.g. a pre-sync duplicate) may be overdue and should still nag.
+        continue
     days = (now - dt).days  # floor: whole days past the defer date
     if days < 1:
         print('🧹 Weekly chores are due today — say \"let\'s do chores\".')
