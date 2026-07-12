@@ -20,6 +20,21 @@ import pytest
 LIB_PATH = Path(__file__).parent.parent / "hooks" / "huddle-lib.sh"
 TODAY = "2026-07-06"
 
+
+def _set_server_mode(repo: Path) -> None:
+    """Write .beads/metadata.json with dolt_mode=server (main-worktree path).
+
+    huddle_dolt_mode resolves the main worktree via `git rev-parse
+    --git-common-dir`; in these temp repos that is <repo>/.git, so metadata.json
+    lives at <repo>/.beads/metadata.json.
+    """
+    beads = repo / ".beads"
+    beads.mkdir(exist_ok=True)
+    (beads / "metadata.json").write_text(
+        json.dumps({"database": "dolt", "backend": "dolt", "dolt_mode": "server"})
+    )
+
+
 # Stub `bd`: append the full arg list to $BD_LOG, and for read subcommands emit
 # the JSON in the file named by the matching env var. Everything else exits 0.
 BD_STUB = r"""#!/usr/bin/env bash
@@ -131,6 +146,54 @@ def test_sync_fail_open_when_push_and_pull_error(repo: Path) -> None:
     assert (repo / ".agents" / "huddle" / "last-pull").exists()
 
 
+def test_sync_noop_in_server_mode(repo: Path) -> None:
+    # Server mode: nothing local to sync — huddle_sync is a pure no-op. No dolt
+    # push/pull, and the embedded-mode throttle marker is never written.
+    _set_server_mode(repo)
+    rc, _out, _err, log = run_fn(repo, "huddle_sync")
+    assert rc == 0
+    assert "dolt" not in log
+    assert not (repo / ".agents" / "huddle" / "last-pull").exists()
+
+
+# --- huddle_dolt_mode ------------------------------------------------------
+
+
+def test_dolt_mode_defaults_embedded_when_no_metadata(repo: Path) -> None:
+    rc, out, _err, _log = run_fn(repo, "printf '%s' \"$(huddle_dolt_mode)\"")
+    assert rc == 0
+    assert out.strip() == "embedded"
+
+
+def test_dolt_mode_reads_server(repo: Path) -> None:
+    _set_server_mode(repo)
+    rc, out, _err, _log = run_fn(repo, "printf '%s' \"$(huddle_dolt_mode)\"")
+    assert rc == 0
+    assert out.strip() == "server"
+
+
+# --- huddle_warn_degraded --------------------------------------------------
+
+
+def test_warn_degraded_noop_in_embedded_mode(repo: Path) -> None:
+    rc, _out, err, _log = run_fn(repo, "huddle_warn_degraded")
+    assert rc == 0
+    assert "huddle degraded" not in err
+    assert not (repo / ".agents" / "huddle" / "degraded-warned").exists()
+
+
+def test_warn_degraded_emits_once_in_server_mode(repo: Path) -> None:
+    _set_server_mode(repo)
+    # First call warns and writes the throttle marker; the immediate second call
+    # is throttled (silent).
+    rc, _out, err, _log = run_fn(
+        repo, "huddle_warn_degraded; echo '---'; huddle_warn_degraded"
+    )
+    assert rc == 0
+    assert err.count("huddle degraded: beads server unreachable") == 1
+    assert (repo / ".agents" / "huddle" / "degraded-warned").exists()
+
+
 # --- huddle_discover_root --------------------------------------------------
 
 
@@ -190,6 +253,38 @@ def test_discover_root_none_returns_nonzero(repo: Path) -> None:
     assert out.strip() == ""
 
 
+def test_discover_root_skips_pull_in_server_mode(repo: Path) -> None:
+    _set_server_mode(repo)
+    epics = repo / "epics.json"
+    epics.write_text(
+        json.dumps(
+            [{"id": "PP-lt12", "title": "Huddle coordination root", "status": "open"}]
+        )
+    )
+    rc, out, _err, log = run_fn(
+        repo, "huddle_discover_root", {"BD_LIST_JSON": str(epics)}
+    )
+    assert rc == 0
+    assert out.strip() == "PP-lt12"
+    # Server mode queries the live shared DB directly — no pre-query pull.
+    assert "dolt pull" not in log
+
+
+def test_discover_root_pulls_in_embedded_mode(repo: Path) -> None:
+    epics = repo / "epics.json"
+    epics.write_text(
+        json.dumps(
+            [{"id": "PP-lt12", "title": "Huddle coordination root", "status": "open"}]
+        )
+    )
+    rc, out, _err, log = run_fn(
+        repo, "huddle_discover_root", {"BD_LIST_JSON": str(epics)}
+    )
+    assert rc == 0
+    assert out.strip() == "PP-lt12"
+    assert "dolt pull" in log  # embedded mode pulls first to avoid forking
+
+
 # --- huddle_reconcile_today ------------------------------------------------
 
 
@@ -234,9 +329,11 @@ def test_reconcile_collapses_duplicate_dailies(repo: Path) -> None:
     # Canonical = lowest id (PP-lt12.40). The higher-id dup is closed...
     assert "close PP-lt12.99" in log
     assert "close PP-lt12.40" not in log
-    # ...and root notes are re-pointed at the canonical, then pushed.
+    # ...and root notes are re-pointed at the canonical.
     assert "update PP-lt12 --notes" in log
-    assert "dolt push" in log
+    # No explicit push: server mode writes hit the shared DB; embedded mode
+    # relies on the next huddle_sync / pre-push flush.
+    assert "dolt push" not in log
 
 
 def test_reconcile_noop_when_single_daily(repo: Path) -> None:

@@ -191,8 +191,8 @@ fi
 # Fetch once here and reuse below. If bd is unavailable or the bead is
 # inaccessible, fail open silently — we do NOT want to emit a false "notes
 # malformed" warning when the real issue is a bd outage.
-ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || exit 0
-[[ -n "$ROOT_JSON" ]] || exit 0
+ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || { huddle_warn_degraded; exit 0; }
+[[ -n "$ROOT_JSON" ]] || { huddle_warn_degraded; exit 0; }
 
 # --- Root notes integrity check ---
 # config.json exists but root notes may be null/malformed (e.g. 2026-05-20
@@ -226,7 +226,9 @@ ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
 if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
   # shellcheck source=huddle-rotation-check.sh disable=SC1091
   source "$ROTATION_CHECK_SCRIPT"
-  if huddle_rotation_needed; then
+  # Pass the already-fetched ROOT_JSON so the check reuses it instead of a second
+  # bd show (hot-path budget: root show + comments only).
+  if huddle_rotation_needed "$ROOT_JSON"; then
     STORED_DATE=""
     # Reuse ROOT_JSON + NOTES_STR already fetched above (avoids a second bd call).
     if [[ -n "$NOTES_STR" ]]; then

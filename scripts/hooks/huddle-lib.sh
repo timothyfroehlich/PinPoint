@@ -40,34 +40,148 @@ huddle_state_dir() {
   printf '%s/.agents/huddle' "$main_root"
 }
 
+# huddle_dolt_mode — print the beads Dolt backend mode: "server" or "embedded".
+#
+# Reads `dolt_mode` from <main-worktree>/.beads/metadata.json (gitignored,
+# per-machine). Resolves the main worktree exactly like huddle_state_dir does —
+# linked worktrees carry only a `redirect` stub in `.beads/`, so metadata.json
+# lives in the main clone's `.beads/`. Parse is deliberately minimal and
+# TOLERANT: a missing git dir, missing file, missing/blank key, absent jq, or
+# any parse error all fall through to "embedded" — today's behavior and the safe
+# default. Only the exact string "server" flips the mode. This is the single
+# gate every hot-path `bd dolt push/pull` consults; when the shared server is
+# live, metadata.json says "server" on both machines and the sync calls no-op.
+#
+# We are the first in-repo consumer of metadata.json — keep this to the mode
+# string only; use `bd doctor --server` (see scripts/beads-server/SETUP.md) for
+# any deeper server-config drift check rather than hand-parsing more JSON here.
+#
+# Always returns 0 and always prints something (never empty).
+#
+# shellcheck disable=SC2317  # function is sourced and called by callers
+huddle_dolt_mode() {
+  local common_dir abs_common main_root meta mode
+  common_dir=$(git rev-parse --git-common-dir 2>/dev/null) || { printf 'embedded'; return 0; }
+  if [[ "$common_dir" = /* ]]; then
+    abs_common="$common_dir"
+  else
+    abs_common=$(cd "$common_dir" 2>/dev/null && pwd) || { printf 'embedded'; return 0; }
+  fi
+  main_root=$(dirname "$abs_common")
+  meta="$main_root/.beads/metadata.json"
+  [[ -f "$meta" ]] || { printf 'embedded'; return 0; }
+  if command -v jq >/dev/null 2>&1; then
+    mode=$(jq -r '.dolt_mode // "embedded"' "$meta" 2>/dev/null) || mode="embedded"
+  else
+    # jq-less tolerant fallback: grep the "dolt_mode": "..." pair.
+    mode=$(grep -o '"dolt_mode"[[:space:]]*:[[:space:]]*"[^"]*"' "$meta" 2>/dev/null \
+      | head -n1 | sed 's/.*"\([^"]*\)"$/\1/') || mode="embedded"
+  fi
+  [[ "$mode" == "server" ]] && { printf 'server'; return 0; }
+  printf 'embedded'
+  return 0
+}
+
+# huddle_warn_degraded — throttled one-line stderr notice when the shared beads
+# server is unreachable in server mode. No-op in embedded mode (there is no
+# server to be down). The huddle hooks are deliberately fail-open, so without
+# this a down server would silently kill coordination on BOTH machines with zero
+# signal (PP-0b7p class). Throttled to ~once per 10 min via a marker in the
+# shared state dir so it never spams a session. Always returns 0.
+#
+# shellcheck disable=SC2317  # function is sourced and called by callers
+huddle_warn_degraded() {
+  [[ "$(huddle_dolt_mode)" == "server" ]] || return 0
+  local state_dir marker interval now last
+  state_dir=$(huddle_state_dir) || return 0
+  marker="$state_dir/degraded-warned"
+  interval=600
+  if [[ -f "$marker" ]]; then
+    last=0
+    read -r last < "$marker" 2>/dev/null || true
+    [[ "$last" =~ ^[0-9]+$ ]] || last=0
+    if [[ "$last" -gt 0 ]]; then
+      now=$(date +%s)
+      (( now - last < interval )) && return 0
+    fi
+  fi
+  mkdir -p "$state_dir" 2>/dev/null || true
+  date +%s > "$marker" 2>/dev/null || true
+  printf 'huddle degraded: beads server unreachable\n' >&2
+  return 0
+}
+
+# huddle_root_id — resolve the coordination root epic id, treating
+# <state_dir>/config.json as a REBUILDABLE CACHE rather than a source of truth.
+# Reads the cached root_bead_id; if it's missing or no longer resolves (`bd show`
+# fails), re-discovers the root by title query (huddle_discover_root) and rewrites
+# config.json. Prints the id on success; non-zero + empty on any failure.
+# Fail-open: callers MUST treat non-zero as "skip quietly".
+#
+# shellcheck disable=SC2317  # function is sourced and called by callers
+huddle_root_id() {
+  command -v bd >/dev/null 2>&1 || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+  local state_dir config_file root_id
+  state_dir=$(huddle_state_dir) || return 1
+  config_file="$state_dir/config.json"
+  if [[ -f "$config_file" ]]; then
+    root_id=$(jq -r '.root_bead_id // ""' "$config_file" 2>/dev/null) || root_id=""
+    if [[ -n "$root_id" ]] && bd show "$root_id" --json >/dev/null 2>&1; then
+      printf '%s' "$root_id"
+      return 0
+    fi
+  fi
+  # Cache miss or stale pointer → rediscover by title query and rewrite the cache.
+  root_id=$(huddle_discover_root 2>/dev/null) || return 1
+  [[ -n "$root_id" ]] || return 1
+  mkdir -p "$state_dir" 2>/dev/null || true
+  printf '{"schema_version": 1, "root_bead_id": "%s"}\n' "$root_id" > "$config_file" 2>/dev/null || true
+  printf '%s' "$root_id"
+}
+
 # huddle_today_bead_id — print the ID of today's active coordination bead.
 # Returns 0 on success (and prints the ID), non-zero + empty on any failure.
 # Fail-open: callers MUST treat a non-zero return as "skip quietly".
 #
-# Resolution path:
-#   huddle_state_dir → config.json → root_bead_id → `bd show` root notes JSON
-#   → .today_bead.id
+# Resolution (reads the live DB, not a cache — PP-9lq5):
+#   1. huddle_root_id (rebuildable config.json cache → title-query fallback)
+#   2. Fast-path HINT: root notes .today_bead.id, but VERIFIED via `bd show`
+#      (must still be open AND titled "Huddle daily <today>") before trust —
+#      a dangling/stale pointer is never returned.
+#   3. Fallback: title query over `bd children <root>` for the open
+#      "Huddle daily <today>" (lowest id wins). Missing entirely ⇒ non-zero,
+#      and the rotation path self-heals by (re)creating it.
 #
 # shellcheck disable=SC2317  # function is sourced and called by callers
 huddle_today_bead_id() {
-  local state_dir config_file root_id notes_str today_id
-  state_dir=$(huddle_state_dir) || return 1
-  config_file="$state_dir/config.json"
-  [[ -f "$config_file" ]] || return 1
-  root_id=$(jq -r '.root_bead_id // ""' "$config_file" 2>/dev/null) || return 1
+  command -v bd >/dev/null 2>&1 || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+  local root_id today root_json hint verified id
+  root_id=$(huddle_root_id) || return 1
   [[ -n "$root_id" ]] || return 1
-  notes_str=$(bd show "$root_id" --json 2>/dev/null | jq -r '.[0].notes // ""' 2>/dev/null) || return 1
-  [[ -n "$notes_str" ]] || return 1
-  today_id=$(printf '%s' "$notes_str" | python3 -c "
-import sys, json
-try:
-    n = json.loads(sys.stdin.read())
-    print(n.get('today_bead', {}).get('id', ''))
-except Exception:
-    print('')
-" 2>/dev/null) || return 1
-  [[ -n "$today_id" ]] || return 1
-  printf '%s' "$today_id"
+  today=$(date +%F)
+
+  # Fast-path hint from root notes (single show; reused for the fallback too).
+  root_json=$(bd show "$root_id" --json 2>/dev/null) || root_json=""
+  hint=$(printf '%s' "$root_json" \
+    | jq -r '.[0].notes // "{}" | (fromjson? // {}) | .today_bead.id // ""' 2>/dev/null) || hint=""
+  if [[ -n "$hint" ]]; then
+    verified=$(bd show "$hint" --json 2>/dev/null \
+      | jq -r --arg t "Huddle daily $today" \
+        '.[0] | select(.title==$t and .status!="closed") | .id // ""' 2>/dev/null) || verified=""
+    if [[ -n "$verified" ]]; then
+      printf '%s' "$verified"
+      return 0
+    fi
+  fi
+
+  # Fallback: canonical title query over children (self-healing source of truth).
+  id=$(bd children "$root_id" --json 2>/dev/null \
+    | jq -r --arg t "Huddle daily $today" \
+      '[ .[] | select(.title==$t and .status!="closed") ] | sort_by(.id) | (.[0].id // "")' 2>/dev/null) || return 1
+  [[ -n "$id" ]] || return 1
+  printf '%s' "$id"
 }
 
 # huddle_sync — throttled, per-machine Dolt push+pull to keep the huddle beads
@@ -95,9 +209,17 @@ except Exception:
 # discipline as huddle-poll.sh's poll throttle) so a broken remote can't cause a
 # hammer loop across sessions.
 #
+# Server mode: `huddle_sync` is a no-op. There is no local embedded Dolt to
+# push/pull — both machines read and write the one shared `dolt sql-server` over
+# the tailnet, so coordination is already real-time. The DoltHub bridge (a
+# systemd timer on the server, see scripts/beads-server/) handles off-tailnet
+# cloud replication out of band. Embedded mode keeps the throttled push+pull
+# below until cutover flips metadata.json to "server".
+#
 # shellcheck disable=SC2317  # function is sourced and called by callers
 huddle_sync() {
   command -v bd >/dev/null 2>&1 || return 0
+  [[ "$(huddle_dolt_mode)" == "server" ]] && return 0
   local state_dir marker lockfile interval now last
   state_dir=$(huddle_state_dir) || return 0
   mkdir -p "$state_dir" 2>/dev/null || return 0
@@ -186,7 +308,12 @@ huddle_sync() {
 huddle_discover_root() {
   command -v bd >/dev/null 2>&1 || return 1
   command -v jq >/dev/null 2>&1 || return 1
-  bd dolt pull --quiet >/dev/null 2>&1 || true
+  # Embedded mode: pull first so a freshly-cloned machine sees the remote's root
+  # rather than forking a duplicate. Server mode: the query already runs against
+  # the shared live DB — no pull needed.
+  if [[ "$(huddle_dolt_mode)" != "server" ]]; then
+    bd dolt pull --quiet >/dev/null 2>&1 || true
+  fi
   local id
   # Lowest id wins if (pathologically) more than one root exists — deterministic
   # so every machine picks the same canonical root.
@@ -200,13 +327,15 @@ huddle_discover_root() {
 # huddle_reconcile_today — safety-net dedup for the rare cross-machine rotation
 # race. If two machines both created a "Huddle daily <date>" for the current
 # today_bead date before either pushed, this collapses them to a deterministic
-# canonical (lowest id), re-points root notes at it, closes the loser(s) with a
-# merge marker, and pushes. Idempotent no-op when there is 0 or 1 daily (the
-# common case → two cheap local reads, no writes). Every machine picks the same
-# canonical, so all converge. Fail-open; silent (no stdout). Returns 0 always.
+# canonical (lowest id), re-points root notes at it, and closes the loser(s) with
+# a merge marker. Idempotent no-op when there is 0 or 1 daily (the common case →
+# two cheap local reads, no writes). Every machine picks the same canonical, so
+# all converge. Fail-open; silent (no stdout). Returns 0 always.
 #
-# Assumes the CALLER already did a recent `bd dolt pull` (session-start's
-# huddle_sync, or huddle-rotate.sh's pull) so the local DB is fresh.
+# No explicit `bd dolt push` here — in server mode writes hit the shared DB
+# directly, and in embedded mode the next huddle_sync / pre-push flush carries
+# the dedup to the remote. Server mode is the reliable home for this net: it now
+# operates on the one live DB instead of racing two divergent copies.
 #
 # shellcheck disable=SC2317  # function is sourced and called by callers
 huddle_reconcile_today() {
@@ -259,6 +388,5 @@ huddle_reconcile_today() {
     bd close "$d" >/dev/null 2>&1 || true
   done <<< "$dailies"
 
-  bd dolt push --quiet >/dev/null 2>&1 || true
   return 0
 }
