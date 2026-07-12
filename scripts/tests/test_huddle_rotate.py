@@ -32,8 +32,19 @@ import pytest
 ROTATE_PATH = Path(__file__).parent.parent / "hooks" / "huddle-rotate.sh"
 ROOT_ID = "PP-lt12"
 
+_TODAY = datetime.date.today().isoformat()
 _YESTERDAY = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
 _THIS_MONTH = datetime.date.today().strftime("%Y-%m")
+
+
+def _set_server_mode(repo: Path) -> None:
+    """Write .beads/metadata.json with dolt_mode=server (main-worktree path)."""
+    beads = repo / ".beads"
+    beads.mkdir(exist_ok=True)
+    (beads / "metadata.json").write_text(
+        json.dumps({"database": "dolt", "backend": "dolt", "dolt_mode": "server"})
+    )
+
 
 # Root notes whose today_bead.date is YESTERDAY (rotation is needed) and whose
 # monthly month is the current month (no month roll → no monthly create). `bd show`
@@ -71,7 +82,7 @@ case "$1 $2" in
 esac
 case "$1" in
   show)     cat "$BD_SHOW_JSON"; exit 0 ;;
-  children) printf '[]\n'; exit 0 ;;
+  children) [[ -n "${BD_CHILDREN_JSON:-}" ]] && cat "$BD_CHILDREN_JSON" || printf '[]\n'; exit 0 ;;
   create)   printf 'PP-lt12.99\n'; exit 0 ;;
 esac
 exit 0
@@ -163,3 +174,57 @@ def test_rotation_proceeds_when_offline(repo: Path) -> None:
     )
     assert rc == 0, "an offline (non-conflict) pull failure must not block rotation"
     assert _created(log), "offline rotation must still mint the daily bead"
+
+
+# --- server mode: no dolt push/pull, adopt-by-title, self-heal --------------
+
+
+def test_rotation_server_mode_skips_pull_and_push(repo: Path) -> None:
+    # One shared DB — no divergence, no stale child counter. Rotation must NOT
+    # run any bd dolt pull/push, yet must still mint today's daily.
+    _set_server_mode(repo)
+    # A conflicting pull output is configured but must never be consulted (no
+    # pull runs), so rotation proceeds cleanly.
+    rc, _out, err, log = run_rotate(
+        repo, {"BD_PULL_RC": "1", "BD_PULL_OUT": "merge conflicts require operator"}
+    )
+    assert rc == 0, "server-mode rotation must not consult the (skipped) pull"
+    assert "refusing to rotate" not in err
+    assert "dolt pull" not in log, "server mode must not pull"
+    assert "dolt push" not in log, "server mode must not push"
+    assert _created(log), "server-mode rotation still mints the daily bead"
+
+
+def test_rotation_server_mode_adopts_existing_daily_by_title(repo: Path) -> None:
+    # A peer already created today's daily on the shared DB. Rotation must ADOPT
+    # it (title query) instead of minting a duplicate.
+    _set_server_mode(repo)
+    children = repo / "children.json"
+    children.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "PP-lt12.77",
+                    "title": f"Huddle daily {_TODAY}",
+                    "status": "open",
+                }
+            ]
+        )
+    )
+    rc, out, _err, log = run_rotate(repo, {"BD_CHILDREN_JSON": str(children)})
+    assert rc == 0
+    assert not _created(log), (
+        "an existing daily for today must be adopted, not recreated"
+    )
+    assert "NEW_TODAY=PP-lt12.77" in out
+
+
+def test_rotation_server_mode_self_heals_missing_daily(repo: Path) -> None:
+    # No daily exists for today (e.g. it was deleted). The title query returns
+    # empty, so rotation self-heals by creating today's daily.
+    _set_server_mode(repo)
+    empty = repo / "children.json"
+    empty.write_text("[]")
+    rc, _out, _err, log = run_rotate(repo, {"BD_CHILDREN_JSON": str(empty)})
+    assert rc == 0
+    assert _created(log), "a missing daily must be (re)created by rotation"

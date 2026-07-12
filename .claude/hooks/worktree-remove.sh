@@ -22,11 +22,23 @@ MAIN_WT=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
 CLEANUP="$MAIN_WT/scripts/worktree_cleanup.py"
 
 # Flush bead state to DoltHub before tearing the worktree down.
-# Runs from main worktree (where the Dolt server data lives).
+# Runs from main worktree (where the embedded Dolt data lives).
 # Non-blocking: cleanup proceeds even if the push fails.
+#
+# Server mode: no-op. There is no local embedded Dolt to flush — writes already
+# landed on the shared `dolt sql-server`, and the DoltHub bridge replicates
+# out of band. Mode is read tolerantly from <main>/.beads/metadata.json
+# (missing/unparseable ⇒ embedded, today's behavior).
 if command -v bd >/dev/null 2>&1; then
-  (cd "$MAIN_WT" && bd dolt push --quiet) >&2 \
-    || echo "Warning: bd dolt push failed (non-fatal)" >&2
+  DOLT_MODE="embedded"
+  META="$MAIN_WT/.beads/metadata.json"
+  if [ -f "$META" ] && command -v jq >/dev/null 2>&1; then
+    DOLT_MODE=$(jq -r '.dolt_mode // "embedded"' "$META" 2>/dev/null || echo embedded)
+  fi
+  if [ "$DOLT_MODE" != "server" ]; then
+    (cd "$MAIN_WT" && bd dolt push --quiet) >&2 \
+      || echo "Warning: bd dolt push failed (non-fatal)" >&2
+  fi
 fi
 
 if [ -f "$CLEANUP" ]; then

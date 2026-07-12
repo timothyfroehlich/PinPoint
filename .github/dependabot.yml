@@ -48,13 +48,6 @@ updates:
     labels:
       - "dependencies"
       - "pnpm"
-    # @typescript/native-preview is pinned to an exact TS7 nightly in package.json
-    # (side-by-side with typescript@6 for the tsgo typecheck gate). Because the pin is
-    # a prerelease and this ecosystem runs daily, Dependabot would propose a bump to
-    # each newer nightly. We bump it by hand when TS 7 GA lands — see PP-rl1l and
-    # docs/plans/2026-06-27-typescript-7-upgrade-plan.md.
-    ignore:
-      - dependency-name: "@typescript/native-preview"
 
   # GitHub Actions with 2-week cooldown
   - package-ecosystem: "github-actions"
