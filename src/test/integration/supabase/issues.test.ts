@@ -79,13 +79,16 @@ describe("Issues CRUD Operations (PGlite)", () => {
       // Attempt to create issue without machineInitials should fail.
       // Deliberately passing null for a NOT NULL column to assert the runtime
       // constraint rejection. Extracted to a variable so the single-line
-      // `.values(...)` call is the sole error anchor — tsc and tsgo place the
-      // overload error on different nodes when the object literal is inline.
+      // `.values(...)` call is the sole error anchor — tsc6 and native tsc place
+      // the type error on different nodes when the object literal is inline.
+      // `severity` is pinned with `as const` so the ONLY type mismatch is the
+      // null `machineInitials` (an inferred `string` severity would widen and add
+      // a second, unintended error under the `@ts-expect-error`).
       const invalidValues = {
         title: "Test Issue",
         machineInitials: null,
         issueNumber: 1,
-        severity: "minor",
+        severity: "minor" as const,
         reportedBy: testUser.id,
       };
       await expect(
