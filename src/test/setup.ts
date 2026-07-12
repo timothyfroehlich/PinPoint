@@ -5,6 +5,7 @@
  */
 
 import "@testing-library/jest-dom/vitest";
+import { EventEmitter } from "node:events";
 
 // Ensure POSTGRES_URL is set for tests to avoid db/index.ts throwing error
 if (process.env.POSTGRES_URL === undefined || process.env.POSTGRES_URL === "") {
@@ -69,5 +70,35 @@ if (typeof window !== "undefined") {
     window.Element.prototype.hasPointerCapture = function (): boolean {
       return false;
     };
+  }
+
+  // jsdom cannot navigate between Documents, so anchor clicks and
+  // window.location assignments exercised in component tests (e.g. the
+  // SettingsTab nav-guard suite, NotificationList link clicks) emit a noisy
+  // "Not implemented: navigation to another Document" jsdomError on every
+  // test run. Rewire the virtual console's jsdomError forwarding to drop
+  // exactly that message class — every other jsdomError (unhandled
+  // exceptions, CSS parse errors, other not-implemented APIs) still reaches
+  // the console unchanged. Intercepting here (rather than preventDefault-ing
+  // anchor clicks in the suites) keeps event semantics intact for tests that
+  // assert on defaultPrevented. (PP-at9m)
+  const virtualConsole: unknown = Reflect.get(window, "_virtualConsole");
+  if (virtualConsole instanceof EventEmitter) {
+    const forwarders = virtualConsole.listeners("jsdomError");
+    virtualConsole.removeAllListeners("jsdomError");
+    virtualConsole.on("jsdomError", (...args: unknown[]) => {
+      const [error] = args;
+      if (
+        error instanceof Error &&
+        error.message === "Not implemented: navigation to another Document"
+      ) {
+        return;
+      }
+      for (const forward of forwarders) {
+        // Preserve the original `this === virtualConsole` binding that
+        // EventEmitter gives listeners; a captured forwarder may rely on it.
+        forward.apply(virtualConsole, args);
+      }
+    });
   }
 }

@@ -317,9 +317,6 @@ importers:
       globals:
         specifier: ^17.6.0
         version: 17.7.0
-      happy-dom:
-        specifier: ^20.8.9
-        version: 20.10.6
       husky:
         specifier: ^9.1.7
         version: 9.1.7
