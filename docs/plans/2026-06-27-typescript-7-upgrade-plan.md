@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-27
 **Author:** Claude (investigation + empirical validation on this repo)
-**Status:** Phase 1 implemented on this branch (typecheck gate → `tsgo`). Phases 2–4 deferred.
+**Status:** Phase 1 implemented (typecheck gate → `tsgo`). Phase 2 done in PP-8mv1 (`typecheck:tests` + `typecheck:e2e` → `tsgo`, `tsc-baseline` gate retired). Remaining deferred: type-aware lint on Go, Next native build.
 **Branch:** `claude/typescript-7-upgrade-plan-o85h0g`
 
 ---

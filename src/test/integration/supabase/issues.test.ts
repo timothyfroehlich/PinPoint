@@ -76,17 +76,21 @@ describe("Issues CRUD Operations (PGlite)", () => {
     it("should enforce machine initials requirement (NOT NULL constraint)", async () => {
       const db = await getTestDb();
 
-      // Attempt to create issue without machineInitials should fail
+      // Attempt to create issue without machineInitials should fail.
+      // Deliberately passing null for a NOT NULL column to assert the runtime
+      // constraint rejection. Extracted to a variable so the single-line
+      // `.values(...)` call is the sole error anchor — tsc and tsgo place the
+      // overload error on different nodes when the object literal is inline.
+      const invalidValues = {
+        title: "Test Issue",
+        machineInitials: null,
+        issueNumber: 1,
+        severity: "minor",
+        reportedBy: testUser.id,
+      };
       await expect(
-        // @ts-expect-error - deliberately passing null for a NOT NULL column to
-        // assert the runtime constraint rejection (the call has no matching overload).
-        db.insert(issues).values({
-          title: "Test Issue",
-          machineInitials: null,
-          issueNumber: 1,
-          severity: "minor",
-          reportedBy: testUser.id,
-        })
+        // @ts-expect-error - null machineInitials has no matching insert overload.
+        db.insert(issues).values(invalidValues)
       ).rejects.toThrow();
     });
 
