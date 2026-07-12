@@ -8,6 +8,7 @@ import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { machines, userProfiles } from "~/server/db/schema";
 import { createTestMachine, createTestUser } from "~/test/helpers/factories";
 import MachineInfoTab from "~/app/(app)/m/[initials]/(tabs)/page";
+import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 
 // Mock Supabase Server Client
 const mockGetUser = vi.fn();
@@ -41,16 +42,10 @@ vi.mock("~/server/db", async () => {
 // computes. `MachineTextFields` (owner requirements) only renders when the
 // viewer is allowed to see an owner-private field. The description is now
 // read-only (RichTextDisplay), edited via the Edit Machine dialog.
-//
-// NOTE: `description`/`ownerRequirements` are `ProseMirrorDoc | null` on the
-// real component, but this mock captures only the permission props, so they're
-// typed loosely here. Importing ProseMirrorDoc trips a false
-// no-redundant-type-constituents error in the incremental pre-commit lint
-// (referenced projects aren't built) post-PP-4k76 — see follow-up bead.
 interface MachineTextFieldsProps {
   machineId: string;
-  description: unknown;
-  ownerRequirements: unknown;
+  description: ProseMirrorDoc | null;
+  ownerRequirements: ProseMirrorDoc | null;
   canEditGeneral: boolean;
   canViewOwnerRequirements: boolean;
   showDescription?: boolean;
