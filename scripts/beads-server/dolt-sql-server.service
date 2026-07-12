@@ -19,8 +19,9 @@ Wants=network-online.target
 Type=simple
 Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
 # Absolute path to the seeded Dolt data dir (holds the `PP` database).
-WorkingDirectory=/home/tim/.beads-server/dolt
-ExecStart=/home/linuxbrew/.linuxbrew/bin/dolt sql-server --config /home/tim/.beads-server/server.yaml --skip-root-user-initialization
+# Edit <USER> to the real home (Tim's is /home/froeht).
+WorkingDirectory=/home/<USER>/.beads-server/dolt
+ExecStart=/home/linuxbrew/.linuxbrew/bin/dolt sql-server --config /home/<USER>/.beads-server/server.yaml --skip-root-user-initialization
 Restart=on-failure
 RestartSec=5
 
