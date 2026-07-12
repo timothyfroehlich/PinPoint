@@ -1,0 +1,41 @@
+# Dolt SQL-server config for the shared PinPoint beads database.
+# Used on the Bazzite host: `dolt sql-server --config server.yaml`.
+#
+# This is a TEMPLATE. ${TAILSCALE_IP} defaults to Tim's Bazzite tailnet IP
+# (100.87.228.116) — Mac MagicDNS does not resolve *.ts.net, so both machines
+# connect by raw Tailscale IP. Edit data_dir / privilege_file to match the real
+# on-host paths from SETUP.md before first boot.
+#
+# Password is NEVER in this file: the `beads` user is created once with a
+# GRANT + IDENTIFIED BY (SETUP.md step 4), and clients pass the secret via the
+# BEADS_DOLT_PASSWORD env var only. --skip-root-user-initialization keeps a
+# hardened boot from re-minting a passwordless root.
+
+log_level: info
+
+listener:
+  # Bind to the Tailscale interface so Mac + Bazzite reach it over the tailnet.
+  host: "100.87.228.116"
+  port: 3306
+  max_connections: 100
+  read_timeout_millis: 28800000
+  write_timeout_millis: 28800000
+
+# Absolute path to the Dolt data directory that holds the seeded `PP` database
+# (created by `dolt clone … PP` in SETUP.md step 3). Adjust to the real path.
+data_dir: "/home/tim/.beads-server/dolt"
+
+# Persisted privileges/users table so the `beads` grant survives restarts.
+privilege_file: "/home/tim/.beads-server/privileges.db"
+
+behavior:
+  # Commit each write immediately. bd's default auto-commit is OFF; the DoltHub
+  # bridge chain (commit → pull → push) assumes a committed working set before it
+  # pulls, so this must be ON. Also pinned in the server-side bd config
+  # (dolt.auto-commit: on) — see SETUP.md.
+  autocommit: true
+  # Multi-statement client queries left at dolt's default (not disabled); bd
+  # issues single statements, so this is informational only.
+  disable_client_multi_statements: false
+  # NOTE: dolt sql-server does not auto-GC. Storage reclaim is a manual
+  # `dolt gc` / `bd flatten` step during a quiet window — see SETUP.md.

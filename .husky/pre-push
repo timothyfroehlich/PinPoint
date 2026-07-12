@@ -25,6 +25,25 @@ fi
 
 # Flush local Dolt commits to DoltHub alongside the git push.
 # Non-blocking: a transient bd push failure should not abort code push.
+#
+# Server mode: skip. There is no local embedded Dolt to flush — writes go
+# straight to the shared `dolt sql-server`, and its DoltHub bridge owns remote
+# replication. An ad-hoc push from a server-connected client here would fire
+# uncontrolled DoltHub pushes outside the bridge's cadence. Mode is read
+# tolerantly from <main-worktree>/.beads/metadata.json (this hook may run from a
+# linked worktree, whose .beads/ holds only a redirect stub); a missing file,
+# missing key, or absent jq all fall through to "embedded" — today's behavior.
 if command -v bd >/dev/null 2>&1; then
-  bd dolt push --quiet >&2 || echo "Warning: bd dolt push failed (non-fatal)" >&2
+  _bd_common=$(git rev-parse --git-common-dir 2>/dev/null || echo .git)
+  case "$_bd_common" in
+    /*) _bd_main=$(dirname "$_bd_common") ;;
+    *)  _bd_main=$(dirname "$(cd "$_bd_common" 2>/dev/null && pwd || echo .)") ;;
+  esac
+  _bd_mode=embedded
+  if [ -f "$_bd_main/.beads/metadata.json" ] && command -v jq >/dev/null 2>&1; then
+    _bd_mode=$(jq -r '.dolt_mode // "embedded"' "$_bd_main/.beads/metadata.json" 2>/dev/null || echo embedded)
+  fi
+  if [ "$_bd_mode" != "server" ]; then
+    bd dolt push --quiet >&2 || echo "Warning: bd dolt push failed (non-fatal)" >&2
+  fi
 fi

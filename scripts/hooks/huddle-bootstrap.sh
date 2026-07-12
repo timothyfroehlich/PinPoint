@@ -146,7 +146,6 @@ notes = {
     'schema_version': 1,
     'today_bead': {'id': sys.argv[1], 'date': sys.argv[2]},
     'monthly_bead': {'id': sys.argv[3], 'month': sys.argv[4]},
-    'recent_dailies': [{'id': sys.argv[1], 'date': sys.argv[2]}],
     'settings': {
         'n_dailies_to_inject': 5,
         'day_boundary_tz': 'local',
@@ -217,7 +216,6 @@ TODAY_ID=$(bd create -t task \
   --parent "$ROOT_ID" \
   --title "Huddle daily $TODAY" \
   --description "Active coordination bead for $TODAY. Agents post updates here with their sign-off (e.g. —Claude-WorktreeFix). At midnight rotation, this bead gets a categorized summary in its description and a raw archive in its notes, then closes." \
-  --ephemeral --wisp-type patrol \
   --silent)
 printf '  Today daily:   %s\n' "$TODAY_ID"
 
@@ -238,7 +236,6 @@ notes = {
     'schema_version': 1,
     'today_bead': {'id': sys.argv[1], 'date': sys.argv[2]},
     'monthly_bead': {'id': sys.argv[3], 'month': sys.argv[4]},
-    'recent_dailies': [{'id': sys.argv[1], 'date': sys.argv[2]}],
     'settings': {
         'n_dailies_to_inject': 5,
         'day_boundary_tz': 'local',

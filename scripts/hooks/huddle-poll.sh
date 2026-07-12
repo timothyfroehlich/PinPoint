@@ -191,8 +191,8 @@ fi
 # Fetch once here and reuse below. If bd is unavailable or the bead is
 # inaccessible, fail open silently — we do NOT want to emit a false "notes
 # malformed" warning when the real issue is a bd outage.
-ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || exit 0
-[[ -n "$ROOT_JSON" ]] || exit 0
+ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || { huddle_warn_degraded; exit 0; }
+[[ -n "$ROOT_JSON" ]] || { huddle_warn_degraded; exit 0; }
 
 # --- Root notes integrity check ---
 # config.json exists but root notes may be null/malformed (e.g. 2026-05-20
@@ -226,7 +226,9 @@ ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
 if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
   # shellcheck source=huddle-rotation-check.sh disable=SC1091
   source "$ROTATION_CHECK_SCRIPT"
-  if huddle_rotation_needed; then
+  # Pass the already-fetched ROOT_JSON so the check reuses it instead of a second
+  # bd show (hot-path budget: root show + comments only).
+  if huddle_rotation_needed "$ROOT_JSON"; then
     STORED_DATE=""
     # Reuse ROOT_JSON + NOTES_STR already fetched above (avoids a second bd call).
     if [[ -n "$NOTES_STR" ]]; then
@@ -269,20 +271,34 @@ else
   LAST_SEEN="0"
 fi
 
-# Resolve today_bead.id from root notes, then fetch its comments.
-# ROOT_JSON and NOTES_STR are already populated from the integrity check above;
-# the notes-integrity gate above guarantees NOTES_STR is non-empty here.
-TODAY_BEAD_ID=$(printf '%s' "$NOTES_STR" | python3 -c "
-import sys, json
-try:
-    n = json.loads(sys.stdin.read())
-    print(n.get('today_bead', {}).get('id', ''))
-except Exception:
-    print('')
-" 2>/dev/null || echo "")
-[[ -n "$TODAY_BEAD_ID" ]] || { exit 0; }
+# Resolve today's active daily, then fetch its comments.
+#
+# Fast path: trust the root-notes hint. The rotation check above already confirmed
+# today_bead.date == today, so the hint IS today's daily unless it was
+# purged/renamed out from under the notes (the PP-9lq5 dangling-pointer hazard).
+# The comments fetch doubles as the liveness probe, so the steady-state stays at
+# 2 bd calls (the root show above + this comments fetch — plan item 5 budget).
+#
+# Self-heal: if the hint is missing or dangles (comments fetch fails, or returns
+# a non-array), resolve the REAL open "Huddle daily <today>" through the shared
+# verified title-query resolver — reusing ROOT_ID + ROOT_JSON already in hand, so
+# it makes NO extra root show — then re-fetch. Costs one extra `bd children`
+# (+ retry) only on the rare dangling day, never on the hot path. Without this a
+# dangling cached pointer would silently stop comment injection until rotation
+# repointed notes (the exact PP-9lq5 failure).
+TODAY_BEAD_ID=$(printf '%s' "$ROOT_JSON" \
+  | jq -r '.[0].notes // "{}" | (fromjson? // {}) | .today_bead.id // ""' 2>/dev/null) || TODAY_BEAD_ID=""
 
-COMMENTS_JSON="$(bd comments "$TODAY_BEAD_ID" --json 2>/dev/null)" || { exit 0; }
+COMMENTS_JSON=""
+if [[ -n "$TODAY_BEAD_ID" ]] \
+   && COMMENTS_JSON="$(bd comments "$TODAY_BEAD_ID" --json 2>/dev/null)" \
+   && printf '%s' "$COMMENTS_JSON" | jq -e 'type == "array"' >/dev/null 2>&1; then
+  : # hint is live — COMMENTS_JSON holds its comment array
+else
+  TODAY_BEAD_ID=$(huddle_today_bead_id "$ROOT_ID" "$ROOT_JSON" 2>/dev/null) || { exit 0; }
+  [[ -n "$TODAY_BEAD_ID" ]] || { exit 0; }
+  COMMENTS_JSON="$(bd comments "$TODAY_BEAD_ID" --json 2>/dev/null)" || { exit 0; }
+fi
 
 # Resolve self agent name. Priority order:
 #   1. <STATE_DIR>/session-names.json[session_id] (canonical)

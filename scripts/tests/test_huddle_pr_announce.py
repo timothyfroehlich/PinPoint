@@ -70,12 +70,24 @@ def run_hook(
     # and bd comments/show work correctly.
     with tempfile.TemporaryDirectory() as tmp_dir:
         bd_stub = Path(tmp_dir) / "bd"
+        # Stub the new title-query resolution in huddle_today_bead_id:
+        #   - show <root>      → root notes with a today_bead.id hint
+        #   - show PP-today-123→ a bead titled "Huddle daily <today>", open
+        #     (so the hint verifies) — also the children fallback source
+        #   - comments         → empty (dedup finds nothing)
         bd_stub.write_text("""#!/usr/bin/env bash
-if [[ "$1" == "comments" ]]; then
-  echo '[]'
-elif [[ "$1" == "show" ]]; then
-  echo '[{"notes": "{\\"today_bead\\": {\\"id\\": \\"PP-today-123\\"}}"}]'
-fi
+_today=$(date +%F)
+_daily='[{"id":"PP-today-123","title":"Huddle daily '"$_today"'","status":"open"}]'
+case "$1" in
+  comments) echo '[]' ;;
+  children) printf '%s\\n' "$_daily" ;;
+  show)
+    case "$2" in
+      PP-today-123) printf '%s\\n' "$_daily" ;;
+      *) echo '[{"notes": "{\\"today_bead\\": {\\"id\\": \\"PP-today-123\\"}}"}]' ;;
+    esac
+    ;;
+esac
 exit 0
 """)
         bd_stub.chmod(

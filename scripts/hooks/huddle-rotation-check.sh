@@ -12,9 +12,14 @@
 #
 # Calling pattern in both hooks:
 #   source "$(dirname "$0")/huddle-rotation-check.sh"
-#   if huddle_rotation_needed; then
+#   if huddle_rotation_needed "$ROOT_JSON"; then   # ROOT_JSON optional
 #     # emit "rotation needed" notice and skip subsequent steps
 #   fi
+#
+# Optional arg $1: a pre-fetched `bd show <root> --json` blob. When supplied
+# (huddle-poll.sh already fetches it), this function reuses it instead of
+# spending a second `bd show` — keeping the hot poll path at its ≤2 bd-calls
+# budget (root show + comments). Omitted → it fetches its own (session-start).
 #
 # Requires huddle-lib.sh to be sourced before calling, OR resolves the lib
 # itself if STATE_DIR is not yet set. Both hooks source this file after
@@ -22,6 +27,7 @@
 
 # shellcheck disable=SC2317  # function is sourced and called by callers
 huddle_rotation_needed() {
+  local prefetched_json="${1:-}"
   local state_dir config_file root_id root_json notes_str today_bead_date today
 
   # Resolve state dir — re-use caller's STATE_DIR if already set, otherwise
@@ -43,10 +49,15 @@ huddle_rotation_needed() {
   root_id=$(jq -r '.root_bead_id // ""' "$config_file" 2>/dev/null)
   [[ -n "$root_id" ]] || return 1
 
-  # Fetch the root bead's notes JSON. bd show outputs a JSON array; we pick
-  # the first element's `notes` field (a JSON string). If bd is unavailable,
-  # notes is empty, or notes fails to parse, fail open (return 1).
-  root_json=$(bd show "$root_id" --json 2>/dev/null) || return 1
+  # Reuse the caller's pre-fetched root JSON when given; else fetch it. bd show
+  # outputs a JSON array; we pick the first element's `notes` field (a JSON
+  # string). If bd is unavailable, notes is empty, or notes fails to parse, fail
+  # open (return 1).
+  if [[ -n "$prefetched_json" ]]; then
+    root_json="$prefetched_json"
+  else
+    root_json=$(bd show "$root_id" --json 2>/dev/null) || return 1
+  fi
   notes_str=$(printf '%s' "$root_json" | jq -r '.[0].notes // ""' 2>/dev/null) || return 1
   [[ -n "$notes_str" ]] || return 1
 
