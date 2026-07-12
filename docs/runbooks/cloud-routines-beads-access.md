@@ -182,5 +182,10 @@ handles that); use your DoltHub account email or any non-personal address.
 
 - **PP-3x7s** — the enabler this runbook documents.
 - **PP-nlv6** — a future weekly-chores checklist item (stale Supabase CLI pin).
-- Adoption target: the Weekly Security Review routine files beads for findings
-  (first routine to adopt this).
+- **Consolidated Weekly Review routine** (`trig_01Dp3rMq8LevE4P9gQ1mFSj4`, cron
+  `0 10 * * 6`, Beads env): the three former weekly routines (Security Review,
+  Changelog, Flaky Test Tracker) were merged into one session on 2026-07-12
+  (PP-ld0o.6). Output is "split by risk" — security findings and the flaky-test
+  report are filed as beads (`security` / `flaky-test` labels); the changelog
+  still opens a PR. The former standalone Changelog and Flaky routines are
+  disabled (not deleted).
