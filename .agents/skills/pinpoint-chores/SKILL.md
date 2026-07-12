@@ -13,9 +13,12 @@ This skill is the runbook. The checklist itself is duplicated on the recurring *
 
 ## How the nag works (context)
 
-- **State + due date** live on one recurring bead labeled `weekly-chore` (durable, DoltHub-synced across Tim's machines). Between cycles it sits **deferred** — `bd defer --until=<next Saturday>` — so it's dormant.
-- **The nudge** is a SessionStart hook, `.claude/hooks/session-start-chores-nag.sh`. It looks the bead up **by label** (never a hardcoded ID), reads its `defer_until`, and if that date has passed injects the one-line nag. It's silent while the bead is dormant.
-- **Reset** = re-defer the bead one week out. Because state is on the synced bead, doing chores on ANY machine clears the nag everywhere.
+- **State + due date** live on one recurring bead labeled `weekly-chore` (durable, DoltHub-synced across Tim's machines).
+- **The nudge** is a SessionStart hook, `.claude/hooks/session-start-chores-nag.sh`. It looks the bead up **by label** (never a hardcoded ID) and reads its `defer_until` + `status`. The state machine it enforces:
+  - **Dormant** — `defer_until` in the **future** → no nag (between cycles, after the re-defer).
+  - **Due** — `defer_until` in the **past** AND status is **not** `in_progress` and **not** `closed` → **nag**.
+  - **Working** — status `in_progress` → no nag (you moved the bead there when you started this session; see below).
+- **Reset** = when you finish, re-defer the bead one week out (which also takes it out of `in_progress`). Because state is on the synced bead, doing chores on ANY machine clears the nag everywhere.
 
 Design record: **PP-ld0o.3** (Option C). Epic: **PP-ld0o**.
 
@@ -25,7 +28,7 @@ Find the bead first (by label, so you have its ID for comments + the reset):
 
     bd list --label weekly-chore --json
 
-Optionally move it to in-progress and log start:
+**Move it to in-progress** — this silences the nag while you work (a `due` bead only nags when it is NOT `in_progress`), and logs the start:
 
     bd update <chores-bead> --status in_progress
 

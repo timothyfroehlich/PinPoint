@@ -153,10 +153,44 @@ def test_dormant_future_defer_is_silent(mock_bd: dict, tmp_path: Path) -> None:
 
 
 def test_no_defer_until_is_silent(mock_bd: dict, tmp_path: Path) -> None:
-    # Freshly created / actively being worked → not armed → no nag.
+    # A bead with no defer_until at all (created before its first `bd defer`) is
+    # not armed → no nag. Note this is about the MISSING field only — an
+    # in_progress bead still keeps its defer_until (see the in_progress test).
     bead = _chore_bead(status="open")
     bead.pop("defer_until")
     mock_bd["set_beads"]([bead])
+    rc, out, err = run_hook(STDIN, mock_bd, tmp_path)
+    assert rc == 0, err
+    assert out.strip() == ""
+
+
+def test_due_open_bead_nags(mock_bd: dict, tmp_path: Path) -> None:
+    # DUE + status open (not in_progress, not closed) → nag. Guards the corrected
+    # semantics: the nag keys on status, not just defer_until.
+    mock_bd["set_beads"](
+        [
+            _chore_bead(
+                status="open",
+                defer_until=_iso(_now() - datetime.timedelta(days=2, hours=2)),
+            )
+        ]
+    )
+    rc, out, err = run_hook(STDIN, mock_bd, tmp_path)
+    assert rc == 0, err
+    assert "2 days overdue" in out
+
+
+def test_due_in_progress_bead_is_silent(mock_bd: dict, tmp_path: Path) -> None:
+    # DUE (defer_until in the past) BUT status in_progress → chores actively
+    # under way → no nag, even though defer_until has passed.
+    mock_bd["set_beads"](
+        [
+            _chore_bead(
+                status="in_progress",
+                defer_until=_iso(_now() - datetime.timedelta(days=3)),
+            )
+        ]
+    )
     rc, out, err = run_hook(STDIN, mock_bd, tmp_path)
     assert rc == 0, err
     assert out.strip() == ""
