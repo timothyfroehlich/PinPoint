@@ -190,6 +190,7 @@ function CalendarDayButton({
   const ref = React.useRef<HTMLButtonElement>(null);
   React.useEffect(() => {
     if (modifiers["focused"]) ref.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- PP-k6jp: pre-existing, triage separately
   }, [modifiers["focused"]]);
 
   return (

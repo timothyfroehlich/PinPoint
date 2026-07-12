@@ -5,6 +5,7 @@ import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import promisePlugin from "eslint-plugin-promise";
 import eslintCommentsPlugin from "@eslint-community/eslint-plugin-eslint-comments";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
+import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 import { pinpointTransactionPlugin } from "./eslint-rules/no-side-effects-in-transaction.mjs";
 
@@ -296,6 +297,33 @@ export default [
     files: ["supabase/**/*.mjs"],
     languageOptions: {
       globals: globals.node,
+    },
+  },
+  {
+    // ===== React Hooks correctness (PP-k6jp) =====
+    // eslint-config-next was installed but never loaded, so react-hooks rules
+    // ran nowhere. Wire the plugin directly (not via the legacy next config) and
+    // own the two core rules' severity ourselves. Scoped to app source under
+    // src/ (both .ts custom hooks and .tsx client components); tests/e2e are
+    // excluded — hook-render helpers there produce noise with no user impact.
+    // rules-of-hooks catches conditional/looped hook calls (real bugs).
+    // exhaustive-deps is a hard gate (error); pre-existing violations are
+    // grandfathered inline with a `-- PP-k6jp` disable rather than risky
+    // dependency-array edits, so this PR only ENABLES the rule cleanly.
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    ignores: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
+      "src/test/**",
+    ],
+    plugins: {
+      "react-hooks": reactHooks,
+    },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "error",
     },
   },
   {
