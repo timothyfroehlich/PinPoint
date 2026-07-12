@@ -140,12 +140,20 @@ huddle_root_id() {
   printf '%s' "$root_id"
 }
 
-# huddle_today_bead_id — print the ID of today's active coordination bead.
-# Returns 0 on success (and prints the ID), non-zero + empty on any failure.
-# Fail-open: callers MUST treat a non-zero return as "skip quietly".
+# huddle_today_bead_id [root_id] [root_json] — print the ID of today's active
+# coordination bead. Returns 0 on success (and prints the ID), non-zero + empty
+# on any failure. Fail-open: callers MUST treat a non-zero return as "skip
+# quietly".
+#
+# Optional pre-fetched args (hot-path budget): when the caller already holds the
+# root id AND its `bd show <root> --json` blob — huddle-poll.sh does — pass both
+# so this function skips huddle_root_id and the root `bd show` entirely. The
+# pre-fetched form makes NO root bd show. Omit both (merge-pr.sh,
+# huddle-pr-announce.sh) to resolve them internally.
 #
 # Resolution (reads the live DB, not a cache — PP-9lq5):
-#   1. huddle_root_id (rebuildable config.json cache → title-query fallback)
+#   1. root id: caller-supplied, else huddle_root_id (rebuildable config cache
+#      → title-query fallback).
 #   2. Fast-path HINT: root notes .today_bead.id, but VERIFIED via `bd show`
 #      (must still be open AND titled "Huddle daily <today>") before trust —
 #      a dangling/stale pointer is never returned.
@@ -157,13 +165,18 @@ huddle_root_id() {
 huddle_today_bead_id() {
   command -v bd >/dev/null 2>&1 || return 1
   command -v jq >/dev/null 2>&1 || return 1
-  local root_id today root_json hint verified id
-  root_id=$(huddle_root_id) || return 1
-  [[ -n "$root_id" ]] || return 1
+  local root_id="${1:-}" root_json="${2:-}" today hint verified id
+  if [[ -z "$root_id" ]]; then
+    root_id=$(huddle_root_id) || return 1
+    [[ -n "$root_id" ]] || return 1
+  fi
   today=$(date +%F)
 
-  # Fast-path hint from root notes (single show; reused for the fallback too).
-  root_json=$(bd show "$root_id" --json 2>/dev/null) || root_json=""
+  # Fast-path hint from root notes. Reuse the caller's pre-fetched root JSON when
+  # given; otherwise fetch it once (the only root show in the no-arg form).
+  if [[ -z "$root_json" ]]; then
+    root_json=$(bd show "$root_id" --json 2>/dev/null) || root_json=""
+  fi
   hint=$(printf '%s' "$root_json" \
     | jq -r '.[0].notes // "{}" | (fromjson? // {}) | .today_bead.id // ""' 2>/dev/null) || hint=""
   if [[ -n "$hint" ]]; then

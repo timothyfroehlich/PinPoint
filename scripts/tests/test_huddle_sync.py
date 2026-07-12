@@ -7,6 +7,7 @@ to <repo>/.agents/huddle), stubs `bd` on PATH to record its invocations and emit
 canned JSON, then sources the lib and calls the function under test.
 """
 
+import datetime
 import json
 import os
 import stat
@@ -283,6 +284,74 @@ def test_discover_root_pulls_in_embedded_mode(repo: Path) -> None:
     assert rc == 0
     assert out.strip() == "PP-lt12"
     assert "dolt pull" in log  # embedded mode pulls first to avoid forking
+
+
+# --- huddle_today_bead_id (pre-fetched form used by the poll hot path) ------
+
+
+def _prefetched_root_json(hint_id: str, date: str) -> str:
+    """A `bd show <root>` blob whose notes point today_bead.id at hint_id."""
+    notes = {"today_bead": {"id": hint_id, "date": date}}
+    return json.dumps([{"id": "PP-lt12", "notes": json.dumps(notes)}])
+
+
+def test_today_bead_prefetched_verified_hint_no_root_show(repo: Path) -> None:
+    # Pre-fetched form (root_id + root_json supplied): the hint verifies open +
+    # titled-for-today, so it's returned — and crucially NO root `bd show` runs
+    # (hot-path budget: huddle-poll already holds ROOT_JSON).
+    today = datetime.date.today().isoformat()
+    root_json = _prefetched_root_json("PP-lt12.50", today)
+    daily = repo / "daily.json"
+    daily.write_text(
+        json.dumps(
+            [{"id": "PP-lt12.50", "title": f"Huddle daily {today}", "status": "open"}]
+        )
+    )
+    rc, out, _err, log = run_fn(
+        repo,
+        f"huddle_today_bead_id PP-lt12 '{root_json}'",
+        {"BD_SHOW_JSON": str(daily)},
+    )
+    assert rc == 0
+    assert out.strip() == "PP-lt12.50"
+    assert "show PP-lt12 " not in log, "pre-fetched form must NOT show the root"
+    assert "show PP-lt12.50" in log, "the hint is verified via bd show"
+
+
+def test_today_bead_prefetched_dangling_hint_self_heals(repo: Path) -> None:
+    # The cached hint dangles (verify returns a CLOSED bead — as if the daily was
+    # purged/rotated out from under stale notes). Resolution must self-heal to the
+    # real open "Huddle daily <today>" via the children title query — the exact
+    # PP-9lq5 hazard on the poll path — still without a root show.
+    today = datetime.date.today().isoformat()
+    root_json = _prefetched_root_json("PP-lt12.OLD", today)
+    dead = repo / "dead.json"
+    dead.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "PP-lt12.OLD",
+                    "title": f"Huddle daily {today}",
+                    "status": "closed",
+                }
+            ]
+        )
+    )
+    children = repo / "children.json"
+    children.write_text(
+        json.dumps(
+            [{"id": "PP-lt12.NEW", "title": f"Huddle daily {today}", "status": "open"}]
+        )
+    )
+    rc, out, _err, log = run_fn(
+        repo,
+        f"huddle_today_bead_id PP-lt12 '{root_json}'",
+        {"BD_SHOW_JSON": str(dead), "BD_CHILDREN_JSON": str(children)},
+    )
+    assert rc == 0
+    assert out.strip() == "PP-lt12.NEW", "must self-heal to the real open daily"
+    assert "children PP-lt12" in log, "dangling hint falls back to the title query"
+    assert "show PP-lt12 " not in log, "self-heal still makes no root show"
 
 
 # --- huddle_reconcile_today ------------------------------------------------
