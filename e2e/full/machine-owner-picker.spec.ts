@@ -104,11 +104,17 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     // Submit the form
     await page.getByRole("button", { name: /Create Machine/i }).click();
 
-    // Promote dialog should appear — allow extra time for the server action
-    // round-trip + React useEffect cycle (observed slower in Firefox).
+    // Promote dialog should appear after the server action round-trip +
+    // React useEffect cycle. Use the config's own CI-aware `expect.timeout`
+    // (30s in CI, 10s locally) instead of a hardcoded value — a fixed 15s
+    // override here previously undercut the CI default by half, right where
+    // Mobile Safari/Mobile Chrome + parallel-worker contention need the most
+    // margin (PP flaky-test report 2026-07-05: this assertion was the #1
+    // flakiest test in CI over the prior week, including one run where it
+    // failed all 3 attempts — original + 2 retries — at the 15s mark).
     await expect(
       page.getByRole("heading", { name: /Promote to member and assign/i })
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
 
     // Dialog should show "(GUEST)" badge
     const promoteDialog = page.getByRole("dialog").filter({
@@ -150,17 +156,18 @@ test.describe("Machine Owner Picker — promote-dialog journeys (PP-6oi)", () =>
     // Submit
     await page.getByRole("button", { name: /Create Machine/i }).click();
 
-    // Promote dialog should appear — allow extra time for server round-trip.
+    // Promote dialog should appear after the server action round-trip. Rely
+    // on the config's CI-aware `expect.timeout` (see comment on the sibling
+    // assertion above) rather than a hardcoded override that undercuts it.
     await expect(
       page.getByRole("heading", { name: /Promote to member and assign/i })
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible();
 
     await page.getByRole("button", { name: /Promote and assign/i }).click();
 
-    // Should redirect to machine detail page
-    await expect(page).toHaveURL(new RegExp(`/m/${machineInitials}`), {
-      timeout: 15000,
-    });
+    // Should redirect to machine detail page — same reasoning: let this
+    // inherit the global CI-aware expect timeout instead of a hardcoded 15s.
+    await expect(page).toHaveURL(new RegExp(`/m/${machineInitials}`));
     await expect(
       page.getByRole("heading", { name: `Owner Picker Confirm ${testId}` })
     ).toBeVisible();

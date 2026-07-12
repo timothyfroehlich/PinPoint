@@ -1,56 +1,186 @@
-# Cloud routines: beads DoltHub access
+# Cloud Routines: beads (DoltHub) read/write access
 
-Scheduled Claude cloud routines (CCR) **can read and write** the PinPoint beads
-database on DoltHub (`advacar/pinpoint-beads`) — proven 2026-07-11 (PP-3x7s).
-Cloud sessions cannot reach Tim's tailnet, so they never touch the shared Bazzite
-`dolt sql-server` directly; instead they clone from and push to DoltHub, and the
-Bazzite-side bridge (`scripts/beads-server/beads-dolthub-bridge.*`, ~15-min timer)
-reconciles those cloud writes into the live server on its next cycle.
+## Overview
 
-> This runbook was previously only in beads kv-memory (`bd recall
-cloud-routine-beads-access`); it lives here now as the canonical record.
+PinPoint's scheduled Claude cloud routines (CCR — "routines" at
+`claude.ai/code/routines`) run in ephemeral Ubuntu sandboxes with a fresh git
+checkout. To let them record findings as **beads** (instead of only GitHub
+issues/PRs), they must reach the beads database — a DoltHub-hosted Dolt DB
+(`advacar/pinpoint-beads`) which is **not in git** (`.beads/` is gitignored, so
+the cloud checkout has no beads data).
 
-## Environment
+This runbook documents the cloud **environment** configuration that grants a
+routine full read + write to that DB. Proven end-to-end on 2026-07-11 (PP-3x7s).
 
-- Cloud env **"PinPoint/Beads"** = `env_01KrLCUzkAXXB7sjzezRhpHe`.
-- Runtime: Ubuntu 24.04, **root sandbox, no Homebrew**.
+**Model:** hybrid — routines run unattended and may write beads; a local
+"chores" session reviews and acts on them. Concurrent writers are acceptable:
+Dolt is merge-native, and the beads remote-migrate gate is the backstop.
 
-## Key facts
+## The three things that make it work
 
-1. **No beads data in the checkout.** `.beads/` is gitignored, so a cloud checkout
-   has zero beads data — it must clone from DoltHub.
-2. **Install dolt + bd from GitHub releases, not brew.** The setup script downloads
-   the latest `dolt` and `bd` from the `github.com` release redirect — **not**
-   `api.github.com`, which 403s on shared cloud IPs.
-3. **Egress allowlist.** DoltHub clones read via `*.cloudfront.net` and write via
-   `*.s3.amazonaws.com` — both must be on the env's Custom allowlist, alongside
-   `github.com`, `release-assets.githubusercontent.com`, and
-   `doltremoteapi.dolthub.com`.
-4. **Creds are agent-written, not env-injected.** Env vars are invisible to the
-   setup script (Claude Code #63541), so the **agent** writes
-   `~/.dolt/creds/<DOLT_CREDS_PUB>.jwk` + `config_global.json` from the env vars
-   `DOLT_CREDS_JWK` / `DOLT_CREDS_PUB`. This is a dedicated, revocable DoltHub
-   credential; `DOLT_CREDS_PUB` is the local file-stem handle, distinct from the
-   registered pubkey.
-5. **Clone in one step:**
-   ```bash
-   bd init --remote "$BEADS_SYNC_REMOTE" --prefix PP --non-interactive
-   ```
-6. **NEVER migrate in cloud.** Do not run `bd migrate` or set
-   `BD_ALLOW_REMOTE_MIGRATE` in a cloud session. The remote-migrate refusal gate is
-   the schema-drift backstop; the designated migrator is Tim's Mac only.
+A cloud routine touching beads needs all three. The first two are the silent
+failure modes that defeat a naive attempt:
 
-## Sharp edge: re-bootstrap discards unpushed cloud writes
+1. **Egress allowlist** — DoltHub's clone/push protocol redirects the actual
+   data-blob transfer to a CloudFront CDN (reads) and S3 (writes). Those hosts
+   are blocked by default, so `bd`'s DoltHub API auth succeeds but the blob
+   fetch 403s. Both backend host families must be allowlisted.
+2. **Credentials are materialized by the agent, not the setup script** —
+   environment variables are **not** visible to the setup script
+   ([Claude Code #63541](https://github.com/anthropics/claude-code/issues/63541));
+   they only exist at agent runtime. So the setup script installs binaries; the
+   agent writes the DoltHub credential.
+3. **`bd` + `dolt` installed** in the sandbox (neither is preinstalled; `brew`
+   is absent on the image).
 
-Re-bootstrapping a cloud clone does `dolt reset --hard` against DoltHub, which
-**discards any local cloud writes that were not yet pushed**. Always let a
-`bd dolt push` (or the Bazzite bridge cycle) land cloud work before
-re-bootstrapping a cloud clone.
+## Environment configuration (`claude.ai/customize/environments`)
 
-## Relationship to the shared-server model (PP-0fwz)
+### Network access — Custom allowlist
 
-After the Bazzite shared-server cutover, DoltHub is the async bridge + off-machine
-backup rather than the primary sync path for local work. Cloud routines are the one
-remaining first-class DoltHub writer. Their cadence into the live server is the
-bridge timer interval (~15 min): a cloud push lands on DoltHub, and the next bridge
-`pull` ingests it into the server that Mac + Bazzite read.
+The Custom base policy is minimal (anthropic.com + package registries + RFC1918
+only). Add:
+
+| Host                                   | Why                                                        |
+| -------------------------------------- | ---------------------------------------------------------- |
+| `github.com`                           | resolve latest release tag + download `bd`/`dolt` binaries |
+| `release-assets.githubusercontent.com` | GitHub release-asset CDN (the binary blobs)                |
+| `doltremoteapi.dolthub.com`            | DoltHub API — credential auth, signed-URL issuance         |
+| `*.cloudfront.net`                     | DoltHub **clone/read** — CDN blob fetch                    |
+| `*.s3.amazonaws.com`                   | DoltHub **push/write** — S3 blob upload                    |
+
+If a push 403s, DoltHub may be using region-scoped upload hosts — widen to
+`*.s3.<region>.amazonaws.com` (confirm the exact host from the proxy status log,
+see Reproducing / debugging). Avoid the broad `*.amazonaws.com`.
+
+Do **not** rely on `api.github.com` — it is rate-limited on shared cloud egress
+IPs (returns 403) and may not be allowlisted. Resolve the latest version off the
+`github.com` `/releases/latest` redirect instead (see setup script).
+
+### Environment variables
+
+Values live in the claude.ai UI (never commit them). Names:
+
+| Var                 | Contents                                                             |
+| ------------------- | -------------------------------------------------------------------- |
+| `DOLT_CREDS_JWK`    | the dedicated cloud DoltHub credential's private JWK (one-line JSON) |
+| `DOLT_CREDS_PUB`    | the local **file-stem handle** for that cred (see credential note)   |
+| `BEADS_SYNC_REMOTE` | `https://doltremoteapi.dolthub.com/advacar/pinpoint-beads`           |
+
+Reminder: these are invisible to the setup script (#63541) — the agent consumes
+them.
+
+### Setup script (installs binaries; unpinned)
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "=== ENV DISCOVERY ==="
+head -3 /etc/os-release 2>/dev/null || true
+echo "user=$(whoami) $(id)"
+for t in sudo apt-get brew curl tar jq go; do
+  printf '%s: %s\n' "$t" "$(command -v "$t" || echo MISSING)"
+done
+
+BIN=/usr/local/bin
+export PATH="$BIN:$PATH"
+
+echo "=== INSTALL DOLT (version-agnostic asset, no api.github.com) ==="
+curl -fsSL -o /tmp/dolt.tgz \
+  "https://github.com/dolthub/dolt/releases/latest/download/dolt-linux-amd64.tar.gz"
+tar xzf /tmp/dolt.tgz -C /tmp
+install /tmp/dolt-linux-amd64/bin/dolt "$BIN/dolt"
+
+echo "=== RESOLVE BEADS LATEST TAG (via github.com redirect) ==="
+BD_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}\n' \
+  https://github.com/steveyegge/beads/releases/latest | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
+BD_VER="${BD_TAG#v}"
+echo "=== INSTALL BEADS ${BD_TAG} ==="
+curl -fsSL -o /tmp/bd.tgz \
+  "https://github.com/steveyegge/beads/releases/download/${BD_TAG}/beads_${BD_VER}_linux_amd64.tar.gz"
+tar xzf /tmp/bd.tgz -C /tmp
+install /tmp/bd "$BIN/bd"
+
+echo "=== VERSIONS ==="
+dolt version
+if ! bd version; then
+  echo "bd failed to link — installing libicu"
+  apt-get update -qq && apt-get install -y libicu-dev
+  bd version
+fi
+```
+
+`bd` is intentionally **unpinned** (both cloud and local track latest stable).
+The drift risk — cloud `bd` schema-ahead of the DB — is handled by beads'
+remote-migrate gate, which refuses to auto-migrate a remote-backed DB and prints
+the fix rather than corrupting anything.
+
+## Credential setup (one-time)
+
+Use a **dedicated** DoltHub credential for the cloud, not a personal machine key,
+so it is independently revocable if the env var leaks.
+
+```bash
+dolt creds new          # prints a PUBLIC KEY; writes ~/.dolt/creds/<keyid>.jwk
+```
+
+- **Register the printed public key** on DoltHub (account → Settings →
+  Credentials) with write access to `advacar/pinpoint-beads`. This is the actual
+  access grant.
+- `DOLT_CREDS_JWK` = the contents of the new `~/.dolt/creds/<keyid>.jwk`.
+- `DOLT_CREDS_PUB` = the **file stem** (`<keyid>`), i.e. the filename without
+  `.jwk`.
+
+**Naming nuance:** `dolt` names cred files by an internal key-id that is
+**distinct** from the printed public key. Locate the new file by modification
+time: `ls -t ~/.dolt/creds/*.jwk | head -1`. The local `user.creds`/filename is
+only a lookup handle — authentication binds the _private key_ to the _registered
+public key_, so the handle can be any consistent value as long as the file is
+named `<handle>.jwk` and `user.creds` matches it.
+
+## Agent preamble (prepend to each beads-writing routine prompt)
+
+```bash
+mkdir -p ~/.dolt/creds
+printf '%s' "$DOLT_CREDS_JWK" > ~/.dolt/creds/"$DOLT_CREDS_PUB".jwk
+chmod 600 ~/.dolt/creds/"$DOLT_CREDS_PUB".jwk
+printf '{"user.creds":"%s","user.email":"<dolthub-account-email>","user.name":"advacar"}' \
+  "$DOLT_CREDS_PUB" > ~/.dolt/config_global.json
+
+# Clone + persist sync.remote in one step (no hand-seeded .beads/config.yaml):
+mkdir -p ~/beads && cd ~/beads
+bd init --remote "$BEADS_SYNC_REMOTE" --prefix PP --non-interactive
+
+# ... do work: bd ready / bd create / bd update ...
+bd dolt push
+```
+
+`user.email` is Dolt commit metadata only (not used for authentication — the JWK
+handles that); use your DoltHub account email or any non-personal address.
+
+## Guardrails
+
+- **Never** run `bd migrate` or set `BD_ALLOW_REMOTE_MIGRATE` from a cloud
+  session. The designated migrator is Tim's machine only. If `bd` reports the DB
+  needs migrating (cloud `bd` jumped ahead of the schema), **stop and report** —
+  that is the safety gate working, not a bug to push through.
+- `bd`'s telemetry endpoint (`gastownhall-eventsapi.com`) and `dolt`'s
+  version self-check are blocked by the allowlist. Both are harmless
+  (`metrics.disabled=true`); ignore their proxy-denial log lines.
+
+## Reproducing / debugging
+
+- **Test interactively:** `claude.ai/code` → New session → select the
+  environment. Watch the setup script run; then paste the agent preamble.
+- Editing the setup script forces a cache rebuild on the next session (the
+  script's output layer is cached ~7 days otherwise).
+- **Diagnose an egress denial** from inside a session:
+  `curl "$HTTPS_PROXY/__agentproxy/status"` — it logs `connect_rejected` with the
+  blocked host, distinguishing a policy denial from a DoltHub-side auth error.
+
+## Related
+
+- **PP-3x7s** — the enabler this runbook documents.
+- **PP-nlv6** — a future weekly-chores checklist item (stale Supabase CLI pin).
+- Adoption target: the Weekly Security Review routine files beads for findings
+  (first routine to adopt this).
