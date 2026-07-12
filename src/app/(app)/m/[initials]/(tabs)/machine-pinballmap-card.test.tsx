@@ -19,7 +19,7 @@ describe("MachinePinballmapCard", () => {
     expect(link).toHaveTextContent(/view on pinballmap/i);
     expect(link).toHaveAttribute("href", LOCATION_URL);
     expect(link).toHaveAttribute("target", "_blank");
-    expect(link).toHaveAttribute("rel", "noreferrer");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("shows a Listed pill when the machine is listed", () => {

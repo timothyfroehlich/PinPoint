@@ -69,7 +69,7 @@ export function MachinePinballmapCard(
       <a
         href={props.locationUrl}
         target="_blank"
-        rel="noreferrer"
+        rel="noopener noreferrer"
         data-testid="machine-pinballmap-link"
         className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
       >
