@@ -139,7 +139,7 @@ Run the Supabase advisor checks against **prod** (project_id `udhesuizjsgxfeotqy
 The Weekly Security Review routine (an AI/human security pass over the week's PRs) files its findings as **beads labeled `security`** — one bead per finding, carrying a severity and a recommendation. High-signal work that's already tracked. List the open ones:
 
 ```bash
-bd list --status open --label security
+bd list --status=open --label=security
 ```
 
 Read the severity and one-line summary of each open `security` bead. These beads stay **OPEN until the finding is addressed**, so open security beads are normal — surface them; don't treat their open state as an alarm by itself. If a finding turns out to overlap another already-tracked bead or is only recorded elsewhere, note it the same way you would any untracked item.
