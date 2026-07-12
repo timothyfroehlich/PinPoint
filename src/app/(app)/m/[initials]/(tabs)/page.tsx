@@ -25,7 +25,7 @@ import {
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
 import { getPinballMapState } from "~/lib/pinballmap/sync";
-import { derivePbmMachineStatus } from "~/lib/pinballmap/status";
+import { isListedOnPbm } from "~/lib/pinballmap/status";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
@@ -201,41 +201,21 @@ export default async function MachineInfoTab({
       <EditButtonWithTooltip reason={editDeniedReason} />
     ) : null;
 
-  // PinballMap status card (PP-o355.3): read-only, shown to everyone. The public
-  // link back to our PBM location satisfies CORE-PBM-001 attribution regardless
-  // of link state. When the singleton has never synced (no snapshot yet) we pass
-  // `status={null}` so a linked machine reads "pending next sync" rather than a
-  // misleading "Not listed" derived from an absent snapshot.
-  const snapshot = pinballmapStateRow?.snapshotJson ?? null;
-  const pinballmapLocationHref = pinballmapLocationUrl(
-    pinballmapStateRow?.locationId
-  );
-  const pinballmapCard = machine.pinballmapExcluded ? (
-    <MachinePinballmapCard
-      linkState="excluded"
-      excludedReason={machine.pinballmapExcludedReason}
-      locationUrl={pinballmapLocationHref}
-    />
-  ) : machine.pinballmapMachineId !== null ? (
-    <MachinePinballmapCard
-      linkState="linked"
-      status={
-        snapshot
-          ? derivePbmMachineStatus(
-              snapshot,
-              machine.pinballmapMachineId,
-              machine.presenceStatus
-            )
-          : null
-      }
-      locationUrl={pinballmapLocationHref}
-    />
-  ) : (
-    <MachinePinballmapCard
-      linkState="unlinked"
-      locationUrl={pinballmapLocationHref}
-    />
-  );
+  // PinballMap card (PP-o355.3): show the public "View on PinballMap" link only
+  // for machines that are actually listed on our PBM location (present in the
+  // stored snapshot). Everything else — unlinked, or linked but not on the map —
+  // shows no card. Richer status UI (listing/desync/last comment) is deferred to
+  // a later pass alongside the broader machine-page work.
+  const pinballmapCard =
+    machine.pinballmapMachineId !== null &&
+    isListedOnPbm(
+      pinballmapStateRow?.snapshotJson ?? null,
+      machine.pinballmapMachineId
+    ) ? (
+      <MachinePinballmapCard
+        locationUrl={pinballmapLocationUrl(pinballmapStateRow?.locationId)}
+      />
+    ) : null;
 
   const rail = (
     <InfoRail

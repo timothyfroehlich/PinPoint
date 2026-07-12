@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { shouldBeListedOnPbm, derivePbmMachineStatus } from "./status";
+import {
+  shouldBeListedOnPbm,
+  derivePbmMachineStatus,
+  isListedOnPbm,
+} from "./status";
 import type { LocationSnapshot } from "./types";
 
 function snapshot(lmxes: LocationSnapshot["lmxes"]): LocationSnapshot {
@@ -26,6 +30,30 @@ describe("shouldBeListedOnPbm", () => {
     ] as const) {
       expect(shouldBeListedOnPbm(s)).toBe(false);
     }
+  });
+});
+
+describe("isListedOnPbm", () => {
+  const snap = snapshot([
+    {
+      id: 9001,
+      machineId: 642,
+      icEnabled: null,
+      lastUpdatedByUsername: null,
+      conditions: [],
+    },
+  ]);
+
+  it("is true when the machine id is present in the snapshot", () => {
+    expect(isListedOnPbm(snap, 642)).toBe(true);
+  });
+
+  it("is false when the machine id is absent", () => {
+    expect(isListedOnPbm(snap, 999)).toBe(false);
+  });
+
+  it("is false when there is no snapshot yet", () => {
+    expect(isListedOnPbm(null, 642)).toBe(false);
   });
 });
 

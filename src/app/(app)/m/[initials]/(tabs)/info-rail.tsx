@@ -15,8 +15,8 @@ interface InfoRailProps {
   /** Edit-machine control (dialog trigger or denied tooltip), shown in the owner card footer. */
   editSlot?: React.ReactNode;
   /**
-   * PinballMap status card (PP-o355.3). When provided it fills the reserved
-   * PinballMap slot; omit it to keep the "Coming soon!" placeholder.
+   * PinballMap card (PP-o355.3). Rendered as-is when provided; when omitted, the
+   * PinballMap slot renders nothing.
    */
   pinballmapSlot?: React.ReactNode;
 }
@@ -35,8 +35,8 @@ const COMING_SOON = "text-sm text-muted-foreground";
  * returns the cards as a fragment).
  *
  * Tags is still a reserved placeholder (Collections fills it later). PinballMap
- * shows the live status card when the caller passes `pinballmapSlot`
- * (PP-o355.3), else it keeps its "Coming soon!" placeholder.
+ * renders the `pinballmapSlot` card when the caller provides one (PP-o355.3),
+ * and nothing when it doesn't.
  */
 export function InfoRail({
   owner,
@@ -109,19 +109,10 @@ export function InfoRail({
         <p className={COMING_SOON}>Coming soon!</p>
       </div>
 
-      {/* PinballMap — the PP-o355.3 status card fills this slot; until a caller
-          passes one, the reserved "Coming soon!" placeholder stands in. */}
-      {pinballmapSlot ?? (
-        <div
-          className={PLACEHOLDER_CARD}
-          data-testid="machine-pinballmap-placeholder"
-        >
-          <p className={`mb-2 flex items-center gap-2 ${LABEL}`}>
-            <span className="text-secondary">◆</span> PinballMap
-          </p>
-          <p className={COMING_SOON}>Coming soon!</p>
-        </div>
-      )}
+      {/* PinballMap — the PP-o355.3 card fills this slot only when the machine is
+          listed on PinballMap; otherwise the caller passes nothing and no card
+          renders here. */}
+      {pinballmapSlot}
     </>
   );
 }

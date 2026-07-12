@@ -20,6 +20,24 @@ export interface PbmMachineStatus {
 }
 
 /**
+ * Whether this machine currently appears on our PBM location's public map, i.e.
+ * its linked PBM machine id is present in the stored snapshot. Pure (no I/O).
+ *
+ * This is the single signal the Info-tab card needs: it shows the public
+ * "View on PinballMap" link only for machines that are actually listed there.
+ * (The richer derivation below feeds later beads — timeline comments, the
+ * desync control room.)
+ */
+export function isListedOnPbm(
+  snapshot: LocationSnapshot | null,
+  pinballmapMachineId: number
+): boolean {
+  return (
+    snapshot?.lmxes.some((l) => l.machineId === pinballmapMachineId) ?? false
+  );
+}
+
+/**
  * Our rule for whether a machine *should* be listed at our PBM location: only
  * machines currently on the floor. Everything else (off the floor, on loan,
  * pending arrival, removed) should not appear on the public map.
