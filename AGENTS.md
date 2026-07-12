@@ -124,9 +124,9 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                          |
 | `FORCE_MEM_PRECHECK=skip <command>`   | Bypass the memory-pressure gate for one run (e.g. when you know pressure is transient or acceptable).                                                                                                                            |
 
-### Type-check engine (TS 7 migration — in progress)
+### Type-check engine (TS 7 GA dual-install)
 
-The `typecheck` gate runs on the **Go-native compiler** (`tsgo`, from `@typescript/native-preview`, pinned to a nightly) — ~4–6× faster than `tsc`. **ESLint type-aware linting and `next build` still type-check on `typescript@6`** — they need the JS compiler API the native build omits until TS 7.1, so `typescript@6` stays installed; do not remove it. `pnpm run typecheck:tsc6` runs the old engine for A/B comparison. This is Phase 1 of `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PR #1586) — proven 0 divergences vs `tsc 6` on `tsconfig.json`. **When TS 7.0 GA lands (~July 2026), bump the pinned nightly to the GA release.** Later phases (type-check tests/e2e, type-aware lint on the Go engine, Next native build) are deferred follow-ups.
+TypeScript 7.0 (the Go-native compiler) is GA and installed via Microsoft's recommended dual-install: `@typescript/native` (alias of `typescript@^7`) ships the native `tsc` binary that runs the `typecheck` gate (~4–6× faster than TS6's `tsc`), while the `typescript` package name is aliased to `@typescript/typescript6` — the TS6 JS compiler API + a `tsc6` binary. **ESLint type-aware linting and `next build` still type-check on that TS6 API** — TS7 doesn't ship a stable JS API until 7.1, so do not remove the `typescript` alias. Bin names are unambiguous: `tsc` = native 7, `tsc6` = JS 6. `typecheck:tsc6`, `typecheck:tests`, and `typecheck:e2e` run on `tsc6` (A/B escape hatch; moving tests/e2e to the native engine is PP-8mv1). History and validation record: `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` (PRs #1586, PP-xu96).
 
 ### Prototype mode (rapid iteration)
 
