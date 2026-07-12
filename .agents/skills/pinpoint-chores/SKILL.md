@@ -48,15 +48,15 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 3. **Dependabot updates**
    - Review open Dependabot PRs (`gh pr list --author "app/dependabot"`). Merge the safe ones via the normal PR workflow; file a bead for any that need real work.
 
-4. **Release-notes / changelog routine output**
-   - Review what the changelog/release-notes routine produced since last chores. Correct or supplement as needed.
+4. **Changelog PR from the Weekly Review routine**
+   - The consolidated Weekly Review cloud routine opens a changelog PR (`docs/changelog-<date>`) when user-facing PRs merged that week. Review and merge it via the normal PR workflow (or correct/supplement first).
 
 5. **Sentry + Supabase advisor checks**
    - Run the Sentry error scan and the Supabase advisor checks that previously lived in the session-start briefing. Triage new issues into beads.
 
-6. **Review beads filed by the cloud routines**
-   - The scheduled cloud routines write findings straight into beads (security findings, flaky-test reports, etc.). Review everything filed since the last chores session and act on / prioritize / decline each.
-   - Handy: `bd list --json` filtered by recent `created_at`, or the labels the routines use.
+6. **Review beads filed by the Weekly Review routine**
+   - The consolidated Weekly Review cloud routine files beads for its security findings (`security` label) and its flaky-test report (`flaky-test` label). Review everything filed since the last chores session and act on / prioritize / decline each.
+   - Handy: `bd list --label security` and `bd list --label flaky-test`, or `bd list --json` filtered by recent `created_at`.
 
 ## Finish: re-arm the nag
 
