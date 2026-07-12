@@ -79,9 +79,12 @@ as `claude-rc.service`).
 ### 2. Seed the data dir from DoltHub
 
 ```bash
-mkdir -p ~/.beads-server && cd ~/.beads-server
+mkdir -p ~/.beads-server/dolt && cd ~/.beads-server/dolt
 dolt clone https://doltremoteapi.dolthub.com/advacar/pinpoint-beads PP
 # → ~/.beads-server/dolt/PP with its `origin` remote already registered
+# Remove any stray `.dolt/` the clone leaves in the PARENT data dir — otherwise the
+# server exposes a phantom empty database named after the dir alongside `PP`.
+rm -rf ~/.beads-server/dolt/.dolt
 ```
 
 Point `data_dir` in `server.yaml` at `~/.beads-server/dolt` (the parent that
@@ -99,11 +102,27 @@ to a DB admin connection.)
 
 ```bash
 cd ~/.beads-server/dolt
-dolt sql-server --host 127.0.0.1 --port 3306 &
-dolt sql --host 127.0.0.1 --port 3306 --user root --query \
-  "CREATE USER 'beads'@'%' IDENTIFIED BY '<PASSWORD>'; GRANT ALL PRIVILEGES ON PP.* TO 'beads'@'%'; FLUSH PRIVILEGES;"
-# stop the throwaway localhost server (kill the backgrounded PID)
+# Boot with the SAME --privilege-file the hardened server will read, or the user
+# won't persist into it.
+dolt sql-server --host 127.0.0.1 --port 3306 \
+  --data-dir ~/.beads-server/dolt --privilege-file ~/.beads-server/privileges.db &
+THROWAWAY_PID=$!
+sleep 5
+# dolt's connection flags are GLOBAL — they go BEFORE the `sql` subcommand (the form
+# `dolt sql --host …` errors with "unknown option host"). Passwordless root needs an
+# explicit `--password ""` (no TTY to prompt otherwise). `--no-tls` for the plaintext
+# first boot.
+dolt --host 127.0.0.1 --port 3306 --user root --password "" --no-tls sql -q \
+  "CREATE USER 'beads'@'%' IDENTIFIED BY '<PASSWORD>'; GRANT ALL PRIVILEGES ON *.* TO 'beads'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;"
+kill "$THROWAWAY_PID"   # stop the throwaway localhost server (PID, not %1 — job control isn't reliable in scripts)
 ```
+
+`beads` gets `ALL PRIVILEGES ON *.*` (not just `PP.*`): the bridge's `bd dolt
+pull`/`push` run `DOLT_PULL`/`DOLT_PUSH` which are denied to a `PP.*`-only user
+("command denied to user 'beads'@'%'"). It's the sole app user on a private,
+single-purpose server, so full privileges are appropriate. If you ever need to
+re-grant later, the hardened server binds only the Tailscale IP where root is denied
+— stop it and repeat this throwaway-localhost boot to reach root.
 
 Pick a strong `<PASSWORD>`; it goes ONLY into env (next steps), never into any
 committed file.
@@ -128,7 +147,9 @@ passwordless root. `privilege_file` persists the `beads` grant across restarts.
 
 ### 5. Repoint both machines to server mode
 
-Per machine, edit `.beads/metadata.json` (gitignored, per-machine):
+Per machine, edit `.beads/metadata.json` (gitignored, per-machine). Do **not** put
+`dolt_server_port` here — it's deprecated (bd warns "can cause cross-project data
+leakage"); the port lives in a separate file instead:
 
 ```json
 {
@@ -136,13 +157,19 @@ Per machine, edit `.beads/metadata.json` (gitignored, per-machine):
   "backend": "dolt",
   "dolt_mode": "server",
   "dolt_server_host": "100.87.228.116",
-  "dolt_server_port": 3306,
   "dolt_server_user": "beads",
   "dolt_database": "PP"
 }
 ```
 
-And in `.beads/config.yaml` set `dolt.auto-start: false` and pin
+```bash
+printf '3306\n' > .beads/dolt-server.port   # the port's new primary source
+```
+
+In `.beads/config.yaml` set `backup.enabled: false` — bd's server-side auto-backup
+is denied (it needs privileges the setup doesn't grant) and is redundant now that the
+bridge replicates to DoltHub; manual `bd export` still works for JSONL snapshots.
+Also set `dolt.auto-start: false` so bd never tries to spawn a local server, and pin
 `dolt.auto-commit: on` (bd's default is OFF; the bridge chain assumes committed
 working sets before it pulls — the server-side `server.yaml` also sets
 `autocommit: true`).

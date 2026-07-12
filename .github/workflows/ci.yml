@@ -168,7 +168,7 @@ jobs:
       - name: Run type checking
         run: pnpm run typecheck
 
-      - name: Run test type checking (baseline gate)
+      - name: Run test type checking (native tsc)
         run: pnpm run typecheck:tests
 
   lint:

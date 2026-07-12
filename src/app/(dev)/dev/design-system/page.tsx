@@ -514,9 +514,9 @@ function TypographySection(): React.JSX.Element {
                 </p>
               </div>
               <div>
-                <a className="text-link" href="#">
+                <button type="button" className="text-link">
                   Link text (hover me)
-                </a>
+                </button>
                 <p className="text-[10px] font-mono text-muted-foreground">
                   text-link (utility class — hover glow)
                 </p>

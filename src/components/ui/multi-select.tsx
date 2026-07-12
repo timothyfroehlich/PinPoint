@@ -220,8 +220,16 @@ export function MultiSelect({
                     key={group.label}
                     heading={
                       <div
+                        role="button"
+                        tabIndex={0}
                         className="flex items-center gap-2 py-1 cursor-pointer select-none hover:bg-accent/50 -mx-2 px-2 rounded-sm transition-colors duration-150 group/header"
                         onClick={toggleGroup}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            if (e.key === " ") e.preventDefault();
+                            toggleGroup();
+                          }
+                        }}
                         data-testid={
                           testId
                             ? `${testId}-group-${group.label.toLowerCase().replace(/\s+/g, "-")}`

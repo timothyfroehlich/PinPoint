@@ -113,6 +113,7 @@ export function MachineTimelineComposer({
   };
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- keyboard shortcut on composer wrapper div, PP-u4cp
     <div
       className="@container rounded-md border bg-card p-3"
       onKeyDown={handleKeyDown}
@@ -123,6 +124,7 @@ export function MachineTimelineComposer({
         placeholder="Add a quick note… (⌘/Ctrl + Enter to post)"
         showToolbar={fullMode}
         compact={!fullMode}
+        // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate focus-on-open in sheet, PP-u4cp
         autoFocus={autoFocus}
       />
       <div className="mt-3 flex items-center gap-2">

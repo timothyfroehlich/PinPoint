@@ -90,6 +90,7 @@ export function DateRangePicker({
             align="start"
           >
             <Calendar
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate focus-on-open in popover, PP-u4cp
               autoFocus
               mode="range"
               {...(date?.from ? { defaultMonth: date.from } : {})}

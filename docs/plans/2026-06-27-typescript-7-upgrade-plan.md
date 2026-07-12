@@ -2,8 +2,8 @@
 
 **Date:** 2026-06-27
 **Author:** Claude (investigation + empirical validation on this repo)
-**Status:** TS 7.0 GA landed 2026-07-08 (7.0.2); the `@typescript/native-preview` nightlies are retired. Phase 1 now runs on the GA dual-install (PP-xu96): `@typescript/native` = `npm:typescript@^7` (native `tsc`, drives the typecheck gate), `typescript` = `npm:@typescript/typescript6@^6` (TS6 JS API for ESLint + `next build`, `tsc6` binary). Phases 2–4 deferred (tests/e2e engine move: PP-8mv1).
-**Branch:** `claude/typescript-7-upgrade-plan-o85h0g` (Phase 1 nightly shape: PR #1586; GA swap: PP-xu96)
+**Status:** TS 7.0 GA landed 2026-07-08 (7.0.2); the `@typescript/native-preview` nightlies are retired. Phase 1 runs on the GA dual-install (PP-xu96): `@typescript/native` = `npm:typescript@^7` (native `tsc`, drives the typecheck gate), `typescript` = `npm:@typescript/typescript6@^6` (TS6 JS API for ESLint + `next build`, `tsc6` binary). Phase 2 done in PP-8mv1: `typecheck:tests` + `typecheck:e2e` moved onto native `tsc` and the `tsc-baseline` gate retired (0 divergences vs `tsc6` on `tsconfig.tests.check.json` and `e2e/tsconfig.json`). Remaining deferred: type-aware lint on Go, Next native build.
+**Branch:** `claude/typescript-7-upgrade-plan-o85h0g` (Phase 1 nightly shape: PR #1586; GA swap: PP-xu96; tests/e2e engine move: PP-8mv1)
 
 > **Update 2026-07-12:** TS 7.0 GA shipped 2026-07-08 (7.0.2), and the
 > `@typescript/native-preview` nightlies retired. PR #1650 (PP-xu96) implemented the

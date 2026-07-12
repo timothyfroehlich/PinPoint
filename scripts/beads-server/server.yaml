@@ -1,10 +1,14 @@
 # Dolt SQL-server config for the shared PinPoint beads database.
 # Used on the Bazzite host: `dolt sql-server --config server.yaml`.
 #
-# This is a TEMPLATE. ${TAILSCALE_IP} defaults to Tim's Bazzite tailnet IP
-# (100.87.228.116) — Mac MagicDNS does not resolve *.ts.net, so both machines
-# connect by raw Tailscale IP. Edit data_dir / privilege_file to match the real
-# on-host paths from SETUP.md before first boot.
+# This is a TEMPLATE. `host` is the Bazzite Tailscale IP (100.87.228.116) — Mac
+# MagicDNS does not resolve *.ts.net, so both machines connect by raw Tailscale IP.
+# Edit data_dir / privilege_file to match the real on-host paths from SETUP.md
+# before first boot.
+#
+# IMPORTANT: do NOT reference an env var (dollar-sign + curly-brace syntax) anywhere
+# in this file, even in a comment — dolt interpolates such tokens across the whole
+# YAML and aborts the boot if any referenced var is unset.
 #
 # Password is NEVER in this file: the `beads` user is created once with a
 # GRANT + IDENTIFIED BY (SETUP.md step 4), and clients pass the secret via the
@@ -22,11 +26,12 @@ listener:
   write_timeout_millis: 28800000
 
 # Absolute path to the Dolt data directory that holds the seeded `PP` database
-# (created by `dolt clone … PP` in SETUP.md step 3). Adjust to the real path.
-data_dir: "/home/tim/.beads-server/dolt"
+# (created by `dolt clone … PP` in SETUP.md step 3). Edit <USER> to the real home
+# (Tim's is /home/froeht).
+data_dir: "/home/<USER>/.beads-server/dolt"
 
 # Persisted privileges/users table so the `beads` grant survives restarts.
-privilege_file: "/home/tim/.beads-server/privileges.db"
+privilege_file: "/home/<USER>/.beads-server/privileges.db"
 
 behavior:
   # Commit each write immediately. bd's default auto-commit is OFF; the DoltHub

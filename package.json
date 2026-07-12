@@ -14,9 +14,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "typecheck:tsc6": "tsc6 --noEmit -p tsconfig.app.json",
-    "typecheck:tests": "tsc6 --noEmit --pretty false -p tsconfig.tests.check.json | sed \"s#$(pwd)#.#g\" | tsc-baseline check",
-    "typecheck:tests:save": "tsc6 --noEmit --pretty false -p tsconfig.tests.check.json | sed \"s#$(pwd)#.#g\" | tsc-baseline save",
-    "typecheck:e2e": "tsc6 --noEmit -p e2e/tsconfig.json",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.check.json",
+    "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
     "lint": "eslint src/ --quiet",
     "lint:fix": "eslint src/ --fix --quiet",
     "fix:lint-format": "npm-run-all --sequential lint:fix format:fix",
@@ -176,6 +175,7 @@
     "eslint": "^10.2.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-better-tailwindcss": "^4.5.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-promise": "^7.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-unused-imports": "^4.4.1",
@@ -190,7 +190,6 @@
     "postcss": "^8.5.13",
     "prettier": "^3.8.2",
     "tailwindcss": "^4.2.2",
-    "tsc-baseline": "^1.9.0",
     "tsx": "^4.21.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vite": "^8.0.8",
@@ -215,6 +214,11 @@
       "vite": ">=8.0.16",
       "undici": "^7.28.0",
       "js-yaml": ">=4.2.0"
+    },
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "eslint-plugin-jsx-a11y>eslint": "10"
+      }
     }
   },
   "lint-staged": {
