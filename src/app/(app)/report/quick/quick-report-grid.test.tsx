@@ -205,6 +205,62 @@ describe("QuickReportGrid", () => {
     ).toBeInTheDocument();
   });
 
+  it("moves focus to the next blank row's machine picker after a submit", async () => {
+    submitRow.mockResolvedValue({
+      index: 0,
+      ok: true,
+      issueNumber: 42,
+      machineInitials: "GP",
+    });
+    renderGrid();
+    const row = screen.getByTestId("quick-row");
+    await userEvent.type(
+      within(row).getByLabelText(/problem/i),
+      "Spinner rejecting"
+    );
+    await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
+    await screen.findByRole("link", { name: "GP-42" });
+    // The submitted row is now a confirmation strip (no picker); the only
+    // machine combobox left is the trailing blank row's, and it should be
+    // focused so keyboard authoring flows straight into the next issue.
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: /machine/i })).toHaveFocus()
+    );
+  });
+
+  it("guards against navigating away only while a row has unsaved content", async () => {
+    submitRow.mockResolvedValue({
+      index: 0,
+      ok: true,
+      issueNumber: 42,
+      machineInitials: "GP",
+    });
+    const addSpy = vi.spyOn(window, "addEventListener");
+    const removeSpy = vi.spyOn(window, "removeEventListener");
+    renderGrid();
+    const row = screen.getByTestId("quick-row");
+    // A pristine blank grid arms no guard.
+    expect(addSpy).not.toHaveBeenCalledWith(
+      "beforeunload",
+      expect.any(Function)
+    );
+    // Typing content arms the beforeunload guard.
+    await userEvent.type(
+      within(row).getByLabelText(/problem/i),
+      "Spinner rejecting"
+    );
+    expect(addSpy).toHaveBeenCalledWith("beforeunload", expect.any(Function));
+    // Submitting saves the work and leaves an empty trailing row — guard clears.
+    await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
+    await screen.findByRole("link", { name: "GP-42" });
+    await waitFor(() =>
+      expect(removeSpy).toHaveBeenCalledWith(
+        "beforeunload",
+        expect.any(Function)
+      )
+    );
+  });
+
   it("confirms before discarding a row that has content, then removes it", async () => {
     renderGrid();
     const firstRow = screen.getByTestId("quick-row");
