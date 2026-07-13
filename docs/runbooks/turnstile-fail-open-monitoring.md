@@ -47,8 +47,9 @@ section below.
 The Supabase captcha setting lives in the project's Auth config, not in any
 PinPoint env var or code, so it can only be verified from the Supabase dashboard:
 
-1. Supabase dashboard → **`pinpoint-prod`** project → **Authentication** →
-   **Attack Protection** (formerly "Bot and Abuse Protection").
+1. Supabase dashboard → **`PinPoint-Prod`** project (Advacar org) →
+   **Authentication** → **Attack Protection** (formerly "Bot and Abuse
+   Protection").
 2. Confirm **"Enable Captcha protection"** is **OFF**.
 3. If it is ON, PinPoint auth is currently broken for tokenless users — turn it
    OFF, or coordinate a full revert of the fail-open design (see the client
@@ -57,6 +58,9 @@ PinPoint env var or code, so it can only be verified from the Supabase dashboard
 
 Re-check this whenever anyone touches Supabase Auth settings, and as part of the
 weekly security review routine.
+
+**Last verified: 2026-07-13 — OFF (correct state), by Claude via browser
+automation.** (PP-fy4v)
 
 ### Why there is no startup assertion (design note)
 
@@ -103,19 +107,25 @@ event rate:
 | Field       | Value                                                                         |
 | ----------- | ----------------------------------------------------------------------------- |
 | Name        | `Turnstile fail-open spike`                                                   |
-| Environment | `production`                                                                  |
+| Environment | `vercel-production`                                                           |
 | Condition   | Count of events where `message` = `turnstile.fail_open` is **> 50 in 1 hour** |
 | Action      | Route to the **security channel** (e.g. Slack `#alerts-security`)             |
 | Frequency   | 1 hour                                                                        |
 
-> In the Sentry UI, filter on `message:"turnstile.fail_open"` (or add a
-> dedicated `event: "turnstile_fail_open"` tag search). Set the threshold to
-> **50 events per hour**. Route the action to whichever channel is Tim's security
-> channel — separate from the general `#alerts-*` channels used by the
-> best-effort/primary-path rules (see `sentry-alert-best-effort.md`).
+> In the Sentry UI (Monitors & Alerts → New Alert), this maps to: an IF filter
+> "The event's `message` attribute `contains` `turnstile.fail_open`" combined
+> (via "Filter by frequency" → "Number of events") with "Number of events in an
+> issue is more than `50` in `one hour`". Environment on this org is tagged
+> `vercel-production`, not `production`. Route the action to whichever channel
+> is Tim's security channel — separate from the general `#alerts-*` channels
+> used by the best-effort/primary-path rules (see `sentry-alert-best-effort.md`).
 
-This alert rule is **not** created by code — it is dashboard configuration. Until
-it exists, a fail-open spike is visible in Sentry but will not page anyone.
+**Created: 2026-07-13, by Claude via browser automation** (PP-fy4v) —
+[`pinpoint-nc.sentry.io/monitors/alerts/3700455`](https://pinpoint-nc.sentry.io/monitors/alerts/3700455/?project=4510484045692928).
+No Slack integration is connected to this Sentry org yet, so the action
+currently notifies **Tim Froehlich directly** (Notify → Member) rather than a
+dedicated security channel — add a Slack integration and repoint the action
+if/when a `#alerts-security` channel exists.
 
 ### Action plan on a sustained spike
 
@@ -152,15 +162,17 @@ When the alert fires (or you spot a sustained spike manually):
      re-introduces the lockout risk PP-20yy fixed, so treat it as a temporary
      incident measure, not a permanent reversal — and coordinate with Tim.
 
-## Follow-ups (external / not done here)
+## Follow-ups
 
-These are **manual dashboard actions that cannot be executed from code** and are
-tracked as follow-ups to PP-vo43:
+These were **manual dashboard actions that cannot be executed from code**,
+tracked as follow-ups to PP-vo43 and completed via PP-fy4v (2026-07-13):
 
-1. **Create the Sentry alert rule** on `turnstile.fail_open` event rate
-   (> 50/hour → security channel), per the table above.
-2. **Verify the live Supabase Auth captcha setting is disabled** on
-   `pinpoint-prod`, per "Manual verification" above.
+1. ~~**Create the Sentry alert rule** on `turnstile.fail_open` event rate
+   (> 50/hour → security channel), per the table above.~~ Done — see "Sentry
+   alert rule" above. Notifies Tim directly pending a Slack integration.
+2. ~~**Verify the live Supabase Auth captcha setting is disabled** on
+   `pinpoint-prod`.~~ Done — confirmed OFF, see "Manual verification" above.
+   Re-verify whenever anyone touches Supabase Auth settings.
 3. **(Optional) Out-of-band captcha-setting assertion.** If we want automated
    enforcement of the invariant without a boot-path dependency, add a scheduled
    cloud routine (off the request/boot path) that polls the Supabase Management
