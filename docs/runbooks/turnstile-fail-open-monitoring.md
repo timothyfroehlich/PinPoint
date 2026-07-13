@@ -104,21 +104,19 @@ a sustained elevation above the threshold warrants investigation.
 Create an Issue/Metric alert in **Alerts** on the `turnstile.fail_open` message
 event rate:
 
-| Field       | Value                                                                         |
-| ----------- | ----------------------------------------------------------------------------- |
-| Name        | `Turnstile fail-open spike`                                                   |
-| Environment | `vercel-production`                                                           |
-| Condition   | Count of events where `message` = `turnstile.fail_open` is **> 50 in 1 hour** |
-| Action      | Route to the **security channel** (e.g. Slack `#alerts-security`)             |
-| Frequency   | 1 hour                                                                        |
+| Field       | Value                                                                                     |
+| ----------- | ----------------------------------------------------------------------------------------- |
+| Name        | `Turnstile fail-open spike`                                                               |
+| Environment | `vercel-production`                                                                       |
+| Condition   | `message` **contains** `turnstile.fail_open`, and the issue has **> 50 events in 1 hour** |
+| Action      | Notify **Tim Froehlich directly** (interim — no Slack security channel yet)               |
+| Frequency   | 1 hour (action throttle)                                                                  |
 
 > In the Sentry UI (Monitors & Alerts → New Alert), this maps to: an IF filter
 > "The event's `message` attribute `contains` `turnstile.fail_open`" combined
 > (via "Filter by frequency" → "Number of events") with "Number of events in an
 > issue is more than `50` in `one hour`". Environment on this org is tagged
-> `vercel-production`, not `production`. Route the action to whichever channel
-> is Tim's security channel — separate from the general `#alerts-*` channels
-> used by the best-effort/primary-path rules (see `sentry-alert-best-effort.md`).
+> `vercel-production`, not `production`.
 
 **Created: 2026-07-13, by Claude via browser automation** (PP-fy4v) —
 [`pinpoint-nc.sentry.io/monitors/alerts/3700455`](https://pinpoint-nc.sentry.io/monitors/alerts/3700455/?project=4510484045692928).
@@ -171,7 +169,7 @@ tracked as follow-ups to PP-vo43 and completed via PP-fy4v (2026-07-13):
    (> 50/hour → security channel), per the table above.~~ Done — see "Sentry
    alert rule" above. Notifies Tim directly pending a Slack integration.
 2. ~~**Verify the live Supabase Auth captcha setting is disabled** on
-   `pinpoint-prod`.~~ Done — confirmed OFF, see "Manual verification" above.
+   `PinPoint-Prod`.~~ Done — confirmed OFF, see "Manual verification" above.
    Re-verify whenever anyone touches Supabase Auth settings.
 3. **(Optional) Out-of-band captcha-setting assertion.** If we want automated
    enforcement of the invariant without a boot-path dependency, add a scheduled
