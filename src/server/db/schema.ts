@@ -600,6 +600,57 @@ export const machineSettingsSets = pgTable(
 ).enableRLS();
 
 /**
+ * Collections + Collection Machines
+ *
+ * User-created collections of arbitrary machines (PP-wqit.1, Wave 0a). A
+ * collection is private to its owner in this slice; view/edit share-token
+ * columns are deferred to Wave 0b (PP-wqit.2).
+ */
+export const collections = pgTable(
+  "collections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    description: jsonb("description").$type<ProseMirrorDoc>(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // No Drizzle $onUpdate — every UPDATE sets this explicitly in the action.
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    ownerIdx: index("idx_collections_owner_id").on(t.ownerId),
+  })
+).enableRLS();
+
+export const collectionMachines = pgTable(
+  "collection_machines",
+  {
+    collectionId: uuid("collection_id")
+      .notNull()
+      .references(() => collections.id, { onDelete: "cascade" }),
+    machineId: uuid("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    addedBy: uuid("added_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.collectionId, t.machineId] }),
+    machineIdx: index("idx_collection_machines_machine").on(t.machineId),
+  })
+).enableRLS();
+
+/**
  * Issue Images Table
  *
  * Images attached to issues and comments with soft-delete support.
@@ -823,6 +874,7 @@ export const userProfilesRelations = relations(
     notifications: many(notifications),
     watchedIssues: many(issueWatchers),
     watchedMachines: many(machineWatchers),
+    ownedCollections: many(collections),
   })
 );
 
@@ -840,6 +892,7 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
   }),
   watchers: many(machineWatchers),
   settingsSets: many(machineSettingsSets),
+  collectionMemberships: many(collectionMachines),
 }));
 
 export const machineSettingsSetsRelations = relations(
@@ -852,6 +905,28 @@ export const machineSettingsSetsRelations = relations(
     updatedByUser: one(userProfiles, {
       fields: [machineSettingsSets.updatedBy],
       references: [userProfiles.id],
+    }),
+  })
+);
+
+export const collectionsRelations = relations(collections, ({ one, many }) => ({
+  owner: one(userProfiles, {
+    fields: [collections.ownerId],
+    references: [userProfiles.id],
+  }),
+  members: many(collectionMachines),
+}));
+
+export const collectionMachinesRelations = relations(
+  collectionMachines,
+  ({ one }) => ({
+    collection: one(collections, {
+      fields: [collectionMachines.collectionId],
+      references: [collections.id],
+    }),
+    machine: one(machines, {
+      fields: [collectionMachines.machineId],
+      references: [machines.id],
     }),
   })
 );
