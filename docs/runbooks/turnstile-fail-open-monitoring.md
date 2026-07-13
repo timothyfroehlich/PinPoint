@@ -39,8 +39,8 @@ This precondition is currently enforced only by convention: a code comment in
 `verifyTurnstileFailOpen` and a `NOTE` at each auth-action call site
 (`src/app/(auth)/actions.ts`). There is **no runtime assertion** — a future
 security-hardening pass that re-enables Supabase captcha would break production
-auth silently. See "Why there is no startup assertion" below and the follow-up
-below.
+auth silently. See "Why there is no startup assertion" and the "Follow-ups"
+section below.
 
 ### Manual verification (external — Tim only)
 

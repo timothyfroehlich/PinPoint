@@ -290,9 +290,10 @@ there as follow-ups.
 
 - **CSRF**: Requires additional token-based protection (not yet implemented)
 - **SQL Injection**: Prevented by Drizzle ORM parameterization (separate concern)
-- **Abuse / brute force on auth**: IP + account rate limiting on the auth actions
-  (`~/lib/rate-limit`) is the real backstop, alongside the fail-open Turnstile gate
-  — see "Authentication CAPTCHA (Turnstile fail-open)" above. Non-auth surfaces are
+- **Abuse on non-auth surfaces**: Rate limiting is not comprehensive across the
+  app. Auth actions _are_ protected — IP + account rate limiting via
+  `~/lib/rate-limit`, plus the best-effort fail-open Turnstile gate (see
+  "Authentication CAPTCHA (Turnstile fail-open)" above) — but other surfaces are
   not comprehensively rate-limited.
 - **DDoS**: Requires infrastructure-level protection
 
