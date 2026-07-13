@@ -13,11 +13,7 @@ import { type AccessLevel } from "~/lib/permissions/matrix";
 import { cn } from "~/lib/utils";
 
 type SidebarActionSection =
-  | "assignee"
-  | "status"
-  | "priority"
-  | "severity"
-  | "frequency";
+  "assignee" | "status" | "priority" | "severity" | "frequency";
 
 type SidebarActionsFilter =
   | { only: SidebarActionSection; exclude?: never }

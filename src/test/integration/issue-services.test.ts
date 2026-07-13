@@ -1096,8 +1096,7 @@ describe("Issue Service Functions (Integration)", () => {
       // either A gets its own distinct row OR the call throws — B's content is
       // never returned to A.
       let aComment:
-        | Awaited<ReturnType<typeof addIssueComment>>["comment"]
-        | undefined;
+        Awaited<ReturnType<typeof addIssueComment>>["comment"] | undefined;
       let threw = false;
       try {
         const res = await addIssueComment({

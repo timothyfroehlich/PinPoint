@@ -11,8 +11,7 @@ export interface ParsedPublicIssueFailure {
 }
 
 export type ParsedPublicIssueResult =
-  | ParsedPublicIssue
-  | ParsedPublicIssueFailure;
+  ParsedPublicIssue | ParsedPublicIssueFailure;
 
 const toOptionalString = (
   value: FormDataEntryValue | null

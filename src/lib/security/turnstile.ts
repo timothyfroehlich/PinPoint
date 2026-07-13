@@ -158,11 +158,7 @@ export async function verifyTurnstileToken(
 
 /** Reason a fail-open submission was allowed without a confirmed token. */
 export type TurnstileFailOpenReason =
-  | "verified"
-  | "skipped"
-  | "missing-token"
-  | "invalid-token"
-  | "unverifiable";
+  "verified" | "skipped" | "missing-token" | "invalid-token" | "unverifiable";
 
 export interface TurnstileFailOpenResult {
   /**
