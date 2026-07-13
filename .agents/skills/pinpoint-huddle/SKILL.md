@@ -88,7 +88,15 @@ When the `today_bead.date` in root notes doesn't match today's local date, hooks
 
 ### Rotation subagent dispatch
 
-Use this `Agent` call (adjust model as appropriate):
+**First, post a heads-up on the active daily bead**, then dispatch. Peer sessions poll that bead; a heads-up tells them a rotation is already underway so they don't fire their own subagent. (The rotation file-lock already makes a double-dispatch a safe no-op — this just saves peers a wasted subagent.) At this moment `today_bead.id` still points to the current, pre-rotation daily — that's the bead peers are polling, so it's the right place to post:
+
+```bash
+HUDDLE_DIR="$(dirname "$(git rev-parse --git-common-dir)")/.agents/huddle"
+TODAY_BEAD="$(bd show "$(jq -r '.root_bead_id' "$HUDDLE_DIR/config.json")" --json | jq -r '.[0].notes | fromjson | .today_bead.id')"
+bd comments add "$TODAY_BEAD" "Kicking off huddle rotation → <today's date>. —<YourName>"
+```
+
+Then use this `Agent` call (adjust model as appropriate):
 
 ```javascript
 Agent({
