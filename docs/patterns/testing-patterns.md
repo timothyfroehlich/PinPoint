@@ -114,12 +114,7 @@ describe("Issue Service Functions", () => {
   beforeEach(async () => {
     const db = await getTestDb();
     // Set up test data
-    const [issue] = await db
-      .insert(issues)
-      .values({
-        /*...*/
-      })
-      .returning();
+    const [issue] = await db.insert(issues).values({/*...*/}).returning();
     testIssue = issue;
   });
 

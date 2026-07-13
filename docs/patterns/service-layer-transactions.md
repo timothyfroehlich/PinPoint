@@ -222,12 +222,7 @@ export async function updateIssueStatus({
 
     // Notifications (with error handling)
     try {
-      await createNotification(
-        {
-          /*...*/
-        },
-        tx
-      );
+      await createNotification({/*...*/}, tx);
     } catch (error) {
       log.error({ error }, "Failed to send notification");
     }
@@ -267,9 +262,7 @@ export async function updateValue(id, newValue) {
 export async function updateValue(id, newValue) {
   return await db.transaction(async (tx) => {
     await tx.update(myTable).set({ value: newValue });
-    await createNotification({
-      /*...*/
-    }); // If this fails, update rolls back
+    await createNotification({/*...*/}); // If this fails, update rolls back
   });
 }
 ```

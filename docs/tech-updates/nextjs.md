@@ -274,9 +274,7 @@ async function getPosts() {
 // Invalidate specific tag in Server Action
 async function createPost(formData: FormData) {
   "use server";
-  await db.insert(posts).values({
-    /* ... */
-  });
+  await db.insert(posts).values({/* ... */});
   revalidateTag("posts"); // Only invalidate posts-related cache
 }
 ```

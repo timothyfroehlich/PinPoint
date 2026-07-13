@@ -1001,8 +1001,8 @@ describe("notification delivery (planNotification + dispatchNotification)", () =
   // dispatchNotification directly with hand-built delivery thunks (no DB).
   describe("dispatchNotification failure handling", () => {
     it("swallows a rejecting delivery, reports it, and still runs siblings", async () => {
-      const sibling = vi.fn(
-        (): Promise<DeliveryResult> => Promise.resolve({ ok: true })
+      const sibling = vi.fn((): Promise<DeliveryResult> =>
+        Promise.resolve({ ok: true })
       );
       const plan: DeliveryPlan = {
         deliveries: [() => Promise.reject(new Error("boom")), sibling],
