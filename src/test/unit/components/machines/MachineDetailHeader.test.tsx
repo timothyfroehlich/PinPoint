@@ -29,6 +29,7 @@ function makeMachine(
     pinballmapMachineId: null,
     pinballmapExcluded: false,
     pinballmapExcludedReason: null,
+    pinballmapListed: false,
     opdbId: null,
     ipdbId: null,
     issues: [],

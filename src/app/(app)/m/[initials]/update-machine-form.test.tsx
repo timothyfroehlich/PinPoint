@@ -85,6 +85,7 @@ function makeMachine(description: ProseMirrorDoc | null): Machine {
     pinballmapExcluded: false,
     pinballmapExcludedReason: null,
     pinballmapTitleName: null,
+    pinballmapListed: false,
     description,
   };
 }
@@ -153,5 +154,69 @@ describe("EditMachineDialog — description serialization", () => {
     await openDialog(user);
 
     expect(hiddenDescriptionInput().value).toBe(JSON.stringify(ORIGINAL_DOC));
+  });
+});
+
+describe("EditMachineDialog — unsaved-changes guard", () => {
+  // The dialog's description line only renders while the dialog is open, so it's
+  // a reliable open/closed probe (the trigger button text "Edit Machine" is
+  // always present and would be ambiguous).
+  const dialogIsOpen = (): boolean =>
+    screen.queryByText(/Update the details for/) !== null;
+
+  it("closes without warning when nothing was edited", async () => {
+    const user = userEvent.setup();
+    render(<EditMachineDialog {...makeProps(ORIGINAL_DOC)} />);
+    await openDialog(user);
+    expect(dialogIsOpen()).toBe(true);
+
+    await user.keyboard("{Escape}");
+
+    expect(dialogIsOpen()).toBe(false);
+    expect(
+      screen.queryByText("Discard unsaved changes?")
+    ).not.toBeInTheDocument();
+  });
+
+  it("warns instead of closing when the form is dirty", async () => {
+    const user = userEvent.setup();
+    render(<EditMachineDialog {...makeProps(ORIGINAL_DOC)} />);
+    await openDialog(user);
+
+    // Editing the name marks the form dirty (native input bubbles to onInput).
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+
+    await user.keyboard("{Escape}");
+
+    // The edit dialog stays open and the discard confirmation appears.
+    expect(dialogIsOpen()).toBe(true);
+    expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
+  });
+
+  it("keeps the dialog open when the user chooses to keep editing", async () => {
+    const user = userEvent.setup();
+    render(<EditMachineDialog {...makeProps(ORIGINAL_DOC)} />);
+    await openDialog(user);
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("button", { name: "Keep editing" }));
+
+    expect(
+      screen.queryByText("Discard unsaved changes?")
+    ).not.toBeInTheDocument();
+    expect(dialogIsOpen()).toBe(true);
+  });
+
+  it("discards edits and closes when the user confirms discard", async () => {
+    const user = userEvent.setup();
+    render(<EditMachineDialog {...makeProps(ORIGINAL_DOC)} />);
+    await openDialog(user);
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+
+    expect(dialogIsOpen()).toBe(false);
   });
 });

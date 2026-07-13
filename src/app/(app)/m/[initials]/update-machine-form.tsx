@@ -9,8 +9,14 @@ import {
   startTransition,
 } from "react";
 import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -76,6 +82,8 @@ interface EditMachineDialogProps {
     pinballmapMachineId: number | null;
     pinballmapExcluded: boolean;
     pinballmapExcludedReason: string | null;
+    /** Whether the machine is marked listed on PinballMap's public map (bead C). */
+    pinballmapListed: boolean;
     /** Linked catalog title's display name, resolved server-side from the mirror. */
     pinballmapTitleName: string | null;
     /** Machine description (rich text), edited via the editor in this dialog. */
@@ -97,6 +105,12 @@ export function EditMachineDialog({
 }: EditMachineDialogProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
+  // Unsaved-changes guard: flips true on the first edit to any field, so an
+  // outside-click / Esc / close-button attempt asks before discarding. Reset
+  // each time the dialog opens. (Interim: a later pass folds this into the base
+  // Dialog component — PP-o355.14.)
+  const [isDirty, setIsDirty] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const transferConfirmedRef = useRef(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState(
@@ -155,6 +169,7 @@ export function EditMachineDialog({
       transferConfirmedRef.current = false;
       setPromoteAssignee(null);
       setIsPromoteOpen(false);
+      setIsDirty(false);
     }
   }, [open, currentOwnerId, machine.description]);
 
@@ -208,9 +223,28 @@ export function EditMachineDialog({
     setPromoteAssignee(null);
   };
 
+  // Intercept every close vector (outside click, Esc, the X button) through the
+  // single controlled onOpenChange. A successful save closes via setOpen(false)
+  // directly (bypassing this), and an in-flight submit shouldn't be interrupted,
+  // so both skip the guard. Otherwise, if the form is dirty, hold the dialog
+  // open and ask before discarding.
+  const handleOpenChange = (next: boolean): void => {
+    if (!next && isDirty && !isPending) {
+      setShowDiscardConfirm(true);
+      return;
+    }
+    setOpen(next);
+  };
+
+  const confirmDiscard = (): void => {
+    setShowDiscardConfirm(false);
+    setIsDirty(false);
+    setOpen(false);
+  };
+
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
           <Button
             variant="outline"
@@ -222,7 +256,25 @@ export function EditMachineDialog({
             Edit Machine
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent
+          // Radix portals the Model-picker Popover and the edition/Availability
+          // Selects to <body>, OUTSIDE this content subtree. A pointerdown on
+          // that portalled content otherwise reads as an outside interaction and
+          // dismisses the whole dialog (PP-o355.13: "clicking a dropdown closed
+          // the modal"). Keep the dialog open when the interaction originates
+          // inside a popover/select layer; genuine outside clicks still close it.
+          onInteractOutside={(e) => {
+            const target = e.detail.originalEvent.target;
+            if (
+              target instanceof Element &&
+              target.closest(
+                '[data-slot="popover-content"], [data-slot="select-content"]'
+              )
+            ) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Edit Machine</DialogTitle>
             <DialogDescription>
@@ -234,6 +286,11 @@ export function EditMachineDialog({
             ref={formRef}
             action={formAction}
             onSubmit={handleSubmit}
+            // Any native input event (text fields + the contentEditable rich-text
+            // description) marks the form dirty for the unsaved-changes guard.
+            // Radix Select changes (owner/model/edition) don't bubble input, so
+            // the owner picker flags dirtiness explicitly below.
+            onInput={() => setIsDirty(true)}
             id="edit-machine-form"
             className="space-y-6"
           >
@@ -262,9 +319,6 @@ export function EditMachineDialog({
                 disabled
                 className="border-outline bg-surface-variant text-muted-foreground"
               />
-              <p className="text-xs text-muted-foreground">
-                Machine initials cannot be changed
-              </p>
             </div>
 
             {/* Machine Name */}
@@ -282,6 +336,42 @@ export function EditMachineDialog({
                 className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
               />
             </div>
+
+            {/* Machine Owner - show for admin/technician AND machine owner */}
+            {canEditAnyMachine || isOwner ? (
+              <OwnerSelectWithTracking
+                users={allUsers}
+                defaultValue={currentOwnerId}
+                onOwnerChange={(id) => {
+                  setSelectedOwnerId(id);
+                  setIsDirty(true);
+                }}
+              />
+            ) : (
+              <div className="space-y-2" data-testid="owner-display">
+                <span className="text-sm font-semibold text-foreground">
+                  Machine Owner
+                </span>
+                <div className="rounded-md border border-outline bg-surface px-3 py-2">
+                  {machine.owner || machine.invitedOwner ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-foreground">
+                        {machine.owner?.name ?? machine.invitedOwner?.name}
+                      </span>
+                      {machine.invitedOwner && !machine.owner && (
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                          (Invited)
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">
+                      No owner assigned
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Model — PinballMap catalog model/edition, right after the name
                 (bead B / PP-o355.2). */}
@@ -343,37 +433,39 @@ export function EditMachineDialog({
               </Select>
             </div>
 
-            {/* Machine Owner - show for admin/technician AND machine owner */}
-            {canEditAnyMachine || isOwner ? (
-              <OwnerSelectWithTracking
-                users={allUsers}
-                defaultValue={currentOwnerId}
-                onOwnerChange={setSelectedOwnerId}
-              />
-            ) : (
-              <div className="space-y-2" data-testid="owner-display">
-                <span className="text-sm font-semibold text-foreground">
-                  Machine Owner
-                </span>
-                <div className="rounded-md border border-outline bg-surface px-3 py-2">
-                  {machine.owner || machine.invitedOwner ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-foreground">
-                        {machine.owner?.name ?? machine.invitedOwner?.name}
-                      </span>
-                      {machine.invitedOwner && !machine.owner && (
-                        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                          (Invited)
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">
-                      No owner assigned
-                    </span>
-                  )}
-                </div>
-              </div>
+            {/* List on PinballMap — display-only until outbound sync
+                (PP-o355.11) exists. Disabled rather than editable: with no
+                way to actually push a list/unlist to PinballMap.com yet,
+                letting someone flip this would just be lying to the card.
+                The hidden input always mirrors the persisted value (not
+                `listed`) so saving other fields never silently resets it. */}
+            {canLink && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="edit-pinballmap-listed"
+                      checked={machine.pinballmapListed}
+                      disabled
+                    />
+                    <input
+                      type="hidden"
+                      name="pinballmapListed"
+                      value={machine.pinballmapListed ? "on" : ""}
+                    />
+                    <Label
+                      htmlFor="edit-pinballmap-listed"
+                      className="text-muted-foreground"
+                    >
+                      List on PinballMap
+                    </Label>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Coming soon — PinPoint can&apos;t push listing changes to
+                  PinballMap.com yet.
+                </TooltipContent>
+              </Tooltip>
             )}
 
             <DialogFooter>
@@ -461,6 +553,30 @@ export function EditMachineDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Unsaved-changes guard — shown when closing the edit dialog with a dirty
+          form. "Keep editing" leaves everything as-is; "Discard" drops the
+          in-progress edits and closes. */}
+      <AlertDialog
+        open={showDiscardConfirm}
+        onOpenChange={setShowDiscardConfirm}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You&apos;ve made changes to {machine.name} that haven&apos;t been
+              saved. Closing now will discard them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmDiscard}>
+              Discard changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
@@ -481,6 +597,7 @@ function OwnerSelectWithTracking({
       users={users}
       defaultValue={defaultValue}
       onValueChange={onOwnerChange}
+      showHelpText={false}
     />
   );
 }

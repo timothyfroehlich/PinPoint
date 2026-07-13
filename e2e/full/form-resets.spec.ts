@@ -169,7 +169,8 @@ test.describe("CREATE form resets", () => {
     await page.goto("/m/new");
 
     await page.getByLabel("Machine Name *").fill(name);
-    await page.getByLabel("Initials *").fill(initials);
+    // Label reads "Initials (cannot be changed later) *" — match on the stem.
+    await page.getByLabel(/Initials/i).fill(initials);
 
     await page.getByRole("button", { name: "Create Machine" }).click();
 
@@ -181,7 +182,7 @@ test.describe("CREATE form resets", () => {
     // Re-visit /m/new — all fields must be empty (no leaked state).
     await page.goto("/m/new");
     await expect(page.getByLabel("Machine Name *")).toHaveValue("");
-    await expect(page.getByLabel("Initials *")).toHaveValue("");
+    await expect(page.getByLabel(/Initials/i)).toHaveValue("");
   });
 
   test("AddCommentForm clears editor and images after successful submit", async ({
