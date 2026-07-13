@@ -353,8 +353,16 @@ export function PinballMapLinkField({
           The select carries pinballmapMachineId natively when shown; otherwise
           the hidden input above does. */}
       <div className="space-y-1.5">
+        {/* Associate the label only with a control that actually renders: the
+            reason input when excluded, the edition select when one is needed.
+            In the placeholder state neither exists, so the label is a plain
+            caption (no htmlFor pointing at a non-existent id). */}
         <Label
-          htmlFor={excluded ? reasonId : editionId}
+          {...(excluded
+            ? { htmlFor: reasonId }
+            : needsEdition
+              ? { htmlFor: editionId }
+              : {})}
           className="text-xs text-muted-foreground"
         >
           {excluded ? "Reason (optional)" : "Edition"}

@@ -351,6 +351,57 @@ describe("createMachineAction — PinballMap link (PGlite)", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("VALIDATION");
   });
+
+  // presenceStatus + description reached createMachineAction only after the C
+  // parity pass (the create form gained Availability + a rich-text editor).
+  // These guard that the action actually persists both, not just accepts them.
+  it("persists presenceStatus and description supplied by the create form", async () => {
+    const db = await getTestDb();
+    const { createMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    const doc = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Plays great" }] },
+      ],
+    };
+    const fd = new FormData();
+    fd.append("name", "Attack from Mars");
+    fd.append("initials", "AFM");
+    fd.append("presenceStatus", "on_loan");
+    fd.append("description", JSON.stringify(doc));
+
+    const result = await createMachineAction(undefined, fd);
+    expect(result.ok).toBe(true);
+
+    const machine = await db.query.machines.findFirst({
+      where: eq(machines.initials, "AFM"),
+    });
+    expect(machine?.presenceStatus).toBe("on_loan");
+    expect(machine?.description).toEqual(doc);
+  });
+
+  it("defaults presenceStatus to on_the_floor and description to null when omitted", async () => {
+    const db = await getTestDb();
+    const { createMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+
+    const fd = new FormData();
+    fd.append("name", "Cactus Canyon");
+    fd.append("initials", "CC");
+
+    const result = await createMachineAction(undefined, fd);
+    expect(result.ok).toBe(true);
+
+    const machine = await db.query.machines.findFirst({
+      where: eq(machines.initials, "CC"),
+    });
+    expect(machine?.presenceStatus).toBe("on_the_floor");
+    expect(machine?.description).toBeNull();
+  });
 });
 
 describe("updateMachineAction — PinballMap link (PGlite)", () => {

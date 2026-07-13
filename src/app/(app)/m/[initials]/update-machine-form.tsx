@@ -230,7 +230,25 @@ export function EditMachineDialog({
             Edit Machine
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent
+          // Radix portals the Model-picker Popover and the edition/Availability
+          // Selects to <body>, OUTSIDE this content subtree. A pointerdown on
+          // that portalled content otherwise reads as an outside interaction and
+          // dismisses the whole dialog (PP-o355.13: "clicking a dropdown closed
+          // the modal"). Keep the dialog open when the interaction originates
+          // inside a popover/select layer; genuine outside clicks still close it.
+          onInteractOutside={(e) => {
+            const target = e.detail.originalEvent.target;
+            if (
+              target instanceof Element &&
+              target.closest(
+                '[data-slot="popover-content"], [data-slot="select-content"]'
+              )
+            ) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Edit Machine</DialogTitle>
             <DialogDescription>
