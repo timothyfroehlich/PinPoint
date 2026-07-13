@@ -152,6 +152,7 @@ interface PbmLinkColumns {
   pinballmapMachineId: number | null;
   pinballmapExcluded: boolean;
   pinballmapExcludedReason: string | null;
+  pinballmapListed: boolean;
   manufacturer: string | null;
   year: number | null;
   opdbId: string | null;
@@ -175,6 +176,7 @@ async function resolvePbmLinkColumns(input: {
   pinballmapMachineId?: number | undefined;
   pinballmapExcluded?: boolean | undefined;
   pinballmapExcludedReason?: string | undefined;
+  pinballmapListed?: boolean | undefined;
 }): Promise<ResolvePbmLinkResult> {
   const pinballmapMachineId = input.pinballmapMachineId ?? null;
   const pinballmapExcluded = input.pinballmapExcluded ?? false;
@@ -202,6 +204,9 @@ async function resolvePbmLinkColumns(input: {
     pinballmapMachineId: null,
     pinballmapExcluded: false,
     pinballmapExcludedReason: null,
+    // Listing presupposes a link — only the linked branch below can set it true,
+    // so every not-linked outcome (excluded, or neither) unlists the machine.
+    pinballmapListed: false,
     manufacturer: null,
     year: null,
     opdbId: null,
@@ -233,6 +238,8 @@ async function resolvePbmLinkColumns(input: {
       columns: {
         ...empty,
         pinballmapMachineId,
+        // Only a linked machine can be listed on the public map.
+        pinballmapListed: input.pinballmapListed ?? false,
         manufacturer: entry.manufacturer,
         year: entry.year,
         opdbId: entry.opdbId,
@@ -267,6 +274,7 @@ function readPbmLinkFormFields(formData: FormData): {
   pinballmapMachineId: string | undefined;
   pinballmapExcluded: boolean | undefined;
   pinballmapExcludedReason: string | undefined;
+  pinballmapListed: boolean | undefined;
 } {
   const idRaw = formData.get("pinballmapMachineId");
   const reasonRaw = formData.get("pinballmapExcludedReason");
@@ -279,6 +287,8 @@ function readPbmLinkFormFields(formData: FormData): {
       typeof reasonRaw === "string" && reasonRaw.trim().length > 0
         ? reasonRaw
         : undefined,
+    pinballmapListed:
+      formData.get("pinballmapListed") === "on" ? true : undefined,
   };
 }
 
@@ -339,6 +349,11 @@ export async function createMachineAction(
       (formData.get("ownerId") as string).length > 0
         ? (formData.get("ownerId") as string)
         : undefined,
+    presenceStatus:
+      typeof formData.get("presenceStatus") === "string" &&
+      (formData.get("presenceStatus") as string).length > 0
+        ? (formData.get("presenceStatus") as string)
+        : undefined,
     forcePromoteUserId:
       typeof formData.get("forcePromoteUserId") === "string" &&
       (formData.get("forcePromoteUserId") as string).length > 0
@@ -347,6 +362,14 @@ export async function createMachineAction(
     ...readPbmLinkFormFields(formData),
   };
 
+  // Description carried by the create form's rich text editor, same
+  // hidden-field + JSON pattern as the edit form (bead C parity pass).
+  const descriptionResult = parseDescriptionFormField(formData);
+  if (!descriptionResult.ok) {
+    return err("VALIDATION", descriptionResult.message);
+  }
+  const descriptionColumn = descriptionResult.value;
+
   // Validate input (CORE-SEC-002)
   const validation = createMachineSchema.safeParse(rawData);
   if (!validation.success) {
@@ -354,7 +377,8 @@ export async function createMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { name, initials, ownerId, forcePromoteUserId } = validation.data;
+  const { name, initials, ownerId, presenceStatus, forcePromoteUserId } =
+    validation.data;
 
   // Resolve PinballMap link columns (mutual-exclusion + catalog-derived metadata).
   // Creators are tech/admin (machines.create), who always hold the link
@@ -586,6 +610,11 @@ export async function createMachineAction(
           initials,
           ownerId: finalOwnerId,
           invitedOwnerId: finalInvitedOwnerId,
+          ...(presenceStatus !== undefined && { presenceStatus }),
+          ...(descriptionColumn !== undefined &&
+            descriptionColumn !== null && {
+              description: descriptionColumn,
+            }),
           ...pbmColumns,
         })
         .returning();

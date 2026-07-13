@@ -13,7 +13,7 @@ vi.mock("./actions", () => ({
 
 const machines = [
   {
-    id: "11111111-1111-1111-1111-111111111111",
+    value: "11111111-1111-1111-1111-111111111111",
     name: "Grand Prix",
     initials: "GP",
   },

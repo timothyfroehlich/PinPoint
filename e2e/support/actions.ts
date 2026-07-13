@@ -275,6 +275,38 @@ export async function selectOption(
   await expect(option).toBeHidden({ timeout: 5000 });
 }
 
+/**
+ * Selects a machine from the report-form MachineCombobox (Popover + cmdk).
+ *
+ * The old machine picker was a native `<select>` driven by Playwright's
+ * `.selectOption()`; the combobox needs an open-then-click sequence. Pass a
+ * machine id to pick a specific machine, or omit `machineId` to pick the first
+ * one in the list (the equivalent of the old `.selectOption({ index: 1 })`,
+ * which just needed *a* machine selected).
+ */
+export async function selectMachine(
+  page: Page,
+  machineId?: string
+): Promise<void> {
+  const trigger = page.getByTestId("machine-select");
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+
+  const option = machineId
+    ? page.getByTestId(`machine-option-${machineId}`)
+    : page.locator('[data-testid^="machine-option-"]').first();
+  await expect(option).toBeVisible({ timeout: 5000 });
+  await option.click();
+
+  // Selecting closes the popover, so the option unmounts.
+  await expect(option).toBeHidden({ timeout: 5000 });
+}
+
+/** The hidden input carrying the report form's selected machine id. */
+export function machineSelectValue(page: Page): Locator {
+  return page.getByTestId("machine-select-input");
+}
+
 type IssueFieldName = "status" | "severity" | "priority" | "frequency";
 
 export function visibleIssueFieldControl(page: Page, field: IssueFieldName) {

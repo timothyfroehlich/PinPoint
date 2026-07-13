@@ -38,6 +38,7 @@ import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 import { getLoginUrl } from "~/lib/login-url";
 import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
+import { MachineCombobox } from "~/components/machines/MachineCombobox";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
   AlertDialog,
@@ -149,6 +150,34 @@ export function UnifiedReportForm({
   const selectedMachine = useMemo(
     () => machinesList.find((m) => m.id === selectedMachineId),
     [machinesList, selectedMachineId]
+  );
+
+  // The report form submits the machine's id (as `machineId`), so each option's
+  // combobox `value` is the machine id.
+  const machineOptions = useMemo(
+    () =>
+      machinesList.map((m) => ({
+        value: m.id,
+        name: m.name,
+        initials: m.initials,
+      })),
+    [machinesList]
+  );
+
+  // Mirrors the previous native <select> onChange: track the selection and
+  // silently sync ?machine=<initials> into the URL (no navigation) so a reload
+  // or a "Log in" round-trip lands back on the same machine.
+  const handleMachineChange = useCallback(
+    (newId: string) => {
+      setSelectedMachineId(newId);
+      const machine = machinesList.find((m) => m.id === newId);
+      if (machine) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("machine", machine.initials);
+        window.history.replaceState(null, "", `?${params.toString()}`);
+      }
+    },
+    [machinesList, searchParams]
   );
 
   // Reset form state before navigating away on success (defense in depth).
@@ -457,40 +486,16 @@ export function UnifiedReportForm({
               <Label htmlFor="machineId" className="text-foreground">
                 Machine *
               </Label>
-              <select
+              <MachineCombobox
                 id="machineId"
                 name="machineId"
-                autoComplete="off"
-                data-testid="machine-select"
-                aria-label="Select Machine"
-                required
+                machines={machineOptions}
                 value={selectedMachineId}
-                onChange={(e) => {
-                  const newId = e.target.value;
-                  setSelectedMachineId(newId);
-                  // Update URL silently without triggering navigation
-                  const machine = machinesList.find((m) => m.id === newId);
-                  if (machine) {
-                    const params = new URLSearchParams(searchParams.toString());
-                    params.set("machine", machine.initials);
-                    window.history.replaceState(
-                      null,
-                      "",
-                      `?${params.toString()}`
-                    );
-                  }
-                }}
-                className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-[color,background-color,border-color,box-shadow] duration-150"
-              >
-                <option value="" disabled>
-                  Select a machine...
-                </option>
-                {machinesList.map((machine) => (
-                  <option key={machine.id} value={machine.id}>
-                    {machine.name} ({machine.initials})
-                  </option>
-                ))}
-              </select>
+                onValueChange={handleMachineChange}
+                ariaLabel="Select Machine"
+                placeholder="Select a machine…"
+                triggerClassName="h-9"
+              />
             </div>
 
             {/* Mobile Recent Issues (Compact) - Visible only on small screens */}
@@ -799,7 +804,15 @@ export function UnifiedReportForm({
                 type="submit"
                 className="flex-1 bg-primary text-on-primary hover:bg-primary/90 h-10 text-sm font-semibold"
                 loading={isPending}
-                disabled={isPending || (enforceCaptcha && !turnstileToken)}
+                disabled={
+                  isPending ||
+                  // The combobox submits via a hidden input, which the browser
+                  // can't `required`-validate — gate the button instead so a
+                  // report can't be filed without a machine (replaces the native
+                  // <select required>).
+                  !selectedMachineId ||
+                  (enforceCaptcha && !turnstileToken)
+                }
               >
                 Submit Issue Report
               </Button>

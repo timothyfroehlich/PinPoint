@@ -18,6 +18,8 @@ import {
   loginAs,
   selectOption,
   assertSelectValue,
+  selectMachine,
+  machineSelectValue,
 } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
@@ -65,7 +67,7 @@ test.describe("CREATE form resets", () => {
     const machineInitials = seededMachines.medievalMadness.initials;
 
     await page.goto("/report");
-    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await selectMachine(page);
 
     await fillReportForm(page, {
       title: `${RESET_PREFIX} Report Reset Test`,
@@ -85,7 +87,7 @@ test.describe("CREATE form resets", () => {
     await page.goto("/report");
 
     // Machine select shows placeholder option, not a previously chosen machine.
-    await expect(page.getByTestId("machine-select")).toHaveValue("");
+    await expect(machineSelectValue(page)).toHaveValue("");
 
     // Title cleared.
     await expect(page.getByLabel("Issue Title *")).toHaveValue("");
@@ -114,7 +116,7 @@ test.describe("CREATE form resets", () => {
     });
 
     await page.goto("/report");
-    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await selectMachine(page);
 
     // Picking a machine via the dropdown writes ?machine=… into the URL.
     // Verify before clicking Clear so the strip-on-clear assertion is meaningful.
@@ -142,7 +144,7 @@ test.describe("CREATE form resets", () => {
     ).not.toBeVisible();
 
     await expect(page.getByLabel("Issue Title *")).toHaveValue("");
-    await expect(page.getByTestId("machine-select")).toHaveValue("");
+    await expect(machineSelectValue(page)).toHaveValue("");
 
     // Severity select returned to default "Minor".
     await assertSelectValue(page.getByTestId("issue-severity-select"), "Minor");
@@ -169,7 +171,8 @@ test.describe("CREATE form resets", () => {
     await page.goto("/m/new");
 
     await page.getByLabel("Machine Name *").fill(name);
-    await page.getByLabel("Initials *").fill(initials);
+    // Label reads "Initials (cannot be changed later) *" — match on the stem.
+    await page.getByLabel(/Initials/i).fill(initials);
 
     await page.getByRole("button", { name: "Create Machine" }).click();
 
@@ -181,7 +184,7 @@ test.describe("CREATE form resets", () => {
     // Re-visit /m/new — all fields must be empty (no leaked state).
     await page.goto("/m/new");
     await expect(page.getByLabel("Machine Name *")).toHaveValue("");
-    await expect(page.getByLabel("Initials *")).toHaveValue("");
+    await expect(page.getByLabel(/Initials/i)).toHaveValue("");
   });
 
   test("AddCommentForm clears editor and images after successful submit", async ({
@@ -199,7 +202,7 @@ test.describe("CREATE form resets", () => {
     // issue. afterEach cleans up all issues whose title starts with RESET_PREFIX
     // (which cascades their comments), so no timeline noise accumulates.
     await page.goto("/report");
-    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await selectMachine(page);
     await fillReportForm(page, {
       title: `${RESET_PREFIX} Comment Form Reset Issue`,
       description: "Throwaway issue for AddCommentForm reset test.",

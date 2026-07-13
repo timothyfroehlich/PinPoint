@@ -6,7 +6,11 @@ import {
   fillReportForm,
   submitFormAndWaitForRedirect,
 } from "../support/page-helpers.js";
-import { loginAs, assertNoA11yViolations } from "../support/actions.js";
+import {
+  loginAs,
+  assertNoA11yViolations,
+  selectMachine,
+} from "../support/actions.js";
 import { TEST_USERS } from "../support/constants.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,9 +36,8 @@ test.describe("Image Upload Reporting", () => {
 
     // 2. Go to Report
     await page.goto("/report");
-    const select = page.getByTestId("machine-select");
-    // Ensure we pick the same machine as the dashboard default or just pick the first one
-    await select.selectOption({ index: 1 });
+    // Just pick the first machine in the list
+    await selectMachine(page);
     await expect(page).toHaveURL(/machine=/);
 
     await assertNoA11yViolations(page);

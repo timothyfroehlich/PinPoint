@@ -18,8 +18,10 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
+import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
+import { MachinePinballmapCard } from "./machine-pinballmap-card";
 
 /**
  * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
@@ -157,6 +159,7 @@ export default async function MachineInfoTab({
           pinballmapMachineId: machine.pinballmapMachineId,
           pinballmapExcluded: machine.pinballmapExcluded,
           pinballmapExcludedReason: machine.pinballmapExcludedReason,
+          pinballmapListed: machine.pinballmapListed,
           pinballmapTitleName,
           description: machine.description,
         }}
@@ -169,6 +172,15 @@ export default async function MachineInfoTab({
       <EditButtonWithTooltip reason={editDeniedReason} />
     ) : null;
 
+  // PinballMap card (PP-o355.3): show the public "View on PinballMap" link only
+  // for machines we've marked as listed on PinballMap (the local
+  // `pinballmapListed` flag, toggled in the Edit dialog). Everything else shows
+  // no card. Richer status UI (desync alert, last comment) is deferred to a
+  // later pass alongside the inbound-sync feature.
+  const pinballmapCard = machine.pinballmapListed ? (
+    <MachinePinballmapCard locationUrl={pinballmapLocationUrl()} />
+  ) : null;
+
   const rail = (
     <InfoRail
       owner={machine.owner}
@@ -176,6 +188,7 @@ export default async function MachineInfoTab({
       addedAt={machine.createdAt}
       descriptionSlot={descriptionSlot}
       editSlot={editControl}
+      pinballmapSlot={pinballmapCard}
     />
   );
 

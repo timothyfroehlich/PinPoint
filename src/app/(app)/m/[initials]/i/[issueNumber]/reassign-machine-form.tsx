@@ -2,7 +2,6 @@
 
 import type React from "react";
 import { useActionState, useEffect, useState, startTransition } from "react";
-import { Check } from "lucide-react";
 import {
   reassignIssueMachineAction,
   type ReassignIssueMachineResult,
@@ -17,15 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "~/components/ui/command";
-import { cn } from "~/lib/utils";
+import { MachinePickerList } from "~/components/machines/MachineCombobox";
 
 interface ReassignMachineCandidate {
   initials: string;
@@ -87,38 +78,19 @@ export function ReassignMachineForm({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <Command className="rounded-md border" data-testid="reassign-command">
-          <CommandInput placeholder="Search machines…" />
-          <CommandList>
-            <CommandEmpty>No matching machines.</CommandEmpty>
-            <CommandGroup>
-              {candidates.map((machine) => {
-                const selected = machine.initials === selectedInitials;
-                return (
-                  <CommandItem
-                    key={machine.initials}
-                    value={`${machine.name} ${machine.initials}`}
-                    onSelect={() => {
-                      setSelectedInitials(machine.initials);
-                    }}
-                    data-testid={`reassign-option-${machine.initials}`}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 size-4",
-                        selected ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    <span className="flex-1 truncate">{machine.name}</span>
-                    <span className="ml-2 font-mono text-xs text-muted-foreground">
-                      {machine.initials}
-                    </span>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+        <MachinePickerList
+          machines={candidates.map((machine) => ({
+            value: machine.initials,
+            name: machine.name,
+            initials: machine.initials,
+          }))}
+          selectedValue={selectedInitials}
+          onSelect={setSelectedInitials}
+          className="rounded-md border"
+          commandTestId="reassign-command"
+          optionTestId={(machine) => `reassign-option-${machine.initials}`}
+          emptyText="No matching machines."
+        />
 
         {state && !state.ok && (
           <p className="text-sm text-destructive">{state.message}</p>

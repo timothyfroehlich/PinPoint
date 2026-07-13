@@ -13,7 +13,7 @@ import {
   fillReportForm,
   submitFormAndWaitForRedirect,
 } from "../support/page-helpers.js";
-import { assertNoA11yViolations } from "../support/actions.js";
+import { assertNoA11yViolations, selectMachine } from "../support/actions.js";
 
 const TITLE_PREFIX = "E2E Form Clear";
 
@@ -37,9 +37,7 @@ test.describe("Report Form Clears After Submission", () => {
 
     await assertNoA11yViolations(page);
 
-    const select = page.getByTestId("machine-select");
-    await expect(select).toBeVisible();
-    await select.selectOption({ index: 1 });
+    await selectMachine(page);
     await expect(page).toHaveURL(/machine=/);
 
     const issueTitle = `${TITLE_PREFIX} ${Date.now()}`;

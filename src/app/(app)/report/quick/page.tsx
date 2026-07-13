@@ -51,7 +51,14 @@ export default async function QuickReportPage(): Promise<React.JSX.Element> {
         Log several machine issues at once, then submit them individually or all
         together.
       </p>
-      <QuickReportGrid machines={machinesList} assignees={assignees} />
+      <QuickReportGrid
+        machines={machinesList.map((m) => ({
+          value: m.id,
+          name: m.name,
+          initials: m.initials,
+        }))}
+        assignees={assignees}
+      />
     </PageContainer>
   );
 }

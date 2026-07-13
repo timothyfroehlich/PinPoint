@@ -236,7 +236,7 @@ function QuickRow({
   if (row.submitted) {
     const { issueNumber, machineInitials } = row.submitted;
     const machineName =
-      machines.find((m) => m.id === row.machineId)?.name ?? machineInitials;
+      machines.find((m) => m.value === row.machineId)?.name ?? machineInitials;
     return (
       <div
         data-testid="quick-row"

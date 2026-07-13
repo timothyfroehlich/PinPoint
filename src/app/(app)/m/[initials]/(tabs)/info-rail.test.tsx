@@ -84,11 +84,33 @@ describe("InfoRail", () => {
     expect(screen.getByTestId("owner-block")).not.toHaveClass("border-t");
   });
 
-  it("renders the Tags and PinballMap reserved-slot placeholders", () => {
+  it("renders the Tags placeholder and no PinballMap slot by default", () => {
     render(<InfoRail owner={null} invitedOwner={null} addedAt={addedAt} />);
     expect(screen.getByTestId("machine-tags-placeholder")).toBeInTheDocument();
+    // No pinballmapSlot passed -> nothing renders in the PinballMap slot.
     expect(
-      screen.getByTestId("machine-pinballmap-placeholder")
-    ).toBeInTheDocument();
+      screen.queryByTestId("machine-pinballmap-placeholder")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("machine-pinballmap-card")
+    ).not.toBeInTheDocument();
+  });
+
+  it("fills the PinballMap slot with the card when provided (PP-o355.3)", () => {
+    render(
+      <InfoRail
+        owner={null}
+        invitedOwner={null}
+        addedAt={addedAt}
+        pinballmapSlot={<div data-testid="pbm-card">PinballMap status</div>}
+      />
+    );
+    // The live card replaces the reserved placeholder, not stacks on top of it.
+    expect(screen.getByTestId("pbm-card")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("machine-pinballmap-placeholder")
+    ).not.toBeInTheDocument();
+    // Tags stays a placeholder — only PinballMap got wired.
+    expect(screen.getByTestId("machine-tags-placeholder")).toBeInTheDocument();
   });
 });

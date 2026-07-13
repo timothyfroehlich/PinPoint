@@ -173,6 +173,13 @@ export const machines = pgTable(
     pinballmapMachineId: integer("pinballmap_machine_id"),
     pinballmapExcluded: boolean("pinballmap_excluded").notNull().default(false),
     pinballmapExcludedReason: text("pinballmap_excluded_reason"),
+    // Whether we consider this machine listed on PinballMap's public map (bead C
+    // / PP-o355.3). A local, manually-maintained boolean — the source of truth
+    // for "show the View-on-PinballMap link". Decoupled from presence/availability
+    // by design (no hard link). Listing presupposes a catalog link, enforced by
+    // the CHECK below. Reconciling this against PBM's actual snapshot is a later
+    // feature (inbound sync); pushing the change to PBM is bead E (outbound).
+    pinballmapListed: boolean("pinballmap_listed").notNull().default(false),
     manufacturer: text("manufacturer"),
     year: integer("year"),
     opdbId: text("opdb_id"),
@@ -188,6 +195,12 @@ export const machines = pgTable(
     pinballmapLinkExclusiveCheck: check(
       "machines_pinballmap_link_exclusive",
       sql`NOT (pinballmap_machine_id IS NOT NULL AND pinballmap_excluded)`
+    ),
+    // Can't be listed on PinballMap without a catalog link — you can only appear
+    // on the public map as a recognized title.
+    pinballmapListedRequiresLinkCheck: check(
+      "machines_pinballmap_listed_requires_link",
+      sql`NOT (pinballmap_listed AND pinballmap_machine_id IS NULL)`
     ),
     ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
     invitedOwnerIdIdx: index("idx_machines_invited_owner_id").on(
