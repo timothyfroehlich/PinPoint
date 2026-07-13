@@ -13,18 +13,18 @@ import { dispatchNotification } from "~/lib/notifications";
 import { plainTextToDoc } from "~/lib/tiptap/types";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
-import { parseBulkRow, type ParsedBulkRow } from "./validation";
-import { BULK_MAX_ROWS, type BulkRowInput } from "./schemas";
+import { parseQuickRow, type ParsedQuickRow } from "./validation";
+import { QUICK_MAX_ROWS, type QuickRowInput } from "./schemas";
 
-export type BulkRowResult =
+export type QuickRowResult =
   | { index: number; ok: true; issueNumber: number; machineInitials: string }
   | { index: number; ok: false; error: string };
 
-export type BulkSubmitResponse =
-  { ok: true; results: BulkRowResult[] } | { ok: false; error: string };
+export type QuickSubmitResponse =
+  { ok: true; results: QuickRowResult[] } | { ok: false; error: string };
 
 /** Resolve the current user's technician+ access, or null if not permitted. */
-async function requireBulkReporter(): Promise<{ userId: string } | null> {
+async function requireQuickReporter(): Promise<{ userId: string } | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -36,7 +36,7 @@ async function requireBulkReporter(): Promise<{ userId: string } | null> {
     columns: { role: true },
   });
   const accessLevel = getAccessLevel(profile?.role);
-  if (!checkPermission("issues.report.bulk", accessLevel)) return null;
+  if (!checkPermission("issues.report.quick", accessLevel)) return null;
   return { userId: user.id };
 }
 
@@ -44,10 +44,10 @@ async function requireBulkReporter(): Promise<{ userId: string } | null> {
  *  returns an `ok: false` result the caller surfaces inline. */
 async function createOne(
   index: number,
-  rawRow: BulkRowInput,
+  rawRow: QuickRowInput,
   reportedBy: string
-): Promise<BulkRowResult> {
-  const parsed: ParsedBulkRow = parseBulkRow(rawRow);
+): Promise<QuickRowResult> {
+  const parsed: ParsedQuickRow = parseQuickRow(rawRow);
   if (!parsed.success) return { index, ok: false, error: parsed.error };
   const data = parsed.data;
 
@@ -94,10 +94,10 @@ async function createOne(
       machineInitials: machine.initials,
     };
   } catch (error) {
-    reportError(error, { action: "submitBulkIssueRow", index });
+    reportError(error, { action: "submitQuickIssueRow", index });
     log.error(
       { index, err: error instanceof Error ? error.message : error },
-      "Bulk row create failed"
+      "Quick row create failed"
     );
     return {
       index,
@@ -108,22 +108,22 @@ async function createOne(
 }
 
 /** Batch submit. Creates each good row; bad rows come back flagged. */
-export async function submitBulkIssuesAction(
-  rows: BulkRowInput[]
-): Promise<BulkSubmitResponse> {
+export async function submitQuickIssuesAction(
+  rows: QuickRowInput[]
+): Promise<QuickSubmitResponse> {
   try {
-    const reporter = await requireBulkReporter();
+    const reporter = await requireQuickReporter();
     if (!reporter)
-      return { ok: false, error: "You don't have permission to bulk report." };
+      return { ok: false, error: "You don't have permission to quick report." };
     if (rows.length === 0) return { ok: false, error: "No issues to submit." };
-    if (rows.length > BULK_MAX_ROWS) {
+    if (rows.length > QUICK_MAX_ROWS) {
       return {
         ok: false,
-        error: `Too many rows — submit at most ${BULK_MAX_ROWS} at a time.`,
+        error: `Too many rows — submit at most ${QUICK_MAX_ROWS} at a time.`,
       };
     }
 
-    const results: BulkRowResult[] = [];
+    const results: QuickRowResult[] = [];
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       if (!row) {
@@ -139,16 +139,16 @@ export async function submitBulkIssuesAction(
 }
 
 /** Single-row submit (quick-submit). */
-export async function submitBulkIssueRowAction(
-  row: BulkRowInput
-): Promise<BulkRowResult> {
+export async function submitQuickIssueRowAction(
+  row: QuickRowInput
+): Promise<QuickRowResult> {
   try {
-    const reporter = await requireBulkReporter();
+    const reporter = await requireQuickReporter();
     if (!reporter)
       return {
         index: 0,
         ok: false,
-        error: "You don't have permission to bulk report.",
+        error: "You don't have permission to quick report.",
       };
     return await createOne(0, row, reporter.userId);
   } finally {

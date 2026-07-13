@@ -13,6 +13,7 @@ import {
   Sparkles,
   Settings,
   Shield,
+  ListPlus,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import {
@@ -127,6 +128,18 @@ export function BottomTabBar({
             aria-label="additional navigation"
             className="pt-2 pb-4 space-y-1"
           >
+            {checkPermission("issues.report.quick", getAccessLevel(role)) && (
+              <Link
+                href="/report/quick"
+                onClick={() => setMoreOpen(false)}
+                className={sheetItemClass}
+                data-testid="more-sheet-quick-report"
+              >
+                <ListPlus className="size-5 shrink-0" aria-hidden="true" />
+                <span>Quick report</span>
+              </Link>
+            )}
+
             <button
               type="button"
               onClick={() => {

@@ -1,5 +1,5 @@
 /**
- * Integration tests: bulk report actions (PP-sn34).
+ * Integration tests: quick report actions (PP-sn34).
  * Real PGlite DB, real permission matrix, real createIssue. External
  * boundaries (auth identity, notifications, logger, Sentry, next/*) mocked.
  */
@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { machines, userProfiles } from "~/server/db/schema";
 import { createTestUser, createTestMachine } from "~/test/helpers/factories";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
-import type { BulkRowInput } from "~/app/(app)/report/bulk/schemas";
+import type { QuickRowInput } from "~/app/(app)/report/quick/schemas";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -43,8 +43,8 @@ vi.mock("~/server/db", async () => {
 });
 
 // Import AFTER the db mock so the action and createIssue pick up PGlite.
-const { submitBulkIssuesAction, submitBulkIssueRowAction } =
-  await import("~/app/(app)/report/bulk/actions");
+const { submitQuickIssuesAction, submitQuickIssueRowAction } =
+  await import("~/app/(app)/report/quick/actions");
 
 async function seedUser(
   role: "guest" | "member" | "technician" | "admin"
@@ -67,7 +67,7 @@ async function seedMachine(
   return { id, initials };
 }
 
-const row = (over: Partial<BulkRowInput> = {}): BulkRowInput => ({
+const row = (over: Partial<QuickRowInput> = {}): QuickRowInput => ({
   machineId: "",
   title: "Right flipper sticky",
   description: "",
@@ -81,30 +81,30 @@ const row = (over: Partial<BulkRowInput> = {}): BulkRowInput => ({
   ...over,
 });
 
-describe("bulk report actions", () => {
+describe("quick report actions", () => {
   setupTestDb();
   beforeEach(() => vi.clearAllMocks());
 
-  it("forbids a member", async () => {
+  it("forbids a guest", async () => {
     const db = await getTestDb();
-    const member = await seedUser("member");
+    const guest = await seedUser("guest");
     const m = await seedMachine("GP", "Grand Prix");
-    mockGetUser.mockResolvedValue({ data: { user: { id: member.id } } });
+    mockGetUser.mockResolvedValue({ data: { user: { id: guest.id } } });
 
-    const res = await submitBulkIssuesAction([row({ machineId: m.id })]);
+    const res = await submitQuickIssuesAction([row({ machineId: m.id })]);
     expect(res.ok).toBe(false);
     const before = await db.query.issues.findMany();
     expect(before).toHaveLength(0);
   });
 
-  it("creates all good rows for a technician", async () => {
+  it("creates all good rows for a member", async () => {
     const db = await getTestDb();
-    const tech = await seedUser("technician");
+    const tech = await seedUser("member");
     const m1 = await seedMachine("GP", "Grand Prix");
     const m2 = await seedMachine("FS", "Future Spa");
     mockGetUser.mockResolvedValue({ data: { user: { id: tech.id } } });
 
-    const res = await submitBulkIssuesAction([
+    const res = await submitQuickIssuesAction([
       row({ machineId: m1.id, title: "Spinner rejecting" }),
       row({ machineId: m2.id, title: "Key broken in back box" }),
     ]);
@@ -122,7 +122,7 @@ describe("bulk report actions", () => {
     const m = await seedMachine("GP", "Grand Prix");
     mockGetUser.mockResolvedValue({ data: { user: { id: tech.id } } });
 
-    const res = await submitBulkIssuesAction([
+    const res = await submitQuickIssuesAction([
       row({ machineId: m.id, title: "Good row" }),
       row({ machineId: randomUUID(), title: "Bad machine" }), // uuid, but no such machine
       row({ machineId: "not-a-uuid", title: "Invalid" }), // fails schema
@@ -144,10 +144,10 @@ describe("bulk report actions", () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: tech.id } } });
     const key = randomUUID();
 
-    const first = await submitBulkIssueRowAction(
+    const first = await submitQuickIssueRowAction(
       row({ machineId: m.id, idempotencyKey: key })
     );
-    const second = await submitBulkIssueRowAction(
+    const second = await submitQuickIssueRowAction(
       row({ machineId: m.id, idempotencyKey: key })
     );
     expect(first.ok && second.ok).toBe(true);
@@ -162,7 +162,7 @@ describe("bulk report actions", () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: tech.id } } });
 
     const many = Array.from({ length: 51 }, () => row({ machineId: m.id }));
-    const res = await submitBulkIssuesAction(many);
+    const res = await submitQuickIssuesAction(many);
     expect(res.ok).toBe(false);
     const created = await db.query.issues.findMany();
     expect(created).toHaveLength(0);

@@ -1,8 +1,8 @@
-# Bulk Issue Report — Design
+# Quick Issue Report — Design
 
 **Bead:** PP-sn34
 **Date:** 2026-07-12
-**Prototype:** [`2026-07-12-bulk-report-prototype.html`](./2026-07-12-bulk-report-prototype.html) (open in a browser; interactive)
+**Prototype:** [`2026-07-12-quick-report-prototype.html`](./2026-07-12-quick-report-prototype.html) (open in a browser; interactive)
 **Status:** Design approved, ready for implementation plan
 
 ## Problem
@@ -28,7 +28,7 @@ text parsing.
 
 ## Scope
 
-- **In:** desktop-first authoring grid; technician+ only; per-row and batch submit;
+- **In:** desktop-first authoring grid; member+ only; per-row and batch submit;
   reuse of the existing issue fields (machine, title, severity, priority, status,
   frequency, assignee, watch, description).
 - **Out:** photo/image upload (explicitly dropped); paste-to-seed parsing; anonymous/
@@ -37,14 +37,15 @@ text parsing.
 
 ## Users & access
 
-- **Route:** `/report/bulk` (sibling of the existing `/report`).
-- **Access:** **technician and admin only.** Add a matrix permission
-  `issues.report.bulk` (technician: true, admin: true; everyone else false) so
-  enforcement runs through `checkPermission()` per CORE-ARCH-008 and the
-  `/help/permissions` page auto-documents it. Members, guests, and anonymous visitors
-  never see the page (redirect or 403).
-- Rationale for the floor: bulk creation is a maintenance-workflow power tool, and the
-  technician+ gate is also the abuse control (see Rate limiting).
+- **Route:** `/report/quick` (sibling of the existing `/report`).
+- **Access:** **member, technician, and admin.** Matrix permission
+  `issues.report.quick` (member: true, technician: true, admin: true; guest and
+  unauthenticated: false) so enforcement runs through `checkPermission()` per
+  CORE-ARCH-008 and the `/help/permissions` page auto-documents it. Guests and
+  anonymous visitors are redirected to the single-issue `/report` page rather
+  than shown a 403 — quick authoring simply isn't offered to them.
+- Rationale for the floor: quick creation is a trusted-contributor workflow tool,
+  and the member+ gate is also the abuse control (see Rate limiting).
 
 ## Layout (settled in prototype)
 
@@ -106,7 +107,7 @@ confirmation strip; a bad row stays editable with its error until fixed and resu
 `createIssue`, so a double-click, a retry, or a Submit-all that overlaps a per-row
 submit never creates a duplicate.
 
-**Reporter & permissions:** `reportedBy` = the current technician. Techs may set every
+**Reporter & permissions:** `reportedBy` = the current user. Member+ may set every
 field directly — no field-downgrade logic like the public `/report` path (which forces
 `status=new`, `priority=medium` for restricted reporters).
 
@@ -118,7 +119,7 @@ batch of N issues produces the same notification behavior as N single reports.
 
 **The public IP rate limiter (`checkPublicIssueLimit`) and Turnstile CAPTCHA are NOT
 invoked on this path.** Those exist to throttle _anonymous_ public reporting; this route
-is authenticated and permission-gated, so the technician+ gate is the abuse control.
+is authenticated and permission-gated, so the member+ gate is the abuse control.
 A batch of 9 issues would otherwise blow the 5-per-15-min public limit immediately.
 
 To guard against runaway accidents (not abuse), enforce a **generous soft cap** on
@@ -136,12 +137,12 @@ without client JS; the batch/add-row conveniences are JS enhancements on top.
 ## Testing (per CORE-TEST-005)
 
 - **Integration (PGlite + direct action):** the batch/single server action — permission
-  gate (technician+ only), N issues created with correct fields, partial-failure creates
+  gate (member+ only), N issues created with correct fields, partial-failure creates
   good rows and reports bad ones, idempotency key prevents duplicates, soft cap enforced.
 - **RTL unit:** grid form-state, row reflow (collapsed ↔ expanded), quick-submit →
-  confirmation strip → undo, add-row.
-- **Smoke E2E:** the page renders without a 500 for a technician and is forbidden for a
-  member.
+  confirmation strip → undo (with a fresh idempotency key), add-row.
+- **Smoke E2E:** the page renders without a 500 for a member and redirects a guest to
+  the single-issue `/report` page.
 
 ## Open follow-ups (not v1 blockers)
 

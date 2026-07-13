@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
-import { parseBulkRow } from "./validation";
-import { BULK_MAX_ROWS } from "./schemas";
+import { parseQuickRow } from "./validation";
+import { QUICK_MAX_ROWS } from "./schemas";
 
 const validRow = () => ({
   machineId: randomUUID(),
@@ -16,44 +16,44 @@ const validRow = () => ({
   idempotencyKey: randomUUID(),
 });
 
-describe("parseBulkRow", () => {
+describe("parseQuickRow", () => {
   it("accepts a well-formed row", () => {
-    const res = parseBulkRow(validRow());
+    const res = parseQuickRow(validRow());
     expect(res.success).toBe(true);
   });
 
   it("rejects a missing machineId with a field-prefixed message", () => {
-    const res = parseBulkRow({ ...validRow(), machineId: "not-a-uuid" });
+    const res = parseQuickRow({ ...validRow(), machineId: "not-a-uuid" });
     expect(res.success).toBe(false);
     if (!res.success) expect(res.error).toMatch(/machineId/);
   });
 
   it("rejects an empty title", () => {
-    const res = parseBulkRow({ ...validRow(), title: "" });
+    const res = parseQuickRow({ ...validRow(), title: "" });
     expect(res.success).toBe(false);
   });
 
   it("rejects a whitespace-only title", () => {
-    const res = parseBulkRow({ ...validRow(), title: "   " });
+    const res = parseQuickRow({ ...validRow(), title: "   " });
     expect(res.success).toBe(false);
   });
 
   it("rejects a title longer than 60 chars", () => {
-    const res = parseBulkRow({ ...validRow(), title: "x".repeat(61) });
+    const res = parseQuickRow({ ...validRow(), title: "x".repeat(61) });
     expect(res.success).toBe(false);
   });
 
   it("rejects an invalid severity", () => {
-    const res = parseBulkRow({ ...validRow(), severity: "nope" });
+    const res = parseQuickRow({ ...validRow(), severity: "nope" });
     expect(res.success).toBe(false);
   });
 
   it("treats empty assignedTo as valid (unassigned)", () => {
-    const res = parseBulkRow({ ...validRow(), assignedTo: "" });
+    const res = parseQuickRow({ ...validRow(), assignedTo: "" });
     expect(res.success).toBe(true);
   });
 
   it("exposes the batch cap", () => {
-    expect(BULK_MAX_ROWS).toBe(50);
+    expect(QUICK_MAX_ROWS).toBe(50);
   });
 });

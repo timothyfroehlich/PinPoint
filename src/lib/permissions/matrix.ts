@@ -193,14 +193,14 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
-        id: "issues.report.bulk",
-        label: "Bulk report issues",
+        id: "issues.report.quick",
+        label: "Quick report issues",
         description:
-          "Create many issues at once from the bulk report grid (/report/bulk)",
+          "Create many issues at once from the quick report grid (/report/quick)",
         access: {
           unauthenticated: false,
           guest: false,
-          member: false,
+          member: true,
           technician: true,
           admin: true,
         },

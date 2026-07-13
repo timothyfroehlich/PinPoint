@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { cn } from "~/lib/utils";
+import { formatIssueId } from "~/lib/issues/utils";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
@@ -23,11 +25,11 @@ import type {
   IssueStatus,
 } from "~/lib/types";
 import {
-  submitBulkIssueRowAction,
-  submitBulkIssuesAction,
-  type BulkRowResult,
+  submitQuickIssueRowAction,
+  submitQuickIssuesAction,
+  type QuickRowResult,
 } from "./actions";
-import type { BulkRowInput } from "./schemas";
+import type { QuickRowInput } from "./schemas";
 
 interface RowState {
   key: string; // React key (stable identity — never rotated)
@@ -67,7 +69,7 @@ function blankRow(): RowState {
   };
 }
 
-function toInput(r: RowState): BulkRowInput {
+function toInput(r: RowState): QuickRowInput {
   return {
     machineId: r.machineId,
     title: r.title,
@@ -82,15 +84,15 @@ function toInput(r: RowState): BulkRowInput {
   };
 }
 
-interface BulkReportGridProps {
+interface QuickReportGridProps {
   machines: MachineOption[];
   assignees: { id: string; name: string | null }[];
 }
 
-export function BulkReportGrid({
+export function QuickReportGrid({
   machines,
   assignees,
-}: BulkReportGridProps): React.JSX.Element {
+}: QuickReportGridProps): React.JSX.Element {
   const [rows, setRows] = React.useState<RowState[]>(() => [blankRow()]);
 
   const patch = (key: string, next: Partial<RowState>): void =>
@@ -100,7 +102,7 @@ export function BulkReportGrid({
     (r) => !r.submitted && (r.machineId || r.title)
   ).length;
 
-  const applyResult = (key: string, res: BulkRowResult): void =>
+  const applyResult = (key: string, res: QuickRowResult): void =>
     patch(
       key,
       res.ok
@@ -116,56 +118,82 @@ export function BulkReportGrid({
         : { submitting: false, error: res.error }
     );
 
+  // Keep a blank row available to fill in after a submit, so authoring can
+  // continue without an extra click on "+ Add issue".
+  function ensureTrailingBlankRow(rs: RowState[]): RowState[] {
+    const hasBlank = rs.some((r) => !r.submitted && !r.machineId && !r.title);
+    return hasBlank ? rs : [...rs, blankRow()];
+  }
+
   async function submitOne(row: RowState): Promise<void> {
     patch(row.key, { submitting: true, error: null });
-    const res = await submitBulkIssueRowAction(toInput(row));
-    applyResult(row.key, res);
+    try {
+      const res = await submitQuickIssueRowAction(toInput(row));
+      applyResult(row.key, res);
+      if (res.ok) setRows(ensureTrailingBlankRow);
+    } catch {
+      // A thrown/failed action (auth blip, network drop, server 500) rejects
+      // here — clear the spinner and surface a retryable error rather than
+      // leaving the row stuck on "Submitting…".
+      patch(row.key, {
+        submitting: false,
+        error: "Something went wrong submitting this issue — try again.",
+      });
+    }
   }
 
   async function submitAll(): Promise<void> {
     const ready = rows.filter((r) => !r.submitted && (r.machineId || r.title));
     if (ready.length === 0) return;
-    setRows((rs) =>
-      rs.map((r) =>
-        ready.includes(r) ? { ...r, submitting: true, error: null } : r
-      )
-    );
-    const res = await submitBulkIssuesAction(ready.map(toInput));
-    if (!res.ok) {
+    // Track by stable key: the optimistic update below replaces row objects,
+    // so object-identity (`ready.includes(r)`) would no longer match afterward.
+    const readyKeys = new Set(ready.map((r) => r.key));
+    const flagReady = (error: string): void =>
       setRows((rs) =>
         rs.map((r) =>
-          ready.includes(r) ? { ...r, submitting: false, error: res.error } : r
+          readyKeys.has(r.key) ? { ...r, submitting: false, error } : r
         )
       );
-      return;
+    setRows((rs) =>
+      rs.map((r) =>
+        readyKeys.has(r.key) ? { ...r, submitting: true, error: null } : r
+      )
+    );
+    try {
+      const res = await submitQuickIssuesAction(ready.map(toInput));
+      if (!res.ok) {
+        flagReady(res.error);
+        return;
+      }
+      // Map results back by index into `ready`.
+      res.results.forEach((result) => {
+        const target = ready[result.index];
+        if (target) applyResult(target.key, result);
+      });
+      setRows(ensureTrailingBlankRow);
+    } catch {
+      flagReady("Something went wrong submitting — try again.");
     }
-    // Map results back by index into `ready`.
-    res.results.forEach((result) => {
-      const target = ready[result.index];
-      if (target) applyResult(target.key, result);
-    });
   }
 
   return (
-    <div data-testid="bulk-report-grid">
-      <div className="rounded-xl border border-outline-variant bg-surface-container-low p-2">
-        {rows.map((r) => (
-          <BulkRow
-            key={r.key}
-            row={r}
-            machines={machines}
-            assignees={assignees}
-            onPatch={(next) => patch(r.key, next)}
-            onSubmit={() => submitOne(r)}
-            onUndo={() =>
-              patch(r.key, {
-                submitted: null,
-                idempotencyKey: crypto.randomUUID(),
-              })
-            }
-          />
-        ))}
-      </div>
+    <div data-testid="quick-report-grid">
+      {rows.map((r) => (
+        <QuickRow
+          key={r.key}
+          row={r}
+          machines={machines}
+          assignees={assignees}
+          onPatch={(next) => patch(r.key, next)}
+          onSubmit={() => submitOne(r)}
+          onUndo={() =>
+            patch(r.key, {
+              submitted: null,
+              idempotencyKey: crypto.randomUUID(),
+            })
+          }
+        />
+      ))}
 
       <button
         type="button"
@@ -179,7 +207,6 @@ export function BulkReportGrid({
         <p className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{readyCount}</span>{" "}
           ready · {rows.filter((r) => r.submitted).length} submitted
-          <span className="ml-2 text-xs">Rate limit bypassed for techs+</span>
         </p>
         <Button type="button" onClick={submitAll} disabled={readyCount === 0}>
           {readyCount ? `Submit all (${readyCount})` : "Submit all"}
@@ -189,7 +216,7 @@ export function BulkReportGrid({
   );
 }
 
-interface BulkRowProps {
+interface QuickRowProps {
   row: RowState;
   machines: MachineOption[];
   assignees: { id: string; name: string | null }[];
@@ -198,32 +225,37 @@ interface BulkRowProps {
   onUndo: () => void;
 }
 
-function BulkRow({
+function QuickRow({
   row,
   machines,
   assignees,
   onPatch,
   onSubmit,
   onUndo,
-}: BulkRowProps): React.JSX.Element {
+}: QuickRowProps): React.JSX.Element {
   if (row.submitted) {
+    const { issueNumber, machineInitials } = row.submitted;
+    const machineName =
+      machines.find((m) => m.id === row.machineId)?.name ?? machineInitials;
     return (
       <div
-        data-testid="bulk-row"
+        data-testid="quick-row"
         className="m-2 rounded-xl border border-primary/30 bg-primary/5 p-3"
       >
         <div className="flex items-center gap-2 text-sm">
           <span className="grid size-5 place-items-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
             <Check className="size-3" />
           </span>
-          <span className="font-semibold">
-            {row.machineId
-              ? machines.find((m) => m.id === row.machineId)?.name
-              : ""}
-          </span>
-          <span>— {row.title}</span>
-          <span className="text-muted-foreground">
-            · Created #{row.submitted.issueNumber}
+          <span>
+            Created{" "}
+            <Link
+              href={`/m/${machineInitials}/i/${issueNumber}`}
+              className="font-semibold text-link underline"
+            >
+              {formatIssueId(machineInitials, issueNumber)}
+            </Link>{" "}
+            for <span className="font-semibold">{machineName}</span> -{" "}
+            {row.title}
           </span>
           <button
             type="button"
@@ -251,7 +283,7 @@ function BulkRow({
 
   return (
     <div
-      data-testid="bulk-row"
+      data-testid="quick-row"
       className={cn(
         "m-2 rounded-xl border p-3",
         row.error ? "border-destructive" : "border-outline-variant",
@@ -261,7 +293,7 @@ function BulkRow({
       {!row.open ? (
         <div className="grid gap-2.5">
           <div className="grid grid-cols-[minmax(0,1fr)_170px_150px_auto] items-end gap-2.5">
-            <Field label="Machine">
+            <Field label="Machine" required>
               <MachineCombobox
                 machines={machines}
                 value={row.machineId}
@@ -289,7 +321,7 @@ function BulkRow({
             </Button>
           </div>
           <div className="grid grid-cols-[1fr_auto] items-end gap-2.5">
-            <Field label="Problem (issue title)">
+            <Field label="Problem (issue title)" required>
               <Input
                 value={row.title}
                 onChange={(e) => onPatch({ title: e.target.value })}
@@ -303,14 +335,14 @@ function BulkRow({
       ) : (
         <div className="grid gap-2.5">
           <div className="grid grid-cols-[minmax(0,240px)_1fr_auto] items-end gap-2.5">
-            <Field label="Machine">
+            <Field label="Machine" required>
               <MachineCombobox
                 machines={machines}
                 value={row.machineId}
                 onValueChange={(id) => onPatch({ machineId: id })}
               />
             </Field>
-            <Field label="Problem (issue title)">
+            <Field label="Problem (issue title)" required>
               <Input
                 value={row.title}
                 onChange={(e) => onPatch({ title: e.target.value })}
@@ -400,9 +432,11 @@ function BulkRow({
 
 function Field({
   label,
+  required,
   children,
 }: {
   label: string;
+  required?: boolean;
   children: React.ReactNode;
 }): React.JSX.Element {
   const id = React.useId();
@@ -413,6 +447,12 @@ function Field({
         className="text-[10px] uppercase tracking-wide text-muted-foreground"
       >
         {label}
+        {required ? (
+          <span aria-hidden="true" className="text-destructive">
+            {" "}
+            *
+          </span>
+        ) : null}
       </Label>
       {React.isValidElement<{ id?: string }>(children)
         ? React.cloneElement(children, { id })

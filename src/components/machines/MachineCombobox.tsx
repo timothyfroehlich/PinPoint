@@ -31,16 +31,27 @@ interface MachineComboboxProps {
   id?: string;
   placeholder?: string;
   disabled?: boolean;
+  /** In a narrow container, show the selected machine's initials only (keeps
+   *  the control small when it sits alongside other fields on one line); the
+   *  full "Name (INITIALS)" is shown once the container is >= 640px wide. */
+  responsiveInitials?: boolean;
 }
 
-export function MachineCombobox({
-  machines,
-  value,
-  onValueChange,
-  id,
-  placeholder = "Select a machine…",
-  disabled = false,
-}: MachineComboboxProps): React.JSX.Element {
+export const MachineCombobox = React.forwardRef<
+  HTMLButtonElement,
+  MachineComboboxProps
+>(function MachineCombobox(
+  {
+    machines,
+    value,
+    onValueChange,
+    id,
+    placeholder = "Select a machine…",
+    disabled = false,
+    responsiveInitials = false,
+  },
+  ref
+): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
   const selected = machines.find((m) => m.id === value);
 
@@ -48,6 +59,7 @@ export function MachineCombobox({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          ref={ref}
           id={id}
           type="button"
           variant="outline"
@@ -59,7 +71,18 @@ export function MachineCombobox({
           <span
             className={cn("truncate", !selected && "text-muted-foreground")}
           >
-            {selected ? `${selected.name} (${selected.initials})` : placeholder}
+            {!selected ? (
+              placeholder
+            ) : responsiveInitials ? (
+              <>
+                <span className="@[640px]:hidden">{selected.initials}</span>
+                <span className="hidden @[640px]:inline">
+                  {selected.name} ({selected.initials})
+                </span>
+              </>
+            ) : (
+              `${selected.name} (${selected.initials})`
+            )}
           </span>
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
@@ -97,4 +120,4 @@ export function MachineCombobox({
       </PopoverContent>
     </Popover>
   );
-}
+});

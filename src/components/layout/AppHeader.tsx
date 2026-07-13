@@ -5,8 +5,9 @@ import { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ListPlus } from "lucide-react";
 import { cn } from "~/lib/utils";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { Button } from "~/components/ui/button";
 import {
   NotificationList,
@@ -47,6 +48,10 @@ export function AppHeader({
   newChangelogCount,
 }: AppHeaderProps): React.JSX.Element {
   const pathname = usePathname();
+  const canQuickReport = checkPermission(
+    "issues.report.quick",
+    getAccessLevel(role)
+  );
 
   const navLinks = useMemo(
     () =>
@@ -141,6 +146,22 @@ export function AppHeader({
             </span>
           </Link>
         </Button>
+        {canQuickReport ? (
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="gap-2"
+            data-testid="nav-quick-report"
+          >
+            <Link href="/report/quick" aria-label="Quick report">
+              <ListPlus className="size-4 shrink-0" aria-hidden="true" />
+              <span className="hidden lg:inline" aria-hidden="true">
+                Quick
+              </span>
+            </Link>
+          </Button>
+        ) : null}
         <HelpMenu newChangelogCount={newChangelogCount} />
       </div>
 

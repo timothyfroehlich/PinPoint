@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TooltipProvider } from "~/components/ui/tooltip";
-import { BulkReportGrid } from "./bulk-report-grid";
+import { QuickReportGrid } from "./quick-report-grid";
 
 const submitRow = vi.fn();
 const submitAll = vi.fn();
 vi.mock("./actions", () => ({
-  submitBulkIssueRowAction: (...a: unknown[]) => submitRow(...a),
-  submitBulkIssuesAction: (...a: unknown[]) => submitAll(...a),
+  submitQuickIssueRowAction: (...a: unknown[]) => submitRow(...a),
+  submitQuickIssuesAction: (...a: unknown[]) => submitAll(...a),
 }));
 
 const machines = [
@@ -25,24 +25,24 @@ const assignees = [{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name: "Tim" }];
 function renderGrid(): ReturnType<typeof render> {
   return render(
     <TooltipProvider>
-      <BulkReportGrid machines={machines} assignees={assignees} />
+      <QuickReportGrid machines={machines} assignees={assignees} />
     </TooltipProvider>
   );
 }
 
-describe("BulkReportGrid", () => {
+describe("QuickReportGrid", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("starts with one empty row and can add more", async () => {
     renderGrid();
-    expect(screen.getAllByTestId("bulk-row")).toHaveLength(1);
+    expect(screen.getAllByTestId("quick-row")).toHaveLength(1);
     await userEvent.click(screen.getByRole("button", { name: /add issue/i }));
-    expect(screen.getAllByTestId("bulk-row")).toHaveLength(2);
+    expect(screen.getAllByTestId("quick-row")).toHaveLength(2);
   });
 
   it("expands and collapses a row", async () => {
     renderGrid();
-    const row = screen.getByTestId("bulk-row");
+    const row = screen.getByTestId("quick-row");
     expect(within(row).queryByText(/description/i)).not.toBeInTheDocument();
     await userEvent.click(within(row).getByRole("button", { name: /more/i }));
     expect(within(row).getByText(/description/i)).toBeInTheDocument();
@@ -56,7 +56,7 @@ describe("BulkReportGrid", () => {
       machineInitials: "GP",
     });
     renderGrid();
-    const row = screen.getByTestId("bulk-row");
+    const row = screen.getByTestId("quick-row");
     // machine + problem
     await userEvent.click(
       within(row).getByRole("combobox", { name: /machine/i })
@@ -67,7 +67,40 @@ describe("BulkReportGrid", () => {
       "Spinner rejecting"
     );
     await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
-    expect(await screen.findByText(/Created #42/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: "GP-42" })
+    ).toBeInTheDocument();
+  });
+
+  it("opens a new blank row automatically after a successful quick-submit", async () => {
+    submitRow.mockResolvedValue({
+      index: 0,
+      ok: true,
+      issueNumber: 42,
+      machineInitials: "GP",
+    });
+    renderGrid();
+    const row = screen.getByTestId("quick-row");
+    await userEvent.type(
+      within(row).getByLabelText(/problem/i),
+      "Spinner rejecting"
+    );
+    await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
+    await screen.findByRole("link", { name: "GP-42" });
+    expect(screen.getAllByTestId("quick-row")).toHaveLength(2);
+    expect(screen.getByLabelText(/problem/i)).toHaveValue("");
+  });
+
+  it("marks Machine and Problem as required fields", () => {
+    renderGrid();
+    const row = screen.getByTestId("quick-row");
+    expect(within(row).getByText("Machine")).toBeInTheDocument();
+    const machineLabel = within(row).getByText("Machine").closest("label");
+    expect(machineLabel).toHaveTextContent("*");
+    const problemLabel = within(row)
+      .getByText("Problem (issue title)")
+      .closest("label");
+    expect(problemLabel).toHaveTextContent("*");
   });
 
   it("rotates the idempotency key on undo so a re-edited resubmit isn't deduped", async () => {
@@ -85,13 +118,15 @@ describe("BulkReportGrid", () => {
         machineInitials: "GP",
       });
     renderGrid();
-    const row = screen.getByTestId("bulk-row");
+    const row = screen.getByTestId("quick-row");
     await userEvent.type(
       within(row).getByLabelText(/problem/i),
       "Spinner rejecting"
     );
     await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
-    expect(await screen.findByText(/Created #42/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: "GP-42" })
+    ).toBeInTheDocument();
 
     await userEvent.click(within(row).getByRole("button", { name: /undo/i }));
     await userEvent.type(
@@ -99,7 +134,9 @@ describe("BulkReportGrid", () => {
       "Edited after undo"
     );
     await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
-    expect(await screen.findByText(/Created #43/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: "GP-43" })
+    ).toBeInTheDocument();
 
     const [firstCall, secondCall] = submitRow.mock.calls;
     expect(firstCall?.[0].idempotencyKey).not.toBe(
@@ -125,6 +162,6 @@ describe("BulkReportGrid", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: /submit all/i }));
     expect(await screen.findByText(/Machine not found/)).toBeInTheDocument();
-    expect(screen.getByTestId("bulk-row")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("No machine picked")).toBeInTheDocument();
   });
 });

@@ -52,7 +52,7 @@ export default async function PublicReportPage({
   }
 
   const accessLevel = getAccessLevel(userProfile?.role);
-  const canBulk = checkPermission("issues.report.bulk", accessLevel);
+  const canQuick = checkPermission("issues.report.quick", accessLevel);
 
   if (accessLevel === "admin" || accessLevel === "member") {
     assignees = await db.query.userProfiles.findMany({
@@ -91,10 +91,10 @@ export default async function PublicReportPage({
   return (
     <PageContainer size="standard">
       <PageHeader title="Report an Issue" />
-      {canBulk ? (
+      {canQuick ? (
         <div className="mb-4">
-          <Link href="/report/bulk" className="text-sm font-medium text-link">
-            Reporting several at once? Use bulk report →
+          <Link href="/report/quick" className="text-sm font-medium text-link">
+            Reporting several at once? Use quick report →
           </Link>
         </div>
       ) : null}

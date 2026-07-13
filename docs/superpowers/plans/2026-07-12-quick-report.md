@@ -1,8 +1,8 @@
-# Bulk Issue Report Implementation Plan
+# Quick Issue Report Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a desktop-first `/report/bulk` page where a technician+ authors many issues in one grid and submits them per-row or all at once.
+**Goal:** Build a desktop-first `/report/quick` page where a technician+ authors many issues in one grid and submits them per-row or all at once.
 
 **Architecture:** A Server Component page gates access (technician+) and fetches the machine list + assignable people, then renders a client grid. Each grid row reflows between a compact collapsed state and a full expanded state. Submission (single-row and batch) goes through server actions that re-check permission server-side and reuse the existing `createIssue` service; a batch creates the good rows and returns per-row results so bad rows stay in place flagged.
 
@@ -12,7 +12,7 @@
 
 _(Every task's requirements implicitly include this section. Values copied from AGENTS.md / the design spec.)_
 
-- **Design spec:** `docs/superpowers/specs/2026-07-12-bulk-report-design.md` (prototype: `2026-07-12-bulk-report-prototype.html`). Bead **PP-sn34**.
+- **Design spec:** `docs/superpowers/specs/2026-07-12-quick-report-design.md` (prototype: `2026-07-12-quick-report-prototype.html`). Bead **PP-sn34**.
 - **Permissions via the matrix only** (CORE-ARCH-008): all checks go through `checkPermission()` from `~/lib/permissions/helpers`. New capabilities get a matrix entry.
 - **Type safety** (CORE-TS-007): ts-strictest, `exactOptionalPropertyTypes`. No `any`, no non-null `!`, no unsafe `as`.
 - **Path aliases** (CORE-TS-008): always `~/` imports.
@@ -20,7 +20,7 @@ _(Every task's requirements implicitly include this section. Values copied from 
 - **No side effects inside DB transactions** (CORE-ARCH-011): `createIssue` already handles this; notifications dispatch post-commit via `after()`. Do not add HTTP/email inside any transaction.
 - **Email privacy** (CORE-SEC-007): the assignee picker shows names only, never emails.
 - **`localhost`, never `127.0.0.1`** (CORE-SEC-008) in any local URL.
-- **Escape parens in shell paths**: `src/app/\(app\)/report/bulk/...`.
+- **Escape parens in shell paths**: `src/app/\(app\)/report/quick/...`.
 - **Run `pnpm run check` before each commit.** This feature touches server actions + permissions, so run `pnpm run preflight` before opening the PR.
 - **Commit trailer** on every commit:
   `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
@@ -37,7 +37,7 @@ _(Every task's requirements implicitly include this section. Values copied from 
 
 ---
 
-### Task 1: Add `issues.report.bulk` permission to the matrix
+### Task 1: Add `issues.report.quick` permission to the matrix
 
 **Files:**
 
@@ -46,34 +46,34 @@ _(Every task's requirements implicitly include this section. Values copied from 
 
 **Interfaces:**
 
-- Produces: permission id `"issues.report.bulk"` — granted to `technician` and `admin`; denied to `unauthenticated`, `guest`, `member`. Checked via `checkPermission("issues.report.bulk", accessLevel)`.
+- Produces: permission id `"issues.report.quick"` — granted to `technician` and `admin`; denied to `unauthenticated`, `guest`, `member`. Checked via `checkPermission("issues.report.quick", accessLevel)`.
 
 - [ ] **Step 1: Write the failing test**
 
 Add to `src/test/unit/permissions-matrix.test.ts` (inside the existing top-level `describe` scope, e.g. after the `PERMISSIONS_MATRIX` block):
 
 ```typescript
-describe("issues.report.bulk", () => {
+describe("issues.report.quick", () => {
   it("is granted to technician and admin only", () => {
-    expect(checkPermission("issues.report.bulk", "technician")).toBe(true);
-    expect(checkPermission("issues.report.bulk", "admin")).toBe(true);
-    expect(checkPermission("issues.report.bulk", "member")).toBe(false);
-    expect(checkPermission("issues.report.bulk", "guest")).toBe(false);
-    expect(checkPermission("issues.report.bulk", "unauthenticated")).toBe(
+    expect(checkPermission("issues.report.quick", "technician")).toBe(true);
+    expect(checkPermission("issues.report.quick", "admin")).toBe(true);
+    expect(checkPermission("issues.report.quick", "member")).toBe(false);
+    expect(checkPermission("issues.report.quick", "guest")).toBe(false);
+    expect(checkPermission("issues.report.quick", "unauthenticated")).toBe(
       false
     );
   });
 
   it("is registered in PERMISSIONS_BY_ID", () => {
-    expect(PERMISSIONS_BY_ID["issues.report.bulk"]).toBeDefined();
+    expect(PERMISSIONS_BY_ID["issues.report.quick"]).toBeDefined();
   });
 });
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm exec vitest run src/test/unit/permissions-matrix.test.ts -t "issues.report.bulk"`
-Expected: FAIL — `PERMISSIONS_BY_ID["issues.report.bulk"]` is `undefined`; `checkPermission` returns `false` for technician/admin.
+Run: `pnpm exec vitest run src/test/unit/permissions-matrix.test.ts -t "issues.report.quick"`
+Expected: FAIL — `PERMISSIONS_BY_ID["issues.report.quick"]` is `undefined`; `checkPermission` returns `false` for technician/admin.
 
 - [ ] **Step 3: Add the matrix entry**
 
@@ -81,10 +81,10 @@ In `src/lib/permissions/matrix.ts`, immediately after the `issues.report.assigne
 
 ```typescript
       {
-        id: "issues.report.bulk",
-        label: "Bulk report issues",
+        id: "issues.report.quick",
+        label: "Quick report issues",
         description:
-          "Create many issues at once from the bulk report grid (/report/bulk)",
+          "Create many issues at once from the quick report grid (/report/quick)",
         access: {
           unauthenticated: false,
           guest: false,
@@ -97,7 +97,7 @@ In `src/lib/permissions/matrix.ts`, immediately after the `issues.report.assigne
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm exec vitest run src/test/unit/permissions-matrix.test.ts -t "issues.report.bulk"`
+Run: `pnpm exec vitest run src/test/unit/permissions-matrix.test.ts -t "issues.report.quick"`
 Expected: PASS.
 
 - [ ] **Step 5: Run the full permissions suite (guards the help page + matrix invariants)**
@@ -109,38 +109,38 @@ Expected: PASS (no invariant/coverage test broke from the new entry).
 
 ```bash
 git add src/lib/permissions/matrix.ts src/test/unit/permissions-matrix.test.ts
-git commit -m "feat(permissions): add issues.report.bulk (technician+) for the bulk report page (PP-sn34)
+git commit -m "feat(permissions): add issues.report.quick (technician+) for the quick report page (PP-sn34)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 2: Bulk row schema + validation (pure, testable)
+### Task 2: Quick row schema + validation (pure, testable)
 
 **Files:**
 
-- Create: `src/app/(app)/report/bulk/schemas.ts`
-- Create: `src/app/(app)/report/bulk/validation.ts`
-- Test: `src/app/(app)/report/bulk/validation.test.ts`
+- Create: `src/app/(app)/report/quick/schemas.ts`
+- Create: `src/app/(app)/report/quick/validation.ts`
+- Test: `src/app/(app)/report/quick/validation.test.ts`
 
 **Interfaces:**
 
 - Produces:
-  - `bulkRowSchema` (Zod) and `type BulkRowInput = z.infer<typeof bulkRowSchema>` with fields:
+  - `quickRowSchema` (Zod) and `type QuickRowInput = z.infer<typeof quickRowSchema>` with fields:
     `{ machineId: string; title: string; description?: string; severity: IssueSeverity; priority: IssuePriority; frequency: IssueFrequency; status: IssueStatus; assignedTo?: string; watch: boolean; idempotencyKey: string }`
-  - `BULK_MAX_ROWS = 50`
-  - `parseBulkRow(raw: unknown): { success: true; data: BulkRowInput } | { success: false; error: string }`
+  - `QUICK_MAX_ROWS = 50`
+  - `parseQuickRow(raw: unknown): { success: true; data: QuickRowInput } | { success: false; error: string }`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `src/app/(app)/report/bulk/validation.test.ts`:
+Create `src/app/(app)/report/quick/validation.test.ts`:
 
 ```typescript
 import { describe, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
-import { parseBulkRow } from "./validation";
-import { BULK_MAX_ROWS } from "./schemas";
+import { parseQuickRow } from "./validation";
+import { QUICK_MAX_ROWS } from "./schemas";
 
 const validRow = () => ({
   machineId: randomUUID(),
@@ -155,61 +155,61 @@ const validRow = () => ({
   idempotencyKey: randomUUID(),
 });
 
-describe("parseBulkRow", () => {
+describe("parseQuickRow", () => {
   it("accepts a well-formed row", () => {
-    const res = parseBulkRow(validRow());
+    const res = parseQuickRow(validRow());
     expect(res.success).toBe(true);
   });
 
   it("rejects a missing machineId with a field-prefixed message", () => {
-    const res = parseBulkRow({ ...validRow(), machineId: "not-a-uuid" });
+    const res = parseQuickRow({ ...validRow(), machineId: "not-a-uuid" });
     expect(res.success).toBe(false);
     if (!res.success) expect(res.error).toMatch(/machineId/);
   });
 
   it("rejects an empty title", () => {
-    const res = parseBulkRow({ ...validRow(), title: "" });
+    const res = parseQuickRow({ ...validRow(), title: "" });
     expect(res.success).toBe(false);
   });
 
   it("rejects a title longer than 60 chars", () => {
-    const res = parseBulkRow({ ...validRow(), title: "x".repeat(61) });
+    const res = parseQuickRow({ ...validRow(), title: "x".repeat(61) });
     expect(res.success).toBe(false);
   });
 
   it("rejects an invalid severity", () => {
-    const res = parseBulkRow({ ...validRow(), severity: "nope" });
+    const res = parseQuickRow({ ...validRow(), severity: "nope" });
     expect(res.success).toBe(false);
   });
 
   it("treats empty assignedTo as valid (unassigned)", () => {
-    const res = parseBulkRow({ ...validRow(), assignedTo: "" });
+    const res = parseQuickRow({ ...validRow(), assignedTo: "" });
     expect(res.success).toBe(true);
   });
 
   it("exposes the batch cap", () => {
-    expect(BULK_MAX_ROWS).toBe(50);
+    expect(QUICK_MAX_ROWS).toBe(50);
   });
 });
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm exec vitest run "src/app/(app)/report/bulk/validation.test.ts"`
+Run: `pnpm exec vitest run "src/app/(app)/report/quick/validation.test.ts"`
 Expected: FAIL — module not found (`./validation`, `./schemas`).
 
 - [ ] **Step 3: Create the schema**
 
-Create `src/app/(app)/report/bulk/schemas.ts`:
+Create `src/app/(app)/report/quick/schemas.ts`:
 
 ```typescript
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 
-/** Maximum rows a single bulk submit may create (accident guard, not abuse). */
-export const BULK_MAX_ROWS = 50;
+/** Maximum rows a single quick submit may create (accident guard, not abuse). */
+export const QUICK_MAX_ROWS = 50;
 
-export const bulkRowSchema = z.object({
+export const quickRowSchema = z.object({
   machineId: z.string().uuid({ message: "Please select a machine" }),
   title: z
     .string()
@@ -235,25 +235,25 @@ export const bulkRowSchema = z.object({
   idempotencyKey: z.string().uuid("Invalid idempotency key"),
 });
 
-export type BulkRowInput = z.infer<typeof bulkRowSchema>;
+export type QuickRowInput = z.infer<typeof quickRowSchema>;
 ```
 
 - [ ] **Step 4: Create the validation helper**
 
-Create `src/app/(app)/report/bulk/validation.ts`:
+Create `src/app/(app)/report/quick/validation.ts`:
 
 ```typescript
-import { bulkRowSchema, type BulkRowInput } from "./schemas";
+import { quickRowSchema, type QuickRowInput } from "./schemas";
 
-export type ParsedBulkRow =
-  { success: true; data: BulkRowInput } | { success: false; error: string };
+export type ParsedQuickRow =
+  { success: true; data: QuickRowInput } | { success: false; error: string };
 
 /**
- * Validate one bulk row. Pure so it can be unit-tested and reused by the
+ * Validate one quick row. Pure so it can be unit-tested and reused by the
  * server action without Server-Action plumbing.
  */
-export function parseBulkRow(raw: unknown): ParsedBulkRow {
-  const result = bulkRowSchema.safeParse(raw);
+export function parseQuickRow(raw: unknown): ParsedQuickRow {
+  const result = quickRowSchema.safeParse(raw);
   if (!result.success) {
     const first = result.error.issues[0];
     const field = first?.path.at(0);
@@ -269,14 +269,14 @@ export function parseBulkRow(raw: unknown): ParsedBulkRow {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `pnpm exec vitest run "src/app/(app)/report/bulk/validation.test.ts"`
+Run: `pnpm exec vitest run "src/app/(app)/report/quick/validation.test.ts"`
 Expected: PASS (all 7 assertions).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add "src/app/(app)/report/bulk/schemas.ts" "src/app/(app)/report/bulk/validation.ts" "src/app/(app)/report/bulk/validation.test.ts"
-git commit -m "feat(bulk-report): row schema + validation helper (PP-sn34)
+git add "src/app/(app)/report/quick/schemas.ts" "src/app/(app)/report/quick/validation.ts" "src/app/(app)/report/quick/validation.test.ts"
+git commit -m "feat(quick-report): row schema + validation helper (PP-sn34)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -287,25 +287,25 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 
-- Create: `src/app/(app)/report/bulk/actions.ts`
-- Test: `src/test/integration/bulk-report-action.test.ts`
+- Create: `src/app/(app)/report/quick/actions.ts`
+- Test: `src/test/integration/quick-report-action.test.ts`
 
 **Interfaces:**
 
-- Consumes: `parseBulkRow`, `BulkRowInput`, `BULK_MAX_ROWS` (Task 2); `checkPermission`, `getAccessLevel` (`~/lib/permissions/helpers`); `createIssue` (`~/services/issues`); `plainTextToDoc` (`~/lib/tiptap/types`); `dispatchNotification` (`~/lib/notifications`).
+- Consumes: `parseQuickRow`, `QuickRowInput`, `QUICK_MAX_ROWS` (Task 2); `checkPermission`, `getAccessLevel` (`~/lib/permissions/helpers`); `createIssue` (`~/services/issues`); `plainTextToDoc` (`~/lib/tiptap/types`); `dispatchNotification` (`~/lib/notifications`).
 - Produces:
-  - `type BulkRowResult = { index: number; ok: true; issueNumber: number; machineInitials: string } | { index: number; ok: false; error: string }`
-  - `type BulkSubmitResponse = { ok: true; results: BulkRowResult[] } | { ok: false; error: string }`
-  - `submitBulkIssuesAction(rows: BulkRowInput[]): Promise<BulkSubmitResponse>` — creates each valid row; invalid rows come back `ok: false` and are NOT created. `ok: false` at the top level only for auth failure or exceeding `BULK_MAX_ROWS`.
-  - `submitBulkIssueRowAction(row: BulkRowInput): Promise<BulkRowResult>` — single row (index always `0`).
+  - `type QuickRowResult = { index: number; ok: true; issueNumber: number; machineInitials: string } | { index: number; ok: false; error: string }`
+  - `type QuickSubmitResponse = { ok: true; results: QuickRowResult[] } | { ok: false; error: string }`
+  - `submitQuickIssuesAction(rows: QuickRowInput[]): Promise<QuickSubmitResponse>` — creates each valid row; invalid rows come back `ok: false` and are NOT created. `ok: false` at the top level only for auth failure or exceeding `QUICK_MAX_ROWS`.
+  - `submitQuickIssueRowAction(row: QuickRowInput): Promise<QuickRowResult>` — single row (index always `0`).
 
 - [ ] **Step 1: Write the failing integration test**
 
-Create `src/test/integration/bulk-report-action.test.ts` (mirrors the boundary-mock style of `public-issue-submit.test.ts`; real PGlite + real permission matrix + real `createIssue`):
+Create `src/test/integration/quick-report-action.test.ts` (mirrors the boundary-mock style of `public-issue-submit.test.ts`; real PGlite + real permission matrix + real `createIssue`):
 
 ```typescript
 /**
- * Integration tests: bulk report actions (PP-sn34).
+ * Integration tests: quick report actions (PP-sn34).
  * Real PGlite DB, real permission matrix, real createIssue. External
  * boundaries (auth identity, notifications, logger, Sentry, next/*) mocked.
  */
@@ -365,7 +365,7 @@ const row = (over: Partial<Record<string, unknown>> = {}) => ({
   ...over,
 });
 
-describe("bulk report actions", () => {
+describe("quick report actions", () => {
   setupTestDb();
   beforeEach(() => vi.clearAllMocks());
 
@@ -378,9 +378,9 @@ describe("bulk report actions", () => {
     });
     mockGetUser.mockResolvedValue({ data: { user: { id: member.id } } });
 
-    const { submitBulkIssuesAction } =
-      await import("~/app/(app)/report/bulk/actions");
-    const res = await submitBulkIssuesAction([row({ machineId: m.id })]);
+    const { submitQuickIssuesAction } =
+      await import("~/app/(app)/report/quick/actions");
+    const res = await submitQuickIssuesAction([row({ machineId: m.id })]);
     expect(res.ok).toBe(false);
     const before = await db.query.issues.findMany();
     expect(before).toHaveLength(0);
@@ -399,9 +399,9 @@ describe("bulk report actions", () => {
     });
     mockGetUser.mockResolvedValue({ data: { user: { id: tech.id } } });
 
-    const { submitBulkIssuesAction } =
-      await import("~/app/(app)/report/bulk/actions");
-    const res = await submitBulkIssuesAction([
+    const { submitQuickIssuesAction } =
+      await import("~/app/(app)/report/quick/actions");
+    const res = await submitQuickIssuesAction([
       row({ machineId: m1.id, title: "Spinner rejecting" }),
       row({ machineId: m2.id, title: "Key broken in back box" }),
     ]);
@@ -422,9 +422,9 @@ describe("bulk report actions", () => {
     });
     mockGetUser.mockResolvedValue({ data: { user: { id: tech.id } } });
 
-    const { submitBulkIssuesAction } =
-      await import("~/app/(app)/report/bulk/actions");
-    const res = await submitBulkIssuesAction([
+    const { submitQuickIssuesAction } =
+      await import("~/app/(app)/report/quick/actions");
+    const res = await submitQuickIssuesAction([
       row({ machineId: m.id, title: "Good row" }),
       row({ machineId: randomUUID(), title: "Bad machine" }), // uuid, but no such machine
       row({ machineId: "not-a-uuid", title: "Invalid" }), // fails schema
@@ -449,12 +449,12 @@ describe("bulk report actions", () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: tech.id } } });
     const key = randomUUID();
 
-    const { submitBulkIssueRowAction } =
-      await import("~/app/(app)/report/bulk/actions");
-    const first = await submitBulkIssueRowAction(
+    const { submitQuickIssueRowAction } =
+      await import("~/app/(app)/report/quick/actions");
+    const first = await submitQuickIssueRowAction(
       row({ machineId: m.id, idempotencyKey: key }) as never
     );
-    const second = await submitBulkIssueRowAction(
+    const second = await submitQuickIssueRowAction(
       row({ machineId: m.id, idempotencyKey: key }) as never
     );
     expect(first.ok && second.ok).toBe(true);
@@ -471,10 +471,10 @@ describe("bulk report actions", () => {
     });
     mockGetUser.mockResolvedValue({ data: { user: { id: tech.id } } });
 
-    const { submitBulkIssuesAction } =
-      await import("~/app/(app)/report/bulk/actions");
+    const { submitQuickIssuesAction } =
+      await import("~/app/(app)/report/quick/actions");
     const many = Array.from({ length: 51 }, () => row({ machineId: m.id }));
-    const res = await submitBulkIssuesAction(many);
+    const res = await submitQuickIssuesAction(many);
     expect(res.ok).toBe(false);
     const created = await db.query.issues.findMany();
     expect(created).toHaveLength(0);
@@ -484,12 +484,12 @@ describe("bulk report actions", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm exec vitest run --project integration src/test/integration/bulk-report-action.test.ts`
-Expected: FAIL — cannot import `~/app/(app)/report/bulk/actions`.
+Run: `pnpm exec vitest run --project integration src/test/integration/quick-report-action.test.ts`
+Expected: FAIL — cannot import `~/app/(app)/report/quick/actions`.
 
 - [ ] **Step 3: Implement the actions**
 
-Create `src/app/(app)/report/bulk/actions.ts`:
+Create `src/app/(app)/report/quick/actions.ts`:
 
 ```typescript
 "use server";
@@ -507,18 +507,18 @@ import { dispatchNotification } from "~/lib/notifications";
 import { plainTextToDoc } from "~/lib/tiptap/types";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
-import { parseBulkRow, type ParsedBulkRow } from "./validation";
-import { BULK_MAX_ROWS, type BulkRowInput } from "./schemas";
+import { parseQuickRow, type ParsedQuickRow } from "./validation";
+import { QUICK_MAX_ROWS, type QuickRowInput } from "./schemas";
 
-export type BulkRowResult =
+export type QuickRowResult =
   | { index: number; ok: true; issueNumber: number; machineInitials: string }
   | { index: number; ok: false; error: string };
 
-export type BulkSubmitResponse =
-  { ok: true; results: BulkRowResult[] } | { ok: false; error: string };
+export type QuickSubmitResponse =
+  { ok: true; results: QuickRowResult[] } | { ok: false; error: string };
 
 /** Resolve the current user's technician+ access, or null if not permitted. */
-async function requireBulkReporter(): Promise<{ userId: string } | null> {
+async function requireQuickReporter(): Promise<{ userId: string } | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -530,7 +530,7 @@ async function requireBulkReporter(): Promise<{ userId: string } | null> {
     columns: { role: true },
   });
   const accessLevel = getAccessLevel(profile?.role);
-  if (!checkPermission("issues.report.bulk", accessLevel)) return null;
+  if (!checkPermission("issues.report.quick", accessLevel)) return null;
   return { userId: user.id };
 }
 
@@ -538,10 +538,10 @@ async function requireBulkReporter(): Promise<{ userId: string } | null> {
  *  returns an `ok: false` result the caller surfaces inline. */
 async function createOne(
   index: number,
-  rawRow: BulkRowInput,
+  rawRow: QuickRowInput,
   reportedBy: string
-): Promise<BulkRowResult> {
-  const parsed: ParsedBulkRow = parseBulkRow(rawRow);
+): Promise<QuickRowResult> {
+  const parsed: ParsedQuickRow = parseQuickRow(rawRow);
   if (!parsed.success) return { index, ok: false, error: parsed.error };
   const data = parsed.data;
 
@@ -588,10 +588,10 @@ async function createOne(
       machineInitials: machine.initials,
     };
   } catch (error) {
-    reportError(error, { action: "submitBulkIssueRow", index });
+    reportError(error, { action: "submitQuickIssueRow", index });
     log.error(
       { index, err: error instanceof Error ? error.message : error },
-      "Bulk row create failed"
+      "Quick row create failed"
     );
     return {
       index,
@@ -602,22 +602,22 @@ async function createOne(
 }
 
 /** Batch submit. Creates each good row; bad rows come back flagged. */
-export async function submitBulkIssuesAction(
-  rows: BulkRowInput[]
-): Promise<BulkSubmitResponse> {
+export async function submitQuickIssuesAction(
+  rows: QuickRowInput[]
+): Promise<QuickSubmitResponse> {
   try {
-    const reporter = await requireBulkReporter();
+    const reporter = await requireQuickReporter();
     if (!reporter)
-      return { ok: false, error: "You don't have permission to bulk report." };
+      return { ok: false, error: "You don't have permission to quick report." };
     if (rows.length === 0) return { ok: false, error: "No issues to submit." };
-    if (rows.length > BULK_MAX_ROWS) {
+    if (rows.length > QUICK_MAX_ROWS) {
       return {
         ok: false,
-        error: `Too many rows — submit at most ${BULK_MAX_ROWS} at a time.`,
+        error: `Too many rows — submit at most ${QUICK_MAX_ROWS} at a time.`,
       };
     }
 
-    const results: BulkRowResult[] = [];
+    const results: QuickRowResult[] = [];
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       if (!row) {
@@ -633,16 +633,16 @@ export async function submitBulkIssuesAction(
 }
 
 /** Single-row submit (quick-submit). */
-export async function submitBulkIssueRowAction(
-  row: BulkRowInput
-): Promise<BulkRowResult> {
+export async function submitQuickIssueRowAction(
+  row: QuickRowInput
+): Promise<QuickRowResult> {
   try {
-    const reporter = await requireBulkReporter();
+    const reporter = await requireQuickReporter();
     if (!reporter)
       return {
         index: 0,
         ok: false,
-        error: "You don't have permission to bulk report.",
+        error: "You don't have permission to quick report.",
       };
     return await createOne(0, row, reporter.userId);
   } finally {
@@ -653,14 +653,14 @@ export async function submitBulkIssueRowAction(
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm exec vitest run --project integration src/test/integration/bulk-report-action.test.ts`
+Run: `pnpm exec vitest run --project integration src/test/integration/quick-report-action.test.ts`
 Expected: PASS (all 5 blocks: forbids member, creates all good, partial failure, idempotency, soft cap).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add "src/app/(app)/report/bulk/actions.ts" src/test/integration/bulk-report-action.test.ts
-git commit -m "feat(bulk-report): single + batch submit server actions (PP-sn34)
+git add "src/app/(app)/report/quick/actions.ts" src/test/integration/quick-report-action.test.ts
+git commit -m "feat(quick-report): single + batch submit server actions (PP-sn34)
 
 Technician+ gate, createIssue reuse, partial-failure keeps bad rows,
 idempotency + 50-row soft cap.
@@ -890,46 +890,46 @@ Expected: PASS (placeholder, filter+select, selected label).
 
 ```bash
 git add src/components/machines/MachineCombobox.tsx src/components/machines/MachineCombobox.test.tsx src/components/ui/popover.tsx
-git commit -m "feat(bulk-report): searchable MachineCombobox picker (PP-sn34)
+git commit -m "feat(quick-report): searchable MachineCombobox picker (PP-sn34)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 5: Bulk report page (Server Component, access gate + data)
+### Task 5: Quick report page (Server Component, access gate + data)
 
 **Files:**
 
-- Create: `src/app/(app)/report/bulk/page.tsx`
-- Create: `e2e/smoke/bulk-report.spec.ts`
+- Create: `src/app/(app)/report/quick/page.tsx`
+- Create: `e2e/smoke/quick-report.spec.ts`
 
 **Interfaces:**
 
-- Consumes: `checkPermission`, `getAccessLevel`, `Forbidden`, `MachineOption` (Task 4), and (Task 6) `BulkReportGrid` with props `{ machines: MachineOption[]; assignees: { id: string; name: string | null }[] }`.
-- Produces: the `/report/bulk` route.
+- Consumes: `checkPermission`, `getAccessLevel`, `Forbidden`, `MachineOption` (Task 4), and (Task 6) `QuickReportGrid` with props `{ machines: MachineOption[]; assignees: { id: string; name: string | null }[] }`.
+- Produces: the `/report/quick` route.
 
 - [ ] **Step 1: Write the failing smoke spec**
 
-Create `e2e/smoke/bulk-report.spec.ts` (uses the existing auth fixtures; follow the auth pattern in a sibling smoke spec such as `e2e/smoke/issues-crud.spec.ts` for how to sign in as a role):
+Create `e2e/smoke/quick-report.spec.ts` (uses the existing auth fixtures; follow the auth pattern in a sibling smoke spec such as `e2e/smoke/issues-crud.spec.ts` for how to sign in as a role):
 
 ```typescript
 import { test, expect } from "@playwright/test";
 import { loginAs } from "../helpers/auth"; // match the helper used by sibling smoke specs
 
-test.describe("bulk report page", () => {
+test.describe("quick report page", () => {
   test("renders the grid for a technician", async ({ page }) => {
     await loginAs(page, "technician");
-    await page.goto("/report/bulk");
+    await page.goto("/report/quick");
     await expect(
-      page.getByRole("heading", { name: /bulk report/i })
+      page.getByRole("heading", { name: /quick report/i })
     ).toBeVisible();
-    await expect(page.getByTestId("bulk-report-grid")).toBeVisible();
+    await expect(page.getByTestId("quick-report-grid")).toBeVisible();
   });
 
   test("forbids a member", async ({ page }) => {
     await loginAs(page, "member");
-    await page.goto("/report/bulk");
+    await page.goto("/report/quick");
     await expect(
       page.getByText(/don.t have permission|forbidden/i)
     ).toBeVisible();
@@ -942,12 +942,12 @@ test.describe("bulk report page", () => {
 
 - [ ] **Step 2: Run the spec to verify it fails**
 
-Run: `pnpm exec playwright test e2e/smoke/bulk-report.spec.ts --project=chromium`
-Expected: FAIL — `/report/bulk` 404s (route doesn't exist).
+Run: `pnpm exec playwright test e2e/smoke/quick-report.spec.ts --project=chromium`
+Expected: FAIL — `/report/quick` 404s (route doesn't exist).
 
 - [ ] **Step 3: Implement the page**
 
-Create `src/app/(app)/report/bulk/page.tsx`:
+Create `src/app/(app)/report/quick/page.tsx`:
 
 ```tsx
 import type React from "react";
@@ -961,18 +961,18 @@ import { getLoginUrl } from "~/lib/url";
 import { Forbidden } from "~/components/errors/Forbidden";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
-import { BulkReportGrid } from "./bulk-report-grid";
+import { QuickReportGrid } from "./quick-report-grid";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export default async function BulkReportPage(): Promise<React.JSX.Element> {
+export default async function QuickReportPage(): Promise<React.JSX.Element> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect(getLoginUrl("/report/bulk"));
+  if (!user) redirect(getLoginUrl("/report/quick"));
 
   const profile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, user.id),
@@ -980,7 +980,7 @@ export default async function BulkReportPage(): Promise<React.JSX.Element> {
   });
   const accessLevel = getAccessLevel(profile?.role);
 
-  if (!checkPermission("issues.report.bulk", accessLevel)) {
+  if (!checkPermission("issues.report.quick", accessLevel)) {
     return <Forbidden role={profile?.role ?? null} />;
   }
 
@@ -1000,10 +1000,10 @@ export default async function BulkReportPage(): Promise<React.JSX.Element> {
   return (
     <PageContainer size="wide">
       <PageHeader
-        title="Bulk Report"
+        title="Quick Report"
         description="Log several machine issues at once, then submit them individually or all together."
       />
-      <BulkReportGrid machines={machinesList} assignees={assignees} />
+      <QuickReportGrid machines={machinesList} assignees={assignees} />
     </PageContainer>
   );
 }
@@ -1012,70 +1012,72 @@ export default async function BulkReportPage(): Promise<React.JSX.Element> {
 > Verify `PageContainer` accepts `size="wide"`; if not, use the widest supported
 > value (`grep -n "size" src/components/layout/PageContainer.tsx`).
 
-- [ ] **Step 4: Create a minimal `BulkReportGrid` stub so the page compiles**
+- [ ] **Step 4: Create a minimal `QuickReportGrid` stub so the page compiles**
 
-Create `src/app/(app)/report/bulk/bulk-report-grid.tsx` (replaced fully in Task 6):
+Create `src/app/(app)/report/quick/quick-report-grid.tsx` (replaced fully in Task 6):
 
 ```tsx
 "use client";
 import type React from "react";
 import type { MachineOption } from "~/components/machines/MachineCombobox";
 
-interface BulkReportGridProps {
+interface QuickReportGridProps {
   machines: MachineOption[];
   assignees: { id: string; name: string | null }[];
 }
 
-export function BulkReportGrid(_props: BulkReportGridProps): React.JSX.Element {
-  return <div data-testid="bulk-report-grid" />;
+export function QuickReportGrid(
+  _props: QuickReportGridProps
+): React.JSX.Element {
+  return <div data-testid="quick-report-grid" />;
 }
 ```
 
 - [ ] **Step 5: Run the smoke spec to verify it passes**
 
-Run: `pnpm exec playwright test e2e/smoke/bulk-report.spec.ts --project=chromium`
+Run: `pnpm exec playwright test e2e/smoke/quick-report.spec.ts --project=chromium`
 Expected: PASS (technician sees heading + grid; member sees Forbidden).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add "src/app/(app)/report/bulk/page.tsx" "src/app/(app)/report/bulk/bulk-report-grid.tsx" e2e/smoke/bulk-report.spec.ts
-git commit -m "feat(bulk-report): /report/bulk page with technician+ gate + data fetch (PP-sn34)
+git add "src/app/(app)/report/quick/page.tsx" "src/app/(app)/report/quick/quick-report-grid.tsx" e2e/smoke/quick-report.spec.ts
+git commit -m "feat(quick-report): /report/quick page with technician+ gate + data fetch (PP-sn34)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 6: Bulk report grid (client) — rows, reflow, quick-submit, submit-all
+### Task 6: Quick report grid (client) — rows, reflow, quick-submit, submit-all
 
 **Files:**
 
-- Modify (replace stub): `src/app/(app)/report/bulk/bulk-report-grid.tsx`
-- Create: `src/app/(app)/report/bulk/bulk-report-grid.test.tsx`
+- Modify (replace stub): `src/app/(app)/report/quick/quick-report-grid.tsx`
+- Create: `src/app/(app)/report/quick/quick-report-grid.test.tsx`
 
 **Interfaces:**
 
-- Consumes: `MachineCombobox`/`MachineOption` (Task 4); `SeveritySelect`, `PrioritySelect`, `StatusSelect`, `FrequencySelect` (`~/components/issues/fields/*`); `submitBulkIssuesAction`, `submitBulkIssueRowAction`, `BulkRowResult` (Task 3); `BulkRowInput` (Task 2).
+- Consumes: `MachineCombobox`/`MachineOption` (Task 4); `SeveritySelect`, `PrioritySelect`, `StatusSelect`, `FrequencySelect` (`~/components/issues/fields/*`); `submitQuickIssuesAction`, `submitQuickIssueRowAction`, `QuickRowResult` (Task 3); `QuickRowInput` (Task 2).
 - Produces: the interactive grid used by `page.tsx`.
 
-**Design reference:** `docs/superpowers/specs/2026-07-12-bulk-report-prototype.html` — the reflow, the two submit paths, and the confirmation strip are all demonstrated there.
+**Design reference:** `docs/superpowers/specs/2026-07-12-quick-report-prototype.html` — the reflow, the two submit paths, and the confirmation strip are all demonstrated there.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `src/app/(app)/report/bulk/bulk-report-grid.test.tsx`:
+Create `src/app/(app)/report/quick/quick-report-grid.test.tsx`:
 
 ```tsx
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BulkReportGrid } from "./bulk-report-grid";
+import { QuickReportGrid } from "./quick-report-grid";
 
 const submitRow = vi.fn();
 const submitAll = vi.fn();
 vi.mock("./actions", () => ({
-  submitBulkIssueRowAction: (...a: unknown[]) => submitRow(...a),
-  submitBulkIssuesAction: (...a: unknown[]) => submitAll(...a),
+  submitQuickIssueRowAction: (...a: unknown[]) => submitRow(...a),
+  submitQuickIssuesAction: (...a: unknown[]) => submitAll(...a),
 }));
 
 const machines = [
@@ -1087,19 +1089,19 @@ const machines = [
 ];
 const assignees = [{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name: "Tim" }];
 
-describe("BulkReportGrid", () => {
+describe("QuickReportGrid", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("starts with one empty row and can add more", async () => {
-    render(<BulkReportGrid machines={machines} assignees={assignees} />);
-    expect(screen.getAllByTestId("bulk-row")).toHaveLength(1);
+    render(<QuickReportGrid machines={machines} assignees={assignees} />);
+    expect(screen.getAllByTestId("quick-row")).toHaveLength(1);
     await userEvent.click(screen.getByRole("button", { name: /add issue/i }));
-    expect(screen.getAllByTestId("bulk-row")).toHaveLength(2);
+    expect(screen.getAllByTestId("quick-row")).toHaveLength(2);
   });
 
   it("expands and collapses a row", async () => {
-    render(<BulkReportGrid machines={machines} assignees={assignees} />);
-    const row = screen.getByTestId("bulk-row");
+    render(<QuickReportGrid machines={machines} assignees={assignees} />);
+    const row = screen.getByTestId("quick-row");
     expect(within(row).queryByText(/description/i)).not.toBeInTheDocument();
     await userEvent.click(within(row).getByRole("button", { name: /more/i }));
     expect(within(row).getByText(/description/i)).toBeInTheDocument();
@@ -1112,8 +1114,8 @@ describe("BulkReportGrid", () => {
       issueNumber: 42,
       machineInitials: "GP",
     });
-    render(<BulkReportGrid machines={machines} assignees={assignees} />);
-    const row = screen.getByTestId("bulk-row");
+    render(<QuickReportGrid machines={machines} assignees={assignees} />);
+    const row = screen.getByTestId("quick-row");
     // machine + problem
     await userEvent.click(within(row).getByRole("combobox"));
     await userEvent.click(screen.getByText(/Grand Prix/));
@@ -1136,33 +1138,33 @@ describe("BulkReportGrid", () => {
         },
       ],
     });
-    render(<BulkReportGrid machines={machines} assignees={assignees} />);
+    render(<QuickReportGrid machines={machines} assignees={assignees} />);
     await userEvent.type(
       screen.getByLabelText(/problem/i),
       "No machine picked"
     );
     await userEvent.click(screen.getByRole("button", { name: /submit all/i }));
     expect(await screen.findByText(/Machine not found/)).toBeInTheDocument();
-    expect(screen.getByTestId("bulk-row")).toBeInTheDocument();
+    expect(screen.getByTestId("quick-row")).toBeInTheDocument();
   });
 });
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pnpm exec vitest run "src/app/(app)/report/bulk/bulk-report-grid.test.tsx"`
+Run: `pnpm exec vitest run "src/app/(app)/report/quick/quick-report-grid.test.tsx"`
 Expected: FAIL — the stub renders only an empty `div`.
 
 - [ ] **Step 3: Implement the grid**
 
-Replace `src/app/(app)/report/bulk/bulk-report-grid.tsx` with the full implementation. Translate the prototype's reflow + submit model to React using the shared field selects. Key requirements the tests pin:
+Replace `src/app/(app)/report/quick/quick-report-grid.tsx` with the full implementation. Translate the prototype's reflow + submit model to React using the shared field selects. Key requirements the tests pin:
 
-- each row wrapper has `data-testid="bulk-row"`;
+- each row wrapper has `data-testid="quick-row"`;
 - an "Add issue" button appends a blank row (with a fresh `crypto.randomUUID()` idempotency key);
 - collapsed shows machine + severity + priority + a **More** toggle (line 1) and the problem input + **Submit** (line 2); the problem input is labelled "Problem (issue title)";
 - expanded shows machine + problem (line 1), severity/priority/status/frequency (line 2), description (line 3), assignee/watch/**Submit** (line 4);
-- per-row **Submit** calls `submitBulkIssueRowAction(row)`; on `ok` the row becomes a confirmation strip showing `Created #<n>` with an **Undo** control; on `!ok` the row keeps an inline error;
-- **Submit all** calls `submitBulkIssuesAction(readyRows)`; apply each `BulkRowResult` back to its row by `index` (success → confirmation strip, failure → inline error).
+- per-row **Submit** calls `submitQuickIssueRowAction(row)`; on `ok` the row becomes a confirmation strip showing `Created #<n>` with an **Undo** control; on `!ok` the row keeps an inline error;
+- **Submit all** calls `submitQuickIssuesAction(readyRows)`; apply each `QuickRowResult` back to its row by `index` (success → confirmation strip, failure → inline error).
 
 ```tsx
 "use client";
@@ -1190,11 +1192,11 @@ import type {
   IssueStatus,
 } from "~/lib/types";
 import {
-  submitBulkIssueRowAction,
-  submitBulkIssuesAction,
-  type BulkRowResult,
+  submitQuickIssueRowAction,
+  submitQuickIssuesAction,
+  type QuickRowResult,
 } from "./actions";
-import type { BulkRowInput } from "./schemas";
+import type { QuickRowInput } from "./schemas";
 
 interface RowState {
   key: string; // React key + idempotencyKey (uuid)
@@ -1232,7 +1234,7 @@ function blankRow(): RowState {
   };
 }
 
-function toInput(r: RowState): BulkRowInput {
+function toInput(r: RowState): QuickRowInput {
   return {
     machineId: r.machineId,
     title: r.title,
@@ -1247,15 +1249,15 @@ function toInput(r: RowState): BulkRowInput {
   };
 }
 
-interface BulkReportGridProps {
+interface QuickReportGridProps {
   machines: MachineOption[];
   assignees: { id: string; name: string | null }[];
 }
 
-export function BulkReportGrid({
+export function QuickReportGrid({
   machines,
   assignees,
-}: BulkReportGridProps): React.JSX.Element {
+}: QuickReportGridProps): React.JSX.Element {
   const [rows, setRows] = React.useState<RowState[]>(() => [blankRow()]);
 
   const patch = (key: string, next: Partial<RowState>) =>
@@ -1265,7 +1267,7 @@ export function BulkReportGrid({
     (r) => !r.submitted && (r.machineId || r.title)
   ).length;
 
-  const applyResult = (key: string, res: BulkRowResult) =>
+  const applyResult = (key: string, res: QuickRowResult) =>
     patch(
       key,
       res.ok
@@ -1283,7 +1285,7 @@ export function BulkReportGrid({
 
   async function submitOne(row: RowState) {
     patch(row.key, { submitting: true, error: null });
-    const res = await submitBulkIssueRowAction(toInput(row));
+    const res = await submitQuickIssueRowAction(toInput(row));
     applyResult(row.key, res);
   }
 
@@ -1295,7 +1297,7 @@ export function BulkReportGrid({
         ready.includes(r) ? { ...r, submitting: true, error: null } : r
       )
     );
-    const res = await submitBulkIssuesAction(ready.map(toInput));
+    const res = await submitQuickIssuesAction(ready.map(toInput));
     if (!res.ok) {
       setRows((rs) =>
         rs.map((r) =>
@@ -1315,7 +1317,7 @@ export function BulkReportGrid({
     <div>
       <div className="rounded-xl border border-outline-variant bg-surface-container-low p-2">
         {rows.map((r) => (
-          <BulkRow
+          <QuickRow
             key={r.key}
             row={r}
             machines={machines}
@@ -1349,7 +1351,7 @@ export function BulkReportGrid({
   );
 }
 
-interface BulkRowProps {
+interface QuickRowProps {
   row: RowState;
   machines: MachineOption[];
   assignees: { id: string; name: string | null }[];
@@ -1358,18 +1360,18 @@ interface BulkRowProps {
   onUndo: () => void;
 }
 
-function BulkRow({
+function QuickRow({
   row,
   machines,
   assignees,
   onPatch,
   onSubmit,
   onUndo,
-}: BulkRowProps): React.JSX.Element {
+}: QuickRowProps): React.JSX.Element {
   if (row.submitted) {
     return (
       <div
-        data-testid="bulk-row"
+        data-testid="quick-row"
         className="m-2 rounded-xl border border-primary/30 bg-primary/5 p-3"
       >
         <div className="flex items-center gap-2 text-sm">
@@ -1411,7 +1413,7 @@ function BulkRow({
 
   return (
     <div
-      data-testid="bulk-row"
+      data-testid="quick-row"
       className={cn(
         "m-2 rounded-xl border p-3",
         row.error ? "border-destructive" : "border-outline-variant",
@@ -1592,7 +1594,7 @@ function Field({
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `pnpm exec vitest run "src/app/(app)/report/bulk/bulk-report-grid.test.tsx"`
+Run: `pnpm exec vitest run "src/app/(app)/report/quick/quick-report-grid.test.tsx"`
 Expected: PASS (add row, expand/collapse, quick-submit confirmation, partial-failure keeps flagged row).
 
 - [ ] **Step 5: Typecheck + lint the new surface**
@@ -1603,20 +1605,20 @@ Expected: clean (no `any`, no unused, path aliases correct).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add "src/app/(app)/report/bulk/bulk-report-grid.tsx" "src/app/(app)/report/bulk/bulk-report-grid.test.tsx" src/components/ui/switch.tsx src/components/ui/textarea.tsx
-git commit -m "feat(bulk-report): interactive authoring grid — reflow, quick-submit, submit-all (PP-sn34)
+git add "src/app/(app)/report/quick/quick-report-grid.tsx" "src/app/(app)/report/quick/quick-report-grid.test.tsx" src/components/ui/switch.tsx src/components/ui/textarea.tsx
+git commit -m "feat(quick-report): interactive authoring grid — reflow, quick-submit, submit-all (PP-sn34)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 7: Discoverability — link to the bulk page for techs+
+### Task 7: Discoverability — link to the quick page for techs+
 
 **Files:**
 
-- Modify: `src/app/(app)/report/page.tsx` (add a link to `/report/bulk`, shown only when the viewer is technician+)
-- Test: (covered by the existing smoke; add one assertion to `e2e/smoke/bulk-report.spec.ts`)
+- Modify: `src/app/(app)/report/page.tsx` (add a link to `/report/quick`, shown only when the viewer is technician+)
+- Test: (covered by the existing smoke; add one assertion to `e2e/smoke/quick-report.spec.ts`)
 
 **Interfaces:**
 
@@ -1625,15 +1627,15 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - [ ] **Step 1: Add the link (gated)**
 
 In `src/app/(app)/report/page.tsx`, after computing `accessLevel`, compute
-`const canBulk = checkPermission("issues.report.bulk", accessLevel);` (import
+`const canQuick = checkPermission("issues.report.quick", accessLevel);` (import
 `checkPermission` alongside the existing `getAccessLevel` import) and render a link
-in the header area when `canBulk`:
+in the header area when `canQuick`:
 
 ```tsx
 {
-  canBulk ? (
-    <Link href="/report/bulk" className="text-sm font-medium text-link">
-      Reporting several at once? Use bulk report →
+  canQuick ? (
+    <Link href="/report/quick" className="text-sm font-medium text-link">
+      Reporting several at once? Use quick report →
     </Link>
   ) : null;
 }
@@ -1644,7 +1646,7 @@ in the header area when `canBulk`:
 
 - [ ] **Step 2: Extend the smoke spec**
 
-Append to `e2e/smoke/bulk-report.spec.ts`:
+Append to `e2e/smoke/quick-report.spec.ts`:
 
 ```typescript
 test("is linked from the single report page for a technician", async ({
@@ -1652,21 +1654,21 @@ test("is linked from the single report page for a technician", async ({
 }) => {
   await loginAs(page, "technician");
   await page.goto("/report");
-  await page.getByRole("link", { name: /bulk report/i }).click();
-  await expect(page).toHaveURL(/\/report\/bulk$/);
+  await page.getByRole("link", { name: /quick report/i }).click();
+  await expect(page).toHaveURL(/\/report\/quick$/);
 });
 ```
 
 - [ ] **Step 3: Run the smoke spec**
 
-Run: `pnpm exec playwright test e2e/smoke/bulk-report.spec.ts --project=chromium`
+Run: `pnpm exec playwright test e2e/smoke/quick-report.spec.ts --project=chromium`
 Expected: PASS (all three cases).
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add "src/app/(app)/report/page.tsx" e2e/smoke/bulk-report.spec.ts
-git commit -m "feat(bulk-report): link to /report/bulk from the single report page (techs+) (PP-sn34)
+git add "src/app/(app)/report/page.tsx" e2e/smoke/quick-report.spec.ts
+git commit -m "feat(quick-report): link to /report/quick from the single report page (techs+) (PP-sn34)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -1685,12 +1687,12 @@ Expected: check (types/lint/format/unit) + build + integration all green. Fix an
 - [ ] **Step 2: Targeted smoke**
 
 Run: `pnpm run smoke`
-Expected: green (the new bulk-report smoke plus existing suite).
+Expected: green (the new quick-report smoke plus existing suite).
 
 - [ ] **Step 3: Push + open PR (ready-for-review)**
 
 ```bash
-git push -u origin feat/bulk-report-PP-sn34
+git push -u origin feat/quick-report-PP-sn34
 ```
 
 Open the PR ready-for-review (not draft). Body: link the spec + prototype, summarize
@@ -1711,7 +1713,7 @@ partial-failure keeps bad rows), and reference PP-sn34. Include the
 - Fields incl. machine searchable select, no photo upload → Task 4 (combobox), Task 6 (fields; images absent). ✓
 - Per-row quick-submit + submit-all → Task 3 (actions), Task 6 (UI). ✓
 - Partial failure creates good rows, keeps bad flagged → Task 3 (results model), Task 6 (apply-by-index). ✓
-- Rate-limit bypass + no CAPTCHA + soft cap → Task 3 (`requireBulkReporter` uses no limiter; `BULK_MAX_ROWS`). ✓
+- Rate-limit bypass + no CAPTCHA + soft cap → Task 3 (`requireQuickReporter` uses no limiter; `QUICK_MAX_ROWS`). ✓
 - Reuse `createIssue`, idempotency, reporter = tech, techs set all fields → Task 3. ✓
 - Notifications post-commit via `after()` → Task 3. ✓
 - Tests: integration/RTL/smoke → Tasks 3, 4, 6, 5/7. ✓
@@ -1719,4 +1721,4 @@ partial-failure keeps bad rows), and reference PP-sn34. Include the
 
 **Placeholder scan:** No "TBD"/"handle edge cases"/"similar to". Two `>`-quoted implementer notes (verify `PageContainer size`, confirm shadcn primitive existence, copy the exact smoke auth helper) are pre-flight verifications with concrete commands, not deferred work.
 
-**Type consistency:** `BulkRowInput` (Task 2) is consumed unchanged by Task 3 (`createOne`) and Task 6 (`toInput`). `BulkRowResult`/`BulkSubmitResponse` (Task 3) are consumed by Task 6 (`applyResult`). `MachineOption` (Task 4) flows to Tasks 5 and 6. Field-select `onValueChange` signatures match `~/components/issues/fields/*`. Permission id `"issues.report.bulk"` is identical across Tasks 1, 3, 5, 7.
+**Type consistency:** `QuickRowInput` (Task 2) is consumed unchanged by Task 3 (`createOne`) and Task 6 (`toInput`). `QuickRowResult`/`QuickSubmitResponse` (Task 3) are consumed by Task 6 (`applyResult`). `MachineOption` (Task 4) flows to Tasks 5 and 6. Field-select `onValueChange` signatures match `~/components/issues/fields/*`. Permission id `"issues.report.quick"` is identical across Tasks 1, 3, 5, 7.

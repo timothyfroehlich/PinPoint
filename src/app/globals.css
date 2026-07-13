@@ -177,6 +177,30 @@
   height: 0;
 }
 
+/* Quick report collapsed row (PP-sn34): a single grid that reflows via a
+   container query on the row card (CORE-RESP: component-internal reflow uses
+   container queries, not viewport breakpoints). Narrow → 3 lines
+   (machine·severity·priority / problem / more·discard·submit); wide → 2 lines
+   (machine·severity·priority·more / problem·discard·submit). */
+.quick-collapsed {
+  display: grid;
+  gap: 0.625rem;
+  align-items: end;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-areas:
+    "machine severity priority"
+    "problem problem problem"
+    "more discard submit";
+}
+@container (min-width: 640px) {
+  .quick-collapsed {
+    grid-template-columns: minmax(0, 1fr) 170px 150px auto;
+    grid-template-areas:
+      "machine severity priority more"
+      "problem problem discard submit";
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

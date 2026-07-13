@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 
-/** Maximum rows a single bulk submit may create (accident guard, not abuse). */
-export const BULK_MAX_ROWS = 50;
+/** Maximum rows a single quick submit may create (accident guard, not abuse). */
+export const QUICK_MAX_ROWS = 50;
 
-export const bulkRowSchema = z.object({
+export const quickRowSchema = z.object({
   machineId: z.string().uuid({ message: "Please select a machine" }),
   title: z
     .string()
@@ -30,4 +30,4 @@ export const bulkRowSchema = z.object({
   idempotencyKey: z.string().uuid("Invalid idempotency key"),
 });
 
-export type BulkRowInput = z.infer<typeof bulkRowSchema>;
+export type QuickRowInput = z.infer<typeof quickRowSchema>;

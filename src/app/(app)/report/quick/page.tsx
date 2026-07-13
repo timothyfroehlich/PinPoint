@@ -6,21 +6,20 @@ import { machines, userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getLoginUrl } from "~/lib/url";
-import { Forbidden } from "~/components/errors/Forbidden";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
-import { BulkReportGrid } from "./bulk-report-grid";
+import { QuickReportGrid } from "./quick-report-grid";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export default async function BulkReportPage(): Promise<React.JSX.Element> {
+export default async function QuickReportPage(): Promise<React.JSX.Element> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect(getLoginUrl("/report/bulk"));
+  if (!user) redirect(getLoginUrl("/report/quick"));
 
   const profile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, user.id),
@@ -28,8 +27,8 @@ export default async function BulkReportPage(): Promise<React.JSX.Element> {
   });
   const accessLevel = getAccessLevel(profile?.role);
 
-  if (!checkPermission("issues.report.bulk", accessLevel)) {
-    return <Forbidden role={profile?.role ?? null} />;
+  if (!checkPermission("issues.report.quick", accessLevel)) {
+    redirect("/report");
   }
 
   const [machinesList, assignees] = await Promise.all([
@@ -47,12 +46,12 @@ export default async function BulkReportPage(): Promise<React.JSX.Element> {
 
   return (
     <PageContainer size="wide">
-      <PageHeader title="Bulk Report" />
+      <PageHeader title="Quick Report" />
       <p className="mb-4 text-sm text-muted-foreground">
         Log several machine issues at once, then submit them individually or all
         together.
       </p>
-      <BulkReportGrid machines={machinesList} assignees={assignees} />
+      <QuickReportGrid machines={machinesList} assignees={assignees} />
     </PageContainer>
   );
 }

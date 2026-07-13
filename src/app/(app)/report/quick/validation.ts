@@ -1,14 +1,14 @@
-import { bulkRowSchema, type BulkRowInput } from "./schemas";
+import { quickRowSchema, type QuickRowInput } from "./schemas";
 
-export type ParsedBulkRow =
-  { success: true; data: BulkRowInput } | { success: false; error: string };
+export type ParsedQuickRow =
+  { success: true; data: QuickRowInput } | { success: false; error: string };
 
 /**
- * Validate one bulk row. Pure so it can be unit-tested and reused by the
+ * Validate one quick row. Pure so it can be unit-tested and reused by the
  * server action without Server-Action plumbing.
  */
-export function parseBulkRow(raw: unknown): ParsedBulkRow {
-  const result = bulkRowSchema.safeParse(raw);
+export function parseQuickRow(raw: unknown): ParsedQuickRow {
+  const result = quickRowSchema.safeParse(raw);
   if (!result.success) {
     const first = result.error.issues[0];
     const field = first?.path.at(0);
