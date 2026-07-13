@@ -31,8 +31,7 @@ export function EditorToolbar({
 
   const setLink = (): void => {
     const previousUrl = editor.getAttributes("link")["href"] as
-      | string
-      | undefined;
+      string | undefined;
     const url = window.prompt("URL", previousUrl);
 
     // cancelled
@@ -52,6 +51,7 @@ export function EditorToolbar({
 
   return (
     <div
+      role="toolbar"
       className="flex flex-wrap items-center gap-1 border-b p-1 bg-muted/30"
       onMouseDown={(e) => e.preventDefault()}
     >

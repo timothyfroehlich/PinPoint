@@ -72,17 +72,17 @@ These API signatures are confirmed against current Supabase docs (retrieved 2026
 
 **Columns (final):**
 
-| Column               | Type        | Nullable | Default       | Purpose                                                                               |
+| Column | Type | Nullable | Default | Purpose |
 | -------------------- | ----------- | -------- | ------------- | ------------------------------------------------------------------------------------- | --------- | ----------- |
-| `id`                 | text        | NOT NULL | `'singleton'` | PK, enforced single row                                                               |
-| `enabled`            | boolean     | NOT NULL | `false`       | Master toggle                                                                         |
-| `guild_id`           | text        | NULL     | NULL          | APC Discord server ID                                                                 |
-| `invite_link`        | text        | NULL     | NULL          | URL shown in PR 5 warnings                                                            |
-| `bot_token_vault_id` | uuid        | NULL     | NULL          | FK-in-spirit to `vault.secrets.id`; no enforced FK (cross-schema, Drizzle limitation) |
-| `bot_health_status`  | text        | NOT NULL | `'unknown'`   | Enum via CHECK: `'unknown'                                                            | 'healthy' | 'degraded'` |
-| `last_bot_check_at`  | timestamptz | NULL     | NULL          | Populated by PR 5                                                                     |
-| `updated_at`         | timestamptz | NOT NULL | `now()`       | Audit                                                                                 |
-| `updated_by`         | uuid        | NULL     | NULL          | `auth.users(id)` — no FK (cross-schema)                                               |
+| `id` | text | NOT NULL | `'singleton'` | PK, enforced single row |
+| `enabled` | boolean | NOT NULL | `false` | Master toggle |
+| `guild_id` | text | NULL | NULL | APC Discord server ID |
+| `invite_link` | text | NULL | NULL | URL shown in PR 5 warnings |
+| `bot_token_vault_id` | uuid | NULL | NULL | FK-in-spirit to `vault.secrets.id`; no enforced FK (cross-schema, Drizzle limitation) |
+| `bot_health_status` | text | NOT NULL | `'unknown'` | Enum via CHECK: `'unknown'                                                            | 'healthy' | 'degraded'` |
+| `last_bot_check_at` | timestamptz | NULL | NULL | Populated by PR 5 |
+| `updated_at` | timestamptz | NOT NULL | `now()` | Audit |
+| `updated_by` | uuid | NULL | NULL | `auth.users(id)` — no FK (cross-schema) |
 
 `bot_health_status` and `last_bot_check_at` land in this PR even though PR 5 writes to them — cheaper to add nullable columns once than to migrate again.
 
@@ -1837,7 +1837,7 @@ gh pr create --title "feat(discord): admin integration config subpage (PP-mud)" 
 
 ### Known ambiguities a reviewer should double-check
 
-1. **`vault.*` function calls from Drizzle `db.execute(sql\`...\`)`.** We use direct SQL through the pooled connection. Confirm the runtime DB role (the role that owns the pooled Supabase connection) has EXECUTE privilege on `vault.create_secret` / `vault.update_secret`. On hosted Supabase, only `postgres` can by default. If the app role can't, we need to wrap the vault calls in another SECURITY DEFINER function and call that via the service-role client. This is a 30-minute swap if it bites — note on the PR.
+1. **`vault.*` function calls from Drizzle `db.execute(sql\`...\`)`.** We use direct SQL through the pooled connection. Confirm the runtime DB role (the role that owns the pooled Supabase connection) has EXECUTE privilege on `vault.create_secret`/`vault.update_secret`. On hosted Supabase, only `postgres` can by default. If the app role can't, we need to wrap the vault calls in another SECURITY DEFINER function and call that via the service-role client. This is a 30-minute swap if it bites — note on the PR.
 2. **Drizzle `meta/_journal.json` migration index.** Plan assumes the next index is 28. If another migration lands in main before PR 3, rebase + regenerate is required (see AGENTS.md § Migration Conflict Resolution).
 3. **shadcn/ui component availability.** Confirmed present in `src/components/ui/`: `switch.tsx`, `label.tsx`, `card.tsx`, `button.tsx`, `input.tsx`, `badge.tsx`. No additional installs needed.
 4. **Anon/member RLS denial on UPDATE.** PostgREST returns HTTP 200 with no error when an UPDATE affects 0 rows under RLS — the Task 6 test asserts via re-read rather than expecting an error. If RLS is tightened later to throw explicitly, adjust that test.

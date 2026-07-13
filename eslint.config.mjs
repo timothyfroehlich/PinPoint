@@ -6,6 +6,7 @@ import promisePlugin from "eslint-plugin-promise";
 import eslintCommentsPlugin from "@eslint-community/eslint-plugin-eslint-comments";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 import reactHooks from "eslint-plugin-react-hooks";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 import globals from "globals";
 import { pinpointTransactionPlugin } from "./eslint-rules/no-side-effects-in-transaction.mjs";
 
@@ -324,6 +325,32 @@ export default [
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error",
+    },
+  },
+  {
+    // ===== JSX accessibility (PP-u4cp) =====
+    // eslint-config-next used to bundle eslint-plugin-jsx-a11y, but (like
+    // react-hooks, PP-k6jp) it was never actually loaded — and #1652 removed
+    // eslint-config-next entirely, so there was zero a11y linting. Wire the
+    // plugin directly at its "recommended" ruleset so a11y regressions get
+    // caught at lint time; this is the prerequisite for the eventual "strict"
+    // bump (PP-kqbk.10). Scoped to app source *.tsx (a11y rules are JSX-only);
+    // tests/spec/src/test are excluded (render helpers there produce noise with
+    // no user impact). The recommended set is spread from the plugin's flat
+    // export (flatConfigs.recommended.rules). Pre-existing deliberate-autofocus
+    // and shortcut-wrapper sites are suppressed inline with `-- … PP-u4cp`
+    // disables, so this PR ENABLES the rule cleanly.
+    files: ["src/**/*.tsx"],
+    ignores: [
+      "**/*.test.tsx",
+      "**/*.spec.tsx",
+      "src/test/**",
+    ],
+    plugins: {
+      "jsx-a11y": jsxA11y,
+    },
+    rules: {
+      ...jsxA11y.flatConfigs.recommended.rules,
     },
   },
   {

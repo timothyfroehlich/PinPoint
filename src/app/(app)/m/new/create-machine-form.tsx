@@ -241,7 +241,6 @@ export function CreateMachineForm({
             required
             placeholder="e.g., Medieval Madness"
             className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
-            autoFocus
             value={nameValue}
             onChange={(e) => setNameValue(e.target.value)}
           />

@@ -61,6 +61,7 @@ export function MachineNoteComposerSheet({
         <div className="px-4 pb-6">
           <MachineTimelineComposer
             machineId={machineId}
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate focus-on-open in bottom sheet, PP-u4cp
             autoFocus
             onCancel={() => {
               setOpen(false);

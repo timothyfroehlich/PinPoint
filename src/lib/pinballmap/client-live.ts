@@ -150,8 +150,7 @@ function serializeWrite<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 type WriteOutcome =
-  | { ok: true; body: Record<string, unknown> | null }
-  | PbmWriteFailure;
+  { ok: true; body: Record<string, unknown> | null } | PbmWriteFailure;
 
 /**
  * Issue a write and classify the result from the body. Honors one 429 retry
