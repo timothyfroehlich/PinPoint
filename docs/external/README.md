@@ -12,11 +12,13 @@ read before touching the PinballMap integration (`src/lib/pinballmap/`).
 
 ## Why these are vendored
 
-1. **Compliance is a moving target.** The `llms.txt` drift-detection GitHub
-   Action (epic bead I, `PP-o355.9`) diffs the live file against
-   `pinballmap-llms.txt` here daily and opens a GitHub issue on change — so this
-   copy must stay **byte-identical** to what PBM serves. Do not edit it by hand;
-   refresh it from source.
+1. **Compliance is a moving target.** These copies must stay **byte-identical**
+   to what PBM serves, or our conduct posture silently drifts from the current
+   policy. The weekly chores routine
+   (`.agents/skills/pinpoint-chores/SKILL.md`) diffs the live `llms.txt` and
+   `robots.txt` against the vendored copies here and refreshes them on drift —
+   there is no automated drift GHA. Do not edit these by hand; refresh from
+   source.
 2. **The API is the sanctioned channel; the website is not.** `robots.txt`
    blocks `ClaudeBot`/`anthropic-ai`/etc. from crawling pinballmap.com. Always
    use the documented JSON API (per `llms.txt`), never scrape the site.
