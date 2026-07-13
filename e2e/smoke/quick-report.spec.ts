@@ -46,7 +46,11 @@ test.describe("quick report page", () => {
       password: TEST_USERS.member.password,
     });
     await page.goto("/report");
-    await page.getByRole("link", { name: /quick report/i }).click();
+    // Target the in-page CTA specifically: the global header also has a "Quick
+    // report" nav link (aria-label), so /quick report/i alone is ambiguous.
+    await page
+      .getByRole("link", { name: /reporting several at once/i })
+      .click();
     await expect(page).toHaveURL(/\/report\/quick$/);
   });
 });
