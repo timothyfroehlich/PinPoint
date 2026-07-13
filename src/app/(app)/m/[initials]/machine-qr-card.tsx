@@ -19,8 +19,8 @@ interface MachineQrCardProps {
 /**
  * QR code card — the Service tab's printable sticker (design §4). Shows the
  * code inline (relocated off the Info tab's header/tools block) with Download
- * and copy/open-link actions. Horizontal layout (code + caption side by side)
- * so it stays compact in the 320px rail and on mobile alike.
+ * and copy-link actions. Horizontal layout (code + caption side by side) so it
+ * stays compact in the 320px rail and on mobile alike.
  */
 export function MachineQrCard({
   machineName,

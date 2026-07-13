@@ -39,16 +39,18 @@ export function MachinePresenceSelect({
   const [current, setCurrent] = useState<MachinePresenceStatus>(value);
   const [isPending, startTransition] = useTransition();
 
-  function handleChange(next: string): void {
-    const nextStatus = next as MachinePresenceStatus;
+  // Radix's `onValueChange` is typed `(value: string) => void`; narrowing the
+  // param to `MachinePresenceStatus` here is sound because every `SelectItem`
+  // value is drawn from `VALID_MACHINE_PRESENCE_STATUSES`, and the server action
+  // re-validates. Matches the codebase Select pattern (e.g. `StatusSelect`),
+  // avoiding an unsafe `as` cast (CORE-TS-007).
+  function handleChange(next: MachinePresenceStatus): void {
     const previous = current;
-    setCurrent(nextStatus);
+    setCurrent(next);
     startTransition(async () => {
-      const result = await updateMachinePresenceAction(machineId, nextStatus);
+      const result = await updateMachinePresenceAction(machineId, next);
       if (result.ok) {
-        toast.success(
-          `Availability set to ${getMachinePresenceLabel(nextStatus)}`
-        );
+        toast.success(`Availability set to ${getMachinePresenceLabel(next)}`);
       } else {
         setCurrent(previous);
         toast.error(result.message);
