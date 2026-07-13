@@ -85,6 +85,7 @@ function makeMachine(description: ProseMirrorDoc | null): Machine {
     pinballmapExcluded: false,
     pinballmapExcludedReason: null,
     pinballmapTitleName: null,
+    pinballmapListed: false,
     description,
   };
 }

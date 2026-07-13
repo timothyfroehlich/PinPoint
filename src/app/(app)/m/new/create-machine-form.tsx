@@ -5,8 +5,16 @@ import { useState, useRef, useEffect, startTransition } from "react";
 import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import {
   createMachineAction,
   type CreateMachineResult,
@@ -18,6 +26,17 @@ import {
   type OwnerSelectUser,
 } from "~/components/machines/OwnerSelect";
 import { PinballMapLinkField } from "~/components/machines/PinballMapLinkField";
+import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  VALID_MACHINE_PRESENCE_STATUSES,
+  getMachinePresenceLabel,
+} from "~/lib/machines/presence";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +71,9 @@ export function CreateMachineForm({
   const [ownerIdValue, setOwnerIdValue] = useState("");
   // Bumped on reset to remount OwnerSelect (which holds its own internal state).
   const [ownerSelectKey, setOwnerSelectKey] = useState(0);
+  const [descriptionDoc, setDescriptionDoc] = useState<ProseMirrorDoc | null>(
+    null
+  );
 
   // Promote dialog state — populated when server returns ASSIGNEE_NOT_MEMBER
   const [promoteAssignee, setPromoteAssignee] = useState<
@@ -75,6 +97,7 @@ export function CreateMachineForm({
     setInitialsValue("");
     setOwnerIdValue("");
     setOwnerSelectKey((k) => k + 1);
+    setDescriptionDoc(null);
   };
 
   // Open the promote dialog when server returns ASSIGNEE_NOT_MEMBER (once per state)
@@ -224,19 +247,15 @@ export function CreateMachineForm({
           />
         </div>
 
-        {/* Model — links the machine to its PinballMap catalog model/edition.
-            Sits right after the name: capturing the model is fundamental, not an
-            afterthought (bead B / PP-o355.2). */}
-        <PinballMapLinkField />
-
         {/* Machine Initials */}
         <div className="space-y-1.5">
           <Label htmlFor="initials" className="text-foreground">
-            Initials *
+            Initials{" "}
+            <span className="font-normal text-muted-foreground">
+              (cannot be changed later)
+            </span>{" "}
+            *
           </Label>
-          <p className="text-xs text-muted-foreground">
-            2–6 characters, permanent.
-          </p>
           <Input
             id="initials"
             name="initials"
@@ -265,6 +284,72 @@ export function CreateMachineForm({
             showHelpText={false}
           />
         )}
+
+        {/* Model — links the machine to its PinballMap catalog model/edition
+            (bead B / PP-o355.2). */}
+        <PinballMapLinkField />
+
+        {/* Description */}
+        <div className="space-y-1.5">
+          <Label className="text-foreground">Description</Label>
+          <RichTextEditor
+            content={null}
+            onChange={setDescriptionDoc}
+            mentionsEnabled={false}
+            placeholder="Add a description for this machine..."
+            ariaLabel="Machine description"
+            compact={false}
+            className="min-h-[120px]"
+          />
+          <input
+            type="hidden"
+            name="description"
+            value={descriptionDoc ? JSON.stringify(descriptionDoc) : ""}
+          />
+        </div>
+
+        {/* Availability */}
+        <div className="space-y-1.5">
+          <Label htmlFor="presence-status" className="text-foreground">
+            Availability
+          </Label>
+          <Select name="presenceStatus" defaultValue="on_the_floor">
+            <SelectTrigger
+              id="presence-status"
+              className="border-outline bg-surface text-foreground"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {VALID_MACHINE_PRESENCE_STATUSES.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {getMachinePresenceLabel(status)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* List on PinballMap — display-only until outbound sync
+            (PP-o355.11) exists; a new machine always starts unlisted. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-2">
+              <Checkbox id="pinballmap-listed" checked={false} disabled />
+              <input type="hidden" name="pinballmapListed" value="" />
+              <Label
+                htmlFor="pinballmap-listed"
+                className="text-muted-foreground"
+              >
+                List on PinballMap
+              </Label>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            Coming soon — PinPoint can&apos;t push listing changes to
+            PinballMap.com yet.
+          </TooltipContent>
+        </Tooltip>
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-2">

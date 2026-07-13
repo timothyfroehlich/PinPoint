@@ -396,19 +396,6 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
-        id: "pinballmap.sync",
-        label: "Sync PinballMap data",
-        description:
-          "Manually refresh the PinballMap location snapshot (listed status, comments, desync)",
-        access: {
-          unauthenticated: false,
-          guest: false,
-          member: false,
-          technician: true,
-          admin: true,
-        },
-      },
-      {
         id: "machines.settings.manage",
         label: "Manage machine settings",
         description:

@@ -12,12 +12,7 @@
 
 "use server";
 
-import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import {
   searchCatalogFamilies,
   listGroupEditions,
@@ -25,7 +20,6 @@ import {
   type CatalogEdition,
   type CatalogFamily,
 } from "~/lib/pinballmap/catalog";
-import { syncLocationSnapshot } from "~/lib/pinballmap/sync";
 
 export type { CatalogEdition, CatalogFamily } from "~/lib/pinballmap/catalog";
 
@@ -112,41 +106,4 @@ export async function resolvePinballMapLinkAction(
     editions: single ? [] : editions,
     pinballmapMachineId: entry.pinballmapMachineId,
   };
-}
-
-/** Result of a manual "Sync now" trigger. */
-export type SyncNowResult =
-  | { ok: true; machineCount: number }
-  | { ok: false; error: string };
-
-/**
- * Manually refresh the PinballMap location snapshot ("Sync now"). Gated by
- * `pinballmap.sync` (technician+). Pass the current machine's initials so a
- * no-JS form submit re-renders that machine's Info card with the fresh snapshot.
- */
-export async function syncPinballMapNowAction(
-  machineInitials?: string
-): Promise<SyncNowResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "You must be signed in." };
-
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-  if (!checkPermission("pinballmap.sync", getAccessLevel(profile?.role))) {
-    return {
-      ok: false,
-      error: "You don't have permission to sync PinballMap.",
-    };
-  }
-
-  const result = await syncLocationSnapshot({ updatedBy: user.id });
-  if (!result.ok) return { ok: false, error: result.error };
-
-  if (machineInitials) revalidatePath(`/m/${machineInitials}`);
-  return { ok: true, machineCount: result.machineCount };
 }

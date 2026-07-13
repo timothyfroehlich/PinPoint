@@ -9,8 +9,14 @@ import {
   startTransition,
 } from "react";
 import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -76,6 +82,8 @@ interface EditMachineDialogProps {
     pinballmapMachineId: number | null;
     pinballmapExcluded: boolean;
     pinballmapExcludedReason: string | null;
+    /** Whether the machine is marked listed on PinballMap's public map (bead C). */
+    pinballmapListed: boolean;
     /** Linked catalog title's display name, resolved server-side from the mirror. */
     pinballmapTitleName: string | null;
     /** Machine description (rich text), edited via the editor in this dialog. */
@@ -262,9 +270,6 @@ export function EditMachineDialog({
                 disabled
                 className="border-outline bg-surface-variant text-muted-foreground"
               />
-              <p className="text-xs text-muted-foreground">
-                Machine initials cannot be changed
-              </p>
             </div>
 
             {/* Machine Name */}
@@ -282,6 +287,39 @@ export function EditMachineDialog({
                 className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
               />
             </div>
+
+            {/* Machine Owner - show for admin/technician AND machine owner */}
+            {canEditAnyMachine || isOwner ? (
+              <OwnerSelectWithTracking
+                users={allUsers}
+                defaultValue={currentOwnerId}
+                onOwnerChange={setSelectedOwnerId}
+              />
+            ) : (
+              <div className="space-y-2" data-testid="owner-display">
+                <span className="text-sm font-semibold text-foreground">
+                  Machine Owner
+                </span>
+                <div className="rounded-md border border-outline bg-surface px-3 py-2">
+                  {machine.owner || machine.invitedOwner ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-foreground">
+                        {machine.owner?.name ?? machine.invitedOwner?.name}
+                      </span>
+                      {machine.invitedOwner && !machine.owner && (
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                          (Invited)
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">
+                      No owner assigned
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Model — PinballMap catalog model/edition, right after the name
                 (bead B / PP-o355.2). */}
@@ -343,37 +381,39 @@ export function EditMachineDialog({
               </Select>
             </div>
 
-            {/* Machine Owner - show for admin/technician AND machine owner */}
-            {canEditAnyMachine || isOwner ? (
-              <OwnerSelectWithTracking
-                users={allUsers}
-                defaultValue={currentOwnerId}
-                onOwnerChange={setSelectedOwnerId}
-              />
-            ) : (
-              <div className="space-y-2" data-testid="owner-display">
-                <span className="text-sm font-semibold text-foreground">
-                  Machine Owner
-                </span>
-                <div className="rounded-md border border-outline bg-surface px-3 py-2">
-                  {machine.owner || machine.invitedOwner ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-foreground">
-                        {machine.owner?.name ?? machine.invitedOwner?.name}
-                      </span>
-                      {machine.invitedOwner && !machine.owner && (
-                        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                          (Invited)
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">
-                      No owner assigned
-                    </span>
-                  )}
-                </div>
-              </div>
+            {/* List on PinballMap — display-only until outbound sync
+                (PP-o355.11) exists. Disabled rather than editable: with no
+                way to actually push a list/unlist to PinballMap.com yet,
+                letting someone flip this would just be lying to the card.
+                The hidden input always mirrors the persisted value (not
+                `listed`) so saving other fields never silently resets it. */}
+            {canLink && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="edit-pinballmap-listed"
+                      checked={machine.pinballmapListed}
+                      disabled
+                    />
+                    <input
+                      type="hidden"
+                      name="pinballmapListed"
+                      value={machine.pinballmapListed ? "on" : ""}
+                    />
+                    <Label
+                      htmlFor="edit-pinballmap-listed"
+                      className="text-muted-foreground"
+                    >
+                      List on PinballMap
+                    </Label>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Coming soon — PinPoint can&apos;t push listing changes to
+                  PinballMap.com yet.
+                </TooltipContent>
+              </Tooltip>
             )}
 
             <DialogFooter>
@@ -481,6 +521,7 @@ function OwnerSelectWithTracking({
       users={users}
       defaultValue={defaultValue}
       onValueChange={onOwnerChange}
+      showHelpText={false}
     />
   );
 }

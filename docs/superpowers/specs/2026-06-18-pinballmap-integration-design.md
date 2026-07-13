@@ -2,9 +2,28 @@
 
 **Date:** 2026-06-18
 **Status:** Approved — epic created
-**Epic:** PP-o355 (children PP-o355.1–.10 — see §6)
+**Epic:** PP-o355 (children PP-o355.1–.11 — see §6)
 **Branch:** `worktree-pinballmap`
 **Wireframes:** `docs/superpowers/specs/2026-06-07-pinballmap-wireframes.html` (PinPoint-styled, open in a browser)
+
+> **Revision — 2026-07-12 (Tim).** The "sync" architecture below was descoped to
+> ship value sooner; **the beads are now authoritative** where they diverge from
+> this record. Key changes:
+>
+> - **Three independent concepts, no hard link.** Catalog association (linking to
+>   a PBM title), **PBM listing** (a local `machines.pinballmapListed` boolean /
+>   what's actually on the map), and **availability** (`presence_status`) are
+>   separate. Do **not** derive "should be listed" from presence (retire
+>   `shouldBeListedOnPbm`). Availability↔listing mismatch is a _soft_ alert only.
+> - **Bead C split (PP-o355.3 → + PP-o355.11).** C is now just the local listing
+>   toggle (Edit-dialog checkbox) + the Info-tab status card (show the
+>   "View on PinballMap" link when listed, else nothing). The **automatic inbound
+>   snapshot sync + reconciliation** moved to new bead **PP-o355.11** (§3 "Sync
+>   semantics/mechanics", §4.3 "Sync flow" now describe PP-o355.11, not C). Its
+>   backend was built then reverted from #1659 — recover from commit `b6eb7dca`.
+> - **D / G / H / rollout** now depend on **PP-o355.11** for the snapshot. The
+>   **control room (G / PP-o355.7)** is kept but simplified and de-hard-linked
+>   from presence (desync = local listed-flag vs. PBM snapshot, both directions).
 
 ---
 

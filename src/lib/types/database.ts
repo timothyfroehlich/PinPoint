@@ -17,7 +17,6 @@ import type {
   issueWatchers,
   issueImages,
   pinballmapCatalog,
-  pinballmapState,
 } from "~/server/db/schema";
 
 // Enum types for type safety (import/define before using in Issue type)
@@ -69,6 +68,3 @@ export type PinballmapCatalogEntry = InferSelectModel<typeof pinballmapCatalog>;
 export type NewPinballmapCatalogEntry = InferInsertModel<
   typeof pinballmapCatalog
 >;
-
-// PinballMap integration state singleton (bead C / PP-o355.3)
-export type PinballmapState = InferSelectModel<typeof pinballmapState>;

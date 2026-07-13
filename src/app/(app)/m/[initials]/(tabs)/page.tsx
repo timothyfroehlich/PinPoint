@@ -24,8 +24,6 @@ import {
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
-import { getPinballMapState } from "~/lib/pinballmap/sync";
-import { isListedOnPbm } from "~/lib/pinballmap/status";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
@@ -124,9 +122,7 @@ export default async function MachineInfoTab({
 
   // These are independent of one another — resolve them concurrently rather than
   // serially so the QR-scan landing doesn't stack the linked-title lookup, the
-  // unified-user list, the QR PNG encode, and the PinballMap snapshot read
-  // back-to-back on the render path. The snapshot singleton feeds the Info-tab
-  // PinballMap status card below (PP-o355.3).
+  // unified-user list, and the QR PNG encode back-to-back on the render path.
   const pinballmapTitlePromise: Promise<string | null> =
     canLink && machine.pinballmapMachineId !== null
       ? db.query.pinballmapCatalog
@@ -142,13 +138,11 @@ export default async function MachineInfoTab({
   const allUsersPromise: Promise<Awaited<ReturnType<typeof getUnifiedUsers>>> =
     canEdit ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]);
 
-  const [pinballmapTitleName, allUsersRaw, qrDataUrl, pinballmapStateRow] =
-    await Promise.all([
-      pinballmapTitlePromise,
-      allUsersPromise,
-      generateQrPngDataUrl(reportUrl),
-      getPinballMapState(),
-    ]);
+  const [pinballmapTitleName, allUsersRaw, qrDataUrl] = await Promise.all([
+    pinballmapTitlePromise,
+    allUsersPromise,
+    generateQrPngDataUrl(reportUrl),
+  ]);
   const allUsers = allUsersRaw.map((u) => ({
     id: u.id,
     name: u.name,
@@ -189,6 +183,7 @@ export default async function MachineInfoTab({
           pinballmapMachineId: machine.pinballmapMachineId,
           pinballmapExcluded: machine.pinballmapExcluded,
           pinballmapExcludedReason: machine.pinballmapExcludedReason,
+          pinballmapListed: machine.pinballmapListed,
           pinballmapTitleName,
           description: machine.description,
         }}
@@ -202,20 +197,13 @@ export default async function MachineInfoTab({
     ) : null;
 
   // PinballMap card (PP-o355.3): show the public "View on PinballMap" link only
-  // for machines that are actually listed on our PBM location (present in the
-  // stored snapshot). Everything else — unlinked, or linked but not on the map —
-  // shows no card. Richer status UI (listing/desync/last comment) is deferred to
-  // a later pass alongside the broader machine-page work.
-  const pinballmapCard =
-    machine.pinballmapMachineId !== null &&
-    isListedOnPbm(
-      pinballmapStateRow?.snapshotJson ?? null,
-      machine.pinballmapMachineId
-    ) ? (
-      <MachinePinballmapCard
-        locationUrl={pinballmapLocationUrl(pinballmapStateRow?.locationId)}
-      />
-    ) : null;
+  // for machines we've marked as listed on PinballMap (the local
+  // `pinballmapListed` flag, toggled in the Edit dialog). Everything else shows
+  // no card. Richer status UI (desync alert, last comment) is deferred to a
+  // later pass alongside the inbound-sync feature.
+  const pinballmapCard = machine.pinballmapListed ? (
+    <MachinePinballmapCard locationUrl={pinballmapLocationUrl()} />
+  ) : null;
 
   const rail = (
     <InfoRail

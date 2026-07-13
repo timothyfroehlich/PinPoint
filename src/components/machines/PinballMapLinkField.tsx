@@ -1,14 +1,12 @@
 "use client";
 
 import React, { useEffect, useId, useState } from "react";
-import { ChevronsUpDown, X } from "lucide-react";
+import { ChevronsUpDown } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
-import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
@@ -86,7 +84,7 @@ export function PinballMapLinkField({
   defaultExcludedReason = null,
   disabled = false,
 }: PinballMapLinkFieldProps): React.JSX.Element {
-  const excludedId = useId();
+  const reasonId = useId();
   const triggerId = useId();
   const editionId = useId();
 
@@ -179,21 +177,15 @@ export function PinballMapLinkField({
     })();
   };
 
-  const handleClear = (): void => {
+  // Choosing "Not on PinballMap" from the Model dropdown. Mutually exclusive
+  // with a catalog link, and a machine that isn't on the map can't be listed.
+  const handlePickExcluded = (): void => {
+    setExcluded(true);
     setFamily(null);
     setEditions([]);
     setSelectedEditionId(null);
+    setOpen(false);
     setQuery("");
-  };
-
-  const handleExcludedChange = (checked: boolean): void => {
-    setExcluded(checked);
-    if (checked) {
-      // mutual exclusion
-      setFamily(null);
-      setEditions([]);
-      setSelectedEditionId(null);
-    }
   };
 
   // The edition step is shown only for an ambiguous (multi-edition) family.
@@ -229,12 +221,15 @@ export function PinballMapLinkField({
         />
       )}
 
-      <Label htmlFor={triggerId} className="text-foreground">
+      <Label
+        htmlFor={triggerId}
+        className="flex items-baseline gap-2 text-foreground"
+      >
         Model
+        <span className="text-xs font-normal text-muted-foreground">
+          source: PinballMap
+        </span>
       </Label>
-      <p className="text-xs text-muted-foreground">
-        From the PinballMap catalog.
-      </p>
 
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
@@ -244,16 +239,20 @@ export function PinballMapLinkField({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            disabled={disabled || excluded}
+            disabled={disabled}
             data-testid="pinballmap-link-select"
             className="w-full justify-between border-outline bg-surface text-foreground font-normal"
           >
             <span
-              className={family ? "text-foreground" : "text-muted-foreground"}
+              className={
+                family || excluded ? "text-foreground" : "text-muted-foreground"
+              }
             >
               {family
                 ? `${family.name}${familyMeta ? ` · ${familyMeta}` : ""}`
-                : placeholderLabel}
+                : excluded
+                  ? "Not on PinballMap"
+                  : placeholderLabel}
             </span>
             <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
           </Button>
@@ -277,47 +276,69 @@ export function PinballMapLinkField({
                 >
                   Searching…
                 </div>
-              ) : (
-                <>
-                  <CommandEmpty>
-                    {query.trim().length === 0
-                      ? "Type to search the catalog."
-                      : "No matching titles."}
-                  </CommandEmpty>
-                  {results.length > 0 && (
-                    <CommandGroup>
-                      {results.map((r) => {
-                        const meta = formatMeta(r.manufacturer, r.year);
-                        const key =
-                          r.machineGroupId !== null
-                            ? `g${r.machineGroupId}`
-                            : `m${r.pinballmapMachineId}`;
-                        return (
-                          <CommandItem
-                            key={key}
-                            value={key}
-                            onSelect={() => handlePickFamily(r)}
-                          >
-                            <div className="flex flex-col">
-                              <span>
-                                {r.name}
-                                {r.editionCount > 1 && (
-                                  <span className="ml-1.5 text-[10px] text-muted-foreground">
-                                    {r.editionCount} editions
-                                  </span>
-                                )}
+              ) : query.trim().length === 0 ? (
+                <div className="px-3 py-4 text-xs text-muted-foreground">
+                  Type a title to search PinballMap.
+                </div>
+              ) : results.length > 0 ? (
+                <CommandGroup>
+                  {results.map((r) => {
+                    const meta = formatMeta(r.manufacturer, r.year);
+                    const key =
+                      r.machineGroupId !== null
+                        ? `g${r.machineGroupId}`
+                        : `m${r.pinballmapMachineId}`;
+                    return (
+                      <CommandItem
+                        key={key}
+                        value={key}
+                        onSelect={() => handlePickFamily(r)}
+                      >
+                        <div className="flex flex-col">
+                          <span>
+                            {r.name}
+                            {r.editionCount > 1 && (
+                              <span className="ml-1.5 text-[10px] text-muted-foreground">
+                                {r.editionCount} editions
                               </span>
-                              {meta.length > 0 && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  {meta}
-                                </span>
-                              )}
-                            </div>
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
-                  )}
+                            )}
+                          </span>
+                          {meta.length > 0 && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {meta}
+                            </span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              ) : (
+                // Searched with no match → surface the "Not on PinballMap"
+                // fallback here (not before someone has looked), so the choice
+                // only appears once the catalog has actually come up empty.
+                <>
+                  <p className="px-3 pt-3 pb-1 text-xs text-muted-foreground">
+                    No PinballMap match for “{query.trim()}”.
+                  </p>
+                  <CommandGroup>
+                    <CommandItem
+                      value="__not_on_pinballmap__"
+                      onSelect={handlePickExcluded}
+                      data-testid="pinballmap-not-on-map"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium text-foreground">
+                          Not on PinballMap
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          PinballMap only maps standard pinball machines — pick
+                          this for novelty or non-pinball games it won&apos;t
+                          list.
+                        </span>
+                      </div>
+                    </CommandItem>
+                  </CommandGroup>
                 </>
               )}
             </CommandList>
@@ -325,13 +346,34 @@ export function PinballMapLinkField({
         </PopoverContent>
       </Popover>
 
-      {/* Edition step — only for an ambiguous (multi-edition) family. The select
-          IS the pinballmapMachineId field so `required` is enforced natively. */}
-      {needsEdition && !excluded && (
-        <div className="space-y-1.5">
-          <Label htmlFor={editionId} className="text-xs text-muted-foreground">
-            Edition <span className="text-destructive">*</span>
-          </Label>
+      {/* Edition / Reason — one always-present slot so the field never reflows.
+          It's the required edition picker for an ambiguous multi-edition family;
+          when the machine is marked Not on PinballMap it becomes the reason
+          input instead; otherwise it's a disabled slot with contextual text.
+          The select carries pinballmapMachineId natively when shown; otherwise
+          the hidden input above does. */}
+      <div className="space-y-1.5">
+        <Label
+          htmlFor={excluded ? reasonId : editionId}
+          className="text-xs text-muted-foreground"
+        >
+          {excluded ? "Reason (optional)" : "Edition"}
+          {needsEdition && !excluded && (
+            <span className="text-destructive"> *</span>
+          )}
+        </Label>
+        {excluded ? (
+          <Input
+            id={reasonId}
+            name="pinballmapExcludedReason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. novelty game, not real pinball"
+            maxLength={200}
+            disabled={disabled}
+            aria-label="Reason this machine is not on PinballMap"
+          />
+        ) : needsEdition ? (
           <Select
             name="pinballmapMachineId"
             required
@@ -373,53 +415,14 @@ export function PinballMapLinkField({
               })}
             </SelectContent>
           </Select>
-        </div>
-      )}
-
-      {family && !disabled && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleClear}
-          className="h-7 px-2 text-xs text-muted-foreground"
-        >
-          <X className="mr-1 size-3" />
-          Clear link
-        </Button>
-      )}
-
-      <div className="flex items-start gap-2 pt-1">
-        <Checkbox
-          id={excludedId}
-          checked={excluded}
-          disabled={disabled}
-          onCheckedChange={(checked) => handleExcludedChange(checked === true)}
-          className="mt-0.5 border-outline"
-        />
-        <div className="flex-1 space-y-2">
-          <label
-            htmlFor={excludedId}
-            className="cursor-pointer text-sm text-muted-foreground select-none"
+        ) : (
+          <div
+            data-testid="pinballmap-edition-placeholder"
+            className="flex h-9 w-full items-center rounded-md border border-outline bg-surface px-3 text-sm text-muted-foreground opacity-60"
           >
-            This machine is{" "}
-            <span className="font-medium text-foreground">
-              not on PinballMap
-            </span>{" "}
-            (e.g. not counted as pinball)
-          </label>
-          {excluded && (
-            <Input
-              name="pinballmapExcludedReason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="reason (optional)"
-              maxLength={200}
-              disabled={disabled}
-              aria-label="Reason this machine is not on PinballMap"
-            />
-          )}
-        </div>
+            {family ? "Only one edition" : "Pick a model first"}
+          </div>
+        )}
       </div>
     </div>
   );

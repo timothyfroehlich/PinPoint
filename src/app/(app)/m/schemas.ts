@@ -22,6 +22,10 @@ const pinballmapLinkFields = {
     .trim()
     .max(200, "Reason must be less than 200 characters")
     .optional(),
+  // Whether we consider the machine listed on PinballMap's public map (bead C /
+  // PP-o355.3). Only honored when the machine is linked (the server coerces it
+  // to false otherwise); decoupled from availability by design.
+  pinballmapListed: z.boolean().optional(),
 };
 
 /**
@@ -45,6 +49,7 @@ export const createMachineSchema = z.object({
     .regex(/^[A-Z0-9]+$/i, "Only letters and numbers allowed")
     .transform((val) => val.toUpperCase()),
   ownerId: z.string().uuid().optional(),
+  presenceStatus: z.enum(VALID_MACHINE_PRESENCE_STATUSES).optional(),
   forcePromoteUserId: z.string().uuid().optional(),
   ...pinballmapLinkFields,
 });

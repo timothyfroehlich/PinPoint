@@ -22,7 +22,6 @@ import { type TimelineEventData } from "~/lib/timeline/types";
 import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-types";
 import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
-import { type LocationSnapshot } from "~/lib/pinballmap/types";
 import { type SettingsSection } from "~/lib/machines/settings-types";
 
 /**
@@ -174,6 +173,13 @@ export const machines = pgTable(
     pinballmapMachineId: integer("pinballmap_machine_id"),
     pinballmapExcluded: boolean("pinballmap_excluded").notNull().default(false),
     pinballmapExcludedReason: text("pinballmap_excluded_reason"),
+    // Whether we consider this machine listed on PinballMap's public map (bead C
+    // / PP-o355.3). A local, manually-maintained boolean — the source of truth
+    // for "show the View-on-PinballMap link". Decoupled from presence/availability
+    // by design (no hard link). Listing presupposes a catalog link, enforced by
+    // the CHECK below. Reconciling this against PBM's actual snapshot is a later
+    // feature (inbound sync); pushing the change to PBM is bead E (outbound).
+    pinballmapListed: boolean("pinballmap_listed").notNull().default(false),
     manufacturer: text("manufacturer"),
     year: integer("year"),
     opdbId: text("opdb_id"),
@@ -189,6 +195,12 @@ export const machines = pgTable(
     pinballmapLinkExclusiveCheck: check(
       "machines_pinballmap_link_exclusive",
       sql`NOT (pinballmap_machine_id IS NOT NULL AND pinballmap_excluded)`
+    ),
+    // Can't be listed on PinballMap without a catalog link — you can only appear
+    // on the public map as a recognized title.
+    pinballmapListedRequiresLinkCheck: check(
+      "machines_pinballmap_listed_requires_link",
+      sql`NOT (pinballmap_listed AND pinballmap_machine_id IS NULL)`
     ),
     ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
     invitedOwnerIdIdx: index("idx_machines_invited_owner_id").on(
@@ -233,52 +245,6 @@ export const pinballmapCatalog = pgTable(
     groupIdx: index("idx_pinballmap_catalog_group").on(t.machineGroupId),
   })
 ).enableRLS();
-
-/**
- * PinballMap integration state (singleton; mirrors discordIntegrationConfig).
- *
- * One row holds the integration config (enabled, our PBM location id), the
- * latest location SNAPSHOT (the whole `LocationSnapshot` stored as JSON — every
- * downstream feature reads this, never the live API; bead C / PP-o355.3), sync
- * health, and the manually-seeded outbound operator creds (bead E). The raw PBM
- * token is never stored in a column — `outboundTokenVaultId` references
- * `vault.secrets.id`, like the Discord bot token.
- */
-export const pinballmapState = pgTable(
-  "pinballmap_state",
-  {
-    id: text("id").primaryKey().default("singleton"),
-    enabled: boolean("enabled").notNull().default(false),
-    // Austin Pinball Collective's PBM location (see APC_LOCATION_ID in config).
-    locationId: integer("location_id").notNull().default(26454),
-    // The whole LocationSnapshot from the last sync (raw PBM payload included).
-    // Typed via $type so reads come back as LocationSnapshot without a cast.
-    snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>(),
-    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
-    lastSyncStatus: text("last_sync_status", {
-      enum: ["unknown", "ok", "error"],
-    })
-      .notNull()
-      .default("unknown"),
-    lastSyncError: text("last_sync_error"),
-    // Outbound operator creds (bead E). Token lives in Supabase Vault; this is
-    // only the UUID reference to vault.secrets.id (no FK — cross-schema).
-    outboundEmail: text("outbound_email"),
-    outboundTokenVaultId: uuid("outbound_token_vault_id"),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    // UUID reference to auth.users.id — no FK (Drizzle cannot cross-schema).
-    updatedBy: uuid("updated_by"),
-  },
-  (_t) => ({
-    singletonCheck: check("pinballmap_state_singleton", sql`id = 'singleton'`),
-    syncStatusCheck: check(
-      "pinballmap_state_sync_status_check",
-      sql`last_sync_status IN ('unknown', 'ok', 'error')`
-    ),
-  })
-);
 
 /**
  * Issues Table
