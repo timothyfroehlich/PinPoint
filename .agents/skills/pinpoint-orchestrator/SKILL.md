@@ -183,8 +183,9 @@ mcp__github__pull_request_read(method: "get_review_comments", owner, repo, pullN
 **Infrastructure failures** — first log the flake, then rerun (see `docs/runbooks/gha-flake-log.md`):
 
 ```bash
-bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>" --rerun green
+bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"
 gh run rerun <run-id> --failed
+# (optionally re-run the helper with --rerun green|red once the rerun outcome is known)
 ```
 
 ### Label Ready PRs

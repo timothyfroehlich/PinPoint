@@ -128,10 +128,17 @@ if [[ -z "$symptom" ]]; then
   echo "error: <symptom> must not be empty" >&2
   usage
 fi
+if [[ "$symptom" == *$'\n'* || "$symptom" == *$'\r'* ]]; then
+  echo "error: <symptom> must be a single line (no newlines) — it becomes one greppable log line" >&2
+  usage
+fi
 
 # --- Resolve the ledger root by label (self-healing, never hardcoded) --------
+# `|| true` so a failing `bd list` (DB unreachable, bd missing) yields an empty
+# result and falls through to the friendly error below, instead of `set -e`
+# killing the script silently mid-pipeline.
 log_bead=$(bd list --label "$LOG_LABEL" --json 2>/dev/null \
-  | jq -r '.[0].id // empty')
+  | jq -r '.[0].id // empty' 2>/dev/null || true)
 if [[ -z "$log_bead" ]]; then
   echo "error: no bead found with label '$LOG_LABEL' — is the beads DB reachable?" >&2
   echo "       (the permanent ledger root must exist; see docs/runbooks/gha-flake-log.md)" >&2
@@ -147,9 +154,12 @@ week_title="GHA flakes ${week}"
 # Return the OLDEST open bead labeled gha-flake-week whose title matches exactly.
 # Choosing the oldest is what makes concurrent creators converge on one bead.
 find_week_bead() {
+  # `|| true` for the same reason as the root lookup: a `bd list` failure must
+  # not `set -e`-abort; it should yield empty so the caller can create or error.
   bd list --label "$WEEK_LABEL" --status open --json 2>/dev/null \
     | jq -r --arg t "$week_title" \
-        '[.[] | select(.title == $t)] | sort_by(.created_at) | .[0].id // empty'
+        '[.[] | select(.title == $t)] | sort_by(.created_at) | .[0].id // empty' \
+        2>/dev/null || true
 }
 
 week_bead=$(find_week_bead)
