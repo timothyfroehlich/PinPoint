@@ -104,9 +104,7 @@ describe("updateMachinePresenceAction (PP-5sgt.3)", () => {
 
     const events = await presenceEvents(machine.id);
     const presence = events.filter(
-      (e) =>
-        e.eventData !== null &&
-        (e.eventData as { kind?: string }).kind === "presence_changed"
+      (e) => e.eventData?.kind === "presence_changed"
     );
     expect(presence).toHaveLength(1);
     expect(presence[0]?.eventData).toMatchObject({
@@ -163,11 +161,7 @@ describe("updateMachinePresenceAction (PP-5sgt.3)", () => {
 
     const events = await presenceEvents(machine.id);
     expect(
-      events.filter(
-        (e) =>
-          e.eventData !== null &&
-          (e.eventData as { kind?: string }).kind === "presence_changed"
-      )
+      events.filter((e) => e.eventData?.kind === "presence_changed")
     ).toHaveLength(0);
   });
 

@@ -1547,6 +1547,14 @@ export async function updateMachinePresenceAction(
       );
     }
 
+    // No-op when the value is unchanged: skip the write entirely (no bumped
+    // `updatedAt`, no wasted write load, no timeline event). Radix's Select
+    // won't re-fire onValueChange for the current value, but a direct action
+    // call could, so guard here rather than rely on the client.
+    if (machine.presenceStatus === parsedPresence.data) {
+      return ok({ machineId: machine.id });
+    }
+
     // Atomic: update + lifecycle emit. `emitMachineUpdated` only emits a
     // `presence_changed` event when the value actually differs; name/owner are
     // passed unchanged so no spurious name/owner events fire.
