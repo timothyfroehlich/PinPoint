@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bulk Report — layout playground</title>
+<style>
+  :root {
+    --background: #0f0f11; --foreground: #f8fafc; --card: #18151b; --surface-low: #141217; --surface: #0f0f11;
+    --muted: #27272a; --muted-foreground: #a1a1aa; --border: #27272a; --outline: #3f3f46; --outline-variant: #52525b;
+    --primary: #4ade80; --secondary: #2dd4bf; --radius: 10px; --pad: 14px; --gap: 10px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font); }
+  body { padding: 24px 24px 120px; }
+  h1 { font-size: 20px; margin: 0 0 2px; }
+  .sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 18px; max-width: 940px; line-height: 1.5; }
+
+  .controls {
+    position: sticky; top: 0; z-index: 40; background: rgba(15,15,17,.86); backdrop-filter: blur(6px);
+    display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+    padding: 12px 14px; margin: 0 0 18px; border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .ctl { display: flex; flex-direction: column; gap: 4px; }
+  .ctl > span { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted-foreground); }
+  .seg { display: inline-flex; border: 1px solid var(--outline); border-radius: 8px; overflow: hidden; }
+  .seg button { appearance: none; border: 0; background: var(--card); color: var(--foreground); padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--outline); }
+  .seg button[aria-pressed="true"] { background: var(--primary); color: #022c22; font-weight: 600; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .board { background: var(--surface-low); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; }
+
+  .row { border: 1px solid var(--border); border-radius: var(--radius); padding: var(--pad); margin: 8px; position: relative; display: grid; gap: var(--gap); background: var(--card); }
+  .row:hover { border-color: var(--outline); }
+  .row.expanded { border-color: var(--outline-variant); }
+  .rownum { position: absolute; left: -8px; top: -8px; width: 22px; height: 22px; border-radius: 50%; background: var(--muted); color: var(--muted-foreground); font-size: 11px; font-weight: 600; display: grid; place-items: center; border: 1px solid var(--outline); z-index: 2; }
+
+  label.f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  label.f > span, .fieldlabel { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted-foreground); }
+  input, textarea, select { font: inherit; font-size: 14px; color: var(--foreground); border: 1px solid var(--outline); border-radius: 8px; background: var(--surface); padding: 8px 10px; width: 100%; min-width: 0; }
+  input::placeholder, textarea::placeholder { color: #6b7280; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid rgba(74,222,128,.25); border-color: var(--primary); }
+  textarea { resize: vertical; min-height: 40px; }
+  .machine { font-weight: 600; }
+  select { appearance: none; padding-right: 28px; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 9px center; }
+  select option { background: var(--card); color: var(--foreground); }
+
+  .toggle { appearance: none; border: 1px solid var(--outline); background: var(--surface); color: var(--muted-foreground); border-radius: 8px; height: 38px; cursor: pointer; font: inherit; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .toggle:hover { border-color: var(--outline-variant); color: var(--foreground); }
+  .toggle .chev { transition: transform .12s ease; display: inline-block; }
+  .toggle.more { padding: 0 14px; white-space: nowrap; }
+  .toggle.less { width: 38px; }
+  .row.expanded .toggle .chev { transform: rotate(180deg); }
+
+  /* per-row quick-submit */
+  .rowsubmit { appearance: none; border: 1px solid var(--primary); background: transparent; color: var(--primary); border-radius: 8px; height: 38px; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .rowsubmit:hover { background: rgba(74,222,128,.12); }
+
+  /* ---------- COLLAPSED ---------- */
+  .row:not(.expanded):not(.submitted) .line-machinemeta { display: grid; grid-template-columns: 250px 160px 150px 1fr auto; gap: var(--gap); align-items: end; }
+  .row:not(.expanded):not(.submitted) .line-machinemeta .spacer { display: block; }
+  .row:not(.expanded):not(.submitted) .line-title { display: grid; grid-template-columns: 1fr auto; gap: var(--gap); align-items: end; }
+  .row:not(.expanded) .line1-expanded, .row:not(.expanded) .meta-a, .row:not(.expanded) .meta-b, .row:not(.expanded) .desc { display: none; }
+
+  /* ---------- EXPANDED ---------- */
+  .row.expanded .line1-expanded { display: grid; grid-template-columns: 250px 1fr 38px; gap: var(--gap); align-items: end; }
+  .row.expanded .meta-a { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); align-items: end; }
+  .row.expanded .desc { display: block; }
+  .row.expanded .meta-b { display: grid; grid-template-columns: minmax(220px, 340px) auto 1fr; gap: 16px; align-items: end; }
+  .row.expanded .meta-b .rowsubmit { justify-self: end; }
+  .row.expanded .line-machinemeta, .row.expanded .line-title { display: none; }
+  .spacer { display: none; }
+
+  /* watch switch */
+  .switch { display: inline-flex; align-items: center; gap: 8px; height: 38px; cursor: pointer; white-space: nowrap; padding: 0 2px; }
+  .switch input { display: none; }
+  .track { width: 38px; height: 21px; border-radius: 999px; background: var(--outline); position: relative; transition: background .12s; flex: none; }
+  .track::after { content:""; position:absolute; top:2px; left:2px; width:17px; height:17px; border-radius:50%; background:#f8fafc; transition: transform .12s; }
+  .switch input:checked + .track { background: var(--primary); }
+  .switch input:checked + .track::after { transform: translateX(17px); }
+  .switch .tl { font-size: 13px; color: var(--muted-foreground); }
+  .switch input:checked ~ .tl { color: var(--foreground); }
+
+  /* submitted confirmation row */
+  .row.submitted { display: block; background: rgba(74,222,128,.06); border-color: rgba(74,222,128,.32); padding: 12px 14px; }
+  .donebar { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .donebar .check { width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #022c22; display: grid; place-items: center; font-size: 13px; font-weight: 800; flex: none; }
+  .donebar .mname { font-weight: 700; }
+  .donebar .dmuted { color: var(--muted-foreground); }
+  .donebar .undo { margin-left: auto; background: none; border: 0; color: var(--muted-foreground); cursor: pointer; font: inherit; font-size: 12px; text-decoration: underline; }
+  .donebar .undo:hover { color: var(--foreground); }
+
+  body.compact { --pad: 10px; --gap: 7px; }
+  body.compact input, body.compact textarea, body.compact select { padding: 6px 8px; font-size: 13px; }
+  body.compact select { padding-right: 26px; }
+  body.compact textarea { min-height: 32px; }
+  body.compact .toggle, body.compact .switch, body.compact .track, body.compact .rowsubmit { height: 32px; }
+
+  .addrow { margin: 8px; padding: 12px; width: calc(100% - 16px); border: 1px dashed var(--outline); border-radius: var(--radius); background: var(--surface); color: var(--primary); font: inherit; font-size: 14px; cursor: pointer; }
+  .addrow:hover { background: #131a14; }
+
+  .submitbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--card); border-top: 1px solid var(--outline); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .submitbar .count { font-size: 13px; color: var(--muted-foreground); }
+  .submitbar .count b { color: var(--foreground); }
+  .barbtns { display: flex; gap: 8px; }
+  .btn { appearance: none; border: 1px solid var(--outline); background: var(--surface); color: var(--foreground); font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 8px; cursor: pointer; }
+  .btn:hover { border-color: var(--outline-variant); }
+  .btn-primary { appearance: none; border: 0; background: var(--primary); color: #022c22; font: inherit; font-size: 14px; font-weight: 700; padding: 10px 18px; border-radius: 8px; cursor: pointer; }
+  .btn-primary:hover { filter: brightness(1.05); }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+  .hint { font-size: 12px; color: var(--muted-foreground); margin-left: 10px; }
+
+  .decision { max-width: 1180px; margin: 20px auto 0; background: #131019; color: #c9d1e0; border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; font-size: 13px; line-height: 1.55; }
+  .decision h3 { margin: 0 0 8px; color: #fff; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Bulk Report — layout playground</h1>
+  <p class="sub">Techs+ author a batch of issues, quick-submitting each as they go or submitting the rest at the end. Row reflows on expand. Expanded meta is now two lines (four classifiers, then assignee + watch), description last. No row-delete. Rows 3 &amp; 8 start expanded; row 2 shows the submitted state.</p>
+
+  <div class="controls">
+    <div class="ctl">
+      <span>Density</span>
+      <div class="seg" id="seg-density">
+        <button data-v="comfortable" aria-pressed="true">Comfortable</button>
+        <button data-v="compact" aria-pressed="false">Compact</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <span>View</span>
+      <div class="barbtns">
+        <button class="btn" id="expandall">Expand all</button>
+        <button class="btn" id="collapseall">Collapse all</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="board" id="board"></div>
+  <button class="addrow" id="addrow">+ Add issue</button>
+
+  <div class="decision">
+    <h3>Two submit paths</h3>
+    Each row has its own <b>Submit</b> (outline green) — quick-fire an issue the moment it's filled; it drops to a slim confirmation strip (✓ machine — problem · Created #NN, with Undo) and leaves the pending count. The bottom bar's <b>Submit all</b> creates every remaining row in one go. So a tech can trickle-submit while walking the list, or fill everything and submit once — either works.
+    <br><br>Open question I still owe you: what happens if <b>Submit all</b> hits one bad row (e.g. a machine that didn't resolve) — stop everything, or create the good ones and leave the bad rows in place flagged? Have a look at the layout first.
+  </div>
+</div>
+
+<div class="submitbar">
+  <div>
+    <span class="count"><b id="count">0</b> ready · <span id="done">0</span> submitted</span>
+    <span class="hint">Rate limit bypassed for techs+</span>
+  </div>
+  <div class="barbtns">
+    <button class="btn-primary" id="submit">Submit all</button>
+  </div>
+</div>
+
+<script>
+const MACHINES = ["Hokus Pokus","Grand Prix","Congo","Future Spa","Fathom","Jurassic Park (Home)","Torpedo Alley","Harlem Globetrotters","Medieval Madness","Attack from Mars","Twilight Zone","The Addams Family","Monster Bash","Cactus Canyon"];
+const STATUS = [["new","New"],["confirmed","Confirmed"],["in_progress","In Progress"],["need_parts","Need Parts"],["need_help","Need Help"],["wait_owner","Pending Owner"],["fixed","Fixed"],["wai","As Intended"],["wont_fix","Won't Fix"],["no_repro","No Repro"],["duplicate","Duplicate"]];
+const SEV = [["cosmetic","Cosmetic"],["minor","Minor"],["major","Major"],["unplayable","Unplayable"]];
+const PRI = [["low","Low"],["medium","Medium"],["high","High"]];
+const FRQ = [["intermittent","Intermittent"],["frequent","Frequent"],["constant","Constant"]];
+const PEOPLE = [["","Unassigned"],["tim","Tim Froehlich"],["alex","Alex Reyes"],["sam","Sam Patel"],["jordan","Jordan Kim"]];
+
+const SEED = [
+  {machine:"Hokus Pokus", title:"Not reading drained ball in trough (~half the time)", status:"new", sev:"major", pri:"medium", frq:"intermittent", assignee:"", watch:true, desc:"", open:false, submitted:false},
+  {machine:"Grand Prix", title:"Right spinner rejecting", status:"new", sev:"minor", pri:"medium", frq:"frequent", assignee:"", watch:true, desc:"", open:false, submitted:true, num:212},
+  {machine:"Congo", title:"Check scoop kick-outs + auto-fire once moved & level", status:"new", sev:"minor", pri:"low", frq:"intermittent", assignee:"alex", watch:true, desc:"Once it's been moved and levelled, need to re-check the scoop kick outs and the results of auto fire.", open:true, submitted:false},
+  {machine:"Future Spa", title:"Key broken off in back box — can't turn extra balls off", status:"new", sev:"major", pri:"high", frq:"constant", assignee:"", watch:true, desc:"", open:false, submitted:false},
+  {machine:"Fathom", title:"Right inlane bumps ball up, bricks the gate (~1/3)", status:"new", sev:"major", pri:"medium", frq:"intermittent", assignee:"", watch:true, desc:"Right inlane going into the gate bumps the ball up and then it bricks the gate about 1/3 of the time.", open:false, submitted:false},
+  {machine:"Jurassic Park (Home)", title:"Right flipper sticky", status:"new", sev:"major", pri:"medium", frq:"frequent", assignee:"", watch:true, desc:"", open:false, submitted:false},
+  {machine:"Future Spa", title:"Player 2 score — 100k digit not showing", status:"new", sev:"minor", pri:"medium", frq:"constant", assignee:"", watch:true, desc:"", open:false, submitted:false},
+  {machine:"Torpedo Alley", title:"Won't put ball in shooter lane to start game", status:"confirmed", sev:"unplayable", pri:"high", frq:"constant", assignee:"tim", watch:true, desc:"Not kicking out any ball to start the game. After a short time it fires a pop bumper, then declares the ball drained, counts bonus, and goes to ball 2 — but never puts a ball in the shooter lane.", open:true, submitted:false},
+  {machine:"Harlem Globetrotters", title:"Start button gets stuck", status:"new", sev:"major", pri:"medium", frq:"frequent", assignee:"", watch:true, desc:"", open:false, submitted:false},
+];
+let rows = SEED.map(r => ({...r}));
+let nextNum = 213;
+
+function esc(s){ return (s||"").replace(/"/g,'&quot;'); }
+function opts(list, val){ return list.map(([v,l])=>`<option value="${v}"${v===val?" selected":""}>${l}</option>`).join(""); }
+function personLabel(v){ const p=PEOPLE.find(x=>x[0]===v); return p?p[1]:"Unassigned"; }
+const machineField = (r)=>`<label class="f"><span>Machine</span><input class="machine" list="machinelist" value="${esc(r.machine)}" placeholder="Type to find…" /></label>`;
+const titleField   = (r)=>`<label class="f"><span>Problem (issue title)</span><input class="title" value="${esc(r.title)}" placeholder="What's wrong…" /></label>`;
+const sevField = (r)=>`<label class="f"><span>Severity</span><select>${opts(SEV,r.sev)}</select></label>`;
+const priField = (r)=>`<label class="f"><span>Priority</span><select>${opts(PRI,r.pri)}</select></label>`;
+const stField  = (r)=>`<label class="f"><span>Status</span><select>${opts(STATUS,r.status)}</select></label>`;
+const fqField  = (r)=>`<label class="f"><span>Frequency</span><select>${opts(FRQ,r.frq)}</select></label>`;
+const asField  = (r)=>`<label class="f"><span>Assignee</span><select>${opts(PEOPLE,r.assignee)}</select></label>`;
+const waField  = (r,i)=>`<div class="f"><span>&nbsp;</span><label class="switch"><input type="checkbox" ${r.watch?"checked":""} data-watch="1" data-i="${i}"/><span class="track"></span><span class="tl">Watch this issue</span></label></div>`;
+const submitBtn = ()=>`<button class="rowsubmit" data-submit="1">Submit ▸</button>`;
+
+function rowHTML(r, i){
+  if(r.submitted){
+    return `<div class="row submitted" data-i="${i}">
+      <div class="donebar">
+        <span class="check">✓</span>
+        <span><span class="mname">${esc(r.machine)}</span> — ${esc(r.title)}</span>
+        <span class="dmuted">· Created #${r.num}</span>
+        <button class="undo" data-undo="1">Undo</button>
+      </div>
+    </div>`;
+  }
+  return `
+  <div class="row${r.open?" expanded":""}" data-i="${i}">
+    <div class="rownum">${i+1}</div>
+
+    <!-- collapsed -->
+    <div class="line-machinemeta">
+      ${machineField(r)}
+      ${sevField(r)}
+      ${priField(r)}
+      <span class="spacer"></span>
+      <button class="toggle more" data-toggle="1"><span>More</span><span class="chev">▾</span></button>
+    </div>
+    <div class="line-title">${titleField(r)} ${submitBtn()}</div>
+
+    <!-- expanded -->
+    <div class="line1-expanded">
+      ${machineField(r)}
+      ${titleField(r)}
+      <button class="toggle less" data-toggle="1" title="Collapse"><span class="chev">▴</span></button>
+    </div>
+    <div class="meta-a">${sevField(r)} ${priField(r)} ${stField(r)} ${fqField(r)}</div>
+    <label class="f desc"><span>Description (optional)</span><textarea placeholder="Extra detail…">${r.desc||""}</textarea></label>
+    <div class="meta-b">${asField(r)} ${waField(r,i)} ${submitBtn()}</div>
+  </div>`;
+}
+
+function updateCounts(){
+  const ready = rows.filter(r=>!r.submitted && (r.machine||r.title)).length;
+  const done = rows.filter(r=>r.submitted).length;
+  document.getElementById("count").textContent = ready;
+  document.getElementById("done").textContent = done;
+  document.getElementById("submit").disabled = ready === 0;
+  document.getElementById("submit").textContent = ready ? `Submit all (${ready})` : "Submit all";
+}
+
+function render(){
+  const board = document.getElementById("board");
+  board.innerHTML = rows.map(rowHTML).join("");
+  updateCounts();
+  board.querySelectorAll(".row").forEach(el=>{
+    const i = +el.dataset.i;
+    el.querySelectorAll("[data-toggle]").forEach(t=> t.onclick = ()=>{ rows[i].open = !rows[i].open; render(); });
+    el.querySelectorAll("[data-watch]").forEach(w=> w.onchange = ()=>{ rows[i].watch = w.checked; });
+    el.querySelectorAll("[data-submit]").forEach(s=> s.onclick = ()=>{ rows[i].submitted = true; rows[i].num = nextNum++; rows[i].open = false; render(); });
+    el.querySelectorAll("[data-undo]").forEach(u=> u.onclick = ()=>{ rows[i].submitted = false; delete rows[i].num; render(); });
+  });
+}
+
+function seg(id, fn){
+  const box = document.getElementById(id);
+  box.querySelectorAll("button").forEach(b=> b.onclick = ()=>{
+    box.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed","false"));
+    b.setAttribute("aria-pressed","true"); fn(b.dataset.v);
+  });
+}
+seg("seg-density", v=> document.body.classList.toggle("compact", v==="compact"));
+
+document.getElementById("addrow").onclick = ()=>{ rows.push({machine:"",title:"",status:"new",sev:"minor",pri:"medium",frq:"intermittent",assignee:"",watch:true,desc:"",open:true,submitted:false}); render(); };
+document.getElementById("expandall").onclick = ()=>{ rows.forEach(r=>{ if(!r.submitted) r.open=true; }); render(); };
+document.getElementById("collapseall").onclick = ()=>{ rows.forEach(r=>r.open=false); render(); };
+document.getElementById("submit").onclick = ()=>{ rows.forEach(r=>{ if(!r.submitted && (r.machine||r.title)){ r.submitted=true; r.num=nextNum++; r.open=false; } }); render(); };
+
+render();
+</script>
+
+<datalist id="machinelist"></datalist>
+<script>document.getElementById("machinelist").innerHTML = MACHINES.map(m=>`<option value="${m}">`).join("");</script>
+</body>
+</html>
