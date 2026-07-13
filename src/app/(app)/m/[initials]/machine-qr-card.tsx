@@ -1,5 +1,5 @@
 import type React from "react";
-import { Download, ExternalLink, QrCode } from "lucide-react";
+import { Download, QrCode } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { CopyButton } from "~/components/ui/copy-button";
@@ -69,17 +69,6 @@ export function MachineQrCard({
               size="sm"
               aria-label="Copy report link"
             />
-            <Button
-              asChild
-              size="icon"
-              variant="ghost"
-              className="size-8 shrink-0"
-              aria-label="Open report link in a new tab"
-            >
-              <a href={reportUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="size-4" aria-hidden="true" />
-              </a>
-            </Button>
           </div>
         </div>
       </div>
