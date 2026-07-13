@@ -30,7 +30,8 @@ import {
 import type { BulkRowInput } from "./schemas";
 
 interface RowState {
-  key: string; // React key + idempotencyKey (uuid)
+  key: string; // React key (stable identity — never rotated)
+  idempotencyKey: string; // rotated on Undo so a re-edited resubmit isn't deduped
   machineId: string;
   title: string;
   description: string;
@@ -49,6 +50,7 @@ interface RowState {
 function blankRow(): RowState {
   return {
     key: crypto.randomUUID(),
+    idempotencyKey: crypto.randomUUID(),
     machineId: "",
     title: "",
     description: "",
@@ -76,7 +78,7 @@ function toInput(r: RowState): BulkRowInput {
     status: r.status,
     assignedTo: r.assignedTo,
     watch: r.watch,
-    idempotencyKey: r.key,
+    idempotencyKey: r.idempotencyKey,
   };
 }
 
@@ -155,7 +157,12 @@ export function BulkReportGrid({
             assignees={assignees}
             onPatch={(next) => patch(r.key, next)}
             onSubmit={() => submitOne(r)}
-            onUndo={() => patch(r.key, { submitted: null })}
+            onUndo={() =>
+              patch(r.key, {
+                submitted: null,
+                idempotencyKey: crypto.randomUUID(),
+              })
+            }
           />
         ))}
       </div>

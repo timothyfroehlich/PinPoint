@@ -70,6 +70,43 @@ describe("BulkReportGrid", () => {
     expect(await screen.findByText(/Created #42/)).toBeInTheDocument();
   });
 
+  it("rotates the idempotency key on undo so a re-edited resubmit isn't deduped", async () => {
+    submitRow
+      .mockResolvedValueOnce({
+        index: 0,
+        ok: true,
+        issueNumber: 42,
+        machineInitials: "GP",
+      })
+      .mockResolvedValueOnce({
+        index: 0,
+        ok: true,
+        issueNumber: 43,
+        machineInitials: "GP",
+      });
+    renderGrid();
+    const row = screen.getByTestId("bulk-row");
+    await userEvent.type(
+      within(row).getByLabelText(/problem/i),
+      "Spinner rejecting"
+    );
+    await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
+    expect(await screen.findByText(/Created #42/)).toBeInTheDocument();
+
+    await userEvent.click(within(row).getByRole("button", { name: /undo/i }));
+    await userEvent.type(
+      within(row).getByLabelText(/problem/i),
+      "Edited after undo"
+    );
+    await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
+    expect(await screen.findByText(/Created #43/)).toBeInTheDocument();
+
+    const [firstCall, secondCall] = submitRow.mock.calls;
+    expect(firstCall?.[0].idempotencyKey).not.toBe(
+      secondCall?.[0].idempotencyKey
+    );
+  });
+
   it("keeps a bad row flagged after submit-all partial failure", async () => {
     submitAll.mockResolvedValue({
       ok: true,
