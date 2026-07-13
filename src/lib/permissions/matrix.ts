@@ -62,11 +62,7 @@ export type PermissionValue = boolean | "own" | "owner" | "own_or_owner";
  * helpers.ts to convert a UserRole (or null) into an AccessLevel.
  */
 export type AccessLevel =
-  | "unauthenticated"
-  | "guest"
-  | "member"
-  | "technician"
-  | "admin";
+  "unauthenticated" | "guest" | "member" | "technician" | "admin";
 
 export const ACCESS_LEVELS = [
   "unauthenticated",
