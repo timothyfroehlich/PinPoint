@@ -585,3 +585,19 @@ describe("admin.integrations.manage permission", () => {
     ).toBe(false);
   });
 });
+
+describe("issues.report.bulk", () => {
+  it("is granted to technician and admin only", () => {
+    expect(checkPermission("issues.report.bulk", "technician")).toBe(true);
+    expect(checkPermission("issues.report.bulk", "admin")).toBe(true);
+    expect(checkPermission("issues.report.bulk", "member")).toBe(false);
+    expect(checkPermission("issues.report.bulk", "guest")).toBe(false);
+    expect(checkPermission("issues.report.bulk", "unauthenticated")).toBe(
+      false
+    );
+  });
+
+  it("is registered in PERMISSIONS_BY_ID", () => {
+    expect(PERMISSIONS_BY_ID["issues.report.bulk"]).toBeDefined();
+  });
+});

@@ -197,6 +197,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "issues.report.bulk",
+        label: "Bulk report issues",
+        description:
+          "Create many issues at once from the bulk report grid (/report/bulk)",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
         id: "issues.update.reporting",
         label: "Update issue details",
         description: "Change title, status, severity, or frequency",
