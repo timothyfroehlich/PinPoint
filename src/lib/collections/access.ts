@@ -16,6 +16,9 @@ export function canViewCollection(
   if (viewer.userId !== undefined && viewer.userId === collection.owner.id) {
     return true;
   }
+  // Wave 0a private-collection view invariant: admins may view any collection
+  // (spec §Wave 0a). This is a data-visibility rule, not a role-gated toggle.
+  // permissions-audit-allow: admin-may-view invariant
   return viewer.role === "admin";
 }
 
