@@ -8,6 +8,8 @@ import { test, expect } from "@playwright/test";
 import {
   assertNoHorizontalOverflow,
   assertNoA11yViolations,
+  selectMachine,
+  machineSelectValue,
 } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { TEST_USERS } from "../support/constants.js";
@@ -32,9 +34,7 @@ test.describe("Public Issue Reporting", () => {
       })
     ).toBeVisible();
 
-    const select = page.getByTestId("machine-select");
-    await expect(select).toBeVisible();
-    await select.selectOption({ index: 1 });
+    await selectMachine(page);
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
 
@@ -75,7 +75,7 @@ test.describe("Public Issue Reporting", () => {
     page,
   }) => {
     await page.goto("/report");
-    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await selectMachine(page);
     await expect(page).toHaveURL(/machine=/);
 
     const machineInitials = new URL(page.url()).searchParams.get("machine");
@@ -114,7 +114,7 @@ test.describe("Public Issue Reporting", () => {
     page,
   }) => {
     await page.goto("/report");
-    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await selectMachine(page);
     await expect(page).toHaveURL(/machine=/);
 
     const machineInitials = new URL(page.url()).searchParams.get("machine");
@@ -155,15 +155,15 @@ test.describe("Public Issue Reporting", () => {
   }) => {
     // Submit an issue first - select a machine (dropdown starts unselected)
     await page.goto("/report");
-    const select = page.getByTestId("machine-select");
+    const machineValue = machineSelectValue(page);
 
-    // Verify machine dropdown starts with no selection (empty value)
-    const initialMachineId = await select.inputValue();
+    // Verify machine picker starts with no selection (empty value)
+    const initialMachineId = await machineValue.inputValue();
     expect(initialMachineId).toBe(""); // Should be unselected by default
 
-    // Select a machine (use index 1 to select the first actual machine option)
-    await select.selectOption({ index: 1 });
-    const selectedMachineId = await select.inputValue();
+    // Select the first actual machine option
+    await selectMachine(page);
+    const selectedMachineId = await machineValue.inputValue();
     expect(selectedMachineId).toBeTruthy(); // Should have a valid selection now
     await expect(page).toHaveURL(/machine=/);
 
@@ -203,7 +203,7 @@ test.describe("Public Issue Reporting", () => {
 
     // Machine should be back to unselected state (empty), not the one we selected
     // This verifies draft wasn't restored - the form starts with no machine selected
-    const machineAfterReset = await select.inputValue();
+    const machineAfterReset = await machineValue.inputValue();
     expect(machineAfterReset).toBe(""); // Should be unselected again
     expect(machineAfterReset).not.toBe(selectedMachineId);
   });
