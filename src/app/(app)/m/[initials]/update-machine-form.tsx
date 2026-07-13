@@ -105,6 +105,12 @@ export function EditMachineDialog({
 }: EditMachineDialogProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
+  // Unsaved-changes guard: flips true on the first edit to any field, so an
+  // outside-click / Esc / close-button attempt asks before discarding. Reset
+  // each time the dialog opens. (Interim: a later pass folds this into the base
+  // Dialog component — PP-o355.14.)
+  const [isDirty, setIsDirty] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const transferConfirmedRef = useRef(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState(
@@ -163,6 +169,7 @@ export function EditMachineDialog({
       transferConfirmedRef.current = false;
       setPromoteAssignee(null);
       setIsPromoteOpen(false);
+      setIsDirty(false);
     }
   }, [open, currentOwnerId, machine.description]);
 
@@ -216,9 +223,28 @@ export function EditMachineDialog({
     setPromoteAssignee(null);
   };
 
+  // Intercept every close vector (outside click, Esc, the X button) through the
+  // single controlled onOpenChange. A successful save closes via setOpen(false)
+  // directly (bypassing this), and an in-flight submit shouldn't be interrupted,
+  // so both skip the guard. Otherwise, if the form is dirty, hold the dialog
+  // open and ask before discarding.
+  const handleOpenChange = (next: boolean): void => {
+    if (!next && isDirty && !isPending) {
+      setShowDiscardConfirm(true);
+      return;
+    }
+    setOpen(next);
+  };
+
+  const confirmDiscard = (): void => {
+    setShowDiscardConfirm(false);
+    setIsDirty(false);
+    setOpen(false);
+  };
+
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>
           <Button
             variant="outline"
@@ -260,6 +286,11 @@ export function EditMachineDialog({
             ref={formRef}
             action={formAction}
             onSubmit={handleSubmit}
+            // Any native input event (text fields + the contentEditable rich-text
+            // description) marks the form dirty for the unsaved-changes guard.
+            // Radix Select changes (owner/model/edition) don't bubble input, so
+            // the owner picker flags dirtiness explicitly below.
+            onInput={() => setIsDirty(true)}
             id="edit-machine-form"
             className="space-y-6"
           >
@@ -311,7 +342,10 @@ export function EditMachineDialog({
               <OwnerSelectWithTracking
                 users={allUsers}
                 defaultValue={currentOwnerId}
-                onOwnerChange={setSelectedOwnerId}
+                onOwnerChange={(id) => {
+                  setSelectedOwnerId(id);
+                  setIsDirty(true);
+                }}
               />
             ) : (
               <div className="space-y-2" data-testid="owner-display">
@@ -515,6 +549,30 @@ export function EditMachineDialog({
               onClick={handleConfirmTransfer}
             >
               Transfer Ownership
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unsaved-changes guard — shown when closing the edit dialog with a dirty
+          form. "Keep editing" leaves everything as-is; "Discard" drops the
+          in-progress edits and closes. */}
+      <AlertDialog
+        open={showDiscardConfirm}
+        onOpenChange={setShowDiscardConfirm}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You&apos;ve made changes to {machine.name} that haven&apos;t been
+              saved. Closing now will discard them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmDiscard}>
+              Discard changes
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
