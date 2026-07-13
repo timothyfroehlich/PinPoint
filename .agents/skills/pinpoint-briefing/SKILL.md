@@ -84,7 +84,7 @@ gh issue list --state open --limit 20 \
 
 User-reported bugs and feature requests. Cross-reference with beads — flag any not yet tracked.
 
-### Group G: Security Review Beads
+### Group E: Security Review Beads
 
 The Weekly Security Review routine (an AI/human security pass over the week's PRs) files its findings as **beads labeled `security`** — one bead per finding, carrying a severity and a recommendation. High-signal work that's already tracked. List the open ones:
 
