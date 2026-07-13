@@ -52,7 +52,7 @@ Pasting a fresh token into the admin form for every new worktree gets tedious. F
   - `DISCORD_BOT_TOKEN` — the bot token (required to seed anything)
   - `DISCORD_GUILD_ID` — the Server ID
   - `DISCORD_INVITE_LINK` — the non-expiring invite link
-- The seed step (`pnpm run db:_seed-discord`, run as part of the DB seed pipeline) copies these into the `discord_integration_config` row **only when it's still empty** — it creates a Vault secret for the token and fills `guild_id` / `invite_link` only if they're currently unset. It never overwrites a value an admin already saved through the UI.
+- The seed step (`pnpm run db:_seed-discord`, run as part of the DB seed pipeline) only acts when **no bot token is saved yet** — the whole step is skipped once the row has a token. On that first seed it creates a Vault secret for the token and, in the same write, fills `guild_id` / `invite_link` from env only where those columns are still null. It never overwrites a value an admin already saved. (Corollary: once a token exists, env vars won't backfill the Server ID or invite link later even if those columns are blank — set them in the admin form.)
 - **The database is the source of truth after that first seed.** Env vars are a bootstrap convenience, not a runtime override — once the row has a token, the app reads the DB and ignores these env vars. To change a seeded value later, edit it in the admin form (or clear the row and re-seed).
 
 Sign in with Discord (the OAuth login button, separate from the bot) is driven by `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` in `.env.local`, wired through `supabase/config.toml`.
