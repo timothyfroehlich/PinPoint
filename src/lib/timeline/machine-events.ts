@@ -48,8 +48,7 @@ type SystemSourceType = "lifecycle" | "issue";
  * (invited, not yet signed up) is set — the discriminated union enforces it.
  */
 export type TimelinePersonRef =
-  | { role: string; userId: string }
-  | { role: string; invitedId: string };
+  { role: string; userId: string } | { role: string; invitedId: string };
 
 /**
  * All valid values for `timeline_events.source_type`. Used as the column's

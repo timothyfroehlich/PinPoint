@@ -97,11 +97,7 @@ export interface PbmCredentials {
  * - `transient` — network error or 5xx; safe to retry later
  */
 export type PbmWriteFailureReason =
-  | "rate_limited"
-  | "unauthorized"
-  | "not_found"
-  | "rejected"
-  | "transient";
+  "rate_limited" | "unauthorized" | "not_found" | "rejected" | "transient";
 
 /** Shared failure shape; `message` carries PBM's own text when it supplied one. */
 export interface PbmWriteFailure {
@@ -122,15 +118,11 @@ export type PbmAddMachineResult = { ok: true; lmxId: number } | PbmWriteFailure;
  * differs. `null` means PBM returned no IC state for the lmx.
  */
 export type PbmToggleResult =
-  | { ok: true; icEnabled: boolean | null }
-  | PbmWriteFailure;
+  { ok: true; icEnabled: boolean | null } | PbmWriteFailure;
 
 /** Result of exchanging a login+password for an API token (bead F). */
 export type PbmAuthFailureReason =
-  | "invalid_credentials"
-  | "account_disabled"
-  | "rate_limited"
-  | "transient";
+  "invalid_credentials" | "account_disabled" | "rate_limited" | "transient";
 
 export interface PbmAuthFailure {
   ok: false;
@@ -139,8 +131,7 @@ export interface PbmAuthFailure {
 }
 
 export type PbmAuthResult =
-  | { ok: true; token: string; username: string }
-  | PbmAuthFailure;
+  { ok: true; token: string; username: string } | PbmAuthFailure;
 
 /**
  * The single seam wrapping all PBM HTTP. Live and mock implementations both

@@ -51,8 +51,9 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 4. **Changelog PR from the Weekly Review routine**
    - The consolidated Weekly Review cloud routine opens a changelog PR (`docs/changelog-<date>`) when user-facing PRs merged that week. Review and merge it via the normal PR workflow (or correct/supplement first).
 
-5. **Sentry + Supabase advisor checks**
-   - Run the Sentry error scan and the Supabase advisor checks that previously lived in the session-start briefing. Triage new issues into beads.
+5. **Sentry + Supabase advisor checks** (moved here from the session-start briefing)
+   - **Sentry — new production errors.** Requires the Sentry MCP OAuth handshake; if the query tools aren't registered, run `mcp__plugin_sentry_sentry__authenticate`, complete the browser login, then `/reload-plugins` (tool registration is a one-time handshake — completing OAuth alone won't expose the query tools). Then `mcp__plugin_sentry_sentry__find_organizations` → `mcp__plugin_sentry_sentry__search_issues` with `query: "is:unresolved firstSeen:>-7d"`. Flag high-event-count issues and new regressions; triage into beads.
+   - **Supabase advisors — prod** (`project_id` = `udhesuizjsgxfeotqybn`, PinPoint-Prod). Load the deferred tool first (`ToolSearch` query `select:mcp__plugin_supabase_supabase__get_advisors`), then call `mcp__plugin_supabase_supabase__get_advisors` twice: `type: "security"` (RLS gaps, exposed tables/functions, auth misconfig) and `type: "performance"` (unindexed FKs, RLS initplan re-evaluation, unused indexes). ERROR-level security lints are immediate-attention. **Known-intentional:** tables with RLS **enabled but zero policies** are the deliberate Drizzle-superuser-only pattern (migration 0034), not a regression — don't file them. If the MCP isn't connected, note the one-line skip and move on. File beads for genuine findings.
 
 6. **Review beads filed by the Weekly Review routine**
    - The consolidated Weekly Review cloud routine files beads for its security findings (`security` label) and its flaky-test report (`flaky-test` label). Review everything filed since the last chores session and act on / prioritize / decline each.

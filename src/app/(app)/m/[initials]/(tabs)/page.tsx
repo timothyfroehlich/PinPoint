@@ -1,19 +1,13 @@
 import type React from "react";
 import { notFound } from "next/navigation";
-import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
 import { deriveMachineStatus } from "~/lib/machines/status";
-import { resolveRequestUrl } from "~/lib/url";
-import { buildMachineReportUrl } from "~/lib/machines/report-url";
-import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { EditButtonWithTooltip } from "../edit-button-tooltip";
 import { EditMachineDialog } from "../update-machine-form";
-import { QrCodeDialog } from "../qr-code-dialog";
-import { MachineTextFields } from "../machine-text-fields";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { docIsEmpty } from "~/lib/tiptap/types";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
@@ -33,14 +27,12 @@ import { InfoRail } from "./info-rail";
  *
  * Reading order (both breakpoints): Hero (status + presence + Report button +
  * known-issues peek) → reference cluster (Details card: machine description +
- * owner, then Tags / PinballMap placeholders) → recent-activity peek →
- * maintainer tools. Desktop is a main column + 320px rail; mobile folds the
- * rail inline after the hero.
+ * owner, then Tags / PinballMap placeholders) → recent-activity peek. Desktop
+ * is a main column + 320px rail; mobile folds the rail inline after the hero.
  *
- * NOTE (PP-5sgt.3): the maintainer tools at the bottom — QR code and owner
- * requirements/notes — are kept here temporarily. The Service-tab rework
- * relocates both to the Service tab (the maintainer's workbench); remove this
- * block then. (Edit already moved into the Details card.)
+ * Maintainer/owner-private tools (QR code, Owner's Requirements) live on the
+ * Service tab (the maintainer's workbench, PP-5sgt.3) — not here. The player
+ * landing carries only player-facing content; Edit lives in the Details card.
  */
 export default async function MachineInfoTab({
   params,
@@ -91,10 +83,6 @@ export default async function MachineInfoTab({
     !!user &&
     (user.id === machine.ownerId || user.id === machine.invitedOwnerId);
 
-  const canViewOwnerRequirements = checkPermission(
-    "machines.view.ownerRequirements",
-    accessLevel
-  );
   const canCompose = checkPermission(
     "machines.timeline.comment.add",
     accessLevel
@@ -110,18 +98,8 @@ export default async function MachineInfoTab({
   );
   const machineStatus = deriveMachineStatus(openIssues);
 
-  const headersList = await headers();
-  const dynamicSiteUrl = resolveRequestUrl(headersList);
-  const reportUrl = buildMachineReportUrl({
-    siteUrl: dynamicSiteUrl,
-    machineInitials: machine.initials,
-    source: "qr",
-  });
-
-  // These three are independent of one another — resolve them concurrently
-  // rather than serially so the QR-scan landing doesn't stack a PinballMap
-  // lookup, the unified-user list, and the QR PNG encode back-to-back on the
-  // render path.
+  // Both reads are independent — resolve them concurrently so the QR-scan
+  // landing doesn't stack the PinballMap lookup and the unified-user list.
   const pinballmapTitlePromise: Promise<string | null> =
     canLink && machine.pinballmapMachineId !== null
       ? db.query.pinballmapCatalog
@@ -137,10 +115,9 @@ export default async function MachineInfoTab({
   const allUsersPromise: Promise<Awaited<ReturnType<typeof getUnifiedUsers>>> =
     canEdit ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]);
 
-  const [pinballmapTitleName, allUsersRaw, qrDataUrl] = await Promise.all([
+  const [pinballmapTitleName, allUsersRaw] = await Promise.all([
     pinballmapTitlePromise,
     allUsersPromise,
-    generateQrPngDataUrl(reportUrl),
   ]);
   const allUsers = allUsersRaw.map((u) => ({
     id: u.id,
@@ -150,8 +127,6 @@ export default async function MachineInfoTab({
     status: u.status,
     role: u.role,
   }));
-
-  const showOwnerFields = canViewOwnerRequirements;
 
   // Description renders read-only inside the Details card; editing happens in
   // the Edit Machine dialog (not inline). Gate on docIsEmpty rather than just
@@ -205,11 +180,11 @@ export default async function MachineInfoTab({
   );
 
   // Single grid in DOM reading order: Hero → reference rail (Details card:
-  // description + owner, then Tags / PinballMap) → recent activity → maintainer
-  // tools. On mobile it's one flex column (the rail folds inline after the
-  // hero). On desktop the rail is pinned to the 320px right column, spanning the
-  // main column's rows; everything else auto-flows down column 1. Rendered once
-  // so test ids stay unique.
+  // description + owner, then Tags / PinballMap) → recent activity. On mobile
+  // it's one flex column (the rail folds inline after the hero). On desktop the
+  // rail is pinned to the 320px right column, spanning the main column's rows;
+  // everything else auto-flows down column 1. Rendered once so test ids stay
+  // unique.
   return (
     <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-6">
       <InfoHero
@@ -231,36 +206,6 @@ export default async function MachineInfoTab({
         machineName={machine.name}
         canCompose={canCompose}
       />
-
-      {/* Maintainer tools. QR is shown to everyone (matching pre-redesign
-          behavior); owner requirements/notes are permission-gated. Edit moved
-          into the owner card. NOTE (PP-5sgt.3): owner requirements/notes
-          relocate to the Service tab; QR relocates there too. Remove this block
-          then. */}
-      <div className="space-y-4 border-t border-outline-variant pt-6">
-        {showOwnerFields && (
-          <MachineTextFields
-            machineId={machine.id}
-            // showDescription={false} → the description is never rendered here,
-            // so don't ship the ProseMirror doc across the RSC→client boundary
-            // (CORE-SEC-006 minimal client payload); it already crosses once via
-            // the Edit dialog where it's actually needed.
-            description={null}
-            ownerRequirements={machine.ownerRequirements}
-            canEditGeneral={canEdit}
-            canViewOwnerRequirements={canViewOwnerRequirements}
-            showDescription={false}
-          />
-        )}
-        <div className="flex flex-wrap gap-3">
-          <QrCodeDialog
-            machineName={machine.name}
-            machineInitials={machine.initials}
-            qrDataUrl={qrDataUrl}
-            reportUrl={reportUrl}
-          />
-        </div>
-      </div>
     </div>
   );
 }
