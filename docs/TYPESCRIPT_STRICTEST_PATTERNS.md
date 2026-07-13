@@ -100,8 +100,7 @@ const result = await fetchUser(userId);
 ```typescript
 // ✅ Discriminated unions
 type Result =
-  | { type: "success"; data: string }
-  | { type: "error"; message: string };
+  { type: "success"; data: string } | { type: "error"; message: string };
 
 function processResult(result: Result) {
   if (result.type === "success") {

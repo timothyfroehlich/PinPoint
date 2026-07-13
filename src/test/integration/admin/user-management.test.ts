@@ -134,7 +134,9 @@ describe("Admin User Management Integration", () => {
 
   it("should prevent non-admin from changing roles", async () => {
     // Reset Target User to Member (it was made admin in first test)
-    await (await getTestDb())
+    await (
+      await getTestDb()
+    )
       .update(userProfiles)
       .set({ role: "member" })
       .where(eq(userProfiles.id, targetUser!.id));

@@ -39,12 +39,7 @@ export interface CollectionOverviewRow {
 }
 
 type ColumnKey =
-  | "machine"
-  | "status"
-  | "open"
-  | "oldest"
-  | "activity"
-  | "presence";
+  "machine" | "status" | "open" | "oldest" | "activity" | "presence";
 
 const HIDEABLE: readonly ColumnKey[] = [
   "open",

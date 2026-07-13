@@ -102,8 +102,7 @@ function isUserProfile(profile: unknown): profile is UserProfile {
 
 // ✅ Type guard for discriminated unions
 type Result =
-  | { type: "success"; data: string }
-  | { type: "error"; message: string };
+  { type: "success"; data: string } | { type: "error"; message: string };
 
 function processResult(result: Result) {
   if (result.type === "success") {
