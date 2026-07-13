@@ -1,8 +1,7 @@
 import { bulkRowSchema, type BulkRowInput } from "./schemas";
 
 export type ParsedBulkRow =
-  | { success: true; data: BulkRowInput }
-  | { success: false; error: string };
+  { success: true; data: BulkRowInput } | { success: false; error: string };
 
 /**
  * Validate one bulk row. Pure so it can be unit-tested and reused by the

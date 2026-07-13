@@ -246,8 +246,7 @@ Create `src/app/(app)/report/bulk/validation.ts`:
 import { bulkRowSchema, type BulkRowInput } from "./schemas";
 
 export type ParsedBulkRow =
-  | { success: true; data: BulkRowInput }
-  | { success: false; error: string };
+  { success: true; data: BulkRowInput } | { success: false; error: string };
 
 /**
  * Validate one bulk row. Pure so it can be unit-tested and reused by the
@@ -516,8 +515,7 @@ export type BulkRowResult =
   | { index: number; ok: false; error: string };
 
 export type BulkSubmitResponse =
-  | { ok: true; results: BulkRowResult[] }
-  | { ok: false; error: string };
+  { ok: true; results: BulkRowResult[] } | { ok: false; error: string };
 
 /** Resolve the current user's technician+ access, or null if not permitted. */
 async function requireBulkReporter(): Promise<{ userId: string } | null> {

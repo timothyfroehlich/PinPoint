@@ -21,8 +21,7 @@ export type BulkRowResult =
   | { index: number; ok: false; error: string };
 
 export type BulkSubmitResponse =
-  | { ok: true; results: BulkRowResult[] }
-  | { ok: false; error: string };
+  { ok: true; results: BulkRowResult[] } | { ok: false; error: string };
 
 /** Resolve the current user's technician+ access, or null if not permitted. */
 async function requireBulkReporter(): Promise<{ userId: string } | null> {
