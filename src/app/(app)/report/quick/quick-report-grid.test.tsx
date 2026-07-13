@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { QuickReportGrid } from "./quick-report-grid";
@@ -163,5 +163,70 @@ describe("QuickReportGrid", () => {
     await userEvent.click(screen.getByRole("button", { name: /submit all/i }));
     expect(await screen.findByText(/Machine not found/)).toBeInTheDocument();
     expect(screen.getByDisplayValue("No machine picked")).toBeInTheDocument();
+  });
+
+  it("recovers from a thrown submit action instead of hanging", async () => {
+    submitRow.mockRejectedValue(new Error("network down"));
+    renderGrid();
+    const row = screen.getByTestId("quick-row");
+    await userEvent.type(
+      within(row).getByLabelText(/problem/i),
+      "Spinner rejecting"
+    );
+    await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
+    expect(
+      await screen.findByText(/something went wrong/i)
+    ).toBeInTheDocument();
+    // Spinner cleared — the row is retryable, not stuck on "Submitting…".
+    expect(
+      within(row).getByRole("button", { name: /^submit$/i })
+    ).not.toBeDisabled();
+  });
+
+  it("quick-submits the row when Enter is pressed in the problem field", async () => {
+    submitRow.mockResolvedValue({
+      index: 0,
+      ok: true,
+      issueNumber: 42,
+      machineInitials: "GP",
+    });
+    renderGrid();
+    const row = screen.getByTestId("quick-row");
+    await userEvent.click(
+      within(row).getByRole("combobox", { name: /machine/i })
+    );
+    await userEvent.click(screen.getByText(/Grand Prix/));
+    await userEvent.type(
+      within(row).getByLabelText(/problem/i),
+      "Spinner rejecting{Enter}"
+    );
+    expect(
+      await screen.findByRole("link", { name: "GP-42" })
+    ).toBeInTheDocument();
+  });
+
+  it("confirms before discarding a row that has content, then removes it", async () => {
+    renderGrid();
+    const firstRow = screen.getByTestId("quick-row");
+    await userEvent.type(
+      within(firstRow).getByLabelText(/problem/i),
+      "First problem"
+    );
+    await userEvent.click(screen.getByRole("button", { name: /add issue/i }));
+    expect(screen.getAllByTestId("quick-row")).toHaveLength(2);
+
+    const rowToDiscard = screen.getAllByTestId("quick-row")[0];
+    await userEvent.click(
+      within(rowToDiscard).getByRole("button", { name: /discard/i })
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Discard" })
+    );
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId("quick-row")).toHaveLength(1)
+    );
+    expect(screen.queryByDisplayValue("First problem")).not.toBeInTheDocument();
   });
 });

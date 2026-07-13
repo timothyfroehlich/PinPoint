@@ -50,25 +50,39 @@ text parsing.
 ## Layout (settled in prototype)
 
 A vertical list of issue rows on the PinPoint dark theme, using the real form
-controls (native selects, not badges). Each row **reflows** between two states:
+controls (native selects, not badges). Each row **reflows** between two states.
 
-**Collapsed (2 lines)** — the fast-triage view:
+The **collapsed** state is itself responsive — driven by the row's own width
+via a container query (CORE-RESP: component-internal reflow), not the viewport:
+
+**Collapsed, wide row (2 lines)** — the desktop fast-triage view:
 
 - Line 1: `Machine` · `Severity` · `Priority` · **More ▾**
-- Line 2: `Problem (issue title)` · **Submit ▸**
+- Line 2: `Problem (issue title)` · **Discard** · **Submit ▸**
 
-**Expanded (4 lines)** — the full form:
+**Collapsed, narrow row (3 lines)** — the mobile view:
 
-- Line 1: `Machine` · `Problem (issue title)` · **▴** (collapse)
-- Line 2: `Severity` · `Priority` · `Status` · `Frequency`
-- Line 3: `Description`
-- Line 4: `Assignee` · `Watch` · **Submit ▸**
+- Line 1: `Machine` · `Severity` · `Priority`
+- Line 2: `Problem (issue title)`
+- Line 3: **More ▾** · **Discard** · **Submit ▸**
+
+In the narrow view the `Machine` control shows the selected machine's **initials**
+(e.g. `GP`) to stay compact alongside severity and priority; it expands to the
+full `Name (INITIALS)` once the row is wide enough.
+
+**Expanded (full form):**
+
+- `Machine` · **▴** (collapse)
+- `Problem (issue title)`
+- `Severity` · `Priority` · `Status` · `Frequency`
+- `Description`
+- `Assignee` · `Watch` · **Discard** · **Submit ▸**
 
 Notes:
 
-- The **More ▾ / ▴** toggle lives at the end of line 1 in both states, so it stays put
-  as the row reflows. Collapsed leads with machine + severity + priority so a screen of
-  rows scans as "which machine, how bad, what."
+- Collapsed leads with machine + severity + priority so a screen of
+  rows scans as "which machine, how bad, what." Severity precedes Priority
+  everywhere, matching the single-report form.
 - **Machine** is a searchable select that resolves to a real `machineId` (same model as
   the single-report form) — **not** free text. This makes "unresolved machine" nearly
   impossible; a "bad row" is just a missing machine or empty problem.
@@ -77,8 +91,14 @@ Notes:
   the badge/label vocabulary with `STATUS/SEVERITY/PRIORITY/FREQUENCY_CONFIG`.
 - Two view controls at the page level: **density** (comfortable/compact) and
   **Expand all / Collapse all**. (Density can be deferred if it complicates v1.)
-- No per-row delete control. Unwanted rows are simply left un-submitted; an empty row is
-  ignored by submit.
+- Each row has a **Discard** control. An empty row discards immediately; a row with
+  typed content asks for confirmation first (typed data is never dropped silently).
+  Discarding the last remaining row resets it to a fresh blank row. An un-submitted
+  empty row is otherwise ignored by submit.
+- **Navigation guard:** while any un-submitted row has content, a `beforeunload`
+  guard warns before an accidental back/close would lose the batch.
+- **Keyboard:** `Enter` in the Problem field quick-submits a ready row; after any
+  submit, focus advances to the next blank row's machine picker.
 
 ### Defaults per new row
 
@@ -93,8 +113,9 @@ watcher setup, notifications, and idempotency all come for free):
 
 1. **Per-row quick-submit** — the row's **Submit ▸** creates that single issue
    immediately. On success the row collapses to a slim confirmation strip
-   (✓ machine — problem · Created #NN) with an **Undo** affordance, and the pending
-   count drops. This supports the "trickle-submit while walking the list" workflow.
+   (✓ `Created <id> for <machine> - <title>`, where `<id>` links to the new issue)
+   with an **Undo** affordance, and the pending count drops. This supports the
+   "trickle-submit while walking the list" workflow.
 2. **Submit all** — the bottom bar creates every remaining ready row in one pass
    (iterating `createIssue`, **not** a single DB transaction).
 

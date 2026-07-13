@@ -9,7 +9,18 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/components/ui/alert-dialog";
 import {
   MachineCombobox,
   type MachineOption,
@@ -84,6 +95,12 @@ function toInput(r: RowState): QuickRowInput {
   };
 }
 
+/** A row worth warning about / confirming before discard: unsubmitted and has
+ *  some typed content. */
+function rowHasContent(r: RowState): boolean {
+  return Boolean(r.machineId || r.title || r.description);
+}
+
 interface QuickReportGridProps {
   machines: MachineOption[];
   assignees: { id: string; name: string | null }[];
@@ -94,6 +111,7 @@ export function QuickReportGrid({
   assignees,
 }: QuickReportGridProps): React.JSX.Element {
   const [rows, setRows] = React.useState<RowState[]>(() => [blankRow()]);
+  const [focusPending, setFocusPending] = React.useState(false);
 
   const patch = (key: string, next: Partial<RowState>): void =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...next } : r)));
@@ -125,12 +143,50 @@ export function QuickReportGrid({
     return hasBlank ? rs : [...rs, blankRow()];
   }
 
+  // Discard a row; never leave the grid empty.
+  const discardRow = (key: string): void =>
+    setRows((rs) => {
+      const next = rs.filter((r) => r.key !== key);
+      return next.length > 0 ? next : [blankRow()];
+    });
+
+  // After a submit, advance focus to the next blank row's machine picker so
+  // keyboard authoring can continue (machine → problem → submit → next). Keyed
+  // off state (not autoFocus-on-mount) so it also fires when the trailing blank
+  // already existed and no new row mounted.
+  React.useEffect(() => {
+    if (!focusPending) return;
+    setFocusPending(false);
+    const target = rows.find((r) => !r.submitted && !r.machineId && !r.title);
+    if (!target) return;
+    document
+      .querySelector<HTMLElement>(`[data-testid="machine-${target.key}"]`)
+      ?.focus();
+  }, [focusPending, rows]);
+
+  // Warn before leaving with unsubmitted work — a screenful of rows is easy to
+  // lose to an accidental back/close. Matches the app's other beforeunload
+  // guards (e.g. the machine timeline composer).
+  const hasUnsaved = rows.some((r) => !r.submitted && rowHasContent(r));
+  React.useEffect(() => {
+    if (!hasUnsaved) return;
+    const handler = (e: BeforeUnloadEvent): void => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsaved]);
+
   async function submitOne(row: RowState): Promise<void> {
     patch(row.key, { submitting: true, error: null });
     try {
       const res = await submitQuickIssueRowAction(toInput(row));
       applyResult(row.key, res);
-      if (res.ok) setRows(ensureTrailingBlankRow);
+      if (res.ok) {
+        setRows(ensureTrailingBlankRow);
+        setFocusPending(true);
+      }
     } catch {
       // A thrown/failed action (auth blip, network drop, server 500) rejects
       // here — clear the spinner and surface a retryable error rather than
@@ -171,29 +227,35 @@ export function QuickReportGrid({
         if (target) applyResult(target.key, result);
       });
       setRows(ensureTrailingBlankRow);
+      setFocusPending(true);
     } catch {
       flagReady("Something went wrong submitting — try again.");
     }
   }
 
+  const submittedCount = rows.filter((r) => r.submitted).length;
+
   return (
     <div data-testid="quick-report-grid">
-      {rows.map((r) => (
-        <QuickRow
-          key={r.key}
-          row={r}
-          machines={machines}
-          assignees={assignees}
-          onPatch={(next) => patch(r.key, next)}
-          onSubmit={() => submitOne(r)}
-          onUndo={() =>
-            patch(r.key, {
-              submitted: null,
-              idempotencyKey: crypto.randomUUID(),
-            })
-          }
-        />
-      ))}
+      <div className="space-y-2">
+        {rows.map((r) => (
+          <QuickRow
+            key={r.key}
+            row={r}
+            machines={machines}
+            assignees={assignees}
+            onPatch={(next) => patch(r.key, next)}
+            onSubmit={() => submitOne(r)}
+            onUndo={() =>
+              patch(r.key, {
+                submitted: null,
+                idempotencyKey: crypto.randomUUID(),
+              })
+            }
+            onDiscard={() => discardRow(r.key)}
+          />
+        ))}
+      </div>
 
       <button
         type="button"
@@ -206,7 +268,7 @@ export function QuickReportGrid({
       <div className="sticky bottom-0 mt-4 flex items-center justify-between rounded-xl border border-outline-variant bg-card p-3">
         <p className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{readyCount}</span>{" "}
-          ready · {rows.filter((r) => r.submitted).length} submitted
+          ready · {submittedCount} submitted
         </p>
         <Button type="button" onClick={submitAll} disabled={readyCount === 0}>
           {readyCount ? `Submit all (${readyCount})` : "Submit all"}
@@ -223,6 +285,7 @@ interface QuickRowProps {
   onPatch: (next: Partial<RowState>) => void;
   onSubmit: () => void;
   onUndo: () => void;
+  onDiscard: () => void;
 }
 
 function QuickRow({
@@ -232,6 +295,7 @@ function QuickRow({
   onPatch,
   onSubmit,
   onUndo,
+  onDiscard,
 }: QuickRowProps): React.JSX.Element {
   if (row.submitted) {
     const { issueNumber, machineInitials } = row.submitted;
@@ -240,7 +304,7 @@ function QuickRow({
     return (
       <div
         data-testid="quick-row"
-        className="m-2 rounded-xl border border-primary/30 bg-primary/5 p-3"
+        className="rounded-xl border border-primary/30 bg-primary/5 p-3"
       >
         <div className="flex items-center gap-2 text-sm">
           <span className="grid size-5 place-items-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
@@ -269,7 +333,29 @@ function QuickRow({
     );
   }
 
-  const submitBtn = (
+  const ready = Boolean(row.machineId && row.title);
+  const onProblemKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+    // Enter on the problem field quick-submits the row (fast keyboard path),
+    // but only once it's actually submittable — otherwise a stray Enter fires
+    // a doomed server round-trip.
+    if (e.key === "Enter" && !e.shiftKey && ready && !row.submitting) {
+      e.preventDefault();
+      onSubmit();
+    }
+  };
+
+  const machineField = (
+    <MachineCombobox
+      machines={machines}
+      value={row.machineId}
+      onValueChange={(id) => onPatch({ machineId: id })}
+      ariaLabel="Machine"
+      triggerTestId={`machine-${row.key}`}
+      responsiveInitials
+    />
+  );
+
+  const submitButton = (
     <Button
       type="button"
       variant="outline"
@@ -281,74 +367,76 @@ function QuickRow({
     </Button>
   );
 
+  const discardButton = (
+    <DiscardButton dirty={rowHasContent(row)} onDiscard={onDiscard} />
+  );
+
   return (
     <div
       data-testid="quick-row"
       className={cn(
-        "m-2 rounded-xl border p-3",
+        "@container rounded-xl border p-3",
         row.error ? "border-destructive" : "border-outline-variant",
         "bg-card"
       )}
     >
       {!row.open ? (
-        <div className="grid gap-2.5">
-          <div className="grid grid-cols-[minmax(0,1fr)_170px_150px_auto] items-end gap-2.5">
-            <Field label="Machine" required>
-              <MachineCombobox
-                machines={machines}
-                value={row.machineId}
-                onValueChange={(id) => onPatch({ machineId: id })}
-              />
-            </Field>
-            <Field label="Severity">
-              <SeveritySelect
-                value={row.severity}
-                onValueChange={(v) => onPatch({ severity: v })}
-              />
-            </Field>
-            <Field label="Priority">
-              <PrioritySelect
-                value={row.priority}
-                onValueChange={(v) => onPatch({ priority: v })}
-              />
-            </Field>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onPatch({ open: true })}
-            >
-              More <ChevronDown className="ml-1 size-4" />
-            </Button>
-          </div>
-          <div className="grid grid-cols-[1fr_auto] items-end gap-2.5">
-            <Field label="Problem (issue title)" required>
-              <Input
-                value={row.title}
-                onChange={(e) => onPatch({ title: e.target.value })}
-                placeholder="What's wrong…"
-                maxLength={60}
-              />
-            </Field>
-            {submitBtn}
+        // Collapsed: a single grid that reflows via the row's container width —
+        // 3 lines when narrow (machine·sev·pri / problem / more·discard·submit),
+        // 2 lines when wide (…·more / problem·discard·submit). See globals.css.
+        <div className="quick-collapsed">
+          <Field label="Machine" required area="machine">
+            {machineField}
+          </Field>
+          <Field label="Severity" area="severity">
+            <SeveritySelect
+              value={row.severity}
+              onValueChange={(v) => onPatch({ severity: v })}
+            />
+          </Field>
+          <Field label="Priority" area="priority">
+            <PrioritySelect
+              value={row.priority}
+              onValueChange={(v) => onPatch({ priority: v })}
+            />
+          </Field>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onPatch({ open: true })}
+            style={{ gridArea: "more" }}
+            className="w-full @[640px]:w-auto @[640px]:justify-self-end"
+          >
+            More <ChevronDown className="ml-1 size-4" />
+          </Button>
+          <Field label="Problem (issue title)" required area="problem">
+            <Input
+              value={row.title}
+              onChange={(e) => onPatch({ title: e.target.value })}
+              onKeyDown={onProblemKeyDown}
+              placeholder="What's wrong…"
+              maxLength={60}
+              enterKeyHint="send"
+            />
+          </Field>
+          <DiscardButton
+            dirty={rowHasContent(row)}
+            onDiscard={onDiscard}
+            style={{ gridArea: "discard" }}
+            className="w-full @[640px]:w-auto @[640px]:justify-self-end"
+          />
+          <div
+            style={{ gridArea: "submit" }}
+            className="w-full @[640px]:w-auto @[640px]:justify-self-end [&>button]:w-full @[640px]:[&>button]:w-auto"
+          >
+            {submitButton}
           </div>
         </div>
       ) : (
         <div className="grid gap-2.5">
-          <div className="grid grid-cols-[minmax(0,240px)_1fr_auto] items-end gap-2.5">
+          <div className="grid grid-cols-[1fr_auto] items-end gap-2.5">
             <Field label="Machine" required>
-              <MachineCombobox
-                machines={machines}
-                value={row.machineId}
-                onValueChange={(id) => onPatch({ machineId: id })}
-              />
-            </Field>
-            <Field label="Problem (issue title)" required>
-              <Input
-                value={row.title}
-                onChange={(e) => onPatch({ title: e.target.value })}
-                placeholder="What's wrong…"
-                maxLength={60}
-              />
+              {machineField}
             </Field>
             <Button
               type="button"
@@ -360,7 +448,17 @@ function QuickRow({
               <ChevronDown className="size-4 rotate-180" />
             </Button>
           </div>
-          <div className="grid grid-cols-4 items-end gap-2.5">
+          <Field label="Problem (issue title)" required>
+            <Input
+              value={row.title}
+              onChange={(e) => onPatch({ title: e.target.value })}
+              onKeyDown={onProblemKeyDown}
+              placeholder="What's wrong…"
+              maxLength={60}
+              enterKeyHint="send"
+            />
+          </Field>
+          <div className="grid grid-cols-2 items-end gap-2.5 @[640px]:grid-cols-4">
             <Field label="Severity">
               <SeveritySelect
                 value={row.severity}
@@ -393,7 +491,7 @@ function QuickRow({
               placeholder="Extra detail…"
             />
           </Field>
-          <div className="grid grid-cols-[minmax(220px,340px)_auto_1fr] items-end gap-4">
+          <div className="grid grid-cols-1 items-end gap-4 @[640px]:grid-cols-[minmax(220px,340px)_auto_1fr]">
             <Field label="Assignee">
               <select
                 value={row.assignedTo}
@@ -419,7 +517,10 @@ function QuickRow({
                 Watch
               </Label>
             </div>
-            <div className="justify-self-end">{submitBtn}</div>
+            <div className="flex items-center gap-2 @[640px]:justify-self-end">
+              {discardButton}
+              {submitButton}
+            </div>
           </div>
         </div>
       )}
@@ -430,18 +531,91 @@ function QuickRow({
   );
 }
 
+/** Discard control. Empty rows discard immediately; a row with typed content
+ *  asks for confirmation first (typed data is never dropped silently). */
+function DiscardButton({
+  dirty,
+  onDiscard,
+  className,
+  style,
+}: {
+  dirty: boolean;
+  onDiscard: () => void;
+  className?: string;
+  style?: React.CSSProperties;
+}): React.JSX.Element {
+  const label = (
+    <>
+      <Trash2 className="mr-1 size-4" aria-hidden="true" /> Discard
+    </>
+  );
+  const btnClass = cn("text-muted-foreground hover:text-foreground", className);
+
+  if (!dirty) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={onDiscard}
+        style={style}
+        className={btnClass}
+      >
+        {label}
+      </Button>
+    );
+  }
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          style={style}
+          className={btnClass}
+        >
+          {label}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard this issue?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This removes the row and anything you&apos;ve typed in it. This
+            can&apos;t be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onDiscard}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Discard
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function Field({
   label,
   required,
+  area,
   children,
 }: {
   label: string;
   required?: boolean;
+  area?: string;
   children: React.ReactNode;
 }): React.JSX.Element {
   const id = React.useId();
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div
+      className="flex min-w-0 flex-col gap-1"
+      style={area ? { gridArea: area } : undefined}
+    >
       <Label
         htmlFor={id}
         className="text-[10px] uppercase tracking-wide text-muted-foreground"
