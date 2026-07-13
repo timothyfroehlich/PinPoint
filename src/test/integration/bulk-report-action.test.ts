@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { machines, userProfiles } from "~/server/db/schema";
 import { createTestUser, createTestMachine } from "~/test/helpers/factories";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import type { BulkRowInput } from "~/app/(app)/report/bulk/schemas";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -66,7 +67,7 @@ async function seedMachine(
   return { id, initials };
 }
 
-const row = (over: Partial<Record<string, unknown>> = {}) => ({
+const row = (over: Partial<BulkRowInput> = {}): BulkRowInput => ({
   machineId: "",
   title: "Right flipper sticky",
   description: "",
@@ -90,9 +91,7 @@ describe("bulk report actions", () => {
     const m = await seedMachine("GP", "Grand Prix");
     mockGetUser.mockResolvedValue({ data: { user: { id: member.id } } });
 
-    const res = await submitBulkIssuesAction([
-      row({ machineId: m.id }),
-    ] as never);
+    const res = await submitBulkIssuesAction([row({ machineId: m.id })]);
     expect(res.ok).toBe(false);
     const before = await db.query.issues.findMany();
     expect(before).toHaveLength(0);
@@ -108,7 +107,7 @@ describe("bulk report actions", () => {
     const res = await submitBulkIssuesAction([
       row({ machineId: m1.id, title: "Spinner rejecting" }),
       row({ machineId: m2.id, title: "Key broken in back box" }),
-    ] as never);
+    ]);
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.results.every((r) => r.ok)).toBe(true);
@@ -127,7 +126,7 @@ describe("bulk report actions", () => {
       row({ machineId: m.id, title: "Good row" }),
       row({ machineId: randomUUID(), title: "Bad machine" }), // uuid, but no such machine
       row({ machineId: "not-a-uuid", title: "Invalid" }), // fails schema
-    ] as never);
+    ]);
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.results[0]).toMatchObject({ index: 0, ok: true });
@@ -146,10 +145,10 @@ describe("bulk report actions", () => {
     const key = randomUUID();
 
     const first = await submitBulkIssueRowAction(
-      row({ machineId: m.id, idempotencyKey: key }) as never
+      row({ machineId: m.id, idempotencyKey: key })
     );
     const second = await submitBulkIssueRowAction(
-      row({ machineId: m.id, idempotencyKey: key }) as never
+      row({ machineId: m.id, idempotencyKey: key })
     );
     expect(first.ok && second.ok).toBe(true);
     const created = await db.query.issues.findMany();
@@ -163,7 +162,7 @@ describe("bulk report actions", () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: tech.id } } });
 
     const many = Array.from({ length: 51 }, () => row({ machineId: m.id }));
-    const res = await submitBulkIssuesAction(many as never);
+    const res = await submitBulkIssuesAction(many);
     expect(res.ok).toBe(false);
     const created = await db.query.issues.findMany();
     expect(created).toHaveLength(0);

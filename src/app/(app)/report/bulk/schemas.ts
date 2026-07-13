@@ -8,9 +8,9 @@ export const bulkRowSchema = z.object({
   machineId: z.string().uuid({ message: "Please select a machine" }),
   title: z
     .string()
+    .trim()
     .min(1, "Problem is required")
-    .max(60, "Problem must be 60 characters or less")
-    .trim(),
+    .max(60, "Problem must be 60 characters or less"),
   description: z
     .string()
     .trim()

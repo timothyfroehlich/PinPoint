@@ -145,7 +145,7 @@ export function BulkReportGrid({
   }
 
   return (
-    <div>
+    <div data-testid="bulk-report-grid">
       <div className="rounded-xl border border-outline-variant bg-surface-container-low p-2">
         {rows.map((r) => (
           <BulkRow
@@ -407,10 +407,8 @@ function Field({
       >
         {label}
       </Label>
-      {React.isValidElement(children)
-        ? React.cloneElement(children as React.ReactElement<{ id?: string }>, {
-            id,
-          })
+      {React.isValidElement<{ id?: string }>(children)
+        ? React.cloneElement(children, { id })
         : children}
     </div>
   );

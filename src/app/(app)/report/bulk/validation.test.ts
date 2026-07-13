@@ -33,6 +33,11 @@ describe("parseBulkRow", () => {
     expect(res.success).toBe(false);
   });
 
+  it("rejects a whitespace-only title", () => {
+    const res = parseBulkRow({ ...validRow(), title: "   " });
+    expect(res.success).toBe(false);
+  });
+
   it("rejects a title longer than 60 chars", () => {
     const res = parseBulkRow({ ...validRow(), title: "x".repeat(61) });
     expect(res.success).toBe(false);
