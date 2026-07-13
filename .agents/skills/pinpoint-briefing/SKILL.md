@@ -12,15 +12,15 @@ Goal: answer "what's broken, what shipped, what needs attention" before picking 
 
 Run all data-gathering steps **in parallel** (one Bash call per logical group). Then synthesize into a structured briefing output.
 
-**Pre-flight first**: run both checks in Step 0 BEFORE launching the parallel batch. The briefing reads local files (lockfile, `package.json`) AND remote services (Sentry MCP) — if either is stale or unauthenticated, the briefing reports rotten data without warning.
+**Pre-flight first**: run the Step 0 check BEFORE launching the parallel batch. The briefing reads local files (lockfile, `package.json`); if local main is stale, the audit reports rotten data without warning.
 
 ---
 
-## Step 0 — Pre-flight checks
+## Step 0 — Pre-flight check
 
-Two independent gates. Each one failing is a stop-and-ask, not a soft warning.
+One gate. Failing it is a stop-and-ask, not a soft warning.
 
-### 0a — Confirm we're on a fresh main
+### Confirm we're on a fresh main
 
 The audit, the lockfile, and the package overrides are read from the **local** working tree. If local main is days behind, `pnpm audit` will flag CVEs that have already been patched upstream and the briefing ships a "regression" finding that's actually just stale state. (We've shipped this exact bug — a `uuid` override "regression" turned out to be a 2-day-old local checkout.)
 
@@ -38,30 +38,6 @@ fi
   > ⚠️ I'm on `<branch>`, not main. The briefing reads local files (`pnpm-lock.yaml`, `package.json`) and would silently report stale CVEs from before main moved on. Want me to switch to main first, or run anyway with that caveat in mind?
 
   Wait for an explicit answer. If they say "run anyway", state in the briefing's Security section that the audit was run from a non-main checkout and any CVE finding should be re-verified.
-
-### 0b — Verify Sentry auth
-
-The Sentry MCP server only exposes its real query tools (`find_organizations`, `search_issues`, etc.) AFTER the user has completed OAuth. Pre-auth, only `authenticate` / `complete_authentication` stubs are registered. The briefing's Group E depends on the real tools — without them it returns empty and you ship a briefing that missed live production errors.
-
-**Check (Claude Code)**: attempt to load the `search_issues` schema via the tool catalog:
-
-```
-ToolSearch query: "select:mcp__plugin_sentry_sentry__search_issues", max_results: 1
-```
-
-- If the tool schema comes back → Sentry is authenticated. Proceed to Step 1.
-- If `No matching deferred tools found` → Sentry is NOT authenticated. **STOP. Do NOT run the briefing yet.**
-
-**When auth is missing**, tell the user (verbatim wording optional but cover these points):
-
-> ⚠️ Sentry MCP isn't authenticated — the briefing would miss production errors. Please:
->
-> 1. Run `mcp__plugin_sentry_sentry__authenticate` (this triggers a browser OAuth flow).
-> 2. Complete the Sentry login in your browser.
-> 3. **Run `/reload-plugins`** — MCP tool registration is a one-time handshake, so OAuth completion does NOT retroactively expose the real Sentry tools. A reload is required.
-> 4. Tell me to re-run the briefing.
-
-Do not proceed past this step until auth is confirmed. Partial briefings that skip Sentry hide production issues.
 
 ---
 
@@ -108,32 +84,6 @@ gh issue list --state open --limit 20 \
 
 User-reported bugs and feature requests. Cross-reference with beads — flag any not yet tracked.
 
-### Group E: Sentry — New Errors
-
-Use the Sentry MCP tools:
-
-1. `mcp__plugin_sentry_sentry__find_organizations` — get org slug
-2. `mcp__plugin_sentry_sentry__search_issues` with `query: "is:unresolved firstSeen:>-5d"` and `limit: 10`
-
-Flag issues with high event counts or new regressions.
-
-### Group F: Supabase Advisors
-
-Run the Supabase advisor checks against **prod** (project_id `udhesuizjsgxfeotqybn`, name: PinPoint-Prod). Call `mcp__plugin_supabase_supabase__get_advisors` twice:
-
-1. `type: "security"` — RLS gaps, exposed tables/functions, auth misconfig
-2. `type: "performance"` — unindexed FKs, RLS initplan re-evaluation, unused indexes
-
-**This is a deferred MCP tool**: load its schema first via `ToolSearch` query `select:mcp__plugin_supabase_supabase__get_advisors` before calling it.
-
-- If the tool schema comes back → run both checks.
-- If `No matching deferred tools found` → the Supabase MCP isn't connected. This is a **soft skip**: surface a one-line `Supabase MCP not connected, advisor check skipped` note in the briefing output and move on. Unlike Group E (Sentry), this is NOT a stop-and-ask gate — just don't drop it silently.
-
-**Triage guidance**: each lint carries a `level` — ERROR / WARN / INFO.
-
-- **ERROR-level security lints are immediate-attention items** (e.g. a public table with RLS disabled). Flag ERROR and WARN security lints prominently; INFO is informational.
-- Some findings are intentional by design. Tables with RLS **enabled but zero policies** are the deliberate "Drizzle-superuser-only access" pattern from migration 0034, not a regression. Cross-check every finding against known-intentional patterns before reporting it as a new problem.
-
 ### Group G: Security Review Beads
 
 The Weekly Security Review routine (an AI/human security pass over the week's PRs) files its findings as **beads labeled `security`** — one bead per finding, carrying a severity and a recommendation. High-signal work that's already tracked. List the open ones:
@@ -158,7 +108,7 @@ Synthesize all gathered data into this format:
 📅 Date: [today]
 
 ## 🚨 Needs Immediate Attention
-[Anything failing on main, critical security alerts, P0 bugs, ERROR-level Supabase advisor findings, high-severity open `security` beads needing attention]
+[Anything failing on main, critical security alerts, P0 bugs, high-severity open `security` beads needing attention]
 
 ## 🔐 Security
 pnpm audit:    [X vulns (critical/high/moderate)] or ✅ clean
@@ -175,15 +125,6 @@ Highlight: any with failing CI or stale > 7 days
 
 ## 🐛 New GitHub Issues (last 5 days)
 [List: #NNN Title (created X days ago) — [in beads / NOT TRACKED]]
-
-## ⚠️ Sentry — New Errors
-[List: Error message | First seen | Event count | URL]
-Or: ✅ No new errors in last 5 days
-
-## 🛡️ Supabase Advisors
-Security:    [X errors, Y warnings] — list any ERROR-level findings with table/function name
-Performance: [X warnings, Z info] — summarize (unindexed FKs, RLS initplan, unused indexes)
-Or: ✅ No actionable advisor findings
 
 ## 📦 Beads State
 Ready to pick up: [top 5 from `bd ready`]
