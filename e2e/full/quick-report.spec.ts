@@ -62,6 +62,22 @@ test.describe("quick report — authoring", () => {
     ).toBeVisible();
   });
 
+  test("keyboard Tab flows from the machine picker straight to the problem field", async ({
+    page,
+  }) => {
+    const firstRow = page.getByTestId("quick-row").first();
+    const machine = firstRow.getByRole("combobox", { name: "Machine" });
+    await machine.focus();
+    await expect(machine).toBeFocused();
+
+    // Tab lands on Problem (not Severity) — the pre-filled severity/priority
+    // fields sit later in tab order so the fast path is machine → problem.
+    await page.keyboard.press("Tab");
+    await expect(
+      firstRow.getByRole("textbox", { name: /Problem/ })
+    ).toBeFocused();
+  });
+
   test("collapsed row shows initials-only at a phone width and the full name on desktop", async ({
     page,
   }) => {

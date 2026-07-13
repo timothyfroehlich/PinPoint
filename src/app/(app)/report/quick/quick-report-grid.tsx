@@ -388,6 +388,19 @@ function QuickRow({
           <Field label="Machine" required area="machine">
             {machineField}
           </Field>
+          {/* Problem sits right after Machine in the DOM so keyboard Tab flows
+              machine → problem (the fast authoring path); grid-template-areas
+              keeps its visual position on line 2 regardless of source order. */}
+          <Field label="Problem (issue title)" required area="problem">
+            <Input
+              value={row.title}
+              onChange={(e) => onPatch({ title: e.target.value })}
+              onKeyDown={onProblemKeyDown}
+              placeholder="What's wrong…"
+              maxLength={60}
+              enterKeyHint="send"
+            />
+          </Field>
           <Field label="Severity" area="severity">
             <SeveritySelect
               value={row.severity}
@@ -409,16 +422,6 @@ function QuickRow({
           >
             More <ChevronDown className="ml-1 size-4" />
           </Button>
-          <Field label="Problem (issue title)" required area="problem">
-            <Input
-              value={row.title}
-              onChange={(e) => onPatch({ title: e.target.value })}
-              onKeyDown={onProblemKeyDown}
-              placeholder="What's wrong…"
-              maxLength={60}
-              enterKeyHint="send"
-            />
-          </Field>
           <DiscardButton
             dirty={rowHasContent(row)}
             onDiscard={onDiscard}
