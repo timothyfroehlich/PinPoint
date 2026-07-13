@@ -11,6 +11,13 @@ interface IssueBadgeGridProps {
   size?: "normal" | "lg";
   className?: string;
   showPriority?: boolean; // Default true, but maybe hide for guests externally
+  /**
+   * Strip only: collapse Priority + Frequency below the `@md/card-header`
+   * container tier so a narrow row keeps only Status + Severity and never
+   * wraps to a second line (design §4, PP-dnk8). Needs a `@container/card-header`
+   * ancestor (the shadcn `CardHeader` provides it).
+   */
+  capNarrow?: boolean;
 }
 
 export function IssueBadgeGrid({
@@ -19,8 +26,12 @@ export function IssueBadgeGrid({
   size = "normal",
   className,
   showPriority = true,
+  capNarrow = false,
 }: IssueBadgeGridProps): React.JSX.Element {
   if (variant === "strip") {
+    // `contents` keeps the badge a direct flex item (gaps intact) when shown;
+    // `hidden` removes it below the tier when capped.
+    const capClass = capNarrow ? "hidden @md/card-header:contents" : "contents";
     return (
       <div
         className={cn("flex flex-wrap gap-2", className)}
@@ -34,12 +45,14 @@ export function IssueBadgeGrid({
           size={size}
         />
         {showPriority && (
-          <IssueBadge
-            type="priority"
-            value={issue.priority}
-            variant={variant}
-            size={size}
-          />
+          <span className={capClass}>
+            <IssueBadge
+              type="priority"
+              value={issue.priority}
+              variant={variant}
+              size={size}
+            />
+          </span>
         )}
         <IssueBadge
           type="severity"
@@ -47,12 +60,14 @@ export function IssueBadgeGrid({
           variant={variant}
           size={size}
         />
-        <IssueBadge
-          type="frequency"
-          value={issue.frequency}
-          variant={variant}
-          size={size}
-        />
+        <span className={capClass}>
+          <IssueBadge
+            type="frequency"
+            value={issue.frequency}
+            variant={variant}
+            size={size}
+          />
+        </span>
       </div>
     );
   }

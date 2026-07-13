@@ -25,7 +25,9 @@
  *   status surface as a colored badge on the Service tab itself.
  * - The issues section is no longer a collapsible expando; it renders an
  *   always-open list inside the Service tab (`/m/[initials]/maintenance`).
- * - The export button moved with the issues list onto the Service tab.
+ * - Export moved with the issues list onto the Service tab, and now lives
+ *   inside the section header's ⋯ menu ("Export all issues (CSV)") rather than
+ *   as a standalone button (design §4, PP-5sgt.3).
  */
 
 import { test, expect } from "@playwright/test";
@@ -97,14 +99,17 @@ test.describe("Machine Details Redesign", () => {
   });
 
   test("Service tab exports machine issues to CSV", async ({ page }) => {
-    // Export button lives in the Service tab's section header.
+    // Export now lives inside the issues section header's ⋯ menu.
     await page.goto(`/m/${seededMachines.addamsFamily.initials}/maintenance`);
 
-    const exportButton = page.getByTestId("export-csv-button");
-    await expect(exportButton).toBeVisible();
+    await page.getByRole("button", { name: "Issue options" }).click();
+    const exportItem = page.getByRole("menuitem", {
+      name: /Export all issues/i,
+    });
+    await expect(exportItem).toBeVisible();
 
     const downloadPromise = page.waitForEvent("download");
-    await exportButton.click();
+    await exportItem.click();
 
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(
