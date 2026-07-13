@@ -69,11 +69,7 @@ to:
 
 ```typescript
 export type AccessLevel =
-  | "unauthenticated"
-  | "guest"
-  | "member"
-  | "technician"
-  | "admin";
+  "unauthenticated" | "guest" | "member" | "technician" | "admin";
 ```
 
 In `src/lib/permissions/matrix.ts:58-63`, change:

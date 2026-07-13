@@ -159,8 +159,7 @@ interface PbmLinkColumns {
 }
 
 type ResolvePbmLinkResult =
-  | { ok: true; columns: PbmLinkColumns }
-  | { ok: false; message: string };
+  { ok: true; columns: PbmLinkColumns } | { ok: false; message: string };
 
 /**
  * Resolve the machine's PinballMap columns from the submitted link selection.

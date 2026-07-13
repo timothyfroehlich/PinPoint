@@ -81,8 +81,7 @@ const createIssueSchema = z.object({
 
 // 2. Define return type
 export type CreateIssueResult =
-  | { success: true; issueId: string }
-  | { success: false; error: string };
+  { success: true; issueId: string } | { success: false; error: string };
 
 // 3. Implement action
 export async function createIssue(
@@ -211,8 +210,7 @@ export const getMachines = cache(async () => {
 ```typescript
 // ✅ Good: Return structured errors
 export type ActionResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: string };
+  { success: true; data: T } | { success: false; error: string };
 
 export async function createMachine(
   formData: FormData

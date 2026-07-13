@@ -16,8 +16,7 @@
  * ```
  */
 export type Result<T, C extends string = string, M = undefined> =
-  | { ok: true; value: T }
-  | { ok: false; code: C; message: string; meta?: M };
+  { ok: true; value: T } | { ok: false; code: C; message: string; meta?: M };
 
 /**
  * Create a successful Result

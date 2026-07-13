@@ -660,10 +660,7 @@ export async function resetPasswordAction(
         if (resetCodes.has(mapped.code)) {
           return err(
             mapped.code as
-              | "WEAK_PASSWORD"
-              | "SAME_PASSWORD"
-              | "SERVER"
-              | "VALIDATION",
+              "WEAK_PASSWORD" | "SAME_PASSWORD" | "SERVER" | "VALIDATION",
             mapped.message
           );
         }
