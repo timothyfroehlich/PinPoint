@@ -1,6 +1,6 @@
 ---
 name: pinpoint-chores
-description: Runbook for the weekly PinPoint "chores" session — the human-in-the-loop maintenance pass (Supabase CLI pin, TS-7 rollout, Dependabot, changelog, Sentry/Supabase advisors, PinballMap vendored-docs drift, cloud-routine beads). Use when Tim says "let's do chores", when the SessionStart chores-nag fires ("🧹 Weekly chores are N days overdue"), or when you want the chores checklist. After finishing, re-arm the nag with `bd defer`.
+description: Runbook for the weekly PinPoint "chores" session — the human-in-the-loop maintenance pass (Supabase CLI pin, TS-7 rollout, Dependabot, changelog, Sentry/Supabase advisors, PinballMap vendored-docs drift, GHA infra-flake triage, cloud-routine beads). Use when Tim says "let's do chores", when the SessionStart chores-nag fires ("🧹 Weekly chores are N days overdue"), or when you want the chores checklist. After finishing, re-arm the nag with `bd defer`.
 ---
 
 # pinpoint-chores
@@ -31,6 +31,8 @@ Find the bead first (by label, so you have its ID for comments + the reset):
 **Move it to in-progress** — this silences the nag while you work (a `due` bead only nags when it is NOT `in_progress`), and logs the start:
 
     bd update <chores-bead> --status in_progress
+
+**Delegate the context-heavy items to subagents.** The checklist keeps growing, and several items burn a lot of context (the GHA infra-flake triage, the Sentry / Supabase advisor sweeps, the Weekly-Review bead review). As lead, farm those out to subagents and keep just the synthesis — don't run everything inline. Give each subagent the item's runbook pointer and have it report back findings + proposed beads; you decide and file. Cheap, quick items (version-pin checks, the vendored-docs diff) can stay inline.
 
 Then work the checklist. For each item, note findings as a comment on the bead (`bd comments add <chores-bead> "..."`) and file follow-up beads for anything actionable — don't fix everything inline; chores is triage + quick wins.
 
@@ -63,6 +65,10 @@ Then work the checklist. For each item, note findings as a comment on the bead (
    - Fetch the live `https://pinballmap.com/llms.txt` and `https://pinballmap.com/robots.txt`, and diff each against the vendored copy in `docs/external/` (`pinballmap-llms.txt`, `pinballmap-robots.txt`). These must stay **byte-identical** to what PBM serves.
    - If either changed: refresh the vendored file verbatim from source, then re-review the conduct / rate-limit / attribution implications against `src/lib/pinballmap/`. File a bead if the change affects API conduct (not just a trivial wording tweak).
    - This weekly check is our **standing** drift guard — there is no automated drift GHA (the once-planned PP-o355.9 was closed in favor of this).
+
+8. **GHA infra-flake triage**
+   - Run the weekly triage procedure in `docs/runbooks/gha-flake-log.md`: read the recent weekly `gha-flake-week` sighting beads (current ISO week + prior 2) plus the permanent `gha-flake-log` ledger, pull new sightings past the ledger cursor, cluster by signature, rule out non-issues, spin genuine recurring infra issues into child beads, catch regressions against `fixed` rows, close aged-out weekly beads, then rewrite the ledger and advance the cursor.
+   - This is context-heavy — a good candidate to delegate to a subagent (see "Running the chores").
 
 ## Finish: re-arm the nag
 

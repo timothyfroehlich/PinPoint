@@ -107,6 +107,8 @@ timeout_ms: 3600000
 
 Exit 0 = all passed, or stopped for a new Copilot review. Exit 1 = failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
 
+If you judge the failure to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, Supabase container-start) rather than a real code/test failure, log it before rerunning: `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`).
+
 ### 3.2 Check for review comments
 
 If the PR has review comments (from Tim or another agent), read them via MCP:
@@ -260,7 +262,8 @@ Prefer the Claude fallback (Phase 3.4 — run `/code-review` + `mark-claude-revi
 **`--bypass-merge-requirements`** — for CI/branch-protection issues:
 
 - A required check is failing for known-irrelevant reasons (infrastructure flake, unrelated job)
-  AND you've manually verified the change is safe
+  AND you've manually verified the change is safe. Log the flake first:
+  `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`).
 - An emergency hotfix where waiting for CI is not acceptable
 - Combine with `--force` when both review-state and CI gates need to be skipped
 
