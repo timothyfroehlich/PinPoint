@@ -5,6 +5,8 @@ import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import promisePlugin from "eslint-plugin-promise";
 import eslintCommentsPlugin from "@eslint-community/eslint-plugin-eslint-comments";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
+import reactHooks from "eslint-plugin-react-hooks";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 import globals from "globals";
 import { pinpointTransactionPlugin } from "./eslint-rules/no-side-effects-in-transaction.mjs";
 
@@ -37,9 +39,18 @@ export default [
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {
-        // App-source project (was tsconfig.json before the PP-4k76 solution-style
-        // split; the root is now references-only and owns no files).
-        project: "./tsconfig.app.json",
+        // Project service (typescript-eslint v8 recommended) instead of the
+        // hand-maintained `project:` mappings this config used to carry (app /
+        // tests / e2e blocks each pointing at their tsconfig). The service
+        // resolves each linted file to its owning tsconfig the same way
+        // tsserver does — root tsconfig.json (solution-style, PP-4k76) →
+        // tsconfig.app.json / tsconfig.tests.json via references, and
+        // e2e/tsconfig.json as the nearest config for e2e files. Classic
+        // `project:` mode resolved cross-project imports through never-emitted
+        // composite declarations, which made `eslint --fix`'s re-parse see
+        // imported app types as error/any in test files and fail lint-staged
+        // pre-commit with false positives (PP-v2ne).
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -168,7 +179,8 @@ export default [
     },
   },
   {
-    // Test files use different tsconfig
+    // Test files (owned by tsconfig.tests.json; the project service in the
+    // main block resolves that automatically — no per-block parserOptions).
     files: [
       "**/*.test.ts",
       "**/*.test.tsx",
@@ -176,13 +188,6 @@ export default [
       "**/*.spec.tsx",
       "src/test/**/*",
     ],
-    languageOptions: {
-      parser: typescriptParser,
-      parserOptions: {
-        project: "./tsconfig.tests.json",
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
     rules: {
       // Allow any in tests for mocking
       "@typescript-eslint/no-explicit-any": "off",
@@ -211,20 +216,11 @@ export default [
   },
   {
     // E2E files use their own tsconfig (NodeNext resolution, separate from
-    // tsconfig.tests.json's bundler resolution) — see e2e/tsconfig.json.
-    // Dropped from tsconfig.tests.json's `include` in PP-d8uq; this block
-    // keeps ESLint's parserOptions.project in sync with that change so
-    // type-aware linting of e2e/**/* doesn't hit a "file not included in any
-    // tsconfig" parse error. Same rule relaxations as the test-files block
-    // above (mocking/test-data patterns are common to both).
+    // tsconfig.tests.json's bundler resolution) — see e2e/tsconfig.json,
+    // which the project service picks up as the nearest config for e2e
+    // files. Same rule relaxations as the test-files block above
+    // (mocking/test-data patterns are common to both).
     files: ["e2e/**/*"],
-    languageOptions: {
-      parser: typescriptParser,
-      parserOptions: {
-        project: "./e2e/tsconfig.json",
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-floating-promises": "off",
@@ -302,6 +298,59 @@ export default [
     files: ["supabase/**/*.mjs"],
     languageOptions: {
       globals: globals.node,
+    },
+  },
+  {
+    // ===== React Hooks correctness (PP-k6jp) =====
+    // eslint-config-next was installed but never loaded, so react-hooks rules
+    // ran nowhere. Wire the plugin directly (not via the legacy next config) and
+    // own the two core rules' severity ourselves. Scoped to app source under
+    // src/ (both .ts custom hooks and .tsx client components); tests/e2e are
+    // excluded — hook-render helpers there produce noise with no user impact.
+    // rules-of-hooks catches conditional/looped hook calls (real bugs).
+    // exhaustive-deps is a hard gate (error); pre-existing violations are
+    // grandfathered inline with a `-- PP-k6jp` disable rather than risky
+    // dependency-array edits, so this PR only ENABLES the rule cleanly.
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    ignores: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
+      "src/test/**",
+    ],
+    plugins: {
+      "react-hooks": reactHooks,
+    },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "error",
+    },
+  },
+  {
+    // ===== JSX accessibility (PP-u4cp) =====
+    // eslint-config-next used to bundle eslint-plugin-jsx-a11y, but (like
+    // react-hooks, PP-k6jp) it was never actually loaded — and #1652 removed
+    // eslint-config-next entirely, so there was zero a11y linting. Wire the
+    // plugin directly at its "recommended" ruleset so a11y regressions get
+    // caught at lint time; this is the prerequisite for the eventual "strict"
+    // bump (PP-kqbk.10). Scoped to app source *.tsx (a11y rules are JSX-only);
+    // tests/spec/src/test are excluded (render helpers there produce noise with
+    // no user impact). The recommended set is spread from the plugin's flat
+    // export (flatConfigs.recommended.rules). Pre-existing deliberate-autofocus
+    // and shortcut-wrapper sites are suppressed inline with `-- … PP-u4cp`
+    // disables, so this PR ENABLES the rule cleanly.
+    files: ["src/**/*.tsx"],
+    ignores: [
+      "**/*.test.tsx",
+      "**/*.spec.tsx",
+      "src/test/**",
+    ],
+    plugins: {
+      "jsx-a11y": jsxA11y,
+    },
+    rules: {
+      ...jsxA11y.flatConfigs.recommended.rules,
     },
   },
   {

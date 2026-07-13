@@ -226,7 +226,11 @@ describe("getPermissionDeniedReason", () => {
 
   it("should return admin message for technician role denial", () => {
     const reason = getPermissionDeniedReason("admin.access", "technician");
-    expect(reason).toContain("admin");
+    // Both this message and the member-role message contain "admin" as a
+    // substring ("Technicians or admins...") — assert the distinguishing
+    // prefix so a regression that falls through to the wrong branch is caught
+    // (found via Stryker mutation audit, PP-x4li.2).
+    expect(reason).toContain("Only admins");
   });
 
   it("should return ownership message for ownership denial", () => {

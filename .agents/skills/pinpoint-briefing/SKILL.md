@@ -134,18 +134,15 @@ Run the Supabase advisor checks against **prod** (project_id `udhesuizjsgxfeotqy
 - **ERROR-level security lints are immediate-attention items** (e.g. a public table with RLS disabled). Flag ERROR and WARN security lints prominently; INFO is informational.
 - Some findings are intentional by design. Tables with RLS **enabled but zero policies** are the deliberate "Drizzle-superuser-only access" pattern from migration 0034, not a regression. Cross-check every finding against known-intentional patterns before reporting it as a new problem.
 
-### Group G: Weekly Security Review
+### Group G: Security Review Beads
 
-A "Weekly Security Review" GitHub issue (label `security`, title `Weekly Security Review: <date range>`) is filed each week — an AI/human security pass over the week's PRs. It carries a **Verdict** line ("N findings need attention"), a Non-Negotiable checklist table, and detailed **Findings** (severity + recommendation). High-signal, often not yet tracked as beads. Find and read the most recent open one:
+The Weekly Security Review routine (an AI/human security pass over the week's PRs) files its findings as **beads labeled `security`** — one bead per finding, carrying a severity and a recommendation. High-signal work that's already tracked. List the open ones:
 
 ```bash
-gh issue list --state open --label security --search "Weekly Security Review in:title" \
-  --limit 1 --json number,title,createdAt
-# then read the body of that issue number:
-gh issue view <number> --json title,body
+bd list --status=open --label=security
 ```
 
-Parse the **Verdict** line and each **Finding** (severity + one-line summary). Cross-reference every finding against beads and flag any NOT yet tracked. These issues stay **OPEN until findings are addressed**, so an open issue is normal — surface the freshest one; don't treat its open state as an alarm by itself.
+Read the severity and one-line summary of each open `security` bead. These beads stay **OPEN until the finding is addressed**, so open security beads are normal — surface them; don't treat their open state as an alarm by itself. If a finding turns out to overlap another already-tracked bead or is only recorded elsewhere, note it the same way you would any untracked item.
 
 ---
 
@@ -161,12 +158,12 @@ Synthesize all gathered data into this format:
 📅 Date: [today]
 
 ## 🚨 Needs Immediate Attention
-[Anything failing on main, critical security alerts, P0 bugs, ERROR-level Supabase advisor findings, UNTRACKED non-trivial Weekly Security Review findings — call out for bead-filing]
+[Anything failing on main, critical security alerts, P0 bugs, ERROR-level Supabase advisor findings, high-severity open `security` beads needing attention]
 
 ## 🔐 Security
 pnpm audit:    [X vulns (critical/high/moderate)] or ✅ clean
 Dependabot:    [X open alerts] — link to any mergeable PRs
-Weekly Review: #NNNN (week of <dates>) — <verdict>; <X> findings [Y tracked, Z UNTRACKED]
+Security beads: [X open `security`-labeled beads] — list by severity, or ✅ none open
 
 ## 📋 Open PRs
 [Table from pr-dashboard.sh: PR# | Title | CI | Merge Ready]

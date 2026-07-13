@@ -1,0 +1,29 @@
+# systemd --user unit: the shared PinPoint beads Dolt SQL server (Bazzite).
+#
+# TEMPLATE. Install to ~/.config/systemd/user/dolt-sql-server.service, edit the
+# paths to match SETUP.md, then:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now dolt-sql-server.service
+# Requires user lingering (loginctl enable-linger "$USER") so it runs headless.
+#
+# PATH must include /home/linuxbrew/.linuxbrew/bin — brew-installed `dolt` lives
+# there and systemd --user does NOT inherit an interactive shell's PATH (same
+# gotcha as the claude-rc.service pattern).
+
+[Unit]
+Description=Dolt SQL server for shared PinPoint beads DB
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+# Absolute path to the seeded Dolt data dir (holds the `PP` database).
+# Edit <USER> to the real home (Tim's is /home/froeht).
+WorkingDirectory=/home/<USER>/.beads-server/dolt
+ExecStart=/home/linuxbrew/.linuxbrew/bin/dolt sql-server --config /home/<USER>/.beads-server/server.yaml --skip-root-user-initialization
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

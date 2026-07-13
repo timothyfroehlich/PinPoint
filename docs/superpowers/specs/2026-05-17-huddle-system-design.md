@@ -93,10 +93,6 @@ Parent-child links via `bd dep add <child> <root> --type parent-child`.
   "schema_version": 1,
   "today_bead": { "id": "PP-AAAA", "date": "2026-05-17" },
   "monthly_bead": { "id": "PP-BBBB", "month": "2026-05" },
-  "recent_dailies": [
-    { "id": "PP-AAAA", "date": "2026-05-17" },
-    { "id": "PP-CCCC", "date": "2026-05-16" }
-  ],
   "settings": {
     "n_dailies_to_inject": 5,
     "day_boundary_tz": "local",
@@ -106,11 +102,17 @@ Parent-child links via `bd dep add <child> <root> --type parent-child`.
 }
 ```
 
-- `today_bead`: the only bead currently accepting coordination comments.
+- `today_bead`: the only bead currently accepting coordination comments. The
+  `id` is a fast-path HINT only — readers verify it via `bd show` (open +
+  titled-for-today) and fall back to a `bd children <root>` title query, so a
+  stale/dangling id is never trusted (PP-9lq5).
 - `monthly_bead`: the open monthly summary for the current month.
-- `recent_dailies`: denormalized list of the N most-recent daily beads (cap at
-  ~20 entries to bound size). Hooks read this directly without bd queries.
 - `last_rotation`: timestamp of the last successful rotation, for diagnostics.
+
+> Root notes hold only genuine pointers + settings. There is **no**
+> `recent_dailies` array — it was a cache of DB state and the source of the
+> PP-9lq5 dangling pointers; session-start now queries `bd children <root>` by
+> title at read time (§14.2).
 
 ### 4.3 Local config file (`<main-worktree>/.agents/huddle/config.json`)
 
@@ -134,8 +136,9 @@ agent_type? }` where `source` is `startup` | `resume` | `clear` | `compact`.
 Logic, in order:
 
 1. **Skip if subagent:** if `transcript_path` contains `/subagents/`, exit 0.
-2. **Per-machine sync** (§14.1): `huddle_sync` — throttled `bd dolt push`+`pull`
-   so this session opens on the freshest cross-machine state.
+2. **Per-machine sync** (§14.1): `huddle_sync` — no-op in server mode (shared
+   live DB); throttled `bd dolt push`+`pull` in embedded mode so the session
+   opens on the freshest cross-machine state.
 3. **Skip if not bootstrapped:** if `config.json` is missing, first try
    `huddle_discover_root` to **auto-adopt** an already-synced root (§14.2); only
    if none exists emit the "bootstrap needed" notice (see §7.1) and exit.
@@ -150,7 +153,8 @@ Logic, in order:
    (see §7.3 and §7.4).
 6. **Summary injection** (suppressed if `source == "compact"`): inject the
    monthly summary description and the descriptions of the
-   `n_dailies_to_inject` most-recent daily beads (from `recent_dailies`).
+   `n_dailies_to_inject` most-recent daily beads, resolved by a
+   `bd children <root>` title query (newest date first) — not a notes cache.
 
 ### 5.2 `huddle-poll.sh` (UserPromptSubmit)
 
@@ -160,8 +164,9 @@ cwd, permission_mode, hook_event_name, prompt }`.
 Logic, in order:
 
 1. **Skip if subagent:** if `transcript_path` contains `/subagents/`, exit 0.
-2. **Per-machine sync** (§14.1): `huddle_sync` (throttled) before reading, so
-   peer machines' new comments are pulled in before the poll.
+2. **Per-machine sync** (§14.1): `huddle_sync` — no-op in server mode; in
+   embedded mode a throttled `bd dolt push`+`pull` before reading so peer
+   machines' new comments are pulled in before the poll.
 3. **Skip if not bootstrapped:** if config missing, exit 0 silently (the
    SessionStart hook handles the user-visible notice / auto-adopt).
 4. **Rotation check:** source `huddle-rotation-check.sh`. If rotation needed,
@@ -519,46 +524,82 @@ foundation is on main. Brand-new bead to be filed when PR #1357 lands.
 - **Lock timeout** — 60s. Larger than PP-bg45's worktree lock (30s) because
   this lock covers LLM-driven summarization, which can be the slowest step.
 
-## 14. Multi-machine synchronization (PP-lt12.38)
+## 14. Multi-machine model: one shared Dolt server (PP-0fwz)
 
 The huddle runs across Tim's machines (Mac + Bazzite) with many concurrent
-sessions per machine. It piggybacks on the beads sync backbone rather than
-inventing its own: beads is **Dolt embedded + a DoltHub remote** (`sync.remote`
-in `.beads/config.yaml`), so the root bead + its `notes` pointers, the
-daily/monthly beads, and every comment already replicate via `bd dolt push` /
-`bd dolt pull`. What was machine-local — and had to be fixed — was the _pointer
-to the root_, the _freshness of reads_, and the _rotation lock_.
+sessions per machine. Both machines use **one live `dolt sql-server` on Bazzite**
+(`100.87.228.116:3306`, DB `PP`, user `beads`) over the tailnet, so the root bead
 
-### 14.1 Throttled per-machine sync
+- its `notes` pointers, the daily/monthly beads, and every comment are a single
+  shared copy — reads and writes are real-time, with no per-machine replication
+  step. DoltHub (`advacar/pinpoint-beads`) is demoted to an **async bridge** for
+  off-tailnet cloud sessions and off-machine backup: a systemd `--user` timer on
+  Bazzite runs `bd dolt commit → pull → push` every ~15 min (see
+  `scripts/beads-server/`).
 
-`huddle_sync` (`huddle-lib.sh`) does `bd dolt push` then `pull`, gated by a
-`last-pull` epoch marker in the shared state dir plus a non-blocking `pull.lock`.
-Because the state dir resolves identically for every worktree/session of a clone
-(`git rev-parse --git-common-dir`), the throttle is **per-machine**: one sync per
-`HUDDLE_SYNC_SECONDS` (default 180) serves all sessions, and when many fire at
-once exactly one holds the lock while the rest skip and read the freshly-pulled
-DB. Called from session-start (before reading root notes) and the poll hook
-(before fetching comments). Fully fail-open — offline/bd errors write the marker
-and return 0, never blocking a prompt; the next successful sync catches up.
+This replaces the earlier "embedded Dolt on each machine, reconciled via
+`bd dolt push/pull` to DoltHub" design. Two divergent writers caused the
+2026-07-07 ID collision (PP-1d51) and a pile of workaround machinery; a single hot
+server deletes that whole bug class.
 
-### 14.2 Fork-proof discovery / auto-adopt
+### 14.1 Mode gate
 
-`config.json` (the `root_bead_id`) is machine-local, so a fresh machine used to
-see "not bootstrapped" and, if bootstrapped, forked a second root epic.
-`huddle_discover_root` pulls and queries for the existing "Huddle coordination
-root" epic; session-start **auto-adopts** it (writes `config.json`) when
-`config.json` is missing, and `huddle-bootstrap.sh` adopts-before-create. One
-canonical root, shared by every machine.
+The backend is selected per-machine by `dolt_mode` in `<main-worktree>/.beads/`
+`metadata.json` (gitignored): `"server"` or `"embedded"`. `huddle_dolt_mode`
+(`huddle-lib.sh`) reads it with a tolerant parse (missing file/key ⇒ `embedded`,
+the safe default), resolving the main worktree the same way `huddle_state_dir`
+does (linked worktrees carry only a `redirect` stub in `.beads/`). Every hot-path
+`bd dolt push/pull` is gated on this:
+
+- `huddle_sync` — **no-op** in server mode (nothing local to push/pull); the
+  throttled push+pull below applies only in embedded mode.
+- `huddle_discover_root` — skips the pre-query `bd dolt pull` in server mode (the
+  query already hits the live shared DB).
+- `huddle-rotate.sh` — skips the verified pre-rotation pull/conflict-abort, the
+  post-rotation push, and the trailing reconcile pull in server mode. The
+  `rotation.lock` (same-machine serialization) and adopt-existing-daily-by-title
+  (cross-machine idempotency) are retained in both modes.
+- `.claude/hooks/worktree-remove.sh` and `.husky/pre-push` — skip their
+  `bd dolt push` flush in server mode.
+
+Rollback is a one-line flip of `metadata.json` back to `embedded`.
+
+### 14.2 State reads straight from beads (no caches)
+
+Local files are machine-scoped, race-safe, and never caches of DB state:
+
+- **Today's daily** resolves by title query — `bd children <root>` selecting the
+  open `"Huddle daily <today>"` (lowest id) — not a cached `today_bead.id`. The
+  root-notes id is kept only as a fast-path HINT, verified via `bd show` (open +
+  titled-for-today) before it's trusted. Missing entirely ⇒ rotation self-heals by
+  (re)creating it. (Fixes the PP-9lq5 dangling pointer.)
+- **Root pointer** — `config.json` is a rebuildable cache: on miss or a stale id
+  (`bd show` fails), `huddle_root_id` re-discovers by title query and rewrites it.
+- **Recent dailies** — session-start queries `bd children <root>` by title at read
+  time; the old `recent_dailies` notes array (source of the PP-9lq5 dangling
+  pointers) is gone. Root notes hold only genuine pointers + settings.
 
 ### 14.3 Idempotent rotation + reconcile
 
-Covered in §9.4: pull-first, adopt-existing-daily-by-title, push-after, and a
-deterministic `huddle_reconcile_today` dedup. This replaces the (single-machine)
-`rotation.lock` as the _cross-machine_ guarantee; the local lock is retained only
-to serialize same-machine sessions.
+Covered in §9.4: adopt-existing-daily-by-title plus a deterministic
+`huddle_reconcile_today` dedup, both now operating on the single live DB (so the
+"two machines created a duplicate daily before either pushed" race is largely
+moot). The local `rotation.lock` serializes same-machine sessions. Daily beads are
+**normal (non-ephemeral) tasks** — closed dailies must survive so session-start
+can inject their summaries and rotation can roll them into the monthly; the
+ephemeral+wisp marking (#1631) made them `bd purge`-eligible once closed and lost
+the day's log (PP-9lq5).
 
-### 14.4 Intentionally still machine-local
+### 14.4 Server-down visibility
+
+The huddle hooks are fail-open, so a down server would otherwise silently kill
+coordination on both machines. `huddle_warn_degraded` emits a throttled (~10 min)
+one-line stderr `huddle degraded: beads server unreachable` when a hook's `bd`
+read fails in server mode, so sessions see the degradation instead of nothing.
+
+### 14.5 Intentionally still machine-local
 
 `session-names.json` (self-filter) and `last-seen-<hash>` (poll cursor) stay
 per-machine/per-checkout by design — a session lives on one machine, and a peer
-machine's posts must not be self-filtered on yours.
+machine's posts must not be self-filtered on yours. Stale poll cursors and old
+`session-names.json.pre-prune-*` backups are swept during rotation.

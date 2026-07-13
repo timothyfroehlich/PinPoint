@@ -1,0 +1,22 @@
+# systemd --user timer: fire the DoltHub bridge every ~15 minutes.
+#
+# TEMPLATE. Install to ~/.config/systemd/user/beads-dolthub-bridge.timer, then:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now beads-dolthub-bridge.timer
+#
+# Cadence is deliberately coarse: DoltHub is only the off-tailnet cloud path +
+# backup, and per Tim cloud sessions are rare and essentially never concurrent
+# with local work. Persistent=true catches up one missed run after the host
+# was asleep.
+
+[Unit]
+Description=Run the beads DoltHub bridge every 15 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Persistent=true
+Unit=beads-dolthub-bridge.service
+
+[Install]
+WantedBy=timers.target

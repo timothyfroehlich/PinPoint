@@ -264,7 +264,10 @@ python3 scripts/worktree_cleanup.py ../pinpoint-worktrees/<branch>
 ### On Session End
 
 - `bd list --status=in_progress` — anything done? Close it
-- `bd dolt pull` if using beads remote sync
+- `bd dolt pull` only in **embedded** beads mode. In **server** mode
+  (`dolt_mode: "server"` in `.beads/metadata.json` — the shared Bazzite Dolt
+  server) reads/writes are already live against the one shared DB; there is
+  nothing to pull, and the DoltHub bridge handles remote replication.
 
 ---
 

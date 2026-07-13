@@ -53,6 +53,13 @@ CONFIG_FILE="$STATE_DIR/config.json"
 ROOT_ID=$(jq -r '.root_bead_id // ""' "$CONFIG_FILE" 2>/dev/null)
 [[ -n "$ROOT_ID" ]] || { printf 'huddle-rotate.sh: config.json missing root_bead_id\n' >&2; exit 1; }
 
+# Beads Dolt mode gates the cross-machine sync machinery. In "server" mode both
+# machines share one live `dolt sql-server`, so the verified pre-pull, post-push,
+# and trailing pull below are unnecessary (no divergence, no stale child counter
+# to collide). In "embedded" mode they stay. Computed once in the parent and
+# exported so the locked do_rotation subshell sees it.
+DOLT_MODE=$(huddle_dolt_mode)
+
 LOCK_FILE="$STATE_DIR/rotation.lock"
 
 # Platform-detected locking — same pattern as .claude/hooks/worktree-create.sh (PP-bg45).
@@ -86,13 +93,19 @@ do_rotation() {
   #
   # Note: --quiet is dropped deliberately so the conflict message is captured in
   # pull_out for the conflict check below.
-  local pull_rc=0 pull_out
-  pull_out=$(bd dolt pull 2>&1) || pull_rc=$?
-  if [[ "$pull_rc" -ne 0 ]] && printf '%s' "$pull_out" | grep -qiE 'conflict|operator resolution'; then
-    printf 'huddle-rotate.sh: beads sync has unresolved merge conflicts — refusing to rotate.\n' >&2
-    printf 'Rotating now would allocate the daily bead off a possibly-stale child counter and collide across machines (see PP-1d51).\n' >&2
-    printf 'Resolve the beads Dolt conflict first (bd dolt pull), then re-run rotation.\n' >&2
-    exit 1
+  #
+  # SERVER MODE: skip entirely. There is one shared DB and one child counter —
+  # no divergence, no stale-counter collision, nothing to pull. The adopt-by-
+  # title below (which queries that live DB) is the cross-machine guard.
+  if [[ "${DOLT_MODE:-embedded}" != "server" ]]; then
+    local pull_rc=0 pull_out
+    pull_out=$(bd dolt pull 2>&1) || pull_rc=$?
+    if [[ "$pull_rc" -ne 0 ]] && printf '%s' "$pull_out" | grep -qiE 'conflict|operator resolution'; then
+      printf 'huddle-rotate.sh: beads sync has unresolved merge conflicts — refusing to rotate.\n' >&2
+      printf 'Rotating now would allocate the daily bead off a possibly-stale child counter and collide across machines (see PP-1d51).\n' >&2
+      printf 'Resolve the beads Dolt conflict first (bd dolt pull), then re-run rotation.\n' >&2
+      exit 1
+    fi
   fi
 
   # Re-check date inside the lock (idempotency: a peer may have rotated first).
@@ -136,7 +149,7 @@ print(d)
   fi
 
   # Parse current pointers from notes
-  local old_today_id old_monthly_id old_month recent_dailies settings current_month
+  local old_today_id old_monthly_id old_month settings current_month
   old_today_id=$(printf '%s' "$notes_str" | python3 -c "
 import sys, json
 try:
@@ -161,14 +174,6 @@ try:
 except Exception:
     print('')
 " 2>/dev/null || echo "")
-  recent_dailies=$(printf '%s' "$notes_str" | python3 -c "
-import sys, json
-try:
-    n = json.loads(sys.stdin.read())
-    print(json.dumps(n.get('recent_dailies', [])))
-except Exception:
-    print('[]')
-" 2>/dev/null || echo "[]")
   settings=$(printf '%s' "$notes_str" | python3 -c "
 import sys, json
 try:
@@ -193,14 +198,16 @@ except Exception:
     | jq -r --arg t "Huddle daily $today" \
       '[ .[] | select(.title==$t and .status!="closed") ] | sort_by(.id) | (.[0].id // "")' 2>/dev/null || echo "")
   if [[ -z "$new_today_id" ]]; then
-    # Ephemeral wisp (PP-140e.4): a daily is a rotating log, not a permanent
-    # artifact — closed dailies stay queryable (recent_dailies reads their
-    # description) but are now eligible for `bd purge` if that's ever run.
+    # NON-ephemeral (PP-9lq5): a daily must survive after it closes. Session-start
+    # injects recent CLOSED dailies' descriptions, and rotation summarizes a
+    # daily into the monthly. `bd purge` deletes closed ephemeral beads, so the
+    # ephemeral+wisp marking (#1631) made closed dailies purge-eligible and lost
+    # the day's log before it was read/summarized. Plain task beads are never
+    # purge-eligible, so the coordination history is durable.
     new_today_id=$(bd create -t task \
       --parent "$ROOT_ID" \
       --title "Huddle daily $today" \
       --description "Active coordination bead for $today. Agents post updates here. At midnight rotation this bead gets a categorized summary and closes." \
-      --ephemeral --wisp-type patrol \
       --silent)
   fi
 
@@ -221,17 +228,10 @@ except Exception:
   local now
   now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-  # Build new recent_dailies: prepend today's entry, cap at 20
-  local new_recent
-  new_recent=$(python3 -c "
-import sys, json
-existing = json.loads(sys.argv[1])
-new_entry = {'id': sys.argv[2], 'date': sys.argv[3]}
-combined = [new_entry] + existing
-print(json.dumps(combined[:20]))
-" "$recent_dailies" "$new_today_id" "$today")
-
-  # Build new notes JSON
+  # Build new notes JSON. Root notes hold only genuine pointers + settings now —
+  # `recent_dailies` was a cache of DB state (and the source of the PP-9lq5
+  # dangling pointers); readers query `bd children <root>` by title at read time
+  # instead (see huddle-session-start.sh).
   local new_notes
   new_notes=$(python3 -c "
 import sys, json
@@ -239,19 +239,22 @@ notes = {
     'schema_version': 1,
     'today_bead': {'id': sys.argv[1], 'date': sys.argv[2]},
     'monthly_bead': {'id': sys.argv[3], 'month': sys.argv[4]},
-    'recent_dailies': json.loads(sys.argv[5]),
-    'settings': json.loads(sys.argv[6]),
-    'last_rotation': sys.argv[7]
+    'settings': json.loads(sys.argv[5]),
+    'last_rotation': sys.argv[6]
 }
 print(json.dumps(notes))
-" "$new_today_id" "$today" "$new_monthly_id" "$current_month" "$new_recent" "$settings" "$now")
+" "$new_today_id" "$today" "$new_monthly_id" "$current_month" "$settings" "$now")
 
   # ATOMIC: update root notes — after this the system is consistent
   bd update "$ROOT_ID" --notes "$new_notes"
 
   # Push the new pointers so peer machines converge fast and don't double-rotate.
   # Fail-open: a transient push failure doesn't abort (pre-push + next sync catch up).
-  bd dolt push --quiet >/dev/null 2>&1 || true
+  # SERVER MODE: no-op — the update above already landed on the shared DB, so the
+  # peer sees it immediately; the DoltHub bridge handles remote replication.
+  if [[ "${DOLT_MODE:-embedded}" != "server" ]]; then
+    bd dolt push --quiet >/dev/null 2>&1 || true
+  fi
 
   # Post continuation comments on old beads (best-effort: failures do not abort)
   if [[ -n "$old_today_id" ]]; then
@@ -273,7 +276,7 @@ print(json.dumps(notes))
 }
 
 export -f do_rotation
-export ROOT_ID STATE_DIR CONFIG_FILE
+export ROOT_ID STATE_DIR CONFIG_FILE DOLT_MODE
 
 # Acquire exclusive lock and run the rotation body
 case "$LOCK_TOOL" in
@@ -298,5 +301,16 @@ esac
 # the peer's duplicate may not be in our local DB yet, so without a fresh pull the
 # reconcile would just no-op. Rotation is rare, so the extra pull is cheap and
 # makes the safety-net materially more effective. Fail-open (offline → skip).
-bd dolt pull --quiet >/dev/null 2>&1 || true
+# SERVER MODE: skip — the reconcile already queries the one shared DB, which
+# holds any peer's duplicate the instant it's created.
+if [[ "$DOLT_MODE" != "server" ]]; then
+  bd dolt pull --quiet >/dev/null 2>&1 || true
+fi
 huddle_reconcile_today || true
+
+# --- Cursor hygiene (best-effort, fail-open) ---
+# Rotation is the natural once-a-day sweep point. Drop poll cursors not touched
+# in ~14 days (worktrees long gone — 135 had accumulated) and any leftover
+# session-names prune backups. Never fatal; a failure here must not fail rotation.
+find "$STATE_DIR" -maxdepth 1 -name 'last-seen-*' -type f -mtime +14 -delete 2>/dev/null || true
+find "$STATE_DIR" -maxdepth 1 -name 'session-names.json.pre-prune-*' -type f -delete 2>/dev/null || true

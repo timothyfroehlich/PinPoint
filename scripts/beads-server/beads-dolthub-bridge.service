@@ -1,0 +1,29 @@
+# systemd --user unit: one bridge cycle (commit -> pull -> push) between the
+# live Dolt server and DoltHub. Triggered by beads-dolthub-bridge.timer.
+#
+# TEMPLATE. Install to ~/.config/systemd/user/beads-dolthub-bridge.service.
+# oneshot + loud failure: a failed cycle leaves the unit in `failed` and the
+# timer keeps its next run, but a pull CONFLICT makes the script exit nonzero
+# after aborting the merge — inspect `journalctl --user -u beads-dolthub-bridge`
+# and resolve before trusting the next cycle.
+#
+# BEADS_DOLT_PASSWORD comes from an environment file readable only by the user
+# (chmod 600). NEVER commit that file; NEVER put the password in this unit.
+# PATH must include /home/linuxbrew/.linuxbrew/bin for brew-installed bd + dolt.
+
+[Unit]
+Description=Beads DoltHub bridge (commit/pull/push cycle)
+After=dolt-sql-server.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# REQUIRED: run from the project so `bd` resolves .beads (the server config).
+# Without this the bridge runs from $HOME and every `bd dolt` call fails.
+WorkingDirectory=%h/Code/PinPoint
+Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+# Secret lives here, mode 600, outside git. See SETUP.md.
+EnvironmentFile=%h/.beads-server/bridge.env
+# System bash (brew bash is not guaranteed installed); script is invoked via bash
+# so its +x bit is optional.
+ExecStart=/usr/bin/bash %h/.beads-server/beads-dolthub-bridge.sh

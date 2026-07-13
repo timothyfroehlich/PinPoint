@@ -1,6 +1,8 @@
 {
   // TypeScript Configuration - Optimized for @tsconfig/strictest
-  "typescript.tsdk": "node_modules/typescript/lib",
+  // No "typescript.tsdk": the workspace `typescript` package is the
+  // @typescript/typescript6 API wrapper (no tsserver.js), so VS Code uses its
+  // bundled tsserver for editor features. CLI gates run TS7 native / tsc6.
   "typescript.preferences.includePackageJsonAutoImports": "on",
   "typescript.preferences.strictMode": true,
   "typescript.suggest.autoImports": true,

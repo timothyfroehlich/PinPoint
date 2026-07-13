@@ -94,7 +94,10 @@ fi
 # Verify the root bead is still reachable. If it was deleted/closed/renamed
 # under us, hooks would silently stop injecting — surface a specific notice
 # so the user knows to re-bootstrap. `bd show` exits non-zero for missing IDs.
+# In server mode a failure here may just mean the shared server is unreachable —
+# emit the throttled "degraded" signal so it isn't mistaken for a missing bead.
 if ! bd show "$ROOT_ID" --json >/dev/null 2>&1; then
+  huddle_warn_degraded
   printf '## ⚠️ Huddle root bead missing\n\n'
   # shellcheck disable=SC2016  # backticks are literal Markdown, not command substitution
   printf 'config.json points at %s but `bd show %s` failed.\n' "$ROOT_ID" "$ROOT_ID"
@@ -290,15 +293,28 @@ except Exception:
     print('')
 " 2>/dev/null || echo "")
 
-RECENT_DAILIES=$(printf '%s' "$NOTES_STR" | python3 -c "
-import sys, json
+# Recent dailies: query the live children by title (id + date parsed from the
+# "Huddle daily <date>" title), newest first — NOT a cached notes array. The old
+# recent_dailies cache was the source of the PP-9lq5 dangling pointers; reading
+# the DB directly means a purged/renamed daily simply drops out instead of
+# lingering as a broken reference.
+RECENT_DAILIES=$(bd children "$ROOT_ID" --json 2>/dev/null | python3 -c "
+import sys, json, re
 try:
-    n = json.loads(sys.stdin.read())
-    items = n.get('recent_dailies', [])
-    for item in items:
-        print(item.get('id', '') + '\t' + item.get('date', ''))
+    children = json.load(sys.stdin)
 except Exception:
-    pass
+    children = []
+rows = []
+for c in children:
+    m = re.match(r'^Huddle daily (\d{4}-\d{2}-\d{2})\$', c.get('title', ''))
+    if not m:
+        continue
+    cid = c.get('id', '')
+    if cid:
+        rows.append((m.group(1), cid))
+rows.sort(reverse=True)  # newest date first
+for date, cid in rows:
+    print(cid + '\t' + date)
 " 2>/dev/null || echo "")
 
 # Gather content — only emit the section header if there's something to show
