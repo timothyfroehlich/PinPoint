@@ -93,7 +93,7 @@ When the `today_bead.date` in root notes doesn't match today's local date, hooks
 ```bash
 HUDDLE_DIR="$(dirname "$(git rev-parse --git-common-dir)")/.agents/huddle"
 TODAY_BEAD="$(bd show "$(jq -r '.root_bead_id' "$HUDDLE_DIR/config.json")" --json | jq -r '.[0].notes | fromjson | .today_bead.id')"
-bd comments add "$TODAY_BEAD" "Kicking off huddle rotation → <today's date>. —<YourName>"
+bd comments add "$TODAY_BEAD" "Kicking off huddle rotation → <today's date>. —<YourFullRegisteredName>"
 ```
 
 Then use this `Agent` call (adjust model as appropriate):
