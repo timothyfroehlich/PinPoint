@@ -9,14 +9,8 @@ import {
   startTransition,
 } from "react";
 import { Button } from "~/components/ui/button";
-import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -32,6 +26,7 @@ import {
 import { cn } from "~/lib/utils";
 import { OwnerSelect } from "~/components/machines/OwnerSelect";
 import { PinballMapLinkField } from "~/components/machines/PinballMapLinkField";
+import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
 import type { ProseMirrorDoc } from "~/lib/tiptap/types";
 import {
@@ -84,6 +79,8 @@ interface EditMachineDialogProps {
     pinballmapExcludedReason: string | null;
     /** Whether the machine is marked listed on PinballMap's public map (bead C). */
     pinballmapListed: boolean;
+    /** Captured PinballMap listing handle (location_machine_xref id), or null. */
+    pinballmapLmxId: number | null;
     /** Linked catalog title's display name, resolved server-side from the mirror. */
     pinballmapTitleName: string | null;
     /** Machine description (rich text), edited via the editor in this dialog. */
@@ -94,6 +91,8 @@ interface EditMachineDialogProps {
   isOwner: boolean;
   /** Whether the viewer may set/change the PinballMap link (machines.pinballmap.link). */
   canLink: boolean;
+  /** Public pinballmap.com deep link (attribution + listing fallback). */
+  pinballmapUrl: string;
 }
 
 export function EditMachineDialog({
@@ -102,6 +101,7 @@ export function EditMachineDialog({
   canEditAnyMachine,
   isOwner,
   canLink,
+  pinballmapUrl,
 }: EditMachineDialogProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
@@ -433,41 +433,6 @@ export function EditMachineDialog({
               </Select>
             </div>
 
-            {/* List on PinballMap — display-only until outbound sync
-                (PP-o355.11) exists. Disabled rather than editable: with no
-                way to actually push a list/unlist to PinballMap.com yet,
-                letting someone flip this would just be lying to the card.
-                The hidden input always mirrors the persisted value (not
-                `listed`) so saving other fields never silently resets it. */}
-            {canLink && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="edit-pinballmap-listed"
-                      checked={machine.pinballmapListed}
-                      disabled
-                    />
-                    <input
-                      type="hidden"
-                      name="pinballmapListed"
-                      value={machine.pinballmapListed ? "on" : ""}
-                    />
-                    <Label
-                      htmlFor="edit-pinballmap-listed"
-                      className="text-muted-foreground"
-                    >
-                      List on PinballMap
-                    </Label>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Coming soon — PinPoint can&apos;t push listing changes to
-                  PinballMap.com yet.
-                </TooltipContent>
-              </Tooltip>
-            )}
-
             <DialogFooter>
               <Button
                 type="submit"
@@ -478,6 +443,25 @@ export function EditMachineDialog({
               </Button>
             </DialogFooter>
           </form>
+
+          {/*
+           * PinballMap listing lives OUTSIDE the edit form: it drives its own
+           * server actions (link / verify) via its own <form> elements, and
+           * nested forms are invalid HTML. The disabled "List on PinballMap"
+           * checkbox it replaces was display-only (PP-o355.12 read side).
+           */}
+          {canLink && (
+            <div className="mt-4">
+              <PinballmapListingControl
+                machineId={machine.id}
+                hasCatalogLink={machine.pinballmapMachineId !== null}
+                listed={machine.pinballmapListed}
+                lmxId={machine.pinballmapLmxId}
+                canLink={canLink}
+                pinballmapUrl={pinballmapUrl}
+              />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
