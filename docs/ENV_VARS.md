@@ -102,17 +102,18 @@ the degradation is a known, documented choice — not an oversight.
 
 ### 4.3 Local / CI / test-only config
 
-| Var (aliases)                                                                   | Sens.         | Scope    | Owner module                               | Notes                                       |
-| ------------------------------------------------------------------------------- | ------------- | -------- | ------------------------------------------ | ------------------------------------------- |
-| `PORT`                                                                          | 🟢            | Dev      | `src/lib/url.ts`, `src/lib/blob/client.ts` | default `3000`                              |
-| `EMAIL_TRANSPORT`                                                               | 🟢            | Dev/CI   | `src/lib/email/client.ts`                  | `smtp` → Mailpit; unset → Resend            |
-| `MAILPIT_PORT` / `MAILPIT_SMTP_PORT` (`INBUCKET_PORT` / `INBUCKET_SMTP_PORT`)   | 🟢            | Dev/CI   | `src/lib/email/client.ts`                  | per-worktree test mail ports                |
-| `DEV_AUTOLOGIN_ENABLED` / `_EMAIL` / `_PASSWORD`                                | 🔴(dev creds) | Dev      | `src/lib/supabase/middleware.ts`           | 🚫 must be absent/`false` in prod           |
-| `PINBALLMAP_MODE`                                                               | 🟢            | All      | `src/lib/pinballmap/config.ts`             | `live` in prod, `mock` elsewhere by default |
-| `MOCK_BLOB_STORAGE`                                                             | 🟢            | Dev/test | `src/lib/blob/client.ts`                   | feature flag                                |
-| `DRIZZLE_FORCE_PRODUCTION`                                                      | 🟢            | Ops      | `drizzle.config.ts`                        | explicit opt-in guard for prod DDL          |
-| `LOG_LEVEL` / `PINPOINT_LOG_DIR`                                                | 🟢            | All      | `src/lib/logger.ts`                        | defaults: `info` / `<cwd>/logs`             |
-| `SKIP_SUPABASE_RESET`, `E2E_DOCKER_READY_ATTEMPTS`, `E2E_DOCKER_READY_DELAY_MS` | 🟢            | CI/test  | `e2e/global-setup.ts`                      | E2E harness tuning                          |
+| Var (aliases)                                                                   | Sens.         | Scope    | Owner module                               | Notes                                                                          |
+| ------------------------------------------------------------------------------- | ------------- | -------- | ------------------------------------------ | ------------------------------------------------------------------------------ |
+| `PORT`                                                                          | 🟢            | Dev      | `src/lib/url.ts`, `src/lib/blob/client.ts` | default `3000`                                                                 |
+| `EMAIL_TRANSPORT`                                                               | 🟢            | Dev/CI   | `src/lib/email/client.ts`                  | `smtp` → Mailpit; unset → Resend                                               |
+| `MAILPIT_PORT` / `MAILPIT_SMTP_PORT` (`INBUCKET_PORT` / `INBUCKET_SMTP_PORT`)   | 🟢            | Dev/CI   | `src/lib/email/client.ts`                  | per-worktree test mail ports                                                   |
+| `DEV_AUTOLOGIN_ENABLED` / `_EMAIL` / `_PASSWORD`                                | 🔴(dev creds) | Dev      | `src/lib/supabase/middleware.ts`           | 🚫 must be absent/`false` in prod                                              |
+| `DEV_ALLOWED_ORIGINS`                                                           | 🟢            | Dev      | `next.config.ts`                           | comma-sep origins for cross-machine `next dev`; ignored by `next build`/Vercel |
+| `PINBALLMAP_MODE`                                                               | 🟢            | All      | `src/lib/pinballmap/config.ts`             | `live` in prod, `mock` elsewhere by default                                    |
+| `MOCK_BLOB_STORAGE`                                                             | 🟢            | Dev/test | `src/lib/blob/client.ts`                   | feature flag                                                                   |
+| `DRIZZLE_FORCE_PRODUCTION`                                                      | 🟢            | Ops      | `drizzle.config.ts`                        | explicit opt-in guard for prod DDL                                             |
+| `LOG_LEVEL` / `PINPOINT_LOG_DIR`                                                | 🟢            | All      | `src/lib/logger.ts`                        | defaults: `info` / `<cwd>/logs`                                                |
+| `SKIP_SUPABASE_RESET`, `E2E_DOCKER_READY_ATTEMPTS`, `E2E_DOCKER_READY_DELAY_MS` | 🟢            | CI/test  | `e2e/global-setup.ts`                      | E2E harness tuning                                                             |
 
 ### 4.4 Platform-set (do not manage manually)
 
