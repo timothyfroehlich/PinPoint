@@ -38,9 +38,17 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 
 ### Checklist
 
-1. **Stale Supabase CLI pin check** (PP-nlv6)
-   - Compare the pinned Supabase CLI version against the latest release. The pin lives in CI setup / config; a version-drift nudge belongs here, not in per-session briefing.
-   - If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
+1. **Stale version-pin checks** (Supabase CLI — PP-nlv6; pnpm corepack pin — PP-w0eq)
+   - **Supabase CLI pin.** Compare the pinned Supabase CLI version against the latest release. The pin lives in CI setup / config; a version-drift nudge belongs here, not in per-session briefing. If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
+   - **pnpm corepack pin.** The pnpm binary is pinned in the `packageManager` field of `package.json` (corepack). **Dependabot cannot bump this field** — it's an open, unimplemented feature request ([dependabot-core#4830](https://github.com/dependabot/dependabot-core/issues/4830)); Dependabot's pnpm support only updates deps _inside_ the lockfile, never the corepack pin. So this is the only watcher it has, and it silently rots without it (that's how we ended up 9 months behind on 10.2.0 until npm's audit-endpoint retirement forced the jump — PP-w0eq).
+     - **Apply a 30-day cooldown** (supply-chain soak — same rationale as the Dependabot npm cooldown): bump only to the newest stable pnpm ≥30 days old, never the just-released `latest`.
+     - Find the newest eligible version:
+
+       ```bash
+       npm view pnpm time --json | python3 -c "import json,sys,datetime as d; t=json.load(sys.stdin); c=d.datetime.now(d.UTC)-d.timedelta(days=30); r=[(v,ts) for v,ts in t.items() if '-' not in v and v.split('.')[0].isdigit()]; r.sort(key=lambda x:list(map(int,x[0].split('.')))); print(next(v for v,ts in reversed(r) if d.datetime.fromisoformat(ts.replace('Z','+00:00'))<=c))"
+       ```
+
+     - If it's newer than the current pin (mind major bumps — read the pnpm release notes/migration guide first), bump via `corepack use pnpm@<version>`, then verify no lockfile churn (`pnpm install --frozen-lockfile` → only `package.json` should change), `pnpm audit --audit-level=high` still resolves, and `pnpm run check` is green. PR it through the normal workflow; file a bead if a major bump needs real migration work.
 
 2. **TypeScript-7 rollout status**
    - Read `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` for the current phase.
