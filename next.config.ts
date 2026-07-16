@@ -56,9 +56,22 @@ function assertVercelDeploymentEnv(): void {
 
 assertVercelDeploymentEnv();
 
+// Comma-separated hostnames/IPs allowed to reach the dev server's HMR/dev
+// resources when a browser hits it from a non-localhost origin (e.g. reaching a
+// Bazzite-hosted dev server from another tailnet machine). Dev-server-only —
+// `next build`/Vercel ignore `allowedDevOrigins`. Set per-machine in the
+// gitignored `.env.development.local`; empty/unset in normal local dev.
+const devAllowedOrigins = process.env["DEV_ALLOWED_ORIGINS"]
+  ?.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const nextConfig: NextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
   reactStrictMode: true,
+  ...(devAllowedOrigins?.length
+    ? { allowedDevOrigins: devAllowedOrigins }
+    : {}),
   experimental: {
     serverActions: {
       // Image uploads are sent through Server Actions as multipart FormData.
