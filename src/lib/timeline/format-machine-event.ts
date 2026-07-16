@@ -59,5 +59,16 @@ export function formatMachineEvent(
       return `Settings set "${event.setName}" removed`;
     case "settings_set_preferred":
       return `Marked "${event.setName}" as the preferred settings set`;
+    case "pinballmap_listing":
+      switch (event.action) {
+        case "listed":
+          return "Listed on PinballMap";
+        case "unlisted":
+          return "Unlisted from PinballMap";
+        case "linked":
+          return "Linked to PinballMap entry";
+        case "reconnected":
+          return "Reconnected PinballMap link";
+      }
   }
 }

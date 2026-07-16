@@ -36,6 +36,16 @@ export type MachineTimelineEventData =
   | { kind: "settings_set_updated"; setName: string }
   | { kind: "settings_set_deleted"; setName: string }
   | { kind: "settings_set_preferred"; setName: string }
+  // === sourceType='lifecycle' — PinballMap listing link (PP-o355.12) ===
+  // Mirrors the outbound/link operations against a machine's PinballMap
+  // listing. `lmxId` is the captured location_machine_xref id at event time
+  // (null only for an unlisted → the handle was cleared). `linked`/`reconnected`
+  // are read-only captures; `listed`/`unlisted` are operator-token writes.
+  | {
+      kind: "pinballmap_listing";
+      action: "listed" | "unlisted" | "linked" | "reconnected";
+      lmxId: number | null;
+    }
   // === sourceType='issue' (duplicate-written from issue actions) ===
   | {
       kind: "issue_opened";
