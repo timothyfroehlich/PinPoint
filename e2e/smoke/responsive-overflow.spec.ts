@@ -23,9 +23,28 @@ import { getProfileIdByEmail } from "../support/supabase-admin.js";
 const machineInitials = seededMachines.addamsFamily.initials;
 const issueNum = seededIssue("TAF").num;
 
+// Filter-heavy query for surfaces that render <IssueFilters>. Overflow bugs
+// live in the loaded, many-chips state — not the empty default — so exercise a
+// route variant where a wide set of active-filter chips is rendered. This is
+// what surfaces content bleeding off the viewport (see PP collections chip
+// overflow: chips previously overlaid the search input and spilled off-screen
+// on narrow viewports once several filters were active).
+// Deliberately heavy: partial selections from each status group (so they render
+// as individual chips rather than collapsing to a single group chip) plus every
+// severity, priority, and frequency value. This produces ~19 chips — enough that
+// a non-wrapping chip row would overrun a 375px viewport, which is exactly the
+// regression this guards against.
+const filterHeavyQuery =
+  `?status=new,in_progress,need_parts,need_help,fixed,wont_fix,wai,no_repro` +
+  `&severity=cosmetic,minor,major,unplayable` +
+  `&priority=low,medium,high` +
+  `&frequency=intermittent,frequent,constant` +
+  `&machine=${machineInitials}`;
+
 const authenticatedRoutes = [
   "/dashboard",
   "/issues",
+  `/issues${filterHeavyQuery}`,
   "/m",
   `/m/${machineInitials}`,
   `/m/${machineInitials}/settings`,
@@ -69,6 +88,16 @@ test.describe("Responsive: no horizontal overflow", () => {
           await assertNoA11yViolations(page);
         });
       }
+
+      // Loaded state: the collection Issues tab with a wide set of active
+      // filters renders the full chip row — the surface where the chip overflow
+      // was originally reported.
+      test(`/c/owner/[member]/issues (filters active)`, async ({ page }) => {
+        await page.goto(`${collectionBase}/issues${filterHeavyQuery}`);
+        await page.waitForLoadState("load");
+        await assertNoHorizontalOverflow(page);
+        await assertNoA11yViolations(page);
+      });
     });
   });
 
