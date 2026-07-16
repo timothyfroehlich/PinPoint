@@ -179,9 +179,11 @@ async function authorizeListingRead(
   return { ok: true, userId: user.id, machine };
 }
 
+// Codes the shared preamble can emit; a subset of every listing action's union,
+// so `return authed.result` typechecks in each caller.
 type ListingActionError = Result<
   never,
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "ABSENT" | "SERVER"
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND"
 >;
 
 export type LinkPinballmapResult = Result<
@@ -263,4 +265,67 @@ export async function linkPinballmapEntryAction(
 
   revalidatePath(`/m/${machine.initials}`);
   return ok({ lmxId: lmx.id });
+}
+
+export type VerifyPinballmapResult = Result<
+  { state: "ok" | "stale" | "healed" },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+/**
+ * On-demand "Verify" — re-check a machine's stored PinballMap link against a
+ * FRESH lineup (this is the explicit "check now" affordance, so it always forces
+ * a sync). Read-only, `machines.pinballmap.link`.
+ *
+ *  - stored lmx still present  → `ok`      (nothing to do)
+ *  - title resolves to a NEW id → `healed`  (update the stored handle + timeline)
+ *  - title absent from lineup   → `stale`   (leave the stored id; UI shows Reconnect)
+ *
+ * Continuous background desync detection stays in the hourly snapshot (PP-o355.11);
+ * this is the user-triggered spot-check, so a single sync per click is within
+ * conduct (CORE-PBM-001).
+ */
+export async function verifyPinballmapLinkAction(
+  _prev: VerifyPinballmapResult | undefined,
+  formData: FormData
+): Promise<VerifyPinballmapResult> {
+  const authed = await authorizeListingRead(formData);
+  if (!authed.ok) return authed.result;
+  const { userId, machine } = authed;
+  if (machine.pinballmapMachineId === null)
+    return err("VALIDATION", "Machine isn't linked to a PinballMap title yet");
+
+  // Verify means "check right now" — force a fresh sync before resolving.
+  await syncLocationSnapshot();
+  const snapshot = (await getPinballMapState())?.snapshotJson;
+  if (!snapshot) return err("SERVER", "PinballMap lineup unavailable");
+
+  const lmx = findLmxForMachine(snapshot, machine.pinballmapMachineId);
+  if (!lmx) return ok({ state: "stale" });
+  if (lmx.id === machine.pinballmapLmxId) return ok({ state: "ok" });
+
+  // Title now maps to a different lmx (PBM re-minted it) — heal the stored handle.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(machines)
+      .set({ pinballmapLmxId: lmx.id, pinballmapListed: true })
+      .where(eq(machines.id, machine.id));
+    await createMachineTimelineEvent(
+      machine.id,
+      {
+        sourceType: "lifecycle",
+        tag: "lifecycle",
+        eventData: {
+          kind: "pinballmap_listing",
+          action: "reconnected",
+          lmxId: lmx.id,
+        },
+        actorId: userId,
+      },
+      tx
+    );
+  });
+
+  revalidatePath(`/m/${machine.initials}`);
+  return ok({ state: "healed" });
 }

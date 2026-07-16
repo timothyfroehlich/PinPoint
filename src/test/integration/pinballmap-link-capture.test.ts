@@ -220,3 +220,96 @@ describe("linkPinballmapEntryAction (PGlite)", () => {
     if (!res.ok) expect(res.code).toBe("UNAUTHORIZED");
   });
 });
+
+describe("verifyPinballmapLinkAction (PGlite)", () => {
+  setupTestDb();
+
+  it("returns ok when the stored lmx is still present", async () => {
+    const db = await getTestDb();
+    const { verifyPinballmapLinkAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 900, machineId: 42 }];
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    const res = await verifyPinballmapLinkAction(undefined, fdFor(machine.id));
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value.state).toBe("ok");
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapLmxId).toBe(900);
+    // No timeline event on a no-op verify.
+    const events = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(events).toHaveLength(0);
+  });
+
+  it("heals the stored lmx when the title now maps to a new id", async () => {
+    const db = await getTestDb();
+    const { verifyPinballmapLinkAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 950, machineId: 42 }]; // PBM re-minted the lmx
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    const res = await verifyPinballmapLinkAction(undefined, fdFor(machine.id));
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value.state).toBe("healed");
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapLmxId).toBe(950);
+    const events = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(events[0]?.eventData).toMatchObject({
+      kind: "pinballmap_listing",
+      action: "reconnected",
+      lmxId: 950,
+    });
+  });
+
+  it("flags the link stale (unchanged) when the title is absent", async () => {
+    const db = await getTestDb();
+    const { verifyPinballmapLinkAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = []; // title 42 no longer on the lineup — link broke on PBM's side
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    const res = await verifyPinballmapLinkAction(undefined, fdFor(machine.id));
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value.state).toBe("stale");
+
+    // Stored id is LEFT so the UI can offer Reconnect — not cleared.
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapLmxId).toBe(900);
+    expect(row?.pinballmapListed).toBe(true);
+  });
+});
