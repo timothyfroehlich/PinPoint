@@ -22,10 +22,14 @@ describe("parseQuickRow", () => {
     expect(res.success).toBe(true);
   });
 
-  it("rejects a missing machineId with a field-prefixed message", () => {
+  it("rejects a missing machineId with the schema's plain message (no field prefix)", () => {
     const res = parseQuickRow({ ...validRow(), machineId: "not-a-uuid" });
     expect(res.success).toBe(false);
-    if (!res.success) expect(res.error).toMatch(/machineId/);
+    if (!res.success) {
+      expect(res.error).toBe("Please select a machine");
+      // The raw field path must not leak into the user-facing message.
+      expect(res.error).not.toMatch(/machineId/);
+    }
   });
 
   it("rejects an empty title", () => {

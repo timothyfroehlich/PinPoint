@@ -114,10 +114,23 @@ export function QuickReportGrid({
   const [focusPending, setFocusPending] = React.useState(false);
 
   const patch = (key: string, next: Partial<RowState>): void =>
-    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...next } : r)));
+    setRows((rs) =>
+      rs.map((r) => {
+        if (r.key !== key) return r;
+        // Editing a required field clears a stale validation error so a
+        // just-fixed row stops showing the red border + message; the error
+        // re-derives on the next submit if it's still wrong.
+        const clearsError =
+          r.error !== null && ("machineId" in next || "title" in next);
+        return { ...r, ...next, ...(clearsError ? { error: null } : {}) };
+      })
+    );
 
+  // A row is "ready" only when it's actually submittable — both required
+  // fields present. Counting machine-OR-title would over-promise: the count
+  // and "Submit all" would include half-filled rows the server must reject.
   const readyCount = rows.filter(
-    (r) => !r.submitted && (r.machineId || r.title)
+    (r) => !r.submitted && r.machineId && r.title
   ).length;
 
   const applyResult = (key: string, res: QuickRowResult): void =>
@@ -143,12 +156,11 @@ export function QuickReportGrid({
     return hasBlank ? rs : [...rs, blankRow()];
   }
 
-  // Discard a row; never leave the grid empty.
+  // Discard a row; always leave an editable blank to type in — otherwise
+  // discarding the last unsubmitted row (with submitted cards still present)
+  // strands the user on read-only cards until they find "+ Add issue".
   const discardRow = (key: string): void =>
-    setRows((rs) => {
-      const next = rs.filter((r) => r.key !== key);
-      return next.length > 0 ? next : [blankRow()];
-    });
+    setRows((rs) => ensureTrailingBlankRow(rs.filter((r) => r.key !== key)));
 
   // After a submit, advance focus to the next blank row's machine picker so
   // keyboard authoring can continue (machine → problem → submit → next). Keyed
@@ -199,7 +211,10 @@ export function QuickReportGrid({
   }
 
   async function submitAll(): Promise<void> {
-    const ready = rows.filter((r) => !r.submitted && (r.machineId || r.title));
+    // Only fire genuinely complete rows (machine AND title) — matches
+    // readyCount. Half-filled rows stay put for the user to finish rather than
+    // triggering a doomed server round-trip.
+    const ready = rows.filter((r) => !r.submitted && r.machineId && r.title);
     if (ready.length === 0) return;
     // Track by stable key: the optimistic update below replaces row objects,
     // so object-identity (`ready.includes(r)`) would no longer match afterward.
@@ -371,6 +386,21 @@ function QuickRow({
     <DiscardButton dirty={rowHasContent(row)} onDiscard={onDiscard} />
   );
 
+  // "Less" makes sense next to Machine on desktop, but at a phone width there's
+  // no room up there — it migrates down to sit with Discard/Submit instead.
+  // Rendered twice, CSS-toggled by container width (no JS layout branching).
+  const collapseButton = (visibilityClassName: string): React.JSX.Element => (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={() => onPatch({ open: false })}
+      className={visibilityClassName}
+    >
+      <ChevronDown className="mr-1 size-4 rotate-180" />
+      Less
+    </Button>
+  );
+
   return (
     <div
       data-testid="quick-row"
@@ -382,8 +412,10 @@ function QuickRow({
     >
       {!row.open ? (
         // Collapsed: a single grid that reflows via the row's container width —
-        // 3 lines when narrow (machine·sev·pri / problem / more·discard·submit),
-        // 2 lines when wide (…·more / problem·discard·submit). See globals.css.
+        // 3 lines when narrow (machine·sev / problem / more·discard·submit),
+        // 2 lines when wide (…sev·pri·more / problem·discard·submit).
+        // Priority is hidden at the narrow width (doesn't fit; still
+        // editable in the expanded row). See globals.css.
         <div className="quick-collapsed">
           <Field label="Machine" required area="machine">
             {machineField}
@@ -407,7 +439,13 @@ function QuickRow({
               onValueChange={(v) => onPatch({ severity: v })}
             />
           </Field>
-          <Field label="Priority" area="priority">
+          {/* Priority doesn't fit at a narrow container width, so it's hidden
+              there — still editable in the expanded row. */}
+          <Field
+            label="Priority"
+            area="priority"
+            className="hidden @[640px]:flex"
+          >
             <PrioritySelect
               value={row.priority}
               onValueChange={(v) => onPatch({ priority: v })}
@@ -422,16 +460,11 @@ function QuickRow({
           >
             More <ChevronDown className="ml-1 size-4" />
           </Button>
-          <DiscardButton
-            dirty={rowHasContent(row)}
-            onDiscard={onDiscard}
-            style={{ gridArea: "discard" }}
-            className="w-full @[640px]:w-auto @[640px]:justify-self-end"
-          />
           <div
-            style={{ gridArea: "submit" }}
-            className="w-full @[640px]:w-auto @[640px]:justify-self-end [&>button]:w-full @[640px]:[&>button]:w-auto"
+            style={{ gridArea: "actions" }}
+            className="flex items-center gap-2 [&>*]:flex-1 @[640px]:justify-end @[640px]:[&>*]:flex-none"
           >
+            {discardButton}
             {submitButton}
           </div>
         </div>
@@ -441,15 +474,7 @@ function QuickRow({
             <Field label="Machine" required>
               {machineField}
             </Field>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label="Collapse"
-              onClick={() => onPatch({ open: false })}
-            >
-              <ChevronDown className="size-4 rotate-180" />
-            </Button>
+            {collapseButton("hidden @[640px]:inline-flex")}
           </div>
           <Field label="Problem (issue title)" required>
             <Input
@@ -521,6 +546,7 @@ function QuickRow({
               </Label>
             </div>
             <div className="flex items-center gap-2 @[640px]:justify-self-end">
+              {collapseButton("@[640px]:hidden")}
               {discardButton}
               {submitButton}
             </div>
@@ -539,20 +565,16 @@ function QuickRow({
 function DiscardButton({
   dirty,
   onDiscard,
-  className,
-  style,
 }: {
   dirty: boolean;
   onDiscard: () => void;
-  className?: string;
-  style?: React.CSSProperties;
 }): React.JSX.Element {
   const label = (
     <>
       <Trash2 className="mr-1 size-4" aria-hidden="true" /> Discard
     </>
   );
-  const btnClass = cn("text-muted-foreground hover:text-foreground", className);
+  const btnClass = "text-muted-foreground hover:text-foreground";
 
   if (!dirty) {
     return (
@@ -560,7 +582,6 @@ function DiscardButton({
         type="button"
         variant="ghost"
         onClick={onDiscard}
-        style={style}
         className={btnClass}
       >
         {label}
@@ -571,12 +592,7 @@ function DiscardButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          style={style}
-          className={btnClass}
-        >
+        <Button type="button" variant="ghost" className={btnClass}>
           {label}
         </Button>
       </AlertDialogTrigger>
@@ -606,17 +622,19 @@ function Field({
   label,
   required,
   area,
+  className,
   children,
 }: {
   label: string;
   required?: boolean;
   area?: string;
+  className?: string;
   children: React.ReactNode;
 }): React.JSX.Element {
   const id = React.useId();
   return (
     <div
-      className="flex min-w-0 flex-col gap-1"
+      className={cn("flex min-w-0 flex-col gap-1", className)}
       style={area ? { gridArea: area } : undefined}
     >
       <Label

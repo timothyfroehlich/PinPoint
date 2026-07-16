@@ -10,13 +10,11 @@ export type ParsedQuickRow =
 export function parseQuickRow(raw: unknown): ParsedQuickRow {
   const result = quickRowSchema.safeParse(raw);
   if (!result.success) {
-    const first = result.error.issues[0];
-    const field = first?.path.at(0);
-    const message = first?.message ?? "Invalid input";
-    return {
-      success: false,
-      error: field ? `${String(field)}: ${message}` : message,
-    };
+    // Surface the schema's own message verbatim — each one is written to stand
+    // alone ("Please select a machine"), so prefixing the raw field path
+    // ("machineId: …") only leaks an internal name at the user.
+    const message = result.error.issues[0]?.message ?? "Invalid input";
+    return { success: false, error: message };
   }
   return { success: true, data: result.data };
 }

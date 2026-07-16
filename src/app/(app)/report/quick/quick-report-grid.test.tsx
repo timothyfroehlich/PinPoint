@@ -145,6 +145,9 @@ describe("QuickReportGrid", () => {
   });
 
   it("keeps a bad row flagged after submit-all partial failure", async () => {
+    // The row is client-ready (machine + problem both filled) so submit-all
+    // fires it; the *server* rejects it (e.g. the machine was removed), and
+    // that per-row failure must map back to keep this row flagged.
     submitAll.mockResolvedValue({
       ok: true,
       results: [
@@ -156,13 +159,18 @@ describe("QuickReportGrid", () => {
       ],
     });
     renderGrid();
+    const row = screen.getByTestId("quick-row");
+    await userEvent.click(
+      within(row).getByRole("combobox", { name: /machine/i })
+    );
+    await userEvent.click(screen.getByText(/Grand Prix/));
     await userEvent.type(
-      screen.getByLabelText(/problem/i),
-      "No machine picked"
+      within(row).getByLabelText(/problem/i),
+      "Server rejects this"
     );
     await userEvent.click(screen.getByRole("button", { name: /submit all/i }));
     expect(await screen.findByText(/Machine not found/)).toBeInTheDocument();
-    expect(screen.getByDisplayValue("No machine picked")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Server rejects this")).toBeInTheDocument();
   });
 
   it("recovers from a thrown submit action instead of hanging", async () => {
@@ -284,5 +292,72 @@ describe("QuickReportGrid", () => {
       expect(screen.getAllByTestId("quick-row")).toHaveLength(1)
     );
     expect(screen.queryByDisplayValue("First problem")).not.toBeInTheDocument();
+  });
+
+  it("counts a row as ready only once both required fields are filled", async () => {
+    renderGrid();
+    const row = screen.getByTestId("quick-row");
+    const submitAllBtn = screen.getByRole("button", { name: /submit all/i });
+    // A problem alone (no machine) is not submittable — must not count as ready.
+    await userEvent.type(
+      within(row).getByLabelText(/problem/i),
+      "Only a problem"
+    );
+    expect(submitAllBtn).toBeDisabled();
+    // Picking the machine completes the row → now ready.
+    await userEvent.click(
+      within(row).getByRole("combobox", { name: /machine/i })
+    );
+    await userEvent.click(screen.getByText(/Grand Prix/));
+    expect(
+      screen.getByRole("button", { name: /submit all \(1\)/i })
+    ).toBeEnabled();
+  });
+
+  it("clears a row's validation error when the offending field is edited", async () => {
+    submitRow.mockResolvedValue({
+      index: 0,
+      ok: false,
+      error: "Please select a machine",
+    });
+    renderGrid();
+    const row = screen.getByTestId("quick-row");
+    await userEvent.type(
+      within(row).getByLabelText(/problem/i),
+      "Weak flipper"
+    );
+    await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
+    expect(
+      await screen.findByText(/please select a machine/i)
+    ).toBeInTheDocument();
+    // Editing a required field (the title) drops the stale error immediately.
+    await userEvent.type(within(row).getByLabelText(/problem/i), " now");
+    expect(
+      screen.queryByText(/please select a machine/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps an editable blank row after discarding the last unsubmitted row", async () => {
+    submitRow.mockResolvedValue({
+      index: 0,
+      ok: true,
+      issueNumber: 42,
+      machineInitials: "GP",
+    });
+    renderGrid();
+    const row = screen.getByTestId("quick-row");
+    await userEvent.type(
+      within(row).getByLabelText(/problem/i),
+      "Spinner rejecting"
+    );
+    await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
+    await screen.findByRole("link", { name: "GP-42" });
+    // Discard the trailing blank (empty → no confirm). A fresh blank must
+    // remain so the user still has somewhere to type.
+    await userEvent.click(screen.getByRole("button", { name: /discard/i }));
+    await waitFor(() =>
+      expect(screen.getByLabelText(/problem/i)).toHaveValue("")
+    );
+    expect(screen.getByRole("link", { name: "GP-42" })).toBeInTheDocument();
   });
 });
