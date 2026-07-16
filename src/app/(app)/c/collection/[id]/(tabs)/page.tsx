@@ -1,11 +1,8 @@
 import type React from "react";
-import { asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { db } from "~/server/db";
-import { machines as machinesTable } from "~/server/db/schema";
 import { getLatestTimelineEventPerMachine } from "~/lib/collections/latest-activity";
 import { deriveMachineStatus } from "~/lib/machines/status";
-import { getCollectionForLayout } from "../_data";
+import { getCollectionForLayout, getPickerMachines } from "../_data";
 import {
   CollectionOverviewTable,
   type CollectionOverviewRow,
@@ -29,10 +26,7 @@ export default async function CollectionOverviewPage({
   // machine picker so it's fillable the moment it's created.
   if (machines.length === 0) {
     if (data.viewerCanManage) {
-      const allMachines = await db.query.machines.findMany({
-        columns: { id: true, initials: true, name: true },
-        orderBy: [asc(machinesTable.name)],
-      });
+      const allMachines = await getPickerMachines();
       return (
         <AddMachinesInline
           collectionId={data.collection.id}

@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { getCollection, type UserCollection } from "~/lib/collections/user";
 import {
   canManageCollection,
@@ -7,12 +7,52 @@ import {
 } from "~/lib/collections/access";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
+import { machines as machinesTable, userProfiles } from "~/server/db/schema";
 
 export interface CollectionForLayout {
   collection: UserCollection;
   viewerCanManage: boolean;
 }
+
+/** The current viewer: their id (undefined if unauthenticated) and role. */
+export interface Viewer {
+  userId: string | undefined;
+  role: string | null;
+}
+
+/**
+ * Request-deduped current viewer (user id + role). Shared by the layout,
+ * the collection resolver, and the Issues tab so a single request validates
+ * the JWT (`auth.getUser()`) and reads the role row once, not per call site.
+ */
+export const getViewer = cache(async (): Promise<Viewer> => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  let role: string | null = null;
+  if (user) {
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+    role = profile?.role ?? null;
+  }
+  return { userId: user?.id, role };
+});
+
+/**
+ * Request-deduped list of all machines for the collection edit/add pickers
+ * (id + initials + name, alphabetical). The layout's Edit modal and the empty
+ * Overview's inline picker both need it; caching collapses them to one query.
+ */
+export const getPickerMachines = cache(
+  async (): Promise<{ id: string; initials: string; name: string }[]> =>
+    db.query.machines.findMany({
+      columns: { id: true, initials: true, name: true },
+      orderBy: [asc(machinesTable.name)],
+    })
+);
 
 /**
  * Request-deduped fetch shared by the (tabs) layout and tab pages.
@@ -25,20 +65,7 @@ export const getCollectionForLayout = cache(
     const collection = await getCollection(undefined, collectionId);
     if (!collection) return null;
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    let role: string | null = null;
-    if (user) {
-      const profile = await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: { role: true },
-      });
-      role = profile?.role ?? null;
-    }
-
-    const viewer = { userId: user?.id, role };
+    const viewer = await getViewer();
     if (!canViewCollection(collection, viewer)) return null;
     return {
       collection,

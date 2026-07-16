@@ -1,14 +1,13 @@
 import type React from "react";
-import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
-import { createClient } from "~/lib/supabase/server";
 import { parseIssueFilters } from "~/lib/issues/filters";
 import { loadIssueListPage } from "~/lib/issues/list-page";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueList } from "~/components/issues/IssueList";
-import { getCollectionForLayout } from "~/app/(app)/c/collection/[id]/_data";
+import {
+  getCollectionForLayout,
+  getViewer,
+} from "~/app/(app)/c/collection/[id]/_data";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -24,10 +23,8 @@ export default async function CollectionIssuesPage({
   if (!data) notFound();
   const collection = data.collection;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Request-deduped with the layout/resolver — one getUser() + role read.
+  const viewer = await getViewer();
 
   const rawParams = await searchParams;
   const urlParams = new URLSearchParams();
@@ -69,15 +66,9 @@ export default async function CollectionIssuesPage({
   }
   filters.machine = scoped;
 
-  const currentUserProfile = user
-    ? await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: { role: true },
-      })
-    : undefined;
-  const isAdmin = currentUserProfile?.role === "admin"; // permissions-audit-allow: SQL visibility flag, mirrors /issues page
+  const isAdmin = viewer.role === "admin"; // permissions-audit-allow: SQL visibility flag, mirrors /issues page
 
-  filters.currentUserId = user?.id;
+  filters.currentUserId = viewer.userId;
   const { issuesList, totalCount, filterUsers, assigneeUsers, page, pageSize } =
     await loadIssueListPage(filters, { isAdmin });
 
@@ -93,7 +84,7 @@ export default async function CollectionIssuesPage({
           name: m.name,
         }))}
         filters={filters}
-        currentUserId={user?.id ?? null}
+        currentUserId={viewer.userId ?? null}
       />
       <IssueList
         issues={issuesList}

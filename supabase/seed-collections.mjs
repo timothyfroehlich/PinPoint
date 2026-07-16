@@ -47,6 +47,7 @@ async function run() {
     `;
     if (!admin) {
       console.error("❌ admin@test.com not found — run seed-users first");
+      process.exitCode = 1;
       return;
     }
 

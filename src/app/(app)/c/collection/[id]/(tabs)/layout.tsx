@@ -1,15 +1,12 @@
 import type React from "react";
 import type { Metadata } from "next";
-import { asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { db } from "~/server/db";
-import { machines as machinesTable } from "~/server/db/schema";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { CollectionHeader } from "~/components/collections/CollectionHeader";
 import { CollectionTabStrip } from "~/components/collections/CollectionTabStrip";
 import { EditCollectionDialog } from "~/components/collections/EditCollectionDialog";
 import { summarizeCollection } from "~/lib/collections/summary";
-import { getCollectionForLayout } from "../_data";
+import { getCollectionForLayout, getPickerMachines } from "../_data";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -50,10 +47,7 @@ export default async function CollectionLayout({
   // delete). The all-machines fetch runs only on the owner's own view.
   let headerAction: React.ReactNode = null;
   if (data.viewerCanManage) {
-    const allMachines = await db.query.machines.findMany({
-      columns: { id: true, initials: true, name: true },
-      orderBy: [asc(machinesTable.name)],
-    });
+    const allMachines = await getPickerMachines();
     headerAction = (
       <EditCollectionDialog
         collectionId={data.collection.id}
