@@ -449,9 +449,9 @@ trigger: always_on
 **CORE-RESP-004:** Overflow testing required
 
 - **Severity:** High
-- **Why:** Horizontal overflow is invisible to Playwright visibility assertions but breaks the user experience
-- **Do:** Add route to `e2e/smoke/responsive-overflow.spec.ts` when creating a new page
-- **Don't:** Ship a new page without overflow coverage at both mobile and desktop viewports
+- **Why:** Horizontal overflow is invisible to Playwright visibility assertions but breaks the user experience. It is also invisible to a naive `document.scrollWidth` check, because the app shell clips overflow at `<body>` (`overflow-x: hidden` in `globals.css`) — so `assertNoHorizontalOverflow` walks the DOM for content a non-scrollable ancestor clips off-screen instead. Overflow bugs live in the **loaded, filled state** (long names, many chips/badges, active filters), not the empty default a page lands on — an empty-state visit passes while the real state is broken.
+- **Do:** Add every new top-level route to `e2e/smoke/responsive-overflow.spec.ts`, and exercise it in its **loaded state** — pre-apply filters/params so lists, chip rows, and badges actually render (see the `filterHeavyQuery` variants). Both mobile (375px) and desktop viewports run via the project matrix.
+- **Don't:** Ship a new page without overflow coverage, or cover it only in its empty state. Don't "fix" an overflow by adding `overflow-x: hidden` to hide the symptom — that clips content off-screen where the user can't reach it.
 
 ---
 

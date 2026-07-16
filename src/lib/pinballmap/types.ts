@@ -22,8 +22,10 @@ export interface PbmCondition {
 
 /**
  * A location_machine_xref — "this machine at this location". The `id` (lmx id)
- * is ephemeral: removing and re-adding a machine mints a new one, so it is
- * resolved from the latest snapshot at action time and never cached.
+ * is the durable listing handle: we capture it when a machine is listed and
+ * STORE it on `machines.pinballmap_lmx_id`, healing it from the latest snapshot
+ * when PBM re-mints one (removing + re-adding a machine changes the id). We do
+ * not re-resolve it per push — see the store-and-heal model (PP-o355.16 / .12).
  *
  * Note: PBM's location payload carries only `machineId` here, not the machine
  * name — names come from the catalog mirror (bead B).
