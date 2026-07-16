@@ -10,8 +10,7 @@ import {
   CollectionOverviewTable,
   type CollectionOverviewRow,
 } from "~/components/collections/CollectionOverviewTable";
-import { CollectionOwnerControls } from "~/components/collections/CollectionOwnerControls";
-import { ManageCollectionMachines } from "~/components/collections/ManageCollectionMachines";
+import { AddMachinesInline } from "~/components/collections/AddMachinesInline";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -25,37 +24,27 @@ export default async function CollectionOverviewPage({
   if (!data) notFound();
   const { machines } = data.collection;
 
-  // Owner-only management surface: rename/delete + a full-machine multi-select.
-  // The all-machines fetch runs only on the owner's own view.
-  let ownerControls: React.JSX.Element | null = null;
-  if (data.viewerCanManage) {
-    const allMachines = await db.query.machines.findMany({
-      columns: { id: true, initials: true, name: true },
-      orderBy: [asc(machinesTable.name)],
-    });
-    ownerControls = (
-      <div className="space-y-3 rounded-md border border-outline-variant p-4">
-        <CollectionOwnerControls
-          collectionId={data.collection.id}
-          currentName={data.collection.name}
-        />
-        <ManageCollectionMachines
-          collectionId={data.collection.id}
-          allMachines={allMachines}
-          currentIds={machines.map((m) => m.id)}
-        />
-      </div>
-    );
-  }
-
+  // Editing (rename / machine set / delete) lives in the header's "Edit
+  // collection" modal. Here, an empty collection the viewer owns gets an inline
+  // machine picker so it's fillable the moment it's created.
   if (machines.length === 0) {
+    if (data.viewerCanManage) {
+      const allMachines = await db.query.machines.findMany({
+        columns: { id: true, initials: true, name: true },
+        orderBy: [asc(machinesTable.name)],
+      });
+      return (
+        <AddMachinesInline
+          collectionId={data.collection.id}
+          collectionName={data.collection.name}
+          allMachines={allMachines}
+        />
+      );
+    }
     return (
-      <div className="space-y-4">
-        {ownerControls}
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          No machines in this collection yet.
-        </p>
-      </div>
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        No machines in this collection yet.
+      </p>
     );
   }
 
@@ -80,10 +69,5 @@ export default async function CollectionOverviewPage({
     presence: m.presenceStatus,
   }));
 
-  return (
-    <div className="space-y-4">
-      {ownerControls}
-      <CollectionOverviewTable rows={rows} />
-    </div>
-  );
+  return <CollectionOverviewTable rows={rows} />;
 }

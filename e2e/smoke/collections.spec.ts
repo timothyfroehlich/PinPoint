@@ -30,22 +30,23 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     await page.getByTestId("user-menu-my-collections").click();
     await expect(page).toHaveURL(/\/c\/collections$/);
 
-    // Create a collection — redirects to its view.
-    await page.getByLabel("New collection name").fill(name);
-    await page.getByRole("button", { name: "Create" }).click();
+    // Create a collection via the "New collection" modal — redirects to its view.
+    await page.getByTestId("create-collection-trigger").click();
+    await page.getByLabel("Name").fill(name);
+    await page.getByTestId("create-collection-submit").click();
     await expect(page).toHaveURL(/\/c\/collection\//);
 
-    // Fresh collection is empty.
+    // Fresh collection is empty — the owner sees the inline add-machines picker.
     await expect(
-      page.getByText("No machines in this collection yet.")
+      page.getByText("This collection is empty. Add machines to get started.")
     ).toBeVisible();
 
-    // Add a machine via the owner multi-select.
+    // Add a machine via the inline empty-state picker.
     await page.getByTestId("collection-machines-multiselect").click();
     await page.getByPlaceholder("Search machines…").fill("Slick Chick");
     await page.getByRole("option", { name: /Slick Chick/ }).click();
-    await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: /save machines/i }).click();
+    await page.keyboard.press("Escape"); // close the multi-select popover
+    await page.getByTestId("collection-add-machines").click();
 
     // Overview now renders the machine table.
     await expect(page.getByTestId("collection-overview-body")).toBeVisible();

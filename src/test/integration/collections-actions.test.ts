@@ -89,7 +89,56 @@ describe("collection actions", () => {
     expect(anon.success).toBe(false);
   });
 
-  it("updateCollectionMachinesAction: owner replaces membership (add + remove)", async () => {
+  it("createCollectionAction: creates with initial machines attached", async () => {
+    const db = await getTestDb();
+    const member = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(member);
+    const a = createTestMachine({ initials: "AA", name: "A" });
+    const b = createTestMachine({ initials: "BB", name: "B" });
+    await db.insert(machines).values([a, b]);
+    const { createCollectionAction } =
+      await import("~/app/(app)/c/collections/actions");
+
+    signIn(member.id);
+    const created = await createCollectionAction({
+      name: "Bank",
+      machineIds: [a.id, b.id],
+    });
+    expect(created.success).toBe(true);
+    if (!created.success) throw new Error("expected success");
+    expect(await membershipOf(created.data?.id ?? "")).toEqual(
+      new Set([a.id, b.id])
+    );
+  });
+
+  it("createCollectionAction: rejects an unknown initial machine id", async () => {
+    const db = await getTestDb();
+    const member = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(member);
+    const { createCollectionAction } =
+      await import("~/app/(app)/c/collections/actions");
+
+    signIn(member.id);
+    const before = await db.select().from(collections);
+    const result = await createCollectionAction({
+      name: "Bank",
+      machineIds: [crypto.randomUUID()],
+    });
+    expect(result.success).toBe(false);
+    // Nothing persists when validation fails before the transaction.
+    const after = await db.select().from(collections);
+    expect(after.length).toBe(before.length);
+  });
+
+  async function nameOf(collectionId: string): Promise<string | undefined> {
+    const db = await getTestDb();
+    const row = await db.query.collections.findFirst({
+      where: eq(collections.id, collectionId),
+    });
+    return row?.name;
+  }
+
+  it("updateCollectionAction: owner updates name + machines together (add + remove)", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ role: "member" });
     await db.insert(userProfiles).values(owner);
@@ -105,18 +154,20 @@ describe("collection actions", () => {
       .insert(collectionMachines)
       .values({ collectionId: collection.id, machineId: a.id });
 
-    const { updateCollectionMachinesAction } =
+    const { updateCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
     signIn(owner.id);
-    const result = await updateCollectionMachinesAction({
+    const result = await updateCollectionAction({
       collectionId: collection.id,
+      name: "Renamed Set",
       machineIds: [b.id, c.id],
     });
     expect(result.success).toBe(true);
+    expect(await nameOf(collection.id)).toBe("Renamed Set");
     expect(await membershipOf(collection.id)).toEqual(new Set([b.id, c.id]));
   });
 
-  it("updateCollectionMachinesAction: rejects unknown machine id, membership unchanged", async () => {
+  it("updateCollectionAction: rejects unknown machine id, name + membership unchanged", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ role: "member" });
     await db.insert(userProfiles).values(owner);
@@ -130,18 +181,49 @@ describe("collection actions", () => {
       .insert(collectionMachines)
       .values({ collectionId: collection.id, machineId: a.id });
 
-    const { updateCollectionMachinesAction } =
+    const { updateCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
     signIn(owner.id);
-    const result = await updateCollectionMachinesAction({
+    const result = await updateCollectionAction({
       collectionId: collection.id,
+      name: "New Name",
       machineIds: [a.id, crypto.randomUUID()],
     });
     expect(result.success).toBe(false);
+    // Validation happens before the transaction — nothing persists.
+    expect(await nameOf(collection.id)).toBe("Set");
     expect(await membershipOf(collection.id)).toEqual(new Set([a.id]));
   });
 
-  it("updateCollectionMachinesAction: non-owner denied, membership unchanged", async () => {
+  it("updateCollectionAction: rejects blank name, name + membership unchanged", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(owner);
+    const a = createTestMachine({ initials: "AA", name: "A" });
+    const b = createTestMachine({ initials: "BB", name: "B" });
+    await db.insert(machines).values([a, b]);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Set", ownerId: owner.id })
+      .returning();
+    await db
+      .insert(collectionMachines)
+      .values({ collectionId: collection.id, machineId: a.id });
+
+    const { updateCollectionAction } =
+      await import("~/app/(app)/c/collections/actions");
+    signIn(owner.id);
+    const result = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "   ",
+      machineIds: [a.id, b.id],
+    });
+    expect(result.success).toBe(false);
+    expect(await nameOf(collection.id)).toBe("Set");
+    expect(await membershipOf(collection.id)).toEqual(new Set([a.id]));
+  });
+
+  it("updateCollectionAction: non-owner denied, name + membership unchanged", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ role: "member" });
     const intruder = createTestUser({ role: "admin" });
@@ -157,19 +239,37 @@ describe("collection actions", () => {
       .insert(collectionMachines)
       .values({ collectionId: collection.id, machineId: a.id });
 
-    const { updateCollectionMachinesAction } =
+    const { updateCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
     // Admin is not the owner — manage is owner-only.
     signIn(intruder.id);
-    const result = await updateCollectionMachinesAction({
+    const result = await updateCollectionAction({
       collectionId: collection.id,
+      name: "Hijacked",
       machineIds: [b.id],
     });
     expect(result.success).toBe(false);
+    expect(await nameOf(collection.id)).toBe("Set");
     expect(await membershipOf(collection.id)).toEqual(new Set([a.id]));
   });
 
-  it("renameCollectionAction / deleteCollectionAction: owner only", async () => {
+  it("updateCollectionAction: missing collection returns not found", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(owner);
+
+    const { updateCollectionAction } =
+      await import("~/app/(app)/c/collections/actions");
+    signIn(owner.id);
+    const result = await updateCollectionAction({
+      collectionId: crypto.randomUUID(),
+      name: "Whatever",
+      machineIds: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("deleteCollectionAction: owner only", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ role: "member" });
     const other = createTestUser({ role: "member" });
@@ -179,32 +279,8 @@ describe("collection actions", () => {
       .values({ name: "Original", ownerId: owner.id })
       .returning();
 
-    const { renameCollectionAction, deleteCollectionAction } =
+    const { deleteCollectionAction } =
       await import("~/app/(app)/c/collections/actions");
-
-    // Non-owner rename denied — name unchanged.
-    signIn(other.id);
-    const denied = await renameCollectionAction({
-      collectionId: collection.id,
-      name: "Hijacked",
-    });
-    expect(denied.success).toBe(false);
-    let row = await db.query.collections.findFirst({
-      where: eq(collections.id, collection.id),
-    });
-    expect(row?.name).toBe("Original");
-
-    // Owner rename succeeds.
-    signIn(owner.id);
-    const renamed = await renameCollectionAction({
-      collectionId: collection.id,
-      name: "Renamed",
-    });
-    expect(renamed.success).toBe(true);
-    row = await db.query.collections.findFirst({
-      where: eq(collections.id, collection.id),
-    });
-    expect(row?.name).toBe("Renamed");
 
     // Non-owner delete denied — row still present.
     signIn(other.id);

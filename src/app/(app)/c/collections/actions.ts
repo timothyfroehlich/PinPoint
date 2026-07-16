@@ -41,6 +41,7 @@ const nameSchema = z.string().trim().min(1, "Name is required").max(120);
 
 export async function createCollectionAction(input: {
   name: string;
+  machineIds?: string[];
 }): Promise<ActionResult<{ id: string }>> {
   const actor = await resolveActor();
   if (!actor) return { success: false, error: "Not authenticated" };
@@ -56,14 +57,47 @@ export async function createCollectionAction(input: {
     };
   }
 
-  const [row] = await db
-    .insert(collections)
-    .values({ name: parsed.data, ownerId: actor.userId })
-    .returning({ id: collections.id });
-  if (!row) return { success: false, error: "Create failed" };
+  const idsParsed = z.array(z.uuid()).safeParse(input.machineIds ?? []);
+  if (!idsParsed.success) {
+    return { success: false, error: "Invalid machine ids" };
+  }
+  const desired = [...new Set(idsParsed.data)];
+
+  // Reject ids that are not real machines (silently dropping would hide bugs).
+  if (desired.length > 0) {
+    const existing = await db
+      .select({ id: machines.id })
+      .from(machines)
+      .where(inArray(machines.id, desired));
+    if (existing.length !== desired.length) {
+      return { success: false, error: "Unknown machine" };
+    }
+  }
+
+  // Create the collection and attach any initial machines in one transaction,
+  // so a create that picks machines can't half-persist. No side effects here
+  // (CORE-ARCH-011).
+  const id = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(collections)
+      .values({ name: parsed.data, ownerId: actor.userId })
+      .returning({ id: collections.id });
+    if (!row) return null;
+    if (desired.length > 0) {
+      await tx.insert(collectionMachines).values(
+        desired.map((machineId) => ({
+          collectionId: row.id,
+          machineId,
+          addedBy: actor.userId,
+        }))
+      );
+    }
+    return row.id;
+  });
+  if (!id) return { success: false, error: "Create failed" };
 
   revalidatePath("/c/collections");
-  return { success: true, data: { id: row.id } };
+  return { success: true, data: { id } };
 }
 
 /** Load a collection's owner for a manage-gate check. */
@@ -78,51 +112,9 @@ async function loadOwner(
   return row ? { owner: { id: row.ownerId } } : null;
 }
 
-export async function renameCollectionAction(input: {
+export async function updateCollectionAction(input: {
   collectionId: string;
   name: string;
-}): Promise<ActionResult> {
-  const actor = await resolveActor();
-  if (!actor) return { success: false, error: "Not authenticated" };
-  const collection = await loadOwner(input.collectionId);
-  if (!collection) return { success: false, error: "Not found" };
-  if (!canManageCollection(collection, { userId: actor.userId })) {
-    return { success: false, error: "Forbidden" };
-  }
-  const parsed = nameSchema.safeParse(input.name);
-  if (!parsed.success) {
-    return {
-      success: false,
-      error: parsed.error.issues[0]?.message ?? "Invalid name",
-    };
-  }
-  await db
-    .update(collections)
-    .set({ name: parsed.data, updatedAt: new Date() })
-    .where(eq(collections.id, input.collectionId));
-  revalidatePath(`/c/collection/${input.collectionId}`);
-  revalidatePath("/c/collections");
-  return { success: true };
-}
-
-export async function deleteCollectionAction(input: {
-  collectionId: string;
-}): Promise<ActionResult> {
-  const actor = await resolveActor();
-  if (!actor) return { success: false, error: "Not authenticated" };
-  const collection = await loadOwner(input.collectionId);
-  if (!collection) return { success: false, error: "Not found" };
-  if (!canManageCollection(collection, { userId: actor.userId })) {
-    return { success: false, error: "Forbidden" };
-  }
-  // collection_machines rows cascade-delete via the FK.
-  await db.delete(collections).where(eq(collections.id, input.collectionId));
-  revalidatePath("/c/collections");
-  return { success: true };
-}
-
-export async function updateCollectionMachinesAction(input: {
-  collectionId: string;
   machineIds: string[];
 }): Promise<ActionResult> {
   const actor = await resolveActor();
@@ -133,9 +125,18 @@ export async function updateCollectionMachinesAction(input: {
     return { success: false, error: "Forbidden" };
   }
 
+  const parsedName = nameSchema.safeParse(input.name);
+  if (!parsedName.success) {
+    return {
+      success: false,
+      error: parsedName.error.issues[0]?.message ?? "Invalid name",
+    };
+  }
+
   const idsParsed = z.array(z.uuid()).safeParse(input.machineIds);
-  if (!idsParsed.success)
+  if (!idsParsed.success) {
     return { success: false, error: "Invalid machine ids" };
+  }
   const desired = [...new Set(idsParsed.data)];
 
   // Reject ids that are not real machines (silently dropping would hide bugs).
@@ -149,6 +150,9 @@ export async function updateCollectionMachinesAction(input: {
     }
   }
 
+  // Name change + machine-set diff-replace commit together, so a partial edit
+  // (name saved but membership not, or vice versa) can never persist. No
+  // external side effects run in this transaction (CORE-ARCH-011).
   await db.transaction(async (tx) => {
     const current = await tx
       .select({ machineId: collectionMachines.machineId })
@@ -181,10 +185,27 @@ export async function updateCollectionMachinesAction(input: {
     }
     await tx
       .update(collections)
-      .set({ updatedAt: new Date() })
+      .set({ name: parsedName.data, updatedAt: new Date() })
       .where(eq(collections.id, input.collectionId));
   });
 
   revalidatePath(`/c/collection/${input.collectionId}`);
+  revalidatePath("/c/collections");
+  return { success: true };
+}
+
+export async function deleteCollectionAction(input: {
+  collectionId: string;
+}): Promise<ActionResult> {
+  const actor = await resolveActor();
+  if (!actor) return { success: false, error: "Not authenticated" };
+  const collection = await loadOwner(input.collectionId);
+  if (!collection) return { success: false, error: "Not found" };
+  if (!canManageCollection(collection, { userId: actor.userId })) {
+    return { success: false, error: "Forbidden" };
+  }
+  // collection_machines rows cascade-delete via the FK.
+  await db.delete(collections).where(eq(collections.id, input.collectionId));
+  revalidatePath("/c/collections");
   return { success: true };
 }
