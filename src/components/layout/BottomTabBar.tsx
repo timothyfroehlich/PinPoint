@@ -14,6 +14,7 @@ import {
   Settings,
   Shield,
   Library,
+  ListPlus,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import {
@@ -141,6 +142,18 @@ export function BottomTabBar({
               <Library className="size-5 shrink-0" aria-hidden="true" />
               <span>Collections</span>
             </Link>
+
+            {checkPermission("issues.report.quick", getAccessLevel(role)) && (
+              <Link
+                href="/report/quick"
+                onClick={() => setMoreOpen(false)}
+                className={sheetItemClass}
+                data-testid="more-sheet-quick-report"
+              >
+                <ListPlus className="size-5 shrink-0" aria-hidden="true" />
+                <span>Quick report</span>
+              </Link>
+            )}
 
             <button
               type="button"

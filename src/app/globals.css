@@ -177,6 +177,34 @@
   height: 0;
 }
 
+/* Quick report collapsed row (PP-sn34): a single grid that reflows via a
+   container query on the row card (CORE-RESP: component-internal reflow uses
+   container queries, not viewport breakpoints). Priority doesn't fit at a
+   narrow width, so the narrow layout drops it (still editable in the
+   expanded row) and gives Machine/Severity a fixed 60/40 split; at
+   container widths ≥640px there's room for it alongside Severity. "actions"
+   is a wrapper around discard+submit so they can share one grid cell.
+   Narrow → 3 lines (machine·severity / problem / more·actions); wide → 2
+   lines (machine·severity·priority·more / problem·actions). */
+.quick-collapsed {
+  display: grid;
+  gap: 0.625rem;
+  align-items: end;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-areas:
+    "machine machine machine severity severity"
+    "problem problem problem problem problem"
+    "more more actions actions actions";
+}
+@container (min-width: 640px) {
+  .quick-collapsed {
+    grid-template-columns: minmax(0, 1fr) 170px 150px auto;
+    grid-template-areas:
+      "machine severity priority more"
+      "problem problem actions actions";
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

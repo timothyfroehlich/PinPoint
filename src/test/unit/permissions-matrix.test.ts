@@ -585,3 +585,19 @@ describe("admin.integrations.manage permission", () => {
     ).toBe(false);
   });
 });
+
+describe("issues.report.quick", () => {
+  it("is granted to member, technician, and admin", () => {
+    expect(checkPermission("issues.report.quick", "member")).toBe(true);
+    expect(checkPermission("issues.report.quick", "technician")).toBe(true);
+    expect(checkPermission("issues.report.quick", "admin")).toBe(true);
+    expect(checkPermission("issues.report.quick", "guest")).toBe(false);
+    expect(checkPermission("issues.report.quick", "unauthenticated")).toBe(
+      false
+    );
+  });
+
+  it("is registered in PERMISSIONS_BY_ID", () => {
+    expect(PERMISSIONS_BY_ID["issues.report.quick"]).toBeDefined();
+  });
+});

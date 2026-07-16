@@ -1,4 +1,5 @@
 import type React from "react";
+import Link from "next/link";
 import { asc, eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
@@ -7,7 +8,7 @@ import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { UnifiedReportForm } from "./unified-report-form";
 import { createClient } from "~/lib/supabase/server";
-import { getAccessLevel } from "~/lib/permissions/helpers";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getRecentIssuesAction, type RecentIssueData } from "./actions";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
@@ -51,6 +52,7 @@ export default async function PublicReportPage({
   }
 
   const accessLevel = getAccessLevel(userProfile?.role);
+  const canQuick = checkPermission("issues.report.quick", accessLevel);
 
   if (accessLevel === "admin" || accessLevel === "member") {
     assignees = await db.query.userProfiles.findMany({
@@ -89,6 +91,13 @@ export default async function PublicReportPage({
   return (
     <PageContainer size="standard">
       <PageHeader title="Report an Issue" />
+      {canQuick ? (
+        <div className="mb-4">
+          <Link href="/report/quick" className="text-sm font-medium text-link">
+            Reporting several at once? Use quick report →
+          </Link>
+        </div>
+      ) : null}
       {/* CORE-SEC-006: Pass minimal user shape, not full Supabase user */}
       <UnifiedReportForm
         machinesList={machinesList}
