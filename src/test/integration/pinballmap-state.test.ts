@@ -72,4 +72,34 @@ describe("PinballMap shared read path (PGlite)", () => {
     expect(state?.lastSyncError).toBe("PBM unreachable");
     spy.mockRestore();
   });
+
+  it("a failed sync after a success preserves lastSyncedAt and the snapshot", async () => {
+    const { getMockClient } = await import("~/lib/pinballmap/client-mock");
+    const { syncLocationSnapshot, getPinballMapState } =
+      await import("~/lib/pinballmap/state");
+
+    // Establish a good sync, then fail the next fetch.
+    await syncLocationSnapshot();
+    const afterOk = await getPinballMapState();
+    expect(afterOk?.lastSyncStatus).toBe("ok");
+
+    const spy = vi
+      .spyOn(getMockClient(), "fetchLocation")
+      .mockRejectedValueOnce(new Error("PBM down"));
+    await syncLocationSnapshot();
+
+    const afterErr = await getPinballMapState();
+    // lastSyncedAt = "last SUCCESSFUL sync" — unchanged by the failed attempt.
+    expect(afterErr?.lastSyncedAt?.getTime()).toBe(
+      afterOk?.lastSyncedAt?.getTime()
+    );
+    // The stale-but-good snapshot is kept, not clobbered.
+    expect(afterErr?.snapshotJson?.locationId).toBe(
+      afterOk?.snapshotJson?.locationId
+    );
+    // Health reflects the failure.
+    expect(afterErr?.lastSyncStatus).toBe("error");
+    expect(afterErr?.lastSyncError).toBe("PBM down");
+    spy.mockRestore();
+  });
 });
