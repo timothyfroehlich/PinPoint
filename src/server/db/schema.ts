@@ -23,6 +23,7 @@ import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-type
 import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
+import type { LocationSnapshot } from "~/lib/pinballmap/types";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -180,6 +181,11 @@ export const machines = pgTable(
     // the CHECK below. Reconciling this against PBM's actual snapshot is a later
     // feature (inbound sync); pushing the change to PBM is bead E (outbound).
     pinballmapListed: boolean("pinballmap_listed").notNull().default(false),
+    // Durable captured PBM listing handle (the location_machine_xref id). We
+    // STORE AND HEAL this rather than re-resolving it per push (PP-o355.16 /
+    // .12). Nullable: only set once a machine is actually listed on PBM. An lmx
+    // implies both a catalog link and pinballmap_listed (CHECKs below).
+    pinballmapLmxId: integer("pinballmap_lmx_id"),
     manufacturer: text("manufacturer"),
     year: integer("year"),
     opdbId: text("opdb_id"),
@@ -202,6 +208,22 @@ export const machines = pgTable(
       "machines_pinballmap_listed_requires_link",
       sql`NOT (pinballmap_listed AND pinballmap_machine_id IS NULL)`
     ),
+    // An lmx handle presupposes a catalog link.
+    pinballmapLmxRequiresLinkCheck: check(
+      "machines_pinballmap_lmx_requires_link",
+      sql`NOT (pinballmap_lmx_id IS NOT NULL AND pinballmap_machine_id IS NULL)`
+    ),
+    // An lmx handle presupposes we consider the machine listed.
+    pinballmapLmxRequiresListedCheck: check(
+      "machines_pinballmap_lmx_requires_listed",
+      sql`NOT (pinballmap_lmx_id IS NOT NULL AND NOT pinballmap_listed)`
+    ),
+    // One PBM lister per catalog title at our location — duplicate cabinets of
+    // the same title share one PBM lmx (PbmApiAudit finding #1). Partial: only
+    // listed rows participate.
+    pinballmapListedUnique: uniqueIndex("machines_pinballmap_listed_unique")
+      .on(t.pinballmapMachineId)
+      .where(sql`pinballmap_listed`),
     ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
     invitedOwnerIdIdx: index("idx_machines_invited_owner_id").on(
       t.invitedOwnerId
@@ -1078,6 +1100,49 @@ export const discordIntegrationConfig = pgTable(
     healthStatusCheck: check(
       "discord_integration_config_health_check",
       sql`bot_health_status IN ('unknown', 'healthy', 'degraded')`
+    ),
+  })
+);
+
+/**
+ * PinballMap integration state (singleton).
+ *
+ * Exactly one row (id = 'singleton'), enforced by a CHECK constraint. Holds the
+ * whole last-fetched location snapshot (`snapshotJson`) plus sync health, so every
+ * downstream surface reads the stored snapshot rather than hitting PBM per request
+ * (PBM's "one call per hour" conduct, CORE-PBM-001). Outbound creds (email + vault
+ * token id) are written by the connect flow (PP-o355.12). Shared foundation for
+ * PP-o355.11 (cron sync) and PP-o355.12 (list/unlist) — PP-o355.16.
+ *
+ * `outboundTokenVaultId` references `vault.secrets.id` and `updatedBy` references
+ * `auth.users.id` — no FK (Drizzle cannot express cross-schema references).
+ */
+export const pinballmapState = pgTable(
+  "pinballmap_state",
+  {
+    id: text("id").primaryKey().default("singleton"),
+    enabled: boolean("enabled").notNull().default(false),
+    locationId: integer("location_id").notNull().default(26454),
+    snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>(),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastSyncStatus: text("last_sync_status", {
+      enum: ["unknown", "ok", "error"],
+    })
+      .notNull()
+      .default("unknown"),
+    lastSyncError: text("last_sync_error"),
+    outboundEmail: text("outbound_email"),
+    outboundTokenVaultId: uuid("outbound_token_vault_id"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedBy: uuid("updated_by"),
+  },
+  (_t) => ({
+    singletonCheck: check("pinballmap_state_singleton", sql`id = 'singleton'`),
+    syncStatusCheck: check(
+      "pinballmap_state_sync_status_check",
+      sql`last_sync_status IN ('unknown', 'ok', 'error')`
     ),
   })
 );

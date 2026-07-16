@@ -1,6 +1,6 @@
 {
-  "id": "1a82e65d-361c-48e5-b641-e4f445b82341",
-  "prevId": "5eebd47f-f504-4113-b405-0089eb55046b",
+  "id": "9808055a-c4ba-4efe-b103-4622a050ebe0",
+  "prevId": "1a82e65d-361c-48e5-b641-e4f445b82341",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -28,6 +28,171 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "public.collection_machines": {
+      "name": "collection_machines",
+      "schema": "",
+      "columns": {
+        "collection_id": {
+          "name": "collection_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "machine_id": {
+          "name": "machine_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "added_at": {
+          "name": "added_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "added_by": {
+          "name": "added_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_collection_machines_machine": {
+          "name": "idx_collection_machines_machine",
+          "columns": [
+            {
+              "expression": "machine_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "collection_machines_collection_id_collections_id_fk": {
+          "name": "collection_machines_collection_id_collections_id_fk",
+          "tableFrom": "collection_machines",
+          "tableTo": "collections",
+          "columnsFrom": ["collection_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "collection_machines_machine_id_machines_id_fk": {
+          "name": "collection_machines_machine_id_machines_id_fk",
+          "tableFrom": "collection_machines",
+          "tableTo": "machines",
+          "columnsFrom": ["machine_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "collection_machines_added_by_user_profiles_id_fk": {
+          "name": "collection_machines_added_by_user_profiles_id_fk",
+          "tableFrom": "collection_machines",
+          "tableTo": "user_profiles",
+          "columnsFrom": ["added_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "collection_machines_collection_id_machine_id_pk": {
+          "name": "collection_machines_collection_id_machine_id_pk",
+          "columns": ["collection_id", "machine_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.collections": {
+      "name": "collections",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_collections_owner_id": {
+          "name": "idx_collections_owner_id",
+          "columns": [
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "collections_owner_id_user_profiles_id_fk": {
+          "name": "collections_owner_id_user_profiles_id_fk",
+          "tableFrom": "collections",
+          "tableTo": "user_profiles",
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": true
     },
     "public.discord_integration_config": {
       "name": "discord_integration_config",
