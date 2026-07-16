@@ -60,11 +60,12 @@ import {
  *   `~/lib/issues/filter-utils`.
  * - Search input is debounced at 300ms before pushing to URL params
  *
- * ## Mobile Notes
- * Desktop uses this component directly. Mobile will use a separate chip-based
- * filter bar that imports the shared utilities from `~/lib/issues/filter-utils`
- * for badge grouping and filter state management; those utilities are not
- * consumed by this component today.
+ * ## Active-filter chips
+ * Selected filters render as removable chips on their own wrapping row below
+ * the search input (`flex-wrap`), at every viewport. Each chip's remove (✕)
+ * button is always visible so it works on touch, where there is no hover.
+ * (Chips were previously overlaid on the right edge of the search input, which
+ * spilled off-screen on narrow viewports once several filters were active.)
  */
 interface MachineOption {
   initials: string;
@@ -105,7 +106,6 @@ export function IssueFilters({
   const [search, setSearch] = React.useState(filters.q ?? "");
   const [expanded, setExpanded] = React.useState(false);
 
-  const searchBarRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   const machineOptions = React.useMemo(
@@ -470,68 +470,34 @@ export function IssueFilters({
           }}
         >
           <div
-            ref={searchBarRef}
             className={cn(
-              "flex items-center gap-2 px-3 h-11 bg-background border rounded-md transition-colors duration-150 shadow-sm ring-offset-background flex-1 relative focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+              "flex items-center gap-2 px-3 h-11 bg-background border rounded-md transition-colors duration-150 shadow-sm ring-offset-background flex-1 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
               isSearching && "opacity-70 grayscale-[0.3]"
             )}
           >
             <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-            <div className="flex-1 min-w-0 relative h-full flex items-center">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <input
-                    ref={inputRef}
-                    placeholder="Search issues..."
-                    data-testid="issue-search"
-                    className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground relative z-10 w-full"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </TooltipTrigger>
-                <TooltipContent
-                  side="bottom"
-                  align="start"
-                  className="max-w-[300px] p-3"
-                >
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    Search across titles, descriptions, IDs (e.g., AFM-101),
-                    machine names, assignees, reporters, and comments.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-
-              <div
-                data-testid="filter-bar"
-                className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-20 pointer-events-none"
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <input
+                  ref={inputRef}
+                  placeholder="Search issues..."
+                  data-testid="issue-search"
+                  className="flex-1 min-w-0 w-full bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </TooltipTrigger>
+              <TooltipContent
+                side="bottom"
+                align="start"
+                className="max-w-[300px] p-3"
               >
-                {visibleBadges.map((badge) => (
-                  <Badge
-                    key={badge.id}
-                    data-testid="filter-badge"
-                    className={cn(
-                      "flex items-center gap-1 px-2 py-0.5 whitespace-nowrap rounded-sm text-[10px] font-medium leading-none h-6 bg-secondary/50 border-secondary/30 text-foreground group/badge max-w-[120px] pointer-events-auto",
-                      badge.iconColor
-                    )}
-                  >
-                    {badge.icon && (
-                      <badge.icon
-                        className={cn("h-3 w-3 shrink-0", badge.iconColor)}
-                      />
-                    )}
-                    <span className="truncate">{badge.label}</span>
-                    <button
-                      type="button"
-                      className="opacity-0 group-hover/badge:opacity-100 p-0.5 hover:bg-secondary rounded-full transition-opacity duration-150 ml-0.5"
-                      onClick={() => badge.clear()}
-                      aria-label={`Clear ${badge.label}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Search across titles, descriptions, IDs (e.g., AFM-101),
+                  machine names, assignees, reporters, and comments.
+                </p>
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           {(badgeList.length > 0 || search) && (
@@ -567,6 +533,38 @@ export function IssueFilters({
             </Button>
           )}
         </form>
+
+        {visibleBadges.length > 0 && (
+          <div
+            data-testid="filter-bar"
+            className="mt-2 flex flex-wrap items-center gap-1.5"
+          >
+            {visibleBadges.map((badge) => (
+              <Badge
+                key={badge.id}
+                data-testid="filter-badge"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-medium leading-none h-7 bg-secondary/50 border-secondary/30 text-foreground max-w-[200px]"
+              >
+                {/* Accent color lives on the icon only — tinting the label text
+                    fails WCAG contrast on the secondary chip background. */}
+                {badge.icon && (
+                  <badge.icon
+                    className={cn("h-3 w-3 shrink-0", badge.iconColor)}
+                  />
+                )}
+                <span className="truncate">{badge.label}</span>
+                <button
+                  type="button"
+                  className="shrink-0 -mr-1 ml-0.5 p-0.5 rounded-full hover:bg-secondary transition-colors"
+                  onClick={() => badge.clear()}
+                  aria-label={`Clear ${badge.label}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="p-3">

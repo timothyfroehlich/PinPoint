@@ -56,7 +56,7 @@ jobs:
         with:
           persist-credentials: false
       - id: filter
-        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d  # ratchet:dorny/paths-filter@v4.0.1
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706  # ratchet:dorny/paths-filter@v4.0.2
         with:
           predicate-quantifier: "every"
           filters: |
@@ -75,7 +75,7 @@ jobs:
       # Separate filter for dependency changes using default "some" quantifier
       # so deps=true when ANY changed file is a dependency file (not ALL).
       - id: deps-filter
-        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d  # ratchet:dorny/paths-filter@v4.0.1
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706  # ratchet:dorny/paths-filter@v4.0.2
         with:
           filters: |
             deps:
@@ -312,7 +312,7 @@ jobs:
             ! -name '*.lock.yml' -print0 | xargs -0 zizmor --min-severity low --format plain
 
       - name: Ratchet Check (pinned actions)
-        uses: sethvargo/ratchet@15bde13e63a9fe94f9abe1c2de94b7efe95da311  # ratchet:sethvargo/ratchet@main
+        uses: sethvargo/ratchet@43c2f868adf316878296666232da1c8d2733f159  # ratchet:sethvargo/ratchet@main
         with:
           files: |
             .github/workflows/ci.yml

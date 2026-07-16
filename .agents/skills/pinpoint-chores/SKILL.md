@@ -1,6 +1,6 @@
 ---
 name: pinpoint-chores
-description: Runbook for the weekly PinPoint "chores" session — the human-in-the-loop maintenance pass (Supabase CLI pin, TS-7 rollout, Dependabot, changelog, Sentry/Supabase advisors, PinballMap vendored-docs drift, cloud-routine beads). Use when Tim says "let's do chores", when the SessionStart chores-nag fires ("🧹 Weekly chores are N days overdue"), or when you want the chores checklist. After finishing, re-arm the nag with `bd defer`.
+description: Runbook for the weekly PinPoint "chores" session — the human-in-the-loop maintenance pass (Supabase CLI pin, TS-7 rollout, Dependabot, changelog, Sentry/Supabase advisors, PinballMap vendored-docs drift, GHA infra-flake triage, cloud-routine beads). Use when Tim says "let's do chores", when the SessionStart chores-nag fires ("🧹 Weekly chores are N days overdue"), or when you want the chores checklist. After finishing, re-arm the nag with `bd defer`.
 ---
 
 # pinpoint-chores
@@ -32,13 +32,23 @@ Find the bead first (by label, so you have its ID for comments + the reset):
 
     bd update <chores-bead> --status in_progress
 
+**Delegate the context-heavy items to subagents.** The checklist keeps growing, and several items burn a lot of context (the GHA infra-flake triage, the Sentry / Supabase advisor sweeps, the Weekly-Review bead review). As lead, farm those out to subagents and keep just the synthesis — don't run everything inline. Give each subagent the item's runbook pointer and have it report back findings + proposed beads; you decide and file. Cheap, quick items (version-pin checks, the vendored-docs diff) can stay inline.
+
 Then work the checklist. For each item, note findings as a comment on the bead (`bd comments add <chores-bead> "..."`) and file follow-up beads for anything actionable — don't fix everything inline; chores is triage + quick wins.
 
 ### Checklist
 
-1. **Stale Supabase CLI pin check** (PP-nlv6)
-   - Compare the pinned Supabase CLI version against the latest release. The pin lives in CI setup / config; a version-drift nudge belongs here, not in per-session briefing.
-   - If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
+1. **Stale version-pin checks** (Supabase CLI — PP-nlv6; pnpm corepack pin — PP-w0eq)
+   - **Supabase CLI pin.** Compare the pinned Supabase CLI version against the latest release. The pin lives in CI setup / config; a version-drift nudge belongs here, not in per-session briefing. If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
+   - **pnpm corepack pin.** The pnpm binary is pinned in the `packageManager` field of `package.json` (corepack). **Dependabot cannot bump this field** — it's an open, unimplemented feature request ([dependabot-core#4830](https://github.com/dependabot/dependabot-core/issues/4830)); Dependabot's pnpm support only updates deps _inside_ the lockfile, never the corepack pin. So this is the only watcher it has, and it silently rots without it (that's how we ended up 9 months behind on 10.2.0 until npm's audit-endpoint retirement forced the jump — PP-w0eq).
+     - **Apply a 30-day cooldown** (supply-chain soak — same rationale as the Dependabot npm cooldown): bump only to the newest stable pnpm ≥30 days old, never the just-released `latest`.
+     - Find the newest eligible version:
+
+       ```bash
+       npm view pnpm time --json | python3 -c "import json,sys,datetime as d; t=json.load(sys.stdin); c=d.datetime.now(d.UTC)-d.timedelta(days=30); r=[(v,ts) for v,ts in t.items() if '-' not in v and v.split('.')[0].isdigit()]; r.sort(key=lambda x:list(map(int,x[0].split('.')))); print(next(v for v,ts in reversed(r) if d.datetime.fromisoformat(ts.replace('Z','+00:00'))<=c))"
+       ```
+
+     - If it's newer than the current pin (mind major bumps — read the pnpm release notes/migration guide first), bump via `corepack use pnpm@<version>`, then verify no lockfile churn (`pnpm install --frozen-lockfile` → only `package.json` should change), `pnpm audit --audit-level=high` still resolves, and `pnpm run check` is green. PR it through the normal workflow; file a bead if a major bump needs real migration work.
 
 2. **TypeScript-7 rollout status**
    - Read `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` for the current phase.
@@ -63,6 +73,10 @@ Then work the checklist. For each item, note findings as a comment on the bead (
    - Fetch the live `https://pinballmap.com/llms.txt` and `https://pinballmap.com/robots.txt`, and diff each against the vendored copy in `docs/external/` (`pinballmap-llms.txt`, `pinballmap-robots.txt`). These must stay **byte-identical** to what PBM serves.
    - If either changed: refresh the vendored file verbatim from source, then re-review the conduct / rate-limit / attribution implications against `src/lib/pinballmap/`. File a bead if the change affects API conduct (not just a trivial wording tweak).
    - This weekly check is our **standing** drift guard — there is no automated drift GHA (the once-planned PP-o355.9 was closed in favor of this).
+
+8. **GHA infra-flake triage**
+   - Run the weekly triage procedure in `docs/runbooks/gha-flake-log.md`: read the recent weekly `gha-flake-week` sighting beads (current ISO week + prior 2) plus the permanent `gha-flake-log` ledger, pull new sightings past the ledger cursor, cluster by signature, rule out non-issues, spin genuine recurring infra issues into child beads, catch regressions against `fixed` rows, close aged-out weekly beads, then rewrite the ledger and advance the cursor.
+   - This is context-heavy — a good candidate to delegate to a subagent (see "Running the chores").
 
 ## Finish: re-arm the nag
 
