@@ -405,6 +405,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "machines.pinballmap.push",
+        label: "Push listing changes to PinballMap",
+        description:
+          "List or unlist a machine on PinballMap.com using the shared operator account",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: false,
+          admin: true,
+        },
+      },
+      {
         id: "machines.settings.manage",
         label: "Manage machine settings",
         description:
