@@ -130,7 +130,7 @@ export function QuickReportGrid({
   // fields present. Counting machine-OR-title would over-promise: the count
   // and "Submit all" would include half-filled rows the server must reject.
   const readyCount = rows.filter(
-    (r) => !r.submitted && r.machineId && r.title
+    (r) => !r.submitted && r.machineId && r.title.trim()
   ).length;
 
   const applyResult = (key: string, res: QuickRowResult): void =>
@@ -214,7 +214,9 @@ export function QuickReportGrid({
     // Only fire genuinely complete rows (machine AND title) — matches
     // readyCount. Half-filled rows stay put for the user to finish rather than
     // triggering a doomed server round-trip.
-    const ready = rows.filter((r) => !r.submitted && r.machineId && r.title);
+    const ready = rows.filter(
+      (r) => !r.submitted && !r.submitting && r.machineId && r.title.trim()
+    );
     if (ready.length === 0) return;
     // Track by stable key: the optimistic update below replaces row objects,
     // so object-identity (`ready.includes(r)`) would no longer match afterward.
@@ -285,7 +287,11 @@ export function QuickReportGrid({
           <span className="font-semibold text-foreground">{readyCount}</span>{" "}
           ready · {submittedCount} submitted
         </p>
-        <Button type="button" onClick={submitAll} disabled={readyCount === 0}>
+        <Button
+          type="button"
+          onClick={submitAll}
+          disabled={readyCount === 0 || rows.some((r) => r.submitting)}
+        >
           {readyCount ? `Submit all (${readyCount})` : "Submit all"}
         </Button>
       </div>
@@ -348,7 +354,7 @@ function QuickRow({
     );
   }
 
-  const ready = Boolean(row.machineId && row.title);
+  const ready = Boolean(row.machineId && row.title.trim());
   const onProblemKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     // Enter on the problem field quick-submits the row (fast keyboard path),
     // but only once it's actually submittable — otherwise a stray Enter fires
