@@ -193,6 +193,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "issues.report.quick",
+        label: "Quick report issues",
+        description:
+          "Create many issues at once from the quick report grid (/report/quick)",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: true,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
         id: "issues.update.reporting",
         label: "Update issue details",
         description: "Change title, status, severity, or frequency",

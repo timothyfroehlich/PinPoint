@@ -150,6 +150,11 @@ interface MachineComboboxProps {
   triggerTestId?: string;
   valueInputTestId?: string;
   triggerClassName?: string;
+  /** Show the selected machine's initials only while the nearest `@container`
+   *  ancestor is < 640px wide, expanding to "Name (INITIALS)" at or above it.
+   *  Lets the trigger sit compactly alongside other fields on one narrow row
+   *  (the quick-report grid). No effect outside an `@container`. */
+  responsiveInitials?: boolean;
 }
 
 /**
@@ -170,6 +175,7 @@ export function MachineCombobox({
   triggerTestId = "machine-select",
   valueInputTestId = "machine-select-input",
   triggerClassName,
+  responsiveInitials = false,
 }: MachineComboboxProps): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
 
@@ -206,9 +212,18 @@ export function MachineCombobox({
             )}
           >
             <span className="truncate">
-              {selected
-                ? `${selected.name} (${selected.initials})`
-                : placeholder}
+              {!selected ? (
+                placeholder
+              ) : responsiveInitials ? (
+                <>
+                  <span className="@[640px]:hidden">{selected.initials}</span>
+                  <span className="hidden @[640px]:inline">
+                    {selected.name} ({selected.initials})
+                  </span>
+                </>
+              ) : (
+                `${selected.name} (${selected.initials})`
+              )}
             </span>
             <ChevronsUpDown
               className="ml-2 size-4 shrink-0 opacity-50"

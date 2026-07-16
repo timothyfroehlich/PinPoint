@@ -107,6 +107,17 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      // Shortlink for the quick report grid (PP-sn34). Temporary (307) so the
+      // canonical target can move without browsers hard-caching the redirect.
+      {
+        source: "/rq",
+        destination: "/report/quick",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {
