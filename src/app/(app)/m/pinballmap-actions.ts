@@ -12,7 +12,11 @@
 
 "use server";
 
+import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
+import { db } from "~/server/db";
+import { machines, userProfiles } from "~/server/db/schema";
 import {
   searchCatalogFamilies,
   listGroupEditions,
@@ -20,6 +24,15 @@ import {
   type CatalogEdition,
   type CatalogFamily,
 } from "~/lib/pinballmap/catalog";
+import {
+  getPinballMapState,
+  syncLocationSnapshot,
+} from "~/lib/pinballmap/state";
+import { findLmxForMachine } from "~/lib/pinballmap/resolve-lmx";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
+import { isPgErrorCode } from "~/lib/db/postgres-errors";
+import { type Result, ok, err } from "~/lib/result";
 
 export type { CatalogEdition, CatalogFamily } from "~/lib/pinballmap/catalog";
 
@@ -106,4 +119,148 @@ export async function resolvePinballMapLinkAction(
     editions: single ? [] : editions,
     pinballmapMachineId: entry.pinballmapMachineId,
   };
+}
+
+/**
+ * Shared preamble for the listing read-actions: authenticate, load the target
+ * machine, and confirm the caller may READ-link it (`machines.pinballmap.link`
+ * — owner-own-machine / technician / admin). Returns the machine row when
+ * permitted, or a failed Result to short-circuit the caller.
+ *
+ * The machine must already carry a catalog link (`pinballmapMachineId`); a
+ * listing handle presupposes a title (schema CHECK), and we resolve the lmx by
+ * that title against the stored lineup.
+ */
+async function authorizeListingRead(
+  formData: FormData
+): Promise<
+  | { ok: true; userId: string; machine: typeof machines.$inferSelect }
+  | { ok: false; result: ListingActionError }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return { ok: false, result: err("UNAUTHORIZED", "Sign in required") };
+
+  const machineIdRaw = formData.get("machineId");
+  const machineId = typeof machineIdRaw === "string" ? machineIdRaw : "";
+  if (!machineId)
+    return { ok: false, result: err("VALIDATION", "Missing machine") };
+
+  const machine = await db.query.machines.findFirst({
+    where: eq(machines.id, machineId),
+  });
+  if (!machine)
+    return { ok: false, result: err("NOT_FOUND", "Machine not found") };
+  if (machine.pinballmapMachineId === null)
+    return {
+      ok: false,
+      result: err(
+        "VALIDATION",
+        "Machine isn't linked to a PinballMap title yet"
+      ),
+    };
+
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+  const accessLevel = getAccessLevel(profile?.role);
+  if (
+    !checkPermission("machines.pinballmap.link", accessLevel, {
+      userId: user.id,
+      machineOwnerId: machine.ownerId,
+    })
+  )
+    return { ok: false, result: err("UNAUTHORIZED", "Not allowed") };
+
+  return { ok: true, userId: user.id, machine };
+}
+
+type ListingActionError = Result<
+  never,
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "ABSENT" | "SERVER"
+>;
+
+export type LinkPinballmapResult = Result<
+  { lmxId: number },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "ABSENT" | "SERVER"
+>;
+
+/**
+ * Capture the durable PinballMap listing handle (lmx) for a machine already on
+ * PinballMap's public lineup — the "Link to this entry" action for APC's
+ * already-listed fleet (state 2 → state 3). Read-only: it resolves the lmx from
+ * the STORED location snapshot (PP-o355.16), never a per-render PBM call
+ * (CORE-PBM-001); it syncs once only if we've never fetched a lineup. No PBM
+ * *write* happens here — this is the anonymous, token-free half of the split.
+ *
+ * On success: stores `pinballmapLmxId` + flips `pinballmapListed` true, mirrors
+ * a `linked` timeline event, and returns the captured lmx. ABSENT means the
+ * title isn't on our location's lineup yet (nothing to link — list it instead).
+ */
+export async function linkPinballmapEntryAction(
+  _prev: LinkPinballmapResult | undefined,
+  formData: FormData
+): Promise<LinkPinballmapResult> {
+  const authed = await authorizeListingRead(formData);
+  if (!authed.ok) return authed.result;
+  const { userId, machine } = authed;
+  // Narrowed by authorizeListingRead, but re-assert for the type checker.
+  if (machine.pinballmapMachineId === null)
+    return err("VALIDATION", "Machine isn't linked to a PinballMap title yet");
+
+  // Read the freshest stored lineup; sync once if we've never captured one.
+  let state = await getPinballMapState();
+  if (!state?.snapshotJson) {
+    await syncLocationSnapshot();
+    state = await getPinballMapState();
+  }
+  const snapshot = state?.snapshotJson;
+  if (!snapshot) return err("SERVER", "PinballMap lineup unavailable");
+
+  const lmx = findLmxForMachine(snapshot, machine.pinballmapMachineId);
+  if (!lmx)
+    return err(
+      "ABSENT",
+      "This machine isn't on PinballMap's lineup for our location yet"
+    );
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(machines)
+        .set({ pinballmapLmxId: lmx.id, pinballmapListed: true })
+        .where(eq(machines.id, machine.id));
+      await createMachineTimelineEvent(
+        machine.id,
+        {
+          sourceType: "lifecycle",
+          tag: "lifecycle",
+          eventData: {
+            kind: "pinballmap_listing",
+            action: "linked",
+            lmxId: lmx.id,
+          },
+          actorId: userId,
+        },
+        tx
+      );
+    });
+  } catch (error) {
+    // Partial-unique (one lister per title at our location): a duplicate cabinet
+    // of this title is already the lister. Graceful 2nd-cabinet handling is
+    // PP-o355.15; here we surface a clear message rather than a 500.
+    if (isPgErrorCode(error, "23505"))
+      return err(
+        "SERVER",
+        "Another cabinet of this title is already linked as the PinballMap lister for our location"
+      );
+    throw error;
+  }
+
+  revalidatePath(`/m/${machine.initials}`);
+  return ok({ lmxId: lmx.id });
 }
