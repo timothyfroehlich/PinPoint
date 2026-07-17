@@ -88,20 +88,38 @@ The only situation where a tab is unavailable:
   (the Multiple tab) so mobile users still jump straight to batch mode. Label stays
   "Quick report" or aligns to "Multiple" — minor, settle during build.
 
-## 8. Architecture direction (to be finalized in the plan)
+## 8. Architecture (final — as implemented)
 
-- A **shared `report/layout.tsx`** hosts the tab bar + a **client context/store holding
-  the shared draft** (single-view fields + grid rows). `/report` (single view) and
-  `/report/quick` (multiple view) render as **children** of that layout.
-- Next.js App Router **layouts persist across sibling-route navigations** (no remount),
-  so switching `/report ↔ /report/quick` keeps the shared draft state alive while the
-  URL changes — satisfying "state survives switching" _and_ "deep-linkable" without a
-  full reload.
-- Machines + assignees fetched once in the layout (currently each page fetches its own).
-- Both the single form and the grid are already client components, so no
-  Server-Component / progressive-enhancement regression is introduced by the shared
-  client store. (The single form's server action + the grid's actions are reused
-  **unchanged** apart from the validation-message fold-in.)
+The Task 1 spike **confirmed** that a client context rendered in `report/layout.tsx`
+survives `/report ↔ /report/quick` navigation without remounting, so the
+shared-store-in-layout approach shipped as designed.
+
+- A **shared `report/layout.tsx`** (Server Component) fetches machines + assignees
+  **once** and hosts the `"use client"` **`ReportDraftProvider`** (the single source of
+  truth for the shared draft) + the boxed **`ReportTabs`** bar, wrapping both child
+  routes. `/report` (Single) and `/report/quick` (Multiple) render as its children.
+- **`ReportDraftProvider`** owns the persisted `localStorage` draft
+  (key `report_draft`, superseding the legacy `report_form_state`, which it migrates on
+  first load), hydration, the stale-machine drop (PP-lql), and the `contentRowCount`
+  the tab bar reads for the lock. Its `entries[0]` is **entry #1** (synced between the
+  Single form and grid row 1); `single` holds the Single-only reporter identity + photos
+  (CORE-SEC-007). A `hydrated` flag lets the Single form apply a URL `?machine=` over a
+  restored draft without a clobber race.
+- **Submitted grid rows LEAVE the shared draft** and become display-only "Created GP-42"
+  receipts (grid-local, ephemeral). This keeps `contentRowCount` — which the layout's
+  tab bar reads for the §5 lock — counting only unsubmitted rows, so submitting down to
+  one row re-enables the Single tab. (This also retired the misleading grid "Undo": the
+  issue is already committed, so it could only ever create a duplicate.)
+- **Description is ProseMirror end-to-end.** The grid's expanded row uses the same
+  `RichTextEditor` as the Single form; `quick/schemas.ts` accepts a ProseMirror doc (a
+  shared `proseMirrorDocValueSchema` bridges the loose validator to the strict app type)
+  and the grid routes an empty editor to `null` via `docIsEmpty`.
+- Machines + assignees are fetched once in the layout (both pages previously fetched
+  their own; `quick/page.tsx` now reads them from the store).
+- Both the Single form and the grid stay client components, so no Server-Component /
+  progressive-enhancement regression. The Single form's server action and the grid's
+  actions are reused unchanged apart from the validation-message fold-in and the
+  ProseMirror description.
 
 ## 9. Out of scope
 
