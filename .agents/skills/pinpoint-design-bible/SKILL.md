@@ -173,6 +173,8 @@ When building a new page, pick the closest archetype and follow its pattern.
 
 `max-w-2xl` -- Form inside a card, back button + title in header.
 
+**Tabbed variant — the report page (`/report`, PP-idrb).** "Report an Issue" is one `PageContainer size="wide"` page with a **boxed**, URL-driven tab bar (Single issue / Multiple) hosted in `report/layout.tsx`. Unlike the underline Tabbed Detail archetype above, these tabs are boxed (segmented look: `rounded-lg border bg-muted p-1`; active tab `bg-card shadow-sm`) with icons (`AlertCircle` / `ListPlus`), default Single. A `"use client"` `ReportDraftProvider` in the layout holds one shared draft so **entry #1** syncs between the detailed Single form and the grid's first row and survives the tab switch (layouts don't remount across sibling-route nav). The one lock (spec `docs/superpowers/specs/2026-07-16-tabbed-report-page-design.md` §5): 2+ grid rows with content disable the Single tab (`aria-disabled`, tapping reveals a one-line reason). Still route-driven — `<Link>` + `usePathname()`, no shadcn `<Tabs>`.
+
 ### Settings Page
 
 `max-w-3xl` -- Vertical sections separated by `Separator` components.

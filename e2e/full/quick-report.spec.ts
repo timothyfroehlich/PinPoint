@@ -37,14 +37,16 @@ test.describe("quick report — authoring", () => {
       .fill("Right flipper weak");
     await firstRow.getByRole("button", { name: /^Submit$/ }).click();
 
-    // The submitted row collapses to a confirmation strip linking the new issue.
+    // The submitted row leaves the draft and becomes a confirmation receipt
+    // linking the new issue (no "undo" — the issue is already created).
+    await expect(page.getByTestId("quick-receipt")).toHaveCount(1);
     await expect(
       page.getByRole("link", { name: createdIdPattern })
     ).toBeVisible();
 
-    // A fresh blank row appears and its machine picker takes focus so keyboard
-    // authoring can continue (… → next issue).
-    await expect(page.getByTestId("quick-row")).toHaveCount(2);
+    // A single fresh blank editable row remains, and its machine picker takes
+    // focus so keyboard authoring can continue (… → next issue).
+    await expect(page.getByTestId("quick-row")).toHaveCount(1);
     await expect(page.getByRole("combobox", { name: "Machine" })).toBeFocused();
   });
 

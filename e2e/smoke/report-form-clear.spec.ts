@@ -66,15 +66,15 @@ test.describe("Report Form Clears After Submission", () => {
     const titleInput = page.getByLabel("Issue Title *");
     await expect(titleInput).toHaveValue("");
 
-    // 5. Assert localStorage draft was cleared
+    // 5. Assert the unified draft (report_draft) was cleared
     const draft = await page.evaluate(() =>
-      window.localStorage.getItem("report_form_state")
+      window.localStorage.getItem("report_draft")
     );
-    // Draft should either be null or contain empty/default values
+    // Draft should either be null or carry no leftover entry-#1 content.
     if (draft !== null) {
       const parsed = JSON.parse(draft);
-      expect(parsed.title).toBeFalsy();
-      expect(parsed.description).toBeNull();
+      expect(parsed.entries?.[0]?.title ?? "").toBeFalsy();
+      expect(parsed.entries?.[0]?.description ?? null).toBeNull();
     }
   });
 });

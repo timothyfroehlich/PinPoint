@@ -10,7 +10,6 @@ import { createClient } from "~/lib/supabase/server";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { createIssue } from "~/services/issues";
 import { dispatchNotification } from "~/lib/notifications";
-import { plainTextToDoc } from "~/lib/tiptap/types";
 import { reportError } from "~/lib/observability/report-error";
 import { log } from "~/lib/logger";
 import { parseQuickRow, type ParsedQuickRow } from "./validation";
@@ -66,7 +65,7 @@ async function createOne(
   try {
     const { issue, deliveryPlan } = await createIssue({
       title: data.title,
-      description: data.description ? plainTextToDoc(data.description) : null,
+      description: data.description ?? null,
       machineInitials: machine.initials,
       severity: data.severity,
       priority: data.priority,

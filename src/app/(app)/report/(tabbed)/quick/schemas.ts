@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
+import { proseMirrorDocValueSchema } from "~/lib/tiptap/types";
 
 /** Maximum rows a single quick submit may create (accident guard, not abuse). */
 export const QUICK_MAX_ROWS = 50;
@@ -11,11 +12,10 @@ export const quickRowSchema = z.object({
     .trim()
     .min(1, "Problem is required")
     .max(60, "Problem must be 60 characters or less"),
-  description: z
-    .string()
-    .trim()
-    .max(20000, "Description is too long")
-    .optional(),
+  // Rich-text (ProseMirror) description, matching the single form. The grid
+  // routes an empty editor to `null` via `docIsEmpty` before submit, so a junk
+  // "empty paragraph" doc is never persisted.
+  description: proseMirrorDocValueSchema.nullable(),
   severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
     message: "Select a severity",
   }),

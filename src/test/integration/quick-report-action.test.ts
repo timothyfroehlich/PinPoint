@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { machines, userProfiles } from "~/server/db/schema";
 import { createTestUser, createTestMachine } from "~/test/helpers/factories";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
-import type { QuickRowInput } from "~/app/(app)/report/quick/schemas";
+import type { QuickRowInput } from "~/app/(app)/report/(tabbed)/quick/schemas";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -44,7 +44,7 @@ vi.mock("~/server/db", async () => {
 
 // Import AFTER the db mock so the action and createIssue pick up PGlite.
 const { submitQuickIssuesAction, submitQuickIssueRowAction } =
-  await import("~/app/(app)/report/quick/actions");
+  await import("~/app/(app)/report/(tabbed)/quick/actions");
 
 async function seedUser(
   role: "guest" | "member" | "technician" | "admin"
@@ -70,7 +70,7 @@ async function seedMachine(
 const row = (over: Partial<QuickRowInput> = {}): QuickRowInput => ({
   machineId: "",
   title: "Right flipper sticky",
-  description: "",
+  description: null,
   severity: "major",
   priority: "medium",
   frequency: "frequent",
