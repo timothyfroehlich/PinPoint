@@ -118,13 +118,14 @@ export default async function MachineInfoTab({
       : Promise.resolve(null);
   const allUsersPromise: Promise<Awaited<ReturnType<typeof getUnifiedUsers>>> =
     canEdit ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]);
-  // The stored PBM snapshot drives the desync signal. Only linked machines can
-  // desync (an unlinked machine can't be listed — DB CHECK), so skip the read
-  // otherwise. It's the location-wide singleton, cached per request.
+  // The stored PBM snapshot drives the desync signal, which is a maintainer-
+  // facing alert (it points at a mismatch to resolve). Only read it when the
+  // viewer may act on it (`canLink`) AND the machine is linked — so the public
+  // QR-scan landing never pays for (or shows) it. Location-wide singleton.
   const pbmStatePromise: Promise<
     Awaited<ReturnType<typeof getPinballMapState>>
   > =
-    machine.pinballmapMachineId !== null
+    canLink && machine.pinballmapMachineId !== null
       ? getPinballMapState()
       : Promise.resolve(null);
 
@@ -184,21 +185,24 @@ export default async function MachineInfoTab({
       <EditButtonWithTooltip reason={editDeniedReason} />
     ) : null;
 
-  // PinballMap card (PP-o355.3 + desync PP-o355.11): show it for machines we've
-  // marked listed OR machines the stored snapshot flags as desynced (e.g. on
-  // PBM but not listed here) — so a mismatch surfaces even when we haven't
-  // marked the machine listed. Everything else shows no card.
+  // PinballMap card (PP-o355.3 + desync PP-o355.11): everyone sees the plain
+  // "View on PinballMap" card for listed machines. The desync alert is
+  // maintainer-only (`canLink`) — for those users the card also appears on a
+  // desynced-but-not-listed machine (e.g. on PBM but not marked listed here),
+  // so the mismatch surfaces where it can be acted on. `pbmState` is null for
+  // non-maintainers, so `desynced` is false for them regardless.
   const pbmStatus = derivePbmMachineStatus({
     pinballmapMachineId: machine.pinballmapMachineId,
     pinballmapListed: machine.pinballmapListed,
     pinballmapLmxId: machine.pinballmapLmxId,
     snapshot: pbmState?.snapshotJson ?? null,
   });
+  const showDesync = canLink && pbmStatus.desynced;
   const pinballmapCard =
-    machine.pinballmapListed || pbmStatus.desynced ? (
+    machine.pinballmapListed || showDesync ? (
       <MachinePinballmapCard
         locationUrl={pinballmapLocationUrl()}
-        desynced={pbmStatus.desynced}
+        desynced={showDesync}
         desyncReason={pbmStatus.reason}
       />
     ) : null;
