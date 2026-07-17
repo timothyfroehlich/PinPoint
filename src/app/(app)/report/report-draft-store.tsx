@@ -32,6 +32,11 @@ interface ReportDraftValue {
   assignees: Assignee[];
   entries: SharedEntry[];
   single: SingleOnlyState;
+  /** True once the mount-time hydration from `localStorage` has run. Consumers
+   *  that need to apply post-hydration seeding (e.g. the single form honoring a
+   *  URL `?machine=` over a restored draft) gate on this to avoid a clobber
+   *  race — the provider's hydrate effect runs after descendant mount effects. */
+  hydrated: boolean;
   /** Number of entries with real content — drives the "2+ disables Single" lock. */
   contentRowCount: number;
   patchEntry: (index: number, next: Partial<SharedEntry>) => void;
@@ -71,6 +76,7 @@ export function ReportDraftProvider({
     emptySingle()
   );
   const hasRestored = React.useRef(false);
+  const [hydrated, setHydrated] = React.useState(false);
   // Skip the next persist run once — set after a successful submit or an
   // explicit Clear, so neither re-writes a draft we just intentionally cleared.
   const suppressPersist = React.useRef(false);
@@ -79,6 +85,10 @@ export function ReportDraftProvider({
   React.useEffect(() => {
     if (hasRestored.current) return;
     hasRestored.current = true;
+    // Flip hydrated in the same commit as any restore below (React batches the
+    // setState calls in this effect), so consumers never see restored entries
+    // without `hydrated` also being true.
+    setHydrated(true);
     if (typeof window === "undefined") return;
 
     let raw = window.localStorage.getItem(REPORT_DRAFT_KEY);
@@ -171,6 +181,7 @@ export function ReportDraftProvider({
       assignees,
       entries,
       single,
+      hydrated,
       contentRowCount,
       patchEntry,
       setEntries,
@@ -184,6 +195,7 @@ export function ReportDraftProvider({
       assignees,
       entries,
       single,
+      hydrated,
       contentRowCount,
       patchEntry,
       setEntries,

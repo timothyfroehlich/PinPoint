@@ -6,7 +6,7 @@ import {
   FREQUENCY_CONFIG,
 } from "~/lib/issues/status";
 import type { IssueSeverity, IssuePriority, IssueFrequency } from "~/lib/types";
-import { proseMirrorDocSchema } from "~/lib/tiptap/types";
+import { proseMirrorDocSchema, type ProseMirrorDoc } from "~/lib/tiptap/types";
 import type { ImageMetadata } from "~/types/images";
 
 /**
@@ -42,12 +42,22 @@ export const REPORT_DRAFT_KEY = "report_draft";
 /** Legacy single-form persistence key, migrated on first load then removed. */
 export const LEGACY_DRAFT_KEY = "report_form_state";
 
+// `proseMirrorDocSchema` deliberately types `content` as `unknown[]` (Tiptap
+// owns node validation), so its inferred type isn't assignable to the strict
+// app `ProseMirrorDoc` the editor consumes. Bridge the two with a `z.custom`
+// whose output type IS `ProseMirrorDoc` and whose validator reuses the loose
+// schema — keeping the draft's `description` directly usable by RichTextEditor
+// with no unsafe cast (CORE-TS-007).
+const proseMirrorDocValueSchema = z.custom<ProseMirrorDoc>(
+  (v) => proseMirrorDocSchema.safeParse(v).success
+);
+
 export const sharedEntrySchema = z.object({
   // Blank-tolerant: a draft row may have no machine/title yet. Submit-time
   // validation (quickRowSchema / publicIssueSchema) enforces the real rules.
   machineId: z.string(),
   title: z.string(),
-  description: proseMirrorDocSchema.nullable(),
+  description: proseMirrorDocValueSchema.nullable(),
   severity: z.enum(SEVERITY_VALUES),
   priority: z.enum(PRIORITY_VALUES),
   status: z.enum(ISSUE_STATUS_VALUES),
@@ -148,7 +158,7 @@ function migrateLegacy(json: unknown): ReportDraft | null {
       ? o["idempotencyKey"]
       : crypto.randomUUID();
 
-  const descParse = proseMirrorDocSchema.safeParse(o["description"]);
+  const descParse = proseMirrorDocValueSchema.safeParse(o["description"]);
   const entry: SharedEntry = {
     ...defaultEntry(key),
     machineId: typeof o["machineId"] === "string" ? o["machineId"] : "",
