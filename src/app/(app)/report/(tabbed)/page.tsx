@@ -1,12 +1,13 @@
 import type React from "react";
-import { asc, eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { userProfiles } from "~/server/db/schema";
 import { resolveDefaultMachineId } from "../default-machine";
 import { UnifiedReportForm } from "../unified-report-form";
 import { createClient } from "~/lib/supabase/server";
 import { getAccessLevel } from "~/lib/permissions/helpers";
 import { getRecentIssuesAction, type RecentIssueData } from "../actions";
+import { getReportMachines, getReportAssignees } from "../report-data";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
 export const dynamic = "force-dynamic";
@@ -28,10 +29,10 @@ export default async function PublicReportPage({
     source?: string;
   }>;
 }): Promise<React.JSX.Element> {
-  const machinesListPromise = db.query.machines.findMany({
-    orderBy: asc(machines.name),
-    columns: { id: true, name: true, initials: true },
-  });
+  // Machines + assignees come from the shared request-deduped loaders (also
+  // called by the layout), so /report doesn't fetch them twice. Assignees are
+  // matrix-gated inside the loader (technicians included). (PP-2m17 #1/#3)
+  const machinesListPromise = getReportMachines();
 
   // Auth context for the form
   const supabase = await createClient();
@@ -40,7 +41,6 @@ export default async function PublicReportPage({
   } = await supabase.auth.getUser();
 
   let userProfile;
-  let assignees: { id: string; name: string | null }[] = [];
   if (user) {
     userProfile = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, user.id),
@@ -49,17 +49,9 @@ export default async function PublicReportPage({
   }
 
   const accessLevel = getAccessLevel(userProfile?.role);
+  const assignees = await getReportAssignees(accessLevel);
 
-  if (accessLevel === "admin" || accessLevel === "member") {
-    assignees = await db.query.userProfiles.findMany({
-      where: (profile) =>
-        sql`${profile.role} = 'admin' OR ${profile.role} = 'member'`,
-      columns: { id: true, name: true },
-      orderBy: asc(userProfiles.name),
-    });
-  }
-
-  const [machinesList] = await Promise.all([machinesListPromise]);
+  const machinesList = await machinesListPromise;
 
   const params = await searchParams;
   const errorMessage = params.error
