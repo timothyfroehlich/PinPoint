@@ -42,7 +42,14 @@
 import { chromium } from "@playwright/test";
 import nextEnv from "@next/env";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,7 +59,10 @@ const { loadEnvConfig } = nextEnv;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..", "..");
 
-const MANIFEST_PATH = join(REPO_ROOT, "scripts/workflow/ui-screenshot-manifest.json");
+const MANIFEST_PATH = join(
+  REPO_ROOT,
+  "scripts/workflow/ui-screenshot-manifest.json"
+);
 const STORAGE_STATE = {
   admin: join(REPO_ROOT, "e2e/.auth/admin.json"),
   member: join(REPO_ROOT, "e2e/.auth/member.json"),
@@ -77,7 +87,10 @@ function parseArgs(argv) {
       forceAuth = true;
     } else if (arg.startsWith("--pages")) {
       const value = arg.includes("=") ? arg.split("=")[1] : "";
-      pagesFilter = value.split(",").map((s) => s.trim()).filter(Boolean);
+      pagesFilter = value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     } else if (!arg.startsWith("--") && pr === undefined) {
       pr = arg;
     } else {
@@ -197,7 +210,13 @@ async function captureScreenshots(baseUrl, pages, workDir) {
           const fileName = `${vpName}-${page.id}.png`;
           const outPath = join(workDir, fileName);
           await pw.screenshot({ path: outPath });
-          captured.push({ id: page.id, label: page.label, vpName, fileName, outPath });
+          captured.push({
+            id: page.id,
+            label: page.label,
+            vpName,
+            fileName,
+            outPath,
+          });
         } catch (error) {
           console.error(
             `⚠️  Failed to capture ${vpName}/${page.id}: ${error instanceof Error ? error.message : error}`
@@ -239,15 +258,23 @@ function publishScreenshots(pr, shortSha, captured) {
 
   try {
     git(["init", "-q", "-b", SCREENSHOTS_BRANCH], { cwd: tmpDir });
-    git(["config", "user.email", "pinpoint-bot@users.noreply.github.com"], { cwd: tmpDir });
+    git(["config", "user.email", "pinpoint-bot@users.noreply.github.com"], {
+      cwd: tmpDir,
+    });
     git(["config", "user.name", "PinPoint Screenshot Bot"], { cwd: tmpDir });
     git(["remote", "add", "origin", remoteUrl], { cwd: tmpDir });
 
     try {
-      git(["fetch", "-q", "--depth", "1", "origin", SCREENSHOTS_BRANCH], { cwd: tmpDir });
-      git(["checkout", "-q", "-B", SCREENSHOTS_BRANCH, "FETCH_HEAD"], { cwd: tmpDir });
+      git(["fetch", "-q", "--depth", "1", "origin", SCREENSHOTS_BRANCH], {
+        cwd: tmpDir,
+      });
+      git(["checkout", "-q", "-B", SCREENSHOTS_BRANCH, "FETCH_HEAD"], {
+        cwd: tmpDir,
+      });
     } catch {
-      console.log(`ℹ️  Remote branch "${SCREENSHOTS_BRANCH}" doesn't exist yet — creating it.`);
+      console.log(
+        `ℹ️  Remote branch "${SCREENSHOTS_BRANCH}" doesn't exist yet — creating it.`
+      );
     }
 
     const destDir = join(tmpDir, `pr-${pr}`, shortSha);
@@ -260,8 +287,12 @@ function publishScreenshots(pr, shortSha, captured) {
     }
 
     git(["add", "-A"], { cwd: tmpDir });
-    git(["commit", "-q", "-m", `screenshots: PR #${pr} @ ${shortSha}`], { cwd: tmpDir });
-    git(["push", "-q", "origin", `HEAD:${SCREENSHOTS_BRANCH}`], { cwd: tmpDir });
+    git(["commit", "-q", "-m", `screenshots: PR #${pr} @ ${shortSha}`], {
+      cwd: tmpDir,
+    });
+    git(["push", "-q", "origin", `HEAD:${SCREENSHOTS_BRANCH}`], {
+      cwd: tmpDir,
+    });
 
     return remotePaths;
   } finally {
@@ -272,7 +303,8 @@ function publishScreenshots(pr, shortSha, captured) {
 function buildCommentBody(repoSlug, pr, shortSha, captured) {
   const byPage = new Map();
   for (const shot of captured) {
-    if (!byPage.has(shot.id)) byPage.set(shot.id, { label: shot.label, desktop: null, mobile: null });
+    if (!byPage.has(shot.id))
+      byPage.set(shot.id, { label: shot.label, desktop: null, mobile: null });
     byPage.get(shot.id)[shot.vpName] = shot.fileName;
   }
 
@@ -312,12 +344,17 @@ function postOrUpdateStickyComment(repoSlug, pr, body) {
     ["api", "--paginate", `repos/${repoSlug}/issues/${pr}/comments`],
     { encoding: "utf8" }
   );
-  const flattened = execFileSync("jq", ["-s", "add"], { input: raw, encoding: "utf8" });
+  const flattened = execFileSync("jq", ["-s", "add"], {
+    input: raw,
+    encoding: "utf8",
+  });
   const list = JSON.parse(flattened);
   const stickyComment = list.find((c) => c.body?.startsWith(COMMENT_MARKER));
 
   if (stickyComment) {
-    console.log(`✏️  Updating sticky screenshot comment (id=${stickyComment.id})`);
+    console.log(
+      `✏️  Updating sticky screenshot comment (id=${stickyComment.id})`
+    );
     return ghJson([
       "api",
       "--method",
@@ -357,14 +394,19 @@ async function main() {
       ["pr", "view", pr, "--json", "headRefOid", "--jq", ".headRefOid"],
       { cwd: REPO_ROOT, encoding: "utf8" }
     ).trim();
-    if (!prHead.startsWith(shortSha) && !shortSha.startsWith(prHead.slice(0, shortSha.length))) {
+    if (
+      !prHead.startsWith(shortSha) &&
+      !shortSha.startsWith(prHead.slice(0, shortSha.length))
+    ) {
       console.warn(
         `⚠️  Local HEAD (${shortSha}) doesn't match PR #${pr}'s remote head (${prHead.slice(0, 7)}). ` +
           "Screenshots will be taken of local HEAD, not the PR's pushed head — push first if they should match."
       );
     }
   } catch {
-    console.warn(`⚠️  Could not verify PR #${pr}'s head via gh — continuing anyway.`);
+    console.warn(
+      `⚠️  Could not verify PR #${pr}'s head via gh — continuing anyway.`
+    );
   }
 
   const baseUrl = resolveBaseUrl();
@@ -383,11 +425,15 @@ async function main() {
   try {
     captured = await captureScreenshots(baseUrl, pages, workDir);
     if (captured.length === 0) {
-      throw new Error("No screenshots captured — every page failed. See errors above.");
+      throw new Error(
+        "No screenshots captured — every page failed. See errors above."
+      );
     }
 
     const remotePaths = publishScreenshots(pr, shortSha, captured);
-    console.log(`✅ Pushed ${remotePaths.length} screenshot(s) to ${SCREENSHOTS_BRANCH}`);
+    console.log(
+      `✅ Pushed ${remotePaths.length} screenshot(s) to ${SCREENSHOTS_BRANCH}`
+    );
 
     const repoSlug = execFileSync(
       "gh",
