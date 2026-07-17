@@ -13,6 +13,7 @@ import {
   Sparkles,
   Settings,
   Shield,
+  Library,
   ListPlus,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
@@ -26,7 +27,7 @@ import {
 import { X } from "lucide-react";
 import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { isNavItemActive } from "~/components/layout/nav-utils";
-import { NAV_ITEMS } from "~/components/layout/nav-config";
+import { NAV_ITEMS, type NavItem } from "~/components/layout/nav-config";
 import type { UserRole } from "~/lib/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
@@ -36,10 +37,14 @@ interface BottomTabBarProps {
   issuesPath?: string | undefined;
 }
 
+// Items flagged hideFromBottomBar (e.g. Collections) live in the "More" sheet
+// instead — the bottom bar keeps just the core destinations plus Report.
 const bottomTabs = [
-  ...NAV_ITEMS,
+  ...(NAV_ITEMS as readonly NavItem[]).filter(
+    (item) => !item.hideFromBottomBar
+  ),
   { title: "Report", href: "/report", icon: Plus },
-] as const;
+];
 
 const tabBaseClass =
   "flex flex-1 flex-col items-center justify-center gap-1 py-2 text-xs font-medium transition-colors duration-150 min-h-[56px]";
@@ -128,6 +133,16 @@ export function BottomTabBar({
             aria-label="additional navigation"
             className="pt-2 pb-4 space-y-1"
           >
+            <Link
+              href="/c/collections"
+              onClick={() => setMoreOpen(false)}
+              className={sheetItemClass}
+              data-testid="more-sheet-collections"
+            >
+              <Library className="size-5 shrink-0" aria-hidden="true" />
+              <span>Collections</span>
+            </Link>
+
             {checkPermission("issues.report.quick", getAccessLevel(role)) && (
               <Link
                 href="/report/quick"
