@@ -64,11 +64,13 @@ export function parsePublicIssueForm(
   const validation = publicIssueSchema.safeParse(rawData);
 
   if (!validation.success) {
-    const firstIssue = validation.error.issues[0];
-    const field = firstIssue?.path.at(0);
-    const message = firstIssue?.message ?? "Invalid input: unable to parse";
-    const prefixedMessage = field ? `${String(field)}: ${message}` : message;
-    return { success: false, error: prefixedMessage };
+    // Surface the schema's own message verbatim — each one stands alone
+    // ("Please select a machine"), so prefixing the raw field path
+    // ("machineId: …") only leaks an internal name at the user. Mirrors
+    // quick/validation.ts. (PP-idrb spec §7.)
+    const message =
+      validation.error.issues[0]?.message ?? "Invalid input: unable to parse";
+    return { success: false, error: message };
   }
 
   return { success: true, data: validation.data };
