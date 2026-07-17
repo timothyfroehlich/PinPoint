@@ -77,6 +77,13 @@ interface UnifiedReportFormProps {
 // guarantees at least one entry, so this is never actually rendered.
 const FALLBACK_ENTRY = defaultEntry("00000000-0000-0000-0000-000000000000");
 
+// Session cache of recent issues keyed by machine initials. The Single form
+// unmounts/remounts on every Single↔Multiple tab switch (they're separate
+// routes), so without this the panel re-fetches and flashes a skeleton each
+// time. The cache lets a return to Single paint the last-known issues instantly
+// while the effect revalidates in the background. Cleared on full page reload.
+const recentIssuesCache = new Map<string, RecentIssueData[]>();
+
 export function UnifiedReportForm({
   machinesList,
   defaultMachineId,
@@ -111,13 +118,25 @@ export function UnifiedReportForm({
   const enforceCaptcha =
     hasTurnstile && process.env.NODE_ENV !== "test" && !userAuthenticated;
 
-  // Recent issues panel state
-  const [issues, setIssues] = useState<RecentIssueData[]>(initialIssues ?? []);
+  // Recent issues panel state. Seed from the session cache for the currently
+  // selected machine (survives a tab remount) before falling back to the
+  // server prefetch — so returning to Single paints instantly, no skeleton.
+  const [issues, setIssues] = useState<RecentIssueData[]>(() => {
+    const initials =
+      machinesList.find((m) => m.id === entry.machineId)?.initials ?? "";
+    return recentIssuesCache.get(initials) ?? initialIssues ?? [];
+  });
   const [isLoadingIssues, setIsLoadingIssues] = useState(false);
-  const [issuesError, setIssuesError] = useState(
-    initialIssues === null && initialMachineInitials !== ""
-  );
-  const prevMachineRef = useRef(initialMachineInitials);
+  const [issuesError, setIssuesError] = useState(false);
+
+  // Seed the cache from the server prefetch once, so the fetch effect below
+  // cache-hits (no skeleton) for the initially-requested machine.
+  useEffect(() => {
+    if (initialMachineInitials && initialIssues) {
+      recentIssuesCache.set(initialMachineInitials, initialIssues);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only seed; props are the server prefetch snapshot and never change for a given mount
+  }, []);
 
   const handleTurnstileVerify = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -225,25 +244,33 @@ export function UnifiedReportForm({
     }
   }, [entry.machineId, machinesList, patchEntry]);
 
-  // Fetch recent issues when selected machine changes
+  // Fetch recent issues for the selected machine, revalidating on every change.
+  // Cache-hits paint immediately (no skeleton); a background fetch refreshes the
+  // cache. No "skip if unchanged" ref guard — that collided with StrictMode's
+  // double-invoked effect and left the loading flag stuck. Cancellation ignores
+  // a stale in-flight result instead.
+  const currentInitials = selectedMachine?.initials ?? "";
   useEffect(() => {
-    const currentInitials = selectedMachine?.initials ?? "";
-
-    // Skip if machine hasn't actually changed
-    if (currentInitials === prevMachineRef.current) return;
-    prevMachineRef.current = currentInitials;
-
-    // No machine selected — clear issues
     if (!currentInitials) {
       setIssues([]);
       setIssuesError(false);
+      setIsLoadingIssues(false);
       return;
     }
 
-    const cancellation = { cancelled: false };
-    setIsLoadingIssues(true);
-    setIssuesError(false);
+    const cached = recentIssuesCache.get(currentInitials);
+    if (cached) {
+      setIssues(cached);
+      setIssuesError(false);
+      setIsLoadingIssues(false);
+    } else {
+      setIsLoadingIssues(true);
+      setIssuesError(false);
+    }
 
+    // Object (not a `let`) so the async closure sees the mutation without
+    // tripping no-unnecessary-condition (TS can't narrow a captured `let`).
+    const cancellation = { cancelled: false };
     void (async () => {
       try {
         const result = await getRecentIssuesAction(currentInitials, 5);
@@ -251,6 +278,7 @@ export function UnifiedReportForm({
         setIsLoadingIssues(false);
         if (result.ok) {
           setIssues(result.value);
+          recentIssuesCache.set(currentInitials, result.value);
         } else {
           setIssuesError(true);
         }
@@ -264,7 +292,7 @@ export function UnifiedReportForm({
     return () => {
       cancellation.cancelled = true;
     };
-  }, [selectedMachine?.initials]);
+  }, [currentInitials]);
 
   const canSetWorkflowFields =
     accessLevel === "admin" ||
