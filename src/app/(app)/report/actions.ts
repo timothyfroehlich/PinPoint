@@ -39,7 +39,7 @@ import {
   type ProseMirrorDoc,
   plainTextToDoc,
   docToPlainText,
-  proseMirrorDocSchema,
+  proseMirrorDocValueSchema,
 } from "~/lib/tiptap/types";
 import type {
   IssueStatus,
@@ -148,18 +148,21 @@ export async function submitPublicIssueAction(
   // Parse description JSON if present
   let description: ProseMirrorDoc | null = null;
   if (descriptionJson) {
+    let parsed: unknown;
     try {
-      description = JSON.parse(descriptionJson) as ProseMirrorDoc;
+      parsed = JSON.parse(descriptionJson);
     } catch (e) {
       log.error(
         { e },
         "Failed to parse description JSON — falling back to plain text"
       );
-      description = plainTextToDoc(descriptionJson);
+      parsed = plainTextToDoc(descriptionJson);
     }
-    if (!proseMirrorDocSchema.safeParse(description).success) {
+    const result = proseMirrorDocValueSchema.safeParse(parsed);
+    if (!result.success) {
       return { error: "Invalid description format." };
     }
+    description = result.data;
     // Enforce size limits: plain-text length (catches large visible content)
     // and serialized JSON size (prevents oversized JSONB with minimal text)
     if (docToPlainText(description).length > 20_000) {

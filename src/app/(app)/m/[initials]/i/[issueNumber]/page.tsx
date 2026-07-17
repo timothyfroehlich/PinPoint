@@ -162,7 +162,7 @@ export default async function IssueDetailPage({
     notFound();
   }
 
-  const issueWithRelations = issue as unknown as IssueWithAllRelations;
+  const issueWithRelations: IssueWithAllRelations = issue;
   const accessLevel = getAccessLevel(currentUserProfile?.role);
   const ownershipContext: OwnershipContext = {
     userId: user?.id,
