@@ -30,6 +30,11 @@ if (!databaseUrl) {
 }
 
 const COLLECTION_NAME = "APC Tournament Bank";
+// Fixed demo view-token (local only) so the shared-link flow is reachable in
+// dev without clicking through the Share dialog: /c/<this>. Real tokens are
+// random base64url (`generateViewToken`); this is a fixed value shaped like one
+// so the seeded link looks and behaves like production, just deterministically.
+const DEMO_VIEW_TOKEN = "kQ7p2Rf9xVnT4mLbYcWdZ3hJ8sA6uD1e";
 // A themed tournament lineup. Any name not present in the seed is skipped, so
 // this stays resilient to seed data changes.
 const MACHINE_NAMES = [
@@ -58,8 +63,8 @@ async function run() {
     `;
 
     const [collection] = await sql`
-      INSERT INTO collections (name, owner_id)
-      VALUES (${COLLECTION_NAME}, ${admin.id})
+      INSERT INTO collections (name, owner_id, view_token)
+      VALUES (${COLLECTION_NAME}, ${admin.id}, ${DEMO_VIEW_TOKEN})
       RETURNING id
     `;
 
@@ -75,7 +80,7 @@ async function run() {
     }
 
     console.log(
-      `✅ Collections seeded: "${COLLECTION_NAME}" (admin) with ${String(machineRows.length)} machine(s).`
+      `✅ Collections seeded: "${COLLECTION_NAME}" (admin) with ${String(machineRows.length)} machine(s). Shared view: /c/${DEMO_VIEW_TOKEN}`
     );
   } finally {
     await sql.end();

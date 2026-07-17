@@ -13,7 +13,10 @@ import {
   machines,
   userProfiles,
 } from "~/server/db/schema";
-import { getCollection } from "~/lib/collections/user";
+import {
+  getCollection,
+  getCollectionByViewToken,
+} from "~/lib/collections/user";
 
 describe("getCollection", () => {
   setupTestDb();
@@ -106,5 +109,49 @@ describe("getCollection", () => {
     const db = await getTestDb();
     expect(await getCollection(asDbOrTx(db), randomUUID())).toBeNull();
     expect(await getCollection(asDbOrTx(db), "not-a-uuid")).toBeNull();
+  });
+});
+
+describe("getCollectionByViewToken", () => {
+  setupTestDb();
+
+  it("resolves a collection by its view token (same shape as getCollection)", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ firstName: "Cara", lastName: "Curator" });
+    await db.insert(userProfiles).values(owner);
+    const zeta = createTestMachine({ initials: "ZZ", name: "Zeta" });
+    await db.insert(machines).values(zeta);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Shared", ownerId: owner.id, viewToken: "tok_abc123" })
+      .returning();
+    await db
+      .insert(collectionMachines)
+      .values({ collectionId: collection.id, machineId: zeta.id });
+
+    const result = await getCollectionByViewToken(asDbOrTx(db), "tok_abc123");
+    expect(result?.id).toBe(collection.id);
+    expect(result?.name).toBe("Shared");
+    expect(result?.viewToken).toBe("tok_abc123");
+    expect(result?.machines.map((m) => m.initials)).toEqual(["ZZ"]);
+  });
+
+  it("returns null for an unknown token", async () => {
+    const db = await getTestDb();
+    expect(
+      await getCollectionByViewToken(asDbOrTx(db), "nope-not-a-token")
+    ).toBeNull();
+  });
+
+  it("returns null for an empty token (never matches a NULL column)", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser();
+    await db.insert(userProfiles).values(owner);
+    // A collection with sharing OFF (viewToken NULL) must be unreachable.
+    await db
+      .insert(collections)
+      .values({ name: "Private", ownerId: owner.id })
+      .returning();
+    expect(await getCollectionByViewToken(asDbOrTx(db), "")).toBeNull();
   });
 });

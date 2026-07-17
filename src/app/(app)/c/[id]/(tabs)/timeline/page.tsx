@@ -15,7 +15,7 @@ import {
   type TimelineTag,
 } from "~/lib/timeline/machine-tags";
 import { db } from "~/server/db";
-import { getCollectionForLayout } from "~/app/(app)/c/collection/[id]/_data";
+import { getCollectionForLayout } from "~/app/(app)/c/[id]/_data";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -25,7 +25,7 @@ interface PageProps {
 const PAGE_SIZE = 25;
 
 /**
- * Collection Timeline Tab (/c/collection/[id]/timeline)
+ * Collection Timeline Tab (/c/[id]/timeline)
  *
  * Combined chronological feed across the collection's machine set, adapted
  * from the per-machine timeline page (/m/[initials]/timeline). Deltas:
@@ -112,7 +112,7 @@ export default async function CollectionTimelinePage({
   );
 
   const groups = bucketTimelineRows(rows);
-  const timelineBasePath = `/c/collection/${id}/timeline`;
+  const timelineBasePath = `/c/${id}/timeline`;
 
   return (
     <div className="flex flex-col gap-4">
@@ -199,7 +199,7 @@ interface TimelinePaginationProps {
   tags: TimelineTag[];
   /** The validated `?m=` machine filter, preserved across page links. */
   machineInitials: string[];
-  /** Base path for the timeline route, e.g. `/c/collection/<id>/timeline`. */
+  /** Base path for the timeline route, e.g. `/c/<id>/timeline`. */
   basePath: string;
 }
 

@@ -51,7 +51,7 @@ export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
             {collections.map((collection) => (
               <li key={collection.id}>
                 <Link
-                  href={`/c/collection/${collection.id}`}
+                  href={`/c/${collection.id}`}
                   className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-surface-variant"
                 >
                   <span className="font-medium text-foreground">

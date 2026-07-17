@@ -56,7 +56,7 @@ export function CreateCollectionDialog({
       if (!result.success) setError(result.error);
       else if (result.data) {
         setOpen(false);
-        router.push(`/c/collection/${result.data.id}`);
+        router.push(`/c/${result.data.id}`);
       } else setError("Create failed");
     });
   }

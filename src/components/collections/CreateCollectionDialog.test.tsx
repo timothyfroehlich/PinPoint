@@ -48,9 +48,7 @@ describe("CreateCollectionDialog", () => {
         machineIds: [],
       })
     );
-    await waitFor(() =>
-      expect(push).toHaveBeenCalledWith("/c/collection/new-id")
-    );
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/c/new-id"));
   });
 
   it("keeps submit disabled until a name is entered", async () => {

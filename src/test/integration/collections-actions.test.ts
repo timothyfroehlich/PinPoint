@@ -269,6 +269,137 @@ describe("collection actions", () => {
     expect(result.success).toBe(false);
   });
 
+  async function tokenOf(collectionId: string): Promise<string | null> {
+    const db = await getTestDb();
+    const row = await db.query.collections.findFirst({
+      where: eq(collections.id, collectionId),
+      columns: { viewToken: true },
+    });
+    return row?.viewToken ?? null;
+  }
+
+  it("setCollectionSharingAction: enable mints a token, disable nulls it, enable is idempotent", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(owner);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Bank", ownerId: owner.id })
+      .returning();
+
+    const { setCollectionSharingAction } =
+      await import("~/app/(app)/c/collections/actions");
+    signIn(owner.id);
+
+    // Off by default.
+    expect(await tokenOf(collection.id)).toBeNull();
+
+    // Enable mints a token.
+    const enabled = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: true,
+    });
+    expect(enabled.success).toBe(true);
+    if (!enabled.success) throw new Error("expected success");
+    const token = enabled.data?.viewToken ?? null;
+    expect(token).toBeTruthy();
+    expect(await tokenOf(collection.id)).toBe(token);
+
+    // Enabling again keeps the same token (stable link).
+    const again = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: true,
+    });
+    expect(again.success && again.data?.viewToken).toBe(token);
+
+    // Disable nulls it (revokes all links).
+    const disabled = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: false,
+    });
+    expect(disabled.success).toBe(true);
+    if (!disabled.success) throw new Error("expected success");
+    expect(disabled.data?.viewToken).toBeNull();
+    expect(await tokenOf(collection.id)).toBeNull();
+  });
+
+  it("setCollectionSharingAction: disabling revokes a live link (old token no longer resolves)", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(owner);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Bank", ownerId: owner.id })
+      .returning();
+
+    const { setCollectionSharingAction } =
+      await import("~/app/(app)/c/collections/actions");
+    const { getCollectionByViewToken } = await import("~/lib/collections/user");
+    signIn(owner.id);
+
+    // Enable and confirm the minted token resolves the collection — the link is
+    // live (this is exactly what the /c/<token> resolver does).
+    const enabled = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: true,
+    });
+    if (!enabled.success) throw new Error("expected success");
+    const token = enabled.data?.viewToken ?? "";
+    expect(token).toBeTruthy();
+    expect((await getCollectionByViewToken(undefined, token))?.id).toBe(
+      collection.id
+    );
+
+    // Disable, then the same token must be dead — the resolver returns null, so
+    // /c/<token> 404s. This is the revocation guarantee for shared links.
+    const disabled = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: false,
+    });
+    if (!disabled.success) throw new Error("expected success");
+    expect(await getCollectionByViewToken(undefined, token)).toBeNull();
+
+    // Re-enabling mints a fresh token; the revoked one stays dead forever.
+    const reEnabled = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: true,
+    });
+    if (!reEnabled.success) throw new Error("expected success");
+    expect(reEnabled.data?.viewToken).not.toBe(token);
+    expect(await getCollectionByViewToken(undefined, token)).toBeNull();
+  });
+
+  it("setCollectionSharingAction: non-owner and unauthenticated denied", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    const intruder = createTestUser({ role: "admin" });
+    await db.insert(userProfiles).values([owner, intruder]);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Bank", ownerId: owner.id })
+      .returning();
+
+    const { setCollectionSharingAction } =
+      await import("~/app/(app)/c/collections/actions");
+
+    // Admin is not the owner — sharing is owner-only.
+    signIn(intruder.id);
+    const denied = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: true,
+    });
+    expect(denied.success).toBe(false);
+    expect(await tokenOf(collection.id)).toBeNull();
+
+    signOut();
+    const anon = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: true,
+    });
+    expect(anon.success).toBe(false);
+    expect(await tokenOf(collection.id)).toBeNull();
+  });
+
   it("deleteCollectionAction: owner only", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ role: "member" });

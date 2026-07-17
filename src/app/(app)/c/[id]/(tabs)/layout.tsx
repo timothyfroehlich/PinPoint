@@ -5,6 +5,7 @@ import { PageContainer } from "~/components/layout/PageContainer";
 import { CollectionHeader } from "~/components/collections/CollectionHeader";
 import { CollectionTabStrip } from "~/components/collections/CollectionTabStrip";
 import { EditCollectionDialog } from "~/components/collections/EditCollectionDialog";
+import { CollectionShareDialog } from "~/components/collections/CollectionShareDialog";
 import { summarizeCollection } from "~/lib/collections/summary";
 import { getCollectionForLayout, getPickerMachines } from "../_data";
 
@@ -24,6 +25,9 @@ export async function generateMetadata({
     title: data
       ? `${data.collection.name} | PinPoint`
       : "Collection | PinPoint",
+    // A token-shared view keeps the capability out of the Referer header when
+    // the visitor navigates away, so the link can't leak to third parties.
+    ...(data?.viaViewToken ? { referrer: "no-referrer" } : {}),
   };
 }
 
@@ -43,18 +47,25 @@ export default async function CollectionLayout({
         ? "needs_service"
         : "operational";
 
-  // Owner-only "Edit collection" lives in the header (rename + machine set +
-  // delete). The all-machines fetch runs only on the owner's own view.
+  // Owner-only "Edit collection" + "Share" live in the header. Both the
+  // all-machines fetch and the token value are surfaced only on the owner's
+  // own (manage) view — never to a view-token or admin visitor.
   let headerAction: React.ReactNode = null;
   if (data.viewerCanManage) {
     const allMachines = await getPickerMachines();
     headerAction = (
-      <EditCollectionDialog
-        collectionId={data.collection.id}
-        currentName={data.collection.name}
-        allMachines={allMachines}
-        currentIds={data.collection.machines.map((m) => m.id)}
-      />
+      <div className="flex items-center gap-2">
+        <CollectionShareDialog
+          collectionId={data.collection.id}
+          viewToken={data.collection.viewToken}
+        />
+        <EditCollectionDialog
+          collectionId={data.collection.id}
+          currentName={data.collection.name}
+          allMachines={allMachines}
+          currentIds={data.collection.machines.map((m) => m.id)}
+        />
+      </div>
     );
   }
 
@@ -67,7 +78,7 @@ export default async function CollectionLayout({
           action={headerAction}
         />
         <CollectionTabStrip
-          basePath={`/c/collection/${data.collection.id}`}
+          basePath={`/c/${data.handle}`}
           openIssueCount={summary.openIssues}
           status={worstStatus}
         />
