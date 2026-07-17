@@ -31,7 +31,7 @@ if (!databaseUrl) {
 
 const COLLECTION_NAME = "APC Tournament Bank";
 // Fixed demo view-token (local only) so the shared-link flow is reachable in
-// dev without clicking through the Share dialog: /c/collection/<this>.
+// dev without clicking through the Share dialog: /c/<this>.
 const DEMO_VIEW_TOKEN = "demo-tournament-view-token";
 // A themed tournament lineup. Any name not present in the seed is skipped, so
 // this stays resilient to seed data changes.
@@ -78,7 +78,7 @@ async function run() {
     }
 
     console.log(
-      `✅ Collections seeded: "${COLLECTION_NAME}" (admin) with ${String(machineRows.length)} machine(s). Shared view: /c/collection/${DEMO_VIEW_TOKEN}`
+      `✅ Collections seeded: "${COLLECTION_NAME}" (admin) with ${String(machineRows.length)} machine(s). Shared view: /c/${DEMO_VIEW_TOKEN}`
     );
   } finally {
     await sql.end();
