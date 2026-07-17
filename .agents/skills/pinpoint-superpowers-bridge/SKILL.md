@@ -69,7 +69,7 @@ Everything above happens **in a worktree** — the root checkout is read-only (A
 
 Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally". **In PinPoint that menu does not apply.** There is exactly one finish path:
 
-- **Never merge locally, never push/merge to `main`.** Ship through a PR: push the branch, open it **ready-for-review**, let **CI** run the full suite, then merge **only** via `scripts/workflow/merge-pr.sh <PR>` (never `gh pr merge` / MCP merge). Full pipeline: `pinpoint-pr-workflow` + landing-the-plane (AGENTS.md §9).
+- **Never merge locally, never push/merge to `main`, and never merge the PR yourself by any path.** Ship through a PR: push the branch, open it **ready-for-review**, let **CI** run the full suite, post UI screenshots if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human` (never `gh pr merge` / MCP merge / running `merge-pr.sh` yourself — all three are blocked for agents, PP-wi85). Full pipeline: `pinpoint-pr-workflow` + landing-the-plane (AGENTS.md §9).
 - **Tests:** use PinPoint's tiered commands (`pnpm run check` floor; `pnpm run preflight` for migrations/auth/server-actions/middleware/schema; `pnpm run smoke` for UI) — **not** `npm test` / `pytest`. Don't run the full E2E suite locally; CI owns it.
 - **Worktree cleanup is destructive → wait for explicit confirmation** (AGENTS.md §9 "Landing the plane", step 6). When confirmed, cleanup goes through the `WorktreeRemove` hook / `scripts/worktree_cleanup.py` (dealloc slot + Docker volumes) — **never raw `git worktree remove`/`rm -rf`**, which leaks the slot manifest and volumes.
 - **"Discard" is not a routine option.** Abandoning work is a deliberate, confirmed action, not a menu pick.
@@ -79,17 +79,17 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 
 ## 4. Quick reference
 
-| Superpowers step         | PinPoint override                                                      |
-| :----------------------- | :--------------------------------------------------------------------- |
-| Spec written             | + create bead with `--spec-id` + `--acceptance` (§2)                   |
-| Plan written             | record path + branch in `--design` (§1)                                |
-| Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`, from main worktree    |
-| SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                   |
-| Code review              | CI Gate + `/code-review`; replies via MCP, signed with your agent name |
-| Finish: "merge locally"  | ❌ prohibited → PR + `merge-pr.sh` + landing-the-plane                 |
-| Finish: tests            | tiered `pnpm run check`/`preflight`/`smoke`, not `npm test`            |
-| Finish: worktree cleanup | `WorktreeRemove` hook / `worktree_cleanup.py`, on confirmation         |
-| Close bead               | only after merge                                                       |
+| Superpowers step         | PinPoint override                                                                 |
+| :----------------------- | :-------------------------------------------------------------------------------- |
+| Spec written             | + create bead with `--spec-id` + `--acceptance` (§2)                              |
+| Plan written             | record path + branch in `--design` (§1)                                           |
+| Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`, from main worktree               |
+| SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                              |
+| Code review              | CI Gate + `/code-review`; replies via MCP, signed with your agent name            |
+| Finish: "merge locally"  | ❌ prohibited → PR + human-only `merge-pr.sh --human` handoff + landing-the-plane |
+| Finish: tests            | tiered `pnpm run check`/`preflight`/`smoke`, not `npm test`                       |
+| Finish: worktree cleanup | `WorktreeRemove` hook / `worktree_cleanup.py`, on confirmation                    |
+| Close bead               | only after merge                                                                  |
 
 ## Red flags — stop if you catch yourself
 

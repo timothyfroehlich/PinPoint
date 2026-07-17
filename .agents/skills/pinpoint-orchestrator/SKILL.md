@@ -32,11 +32,14 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 # Review thread inspection + reply → use MCP via pinpoint-pr-workflow skill Phase 3
 # (mcp__github__pull_request_read / add_reply_to_pull_request_comment / pull_request_review_write)
 
-# Readiness label + merge: pinpoint-pr-workflow skill Phases 3.4 + 4
+# Readiness label + merge handoff: pinpoint-pr-workflow skill Phases 3.4-3.6 + 4
 # Apply label via mcp__github__issue_write or `gh pr edit --add-label`
-bash scripts/workflow/merge-pr.sh <PR>                   # Composite gate-then-merge enforcer; 5 gates incl. `reviewed` (--dry-run)
-bash scripts/workflow/merge-pr.sh <PR> --dry-run         # Preview gate evaluation without merging
+# merge-pr.sh is human-only (PP-wi85) — blocked for agents via ANY invocation shape,
+# including --dry-run. The lead does NOT run it, even to preview gates. Once the PR
+# is ready (label applied, screenshots posted if UI-touching), hand Tim:
+#   ! scripts/workflow/merge-pr.sh <PR> --human
 bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"  # Post SHA-pinned Claude-review marker (satisfies the `reviewed` gate when Copilot skips)
+node scripts/workflow/pr-screenshots.mjs <PR>                 # UI-touching PRs: desktop+mobile screenshots, sticky PR comment
 
 # Worktree health — covers manually created ../pinpoint-worktrees/* ONLY;
 # agent-created .claude/worktrees/* are handled by the WorktreeRemove hook and not scanned here
@@ -200,13 +203,13 @@ Or fallback: `gh pr edit <PR> --add-label ready-for-review`.
 
 ### Ensure every PR is reviewed (lead backstop)
 
-The subagent self-reviews its own diff (Phase 3 template), but that can be skipped or Copilot can silently miss the head commit — so the lead re-checks at the merge boundary. Before applying `ready-for-review` or handing a PR to `merge-pr.sh`, confirm the head commit is covered by **either** a Copilot review **or** a SHA-pinned Claude marker (`<!-- pinpoint-claude-review: <head_sha> -->`). If neither covers head:
+The subagent self-reviews its own diff (Phase 3 template), but that can be skipped or Copilot can silently miss the head commit — so the lead re-checks at the handoff boundary. Before applying `ready-for-review` or handing a PR to Tim for `merge-pr.sh --human`, confirm the head commit is covered by **either** a Copilot review **or** a SHA-pinned Claude marker (`<!-- pinpoint-claude-review: <head_sha> -->`). If neither covers head:
 
 1. Run `/code-review` on the PR diff — the model-invocable **local** review. (`ultra` is the cloud multi-agent review; it is user-triggered and billed, so the agent cannot launch it.)
 2. Address serious findings (fix → have the subagent push → re-review; a fix re-arms the gate). Decline the rest.
 3. `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` to post the marker.
 
-The `reviewed` gate in `merge-pr.sh` is the hard enforcement — it FAILs the merge if the head commit has no Copilot or Claude review once the 600s Copilot window has elapsed. Running the fallback is how you satisfy it; `--force`-bypassing it defeats the guarantee.
+The `reviewed` gate in `merge-pr.sh` is the hard enforcement — it FAILs the merge if the head commit has no Copilot or Claude review once the 600s Copilot window has elapsed. Running the fallback before handoff is how the lead satisfies it; telling Tim to `--force`-bypass it defeats the guarantee.
 
 ---
 
