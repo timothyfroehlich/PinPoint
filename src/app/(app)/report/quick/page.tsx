@@ -6,8 +6,6 @@ import { machines, userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { getLoginUrl } from "~/lib/url";
-import { PageContainer } from "~/components/layout/PageContainer";
-import { PageHeader } from "~/components/layout/PageHeader";
 import { QuickReportGrid } from "./quick-report-grid";
 
 export const dynamic = "force-dynamic";
@@ -45,9 +43,9 @@ export default async function QuickReportPage(): Promise<React.JSX.Element> {
   ]);
 
   return (
-    <PageContainer size="wide">
-      <PageHeader title="Quick Report" />
-      <p className="mb-4 text-sm text-muted-foreground">
+    /* Page chrome (container, header, tab bar) is owned by report/layout.tsx. */
+    <>
+      <p className="text-sm text-muted-foreground">
         Log several machine issues at once, then submit them individually or all
         together.
       </p>
@@ -59,6 +57,6 @@ export default async function QuickReportPage(): Promise<React.JSX.Element> {
         }))}
         assignees={assignees}
       />
-    </PageContainer>
+    </>
   );
 }
