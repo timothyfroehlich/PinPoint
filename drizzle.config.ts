@@ -81,6 +81,8 @@ export default defineConfig({
     "pinballmap_catalog",
     "pinballmap_state",
     "machine_settings_sets",
+    "collections",
+    "collection_machines",
   ],
   schemaFilter: ["public"],
   verbose: true,
