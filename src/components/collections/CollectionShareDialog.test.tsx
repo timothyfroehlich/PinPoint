@@ -52,7 +52,7 @@ describe("CollectionShareDialog", () => {
     );
     // The minted token now drives a visible link field ending in the token.
     await screen.findByTestId("collection-share-url");
-    expect(shareUrlValue()).toContain("/c/collection/fresh-token");
+    expect(shareUrlValue()).toContain("/c/fresh-token");
     await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
 
@@ -62,7 +62,7 @@ describe("CollectionShareDialog", () => {
 
     await userEvent.click(screen.getByTestId("collection-share-trigger"));
     expect(screen.getByTestId("collection-share-toggle")).toBeChecked();
-    expect(shareUrlValue()).toContain("/c/collection/existing");
+    expect(shareUrlValue()).toContain("/c/existing");
 
     await userEvent.click(screen.getByTestId("collection-share-toggle"));
     await waitFor(() =>
@@ -91,9 +91,7 @@ describe("CollectionShareDialog", () => {
     await waitFor(() =>
       expect(resetLink).toHaveBeenCalledWith({ collectionId: "c1" })
     );
-    await waitFor(() =>
-      expect(shareUrlValue()).toContain("/c/collection/rotated")
-    );
+    await waitFor(() => expect(shareUrlValue()).toContain("/c/rotated"));
   });
 
   it("surfaces an error and leaves state unchanged when the action fails", async () => {

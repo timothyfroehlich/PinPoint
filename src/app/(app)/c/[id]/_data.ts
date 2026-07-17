@@ -20,7 +20,7 @@ export interface CollectionForLayout {
   /**
    * The handle from the URL (a collection id OR a view token). Tab links and
    * revalidatePath use THIS, not `collection.id`, so a view-token visitor stays
-   * on `/c/collection/<token>/…` and never sees the internal uuid.
+   * on `/c/<token>/…` and never sees the internal uuid.
    */
   handle: string;
   /** Access was granted by presenting a valid view token (read-only), not owner/admin. */

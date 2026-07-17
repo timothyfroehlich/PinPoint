@@ -190,7 +190,7 @@ export async function updateCollectionAction(input: {
       .where(eq(collections.id, input.collectionId));
   });
 
-  revalidatePath(`/c/collection/${input.collectionId}`);
+  revalidatePath(`/c/${input.collectionId}`);
   revalidatePath("/c/collections");
   return { success: true };
 }
@@ -223,7 +223,7 @@ export async function setCollectionSharingAction(input: {
       .update(collections)
       .set({ viewToken: null, updatedAt: new Date() })
       .where(eq(collections.id, input.collectionId));
-    revalidatePath(`/c/collection/${input.collectionId}`);
+    revalidatePath(`/c/${input.collectionId}`);
     return { success: true, data: { viewToken: null } };
   }
 
@@ -239,7 +239,7 @@ export async function setCollectionSharingAction(input: {
       .set({ viewToken: token, updatedAt: new Date() })
       .where(eq(collections.id, input.collectionId));
   }
-  revalidatePath(`/c/collection/${input.collectionId}`);
+  revalidatePath(`/c/${input.collectionId}`);
   return { success: true, data: { viewToken: token } };
 }
 
@@ -264,7 +264,7 @@ export async function resetCollectionViewLinkAction(input: {
     .update(collections)
     .set({ viewToken: token, updatedAt: new Date() })
     .where(eq(collections.id, input.collectionId));
-  revalidatePath(`/c/collection/${input.collectionId}`);
+  revalidatePath(`/c/${input.collectionId}`);
   return { success: true, data: { viewToken: token } };
 }
 

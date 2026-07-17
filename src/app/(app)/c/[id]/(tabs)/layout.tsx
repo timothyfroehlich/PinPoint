@@ -78,7 +78,7 @@ export default async function CollectionLayout({
           action={headerAction}
         />
         <CollectionTabStrip
-          basePath={`/c/collection/${data.handle}`}
+          basePath={`/c/${data.handle}`}
           openIssueCount={summary.openIssues}
           status={worstStatus}
         />

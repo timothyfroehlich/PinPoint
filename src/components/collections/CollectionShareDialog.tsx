@@ -30,7 +30,7 @@ interface Props {
 /**
  * Owner-only Share panel (Wave 0b, PP-wqit.2). One toggle enables/disables the
  * public view link; a reset rotates the token to kill previously shared links.
- * The token lives in the URL path (`/c/collection/<token>`) — never a query
+ * The token lives in the URL path (`/c/<token>`) — never a query
  * param — so it stays out of access logs and CSP reports.
  */
 export function CollectionShareDialog({
@@ -55,7 +55,7 @@ export function CollectionShareDialog({
   }, [viewToken]);
 
   const enabled = token !== null;
-  const shareUrl = token !== null ? `${origin}/c/collection/${token}` : "";
+  const shareUrl = token !== null ? `${origin}/c/${token}` : "";
 
   function toggle(next: boolean): void {
     setError(null);

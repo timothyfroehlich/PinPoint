@@ -34,7 +34,7 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     await page.getByTestId("create-collection-trigger").click();
     await page.getByLabel("Name").fill(name);
     await page.getByTestId("create-collection-submit").click();
-    await expect(page).toHaveURL(/\/c\/collection\//);
+    await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}/);
 
     // Fresh collection is empty — the owner sees the inline add-machines picker.
     await expect(
@@ -73,7 +73,7 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     await page.getByTestId("create-collection-trigger").click();
     await page.getByLabel("Name").fill(name);
     await page.getByTestId("create-collection-submit").click();
-    await expect(page).toHaveURL(/\/c\/collection\//);
+    await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}/);
     await page.getByTestId("collection-machines-multiselect").click();
     await page.getByPlaceholder("Search machines…").fill("Slick Chick");
     await page.getByRole("option", { name: /Slick Chick/ }).click();
@@ -87,7 +87,7 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     const shareUrl = await page
       .getByTestId("collection-share-url")
       .inputValue();
-    expect(shareUrl).toMatch(/\/c\/collection\/.+/);
+    expect(shareUrl).toMatch(/\/c\/[^/]+$/);
 
     // A fresh, unauthenticated context opens the link — no login redirect, and
     // the read-only Overview renders without any owner controls.
@@ -98,7 +98,7 @@ test.describe("Personal collections (PP-wqit.1)", () => {
       await expect(
         anonPage.getByTestId("collection-overview-body")
       ).toBeVisible();
-      await expect(anonPage).toHaveURL(/\/c\/collection\//);
+      await expect(anonPage).toHaveURL(/\/c\/[^/]+$/);
       await expect(
         anonPage.getByTestId("collection-share-trigger")
       ).toHaveCount(0);

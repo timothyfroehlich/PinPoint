@@ -4,10 +4,7 @@ import { parseIssueFilters } from "~/lib/issues/filters";
 import { loadIssueListPage } from "~/lib/issues/list-page";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueList } from "~/components/issues/IssueList";
-import {
-  getCollectionForLayout,
-  getViewer,
-} from "~/app/(app)/c/collection/[id]/_data";
+import { getCollectionForLayout, getViewer } from "~/app/(app)/c/[id]/_data";
 
 interface PageProps {
   params: Promise<{ id: string }>;
