@@ -160,9 +160,11 @@ describe("Admin User Management Integration", () => {
       formData.append("role", "member");
       formData.append("sendInvite", "true");
 
-      const result = await inviteUser(formData);
+      const result = await inviteUser(undefined, formData);
       expect(result.ok).toBe(true);
-      expect(result.userId).toBeDefined();
+      if (result.ok) {
+        expect(result.value.userId).toBeDefined();
+      }
 
       const ucUser = await (
         await getTestDb()
@@ -204,9 +206,11 @@ describe("Admin User Management Integration", () => {
       formData.append("email", "tech-invite@test.com");
       formData.append("role", "member");
 
-      const result = await inviteUser(formData);
+      const result = await inviteUser(undefined, formData);
       expect(result.ok).toBe(true);
-      expect(result.userId).toBeDefined();
+      if (result.ok) {
+        expect(result.value.userId).toBeDefined();
+      }
 
       const invited = await (
         await getTestDb()
@@ -226,9 +230,13 @@ describe("Admin User Management Integration", () => {
       formData.append("email", targetUser!.email); // targetUser already exists in beforeEach
       formData.append("role", "member");
 
-      await expect(inviteUser(formData)).rejects.toThrow(
-        "A user with this email already exists and is active."
-      );
+      const result = await inviteUser(undefined, formData);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.message).toBe(
+          "A user with this email already exists and is active."
+        );
+      }
     });
 
     it("should reject invite when the email exists in auth.users beyond the first page (PP-a4st)", async () => {
@@ -266,9 +274,13 @@ describe("Admin User Management Integration", () => {
       formData.append("email", collisionEmail);
       formData.append("role", "member");
 
-      await expect(inviteUser(formData)).rejects.toThrow(
-        "A user with this email already exists and is active."
-      );
+      const result = await inviteUser(undefined, formData);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.message).toBe(
+          "A user with this email already exists and is active."
+        );
+      }
 
       // And no invited row was created as a side effect.
       const leaked = await (
@@ -295,9 +307,11 @@ describe("Admin User Management Integration", () => {
       formData.append("email", email);
       formData.append("role", "member");
 
-      await expect(inviteUser(formData)).rejects.toThrow(
-        "This user has already been invited."
-      );
+      const result = await inviteUser(undefined, formData);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.message).toBe("This user has already been invited.");
+      }
     });
 
     it("should throw error when email sending fails", async () => {
@@ -314,9 +328,11 @@ describe("Admin User Management Integration", () => {
       formData.append("role", "member");
       formData.append("sendInvite", "true");
 
-      await expect(inviteUser(formData)).rejects.toThrow(
-        "Failed to send invitation email"
-      );
+      const result = await inviteUser(undefined, formData);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.message).toBe("Failed to send invitation email");
+      }
 
       // Verify user was still created (or should we rollback? Currently it's not in a transaction with email)
       // The current implementation inserts THEN sends email.
