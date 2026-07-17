@@ -6,7 +6,7 @@ import { QUICK_MAX_ROWS } from "./schemas";
 const validRow = () => ({
   machineId: randomUUID(),
   title: "Right flipper sticky",
-  description: "",
+  description: null,
   severity: "major",
   priority: "medium",
   frequency: "frequent",
@@ -55,6 +55,24 @@ describe("parseQuickRow", () => {
   it("treats empty assignedTo as valid (unassigned)", () => {
     const res = parseQuickRow({ ...validRow(), assignedTo: "" });
     expect(res.success).toBe(true);
+  });
+
+  it("accepts a ProseMirror description doc", () => {
+    const res = parseQuickRow({
+      ...validRow(),
+      description: {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: "hi" }] },
+        ],
+      },
+    });
+    expect(res.success).toBe(true);
+  });
+
+  it("rejects a bare string description (must be a ProseMirror doc or null)", () => {
+    const res = parseQuickRow({ ...validRow(), description: "plain text" });
+    expect(res.success).toBe(false);
   });
 
   it("exposes the batch cap", () => {

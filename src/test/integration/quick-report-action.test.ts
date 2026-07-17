@@ -70,7 +70,7 @@ async function seedMachine(
 const row = (over: Partial<QuickRowInput> = {}): QuickRowInput => ({
   machineId: "",
   title: "Right flipper sticky",
-  description: "",
+  description: null,
   severity: "major",
   priority: "medium",
   frequency: "frequent",

@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TooltipProvider } from "~/components/ui/tooltip";
+import { ReportDraftProvider } from "../report-draft-store";
+import type { MachineOption } from "~/components/machines/MachineCombobox";
 import { QuickReportGrid } from "./quick-report-grid";
 
 const submitRow = vi.fn();
@@ -11,7 +13,15 @@ vi.mock("./actions", () => ({
   submitQuickIssuesAction: (...a: unknown[]) => submitAll(...a),
 }));
 
-const machines = [
+// The expanded row's description is the rich editor — stub it (the real one is a
+// dynamically-imported Tiptap instance, too heavy for jsdom).
+vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
+  RichTextEditor: ({ ariaLabel }: { ariaLabel: string }) => (
+    <div aria-label={ariaLabel} data-testid="rich-text-editor" />
+  ),
+}));
+
+const machines: MachineOption[] = [
   {
     value: "11111111-1111-1111-1111-111111111111",
     name: "Grand Prix",
@@ -20,18 +30,25 @@ const machines = [
 ];
 const assignees = [{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name: "Tim" }];
 
-// StatusSelect renders a Tooltip internally, which requires a TooltipProvider
-// ancestor — the real app supplies one via ClientProviders at the root.
+// The grid reads machines/assignees from the shared ReportDraftProvider now, so
+// the provider supplies them. StatusSelect renders a Tooltip internally, which
+// requires a TooltipProvider ancestor (the app supplies one at the root).
 function renderGrid(): ReturnType<typeof render> {
   return render(
-    <TooltipProvider>
-      <QuickReportGrid machines={machines} assignees={assignees} />
-    </TooltipProvider>
+    <ReportDraftProvider machines={machines} assignees={assignees}>
+      <TooltipProvider>
+        <QuickReportGrid />
+      </TooltipProvider>
+    </ReportDraftProvider>
   );
 }
 
 describe("QuickReportGrid", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+  afterEach(() => localStorage.clear());
 
   it("starts with one empty row and can add more", async () => {
     renderGrid();
@@ -48,7 +65,7 @@ describe("QuickReportGrid", () => {
     expect(within(row).getByText(/description/i)).toBeInTheDocument();
   });
 
-  it("quick-submits a row and shows the confirmation strip", async () => {
+  it("quick-submits a row and shows the confirmation receipt", async () => {
     submitRow.mockResolvedValue({
       index: 0,
       ok: true,
@@ -87,7 +104,10 @@ describe("QuickReportGrid", () => {
     );
     await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
     await screen.findByRole("link", { name: "GP-42" });
-    expect(screen.getAllByTestId("quick-row")).toHaveLength(2);
+    // The submitted row became a receipt (separate from the editable rows); a
+    // fresh blank editable row remains so authoring can continue.
+    expect(screen.getByTestId("quick-receipt")).toBeInTheDocument();
+    expect(screen.getAllByTestId("quick-row")).toHaveLength(1);
     expect(screen.getByLabelText(/problem/i)).toHaveValue("");
   });
 
@@ -101,47 +121,6 @@ describe("QuickReportGrid", () => {
       .getByText("Problem (issue title)")
       .closest("label");
     expect(problemLabel).toHaveTextContent("*");
-  });
-
-  it("rotates the idempotency key on undo so a re-edited resubmit isn't deduped", async () => {
-    submitRow
-      .mockResolvedValueOnce({
-        index: 0,
-        ok: true,
-        issueNumber: 42,
-        machineInitials: "GP",
-      })
-      .mockResolvedValueOnce({
-        index: 0,
-        ok: true,
-        issueNumber: 43,
-        machineInitials: "GP",
-      });
-    renderGrid();
-    const row = screen.getByTestId("quick-row");
-    await userEvent.type(
-      within(row).getByLabelText(/problem/i),
-      "Spinner rejecting"
-    );
-    await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
-    expect(
-      await screen.findByRole("link", { name: "GP-42" })
-    ).toBeInTheDocument();
-
-    await userEvent.click(within(row).getByRole("button", { name: /undo/i }));
-    await userEvent.type(
-      within(row).getByLabelText(/problem/i),
-      "Edited after undo"
-    );
-    await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
-    expect(
-      await screen.findByRole("link", { name: "GP-43" })
-    ).toBeInTheDocument();
-
-    const [firstCall, secondCall] = submitRow.mock.calls;
-    expect(firstCall?.[0].idempotencyKey).not.toBe(
-      secondCall?.[0].idempotencyKey
-    );
   });
 
   it("keeps a bad row flagged after submit-all partial failure", async () => {
@@ -228,9 +207,9 @@ describe("QuickReportGrid", () => {
     );
     await userEvent.click(within(row).getByRole("button", { name: /submit/i }));
     await screen.findByRole("link", { name: "GP-42" });
-    // The submitted row is now a confirmation strip (no picker); the only
-    // machine combobox left is the trailing blank row's, and it should be
-    // focused so keyboard authoring flows straight into the next issue.
+    // The submitted row is now a receipt (no picker); the only machine combobox
+    // left is the trailing blank row's, and it should be focused so keyboard
+    // authoring flows straight into the next issue.
     await waitFor(() =>
       expect(screen.getByRole("combobox", { name: /machine/i })).toHaveFocus()
     );

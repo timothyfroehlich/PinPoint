@@ -6,7 +6,6 @@ import { cn } from "~/lib/utils";
 import { formatIssueId } from "~/lib/issues/utils";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 import { ChevronDown, Check, Trash2 } from "lucide-react";
@@ -29,157 +28,139 @@ import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
 import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
 import { StatusSelect } from "~/components/issues/fields/StatusSelect";
 import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
-import type {
-  IssueSeverity,
-  IssuePriority,
-  IssueFrequency,
-  IssueStatus,
-} from "~/lib/types";
+import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
+import { docIsEmpty } from "~/lib/tiptap/types";
 import {
-  submitQuickIssueRowAction,
-  submitQuickIssuesAction,
-  type QuickRowResult,
-} from "./actions";
+  useReportDraft,
+  entryHasContent,
+  type SharedEntry,
+  type Assignee,
+} from "../report-draft-store";
+import { defaultEntry } from "../report-draft-schema";
+import { submitQuickIssueRowAction, submitQuickIssuesAction } from "./actions";
 import type { QuickRowInput } from "./schemas";
 
-interface RowState {
-  key: string; // React key (stable identity — never rotated)
-  idempotencyKey: string; // rotated on Undo so a re-edited resubmit isn't deduped
-  machineId: string;
-  title: string;
-  description: string;
-  severity: IssueSeverity;
-  priority: IssuePriority;
-  status: IssueStatus;
-  frequency: IssueFrequency;
-  assignedTo: string;
-  watch: boolean;
+/** Per-row UI state that does NOT belong in the shared draft (never persisted,
+ *  never synced to the single form). Keyed by the entry's idempotency key. */
+interface RowUi {
   open: boolean;
   submitting: boolean;
-  submitted: null | { issueNumber: number; machineInitials: string };
   error: string | null;
 }
 
-function blankRow(): RowState {
+const IDLE_UI: RowUi = { open: false, submitting: false, error: null };
+
+/** A submitted issue's confirmation receipt — display-only. The created issue
+ *  already lives in the DB; this is just the "Created GP-42" strip. Ephemeral:
+ *  cleared when the grid unmounts (tab switch / reload). */
+interface Receipt {
+  key: string;
+  issueNumber: number;
+  machineInitials: string;
+  machineName: string;
+  title: string;
+}
+
+function blankEntry(): SharedEntry {
+  return defaultEntry(crypto.randomUUID());
+}
+
+/** Route an empty rich editor to `null` so a junk "empty paragraph" doc is
+ *  never persisted (spec §4). */
+function toInput(e: SharedEntry): QuickRowInput {
   return {
-    key: crypto.randomUUID(),
-    idempotencyKey: crypto.randomUUID(),
-    machineId: "",
-    title: "",
-    description: "",
-    severity: "minor",
-    priority: "medium",
-    status: "new",
-    frequency: "intermittent",
-    assignedTo: "",
-    watch: true,
-    open: false,
-    submitting: false,
-    submitted: null,
-    error: null,
+    machineId: e.machineId,
+    title: e.title,
+    description:
+      e.description && !docIsEmpty(e.description) ? e.description : null,
+    severity: e.severity,
+    priority: e.priority,
+    frequency: e.frequency,
+    status: e.status,
+    assignedTo: e.assignedTo,
+    watch: e.watch,
+    idempotencyKey: e.idempotencyKey,
   };
 }
 
-function toInput(r: RowState): QuickRowInput {
-  return {
-    machineId: r.machineId,
-    title: r.title,
-    description: r.description,
-    severity: r.severity,
-    priority: r.priority,
-    frequency: r.frequency,
-    status: r.status,
-    assignedTo: r.assignedTo,
-    watch: r.watch,
-    idempotencyKey: r.idempotencyKey,
-  };
+// Keep a blank row available so authoring can continue without an extra click
+// on "+ Add issue".
+function ensureTrailingBlank(rs: SharedEntry[]): SharedEntry[] {
+  const hasBlank = rs.some((e) => !e.machineId && !e.title);
+  return hasBlank ? rs : [...rs, blankEntry()];
 }
 
-/** A row worth warning about / confirming before discard: unsubmitted and has
- *  some typed content. */
-function rowHasContent(r: RowState): boolean {
-  return Boolean(r.machineId || r.title || r.description);
-}
-
-interface QuickReportGridProps {
-  machines: MachineOption[];
-  assignees: { id: string; name: string | null }[];
-}
-
-export function QuickReportGrid({
-  machines,
-  assignees,
-}: QuickReportGridProps): React.JSX.Element {
-  const [rows, setRows] = React.useState<RowState[]>(() => [blankRow()]);
+export function QuickReportGrid(): React.JSX.Element {
+  const { entries, setEntries, machines, assignees } = useReportDraft();
+  // UI flags + receipts live locally — they aren't part of the shared draft.
+  const [ui, setUi] = React.useState<Record<string, RowUi>>({});
+  const [receipts, setReceipts] = React.useState<Receipt[]>([]);
   const [focusPending, setFocusPending] = React.useState(false);
 
-  const patch = (key: string, next: Partial<RowState>): void =>
-    setRows((rs) =>
-      rs.map((r) => {
-        if (r.key !== key) return r;
-        // Editing a required field clears a stale validation error so a
-        // just-fixed row stops showing the red border + message; the error
-        // re-derives on the next submit if it's still wrong.
-        const clearsError =
-          r.error !== null && ("machineId" in next || "title" in next);
-        return { ...r, ...next, ...(clearsError ? { error: null } : {}) };
-      })
-    );
+  const uiFor = (key: string): RowUi => ui[key] ?? IDLE_UI;
+  const setUiFor = (key: string, next: Partial<RowUi>): void =>
+    setUi((m) => ({ ...m, [key]: { ...(m[key] ?? IDLE_UI), ...next } }));
 
-  // A row is "ready" only when it's actually submittable — both required
-  // fields present. Counting machine-OR-title would over-promise: the count
-  // and "Submit all" would include half-filled rows the server must reject.
-  const readyCount = rows.filter(
-    (r) => !r.submitted && r.machineId && r.title.trim()
+  // Edit a synced field via the shared store (so entry #1 stays in sync with the
+  // Single form). Editing a required field clears a stale validation error.
+  const editField = (key: string, next: Partial<SharedEntry>): void => {
+    setEntries((rs) =>
+      rs.map((e) => (e.idempotencyKey === key ? { ...e, ...next } : e))
+    );
+    if ("machineId" in next || "title" in next) {
+      setUi((m) => {
+        const cur = m[key];
+        if (!cur?.error) return m;
+        return { ...m, [key]: { ...cur, error: null } };
+      });
+    }
+  };
+
+  // A row is "ready" only when it's actually submittable — both required fields
+  // present. (Submitted rows have already left `entries`.)
+  const readyCount = entries.filter(
+    (e) => e.machineId && e.title.trim()
   ).length;
+  const anySubmitting = entries.some((e) => uiFor(e.idempotencyKey).submitting);
 
-  const applyResult = (key: string, res: QuickRowResult): void =>
-    patch(
-      key,
-      res.ok
-        ? {
-            submitting: false,
-            error: null,
-            open: false,
-            submitted: {
-              issueNumber: res.issueNumber,
-              machineInitials: res.machineInitials,
-            },
-          }
-        : { submitting: false, error: res.error }
-    );
+  const addReceipt = (
+    entry: SharedEntry,
+    res: { issueNumber: number; machineInitials: string }
+  ): Receipt => ({
+    key: entry.idempotencyKey,
+    issueNumber: res.issueNumber,
+    machineInitials: res.machineInitials,
+    machineName:
+      machines.find((m) => m.value === entry.machineId)?.name ??
+      res.machineInitials,
+    title: entry.title,
+  });
 
-  // Keep a blank row available to fill in after a submit, so authoring can
-  // continue without an extra click on "+ Add issue".
-  function ensureTrailingBlankRow(rs: RowState[]): RowState[] {
-    const hasBlank = rs.some((r) => !r.submitted && !r.machineId && !r.title);
-    return hasBlank ? rs : [...rs, blankRow()];
-  }
-
-  // Discard a row; always leave an editable blank to type in — otherwise
-  // discarding the last unsubmitted row (with submitted cards still present)
-  // strands the user on read-only cards until they find "+ Add issue".
+  // Discard a row; always leave an editable blank so discarding the last
+  // unsubmitted row doesn't strand the user with only receipts.
   const discardRow = (key: string): void =>
-    setRows((rs) => ensureTrailingBlankRow(rs.filter((r) => r.key !== key)));
+    setEntries((rs) =>
+      ensureTrailingBlank(rs.filter((e) => e.idempotencyKey !== key))
+    );
 
   // After a submit, advance focus to the next blank row's machine picker so
-  // keyboard authoring can continue (machine → problem → submit → next). Keyed
-  // off state (not autoFocus-on-mount) so it also fires when the trailing blank
-  // already existed and no new row mounted.
+  // keyboard authoring can continue (machine → problem → submit → next).
   React.useEffect(() => {
     if (!focusPending) return;
     setFocusPending(false);
-    const target = rows.find((r) => !r.submitted && !r.machineId && !r.title);
+    const target = entries.find((e) => !e.machineId && !e.title);
     if (!target) return;
     document
-      .querySelector<HTMLElement>(`[data-testid="machine-${target.key}"]`)
+      .querySelector<HTMLElement>(
+        `[data-testid="machine-${target.idempotencyKey}"]`
+      )
       ?.focus();
-  }, [focusPending, rows]);
+  }, [focusPending, entries]);
 
-  // Warn before leaving with unsubmitted work — a screenful of rows is easy to
-  // lose to an accidental back/close. Matches the app's other beforeunload
-  // guards (e.g. the machine timeline composer).
-  const hasUnsaved = rows.some((r) => !r.submitted && rowHasContent(r));
+  // Warn before leaving with unsubmitted work. (The draft also persists to
+  // localStorage now, so this is belt-and-suspenders against an accidental
+  // back/close.)
+  const hasUnsaved = entries.some(entryHasContent);
   React.useEffect(() => {
     if (!hasUnsaved) return;
     const handler = (e: BeforeUnloadEvent): void => {
@@ -190,20 +171,24 @@ export function QuickReportGrid({
     return () => window.removeEventListener("beforeunload", handler);
   }, [hasUnsaved]);
 
-  async function submitOne(row: RowState): Promise<void> {
-    patch(row.key, { submitting: true, error: null });
+  async function submitOne(entry: SharedEntry): Promise<void> {
+    const key = entry.idempotencyKey;
+    setUiFor(key, { submitting: true, error: null });
     try {
-      const res = await submitQuickIssueRowAction(toInput(row));
-      applyResult(row.key, res);
+      const res = await submitQuickIssueRowAction(toInput(entry));
       if (res.ok) {
-        setRows(ensureTrailingBlankRow);
+        setEntries((rs) =>
+          ensureTrailingBlank(rs.filter((e) => e.idempotencyKey !== key))
+        );
+        setReceipts((prev) => [...prev, addReceipt(entry, res)]);
         setFocusPending(true);
+      } else {
+        setUiFor(key, { submitting: false, error: res.error });
       }
     } catch {
       // A thrown/failed action (auth blip, network drop, server 500) rejects
-      // here — clear the spinner and surface a retryable error rather than
-      // leaving the row stuck on "Submitting…".
-      patch(row.key, {
+      // here — clear the spinner and surface a retryable error.
+      setUiFor(key, {
         submitting: false,
         error: "Something went wrong submitting this issue — try again.",
       });
@@ -212,85 +197,113 @@ export function QuickReportGrid({
 
   async function submitAll(): Promise<void> {
     // Only fire genuinely complete rows (machine AND title) — matches
-    // readyCount. Half-filled rows stay put for the user to finish rather than
-    // triggering a doomed server round-trip.
-    const ready = rows.filter(
-      (r) => !r.submitted && !r.submitting && r.machineId && r.title.trim()
+    // readyCount. Half-filled rows stay put for the user to finish.
+    const ready = entries.filter(
+      (e) =>
+        e.machineId && e.title.trim() && !uiFor(e.idempotencyKey).submitting
     );
     if (ready.length === 0) return;
-    // Track by stable key: the optimistic update below replaces row objects,
-    // so object-identity (`ready.includes(r)`) would no longer match afterward.
-    const readyKeys = new Set(ready.map((r) => r.key));
-    const flagReady = (error: string): void =>
-      setRows((rs) =>
-        rs.map((r) =>
-          readyKeys.has(r.key) ? { ...r, submitting: false, error } : r
-        )
-      );
-    setRows((rs) =>
-      rs.map((r) =>
-        readyKeys.has(r.key) ? { ...r, submitting: true, error: null } : r
-      )
-    );
+    const flagAll = (error: string): void =>
+      setUi((m) => {
+        const next = { ...m };
+        for (const e of ready)
+          next[e.idempotencyKey] = {
+            ...(next[e.idempotencyKey] ?? IDLE_UI),
+            submitting: false,
+            error,
+          };
+        return next;
+      });
+
+    setUi((m) => {
+      const next = { ...m };
+      for (const e of ready)
+        next[e.idempotencyKey] = {
+          ...(next[e.idempotencyKey] ?? IDLE_UI),
+          submitting: true,
+          error: null,
+        };
+      return next;
+    });
+
     try {
       const res = await submitQuickIssuesAction(ready.map(toInput));
       if (!res.ok) {
-        flagReady(res.error);
+        flagAll(res.error);
         return;
       }
-      // Map results back by index into `ready`.
-      res.results.forEach((result) => {
+      // Map results back by index into `ready`. Created rows leave the draft +
+      // become receipts; rejected rows stay put, flagged.
+      const okKeys = new Set<string>();
+      const newReceipts: Receipt[] = [];
+      for (const result of res.results) {
         const target = ready[result.index];
-        if (target) applyResult(target.key, result);
-      });
-      setRows(ensureTrailingBlankRow);
-      setFocusPending(true);
+        if (!target) continue;
+        if (result.ok) {
+          okKeys.add(target.idempotencyKey);
+          newReceipts.push(addReceipt(target, result));
+        } else {
+          setUiFor(target.idempotencyKey, {
+            submitting: false,
+            error: result.error,
+          });
+        }
+      }
+      setEntries((rs) =>
+        ensureTrailingBlank(rs.filter((e) => !okKeys.has(e.idempotencyKey)))
+      );
+      if (newReceipts.length > 0) {
+        setReceipts((prev) => [...prev, ...newReceipts]);
+        setFocusPending(true);
+      }
     } catch {
-      flagReady("Something went wrong submitting — try again.");
+      flagAll("Something went wrong submitting — try again.");
     }
   }
-
-  const submittedCount = rows.filter((r) => r.submitted).length;
 
   return (
     <div data-testid="quick-report-grid">
       <div className="space-y-2">
-        {rows.map((r) => (
+        {entries.map((e) => (
           <QuickRow
-            key={r.key}
-            row={r}
+            key={e.idempotencyKey}
+            entry={e}
+            ui={uiFor(e.idempotencyKey)}
             machines={machines}
             assignees={assignees}
-            onPatch={(next) => patch(r.key, next)}
-            onSubmit={() => submitOne(r)}
-            onUndo={() =>
-              patch(r.key, {
-                submitted: null,
-                idempotencyKey: crypto.randomUUID(),
-              })
-            }
-            onDiscard={() => discardRow(r.key)}
+            onPatch={(next) => editField(e.idempotencyKey, next)}
+            onToggleOpen={(open) => setUiFor(e.idempotencyKey, { open })}
+            onSubmit={() => submitOne(e)}
+            onDiscard={() => discardRow(e.idempotencyKey)}
           />
         ))}
       </div>
 
       <button
         type="button"
-        onClick={() => setRows((rs) => [...rs, blankRow()])}
+        onClick={() => setEntries((rs) => [...rs, blankEntry()])}
         className="mt-2 w-full rounded-xl border border-dashed border-outline-variant bg-surface p-3 text-sm text-primary hover:bg-primary/5"
       >
         + Add issue
       </button>
 
+      {receipts.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {receipts.map((r) => (
+            <ReceiptCard key={r.key} receipt={r} />
+          ))}
+        </div>
+      )}
+
       <div className="sticky bottom-0 mt-4 flex items-center justify-between rounded-xl border border-outline-variant bg-card p-3">
         <p className="text-sm text-muted-foreground">
           <span className="font-semibold text-foreground">{readyCount}</span>{" "}
-          ready · {submittedCount} submitted
+          ready · {receipts.length} submitted
         </p>
         <Button
           type="button"
           onClick={submitAll}
-          disabled={readyCount === 0 || rows.some((r) => r.submitting)}
+          disabled={readyCount === 0 || anySubmitting}
         >
           {readyCount ? `Submit all (${readyCount})` : "Submit all"}
         </Button>
@@ -300,66 +313,31 @@ export function QuickReportGrid({
 }
 
 interface QuickRowProps {
-  row: RowState;
+  entry: SharedEntry;
+  ui: RowUi;
   machines: MachineOption[];
-  assignees: { id: string; name: string | null }[];
-  onPatch: (next: Partial<RowState>) => void;
+  assignees: Assignee[];
+  onPatch: (next: Partial<SharedEntry>) => void;
+  onToggleOpen: (open: boolean) => void;
   onSubmit: () => void;
-  onUndo: () => void;
   onDiscard: () => void;
 }
 
 function QuickRow({
-  row,
+  entry,
+  ui,
   machines,
   assignees,
   onPatch,
+  onToggleOpen,
   onSubmit,
-  onUndo,
   onDiscard,
 }: QuickRowProps): React.JSX.Element {
-  if (row.submitted) {
-    const { issueNumber, machineInitials } = row.submitted;
-    const machineName =
-      machines.find((m) => m.value === row.machineId)?.name ?? machineInitials;
-    return (
-      <div
-        data-testid="quick-row"
-        className="rounded-xl border border-primary/30 bg-primary/5 p-3"
-      >
-        <div className="flex items-center gap-2 text-sm">
-          <span className="grid size-5 place-items-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
-            <Check className="size-3" />
-          </span>
-          <span>
-            Created{" "}
-            <Link
-              href={`/m/${machineInitials}/i/${issueNumber}`}
-              className="font-semibold text-link underline"
-            >
-              {formatIssueId(machineInitials, issueNumber)}
-            </Link>{" "}
-            for <span className="font-semibold">{machineName}</span> -{" "}
-            {row.title}
-          </span>
-          <button
-            type="button"
-            onClick={onUndo}
-            className="ml-auto text-xs text-muted-foreground underline hover:text-foreground"
-          >
-            Undo
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const ready = Boolean(row.machineId && row.title.trim());
+  const ready = Boolean(entry.machineId && entry.title.trim());
   const onProblemKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     // Enter on the problem field quick-submits the row (fast keyboard path),
-    // but only once it's actually submittable — otherwise a stray Enter fires
-    // a doomed server round-trip.
-    if (e.key === "Enter" && !e.shiftKey && ready && !row.submitting) {
+    // but only once it's actually submittable.
+    if (e.key === "Enter" && !e.shiftKey && ready && !ui.submitting) {
       e.preventDefault();
       onSubmit();
     }
@@ -368,10 +346,10 @@ function QuickRow({
   const machineField = (
     <MachineCombobox
       machines={machines}
-      value={row.machineId}
+      value={entry.machineId}
       onValueChange={(id) => onPatch({ machineId: id })}
       ariaLabel="Machine"
-      triggerTestId={`machine-${row.key}`}
+      triggerTestId={`machine-${entry.idempotencyKey}`}
       responsiveInitials
     />
   );
@@ -380,26 +358,25 @@ function QuickRow({
     <Button
       type="button"
       variant="outline"
-      disabled={row.submitting}
+      disabled={ui.submitting}
       onClick={onSubmit}
       className="border-primary text-primary hover:bg-primary/10"
     >
-      {row.submitting ? "Submitting…" : "Submit"}
+      {ui.submitting ? "Submitting…" : "Submit"}
     </Button>
   );
 
   const discardButton = (
-    <DiscardButton dirty={rowHasContent(row)} onDiscard={onDiscard} />
+    <DiscardButton dirty={entryHasContent(entry)} onDiscard={onDiscard} />
   );
 
   // "Less" makes sense next to Machine on desktop, but at a phone width there's
   // no room up there — it migrates down to sit with Discard/Submit instead.
-  // Rendered twice, CSS-toggled by container width (no JS layout branching).
   const collapseButton = (visibilityClassName: string): React.JSX.Element => (
     <Button
       type="button"
       variant="outline"
-      onClick={() => onPatch({ open: false })}
+      onClick={() => onToggleOpen(false)}
       className={visibilityClassName}
     >
       <ChevronDown className="mr-1 size-4 rotate-180" />
@@ -412,16 +389,12 @@ function QuickRow({
       data-testid="quick-row"
       className={cn(
         "@container rounded-xl border p-3",
-        row.error ? "border-destructive" : "border-outline-variant",
+        ui.error ? "border-destructive" : "border-outline-variant",
         "bg-card"
       )}
     >
-      {!row.open ? (
-        // Collapsed: a single grid that reflows via the row's container width —
-        // 3 lines when narrow (machine·sev / problem / more·discard·submit),
-        // 2 lines when wide (…sev·pri·more / problem·discard·submit).
-        // Priority is hidden at the narrow width (doesn't fit; still
-        // editable in the expanded row). See globals.css.
+      {!ui.open ? (
+        // Collapsed: a single grid that reflows via the row's container width.
         <div className="quick-collapsed">
           <Field label="Machine" required area="machine">
             {machineField}
@@ -431,7 +404,7 @@ function QuickRow({
               keeps its visual position on line 2 regardless of source order. */}
           <Field label="Problem (issue title)" required area="problem">
             <Input
-              value={row.title}
+              value={entry.title}
               onChange={(e) => onPatch({ title: e.target.value })}
               onKeyDown={onProblemKeyDown}
               placeholder="What's wrong…"
@@ -441,7 +414,7 @@ function QuickRow({
           </Field>
           <Field label="Severity" area="severity">
             <SeveritySelect
-              value={row.severity}
+              value={entry.severity}
               onValueChange={(v) => onPatch({ severity: v })}
             />
           </Field>
@@ -453,14 +426,14 @@ function QuickRow({
             className="hidden @[640px]:flex"
           >
             <PrioritySelect
-              value={row.priority}
+              value={entry.priority}
               onValueChange={(v) => onPatch({ priority: v })}
             />
           </Field>
           <Button
             type="button"
             variant="outline"
-            onClick={() => onPatch({ open: true })}
+            onClick={() => onToggleOpen(true)}
             style={{ gridArea: "more" }}
             className="w-full @[640px]:w-auto @[640px]:justify-self-end"
           >
@@ -484,7 +457,7 @@ function QuickRow({
           </div>
           <Field label="Problem (issue title)" required>
             <Input
-              value={row.title}
+              value={entry.title}
               onChange={(e) => onPatch({ title: e.target.value })}
               onKeyDown={onProblemKeyDown}
               placeholder="What's wrong…"
@@ -495,40 +468,42 @@ function QuickRow({
           <div className="grid grid-cols-2 items-end gap-2.5 @[640px]:grid-cols-4">
             <Field label="Severity">
               <SeveritySelect
-                value={row.severity}
+                value={entry.severity}
                 onValueChange={(v) => onPatch({ severity: v })}
               />
             </Field>
             <Field label="Priority">
               <PrioritySelect
-                value={row.priority}
+                value={entry.priority}
                 onValueChange={(v) => onPatch({ priority: v })}
               />
             </Field>
             <Field label="Status">
               <StatusSelect
-                value={row.status}
+                value={entry.status}
                 onValueChange={(v) => onPatch({ status: v })}
               />
             </Field>
             <Field label="Frequency">
               <FrequencySelect
-                value={row.frequency}
+                value={entry.frequency}
                 onValueChange={(v) => onPatch({ frequency: v })}
               />
             </Field>
           </div>
           <Field label="Description (optional)">
-            <Textarea
-              value={row.description}
-              onChange={(e) => onPatch({ description: e.target.value })}
+            <RichTextEditor
+              content={entry.description}
+              onChange={(doc) => onPatch({ description: doc })}
               placeholder="Extra detail…"
+              ariaLabel="Description"
+              className="min-h-[80px]"
             />
           </Field>
           <div className="grid grid-cols-1 items-end gap-4 @[640px]:grid-cols-[minmax(220px,340px)_auto_1fr]">
             <Field label="Assignee">
               <select
-                value={row.assignedTo}
+                value={entry.assignedTo}
                 onChange={(e) => onPatch({ assignedTo: e.target.value })}
                 className="h-9 w-full rounded-md border border-outline-variant bg-surface px-3 text-sm"
                 aria-label="Assignee"
@@ -543,11 +518,14 @@ function QuickRow({
             </Field>
             <div className="flex h-9 items-center gap-2 text-sm">
               <Switch
-                id={`${row.key}-watch`}
-                checked={row.watch}
+                id={`${entry.idempotencyKey}-watch`}
+                checked={entry.watch}
                 onCheckedChange={(v) => onPatch({ watch: v })}
               />
-              <Label htmlFor={`${row.key}-watch`} className="cursor-pointer">
+              <Label
+                htmlFor={`${entry.idempotencyKey}-watch`}
+                className="cursor-pointer"
+              >
                 Watch
               </Label>
             </div>
@@ -559,9 +537,37 @@ function QuickRow({
           </div>
         </div>
       )}
-      {row.error ? (
-        <p className="mt-2 text-xs text-destructive">{row.error}</p>
+      {ui.error ? (
+        <p className="mt-2 text-xs text-destructive">{ui.error}</p>
       ) : null}
+    </div>
+  );
+}
+
+/** A submitted issue's confirmation receipt. Display-only — the issue is
+ *  already created; there is no "undo" (a committed issue can't be un-created). */
+function ReceiptCard({ receipt }: { receipt: Receipt }): React.JSX.Element {
+  const { issueNumber, machineInitials, machineName, title } = receipt;
+  return (
+    <div
+      data-testid="quick-receipt"
+      className="rounded-xl border border-primary/30 bg-primary/5 p-3"
+    >
+      <div className="flex items-center gap-2 text-sm">
+        <span className="grid size-5 place-items-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+          <Check className="size-3" />
+        </span>
+        <span>
+          Created{" "}
+          <Link
+            href={`/m/${machineInitials}/i/${issueNumber}`}
+            className="font-semibold text-link underline"
+          >
+            {formatIssueId(machineInitials, issueNumber)}
+          </Link>{" "}
+          for <span className="font-semibold">{machineName}</span> - {title}
+        </span>
+      </div>
     </div>
   );
 }
