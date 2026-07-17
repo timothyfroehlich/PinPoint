@@ -2,11 +2,11 @@ import type React from "react";
 import { asc, eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
-import { resolveDefaultMachineId } from "./default-machine";
-import { UnifiedReportForm } from "./unified-report-form";
+import { resolveDefaultMachineId } from "../default-machine";
+import { UnifiedReportForm } from "../unified-report-form";
 import { createClient } from "~/lib/supabase/server";
 import { getAccessLevel } from "~/lib/permissions/helpers";
-import { getRecentIssuesAction, type RecentIssueData } from "./actions";
+import { getRecentIssuesAction, type RecentIssueData } from "../actions";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
 export const dynamic = "force-dynamic";

@@ -35,8 +35,8 @@ import {
   entryHasContent,
   type SharedEntry,
   type Assignee,
-} from "../report-draft-store";
-import { defaultEntry } from "../report-draft-schema";
+} from "~/app/(app)/report/report-draft-store";
+import { defaultEntry } from "~/app/(app)/report/report-draft-schema";
 import { submitQuickIssueRowAction, submitQuickIssuesAction } from "./actions";
 import type { QuickRowInput } from "./schemas";
 

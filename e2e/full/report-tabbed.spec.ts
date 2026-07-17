@@ -66,7 +66,10 @@ test.describe("tabbed report page", () => {
     // navigating.
     const singleTab = page.getByTestId("report-tab-single");
     await expect(singleTab).toHaveAttribute("aria-disabled", "true");
-    await singleTab.click();
+    // The tab is aria-disabled (advisory) but not natively disabled — real users
+    // can still tap it to reveal the reason. Playwright's actionability refuses
+    // aria-disabled targets, so force the click to exercise that tap-to-explain path.
+    await singleTab.click({ force: true });
     await expect(
       page.getByText(/remove the extras to go back to a single report/i)
     ).toBeVisible();

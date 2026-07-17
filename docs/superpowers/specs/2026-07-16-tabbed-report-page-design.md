@@ -94,10 +94,17 @@ The Task 1 spike **confirmed** that a client context rendered in `report/layout.
 survives `/report ↔ /report/quick` navigation without remounting, so the
 shared-store-in-layout approach shipped as designed.
 
-- A **shared `report/layout.tsx`** (Server Component) fetches machines + assignees
-  **once** and hosts the `"use client"` **`ReportDraftProvider`** (the single source of
-  truth for the shared draft) + the boxed **`ReportTabs`** bar, wrapping both child
-  routes. `/report` (Single) and `/report/quick` (Multiple) render as its children.
+- A **shared `report/(tabbed)/layout.tsx`** (Server Component) fetches machines +
+  assignees **once** and hosts the `"use client"` **`ReportDraftProvider`** (the single
+  source of truth for the shared draft) + the boxed **`ReportTabs`** bar, wrapping both
+  child routes. `/report` (Single) and `/report/quick` (Multiple) render as its children.
+  The tabs live under a **`(tabbed)` route group** so the layout scopes to exactly those
+  two routes — **`/report/success` sits outside the group** and does not inherit the tab
+  chrome or the provider. That exclusion is load-bearing: navigating Single → submit →
+  `/report/success` unmounts the provider, so its persisted-draft cleanup (localStorage
+  clear on the success page) is sufficient — returning to `/report` remounts a fresh
+  provider that hydrates the now-empty draft. (Were success inside the group, the
+  provider would survive the round-trip and re-show the submitted entry.)
 - **`ReportDraftProvider`** owns the persisted `localStorage` draft
   (key `report_draft`, superseding the legacy `report_form_state`, which it migrates on
   first load), hydration, the stale-machine drop (PP-lql), and the `contentRowCount`

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TooltipProvider } from "~/components/ui/tooltip";
-import { ReportDraftProvider } from "../report-draft-store";
+import { ReportDraftProvider } from "~/app/(app)/report/report-draft-store";
 import type { MachineOption } from "~/components/machines/MachineCombobox";
 import { QuickReportGrid } from "./quick-report-grid";
 

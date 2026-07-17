@@ -6,8 +6,8 @@ import { createClient } from "~/lib/supabase/server";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
-import { ReportDraftProvider } from "./report-draft-store";
-import { ReportTabs } from "./report-tabs";
+import { ReportDraftProvider } from "../report-draft-store";
+import { ReportTabs } from "../report-tabs";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets, and
 // keep the report Server Actions bounded so a slow submit fails fast (PP-2053.1).
