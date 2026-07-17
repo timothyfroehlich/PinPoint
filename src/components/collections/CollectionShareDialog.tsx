@@ -68,10 +68,11 @@ export function CollectionShareDialog({
       setToken(result.data?.viewToken ?? null);
       // Disabling sharing nulls the token, so if the owner is viewing via the
       // now-dead `/c/<token>` URL a plain refresh would re-resolve the stale
-      // token and 404. Land them on the stable canonical `/c/<id>` instead;
-      // only refresh in place when already on it.
+      // token and 404. Redirect to the canonical `/c/<id>` only in that case:
+      // any path under the canonical uuid (overview or a tab like `…/issues`)
+      // stays valid, so refresh in place and keep the owner on their tab.
       const canonical = `/c/${collectionId}`;
-      if (pathname === canonical) {
+      if (pathname.startsWith(canonical)) {
         router.refresh();
       } else {
         router.replace(canonical);

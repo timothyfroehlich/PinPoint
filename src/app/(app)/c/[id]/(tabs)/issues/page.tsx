@@ -43,7 +43,6 @@ export default async function CollectionIssuesPage({
     );
   }
 
-  // Requested machine filters narrow WITHIN the set; they can never widen it.
   const requested = filters.machine ?? [];
   const scoped =
     requested.length > 0

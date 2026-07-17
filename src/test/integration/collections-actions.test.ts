@@ -323,6 +323,52 @@ describe("collection actions", () => {
     expect(await tokenOf(collection.id)).toBeNull();
   });
 
+  it("setCollectionSharingAction: disabling revokes a live link (old token no longer resolves)", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(owner);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Bank", ownerId: owner.id })
+      .returning();
+
+    const { setCollectionSharingAction } =
+      await import("~/app/(app)/c/collections/actions");
+    const { getCollectionByViewToken } = await import("~/lib/collections/user");
+    signIn(owner.id);
+
+    // Enable and confirm the minted token resolves the collection — the link is
+    // live (this is exactly what the /c/<token> resolver does).
+    const enabled = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: true,
+    });
+    if (!enabled.success) throw new Error("expected success");
+    const token = enabled.data?.viewToken ?? "";
+    expect(token).toBeTruthy();
+    expect((await getCollectionByViewToken(undefined, token))?.id).toBe(
+      collection.id
+    );
+
+    // Disable, then the same token must be dead — the resolver returns null, so
+    // /c/<token> 404s. This is the revocation guarantee for shared links.
+    const disabled = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: false,
+    });
+    if (!disabled.success) throw new Error("expected success");
+    expect(await getCollectionByViewToken(undefined, token)).toBeNull();
+
+    // Re-enabling mints a fresh token; the revoked one stays dead forever.
+    const reEnabled = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: true,
+    });
+    if (!reEnabled.success) throw new Error("expected success");
+    expect(reEnabled.data?.viewToken).not.toBe(token);
+    expect(await getCollectionByViewToken(undefined, token)).toBeNull();
+  });
+
   it("setCollectionSharingAction: non-owner and unauthenticated denied", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ role: "member" });
