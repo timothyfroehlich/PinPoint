@@ -10,22 +10,24 @@ function shareUrlValue(): string {
 }
 
 const setSharing = vi.fn();
-const resetLink = vi.fn();
 vi.mock("~/app/(app)/c/collections/actions", () => ({
   setCollectionSharingAction: (input: unknown) => setSharing(input),
-  resetCollectionViewLinkAction: (input: unknown) => resetLink(input),
 }));
 
 const refresh = vi.fn();
+const replace = vi.fn();
+// The dialog reads the current path to decide refresh-in-place vs. redirect to
+// the canonical `/c/<id>`. Pin it to the canonical URL so the toggle refreshes.
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh }),
+  useRouter: () => ({ refresh, replace }),
+  usePathname: () => "/c/c1",
 }));
 
 describe("CollectionShareDialog", () => {
   beforeEach(() => {
     setSharing.mockReset();
-    resetLink.mockReset();
     refresh.mockReset();
+    replace.mockReset();
   });
 
   it("hides the link section when sharing is off, and enabling reveals it", async () => {
@@ -76,22 +78,6 @@ describe("CollectionShareDialog", () => {
         screen.queryByTestId("collection-share-url")
       ).not.toBeInTheDocument()
     );
-  });
-
-  it("reset rotates the token and the link reflects the new value", async () => {
-    resetLink.mockResolvedValue({
-      success: true,
-      data: { viewToken: "rotated" },
-    });
-    render(<CollectionShareDialog collectionId="c1" viewToken="old" />);
-
-    await userEvent.click(screen.getByTestId("collection-share-trigger"));
-    await userEvent.click(screen.getByTestId("collection-share-reset"));
-
-    await waitFor(() =>
-      expect(resetLink).toHaveBeenCalledWith({ collectionId: "c1" })
-    );
-    await waitFor(() => expect(shareUrlValue()).toContain("/c/rotated"));
   });
 
   it("surfaces an error and leaves state unchanged when the action fails", async () => {

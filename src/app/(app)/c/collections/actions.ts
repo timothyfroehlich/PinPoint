@@ -243,31 +243,6 @@ export async function setCollectionSharingAction(input: {
   return { success: true, data: { viewToken: token } };
 }
 
-/**
- * Rotate the view-share token (Wave 0b) — "reset link". Owner-only. Minting a
- * fresh token immediately invalidates every previously shared link. Returns the
- * new token for the Share dialog.
- */
-export async function resetCollectionViewLinkAction(input: {
-  collectionId: string;
-}): Promise<ActionResult<{ viewToken: string }>> {
-  const actor = await resolveActor();
-  if (!actor) return { success: false, error: "Not authenticated" };
-  const collection = await loadOwner(input.collectionId);
-  if (!collection) return { success: false, error: "Not found" };
-  if (!canManageCollection(collection, { userId: actor.userId })) {
-    return { success: false, error: "Forbidden" };
-  }
-
-  const token = generateViewToken();
-  await db
-    .update(collections)
-    .set({ viewToken: token, updatedAt: new Date() })
-    .where(eq(collections.id, input.collectionId));
-  revalidatePath(`/c/${input.collectionId}`);
-  return { success: true, data: { viewToken: token } };
-}
-
 export async function deleteCollectionAction(input: {
   collectionId: string;
 }): Promise<ActionResult> {

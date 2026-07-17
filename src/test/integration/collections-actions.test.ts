@@ -354,40 +354,6 @@ describe("collection actions", () => {
     expect(await tokenOf(collection.id)).toBeNull();
   });
 
-  it("resetCollectionViewLinkAction: rotates the token; non-owner denied", async () => {
-    const db = await getTestDb();
-    const owner = createTestUser({ role: "member" });
-    const other = createTestUser({ role: "member" });
-    await db.insert(userProfiles).values([owner, other]);
-    const [collection] = await db
-      .insert(collections)
-      .values({ name: "Bank", ownerId: owner.id, viewToken: "original-token" })
-      .returning();
-
-    const { resetCollectionViewLinkAction } =
-      await import("~/app/(app)/c/collections/actions");
-
-    // Non-owner cannot rotate — token unchanged.
-    signIn(other.id);
-    const denied = await resetCollectionViewLinkAction({
-      collectionId: collection.id,
-    });
-    expect(denied.success).toBe(false);
-    expect(await tokenOf(collection.id)).toBe("original-token");
-
-    // Owner rotates — new token, old one dead.
-    signIn(owner.id);
-    const reset = await resetCollectionViewLinkAction({
-      collectionId: collection.id,
-    });
-    expect(reset.success).toBe(true);
-    if (!reset.success) throw new Error("expected success");
-    const rotated = reset.data?.viewToken ?? null;
-    expect(rotated).toBeTruthy();
-    expect(rotated).not.toBe("original-token");
-    expect(await tokenOf(collection.id)).toBe(rotated);
-  });
-
   it("deleteCollectionAction: owner only", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ role: "member" });

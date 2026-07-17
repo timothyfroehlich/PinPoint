@@ -31,8 +31,10 @@ if (!databaseUrl) {
 
 const COLLECTION_NAME = "APC Tournament Bank";
 // Fixed demo view-token (local only) so the shared-link flow is reachable in
-// dev without clicking through the Share dialog: /c/<this>.
-const DEMO_VIEW_TOKEN = "demo-tournament-view-token";
+// dev without clicking through the Share dialog: /c/<this>. Real tokens are
+// random base64url (`generateViewToken`); this is a fixed value shaped like one
+// so the seeded link looks and behaves like production, just deterministically.
+const DEMO_VIEW_TOKEN = "kQ7p2Rf9xVnT4mLbYcWdZ3hJ8sA6uD1e";
 // A themed tournament lineup. Any name not present in the seed is skipped, so
 // this stays resilient to seed data changes.
 const MACHINE_NAMES = [

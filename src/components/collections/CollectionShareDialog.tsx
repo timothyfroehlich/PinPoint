@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Share2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
@@ -16,10 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
-import {
-  resetCollectionViewLinkAction,
-  setCollectionSharingAction,
-} from "~/app/(app)/c/collections/actions";
+import { setCollectionSharingAction } from "~/app/(app)/c/collections/actions";
 
 interface Props {
   collectionId: string;
@@ -29,15 +26,15 @@ interface Props {
 
 /**
  * Owner-only Share panel (Wave 0b, PP-wqit.2). One toggle enables/disables the
- * public view link; a reset rotates the token to kill previously shared links.
- * The token lives in the URL path (`/c/<token>`) — never a query
- * param — so it stays out of access logs and CSP reports.
+ * public view link. The token lives in the URL path (`/c/<token>`) — never a
+ * query param — so it stays out of access logs and CSP reports.
  */
 export function CollectionShareDialog({
   collectionId,
   viewToken,
 }: Props): React.JSX.Element {
   const router = useRouter();
+  const pathname = usePathname();
   const [token, setToken] = useState<string | null>(viewToken);
   const [origin, setOrigin] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -69,20 +66,16 @@ export function CollectionShareDialog({
         return;
       }
       setToken(result.data?.viewToken ?? null);
-      router.refresh();
-    });
-  }
-
-  function reset(): void {
-    setError(null);
-    startTransition(async () => {
-      const result = await resetCollectionViewLinkAction({ collectionId });
-      if (!result.success) {
-        setError(result.error);
-        return;
+      // Disabling sharing nulls the token, so if the owner is viewing via the
+      // now-dead `/c/<token>` URL a plain refresh would re-resolve the stale
+      // token and 404. Land them on the stable canonical `/c/<id>` instead;
+      // only refresh in place when already on it.
+      const canonical = `/c/${collectionId}`;
+      if (pathname === canonical) {
+        router.refresh();
+      } else {
+        router.replace(canonical);
       }
-      setToken(result.data?.viewToken ?? null);
-      router.refresh();
     });
   }
 
@@ -125,28 +118,16 @@ export function CollectionShareDialog({
         </div>
 
         {enabled && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Input
-                readOnly
-                value={shareUrl}
-                aria-label="Shareable view link"
-                data-testid="collection-share-url"
-                className="font-mono text-xs"
-                onFocus={(e) => e.currentTarget.select()}
-              />
-              <CopyButton value={shareUrl} aria-label="Copy view link" />
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={reset}
-              disabled={pending}
-              data-testid="collection-share-reset"
-            >
-              Reset link
-            </Button>
+          <div className="flex items-center gap-2">
+            <Input
+              readOnly
+              value={shareUrl}
+              aria-label="Shareable view link"
+              data-testid="collection-share-url"
+              className="font-mono text-xs"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <CopyButton value={shareUrl} aria-label="Copy view link" />
           </div>
         )}
 
