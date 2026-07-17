@@ -6,9 +6,9 @@
  * 1. Manual CI polling loops → use ./scripts/workflow/pr-watch.py
  * 2. Ad-hoc curl health checks → use `pnpm run dev:status`
  *
- * Note: `gh pr merge` is gated by the "ask" tier in settings.json, not by this
- * hook. That keeps the confirmation interactive (and overridable) instead of a
- * hard deny that can't be authorized in-conversation.
+ * Note: `gh pr merge` (and `scripts/workflow/merge-pr.sh`, and MCP
+ * merge_pull_request) is hard-blocked by block-direct-merge.cjs, not by this
+ * hook — merging is human-only with no agent-usable bypass (PP-wi85).
  */
 
 const rules = [
