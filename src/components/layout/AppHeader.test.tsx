@@ -136,21 +136,25 @@ describe("AppHeader", () => {
   });
 
   describe("nav items", () => {
-    it("renders Dashboard, Issues, and Machines nav links", () => {
+    it("renders Dashboard, Machines, Collections, and Issues nav links", () => {
       render(<AppHeader {...defaultAuthProps} />);
 
       expect(screen.getByTestId("nav-dashboard")).toHaveAttribute(
         "href",
         "/dashboard"
       );
+      expect(screen.getByTestId("nav-machines")).toHaveAttribute("href", "/m");
+      expect(screen.getByTestId("nav-collections")).toHaveAttribute(
+        "href",
+        "/c/collections"
+      );
       expect(screen.getByTestId("nav-issues")).toHaveAttribute(
         "href",
         "/issues"
       );
-      expect(screen.getByTestId("nav-machines")).toHaveAttribute("href", "/m");
     });
 
-    it("renders nav links in Dashboard, Machines, Issues order", () => {
+    it("renders nav links in Dashboard, Machines, Collections, Issues order", () => {
       render(<AppHeader {...defaultAuthProps} />);
 
       const mainNav = screen.getByRole("navigation", { name: "main" });
@@ -161,6 +165,7 @@ describe("AppHeader", () => {
       expect(navTestIds).toEqual([
         "nav-dashboard",
         "nav-machines",
+        "nav-collections",
         "nav-issues",
       ]);
     });
