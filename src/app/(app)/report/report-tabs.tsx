@@ -84,9 +84,12 @@ export function ReportTabs({
             const isActive = pathname === href;
             const testIdAttr = `report-tab-${testId}`;
 
-            if (href === SINGLE_HREF && singleLocked) {
+            if (href === SINGLE_HREF && singleLocked && !isActive) {
               // Disabled via aria-disabled (not the `disabled` attribute) so the
-              // control stays focusable/tappable to reveal the reason.
+              // control stays focusable/tappable to reveal the reason. Only when
+              // Single ISN'T the current route: if the user reached /report
+              // directly with a multi-row draft, the tab still shows its active
+              // state rather than a greyed lock (PP-2m17 #5).
               return (
                 <button
                   key={href}

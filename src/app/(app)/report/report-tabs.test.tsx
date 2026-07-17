@@ -105,6 +105,9 @@ describe("ReportTabs", () => {
   });
 
   it("disables Single with 2+ content rows and reveals the reason on tap", async () => {
+    // The lock is seen while ON the grid (that's where you build 2+ rows); the
+    // Single tab is the non-active one being blocked.
+    vi.mocked(usePathname).mockReturnValue("/report/quick");
     seedContentRows(2);
     renderTabs(true);
 
@@ -121,5 +124,17 @@ describe("ReportTabs", () => {
         /you're logging several issues — remove the extras to go back to a single report\./i
       )
     ).toBeInTheDocument();
+  });
+
+  it("keeps Single as the active tab (not a greyed lock) when it's the current route", () => {
+    // Reaching /report directly with a multi-row draft: the tab reflects the
+    // current route rather than rendering as a disabled lock (PP-2m17 #5).
+    vi.mocked(usePathname).mockReturnValue("/report");
+    seedContentRows(2);
+    renderTabs(true);
+
+    const single = screen.getByRole("link", { name: /single issue/i });
+    expect(single).toHaveAttribute("aria-current", "page");
+    expect(single).not.toHaveAttribute("aria-disabled");
   });
 });

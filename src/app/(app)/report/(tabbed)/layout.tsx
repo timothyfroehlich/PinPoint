@@ -1,13 +1,14 @@
 import type React from "react";
-import { asc, eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { ReportDraftProvider } from "../report-draft-store";
 import { ReportTabs } from "../report-tabs";
+import { getReportMachines, getReportAssignees } from "../report-data";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets, and
 // keep the report Server Actions bounded so a slow submit fails fast (PP-2053.1).
@@ -27,10 +28,7 @@ export default async function ReportLayout({
 }: {
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
-  const machinesListPromise = db.query.machines.findMany({
-    orderBy: asc(machines.name),
-    columns: { id: true, name: true, initials: true },
-  });
+  const machinesListPromise = getReportMachines();
 
   const supabase = await createClient();
   const {
@@ -48,18 +46,10 @@ export default async function ReportLayout({
   const accessLevel = getAccessLevel(userProfile?.role);
   const canQuick = checkPermission("issues.report.quick", accessLevel);
 
-  // Superset of both former per-page assignee queries: technician+ can be a
-  // grid assignee, admin/member are the single-form assignees. Fetched only for
-  // signed-in staff; anonymous reporters never see the assignee control.
-  let assignees: { id: string; name: string | null }[] = [];
-  if (accessLevel === "admin" || accessLevel === "member") {
-    assignees = await db.query.userProfiles.findMany({
-      where: (profile) =>
-        sql`${profile.role} = 'admin' OR ${profile.role} = 'member' OR ${profile.role} = 'technician'`,
-      columns: { id: true, name: true },
-      orderBy: asc(userProfiles.name),
-    });
-  }
+  // Assignees for whoever can assign (matrix-gated — includes technicians, who
+  // the old hand-rolled admin/member check dropped). Deduped with page.tsx's
+  // call via React cache(); anonymous reporters get [] and no assignee control.
+  const assignees = await getReportAssignees(accessLevel);
 
   const machinesList = await machinesListPromise;
   const machineOptions = machinesList.map((m) => ({

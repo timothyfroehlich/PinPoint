@@ -31,9 +31,10 @@ import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 import { getLoginUrl } from "~/lib/login-url";
 import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
+import { docIsEmpty } from "~/lib/tiptap/types";
 import { MachineCombobox } from "~/components/machines/MachineCombobox";
 import { useReportDraft } from "./report-draft-store";
-import { defaultEntry } from "./report-draft-schema";
+import { defaultEntry, emptySingle } from "./report-draft-schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -107,8 +108,15 @@ export function UnifiedReportForm({
   // The shared draft is the single source of truth for the synced entry-#1
   // fields + the reporter identity/photos. Persistence + hydration + legacy
   // migration all live in the provider now — the form owns none of it.
-  const { entries, single, patchEntry, patchSingle, clearAll, hydrated } =
-    useReportDraft();
+  const {
+    entries,
+    single,
+    patchEntry,
+    patchSingle,
+    resetEntryZero,
+    clearAll,
+    hydrated,
+  } = useReportDraft();
   const entry = entries[0] ?? FALLBACK_ENTRY;
 
   // CAPTCHA is only required for anonymous reporters. Logged-in users skip it
@@ -181,12 +189,21 @@ export function UnifiedReportForm({
   );
 
   // Reset the single view back to a fresh report: blank entry #1 (fresh
-  // idempotency key), empty reporter identity/photos, cleared draft storage,
-  // remounted rich editor + CAPTCHA. Shared by the success effect and the Clear
-  // dialog. Machine is preserved when it came from the URL (?machine=), matching
-  // the prior behavior — the user came here to report on that specific machine.
+  // idempotency key), empty reporter identity/photos, remounted rich editor +
+  // CAPTCHA. Shared by the success effect and the Clear dialog. Machine is
+  // preserved when it came from the URL (?machine=), matching prior behavior.
+  //
+  // When entry #1 is the whole draft, clear everything (storage included). When
+  // extra unsubmitted grid rows exist, reset ONLY entry #1 + identity so the
+  // batch in progress survives — the Single form owns entry #1, not the whole
+  // batch (PP-2m17 #2).
   const resetSingleForm = useCallback(() => {
-    clearAll();
+    if (entries.length <= 1) {
+      clearAll();
+    } else {
+      resetEntryZero();
+      patchSingle(emptySingle());
+    }
     if (defaultMachineId) patchEntry(0, { machineId: defaultMachineId });
     // Native form reset — clears the honeypot and any browser autofill that
     // bypassed controlled inputs.
@@ -210,7 +227,14 @@ export function UnifiedReportForm({
     setTurnstileToken("");
     setEditorResetKey((k) => k + 1);
     setTurnstileWidgetKey((k) => k + 1);
-  }, [clearAll, patchEntry, defaultMachineId]);
+  }, [
+    entries.length,
+    clearAll,
+    resetEntryZero,
+    patchSingle,
+    patchEntry,
+    defaultMachineId,
+  ]);
 
   // Reset form state before navigating away on success (defense in depth): if
   // navigation fails the user sees an empty form, not stale values, and a
@@ -403,8 +427,13 @@ export function UnifiedReportForm({
               <input
                 type="hidden"
                 name="description"
+                // Route an empty editor (e.g. typed-then-cleared) to "" so the
+                // server stores null — matches the grid's docIsEmpty handling so
+                // a junk empty-paragraph doc is never persisted (spec §4, PP-2m17 #4).
                 value={
-                  entry.description ? JSON.stringify(entry.description) : ""
+                  entry.description && !docIsEmpty(entry.description)
+                    ? JSON.stringify(entry.description)
+                    : ""
                 }
               />
             </div>
