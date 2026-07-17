@@ -6,8 +6,11 @@
 # Usage: merge-pr.sh <PR> --human [--dry-run] [--force] [--bypass-merge-requirements]
 #   --human                       REQUIRED to actually merge. Merging is human-authorized
 #                                 only (PP-wi85) — this script refuses to execute a merge
-#                                 without it. Not required for --dry-run (gate preview is
-#                                 safe to run without a human present).
+#                                 without it. Not required for --dry-run: a human or CI
+#                                 process previewing gate status without merging is fine.
+#                                 This is NOT an agent-preview allowance — inside Claude
+#                                 Code, block-direct-merge.cjs blocks an agent from
+#                                 invoking this script at all, --dry-run included.
 #   --dry-run                     Print would-do summary, take no action. Does not require --human.
 #   --force                       Bypass currency + threads + reviewed gates.
 #   --bypass-merge-requirements   Bypass ci gate AND pass --admin to gh pr merge
@@ -53,10 +56,14 @@ if [ -z "$PR" ] || ! [[ "$PR" =~ ^[0-9]+$ ]]; then
 fi
 
 # Merges are human-authorized only (PP-wi85). --dry-run is exempt — it takes no
-# action, so an agent previewing gate status before handing off to Tim is fine.
+# action, so a human or CI process previewing gate status without merging is
+# fine. This is NOT an agent-preview allowance: inside Claude Code, the
+# block-direct-merge.cjs PreToolUse hook blocks an agent from invoking this
+# script at all, --dry-run included — an agent should read PR state via MCP
+# (pull_request_read) instead of ever reaching this line.
 if [ "$DRY_RUN" != "true" ] && [ "$HUMAN" != "true" ]; then
   echo "REFUSE: merges are human-authorized only. Canonical command: scripts/workflow/merge-pr.sh $PR --human" >&2
-  echo "        (add --dry-run instead to preview gate status without merging)" >&2
+  echo "        (forgot --human? add it to merge. --dry-run previews gate status without merging.)" >&2
   exit 1
 fi
 

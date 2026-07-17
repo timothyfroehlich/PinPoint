@@ -135,6 +135,23 @@ describe("block-direct-merge.cjs — merge-pr.sh (PP-wi85 hard gate)", () => {
     expect(status).toBe(2);
   });
 
+  it("blocks a bare leading VAR=val assignment (no env wrapper)", () => {
+    // Regression: the original regex only tolerated `env VAR=val ...`, so a
+    // bare shell assignment like `DUMMY=1 scripts/workflow/merge-pr.sh ...`
+    // slipped through the hard gate entirely.
+    const { status } = runHook(
+      bashPayload("DUMMY=1 scripts/workflow/merge-pr.sh 123 --human")
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks `env VAR=val bash scripts/workflow/merge-pr.sh <PR>`", () => {
+    const { status } = runHook(
+      bashPayload("env FOO=bar bash scripts/workflow/merge-pr.sh 123")
+    );
+    expect(status).toBe(2);
+  });
+
   it("does NOT block a quoted mention (echo)", () => {
     const { status } = runHook(
       bashPayload('echo "run merge-pr.sh when ready"')

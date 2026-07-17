@@ -8,11 +8,11 @@
 // URLs render inline in the PR comment), and posts/updates one sticky PR comment.
 //
 // Usage:
-//   node scripts/workflow/pr-screenshots.mjs <PR> [--pages a,b,c] [--force-auth]
+//   node scripts/workflow/pr-screenshots.mjs <PR> [--pages=a,b,c] [--force-auth]
 //
 //   <PR>          Required. GitHub PR number — used for the screenshot storage
 //                 path and the sticky comment target.
-//   --pages       Optional comma-separated list of manifest page ids to shoot.
+//   --pages=a,b,c Optional comma-separated list of manifest page ids to shoot.
 //                 Default: every page in ui-screenshot-manifest.json.
 //   --force-auth  Regenerate e2e/.auth/*.json storage state even if present
 //                 (use when a previous session looks stale/expired).

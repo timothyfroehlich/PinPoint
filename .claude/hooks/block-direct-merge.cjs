@@ -58,12 +58,14 @@ process.stdin.on("end", () => {
     }
 
     // scripts/workflow/merge-pr.sh — detect at a command-start position, tolerating
-    // `bash`/`sh` wrappers, `env [VAR=val...]` prefixes, and a relative/absolute path
-    // prefix ahead of the basename. Quote-stripped `stripped` reuses the same
-    // false-positive protection as the gh checks above (docs/echo mentions don't match).
+    // `bash`/`sh` wrappers, leading `VAR=val` assignments (bare or after `env`),
+    // and a relative/absolute path prefix ahead of the basename. Quote-stripped
+    // `stripped` reuses the same false-positive protection as the gh checks above
+    // (docs/echo mentions don't match).
     const mergeScript = new RegExp(
       cmdStart.source +
-        "(?:env\\s+(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*)?" + // optional env VAR=val... prefix
+        "(?:env\\s+)?" + // optional `env` wrapper
+        "(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*" + // optional leading VAR=val assignments (bare or after env)
         "(?:(?:bash|sh)\\s+)?" + // optional interpreter wrapper
         "(?:\\S*/)?" + // optional path prefix (relative or absolute)
         "merge-pr\\.sh\\b"
