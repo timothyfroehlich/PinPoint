@@ -226,6 +226,16 @@ describe("AppHeader", () => {
       expect(reportLink).toHaveAttribute("href", "/report");
     });
 
+    it("has a single report entry point — no separate Quick button (PP-idrb)", () => {
+      render(<AppHeader {...defaultAuthProps} />);
+      // The old standalone "Quick" header button folded into the tabbed report
+      // page; only the one "Report Issue" entry remains.
+      expect(screen.queryByTestId("nav-quick-report")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: /quick report/i })
+      ).not.toBeInTheDocument();
+    });
+
     it("renders HelpMenu with newChangelogCount", () => {
       render(<AppHeader {...defaultAuthProps} newChangelogCount={5} />);
       const helpMenu = screen.getByTestId("help-menu-trigger");
