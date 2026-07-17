@@ -74,7 +74,7 @@ export function WatchMachineButton({
   };
 
   const icon = isPending ? (
-    <Loader2 className="mr-1.5 size-4 animate-spin" />
+    <Loader2 className="mr-1.5 size-4 animate-spin motion-reduce:animate-none" />
   ) : isWatching ? (
     <BellRing className="mr-1.5 size-4" />
   ) : (

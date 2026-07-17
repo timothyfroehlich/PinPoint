@@ -52,7 +52,7 @@ export function IssueAssigneeCell({
           >
             {isUpdating ? (
               <div className="flex items-center gap-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none shrink-0 text-muted-foreground" />
                 <span>{issue.assignedToUser?.name ?? "Unassigned"}</span>
               </div>
             ) : (

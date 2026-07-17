@@ -174,23 +174,24 @@ export function IssueList({
       scope="col"
       aria-sort={getSortAriaSort(column)}
       className={cn(
-        "px-4 py-3 text-sm font-semibold text-muted-foreground group cursor-pointer hover:text-foreground transition-colors duration-150 sticky top-0 bg-muted/30 z-10",
+        "px-4 py-3 text-sm font-semibold text-muted-foreground sticky top-0 bg-muted/30 z-10",
         align === "right" && "text-right",
         align === "center" && "text-center",
         className
       )}
-      onClick={() => handleSort(column)}
     >
-      <div
+      <button
+        type="button"
+        onClick={() => handleSort(column)}
         className={cn(
-          "flex items-center",
+          "group flex w-full items-center cursor-pointer hover:text-foreground transition-colors duration-150",
           align === "right" && "justify-end",
           align === "center" && "justify-center"
         )}
       >
         {label}
         {renderSortIcon(column)}
-      </div>
+      </button>
     </th>
   );
 

@@ -110,6 +110,7 @@ export function MultiSelect({
   "data-testid": testId,
 }: MultiSelectProps): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
+  const groupHeadingId = React.useId();
 
   const selectedCount = value.length;
 
@@ -220,16 +221,7 @@ export function MultiSelect({
                     key={group.label}
                     heading={
                       <div
-                        role="button"
-                        tabIndex={0}
-                        className="flex items-center gap-2 py-1 cursor-pointer select-none hover:bg-accent/50 -mx-2 px-2 rounded-sm transition-colors duration-150 group/header"
-                        onClick={toggleGroup}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            if (e.key === " ") e.preventDefault();
-                            toggleGroup();
-                          }
-                        }}
+                        className="flex items-center gap-2 py-1 select-none hover:bg-accent/50 -mx-2 px-2 rounded-sm transition-colors duration-150 group/header"
                         data-testid={
                           testId
                             ? `${testId}-group-${group.label.toLowerCase().replace(/\s+/g, "-")}`
@@ -237,6 +229,7 @@ export function MultiSelect({
                         }
                       >
                         <Checkbox
+                          id={`${groupHeadingId}-${group.label.toLowerCase().replace(/\s+/g, "-")}`}
                           checked={
                             isAllSelected
                               ? true
@@ -246,11 +239,13 @@ export function MultiSelect({
                           }
                           className="h-3.5 w-3.5"
                           onCheckedChange={toggleGroup}
-                          onClick={(e) => e.stopPropagation()}
                         />
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground group-hover/header:text-foreground transition-colors duration-150">
+                        <label
+                          htmlFor={`${groupHeadingId}-${group.label.toLowerCase().replace(/\s+/g, "-")}`}
+                          className="flex-1 cursor-pointer text-xs font-semibold uppercase tracking-wider text-muted-foreground group-hover/header:text-foreground transition-colors duration-150"
+                        >
                           {group.label}
-                        </span>
+                        </label>
                       </div>
                     }
                   >
