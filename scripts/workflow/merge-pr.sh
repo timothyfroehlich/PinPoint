@@ -3,18 +3,34 @@
 # Re-evaluates all 5 PR gates at merge time (TOCTOU safety vs label-time gates),
 # squash-merges with --match-head-commit if all pass, removes ready-for-review label on failure.
 #
-# Usage: merge-pr.sh <PR> [--dry-run] [--force] [--bypass-merge-requirements]
-#   --dry-run                     Print would-do summary, take no action.
+# Usage: merge-pr.sh <PR> --human [--dry-run] [--force] [--bypass-merge-requirements]
+#   --human                       REQUIRED to actually merge. Merging is human-authorized
+#                                 only (PP-wi85) — this script refuses to execute a merge
+#                                 without it. Not required for --dry-run: a human or CI
+#                                 process previewing gate status without merging is fine.
+#                                 This is NOT an agent-preview allowance — inside Claude
+#                                 Code, block-direct-merge.cjs blocks an agent from
+#                                 invoking this script at all, --dry-run included.
+#   --dry-run                     Print would-do summary, take no action. Does not require --human.
 #   --force                       Bypass currency + threads + reviewed gates.
 #   --bypass-merge-requirements   Bypass ci gate AND pass --admin to gh pr merge
 #                                 (overrides GitHub branch-protection rules).
 #                                 Combine with --force to bypass currency + threads + reviewed + ci together.
+#
+# Canonical human-run command: scripts/workflow/merge-pr.sh <PR> --human
 #
 # no_conflict gate is NEVER bypassable — GitHub rejects conflicting merges regardless of --admin.
 # Authorship gate has no bypass; this script operates only on PRs you authored OR PRs authored
 # by trusted Dependabot bot identities (app/dependabot, dependabot[bot], dependabot).
 # Both --force and --bypass-merge-requirements require manual permission approval
 # (settings.json permissions.ask).
+#
+# Defense-in-depth note (PP-wi85): the --human flag is a same-tool guard against
+# non-interactive/scripted invocation — it does not (and cannot) verify a human is
+# actually typing the command. It stops accidental/scripted calls; the real
+# enforcement boundary is that Claude Code's block-direct-merge.cjs PreToolUse hook
+# refuses to let an agent invoke this script at all (any flags), in ANY harness that
+# wires the hook. Cross-tool (Codex/Gemini/Antigravity) coverage is best-effort only.
 
 set -euo pipefail
 
@@ -22,18 +38,32 @@ PR=""
 DRY_RUN=false
 FORCE=false
 BYPASS_REQS=false
+HUMAN=false
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run)                   DRY_RUN=true ;;
     --force)                     FORCE=true ;;
     --bypass-merge-requirements) BYPASS_REQS=true ;;
+    --human)                     HUMAN=true ;;
     *) if [ -z "$PR" ]; then PR="$arg"; else echo "Error: unexpected argument $arg" >&2; exit 1; fi ;;
   esac
 done
 
 if [ -z "$PR" ] || ! [[ "$PR" =~ ^[0-9]+$ ]]; then
-  echo "Usage: $0 <PR> [--dry-run] [--force] [--bypass-merge-requirements]" >&2
+  echo "Usage: $0 <PR> --human [--dry-run] [--force] [--bypass-merge-requirements]" >&2
+  exit 1
+fi
+
+# Merges are human-authorized only (PP-wi85). --dry-run is exempt — it takes no
+# action, so a human or CI process previewing gate status without merging is
+# fine. This is NOT an agent-preview allowance: inside Claude Code, the
+# block-direct-merge.cjs PreToolUse hook blocks an agent from invoking this
+# script at all, --dry-run included — an agent should read PR state via MCP
+# (pull_request_read) instead of ever reaching this line.
+if [ "$DRY_RUN" != "true" ] && [ "$HUMAN" != "true" ]; then
+  echo "REFUSE: merges are human-authorized only. Canonical command: scripts/workflow/merge-pr.sh $PR --human" >&2
+  echo "        (forgot --human? add it to merge. --dry-run previews gate status without merging.)" >&2
   exit 1
 fi
 
@@ -145,9 +175,11 @@ if [ "$DRY_RUN" = "true" ]; then
 fi
 
 # --- Execute merge ---
-# The block-direct-merge PreToolUse hook fires on top-level Claude Bash invocations only.
-# This `gh pr merge` runs as a subprocess of the script, so the hook does not see it —
-# no sentinel needed. (A leftover sentinel would silently bypass the next user-level merge.)
+# Reaching this line already required passing the --human gate above. The
+# block-direct-merge PreToolUse hook (Claude Code) additionally refuses to let
+# an agent invoke this script at all — see the header comment. This `gh pr
+# merge` runs as a subprocess of the script either way, so the hook does not
+# see it directly; --human is the guard for that layer.
 gh pr merge "$PR" "${MERGE_ARGS[@]}"
 echo "MERGED: PR #$PR"
 

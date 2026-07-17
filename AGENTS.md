@@ -40,7 +40,7 @@
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md` and `.agents/rules/AGY.md`. (PP-46z, PP-bg45.)
-6. **Never `--no-verify`**, never `gh pr merge`, never wildcard tool permissions — without explicit user approval each time.
+6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **Merging is human-only, via ANY path** — never `gh pr merge`, never MCP `merge_pull_request`, and never `scripts/workflow/merge-pr.sh` (even though it enforces the merge gates, running it is still an agent merge). An agent's terminal state on a PR is: ready-for-review, CI green, reviews resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
 
 ## 3. Agent Skills
@@ -233,11 +233,12 @@ Actionable, "what" and "how" only. Skills carry the deep dives.
 Work isn't done at "git push" — it's done when the change is **merged, deployed clean, and cleaned up**. The full pipeline (commit → PR → CI → merge) lives in the `pinpoint-pr-workflow` skill; the load-bearing rules are repeated here in case that skill isn't loaded.
 
 1. **Before you push:** `pnpm run check` is the floor (types, lint, format, unit). Run `pnpm run preflight` for non-trivial changes — migrations, security/auth, server actions, middleware, DB schema. Don't run the full E2E suite locally; CI owns it.
-2. **Push and open the PR ready-for-review** (draft only while iterating — see "Working style"). Sync with main by **merge, never rebase**; `git status` must show "up to date with origin". "Ready" is not just "pushed": wait for Copilot to review the current head commit and resolve/decline its threads before you call the PR ready or done — `merge-pr.sh` re-enforces this (`currency` + `threads` gates) at merge time. See `pinpoint-pr-workflow` Phase 3.
+2. **Push and open the PR ready-for-review** (draft only while iterating — see "Working style"). Sync with main by **merge, never rebase**; `git status` must show "up to date with origin". "Ready" is not just "pushed": wait for Copilot to review the current head commit and resolve/decline its threads before you call the PR ready or done — `merge-pr.sh` re-enforces this (`currency` + `threads` gates) at merge time. See `pinpoint-pr-workflow` Phase 3. **UI-touching PRs additionally need screenshots posted** (see step 4) before they can be called ready.
 3. **Lean on CI for the full E2E suite** — don't run `e2e:full` locally; CI owns it once the PR is up. Do run **selected specs locally** while writing them or iterating on a feature they touch (`pnpm exec playwright test <spec> --project=chromium`).
-4. **Merge via `scripts/workflow/merge-pr.sh <PR>`** — never `gh pr merge` or MCP merge directly. (Bead close timing follows beads' defaults; there's no fixed at-merge rule.)
-5. **After merge, watch the deployment.** Don't walk away at merge — watch the production deploy land and confirm no build, migration, or runtime errors. A merge that breaks prod isn't done.
-6. **Cleanup — non-destructive now, destructive on confirmation.** Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
-7. **Hand off** for the next session, and post to the huddle daily bead if other sessions need to know what landed.
+4. **UI-touching PRs: post screenshots before handoff.** `node scripts/workflow/pr-screenshots.mjs <PR>` shoots the manifest pages at desktop+mobile viewports and posts a sticky PR comment so Tim can eyeball them before merging. The commit-time `ui-screenshot-reminder.cjs` hook nudges when a commit touches a UI glob — don't ignore it.
+5. **Merging is human-only, via ANY path — including `merge-pr.sh`.** An agent never runs `merge-pr.sh` itself, even to enforce the gates; that hook is blocked (PP-wi85). The agent's terminal state on a PR is: ready-for-review, CI green, reviews resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`. (Bead close timing follows beads' defaults; there's no fixed at-merge rule.)
+6. **After Tim merges, watch the deployment.** Don't consider the work done at handoff — after Tim runs the merge, watch the production deploy land and confirm no build, migration, or runtime errors. A merge that breaks prod isn't done. If you're not present when Tim merges, this step is his to do or to ask you to pick back up.
+7. **Cleanup — non-destructive now, destructive on confirmation.** Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
+8. **Hand off** for the next session, and post to the huddle daily bead if other sessions need to know what landed.
 
-Never say "ready to push when you are" — you push.
+Never say "ready to push when you are" — you push. Never say a PR is "merged" or that you merged it — only Tim runs the merge; say "ready for Tim to merge" and give him the command.

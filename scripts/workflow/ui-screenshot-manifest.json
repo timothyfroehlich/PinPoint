@@ -1,0 +1,39 @@
+{
+  "_comment": "Page manifest for scripts/workflow/pr-screenshots.mjs. Keys are the page id (used in filenames + --pages filter). authRole must be one of admin/member/technician (matches e2e/support/auth-state.ts STORAGE_STATE roles). seedNeeds documents which local-seed fixture the route depends on so a broken screenshot points at the right cause.",
+  "issues-list": {
+    "label": "Issues List",
+    "route": "/issues",
+    "authRole": "member",
+    "seedNeeds": "default seed (src/test/data/issues.json)"
+  },
+  "issue-detail": {
+    "label": "Issue Detail (Attack from Mars #1)",
+    "route": "/m/AFM/i/1",
+    "authRole": "member",
+    "seedNeeds": "seeded machine AFM (attackFromMars) + issue #1 from src/test/data/issues.json"
+  },
+  "report": {
+    "label": "Report an Issue",
+    "route": "/report",
+    "authRole": "member",
+    "seedNeeds": "default seed (machine picker options)"
+  },
+  "dashboard": {
+    "label": "Dashboard",
+    "route": "/dashboard",
+    "authRole": "member",
+    "seedNeeds": "default seed"
+  },
+  "machine-detail": {
+    "label": "Machine Detail (Addams Family)",
+    "route": "/m/TAF",
+    "authRole": "member",
+    "seedNeeds": "seeded machine TAF (addamsFamily) from src/test/data/machines.json"
+  },
+  "collections": {
+    "label": "Collections",
+    "route": "/c/collections",
+    "authRole": "member",
+    "seedNeeds": "default seed"
+  }
+}

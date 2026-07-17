@@ -74,6 +74,16 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/ui-screenshot-reminder.cjs",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
         "matcher": "Bash|mcp__github__create_pull_request",
         "hooks": [
           {

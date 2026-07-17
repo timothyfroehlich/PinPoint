@@ -248,7 +248,7 @@ Verification: <commands run + outcome>
 Do not merge — Tim reviews and merges.'
 ```
 
-**Do not merge.** The `block-direct-merge.cjs` hook refuses `mcp__github__merge_pull_request` and `gh pr merge` — do not attempt either.
+**Do not merge — by any path, including `merge-pr.sh`.** Merging is human-only (PP-wi85). Note that the `block-direct-merge.cjs` PreToolUse hook is Claude-Code-specific and does not fire inside Antigravity — the enforcement you're actually bound by here is this instruction plus `merge-pr.sh`'s own `--human` flag requirement (it refuses to execute a merge without `--human`, which only Tim should ever pass). Never run `gh pr merge`, `mcp__github__merge_pull_request`, or `scripts/workflow/merge-pr.sh` yourself, with or without `--human`.
 
 ---
 
@@ -257,7 +257,7 @@ Do not merge — Tim reviews and merges.'
 These apply throughout every step. No exceptions without explicit Tim approval.
 
 - **Never `--no-verify`** on any git command.
-- **Never `gh pr merge` or `mcp__github__merge_pull_request`** — Tim merges.
+- **Never `gh pr merge`, `mcp__github__merge_pull_request`, or `scripts/workflow/merge-pr.sh` (with or without `--human`)** — Tim merges.
 - **Sync via merge, never rebase:** `git fetch origin && git merge origin/main`. Rebase rewrites SHAs, forces push, breaks guardrails.
 - **`bd show <id>` and `bd ready` are the source of truth for scope.** If reality diverges from the bead, stop and update the bead first.
 - **If sandboxed / cannot run `chmod`:** ask Tim to run `chmod +x <path>` and `git update-index --chmod=+x <path>` manually (per `~/.claude/CLAUDE.md`).

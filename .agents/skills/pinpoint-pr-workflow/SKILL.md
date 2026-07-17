@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, Copilot + human review handling (via MCP), readiness labeling, gate-enforced merge. Use when committing changes, opening PRs, watching CI, addressing review comments, or merging.
+description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, Copilot + human review handling (via MCP), UI screenshots, readiness labeling, human-only gate-enforced merge handoff. Use when committing changes, opening PRs, watching CI, addressing review comments, posting screenshots, or handing a PR to Tim to merge.
 ---
 
 # PinPoint PR Workflow
@@ -12,7 +12,7 @@ End-to-end pipeline from "I have changes" to "merged in main". Replaces the depr
 - Uncommitted changes in tree → **Phase 1: Commit**
 - Local commits, no PR yet → **Phase 2: PR**
 - PR open, CI not yet green-and-clean → **Phase 3: Review**
-- `ready-for-review` label applied → **Phase 4: Merge**
+- `ready-for-review` label applied → **Phase 4: Merge** (human-only handoff — see below)
 
 ---
 
@@ -186,9 +186,21 @@ If head is newer than the latest Copilot review:
 
 `merge-pr.sh` enforces this at merge time via the `reviewed` gate (PASSes on a Copilot review OR a SHA-matched Claude marker; WAITs inside the 600s window; FAILs after it with no review of either kind). Unlike the older `currency` gate — which WARN-proceeds on a stale/absent Copilot review — `reviewed` blocks the merge, so the Claude fallback is the way past it, not a bypass. Don't tell Tim a PR is "ready" or "done" while head is still unreviewed — making a review happen is part of finishing the PR, not an optional extra.
 
-### 3.5 Apply `ready-for-review` label
+### 3.5 Post UI screenshots (UI-touching PRs only)
 
-Once CI green + zero unresolved review threads (including Copilot) + Copilot reviewed head commit + no merge conflict:
+If the diff touches `src/app/**`, `src/components/**`, any `.css`, or design tokens, screenshots must be posted before the PR can be called ready — Tim reviews UI by eye, not by reading a diff. The commit-time `ui-screenshot-reminder.cjs` PostToolUse hook nudges on the first `git commit` that touches a UI glob; don't ignore it.
+
+```
+node scripts/workflow/pr-screenshots.mjs <PR>
+```
+
+Shoots the manifest in `scripts/workflow/ui-screenshot-manifest.json` (issues list, issue detail, report form, dashboard, a machine detail, collections — pass `--pages a,b,c` to shoot a subset) at desktop (1440×900) and mobile (390×844) viewports, pushes the PNGs to the orphan `pr-screenshots` branch, and posts/updates one sticky PR comment (marker `<!-- pr-screenshots -->`) with a desktop|mobile table per page. Re-run after any UI-affecting push — it updates the same sticky comment in place, tagged with the new head SHA.
+
+Requires the local dev server (`pnpm run dev`) and Supabase (`supabase start`) running. First run (or a stale/missing login session) regenerates `e2e/.auth/*.json` via the `auth-setup` Playwright project, which resets + reseeds the local dev DB — same as running E2E tests locally, not a new risk.
+
+### 3.6 Apply `ready-for-review` label
+
+Once CI green + zero unresolved review threads (including Copilot) + Copilot reviewed head commit + no merge conflict + screenshots posted (if UI-touching, per 3.5):
 
 1. Read current labels via `pull_request_read(method: "get")` and extract `.labels[]`.
 2. Build new labels array: existing labels + `"ready-for-review"`.
@@ -206,23 +218,34 @@ labels: [<existing>, "ready-for-review"]
 
 NOTE: PR labels are added via the issues endpoint. `labels` parameter is full-replacement, so read current labels first to avoid clobbering.
 
-The label is a hint to Tim that the PR is ready. `merge-pr.sh` re-checks all gates at merge time regardless.
+The label is a hint to Tim that the PR is ready for **him** to merge — it does not authorize an agent to merge. `merge-pr.sh --human` re-checks all gates when Tim runs it.
 
 ---
 
-## Phase 4: Merge
+## Phase 4: Merge — human-only (PP-wi85)
 
-Direct `gh pr merge` and MCP `merge_pull_request` are blocked by hook. Use `merge-pr.sh`.
+**Merging is human-only, via ANY path.** Direct `gh pr merge`, MCP `merge_pull_request`, AND `scripts/workflow/merge-pr.sh` itself are ALL blocked for an agent by the `block-direct-merge.cjs` PreToolUse hook — including `merge-pr.sh --dry-run`. There is no agent-usable bypass; the old `.claude-merge-bypass` sentinel was removed entirely. If you want to sanity-check gate-relevant PR state without running the script, read it via MCP (`pull_request_read`) instead — you cannot invoke `merge-pr.sh` at all, not even to preview.
 
-### 4.1 Invoke
+### 4.1 Agent's terminal state: handoff, not merge
+
+Once 3.1–3.6 are satisfied (CI green, threads resolved, head commit reviewed, no conflict, screenshots posted if UI-touching), your job on this PR is done. Tell Tim it's ready and hand him the exact command to run himself:
 
 ```
-bash scripts/workflow/merge-pr.sh <PR>
+! scripts/workflow/merge-pr.sh <PR> --human
 ```
 
-Flags (stackable, order-independent):
+Never say "merged" or "I merged it" — only Tim runs the merge. Say "ready for you to merge" and give him the command. (A `!`-prefixed command in Claude Code is a human-typed shell passthrough — it does not generate a PreToolUse event, so it is the only channel this hook cannot see. That is by design: it is the human channel.)
 
-- `--dry-run` — preview only, no action.
+### 4.2 What `merge-pr.sh --human` does (reference — Tim runs this, not you)
+
+```
+scripts/workflow/merge-pr.sh <PR> --human [--dry-run] [--force] [--bypass-merge-requirements]
+```
+
+`--human` is required to actually merge; omitting it makes the script refuse with a `REFUSE:` message (defense-in-depth for harnesses without the Claude Code hook — Codex/Gemini/Antigravity). `--dry-run` doesn't require `--human` in the script itself, but that exemption only matters outside Claude Code — inside Claude Code the hook blocks the Bash call before the script even runs, dry-run or not.
+
+Other flags (stackable, order-independent):
+
 - `--force` — bypass `currency` + `threads` + `reviewed` (review-state) gates. Requires manual permission approval.
 - `--bypass-merge-requirements` — bypass `ci` gate AND pass `--admin` to `gh pr merge`,
   overriding GitHub branch-protection rules. Requires manual permission approval.
@@ -230,9 +253,9 @@ Flags (stackable, order-independent):
 Combine `--force --bypass-merge-requirements` to bypass `currency` + `threads` + `reviewed` + `ci` together.
 The `no_conflict` gate is NEVER bypassable — GitHub rejects conflicting merges regardless of `--admin`.
 
-`merge-pr.sh` evaluates **5 gates**: `ci`, `currency`, `threads`, `reviewed`, `no_conflict`. The `reviewed` gate is the hard backstop that no head commit merges unreviewed — prefer running the Claude fallback (Phase 3.4) to satisfy it over `--force`-bypassing it.
+`merge-pr.sh` evaluates **5 gates**: `ci`, `currency`, `threads`, `reviewed`, `no_conflict`. The `reviewed` gate is the hard backstop that no head commit merges unreviewed — prefer running the Claude fallback (Phase 3.4) to satisfy it before handoff, rather than telling Tim to `--force` past it.
 
-### 4.2 Interpret output
+### 4.3 Interpret output (for reading over Tim's shoulder / diagnosing a FAIL he reports)
 
 Script emits structured status tokens:
 
@@ -245,46 +268,39 @@ Script emits structured status tokens:
 | `WARN: <gate>: <state>`  | Permitted to proceed with notice                       | Continue, but be informed             |
 | `SKIP: <gate>: <reason>` | Gate doesn't apply                                     | Continue                              |
 
-On any FAIL: script removes `ready-for-review` label if present (the label's contract is "click-merge-without-thinking"; if a gate fails at merge time, that contract is broken). Exit 1.
+On any FAIL: script removes `ready-for-review` label if present (the label's contract is "click-merge-without-thinking"; if a gate fails at merge time, that contract is broken). Exit 1. If Tim reports a FAIL, fix the underlying issue and push — then re-hand him the same `--human` command.
 
 On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --match-head-commit=<sha>`. TOCTOU-safe — if a new commit lands between gate check and merge, GitHub rejects the merge (`--match-head-commit` mismatch). Branch deletion is handled by the repo's auto-delete-branches setting, not by the merge command — passing `--delete-branch` from a worktree fails local cleanup because main is held by the root checkout.
 
-### 4.3 Escape hatches
+### 4.4 Escape hatches (Tim decides; you can inform, not invoke)
 
 **`--force`** — for Copilot/review-state issues (bypasses `currency` + `threads` + `reviewed`):
 
-- API failure on the `threads`, `currency`, or `reviewed` gate where you've manually verified the underlying state is fine
-- Copilot has silently-skipped a merge-from-main commit AND you've reviewed the diff manually
-- You're aware the `threads` / `currency` / `reviewed` gates would fail and you're explicitly accepting
+- API failure on the `threads`, `currency`, or `reviewed` gate where the underlying state has been manually verified fine
+- Copilot has silently-skipped a merge-from-main commit and the diff was reviewed manually
+- The `threads` / `currency` / `reviewed` gates are known to fail and that's being explicitly accepted
 
-Prefer the Claude fallback (Phase 3.4 — run `/code-review` + `mark-claude-review.sh`) over `--force` for a `reviewed`-gate failure: the fallback makes the guarantee true rather than skipping it.
+Prefer the Claude fallback (Phase 3.4 — run `/code-review` + `mark-claude-review.sh`) over asking Tim to `--force` a `reviewed`-gate failure: the fallback makes the guarantee true rather than skipping it, and you can do it before handoff.
 
 **`--bypass-merge-requirements`** — for CI/branch-protection issues:
 
 - A required check is failing for known-irrelevant reasons (infrastructure flake, unrelated job)
-  AND you've manually verified the change is safe. Log the flake first:
+  AND the change has been manually verified safe. Log the flake first:
   `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`).
 - An emergency hotfix where waiting for CI is not acceptable
 - Combine with `--force` when both review-state and CI gates need to be skipped
 
-Do NOT bypass when:
+Do NOT suggest bypassing when:
 
 - Merge conflict exists (`no_conflict` gate is never bypassable; conflicts can't be ignored)
-- You haven't manually verified the underlying state. Both flags require manual permission approval
+- The underlying state hasn't been manually verified. Both flags require manual permission approval
   in the chat — treat the approval prompt as a "are you sure?" checkpoint.
 
-### 4.4 Bypass the hook (emergency only)
+### 4.5 If `merge-pr.sh` itself is broken
 
-If you absolutely need to bypass the hook (e.g., merge-pr.sh itself is broken and you have a hotfix to ship):
+There is no hook bypass — that channel was removed entirely (PP-wi85). If a hotfix genuinely can't wait for the script to be fixed, that's Tim's call, made in his own shell (`gh pr merge <PR> --squash` run by him directly, or a fixed `--human` run). Document why in the merge commit or a follow-up comment. An agent should not look for a workaround here — flag the breakage and let Tim decide.
 
-```bash
-touch .claude-merge-bypass
-gh pr merge <PR> --squash
-```
-
-The sentinel is single-use — deleted on the next merge attempt. Document in commit message WHY you bypassed.
-
-### 4.5 Dependabot PRs: rebase before merging back-to-back
+### 4.6 Dependabot PRs: rebase before merging back-to-back
 
 When two or more Dependabot PRs that both touch `pnpm-lock.yaml` (or any lockfile) are open simultaneously, merging them in succession without rebasing the second-and-later PRs can silently break the lockfile.
 
@@ -292,7 +308,7 @@ When two or more Dependabot PRs that both touch `pnpm-lock.yaml` (or any lockfil
 
 **Why `rebase-strategy: auto` in `.github/dependabot.yml` doesn't save you:** "auto" means Dependabot rebases when _the dependency version_ is out of date, not when _the lockfile region_ has shifted under it. Two independent Dependabot PRs against the same main can both stay "current" by Dependabot's definition while their lockfile diffs collide on merge.
 
-**Rule:** when merging the first of two or more Dependabot PRs that both touch a lockfile, comment `@dependabot rebase` on each remaining Dependabot PR before merging it. Dependabot regenerates the lockfile against post-first-merge main and the duplicate is deduped automatically. Wait for the rebased CI to pass before invoking `merge-pr.sh` on the second PR.
+**Rule:** when merging the first of two or more Dependabot PRs that both touch a lockfile, comment `@dependabot rebase` on each remaining Dependabot PR before merging it. Dependabot regenerates the lockfile against post-first-merge main and the duplicate is deduped automatically. Wait for the rebased CI to pass before handing Tim the `--human` command for the second PR.
 
 **Casework:** 2026-05-19 — PRs #1379 and #1381 each added `brace-expansion@5.0.6:` to `packages:` independently. Both merged within ~1 minute. Main's `Setup Dependencies` broke until a manual dedup of `pnpm-lock.yaml` was bundled into PR #1383 alongside that PR's primary E2E locator fix.
 
@@ -305,7 +321,7 @@ pr_branch=$(gh pr view <second_pr> --json headRefName --jq .headRefName)
 gh api "repos/{owner}/{repo}/compare/main...$pr_branch" --jq '.behind_by'
 ```
 
-If `behind_by > 0`, comment `@dependabot rebase` on the PR and wait for the rebased CI to pass before invoking `merge-pr.sh`. Do not use `gh pr view --json baseRefOid` for this — `baseRefOid` is the base branch's current SHA at query time, so it always equals `origin/main` and cannot detect a stale PR head.
+If `behind_by > 0`, comment `@dependabot rebase` on the PR and wait for the rebased CI to pass before handing Tim the `--human` command. Do not use `gh pr view --json baseRefOid` for this — `baseRefOid` is the base branch's current SHA at query time, so it always equals `origin/main` and cannot detect a stale PR head.
 
 ---
 

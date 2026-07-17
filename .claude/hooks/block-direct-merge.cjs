@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 // .claude/hooks/block-direct-merge.cjs
-// PreToolUse hook: blocks direct PR merge calls.
-// Bypass: presence of .claude-merge-bypass file in repo root (single-use, deleted on fire).
-
-const fs = require("node:fs");
-const path = require("node:path");
+// PreToolUse hook: blocks ALL agent-initiated PR merges. There is no agent-usable
+// bypass — merging is human-only (PP-wi85). The only merge channel left is a human
+// typing a `!`-prefixed command in Claude Code, which does not generate a
+// PreToolUse event and so is never seen by this hook.
+//
+// Blocks three shapes:
+//   1. `gh pr merge` (direct CLI merge)
+//   2. `gh api .../pulls/N/merge` with a write method (REST merge)
+//   3. `scripts/workflow/merge-pr.sh` (the gate-enforced merge script itself —
+//      gate-enforcement is not a substitute for human sign-off)
+//   4. mcp__github__merge_pull_request (MCP merge)
 
 let input = "";
 process.stdin.on("data", (c) => (input += c));
@@ -21,18 +27,20 @@ process.stdin.on("end", () => {
   const toolInput = payload.tool_input || {};
 
   let isMergeAttempt = false;
+  let isMergeScriptAttempt = false;
   let detail = "";
 
   if (tool === "Bash") {
     const cmd = String(toolInput.command || "");
-    // Prefix gate: skip all regex work when nothing gh-related is present, and
+    // Strip quoted content so mentions in `echo`/`rg`/docs/heredocs don't false-positive.
+    const stripped = cmd
+      .replace(/'[^']*'/g, "''")
+      .replace(/"(?:\\.|[^"\\])*"/g, '""');
+    const cmdStart = /(?:^|;|&&|\|\||\||&|\n|\$\(|<\(|\(|`)\s*/;
+
+    // Prefix gate: skip gh-related regex work when nothing gh-related is present, and
     // pass any --help invocation symmetrically (`gh pr merge --help`, `gh api --help`).
     if (cmd.includes("gh") && !/--help\b/.test(cmd)) {
-      // Strip quoted content so mentions in `echo`/`rg`/docs/heredocs don't false-positive.
-      const stripped = cmd
-        .replace(/'[^']*'/g, "''")
-        .replace(/"(?:\\.|[^"\\])*"/g, '""');
-      const cmdStart = /(?:^|;|&&|\|\||\||&|\n|\$\(|<\(|\(|`)\s*/;
       const ghMerge = new RegExp(cmdStart.source + "gh\\s+pr\\s+merge\\b");
       if (ghMerge.test(stripped)) {
         isMergeAttempt = true;
@@ -48,30 +56,48 @@ process.stdin.on("end", () => {
         detail = "gh api PUT .../merge";
       }
     }
+
+    // scripts/workflow/merge-pr.sh — detect at a command-start position, tolerating
+    // `bash`/`sh` wrappers, leading `VAR=val` assignments (bare or after `env`),
+    // and a relative/absolute path prefix ahead of the basename. Quote-stripped
+    // `stripped` reuses the same false-positive protection as the gh checks above
+    // (docs/echo mentions don't match).
+    const mergeScript = new RegExp(
+      cmdStart.source +
+        "(?:env\\s+)?" + // optional `env` wrapper
+        "(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*" + // optional leading VAR=val assignments (bare or after env)
+        "(?:(?:bash|sh)\\s+)?" + // optional interpreter wrapper
+        "(?:\\S*/)?" + // optional path prefix (relative or absolute)
+        "merge-pr\\.sh\\b"
+    );
+    if (mergeScript.test(stripped)) {
+      isMergeScriptAttempt = true;
+      detail = "scripts/workflow/merge-pr.sh";
+    }
   } else if (tool === "mcp__github__merge_pull_request") {
     isMergeAttempt = true;
     detail = "MCP merge_pull_request";
+  }
+
+  if (isMergeScriptAttempt) {
+    console.error(
+      "Merge is human-only. You cannot run merge-pr.sh. Finish the PR (CI green, reviews " +
+        "resolved, screenshots posted if UI), then hand Tim the exact command to run himself: " +
+        "! scripts/workflow/merge-pr.sh <PR> --human"
+    );
+    process.exit(2);
   }
 
   if (!isMergeAttempt) {
     process.exit(0);
   }
 
-  // Check for bypass sentinel.
-  const cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-  const sentinel = path.join(cwd, ".claude-merge-bypass");
-  if (fs.existsSync(sentinel)) {
-    // Allow this merge; consume the sentinel.
-    try {
-      fs.unlinkSync(sentinel);
-    } catch {}
-    process.exit(0);
-  }
-
-  // Block.
+  // Block. No bypass sentinel — merging has no agent-usable escape hatch under
+  // the hard gate (PP-wi85). If merge-pr.sh itself is broken and a hotfix must
+  // ship, that is a human decision made in a human-run shell, not a hook bypass.
   console.error(
-    `Direct merge blocked: ${detail}. Use scripts/workflow/merge-pr.sh <PR> to enforce gate re-checks. ` +
-      `Override with: touch .claude-merge-bypass (single-use sentinel, auto-deleted on hook fire).`
+    `Direct merge blocked: ${detail}. Merging is human-only — hand Tim the exact command to ` +
+      "run himself: ! scripts/workflow/merge-pr.sh <PR> --human"
   );
   process.exit(2);
 });
