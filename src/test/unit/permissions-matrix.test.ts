@@ -437,6 +437,18 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.pinballmap.push", "admin")).toBe(true);
     });
 
+    it("should restrict PinballMap sync to technicians and admins", () => {
+      expect(getPermission("machines.pinballmap.sync", "unauthenticated")).toBe(
+        false
+      );
+      expect(getPermission("machines.pinballmap.sync", "guest")).toBe(false);
+      expect(getPermission("machines.pinballmap.sync", "member")).toBe(false);
+      expect(getPermission("machines.pinballmap.sync", "technician")).toBe(
+        true
+      );
+      expect(getPermission("machines.pinballmap.sync", "admin")).toBe(true);
+    });
+
     it("should require authentication to watch machines", () => {
       expect(getPermission("machines.watch", "unauthenticated")).toBe(false);
       expect(getPermission("machines.watch", "guest")).toBe(true);

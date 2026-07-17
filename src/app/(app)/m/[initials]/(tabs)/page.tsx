@@ -19,6 +19,8 @@ import {
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
+import { getPinballMapState } from "~/lib/pinballmap/state";
+import { derivePbmMachineStatus } from "~/lib/pinballmap/sync";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
 import { MachinePinballmapCard } from "./machine-pinballmap-card";
@@ -116,10 +118,21 @@ export default async function MachineInfoTab({
       : Promise.resolve(null);
   const allUsersPromise: Promise<Awaited<ReturnType<typeof getUnifiedUsers>>> =
     canEdit ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]);
+  // The stored PBM snapshot drives the desync signal, which is a maintainer-
+  // facing alert (it points at a mismatch to resolve). Only read it when the
+  // viewer may act on it (`canLink`) AND the machine is linked — so the public
+  // QR-scan landing never pays for (or shows) it. Location-wide singleton.
+  const pbmStatePromise: Promise<
+    Awaited<ReturnType<typeof getPinballMapState>>
+  > =
+    canLink && machine.pinballmapMachineId !== null
+      ? getPinballMapState()
+      : Promise.resolve(null);
 
-  const [pinballmapTitleName, allUsersRaw] = await Promise.all([
+  const [pinballmapTitleName, allUsersRaw, pbmState] = await Promise.all([
     pinballmapTitlePromise,
     allUsersPromise,
+    pbmStatePromise,
   ]);
   const allUsers = allUsersRaw.map((u) => ({
     id: u.id,
@@ -174,14 +187,27 @@ export default async function MachineInfoTab({
       <EditButtonWithTooltip reason={editDeniedReason} />
     ) : null;
 
-  // PinballMap card (PP-o355.3): show the public "View on PinballMap" link only
-  // for machines we've marked as listed on PinballMap (the local
-  // `pinballmapListed` flag, toggled in the Edit dialog). Everything else shows
-  // no card. Richer status UI (desync alert, last comment) is deferred to a
-  // later pass alongside the inbound-sync feature.
-  const pinballmapCard = machine.pinballmapListed ? (
-    <MachinePinballmapCard locationUrl={pinballmapLocationUrl()} />
-  ) : null;
+  // PinballMap card (PP-o355.3 + desync PP-o355.11): everyone sees the plain
+  // "View on PinballMap" card for listed machines. The desync alert is
+  // maintainer-only (`canLink`) — for those users the card also appears on a
+  // desynced-but-not-listed machine (e.g. on PBM but not marked listed here),
+  // so the mismatch surfaces where it can be acted on. `pbmState` is null for
+  // non-maintainers, so `desynced` is false for them regardless.
+  const pbmStatus = derivePbmMachineStatus({
+    pinballmapMachineId: machine.pinballmapMachineId,
+    pinballmapListed: machine.pinballmapListed,
+    pinballmapLmxId: machine.pinballmapLmxId,
+    snapshot: pbmState?.snapshotJson ?? null,
+  });
+  const showDesync = canLink && pbmStatus.desynced;
+  const pinballmapCard =
+    machine.pinballmapListed || showDesync ? (
+      <MachinePinballmapCard
+        locationUrl={pinballmapLocationUrl()}
+        desynced={showDesync}
+        desyncReason={pbmStatus.reason}
+      />
+    ) : null;
 
   const rail = (
     <InfoRail

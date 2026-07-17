@@ -17,6 +17,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
+import { reconcileAfterSync } from "~/lib/pinballmap/sync";
+import { log } from "~/lib/logger";
 import {
   searchCatalogFamilies,
   listGroupEditions,
@@ -328,4 +330,60 @@ export async function verifyPinballmapLinkAction(
 
   revalidatePath(`/m/${machine.initials}`);
   return ok({ state: "healed" });
+}
+
+/** Result of an on-demand "Sync now" — the machine count and heals applied. */
+export type SyncPinballMapNowResult = Result<
+  { machineCount: number; healed: number },
+  "UNAUTHORIZED" | "SERVER"
+>;
+
+/**
+ * Manually refresh the stored PinballMap snapshot ("Sync now"), then reconcile
+ * stored lmx drift. Technician+ (`machines.pinballmap.sync`, CORE-ARCH-008).
+ *
+ * Unlike the hourly cron, this does NOT gate on `state.enabled`: it's an
+ * explicit human-initiated refresh, so the human is the caller who owns the
+ * decision (CORE-PBM-001 is respected — a click is naturally rate-limited, and
+ * the permission is technician+). Form-action shaped `(prevState, formData)` so
+ * a `<form action={...}>` + `useActionState` button (control room, PP-o355.7)
+ * can drop it in for progressive enhancement (CORE-ARCH-002).
+ */
+export async function syncPinballMapNowAction(
+  _prevState: SyncPinballMapNowResult | undefined,
+  _formData: FormData
+): Promise<SyncPinballMapNowResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return err("UNAUTHORIZED", "Unauthorized. Please log in.");
+
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+  if (!profile) return err("UNAUTHORIZED", "User profile not found.");
+
+  const accessLevel = getAccessLevel(profile.role);
+  if (!checkPermission("machines.pinballmap.sync", accessLevel)) {
+    return err(
+      "UNAUTHORIZED",
+      "Only technicians and admins can trigger a PinballMap sync."
+    );
+  }
+
+  try {
+    const result = await syncLocationSnapshot({ updatedBy: user.id });
+    if (!result.ok) return err("SERVER", result.error);
+
+    const { healed } = await reconcileAfterSync();
+    // Desync badges on machine Info cards derive from the stored snapshot, so
+    // refresh the whole machine subtree after a successful sync.
+    revalidatePath("/m", "layout");
+    return ok({ machineCount: result.machineCount, healed });
+  } catch (error: unknown) {
+    log.error({ err: error }, "Manual PinballMap sync failed");
+    return err("SERVER", "PinballMap sync failed. Please try again.");
+  }
 }

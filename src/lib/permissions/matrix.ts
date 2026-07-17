@@ -418,6 +418,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "machines.pinballmap.sync",
+        label: "Trigger a PinballMap sync",
+        description:
+          "Manually refresh the stored PinballMap location snapshot ('Sync now'). The hourly cron does this automatically; this grants the on-demand action.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
         id: "machines.settings.manage",
         label: "Manage machine settings",
         description:

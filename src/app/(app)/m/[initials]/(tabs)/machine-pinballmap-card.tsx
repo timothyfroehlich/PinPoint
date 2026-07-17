@@ -1,23 +1,40 @@
 import type React from "react";
-import { ExternalLink } from "lucide-react";
+import { AlertTriangle, ExternalLink } from "lucide-react";
 
 import { cn } from "~/lib/utils";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import type { PbmMachineStatus } from "~/lib/pinballmap/status";
 
 /**
- * PinballMap card for the machine Info tab (bead C / PP-o355.3).
+ * PinballMap card for the machine Info tab (bead C / PP-o355.3, desync alert
+ * PP-o355.11).
  *
- * Intentionally minimal: it renders the public "View on PinballMap" link back to
- * our location (CORE-PBM-001 attribution) and nothing else. The caller renders
- * it only for machines that are actually listed on PinballMap — so a rendered
- * card always means "this machine is on the map, here's the link." Richer status
- * (listing/desync/last-comment) is deferred to a later UI pass alongside the
- * broader machine-page work.
+ * Renders the public "View on PinballMap" link back to our location (CORE-PBM-001
+ * attribution) and, when the stored snapshot disagrees with our local state, a
+ * SOFT desync alert. Desync is informational — it never blocks and never flips
+ * listing on its own (three-concept model); it points a maintainer at a mismatch
+ * to resolve. Only reasons that call for human action carry copy; `ok`/`unlinked`
+ * render no alert.
  *
- * Pure display: a server component with no data access of its own.
+ * Pure display: a server component with no data access of its own. The caller
+ * (Info tab `page.tsx`) derives the status from the stored snapshot and passes
+ * it in.
  */
+
+/** Human-facing copy per desync reason. Reasons without an entry show no alert. */
+const DESYNC_COPY: Partial<Record<PbmMachineStatus["reason"], string>> = {
+  listed_locally_absent_on_pbm: "Listed here but not showing on PinballMap.",
+  on_pbm_not_listed_locally: "On PinballMap but not marked listed here.",
+  lmx_drifted: "PinballMap link moved — verify.",
+};
+
 export interface MachinePinballmapCardProps {
   /** Public link back to the PBM location page (CORE-PBM-001 attribution). */
   locationUrl: string;
+  /** Whether the stored snapshot disagrees with our local state (PP-o355.11). */
+  desynced?: boolean;
+  /** Which desync copy to show; only read when `desynced`. */
+  desyncReason?: PbmMachineStatus["reason"];
 }
 
 const CARD = "rounded-xl border border-outline-variant bg-card p-4";
@@ -26,7 +43,12 @@ const LABEL =
 
 export function MachinePinballmapCard({
   locationUrl,
+  desynced = false,
+  desyncReason,
 }: MachinePinballmapCardProps): React.JSX.Element {
+  const desyncMessage =
+    desynced && desyncReason ? DESYNC_COPY[desyncReason] : undefined;
+
   return (
     <div className={CARD} data-testid="machine-pinballmap-card">
       <p className={cn("mb-2 flex items-center gap-2", LABEL)}>
@@ -35,6 +57,17 @@ export function MachinePinballmapCard({
         </span>{" "}
         PinballMap
       </p>
+
+      {desyncMessage ? (
+        <Alert
+          variant="warning"
+          className="mb-3"
+          data-testid="machine-pinballmap-desync"
+        >
+          <AlertTriangle className="size-4" aria-hidden="true" />
+          <AlertDescription>{desyncMessage}</AlertDescription>
+        </Alert>
+      ) : null}
 
       <a
         href={locationUrl}
