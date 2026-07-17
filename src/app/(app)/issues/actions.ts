@@ -632,6 +632,15 @@ export async function addCommentAction(
     return err("UNAUTHORIZED", "Unauthorized");
   }
 
+  const userProfile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+  const accessLevel = getAccessLevel(userProfile?.role);
+  if (!checkPermission("comments.add", accessLevel)) {
+    return err("UNAUTHORIZED", "You do not have permission to add comments");
+  }
+
   const validation = addCommentSchema.safeParse({
     issueId: toOptionalString(formData.get("issueId")),
     comment: toOptionalString(formData.get("comment")),
@@ -781,7 +790,17 @@ export async function editCommentAction(
       return err("UNAUTHORIZED", "System comments cannot be edited");
     }
 
-    if (existingComment.authorId !== user.id) {
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+    const accessLevel = getAccessLevel(userProfile?.role);
+    if (
+      !checkPermission("comments.edit", accessLevel, {
+        userId: user.id,
+        reporterId: existingComment.authorId,
+      })
+    ) {
       return err("UNAUTHORIZED", "You can only edit your own comments");
     }
 
