@@ -1,6 +1,11 @@
 import { cache } from "react";
 import { asc, eq } from "drizzle-orm";
-import { getCollection, type UserCollection } from "~/lib/collections/user";
+import { z } from "zod";
+import {
+  getCollection,
+  getCollectionByViewToken,
+  type UserCollection,
+} from "~/lib/collections/user";
 import {
   canManageCollection,
   canViewCollection,
@@ -12,6 +17,14 @@ import { machines as machinesTable, userProfiles } from "~/server/db/schema";
 export interface CollectionForLayout {
   collection: UserCollection;
   viewerCanManage: boolean;
+  /**
+   * The handle from the URL (a collection id OR a view token). Tab links and
+   * revalidatePath use THIS, not `collection.id`, so a view-token visitor stays
+   * on `/c/collection/<token>/…` and never sees the internal uuid.
+   */
+  handle: string;
+  /** Access was granted by presenting a valid view token (read-only), not owner/admin. */
+  viaViewToken: boolean;
 }
 
 /** The current viewer: their id (undefined if unauthenticated) and role. */
@@ -19,6 +32,8 @@ export interface Viewer {
   userId: string | undefined;
   role: string | null;
 }
+
+const uuidSchema = z.uuid();
 
 /**
  * Request-deduped current viewer (user id + role). Shared by the layout,
@@ -56,20 +71,41 @@ export const getPickerMachines = cache(
 
 /**
  * Request-deduped fetch shared by the (tabs) layout and tab pages.
- * Returns null when the collection is missing OR the viewer cannot see it
- * (private to owner; admins may view). The route maps null -> notFound()
- * so a private collection's existence is never revealed (404 not 403).
+ *
+ * `handle` is either a collection id or a view token:
+ * - **uuid** -> resolve by id; access requires owner/admin. A uuid is NOT a
+ *   capability, so a non-owner gets null (404) — the id stays a non-secret
+ *   identifier. We never fall through to a token lookup (a uuid can't be one).
+ * - **anything else** -> treat as a view token; a hit grants read-only access
+ *   (anonymous OK), a miss is null.
+ *
+ * The route maps null -> notFound() so a private collection's existence is
+ * never revealed (404 not 403).
  */
 export const getCollectionForLayout = cache(
-  async (collectionId: string): Promise<CollectionForLayout | null> => {
-    const collection = await getCollection(undefined, collectionId);
-    if (!collection) return null;
+  async (handle: string): Promise<CollectionForLayout | null> => {
+    if (uuidSchema.safeParse(handle).success) {
+      const collection = await getCollection(undefined, handle);
+      if (!collection) return null;
 
-    const viewer = await getViewer();
-    if (!canViewCollection(collection, viewer)) return null;
+      const viewer = await getViewer();
+      if (!canViewCollection(collection, viewer)) return null;
+      return {
+        collection,
+        viewerCanManage: canManageCollection(collection, viewer),
+        handle,
+        viaViewToken: false,
+      };
+    }
+
+    // Token path: possession of a valid token is the capability (read-only).
+    const collection = await getCollectionByViewToken(undefined, handle);
+    if (!collection) return null;
     return {
       collection,
-      viewerCanManage: canManageCollection(collection, viewer),
+      viewerCanManage: false,
+      handle,
+      viaViewToken: true,
     };
   }
 );

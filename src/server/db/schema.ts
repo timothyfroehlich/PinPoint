@@ -625,8 +625,9 @@ export const machineSettingsSets = pgTable(
  * Collections + Collection Machines
  *
  * User-created collections of arbitrary machines (PP-wqit.1, Wave 0a). A
- * collection is private to its owner in this slice; view/edit share-token
- * columns are deferred to Wave 0b (PP-wqit.2).
+ * collection is private to its owner unless a `view_token` is minted (Wave 0b,
+ * PP-wqit.2): possession of the token grants anonymous read access. Edit
+ * sharing is account-based (PP-wqit.7), not a token — there is no edit_token.
  */
 export const collections = pgTable(
   "collections",
@@ -637,6 +638,12 @@ export const collections = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => userProfiles.id, { onDelete: "cascade" }),
+    // View-share capability (Wave 0b). Nullable = sharing off; a random
+    // base64url token = "anyone with the link can view". The token IS the
+    // capability and lives in the URL path; rotating it revokes old links.
+    // The collection id is NOT a capability (a uuid handle only resolves for
+    // owner/admin), so the id stays a non-secret internal identifier.
+    viewToken: text("view_token").unique(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

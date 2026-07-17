@@ -30,6 +30,9 @@ if (!databaseUrl) {
 }
 
 const COLLECTION_NAME = "APC Tournament Bank";
+// Fixed demo view-token (local only) so the shared-link flow is reachable in
+// dev without clicking through the Share dialog: /c/collection/<this>.
+const DEMO_VIEW_TOKEN = "demo-tournament-view-token";
 // A themed tournament lineup. Any name not present in the seed is skipped, so
 // this stays resilient to seed data changes.
 const MACHINE_NAMES = [
@@ -58,8 +61,8 @@ async function run() {
     `;
 
     const [collection] = await sql`
-      INSERT INTO collections (name, owner_id)
-      VALUES (${COLLECTION_NAME}, ${admin.id})
+      INSERT INTO collections (name, owner_id, view_token)
+      VALUES (${COLLECTION_NAME}, ${admin.id}, ${DEMO_VIEW_TOKEN})
       RETURNING id
     `;
 
@@ -75,7 +78,7 @@ async function run() {
     }
 
     console.log(
-      `✅ Collections seeded: "${COLLECTION_NAME}" (admin) with ${String(machineRows.length)} machine(s).`
+      `✅ Collections seeded: "${COLLECTION_NAME}" (admin) with ${String(machineRows.length)} machine(s). Shared view: /c/collection/${DEMO_VIEW_TOKEN}`
     );
   } finally {
     await sql.end();

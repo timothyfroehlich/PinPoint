@@ -105,6 +105,12 @@ export async function updateSession(
     path === "/m" ||
     path.startsWith("/m/") ||
     path.startsWith("/issues") ||
+    // Shared collection views (Wave 0b): a view-token link must open for
+    // anonymous visitors. The trailing slash keeps this to /c/collection/<id>
+    // (and its tabs) — it does NOT match /c/collections (the owner's private
+    // list). The in-page resolver still 404s a missing token, so opening the
+    // route publicly reveals nothing; it just avoids a login redirect.
+    path.startsWith("/c/collection/") ||
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
     path.startsWith("/forgot-password") ||

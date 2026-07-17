@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { canManageCollection } from "~/lib/collections/access";
+import { generateViewToken } from "~/lib/collections/tokens";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import {
@@ -192,6 +193,79 @@ export async function updateCollectionAction(input: {
   revalidatePath(`/c/collection/${input.collectionId}`);
   revalidatePath("/c/collections");
   return { success: true };
+}
+
+/**
+ * Enable or disable view-link sharing (Wave 0b, PP-wqit.2). Owner-only.
+ *
+ * Enable mints a token only if one isn't already set (so a no-op enable keeps
+ * the existing link stable); disable nulls it, permanently revoking every prior
+ * link of that collection. Token generation is a pure value computed before the
+ * single UPDATE — no transaction, no side effects (CORE-ARCH-011).
+ *
+ * Returns the resulting token (null when disabled) so the Share dialog can
+ * render the link without a re-fetch.
+ */
+export async function setCollectionSharingAction(input: {
+  collectionId: string;
+  enabled: boolean;
+}): Promise<ActionResult<{ viewToken: string | null }>> {
+  const actor = await resolveActor();
+  if (!actor) return { success: false, error: "Not authenticated" };
+  const collection = await loadOwner(input.collectionId);
+  if (!collection) return { success: false, error: "Not found" };
+  if (!canManageCollection(collection, { userId: actor.userId })) {
+    return { success: false, error: "Forbidden" };
+  }
+
+  if (!input.enabled) {
+    await db
+      .update(collections)
+      .set({ viewToken: null, updatedAt: new Date() })
+      .where(eq(collections.id, input.collectionId));
+    revalidatePath(`/c/collection/${input.collectionId}`);
+    return { success: true, data: { viewToken: null } };
+  }
+
+  // Enable: reuse an existing token if present, else mint one.
+  const existing = await db.query.collections.findFirst({
+    where: eq(collections.id, input.collectionId),
+    columns: { viewToken: true },
+  });
+  const token = existing?.viewToken ?? generateViewToken();
+  if (!existing?.viewToken) {
+    await db
+      .update(collections)
+      .set({ viewToken: token, updatedAt: new Date() })
+      .where(eq(collections.id, input.collectionId));
+  }
+  revalidatePath(`/c/collection/${input.collectionId}`);
+  return { success: true, data: { viewToken: token } };
+}
+
+/**
+ * Rotate the view-share token (Wave 0b) — "reset link". Owner-only. Minting a
+ * fresh token immediately invalidates every previously shared link. Returns the
+ * new token for the Share dialog.
+ */
+export async function resetCollectionViewLinkAction(input: {
+  collectionId: string;
+}): Promise<ActionResult<{ viewToken: string }>> {
+  const actor = await resolveActor();
+  if (!actor) return { success: false, error: "Not authenticated" };
+  const collection = await loadOwner(input.collectionId);
+  if (!collection) return { success: false, error: "Not found" };
+  if (!canManageCollection(collection, { userId: actor.userId })) {
+    return { success: false, error: "Forbidden" };
+  }
+
+  const token = generateViewToken();
+  await db
+    .update(collections)
+    .set({ viewToken: token, updatedAt: new Date() })
+    .where(eq(collections.id, input.collectionId));
+  revalidatePath(`/c/collection/${input.collectionId}`);
+  return { success: true, data: { viewToken: token } };
 }
 
 export async function deleteCollectionAction(input: {

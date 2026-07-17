@@ -61,4 +61,52 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     await expect(page).toHaveURL(/\/timeline$/);
     await expect(page.getByTestId("collection-summary")).toBeVisible();
   });
+
+  test("share a collection and open the view link anonymously (Wave 0b)", async ({
+    page,
+    browser,
+  }) => {
+    const name = `${getTestPrefix()} Shared`;
+
+    // Owner creates a collection with a machine so the shared Overview has content.
+    await page.goto("/c/collections");
+    await page.getByTestId("create-collection-trigger").click();
+    await page.getByLabel("Name").fill(name);
+    await page.getByTestId("create-collection-submit").click();
+    await expect(page).toHaveURL(/\/c\/collection\//);
+    await page.getByTestId("collection-machines-multiselect").click();
+    await page.getByPlaceholder("Search machines…").fill("Slick Chick");
+    await page.getByRole("option", { name: /Slick Chick/ }).click();
+    await page.keyboard.press("Escape");
+    await page.getByTestId("collection-add-machines").click();
+    await expect(page.getByTestId("collection-overview-body")).toBeVisible();
+
+    // Enable view sharing and grab the generated link.
+    await page.getByTestId("collection-share-trigger").click();
+    await page.getByTestId("collection-share-toggle").click();
+    const shareUrl = await page
+      .getByTestId("collection-share-url")
+      .inputValue();
+    expect(shareUrl).toMatch(/\/c\/collection\/.+/);
+
+    // A fresh, unauthenticated context opens the link — no login redirect, and
+    // the read-only Overview renders without any owner controls.
+    const anon = await browser.newContext();
+    try {
+      const anonPage = await anon.newPage();
+      await anonPage.goto(shareUrl);
+      await expect(
+        anonPage.getByTestId("collection-overview-body")
+      ).toBeVisible();
+      await expect(anonPage).toHaveURL(/\/c\/collection\//);
+      await expect(
+        anonPage.getByTestId("collection-share-trigger")
+      ).toHaveCount(0);
+      await expect(anonPage.getByTestId("collection-edit-trigger")).toHaveCount(
+        0
+      );
+    } finally {
+      await anon.close();
+    }
+  });
 });
