@@ -115,9 +115,9 @@ export function AppHeader({
           >
             <item.icon className="size-4 shrink-0" aria-hidden="true" />
             {/* Labels appear at xl (not lg): at the 1024px lg breakpoint the
-                nav (now 4 items incl. Collections) plus the Report + Quick
-                actions overflow the header — icon-only keeps it within the
-                viewport until there's room for text. */}
+                nav (now 4 items incl. Collections) plus the Report action
+                overflow the header — icon-only keeps it within the viewport
+                until there's room for text. */}
             <span className="hidden xl:inline" aria-hidden="true">
               {item.title}
             </span>
