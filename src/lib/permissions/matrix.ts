@@ -405,6 +405,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "machines.pinballmap.sync",
+        label: "Trigger a PinballMap sync",
+        description:
+          "Manually refresh the stored PinballMap location snapshot ('Sync now'). The hourly cron does this automatically; this grants the on-demand action.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
         id: "machines.settings.manage",
         label: "Manage machine settings",
         description:
@@ -539,6 +552,38 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           guest: false,
           member: false,
           technician: false,
+          admin: true,
+        },
+      },
+    ],
+  },
+  {
+    id: "collections",
+    label: "Collections",
+    permissions: [
+      {
+        id: "collections.view",
+        label: "View collections",
+        description:
+          "View a collection's Overview, Issues, and Timeline. Private collections are additionally restricted to their owner (and admins); link-based sharing is handled outside the role matrix.",
+        access: {
+          unauthenticated: true,
+          guest: true,
+          member: true,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "collections.create",
+        label: "Create collections",
+        description:
+          "Create a personal collection and add machines to it. Managing a collection (rename, delete, edit membership) is restricted to its owner.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: true,
+          technician: true,
           admin: true,
         },
       },

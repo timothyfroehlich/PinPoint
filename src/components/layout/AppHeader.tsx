@@ -114,7 +114,11 @@ export function AppHeader({
             data-testid={`nav-${item.title.toLowerCase()}`}
           >
             <item.icon className="size-4 shrink-0" aria-hidden="true" />
-            <span className="hidden lg:inline" aria-hidden="true">
+            {/* Labels appear at xl (not lg): at the 1024px lg breakpoint the
+                nav (now 4 items incl. Collections) plus the Report + Quick
+                actions overflow the header — icon-only keeps it within the
+                viewport until there's room for text. */}
+            <span className="hidden xl:inline" aria-hidden="true">
               {item.title}
             </span>
           </Link>
