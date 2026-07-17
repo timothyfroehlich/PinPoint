@@ -39,8 +39,26 @@ if (!migrationNumber) {
   process.exit(1);
 }
 
-const connectionString =
-  process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
+// Resolve the connection endpoint. This script writes to
+// drizzle.__drizzle_migrations, so it must connect the way the migrator does:
+// prefer POSTGRES_URL_NON_POOLING (the IPv4 SESSION pooler, :5432) and, in
+// production, REFUSE to silently fall back to POSTGRES_URL (the :6543
+// TRANSACTION pooler) — it does not support prepared statements (the PP-d8l8
+// silent-COMMIT-loss hazard) and is the wrong endpoint for a migration write.
+// Mirrors scripts/migrate-production.ts. See AGENTS.md §7.
+const isVercelProduction = process.env["VERCEL_ENV"] === "production";
+const nonPooling = process.env["POSTGRES_URL_NON_POOLING"];
+
+if (isVercelProduction && !nonPooling) {
+  console.error(
+    "❌ POSTGRES_URL_NON_POOLING is required in production but is unset.\n" +
+      "   Refusing to fall back to the :6543 transaction pooler (POSTGRES_URL)."
+  );
+  process.exit(1);
+}
+
+// Outside Vercel production (local / ad-hoc), POSTGRES_URL is a fine fallback.
+const connectionString = nonPooling ?? process.env["POSTGRES_URL"];
 
 if (!connectionString) {
   console.error(
@@ -49,7 +67,11 @@ if (!connectionString) {
   process.exit(1);
 }
 
-const sql = postgres(connectionString, { max: 1 });
+// `prepare: false`: REQUIRED if this ever connects over the `:6543` transaction
+// pooler (which rejects prepared statements — the PP-d8l8 hazard) and harmless
+// on the session pooler. Mirrors scripts/migrate-production.ts and
+// scripts/lib/pg-client.mjs (the canonical PP-d8l8 setting).
+const sql = postgres(connectionString, { max: 1, prepare: false });
 // db not needed for this script, only sql client
 
 async function main() {
