@@ -89,9 +89,13 @@ test.describe("Personal collections (PP-wqit.1)", () => {
       .inputValue();
     expect(shareUrl).toMatch(/\/c\/[^/]+$/);
 
-    // A fresh, unauthenticated context opens the link — no login redirect, and
-    // the read-only Overview renders without any owner controls.
-    const anon = await browser.newContext();
+    // A genuinely signed-out context opens the link — no login redirect, and
+    // the read-only Overview renders without any owner controls. Force an empty
+    // storageState: under this file's `test.use({ storageState: member })`, a
+    // bare newContext() inherits the member session (it would NOT be anonymous).
+    const anon = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     try {
       const anonPage = await anon.newPage();
       await anonPage.goto(shareUrl);
@@ -108,5 +112,11 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     } finally {
       await anon.close();
     }
+
+    // The OWNER opening their own share link still sees full controls — access
+    // is permission-based, not URL-based (the token only widens who can read).
+    await page.goto(shareUrl);
+    await expect(page.getByTestId("collection-share-trigger")).toBeVisible();
+    await expect(page.getByTestId("collection-edit-trigger")).toBeVisible();
   });
 });

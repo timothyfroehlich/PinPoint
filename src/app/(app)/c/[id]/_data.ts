@@ -23,7 +23,11 @@ export interface CollectionForLayout {
    * on `/c/<token>/…` and never sees the internal uuid.
    */
   handle: string;
-  /** Access was granted by presenting a valid view token (read-only), not owner/admin. */
+  /**
+   * The handle used was a view token (the URL carries a shared capability), so
+   * the view suppresses the Referer header. Independent of `viewerCanManage` —
+   * the owner opening their own share link is `viaViewToken` yet still manages.
+   */
   viaViewToken: boolean;
 }
 
@@ -72,23 +76,28 @@ export const getPickerMachines = cache(
 /**
  * Request-deduped fetch shared by the (tabs) layout and tab pages.
  *
- * `handle` is either a collection id or a view token:
- * - **uuid** -> resolve by id; access requires owner/admin. A uuid is NOT a
+ * `handle` is either a collection id or a view token. Access (can-view) depends
+ * on the handle; management (can-edit) always depends on the viewer's identity:
+ * - **uuid** -> resolve by id; can-view requires owner/admin. A uuid is NOT a
  *   capability, so a non-owner gets null (404) — the id stays a non-secret
  *   identifier. We never fall through to a token lookup (a uuid can't be one).
- * - **anything else** -> treat as a view token; a hit grants read-only access
- *   (anonymous OK), a miss is null.
+ * - **anything else** -> treat as a view token; a valid token grants can-view to
+ *   ANYONE (anonymous OK), a miss is null.
+ *
+ * `viewerCanManage` is `canManageCollection(viewer)` on BOTH paths — the token
+ * only widens who may read; the owner opening their own share link still gets
+ * full edit/share controls, and a non-owner with the link stays read-only.
  *
  * The route maps null -> notFound() so a private collection's existence is
  * never revealed (404 not 403).
  */
 export const getCollectionForLayout = cache(
   async (handle: string): Promise<CollectionForLayout | null> => {
+    const viewer = await getViewer();
+
     if (uuidSchema.safeParse(handle).success) {
       const collection = await getCollection(undefined, handle);
       if (!collection) return null;
-
-      const viewer = await getViewer();
       if (!canViewCollection(collection, viewer)) return null;
       return {
         collection,
@@ -98,12 +107,13 @@ export const getCollectionForLayout = cache(
       };
     }
 
-    // Token path: possession of a valid token is the capability (read-only).
+    // Token path: a valid token grants read to anyone; the viewer's identity
+    // still decides management (owner keeps controls, others are read-only).
     const collection = await getCollectionByViewToken(undefined, handle);
     if (!collection) return null;
     return {
       collection,
-      viewerCanManage: false,
+      viewerCanManage: canManageCollection(collection, viewer),
       handle,
       viaViewToken: true,
     };
