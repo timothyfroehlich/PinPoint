@@ -4,10 +4,11 @@ import { createTestMachine, createTestUser } from "~/test/helpers/factories";
 import {
   collections,
   collectionMachines,
+  collectionCollaborators,
   machines,
   userProfiles,
 } from "~/server/db/schema";
-import { getMyCollections } from "~/lib/collections/list";
+import { getMyCollections, getSharedWithMe } from "~/lib/collections/list";
 
 describe("getMyCollections", () => {
   setupTestDb();
@@ -49,5 +50,50 @@ describe("getMyCollections", () => {
     const user = createTestUser();
     await db.insert(userProfiles).values(user);
     expect(await getMyCollections(asDbOrTx(db), user.id)).toEqual([]);
+  });
+});
+
+describe("getSharedWithMe", () => {
+  setupTestDb();
+
+  it("returns collections shared with the user, with owner name + machine count", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ firstName: "Owner", lastName: "One" });
+    const me = createTestUser({ firstName: "Me", lastName: "User" });
+    await db.insert(userProfiles).values([owner, me]);
+    const m1 = createTestMachine({ initials: "M1", name: "One" });
+    await db.insert(machines).values(m1);
+    const [shared] = await db
+      .insert(collections)
+      .values({ name: "Shared C", ownerId: owner.id })
+      .returning();
+    if (!shared) throw new Error("seed failed");
+    await db
+      .insert(collectionMachines)
+      .values({ collectionId: shared.id, machineId: m1.id });
+    await db.insert(collectionCollaborators).values({
+      collectionId: shared.id,
+      userId: me.id,
+      role: "editor",
+      addedBy: owner.id,
+    });
+
+    const rows = await getSharedWithMe(asDbOrTx(db), me.id);
+    expect(rows).toEqual([
+      {
+        id: shared.id,
+        name: "Shared C",
+        machineCount: 1,
+        ownerName: "Owner One",
+      },
+    ]);
+  });
+
+  it("excludes collections the user only owns", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ firstName: "Owner", lastName: "One" });
+    await db.insert(userProfiles).values(owner);
+    await db.insert(collections).values({ name: "Mine", ownerId: owner.id });
+    expect(await getSharedWithMe(asDbOrTx(db), owner.id)).toEqual([]);
   });
 });
