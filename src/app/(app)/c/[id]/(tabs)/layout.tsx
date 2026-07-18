@@ -7,6 +7,11 @@ import { CollectionTabStrip } from "~/components/collections/CollectionTabStrip"
 import { EditCollectionDialog } from "~/components/collections/EditCollectionDialog";
 import { CollectionShareDialog } from "~/components/collections/CollectionShareDialog";
 import { summarizeCollection } from "~/lib/collections/summary";
+import {
+  getEditorCollaborators,
+  getGrantableMembers,
+} from "~/lib/collections/collaborators";
+import { db } from "~/server/db";
 import { getCollectionForLayout, getPickerMachines } from "../_data";
 
 interface LayoutProps {
@@ -54,14 +59,25 @@ export default async function CollectionLayout({
   let headerAction: React.ReactNode = null;
   if (data.viewerCanEdit) {
     const allMachines = await getPickerMachines();
+    let sharePanel: React.ReactNode = null;
+    if (data.viewerCanManage) {
+      const [editors, grantableMembers] = await Promise.all([
+        getEditorCollaborators(db, data.collection.id),
+        getGrantableMembers(db, data.collection.owner.id),
+      ]);
+      sharePanel = (
+        <CollectionShareDialog
+          collectionId={data.collection.id}
+          viewToken={data.collection.viewToken}
+          ownerName={data.collection.owner.name}
+          editors={editors}
+          grantableMembers={grantableMembers}
+        />
+      );
+    }
     headerAction = (
       <div className="flex items-center gap-2">
-        {data.viewerCanManage ? (
-          <CollectionShareDialog
-            collectionId={data.collection.id}
-            viewToken={data.collection.viewToken}
-          />
-        ) : null}
+        {sharePanel}
         <EditCollectionDialog
           collectionId={data.collection.id}
           currentName={data.collection.name}
