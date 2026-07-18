@@ -533,6 +533,33 @@ describe("collection actions", () => {
     expect(denied.success).toBe(false);
   });
 
+  it("addCollectionCollaboratorAction: rejects a guest target", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    const guest = createTestUser({ role: "guest" });
+    await db.insert(userProfiles).values([owner, guest]);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Bank", ownerId: owner.id })
+      .returning();
+
+    const { addCollectionCollaboratorAction } =
+      await import("~/app/(app)/c/collections/actions");
+
+    // Guests can't create collections, so they can't be granted edit access.
+    signIn(owner.id);
+    const denied = await addCollectionCollaboratorAction({
+      collectionId: collection.id,
+      userId: guest.id,
+    });
+    expect(denied.success).toBe(false);
+    const rows = await db
+      .select()
+      .from(collectionCollaborators)
+      .where(eq(collectionCollaborators.collectionId, collection.id));
+    expect(rows).toHaveLength(0);
+  });
+
   it("removeCollectionCollaboratorAction: owner removes; editor then loses edit", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ role: "member" });

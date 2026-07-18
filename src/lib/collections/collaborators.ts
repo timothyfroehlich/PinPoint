@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { db, type DbTransaction } from "~/server/db";
 import { collectionCollaborators, userProfiles } from "~/server/db/schema";
 
@@ -46,14 +46,22 @@ export async function getEditorCollaborators(
     .orderBy(asc(userProfiles.name));
 }
 
-/** All registered members except `excludeUserId` (the owner), id + name. */
+/**
+ * Members grantable as editors: everyone except the owner (`excludeUserId`) and
+ * guest-role accounts. Guests are the default signup role and can't create
+ * collections (permission matrix), so they can't be given edit access either
+ * (PP-wqit.7 — "all members"). id + name, alphabetical. The server action
+ * re-enforces the guest exclusion; this just keeps them out of the picker.
+ */
 export async function getGrantableMembers(
   tx: DbTransaction = db,
   excludeUserId: string
 ): Promise<CollaboratorUser[]> {
-  const rows = await tx
+  return tx
     .select({ id: userProfiles.id, name: userProfiles.name })
     .from(userProfiles)
+    .where(
+      and(ne(userProfiles.id, excludeUserId), ne(userProfiles.role, "guest"))
+    )
     .orderBy(asc(userProfiles.name));
-  return rows.filter((r) => r.id !== excludeUserId);
 }

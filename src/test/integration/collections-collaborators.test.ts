@@ -66,4 +66,18 @@ describe("collaborators", () => {
     expect(rows.map((r) => r.id).sort()).toEqual([editor.id, member.id].sort());
     expect(rows.some((r) => r.id === owner.id)).toBe(false);
   });
+
+  it("getGrantableMembers: excludes guest-role accounts", async () => {
+    const { db, owner, editor, member } = await seed();
+    const guest = createTestUser({
+      firstName: "Guest",
+      lastName: "One",
+      role: "guest",
+    });
+    await db.insert(userProfiles).values(guest);
+    const rows = await getGrantableMembers(asDbOrTx(db), owner.id);
+    // Members appear; the guest does not (can't be granted edit access).
+    expect(rows.map((r) => r.id).sort()).toEqual([editor.id, member.id].sort());
+    expect(rows.some((r) => r.id === guest.id)).toBe(false);
+  });
 });

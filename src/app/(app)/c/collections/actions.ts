@@ -6,10 +6,7 @@ import { z } from "zod";
 
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import type { UserRole } from "~/lib/types";
-import {
-  canEditCollection,
-  canManageCollection,
-} from "~/lib/collections/access";
+import { canManageCollection } from "~/lib/collections/access";
 import { isEditorCollaborator } from "~/lib/collections/collaborators";
 import { generateViewToken } from "~/lib/collections/tokens";
 import { createClient } from "~/lib/supabase/server";
@@ -126,11 +123,13 @@ export async function updateCollectionAction(input: {
   if (!actor) return { success: false, error: "Not authenticated" };
   const collection = await loadOwner(input.collectionId);
   if (!collection) return { success: false, error: "Not found" };
-  const canEdit = canEditCollection(
-    collection,
-    { userId: actor.userId },
-    await isEditorCollaborator(db, input.collectionId, actor.userId)
-  );
+  // The owner (manage) short-circuits without the collaborator lookup; only a
+  // non-owner needs the editor-membership query (avoids a needless query per
+  // owner edit).
+  const viewer = { userId: actor.userId };
+  const canEdit =
+    canManageCollection(collection, viewer) ||
+    (await isEditorCollaborator(db, input.collectionId, actor.userId));
   if (!canEdit) {
     return { success: false, error: "Forbidden" };
   }
@@ -298,9 +297,16 @@ export async function addCollectionCollaboratorAction(input: {
   }
   const target = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, parsed.data.userId),
-    columns: { id: true },
+    columns: { id: true, role: true },
   });
   if (!target) return { success: false, error: "Unknown user" };
+  // Guests (default signup role) can't create collections, so they can't be
+  // granted edit access either — enforced here, not just hidden in the picker
+  // (PP-wqit.7, "all members").
+  // permissions-audit-allow: collaborator eligibility on the target, not an actor gate
+  if (target.role === "guest") {
+    return { success: false, error: "Guests can't be given edit access" };
+  }
 
   await db
     .insert(collectionCollaborators)
