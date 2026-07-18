@@ -106,12 +106,16 @@ export const getCollectionForLayout = cache(
     if (uuidSchema.safeParse(handle).success) {
       const collection = await getCollection(undefined, handle);
       if (!collection) return null;
-      if (!canViewCollection(collection, viewer)) return null;
+      // An editor collaborator can reach the collection by its uuid too (editing
+      // implies viewing). Compute editor status first, then allow the view for
+      // owner/admin OR an editor — otherwise a shared editor 404s on the link
+      // from their "Shared with you" list (PP-wqit.7).
       const isEditor = await isEditorCollaborator(
         db,
         collection.id,
         viewer.userId
       );
+      if (!canViewCollection(collection, viewer) && !isEditor) return null;
       return {
         collection,
         viewerCanManage: canManageCollection(collection, viewer),
