@@ -58,9 +58,13 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
       await expect(
         ed.getByRole("heading", { name: "Shared with you" })
       ).toBeVisible();
+      // Scope every assertion to THIS run's uniquely-named row — parallel
+      // workers each create a Member-User-owned "…EditShare" collection, so a
+      // global getByText("Shared by Member User") is a strict-mode violation.
       const sharedLink = ed.getByRole("link", { name: new RegExp(name) });
       await expect(sharedLink).toBeVisible();
-      await expect(ed.getByText(/Shared by Member User/)).toBeVisible();
+      await expect(sharedLink).toContainText("Shared by Member User");
+      await expect(sharedLink).toContainText("Editor");
 
       await sharedLink.click();
       await expect(ed).toHaveURL(/\/c\/[0-9a-f-]{36}/);
@@ -76,8 +80,9 @@ test.describe("Collection edit sharing (PP-wqit.7)", () => {
       await ed.getByRole("option", { name: /Fireball/ }).click();
       await ed.keyboard.press("Escape");
       await ed.getByTestId("collection-save").click();
-      await expect(ed.getByTestId("collection-overview-body")).toBeVisible();
-      await expect(ed.getByText(/Fireball/)).toBeVisible();
+      const overview = ed.getByTestId("collection-overview-body");
+      await expect(overview).toBeVisible();
+      await expect(overview.getByText(/Fireball/)).toBeVisible();
     } finally {
       await editorCtx.close();
     }
