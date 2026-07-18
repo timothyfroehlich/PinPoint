@@ -156,13 +156,17 @@ function InviteUserForm({
           autoComplete="email"
           required
           enterKeyHint="send"
+          maxLength={254}
         />
       </div>
 
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
         <div className="space-y-0.5">
           <Label htmlFor="invite-sendInvite">Send Invitation Email</Label>
-          <p className="text-sm text-muted-foreground">
+          <p
+            id="invite-sendInvite-desc"
+            className="text-sm text-muted-foreground"
+          >
             User will receive an email to join.
           </p>
         </div>
@@ -174,6 +178,7 @@ function InviteUserForm({
           type="checkbox"
           value="true"
           defaultChecked
+          aria-describedby="invite-sendInvite-desc"
           className="size-4 accent-primary"
         />
       </div>
