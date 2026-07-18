@@ -10,7 +10,6 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { EmptyState } from "~/components/ui/empty-state";
-import type { LucideIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { formatDateTime } from "~/lib/dates";
 import { RelativeTime } from "~/components/issues/RelativeTime";
@@ -364,22 +363,9 @@ export function IssueList({
             </thead>
             <tbody className="divide-y divide-border">
               {stableIssues.map((issue) => {
-                const sc = STATUS_CONFIG as Record<
-                  string,
-                  { label: string; icon: LucideIcon; iconColor: string }
-                >;
-                const sv = SEVERITY_CONFIG as Record<
-                  string,
-                  { label: string; icon: LucideIcon; iconColor: string }
-                >;
-                const pr = PRIORITY_CONFIG as Record<
-                  string,
-                  { label: string; icon: LucideIcon; iconColor: string }
-                >;
-
-                const statusConfig = sc[issue.status]!;
-                const severityConfig = sv[issue.severity]!;
-                const priorityConfig = pr[issue.priority]!;
+                const statusConfig = STATUS_CONFIG[issue.status];
+                const severityConfig = SEVERITY_CONFIG[issue.severity];
+                const priorityConfig = PRIORITY_CONFIG[issue.priority];
 
                 return (
                   <tr
