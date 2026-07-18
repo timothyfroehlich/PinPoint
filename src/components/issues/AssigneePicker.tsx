@@ -126,7 +126,7 @@ export function AssigneePicker({
           <div className="flex items-center gap-2">
             {isPending ? (
               <>
-                <Loader2 className="size-6 animate-spin p-1 text-muted-foreground" />
+                <Loader2 className="size-6 animate-spin motion-reduce:animate-none p-1 text-muted-foreground" />
                 <span className="font-medium text-muted-foreground">
                   Updating...
                 </span>
@@ -146,7 +146,7 @@ export function AssigneePicker({
           </div>
           {isPending ? (
             <Loader2
-              className="size-4 animate-spin opacity-50"
+              className="size-4 animate-spin motion-reduce:animate-none opacity-50"
               aria-hidden="true"
               data-testid="assignee-picker-loader"
             />
