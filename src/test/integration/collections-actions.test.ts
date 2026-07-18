@@ -400,6 +400,46 @@ describe("collection actions", () => {
     expect(await tokenOf(collection.id)).toBeNull();
   });
 
+  it("setCollectionSharingAction: rejects a stringified enabled without touching sharing", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(owner);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Bank", ownerId: owner.id })
+      .returning();
+
+    const { setCollectionSharingAction } =
+      await import("~/app/(app)/c/collections/actions");
+    signIn(owner.id);
+
+    // A form/RPC caller can smuggle the string "false" past the compile-time
+    // boolean type. Pre-fix, `!"false"` is falsy so the action took the ENABLE
+    // branch and minted a token — the opposite of the owner's intent. Zod's
+    // z.boolean() (no coercion) must reject it, leaving sharing untouched.
+    const result = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: "false",
+    } as unknown as { collectionId: string; enabled: boolean });
+    expect(result.success).toBe(false);
+    expect(await tokenOf(collection.id)).toBeNull();
+  });
+
+  it("setCollectionSharingAction: rejects a non-uuid collectionId", async () => {
+    const { setCollectionSharingAction } =
+      await import("~/app/(app)/c/collections/actions");
+    const owner = createTestUser({ role: "member" });
+    const db = await getTestDb();
+    await db.insert(userProfiles).values(owner);
+    signIn(owner.id);
+
+    const result = await setCollectionSharingAction({
+      collectionId: "not-a-uuid",
+      enabled: true,
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("deleteCollectionAction: owner only", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ role: "member" });

@@ -205,30 +205,43 @@ export async function updateCollectionAction(input: {
  * Returns the resulting token (null when disabled) so the Share dialog can
  * render the link without a re-fetch.
  */
+const setCollectionSharingSchema = z.object({
+  collectionId: z.uuid(),
+  enabled: z.boolean(),
+});
+
 export async function setCollectionSharingAction(input: {
   collectionId: string;
   enabled: boolean;
 }): Promise<ActionResult<{ viewToken: string | null }>> {
+  // Validate before any branching: `enabled` gates a security-sensitive
+  // choice (revoke vs. keep a live share link). Without z.boolean(), a
+  // stringified "false" would be truthy and silently take the *enable*
+  // branch — leaving a collection shareable after the owner revoked it.
+  const parsed = setCollectionSharingSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
+  const { collectionId, enabled } = parsed.data;
+
   const actor = await resolveActor();
   if (!actor) return { success: false, error: "Not authenticated" };
-  const collection = await loadOwner(input.collectionId);
+  const collection = await loadOwner(collectionId);
   if (!collection) return { success: false, error: "Not found" };
   if (!canManageCollection(collection, { userId: actor.userId })) {
     return { success: false, error: "Forbidden" };
   }
 
-  if (!input.enabled) {
+  if (!enabled) {
     await db
       .update(collections)
       .set({ viewToken: null, updatedAt: new Date() })
-      .where(eq(collections.id, input.collectionId));
-    revalidatePath(`/c/${input.collectionId}`);
+      .where(eq(collections.id, collectionId));
+    revalidatePath(`/c/${collectionId}`);
     return { success: true, data: { viewToken: null } };
   }
 
   // Enable: reuse an existing token if present, else mint one.
   const existing = await db.query.collections.findFirst({
-    where: eq(collections.id, input.collectionId),
+    where: eq(collections.id, collectionId),
     columns: { viewToken: true },
   });
   const token = existing?.viewToken ?? generateViewToken();
@@ -236,9 +249,9 @@ export async function setCollectionSharingAction(input: {
     await db
       .update(collections)
       .set({ viewToken: token, updatedAt: new Date() })
-      .where(eq(collections.id, input.collectionId));
+      .where(eq(collections.id, collectionId));
   }
-  revalidatePath(`/c/${input.collectionId}`);
+  revalidatePath(`/c/${collectionId}`);
   return { success: true, data: { viewToken: token } };
 }
 
