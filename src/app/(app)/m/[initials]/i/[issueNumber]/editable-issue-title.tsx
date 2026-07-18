@@ -150,7 +150,7 @@ export function EditableIssueTitle({
           disabled={isPending}
         />
         {isPending && (
-          <Loader2 className="size-5 animate-spin text-muted-foreground shrink-0" />
+          <Loader2 className="size-5 animate-spin motion-reduce:animate-none text-muted-foreground shrink-0" />
         )}
       </form>
     );

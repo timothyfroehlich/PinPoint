@@ -74,7 +74,7 @@ export function ExportButton({
           data-testid="export-csv-button"
         >
           {isExporting ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
           ) : (
             <Download className="h-3.5 w-3.5" />
           )}

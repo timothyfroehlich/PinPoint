@@ -43,7 +43,13 @@ export function CollectionFields({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor={nameId}>Name</Label>
+        <Label htmlFor={nameId}>
+          Name
+          <span aria-hidden="true" className="text-destructive">
+            {" "}
+            *
+          </span>
+        </Label>
         <Input
           id={nameId}
           value={name}

@@ -406,6 +406,7 @@ export function UnifiedReportForm({
                 name="title"
                 required
                 maxLength={60}
+                enterKeyHint="next"
                 placeholder="e.g., Left flipper not responding"
                 value={entry.title}
                 onChange={(e) => patchEntry(0, { title: e.target.value })}
@@ -577,6 +578,7 @@ export function UnifiedReportForm({
                         id="firstName"
                         name="firstName"
                         autoComplete="given-name"
+                        enterKeyHint="next"
                         value={single.firstName}
                         onChange={(e) =>
                           patchSingle({ firstName: e.target.value })
@@ -595,6 +597,7 @@ export function UnifiedReportForm({
                         id="lastName"
                         name="lastName"
                         autoComplete="family-name"
+                        enterKeyHint="next"
                         value={single.lastName}
                         onChange={(e) =>
                           patchSingle({ lastName: e.target.value })
@@ -612,6 +615,7 @@ export function UnifiedReportForm({
                       name="email"
                       type="email"
                       autoComplete="email"
+                      enterKeyHint="send"
                       value={single.email}
                       onChange={(e) => patchSingle({ email: e.target.value })}
                       className="h-8 border-outline-variant bg-surface text-sm text-foreground"

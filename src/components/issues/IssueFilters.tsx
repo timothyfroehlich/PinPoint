@@ -480,6 +480,7 @@ export function IssueFilters({
               <TooltipTrigger asChild>
                 <input
                   ref={inputRef}
+                  name="q"
                   placeholder="Search issues..."
                   data-testid="issue-search"
                   className="flex-1 min-w-0 w-full bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground"
