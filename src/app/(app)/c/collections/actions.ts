@@ -6,13 +6,18 @@ import { z } from "zod";
 
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import type { UserRole } from "~/lib/types";
-import { canManageCollection } from "~/lib/collections/access";
+import {
+  canEditCollection,
+  canManageCollection,
+} from "~/lib/collections/access";
+import { isEditorCollaborator } from "~/lib/collections/collaborators";
 import { generateViewToken } from "~/lib/collections/tokens";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import {
   collections,
   collectionMachines,
+  collectionCollaborators,
   machines,
   userProfiles,
 } from "~/server/db/schema";
@@ -121,7 +126,12 @@ export async function updateCollectionAction(input: {
   if (!actor) return { success: false, error: "Not authenticated" };
   const collection = await loadOwner(input.collectionId);
   if (!collection) return { success: false, error: "Not found" };
-  if (!canManageCollection(collection, { userId: actor.userId })) {
+  const canEdit = canEditCollection(
+    collection,
+    { userId: actor.userId },
+    await isEditorCollaborator(db, input.collectionId, actor.userId)
+  );
+  if (!canEdit) {
     return { success: false, error: "Forbidden" };
   }
 
@@ -254,6 +264,85 @@ export async function deleteCollectionAction(input: {
   }
   // collection_machines rows cascade-delete via the FK.
   await db.delete(collections).where(eq(collections.id, input.collectionId));
+  revalidatePath("/c/collections");
+  return { success: true };
+}
+
+const collaboratorSchema = z.object({
+  collectionId: z.uuid(),
+  userId: z.uuid(),
+});
+
+/**
+ * Grant a member editor access to a collection (PP-wqit.7). Owner-only
+ * (managing access). Idempotent: re-granting the same person is a no-op, so the
+ * UI can fire without first checking existing membership. No transaction — a
+ * single insert with no external side effects (CORE-ARCH-011).
+ */
+export async function addCollectionCollaboratorAction(input: {
+  collectionId: string;
+  userId: string;
+}): Promise<ActionResult> {
+  const actor = await resolveActor();
+  if (!actor) return { success: false, error: "Not authenticated" };
+  const parsed = collaboratorSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid request" };
+
+  const collection = await loadOwner(parsed.data.collectionId);
+  if (!collection) return { success: false, error: "Not found" };
+  if (!canManageCollection(collection, { userId: actor.userId })) {
+    return { success: false, error: "Forbidden" };
+  }
+  if (parsed.data.userId === collection.owner.id) {
+    return { success: false, error: "The owner already has full access" };
+  }
+  const target = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, parsed.data.userId),
+    columns: { id: true },
+  });
+  if (!target) return { success: false, error: "Unknown user" };
+
+  await db
+    .insert(collectionCollaborators)
+    .values({
+      collectionId: parsed.data.collectionId,
+      userId: parsed.data.userId,
+      role: "editor",
+      addedBy: actor.userId,
+    })
+    .onConflictDoNothing();
+
+  revalidatePath(`/c/${parsed.data.collectionId}`);
+  revalidatePath("/c/collections");
+  return { success: true };
+}
+
+/** Revoke a collaborator's access (PP-wqit.7). Owner-only. */
+export async function removeCollectionCollaboratorAction(input: {
+  collectionId: string;
+  userId: string;
+}): Promise<ActionResult> {
+  const actor = await resolveActor();
+  if (!actor) return { success: false, error: "Not authenticated" };
+  const parsed = collaboratorSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid request" };
+
+  const collection = await loadOwner(parsed.data.collectionId);
+  if (!collection) return { success: false, error: "Not found" };
+  if (!canManageCollection(collection, { userId: actor.userId })) {
+    return { success: false, error: "Forbidden" };
+  }
+
+  await db
+    .delete(collectionCollaborators)
+    .where(
+      and(
+        eq(collectionCollaborators.collectionId, parsed.data.collectionId),
+        eq(collectionCollaborators.userId, parsed.data.userId)
+      )
+    );
+
+  revalidatePath(`/c/${parsed.data.collectionId}`);
   revalidatePath("/c/collections");
   return { success: true };
 }
