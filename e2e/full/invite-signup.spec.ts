@@ -74,12 +74,10 @@ test.describe("User Invitation & Signup Flow", () => {
     await page.getByRole("textbox", { name: "Email" }).fill(userEmail);
 
     // Ensure "Send invitation email" is checked
-    const inviteSwitch = page.getByRole("switch", {
+    const inviteCheckbox = page.getByRole("checkbox", {
       name: /Send invitation email/i,
     });
-    if ((await inviteSwitch.getAttribute("aria-checked")) === "false") {
-      await inviteSwitch.click();
-    }
+    await inviteCheckbox.check();
 
     await page
       .getByRole("button", { name: /Invite User/i, includeHidden: false })
@@ -142,12 +140,10 @@ test.describe("User Invitation & Signup Flow", () => {
     await page.getByLabel(/Last Name/i).fill("Transfer");
     await page.getByRole("textbox", { name: "Email" }).fill(userEmail);
 
-    const inviteSwitch = page.getByRole("switch", {
+    const inviteCheckbox = page.getByRole("checkbox", {
       name: /Send invitation email/i,
     });
-    if ((await inviteSwitch.getAttribute("aria-checked")) === "false") {
-      await inviteSwitch.click();
-    }
+    await inviteCheckbox.check();
 
     await page
       .getByRole("button", { name: /Invite User/i, includeHidden: false })

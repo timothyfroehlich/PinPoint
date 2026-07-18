@@ -16,6 +16,7 @@ import { requireSiteUrl } from "~/lib/url";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 import { log } from "~/lib/logger";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { type Result, ok, err } from "~/lib/result";
 
 interface AdminListUsersParams {
   page?: number;
@@ -253,16 +254,33 @@ export async function updateUserRole(
   }
 }
 
+/**
+ * Result of {@link inviteUser}. On success it carries the new invited-user id
+ * plus the submitted name so the client can build a display row without a
+ * round-trip. Errors are returned (not thrown) so the form can surface them via
+ * `useActionState` — the progressive-enhancement pattern (CORE-ARCH-002/007).
+ */
+export type InviteUserResult = Result<
+  { userId: string; firstName: string; lastName: string },
+  | "VALIDATION"
+  | "FORBIDDEN"
+  | "EMAIL_TAKEN"
+  | "ALREADY_INVITED"
+  | "EMAIL_FAILED"
+  | "SERVER"
+>;
+
 export async function inviteUser(
+  _prevState: InviteUserResult | undefined,
   formData: FormData
-): Promise<{ ok: boolean; userId: string }> {
+): Promise<InviteUserResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("Unauthorized");
+    return err("FORBIDDEN", "You must be signed in to invite users.");
   }
 
   try {
@@ -274,18 +292,29 @@ export async function inviteUser(
 
     const accessLevel = getAccessLevel(currentUserProfile?.role);
     if (!checkPermission("admin.users.invite", accessLevel)) {
-      throw new Error("Forbidden: You do not have permission to invite users");
+      return err("FORBIDDEN", "You do not have permission to invite users.");
     }
 
-    const rawData = {
+    const parsed = inviteUserSchema.safeParse({
       firstName: formData.get("firstName"),
       lastName: formData.get("lastName"),
       email: formData.get("email"),
       role: formData.get("role"),
       sendInvite: formData.get("sendInvite") === "true",
-    };
+    });
 
-    const validated = inviteUserSchema.parse(rawData);
+    if (!parsed.success) {
+      log.warn(
+        { action: "inviteUser", errors: parsed.error.issues },
+        "Invite validation failed"
+      );
+      return err(
+        "VALIDATION",
+        parsed.error.issues[0]?.message ?? "Invalid input"
+      );
+    }
+
+    const validated = parsed.data;
 
     // Check both auth.users and user_profiles — a user could exist in
     // auth.users without a profile row if the handle_new_user trigger failed.
@@ -298,7 +327,10 @@ export async function inviteUser(
     );
 
     if (existingAuthUser) {
-      throw new Error("A user with this email already exists and is active.");
+      return err(
+        "EMAIL_TAKEN",
+        "A user with this email already exists and is active."
+      );
     }
 
     const existingProfile = await db.query.userProfiles.findFirst({
@@ -306,7 +338,10 @@ export async function inviteUser(
     });
 
     if (existingProfile) {
-      throw new Error("A user with this email already exists and is active.");
+      return err(
+        "EMAIL_TAKEN",
+        "A user with this email already exists and is active."
+      );
     }
 
     const existingInvited = await db.query.invitedUsers.findFirst({
@@ -314,7 +349,7 @@ export async function inviteUser(
     });
 
     if (existingInvited) {
-      throw new Error("This user has already been invited.");
+      return err("ALREADY_INVITED", "This user has already been invited.");
     }
 
     // Create invited user
@@ -344,7 +379,9 @@ export async function inviteUser(
       });
 
       if (!emailResult.success) {
-        // Log the full error but don't expose it to the client
+        // Log the full error but don't expose it to the client. The invited
+        // row is intentionally left in place (creation succeeded before the
+        // email step) so the admin can resend without re-entering details.
         log.error(
           {
             action: "inviteUser",
@@ -353,7 +390,7 @@ export async function inviteUser(
           },
           "Failed to send invitation email"
         );
-        throw new Error("Failed to send invitation email");
+        return err("EMAIL_FAILED", "Failed to send invitation email");
       }
 
       await db
@@ -363,26 +400,12 @@ export async function inviteUser(
     }
 
     revalidatePath("/admin/users");
-    return { ok: true, userId: newInvited.id };
+    return ok({
+      userId: newInvited.id,
+      firstName: validated.firstName,
+      lastName: validated.lastName,
+    });
   } catch (error) {
-    // Allow known errors to propagate
-    if (
-      error instanceof Error &&
-      (error.message === "Unauthorized" ||
-        error.message.startsWith("Forbidden") ||
-        error.message ===
-          "A user with this email already exists and is active." ||
-        error.message === "This user has already been invited." ||
-        error.message === "Failed to send invitation email")
-    ) {
-      throw error;
-    }
-
-    // Validation errors from Zod (if they propagate as Error)
-    if (error instanceof Error && error.constructor.name === "ZodError") {
-      throw error;
-    }
-
     log.error(
       {
         action: "inviteUser",
@@ -391,9 +414,10 @@ export async function inviteUser(
       },
       "Invite user failed"
     );
-    throw new Error("An unexpected error occurred while inviting the user", {
-      cause: error,
-    });
+    return err(
+      "SERVER",
+      "An unexpected error occurred while inviting the user."
+    );
   }
 }
 
