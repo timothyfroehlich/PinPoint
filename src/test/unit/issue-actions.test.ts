@@ -43,8 +43,9 @@ vi.mock("~/lib/supabase/server", () => ({
 
 // Mock DB to satisfy the import: the actions module imports ~/server/db,
 // which throws on a missing POSTGRES_URL in unit tests, so the mock is required
-// just to load the module. The three KEEP-unit blocks below never exercise a
-// real query — the revalidation path after addIssueComment is the only consumer.
+// just to load the module. The only queries these blocks reach are the
+// userProfiles role lookup (for the comments.add permission gate) and the
+// revalidation path after addIssueComment — both mocked below.
 vi.mock("~/server/db", () => ({
   db: {
     insert: vi.fn(),
@@ -85,6 +86,7 @@ vi.mock("~/services/issues", () => ({
 
 import { createClient } from "~/lib/supabase/server";
 import { addIssueComment } from "~/services/issues";
+import { db } from "~/server/db";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -105,6 +107,12 @@ describe("addCommentAction", () => {
 
     // Setup service mock
     vi.mocked(addIssueComment).mockResolvedValue(undefined as any);
+
+    // addCommentAction now routes through checkPermission("comments.add"),
+    // which needs the caller's role — mock an authenticated member by default.
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "member",
+    } as any);
   });
 
   it("should return an error if not authenticated", async () => {

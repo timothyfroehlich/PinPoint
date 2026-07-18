@@ -66,6 +66,9 @@ function createLogger(): pino.Logger {
 
   const baseConfig: pino.LoggerOptions = {
     level: LOG_LEVEL,
+    // Redact reporter PII (email) from log output. Covers both top-level and
+    // one-level-nested occurrences; uses Pino's default "[Redacted]" censor.
+    redact: ["reporterEmail", "*.reporterEmail", "email", "*.email"],
     formatters: {
       level: (label: string) => {
         return { level: label };

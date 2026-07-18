@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import type { UserRole } from "~/lib/types";
 import { canManageCollection } from "~/lib/collections/access";
 import { generateViewToken } from "~/lib/collections/tokens";
 import { createClient } from "~/lib/supabase/server";
@@ -18,8 +19,6 @@ import {
 
 type ActionResult<T = undefined> =
   { success: true; data?: T } | { success: false; error: string };
-
-type UserRole = "guest" | "member" | "technician" | "admin";
 
 async function resolveActor(): Promise<{
   userId: string;
