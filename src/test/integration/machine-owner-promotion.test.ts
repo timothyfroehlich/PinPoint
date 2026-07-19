@@ -54,9 +54,19 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+// Run `after()` callbacks synchronously so post-commit dispatch is exercised
+// inline (createMachineAction now delivers notifications via after()).
+vi.mock("next/server", () => ({
+  after: (cb: () => unknown) => {
+    void cb();
+  },
+}));
+
 vi.mock("~/lib/notifications", () => ({
   createNotification: vi.fn().mockResolvedValue(undefined),
   getChannels: vi.fn().mockResolvedValue([]),
+  planNotification: vi.fn().mockResolvedValue({ deliveries: [] }),
+  dispatchNotification: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("~/lib/logger", () => ({
