@@ -46,7 +46,7 @@ export function MachineBackboxTranslite({
         className="object-cover object-center"
       />
       <figcaption className="absolute right-2 bottom-2 rounded bg-background/75 px-1.5 py-0.5 text-[8.5px] tracking-wide text-muted-foreground">
-        OPDB · PinballMap
+        OPDB · Pinball Map
       </figcaption>
     </figure>
   );

@@ -5,27 +5,25 @@ sources: the vendored `pinballmap-llms.txt` (API guidance) and PBM's
 [FAQ](https://pinballmap.com/faq). When this summary and `pinballmap-llms.txt`
 disagree, **`pinballmap-llms.txt` wins** — fix this file.
 
-## API token — mandatory from July 30 2026 (blog 2026-07-16)
+## Authentication (llms.txt — changed 2026-07-18)
 
-PBM is closing its previously-open API behind a required `api_token`. Once their
-`REQUIRE_API_TOKEN` gate flips on (**July 30 2026**), **every v1 endpoint — reads
-included — requires the token.** Two-layer auth model (confirmed from the pbm
-`Api::V1::BaseController` source):
+**As of 2026-07-30, every request requires an `api_token`** — including
+read-only GETs, which were previously public. (Lone exception:
+`location_machine_xrefs/most_recent_by_lat_lon`, which PBM does not gate.)
 
-- **`api_token`** — the blanket access gate for **reads and writes**. Sent as the
-  `X-Api-Token` header (or `?api_token=` query param; we use the header). Tied to
-  an approved, revocable user account. **Global limit: 120 requests/min per
-  token.** Requested once at pinballmap.com/api_token with a use-plan; there is no
-  rotation API.
-- **Operator write creds** (`user_email` + `user_token`) — writes **also** still
-  need the per-operator identity as query params (the `auth_details` token). This
-  is a distinct layer from the access gate.
+- **Request the token now** at <https://pinballmap.com/api_token> (needs a
+  Pinball Map account; approval is manual). "Request a token now, even if you
+  don't need it yet — do not wait until requests start failing."
+- Send it as the **`X-Api-Token` header** on every request. PBM's `llms.txt`
+  documents an `api_token=` query param, and their source accepts both; we use
+  the header to keep the credential out of URLs and logs.
+- **Writes need a second, separate credential** on top of the `api_token`: the
+  `user_email` + `user_token` identity (obtained once via `auth_details`, then
+  stored — never re-fetched per request). So a write carries **both** layers.
+- Store the `api_token` in Vault; it is app-level and revocable.
 
-→ We inject `X-Api-Token` on **every** request in the live client
-(`createLiveClient(apiToken)`). The token is stored in Supabase Vault
-(`pinballmap_state.api_token_vault_id`) and decrypted via the
-`get_pinballmap_api_token()` service-role RPC. Header is omitted only while the
-integration is unprovisioned (token null). Never log the token.
+→ Obtaining + wiring the token is tracked in bead **PP-uusr** (blocks the prod
+rollout `PP-o355.10`).
 
 ## Attribution (FAQ)
 

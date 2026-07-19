@@ -1,6 +1,6 @@
 {
-  "id": "3f5d3e76-cd95-4081-8396-cba4999f9a73",
-  "prevId": "518836ab-8ded-4134-a543-9aa565367722",
+  "id": "f2aaf5c5-fcff-4e6f-8650-cab62716afa1",
+  "prevId": "3f5d3e76-cd95-4081-8396-cba4999f9a73",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2126,6 +2126,12 @@
         },
         "outbound_token_vault_id": {
           "name": "outbound_token_vault_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "api_token_vault_id": {
+          "name": "api_token_vault_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
