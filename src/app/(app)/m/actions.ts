@@ -189,14 +189,14 @@ async function resolvePbmLinkColumns(input: {
     return {
       ok: false,
       message:
-        "A machine can't be both linked to PinballMap and marked as not on it.",
+        "A machine can't be both linked to Pinball Map and marked as not on it.",
     };
   }
   if (validationError === "link_required") {
     return {
       ok: false,
       message:
-        "Select a PinballMap title or mark the machine as not on PinballMap.",
+        "Select a Pinball Map title or mark the machine as not on Pinball Map.",
     };
   }
 
@@ -230,7 +230,7 @@ async function resolvePbmLinkColumns(input: {
       return {
         ok: false,
         message:
-          "That PinballMap title is no longer in the catalog — search again.",
+          "That Pinball Map title is no longer in the catalog — search again.",
       };
     }
     return {
@@ -389,7 +389,7 @@ export async function createMachineAction(
   ) {
     return err(
       "UNAUTHORIZED",
-      "You do not have permission to link machines to PinballMap."
+      "You do not have permission to link machines to Pinball Map."
     );
   }
   const pbm = await resolvePbmLinkColumns(validation.data);
@@ -891,7 +891,7 @@ export async function updateMachineAction(
       ) {
         return err(
           "UNAUTHORIZED",
-          "You do not have permission to link this machine to PinballMap."
+          "You do not have permission to link this machine to Pinball Map."
         );
       }
       const pbm = await resolvePbmLinkColumns(validation.data);

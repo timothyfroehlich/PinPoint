@@ -154,7 +154,7 @@ export async function syncPinballMapNowAction(
   if (!checkPermission("machines.pinballmap.sync", accessLevel)) {
     return err(
       "UNAUTHORIZED",
-      "Only technicians and admins can trigger a PinballMap sync."
+      "Only technicians and admins can trigger a Pinball Map sync."
     );
   }
 
@@ -169,6 +169,6 @@ export async function syncPinballMapNowAction(
     return ok({ machineCount: result.machineCount, healed });
   } catch (error: unknown) {
     log.error({ err: error }, "Manual PinballMap sync failed");
-    return err("SERVER", "PinballMap sync failed. Please try again.");
+    return err("SERVER", "Pinball Map sync failed. Please try again.");
   }
 }

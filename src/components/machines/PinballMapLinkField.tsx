@@ -227,7 +227,7 @@ export function PinballMapLinkField({
       >
         Model
         <span className="text-xs font-normal text-muted-foreground">
-          source: PinballMap
+          source: Pinball Map
         </span>
       </Label>
 
@@ -251,7 +251,7 @@ export function PinballMapLinkField({
               {family
                 ? `${family.name}${familyMeta ? ` · ${familyMeta}` : ""}`
                 : excluded
-                  ? "Not on PinballMap"
+                  ? "Not on Pinball Map"
                   : placeholderLabel}
             </span>
             <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
@@ -278,7 +278,7 @@ export function PinballMapLinkField({
                 </div>
               ) : query.trim().length === 0 ? (
                 <div className="px-3 py-4 text-xs text-muted-foreground">
-                  Type a title to search PinballMap.
+                  Type a title to search Pinball Map.
                 </div>
               ) : results.length > 0 ? (
                 <CommandGroup>
@@ -319,7 +319,7 @@ export function PinballMapLinkField({
                 // only appears once the catalog has actually come up empty.
                 <>
                   <p className="px-3 pt-3 pb-1 text-xs text-muted-foreground">
-                    No PinballMap match for “{query.trim()}”.
+                    No Pinball Map match for “{query.trim()}”.
                   </p>
                   <CommandGroup>
                     <CommandItem
@@ -329,10 +329,10 @@ export function PinballMapLinkField({
                     >
                       <div className="flex flex-col">
                         <span className="font-medium text-foreground">
-                          Not on PinballMap
+                          Not on Pinball Map
                         </span>
                         <span className="text-[10px] text-muted-foreground">
-                          PinballMap only maps standard pinball machines — pick
+                          Pinball Map only maps standard pinball machines — pick
                           this for novelty or non-pinball games it won&apos;t
                           list.
                         </span>
@@ -379,7 +379,7 @@ export function PinballMapLinkField({
             placeholder="e.g. novelty game, not real pinball"
             maxLength={200}
             disabled={disabled}
-            aria-label="Reason this machine is not on PinballMap"
+            aria-label="Reason this machine is not on Pinball Map"
           />
         ) : needsEdition ? (
           <Select
