@@ -75,7 +75,9 @@ export async function syncLocationSnapshot(opts?: {
   const actor = opts?.updatedBy ? { updatedBy: opts.updatedBy } : {};
 
   try {
-    const snapshot = await getPinballMapClient().fetchLocation(locationId);
+    const snapshot = await (
+      await getPinballMapClient()
+    ).fetchLocation(locationId);
     await upsertState({
       locationId,
       snapshotJson: snapshot,

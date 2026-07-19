@@ -72,7 +72,7 @@ describe("live client — reads", () => {
       })
     );
 
-    const snap = await createLiveClient().fetchLocation(26454);
+    const snap = await createLiveClient(null).fetchLocation(26454);
     expect(calls[0]?.url).toContain("/locations/26454.json");
     expect(calls[0]?.init?.headers).toMatchObject({
       "User-Agent": expect.any(String),
@@ -83,7 +83,7 @@ describe("live client — reads", () => {
 
   it("fetchLocation throws on a non-2xx so sync can record an error", async () => {
     installFetchMock(() => new Response(null, { status: 500 }));
-    await expect(createLiveClient().fetchLocation(26454)).rejects.toThrow(
+    await expect(createLiveClient(null).fetchLocation(26454)).rejects.toThrow(
       /HTTP 500/
     );
   });
@@ -91,7 +91,7 @@ describe("live client — reads", () => {
   it("fetchLocation throws on a 200 that carries an errors body", async () => {
     // PBM reports a bad id as HTTP 200 + {errors}, not a 404.
     installFetchMock(() => json({ errors: "Failed to find location" }));
-    await expect(createLiveClient().fetchLocation(999)).rejects.toThrow(
+    await expect(createLiveClient(null).fetchLocation(999)).rejects.toThrow(
       /Failed to find location/
     );
   });
@@ -108,7 +108,7 @@ describe("live client — reads", () => {
         },
       ])
     );
-    const catalog = await createLiveClient().fetchCatalog();
+    const catalog = await createLiveClient(null).fetchCatalog();
     expect(calls[0]?.url).toContain("/machines.json");
     expect(calls[0]?.url).not.toContain("no_details");
     expect(catalog[0]).toMatchObject({
@@ -125,7 +125,7 @@ describe("live client — reads", () => {
         { id: 2, name: "Medieval Madness" },
       ])
     );
-    const catalog = await createLiveClient().fetchCatalog();
+    const catalog = await createLiveClient(null).fetchCatalog();
     expect(catalog[0]?.machineGroupId).toBe(9001);
     expect(catalog[1]?.machineGroupId).toBeNull();
   });
@@ -134,7 +134,7 @@ describe("live client — reads", () => {
     const calls = installFetchMock(() =>
       json({ machine_groups: [{ id: 9001, name: "Godzilla" }] })
     );
-    const groups = await createLiveClient().fetchMachineGroups();
+    const groups = await createLiveClient(null).fetchMachineGroups();
     expect(calls[0]?.url).toContain("/machine_groups.json");
     expect(groups).toEqual([{ machineGroupId: 9001, name: "Godzilla" }]);
   });
@@ -145,14 +145,17 @@ describe("live client — auth", () => {
     installFetchMock(() =>
       json({ authentication_token: "abc", username: "tim" })
     );
-    const res = await createLiveClient().authDetails("tim@example.com", "pw");
+    const res = await createLiveClient(null).authDetails(
+      "tim@example.com",
+      "pw"
+    );
     expect(res).toEqual({ ok: true, token: "abc", username: "tim" });
   });
 
   it("authDetails maps a 200 errors body to invalid_credentials + message", async () => {
     // Wrong password / unknown user come back as HTTP 200 + {errors}.
     installFetchMock(() => json({ errors: "Incorrect password" }));
-    expect(await createLiveClient().authDetails("tim", "nope")).toEqual({
+    expect(await createLiveClient(null).authDetails("tim", "nope")).toEqual({
       ok: false,
       reason: "invalid_credentials",
       message: "Incorrect password",
@@ -162,7 +165,7 @@ describe("live client — auth", () => {
   it("authDetails maps the 401 account_disabled body to account_disabled", async () => {
     // The one status-based case: disabled accounts return 401 + {error}.
     installFetchMock(() => json({ error: "account_disabled" }, 401));
-    expect(await createLiveClient().authDetails("x", "y")).toEqual({
+    expect(await createLiveClient(null).authDetails("x", "y")).toEqual({
       ok: false,
       reason: "account_disabled",
       message: "account_disabled",
@@ -176,7 +179,7 @@ describe("live client — writes", () => {
     const calls = installFetchMock(() =>
       json({ location_machine: { id: 555 } }, 201)
     );
-    const res = await createLiveClient().addMachine({
+    const res = await createLiveClient(null).addMachine({
       credentials: CREDS,
       locationId: 26454,
       machineId: 10,
@@ -195,7 +198,7 @@ describe("live client — writes", () => {
     // A bad machine id is HTTP 200 + {errors} — must not look like success.
     installFetchMock(() => json({ errors: "Failed to find machine" }));
     expect(
-      await createLiveClient().addMachine({
+      await createLiveClient(null).addMachine({
         credentials: CREDS,
         locationId: 26454,
         machineId: -1,
@@ -209,7 +212,7 @@ describe("live client — writes", () => {
 
   it("postCondition PUTs the condition to the lmx endpoint", async () => {
     const calls = installFetchMock(() => json({ location_machine: {} }, 200));
-    const res = await createLiveClient().postCondition({
+    const res = await createLiveClient(null).postCondition({
       credentials: CREDS,
       lmxId: 42,
       comment: "fixed flippers",
@@ -225,7 +228,7 @@ describe("live client — writes", () => {
     const calls = installFetchMock(() =>
       json({ location_machine: { ic_enabled: true } }, 200)
     );
-    const res = await createLiveClient().toggleInsiderConnected({
+    const res = await createLiveClient(null).toggleInsiderConnected({
       credentials: CREDS,
       lmxId: 7,
     });
@@ -242,7 +245,7 @@ describe("live client — writes", () => {
       json({ errors: "Could not update Insider Connected for this machine" })
     );
     expect(
-      await createLiveClient().toggleInsiderConnected({
+      await createLiveClient(null).toggleInsiderConnected({
         credentials: CREDS,
         lmxId: 7,
       })
@@ -255,7 +258,7 @@ describe("live client — writes", () => {
 
   it("confirmLineup PUTs the confirm endpoint", async () => {
     const calls = installFetchMock(() => json({ msg: "Thanks!" }, 200));
-    await createLiveClient().confirmLineup({
+    await createLiveClient(null).confirmLineup({
       credentials: CREDS,
       locationId: 26454,
     });
@@ -268,7 +271,10 @@ describe("live client — writes", () => {
     // not found
     installFetchMock(() => json({ errors: "Failed to find machine" }));
     expect(
-      await createLiveClient().removeMachine({ credentials: CREDS, lmxId: 1 })
+      await createLiveClient(null).removeMachine({
+        credentials: CREDS,
+        lmxId: 1,
+      })
     ).toEqual({
       ok: false,
       reason: "not_found",
@@ -280,7 +286,10 @@ describe("live client — writes", () => {
       json({ errors: "Authentication is required for this action." })
     );
     expect(
-      await createLiveClient().removeMachine({ credentials: CREDS, lmxId: 1 })
+      await createLiveClient(null).removeMachine({
+        credentials: CREDS,
+        lmxId: 1,
+      })
     ).toEqual({
       ok: false,
       reason: "unauthorized",
@@ -292,7 +301,10 @@ describe("live client — writes", () => {
       throw new Error("ECONNREFUSED");
     });
     expect(
-      await createLiveClient().removeMachine({ credentials: CREDS, lmxId: 1 })
+      await createLiveClient(null).removeMachine({
+        credentials: CREDS,
+        lmxId: 1,
+      })
     ).toEqual({ ok: false, reason: "transient" });
   });
 
@@ -308,7 +320,7 @@ describe("live client — writes", () => {
           })
         : json({}, 200);
     });
-    const promise = createLiveClient().postCondition({
+    const promise = createLiveClient(null).postCondition({
       credentials: CREDS,
       lmxId: 9,
       comment: "x",
@@ -324,11 +336,57 @@ describe("live client — writes", () => {
         new Response(null, { status: 429, headers: { "retry-after": "9999" } })
     );
     expect(
-      await createLiveClient().postCondition({
+      await createLiveClient(null).postCondition({
         credentials: CREDS,
         lmxId: 9,
         comment: "x",
       })
     ).toEqual({ ok: false, reason: "rate_limited" });
+  });
+});
+
+describe("live client — api token gate (X-Api-Token)", () => {
+  const API_TOKEN = "pbm-blanket-token";
+
+  it("attaches X-Api-Token on reads when the token is provided", async () => {
+    const calls = installFetchMock(() =>
+      json({
+        id: 26454,
+        name: "APC",
+        machine_count: 0,
+        location_machine_xrefs: [],
+      })
+    );
+    await createLiveClient(API_TOKEN).fetchLocation(26454);
+    expect(calls[0]?.init?.headers).toMatchObject({ "X-Api-Token": API_TOKEN });
+  });
+
+  it("attaches X-Api-Token on writes (alongside the operator creds)", async () => {
+    const calls = installFetchMock(() =>
+      json({ location_machine: { id: 1 } }, 201)
+    );
+    await createLiveClient(API_TOKEN).addMachine({
+      credentials: CREDS,
+      locationId: 26454,
+      machineId: 10,
+    });
+    // The blanket access gate rides in the header; the operator identity still
+    // rides in the query string — two distinct auth layers.
+    expect(calls[0]?.init?.headers).toMatchObject({ "X-Api-Token": API_TOKEN });
+    const url = new URL(calls[0]?.url ?? "");
+    expect(url.searchParams.get("user_token")).toBe(CREDS.token);
+  });
+
+  it("omits X-Api-Token entirely when unprovisioned (token null)", async () => {
+    const calls = installFetchMock(() =>
+      json({
+        id: 26454,
+        name: "APC",
+        machine_count: 0,
+        location_machine_xrefs: [],
+      })
+    );
+    await createLiveClient(null).fetchLocation(26454);
+    expect(calls[0]?.init?.headers).not.toHaveProperty("X-Api-Token");
   });
 });

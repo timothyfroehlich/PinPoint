@@ -1121,8 +1121,13 @@ export const discordIntegrationConfig = pgTable(
  * token id) are written by the connect flow (PP-o355.12). Shared foundation for
  * PP-o355.11 (cron sync) and PP-o355.12 (list/unlist) — PP-o355.16.
  *
- * `outboundTokenVaultId` references `vault.secrets.id` and `updatedBy` references
- * `auth.users.id` — no FK (Drizzle cannot express cross-schema references).
+ * `apiTokenVaultId` references the mandatory blanket API token (X-Api-Token) that
+ * PBM requires on ALL v1 endpoints — reads included — once REQUIRE_API_TOKEN flips
+ * on (July 30 2026 gate, CORE-PBM-001, PP-uusr). It is a DISTINCT layer from the
+ * per-operator write creds (`outboundEmail`/`outboundTokenVaultId`): the api_token
+ * gates access, the operator creds identify who is writing. Both vault-id columns
+ * and `updatedBy` reference other schemas (`vault.secrets.id`, `auth.users.id`) —
+ * no FK (Drizzle cannot express cross-schema references).
  */
 export const pinballmapState = pgTable(
   "pinballmap_state",
@@ -1140,6 +1145,7 @@ export const pinballmapState = pgTable(
     lastSyncError: text("last_sync_error"),
     outboundEmail: text("outbound_email"),
     outboundTokenVaultId: uuid("outbound_token_vault_id"),
+    apiTokenVaultId: uuid("api_token_vault_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

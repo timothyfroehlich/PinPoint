@@ -21,7 +21,12 @@ import type {
  * Live PinballMap client — the only place real PBM HTTP happens.
  *
  * Conduct (vendored docs/external/pinballmap-llms.txt):
- * - reads are anonymous; writes append `user_email`/`user_token` as query params
+ * - send the mandatory blanket `X-Api-Token` on EVERY request (reads + writes);
+ *   PBM's `REQUIRE_API_TOKEN` gate flips on July 30 2026 (CORE-PBM-001, PP-uusr).
+ *   The token is injected at construction (`createLiveClient(apiToken)`) — null
+ *   until the integration is provisioned, in which case the header is omitted.
+ * - writes ALSO append `user_email`/`user_token` (the per-operator identity) as
+ *   query params — a distinct auth layer from the api_token access gate
  * - identify ourselves with a descriptive User-Agent
  * - back off on 429 within a small budget, then report `rate_limited`
  * - serialize writes so we never fire concurrent mutations at PBM
@@ -63,12 +68,19 @@ function credsQuery(
 async function safeFetch(
   url: string,
   init: RequestInit,
-  label: string
+  label: string,
+  apiToken: string | null
 ): Promise<Response> {
   try {
     return await fetch(url, {
       ...init,
-      headers: { "User-Agent": PBM_USER_AGENT, ...(init.headers ?? {}) },
+      headers: {
+        "User-Agent": PBM_USER_AGENT,
+        // Mandatory blanket access gate on every request; omitted only while the
+        // integration is unprovisioned (apiToken null). PP-uusr / CORE-PBM-001.
+        ...(apiToken ? { "X-Api-Token": apiToken } : {}),
+        ...(init.headers ?? {}),
+      },
     });
   } catch (err) {
     log.warn(
@@ -159,9 +171,10 @@ type WriteOutcome =
 async function writeRequest(
   method: "POST" | "PUT" | "DELETE",
   url: string,
-  label: string
+  label: string,
+  apiToken: string | null
 ): Promise<WriteOutcome> {
-  let res = await safeFetch(url, { method }, label);
+  let res = await safeFetch(url, { method }, label, apiToken);
   if (res.status === 429) {
     const retryAfter = parseRetryAfter(res);
     if (retryAfter > MAX_RETRY_AFTER_SECONDS) {
@@ -172,7 +185,7 @@ async function writeRequest(
       return writeFailure("rate_limited");
     }
     await sleep(retryAfter * 1000);
-    res = await safeFetch(url, { method }, label);
+    res = await safeFetch(url, { method }, label, apiToken);
     if (res.status === 429) return writeFailure("rate_limited");
   }
   // Network error (599) or server error: retry later.
@@ -198,8 +211,17 @@ function toWriteResult(outcome: WriteOutcome): PbmWriteResult {
   return outcome.ok ? { ok: true } : outcome;
 }
 
-async function readJson(path: string, label: string): Promise<unknown> {
-  const res = await safeFetch(buildUrl(path), { method: "GET" }, label);
+async function readJson(
+  path: string,
+  label: string,
+  apiToken: string | null
+): Promise<unknown> {
+  const res = await safeFetch(
+    buildUrl(path),
+    { method: "GET" },
+    label,
+    apiToken
+  );
   if (!res.ok) {
     throw new Error(`PinballMap ${label} failed: HTTP ${res.status}`);
   }
@@ -218,13 +240,19 @@ async function readJson(path: string, label: string): Promise<unknown> {
   return data;
 }
 
-export function createLiveClient(): PinballMapClient {
+/**
+ * Build the live client. `apiToken` is PBM's mandatory blanket access gate
+ * (X-Api-Token), injected once at construction and attached to every request;
+ * null while the integration is unprovisioned (header omitted). PP-uusr.
+ */
+export function createLiveClient(apiToken: string | null): PinballMapClient {
   return {
     async fetchLocation(locationId: number): Promise<LocationSnapshot> {
       assertNotInTransaction("pinballmap.fetchLocation");
       const raw = await readJson(
         `/locations/${locationId}.json`,
-        "fetchLocation"
+        "fetchLocation",
+        apiToken
       );
       return parseLocation(raw, new Date().toISOString());
     },
@@ -233,13 +261,17 @@ export function createLiveClient(): PinballMapClient {
       assertNotInTransaction("pinballmap.fetchCatalog");
       // Full payload (no `no_details`): that flag omits `ipdb_id`, which we
       // store on the machine record (vendored llms.txt §no_details).
-      const raw = await readJson(`/machines.json`, "fetchCatalog");
+      const raw = await readJson(`/machines.json`, "fetchCatalog", apiToken);
       return parseCatalog(raw);
     },
 
     async fetchMachineGroups(): Promise<MachineGroup[]> {
       assertNotInTransaction("pinballmap.fetchMachineGroups");
-      const raw = await readJson(`/machine_groups.json`, "fetchMachineGroups");
+      const raw = await readJson(
+        `/machine_groups.json`,
+        "fetchMachineGroups",
+        apiToken
+      );
       return parseMachineGroups(raw);
     },
 
@@ -247,7 +279,12 @@ export function createLiveClient(): PinballMapClient {
       assertNotInTransaction("pinballmap.authDetails");
       // Credentials in the query string — never log this URL.
       const url = buildUrl(`/users/auth_details.json`, { login, password });
-      const res = await safeFetch(url, { method: "GET" }, "authDetails");
+      const res = await safeFetch(
+        url,
+        { method: "GET" },
+        "authDetails",
+        apiToken
+      );
       if (res.status === 429) return { ok: false, reason: "rate_limited" };
       if (res.status === 599 || res.status >= 500) {
         return { ok: false, reason: "transient" };
@@ -291,7 +328,7 @@ export function createLiveClient(): PinballMapClient {
             machine_id: String(machineId),
           })
         );
-        const outcome = await writeRequest("POST", url, "addMachine");
+        const outcome = await writeRequest("POST", url, "addMachine", apiToken);
         if (!outcome.ok) return outcome;
         // Success body wraps the lmx: {"location_machine": {"id": ...}}.
         const lmx = asRecord(outcome.body?.["location_machine"]);
@@ -314,7 +351,7 @@ export function createLiveClient(): PinballMapClient {
           credsQuery(credentials)
         );
         return toWriteResult(
-          await writeRequest("DELETE", url, "removeMachine")
+          await writeRequest("DELETE", url, "removeMachine", apiToken)
         );
       });
     },
@@ -326,7 +363,9 @@ export function createLiveClient(): PinballMapClient {
           `/location_machine_xrefs/${lmxId}.json`,
           credsQuery(credentials, { condition: comment })
         );
-        return toWriteResult(await writeRequest("PUT", url, "postCondition"));
+        return toWriteResult(
+          await writeRequest("PUT", url, "postCondition", apiToken)
+        );
       });
     },
 
@@ -340,7 +379,8 @@ export function createLiveClient(): PinballMapClient {
         const outcome = await writeRequest(
           "PUT",
           url,
-          "toggleInsiderConnected"
+          "toggleInsiderConnected",
+          apiToken
         );
         if (!outcome.ok) return outcome;
         const lmx = asRecord(outcome.body?.["location_machine"]);
@@ -357,7 +397,9 @@ export function createLiveClient(): PinballMapClient {
           `/locations/${locationId}/confirm.json`,
           credsQuery(credentials)
         );
-        return toWriteResult(await writeRequest("PUT", url, "confirmLineup"));
+        return toWriteResult(
+          await writeRequest("PUT", url, "confirmLineup", apiToken)
+        );
       });
     },
   };

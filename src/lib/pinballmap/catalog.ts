@@ -57,7 +57,7 @@ export const CATALOG_SEARCH_LIMIT = 25;
  * mirror just because a fetch came back empty.
  */
 export async function refreshCatalog(): Promise<number> {
-  const client = getPinballMapClient();
+  const client = await getPinballMapClient();
   const [catalog, groups] = await Promise.all([
     client.fetchCatalog(),
     client.fetchMachineGroups(),
