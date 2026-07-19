@@ -9,7 +9,7 @@ describe("MachinePinballmapCard", () => {
   it("renders a public link back to the PBM location (CORE-PBM-001)", () => {
     render(<MachinePinballmapCard locationUrl={LOCATION_URL} />);
     const link = screen.getByTestId("machine-pinballmap-link");
-    expect(link).toHaveTextContent(/view on pinballmap/i);
+    expect(link).toHaveTextContent(/view on pinball map/i);
     expect(link).toHaveAttribute("href", LOCATION_URL);
     expect(link).toHaveAttribute("target", "_blank");
     // noopener noreferrer to match the codebase convention for target="_blank".
@@ -32,7 +32,7 @@ describe("MachinePinballmapCard", () => {
       />
     );
     expect(screen.getByTestId("machine-pinballmap-desync")).toHaveTextContent(
-      /listed here but not showing on pinballmap/i
+      /listed here but not showing on pinball map/i
     );
   });
 
@@ -45,7 +45,7 @@ describe("MachinePinballmapCard", () => {
       />
     );
     expect(screen.getByTestId("machine-pinballmap-desync")).toHaveTextContent(
-      /on pinballmap but not marked listed here/i
+      /on pinball map but not marked listed here/i
     );
   });
 
@@ -58,7 +58,7 @@ describe("MachinePinballmapCard", () => {
       />
     );
     expect(screen.getByTestId("machine-pinballmap-desync")).toHaveTextContent(
-      /pinballmap link moved/i
+      /pinball map link moved/i
     );
   });
 

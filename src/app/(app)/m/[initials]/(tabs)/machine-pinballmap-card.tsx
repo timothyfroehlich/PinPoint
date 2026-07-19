@@ -23,9 +23,9 @@ import type { PbmMachineStatus } from "~/lib/pinballmap/status";
 
 /** Human-facing copy per desync reason. Reasons without an entry show no alert. */
 const DESYNC_COPY: Partial<Record<PbmMachineStatus["reason"], string>> = {
-  listed_locally_absent_on_pbm: "Listed here but not showing on PinballMap.",
-  on_pbm_not_listed_locally: "On PinballMap but not marked listed here.",
-  lmx_drifted: "PinballMap link moved — verify.",
+  listed_locally_absent_on_pbm: "Listed here but not showing on Pinball Map.",
+  on_pbm_not_listed_locally: "On Pinball Map but not marked listed here.",
+  lmx_drifted: "Pinball Map link moved — verify.",
 };
 
 export interface MachinePinballmapCardProps {
@@ -55,7 +55,7 @@ export function MachinePinballmapCard({
         <span className="text-secondary" aria-hidden="true">
           ◆
         </span>{" "}
-        PinballMap
+        Pinball Map
       </p>
 
       {desyncMessage ? (
@@ -76,7 +76,7 @@ export function MachinePinballmapCard({
         data-testid="machine-pinballmap-link"
         className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
       >
-        View on PinballMap
+        View on Pinball Map
         <ExternalLink className="size-3" aria-hidden="true" />
       </a>
     </div>
