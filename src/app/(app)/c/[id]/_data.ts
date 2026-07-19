@@ -7,9 +7,11 @@ import {
   type UserCollection,
 } from "~/lib/collections/user";
 import {
+  canEditCollection,
   canManageCollection,
   canViewCollection,
 } from "~/lib/collections/access";
+import { isEditorCollaborator } from "~/lib/collections/collaborators";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines as machinesTable, userProfiles } from "~/server/db/schema";
@@ -17,6 +19,12 @@ import { machines as machinesTable, userProfiles } from "~/server/db/schema";
 export interface CollectionForLayout {
   collection: UserCollection;
   viewerCanManage: boolean;
+  /**
+   * The viewer may edit content (name + machines): owner OR an editor
+   * collaborator (PP-wqit.7). Broader than `viewerCanManage`, which stays
+   * owner-only (delete / share-link / manage collaborators).
+   */
+  viewerCanEdit: boolean;
   /**
    * The handle from the URL (a collection id OR a view token). Tab links and
    * revalidatePath use THIS, not `collection.id`, so a view-token visitor stays
@@ -98,10 +106,20 @@ export const getCollectionForLayout = cache(
     if (uuidSchema.safeParse(handle).success) {
       const collection = await getCollection(undefined, handle);
       if (!collection) return null;
-      if (!canViewCollection(collection, viewer)) return null;
+      // An editor collaborator can reach the collection by its uuid too (editing
+      // implies viewing). Compute editor status first, then allow the view for
+      // owner/admin OR an editor — otherwise a shared editor 404s on the link
+      // from their "Shared with you" list (PP-wqit.7).
+      const isEditor = await isEditorCollaborator(
+        db,
+        collection.id,
+        viewer.userId
+      );
+      if (!canViewCollection(collection, viewer) && !isEditor) return null;
       return {
         collection,
         viewerCanManage: canManageCollection(collection, viewer),
+        viewerCanEdit: canEditCollection(collection, viewer, isEditor),
         handle,
         viaViewToken: false,
       };
@@ -111,9 +129,15 @@ export const getCollectionForLayout = cache(
     // still decides management (owner keeps controls, others are read-only).
     const collection = await getCollectionByViewToken(undefined, handle);
     if (!collection) return null;
+    const isEditor = await isEditorCollaborator(
+      db,
+      collection.id,
+      viewer.userId
+    );
     return {
       collection,
       viewerCanManage: canManageCollection(collection, viewer),
+      viewerCanEdit: canEditCollection(collection, viewer, isEditor),
       handle,
       viaViewToken: true,
     };

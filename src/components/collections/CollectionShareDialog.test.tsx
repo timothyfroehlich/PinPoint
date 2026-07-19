@@ -10,8 +10,12 @@ function shareUrlValue(): string {
 }
 
 const setSharing = vi.fn();
+// The embedded "People with access" panel imports the collaborator actions from
+// the same module — stub them so the real server action module never loads.
 vi.mock("~/app/(app)/c/collections/actions", () => ({
   setCollectionSharingAction: (input: unknown) => setSharing(input),
+  addCollectionCollaboratorAction: vi.fn(),
+  removeCollectionCollaboratorAction: vi.fn(),
 }));
 
 const refresh = vi.fn();
@@ -35,7 +39,15 @@ describe("CollectionShareDialog", () => {
       success: true,
       data: { viewToken: "fresh-token" },
     });
-    render(<CollectionShareDialog collectionId="c1" viewToken={null} />);
+    render(
+      <CollectionShareDialog
+        collectionId="c1"
+        viewToken={null}
+        ownerName="You"
+        editors={[]}
+        grantableMembers={[]}
+      />
+    );
 
     await userEvent.click(screen.getByTestId("collection-share-trigger"));
     // Off: toggle unchecked, no link field.
@@ -60,7 +72,15 @@ describe("CollectionShareDialog", () => {
 
   it("shows the link when already shared and disabling hides it", async () => {
     setSharing.mockResolvedValue({ success: true, data: { viewToken: null } });
-    render(<CollectionShareDialog collectionId="c1" viewToken="existing" />);
+    render(
+      <CollectionShareDialog
+        collectionId="c1"
+        viewToken="existing"
+        ownerName="You"
+        editors={[]}
+        grantableMembers={[]}
+      />
+    );
 
     await userEvent.click(screen.getByTestId("collection-share-trigger"));
     expect(screen.getByTestId("collection-share-toggle")).toBeChecked();
@@ -82,7 +102,15 @@ describe("CollectionShareDialog", () => {
 
   it("surfaces an error and leaves state unchanged when the action fails", async () => {
     setSharing.mockResolvedValue({ success: false, error: "Forbidden" });
-    render(<CollectionShareDialog collectionId="c1" viewToken={null} />);
+    render(
+      <CollectionShareDialog
+        collectionId="c1"
+        viewToken={null}
+        ownerName="You"
+        editors={[]}
+        grantableMembers={[]}
+      />
+    );
 
     await userEvent.click(screen.getByTestId("collection-share-trigger"));
     await userEvent.click(screen.getByTestId("collection-share-toggle"));

@@ -680,6 +680,35 @@ export const collectionMachines = pgTable(
 ).enableRLS();
 
 /**
+ * Account-based edit sharing (PP-wqit.7). A row grants `user_id` the given
+ * `role` on `collection_id`. MVP uses only 'editor' (may add owner-granted
+ * 'viewer' later without a migration). Distinct from view_token (anonymous
+ * read) and from a future saved_collections bookmark (self-added view-only).
+ */
+export const collectionCollaborators = pgTable(
+  "collection_collaborators",
+  {
+    collectionId: uuid("collection_id")
+      .notNull()
+      .references(() => collections.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("editor"),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    addedBy: uuid("added_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.collectionId, t.userId] }),
+    userIdx: index("idx_collection_collaborators_user").on(t.userId),
+  })
+).enableRLS();
+
+/**
  * Issue Images Table
  *
  * Images attached to issues and comments with soft-delete support.
@@ -944,7 +973,22 @@ export const collectionsRelations = relations(collections, ({ one, many }) => ({
     references: [userProfiles.id],
   }),
   members: many(collectionMachines),
+  collaborators: many(collectionCollaborators),
 }));
+
+export const collectionCollaboratorsRelations = relations(
+  collectionCollaborators,
+  ({ one }) => ({
+    collection: one(collections, {
+      fields: [collectionCollaborators.collectionId],
+      references: [collections.id],
+    }),
+    user: one(userProfiles, {
+      fields: [collectionCollaborators.userId],
+      references: [userProfiles.id],
+    }),
+  })
+);
 
 export const collectionMachinesRelations = relations(
   collectionMachines,
