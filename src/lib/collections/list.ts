@@ -1,6 +1,6 @@
 import { asc, count, eq } from "drizzle-orm";
 import { db, type DbTransaction } from "~/server/db";
-import { collections, collectionMachines } from "~/server/db/schema";
+import { collections, collectionMachines, machines } from "~/server/db/schema";
 
 export interface CollectionListItem {
   id: string;
@@ -31,4 +31,20 @@ export async function getMyCollections(
     name: r.name,
     machineCount: Number(r.machineCount),
   }));
+}
+
+/**
+ * Count the machines owned by `ownerId` — the size of that user's owner-type
+ * collection (/c/owner/[ownerId]). A dedicated count rather than
+ * `getOwnerCollection`, which eagerly loads every machine and its open issues.
+ */
+export async function getOwnedMachineCount(
+  tx: DbTransaction = db,
+  ownerId: string
+): Promise<number> {
+  const [row] = await tx
+    .select({ value: count() })
+    .from(machines)
+    .where(eq(machines.ownerId, ownerId));
+  return Number(row?.value ?? 0);
 }

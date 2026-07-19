@@ -7,7 +7,7 @@ import {
   machines,
   userProfiles,
 } from "~/server/db/schema";
-import { getMyCollections } from "~/lib/collections/list";
+import { getMyCollections, getOwnedMachineCount } from "~/lib/collections/list";
 
 describe("getMyCollections", () => {
   setupTestDb();
@@ -49,5 +49,33 @@ describe("getMyCollections", () => {
     const user = createTestUser();
     await db.insert(userProfiles).values(user);
     expect(await getMyCollections(asDbOrTx(db), user.id)).toEqual([]);
+  });
+});
+
+describe("getOwnedMachineCount", () => {
+  setupTestDb();
+
+  it("counts only the machines owned by the given user", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ firstName: "Ann", lastName: "Owner" });
+    const other = createTestUser({ firstName: "Bob", lastName: "Other" });
+    await db.insert(userProfiles).values([owner, other]);
+
+    await db
+      .insert(machines)
+      .values([
+        createTestMachine({ initials: "M1", name: "One", ownerId: owner.id }),
+        createTestMachine({ initials: "M2", name: "Two", ownerId: owner.id }),
+        createTestMachine({ initials: "M3", name: "Three", ownerId: other.id }),
+      ]);
+
+    expect(await getOwnedMachineCount(asDbOrTx(db), owner.id)).toBe(2);
+  });
+
+  it("returns 0 for a user who owns no machines", async () => {
+    const db = await getTestDb();
+    const user = createTestUser();
+    await db.insert(userProfiles).values(user);
+    expect(await getOwnedMachineCount(asDbOrTx(db), user.id)).toBe(0);
   });
 });

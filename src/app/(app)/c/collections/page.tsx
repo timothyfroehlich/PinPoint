@@ -1,13 +1,14 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { asc } from "drizzle-orm";
+import { Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines as machinesTable } from "~/server/db/schema";
 import { getLoginUrl } from "~/lib/url";
-import { getMyCollections } from "~/lib/collections/list";
+import { getMyCollections, getOwnedMachineCount } from "~/lib/collections/list";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { CreateCollectionDialog } from "~/components/collections/CreateCollectionDialog";
@@ -25,12 +26,13 @@ export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
     redirect(getLoginUrl("/c/collections"));
   }
 
-  const [collections, allMachines] = await Promise.all([
+  const [collections, allMachines, ownedMachineCount] = await Promise.all([
     getMyCollections(undefined, user.id),
     db.query.machines.findMany({
       columns: { id: true, initials: true, name: true },
       orderBy: [asc(machinesTable.name)],
     }),
+    getOwnedMachineCount(undefined, user.id),
   ]);
 
   return (
@@ -40,6 +42,26 @@ export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
           title="My Collections"
           actions={<CreateCollectionDialog allMachines={allMachines} />}
         />
+
+        {ownedMachineCount > 0 && (
+          <Link
+            href={`/c/owner/${user.id}`}
+            data-testid="my-machines-collection-link"
+            className="flex items-center justify-between gap-4 rounded-md border border-outline-variant px-4 py-3 hover:bg-surface-variant"
+          >
+            <span className="flex items-center gap-2 font-medium text-foreground">
+              <Gamepad2
+                aria-hidden="true"
+                className="size-4 text-muted-foreground"
+              />
+              My Machines
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {ownedMachineCount}{" "}
+              {ownedMachineCount === 1 ? "machine" : "machines"}
+            </span>
+          </Link>
+        )}
 
         {collections.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
