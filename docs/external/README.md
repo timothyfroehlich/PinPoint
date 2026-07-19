@@ -6,9 +6,20 @@ read before touching the PinballMap integration (`src/lib/pinballmap/`).
 
 | File                      | What                                                                                   | Provenance                                                             |
 | :------------------------ | :------------------------------------------------------------------------------------- | :--------------------------------------------------------------------- |
-| `pinballmap-llms.txt`     | PBM's own API guidance for AI assistants — auth, rate limits, anti-patterns, endpoints | Fetched verbatim from `https://pinballmap.com/llms.txt` (2026-06-18)   |
-| `pinballmap-robots.txt`   | PBM's robots policy — blocks AI crawlers from the site                                 | Fetched verbatim from `https://pinballmap.com/robots.txt` (2026-06-18) |
+| `pinballmap-llms.txt`     | PBM's own API guidance for AI assistants — auth, rate limits, anti-patterns, endpoints | Fetched verbatim from `https://pinballmap.com/llms.txt` (2026-07-18)   |
+| `pinballmap-robots.txt`   | PBM's robots policy — blocks AI crawlers from the site                                 | Fetched verbatim from `https://pinballmap.com/robots.txt` (2026-07-18) |
 | `pinballmap-api-terms.md` | Our distilled conduct + attribution notes, with sources                                | Authored by us, cites llms.txt + FAQ                                   |
+
+> **2026-07-18 refresh — mandatory `api_token` incoming.** PBM is closing its
+> previously-public read API behind a required `api_token` **on 2026-07-30**
+> (blog `2026/07/16/api-tokens`; enforcement in their
+> `Api::V1::BaseController#require_api_token`, gated by `ENV["REQUIRE_API_TOKEN"]`).
+> Once live, **every** request — GET reads included — needs the token (the lone
+> exception is `location_machine_xrefs/most_recent_by_lat_lon`). Supply it as the
+> `X-Api-Token` header (the source also accepts an `api_token=` query param, but
+> we keep the secret out of URLs). Writes **additionally** need the existing
+> `user_email` + `user_token` identity — two separate layers. Obtaining + wiring
+> the token is tracked in bead **PP-uusr** (blocks rollout `PP-o355.10`).
 
 ## Why these are vendored
 
