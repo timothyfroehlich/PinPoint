@@ -229,11 +229,11 @@ export async function createMachine({
   machine: Machine;
   deliveryPlan: DeliveryPlan;
 }> {
-  // Resolve channels before the transaction (Supabase Vault RPC is an external
-  // round-trip — keep it out of the DB connection window). Only consumed on the
-  // active-promotion notification path, but resolving unconditionally keeps the
-  // control flow flat and matches the issues service.
-  const channels = await getChannels();
+  // `getChannels()` is a live Supabase Vault round-trip, so resolve it only when
+  // a notification will actually be planned (active-guest promotion) — every
+  // other create path discards it. Must happen before the transaction
+  // (CORE-ARCH-011: no external effects inside the DB connection window).
+  const channels = promoteGuest?.type === "active" ? await getChannels() : [];
 
   return db.transaction(async (tx) => {
     if (promoteGuest) {
@@ -361,9 +361,16 @@ export async function updateMachineOwner({
   machine: Machine;
   deliveryPlan: DeliveryPlan;
 }> {
-  const channels = await getChannels();
   const oldOwnerId = current.ownerId;
   const { ownerId: newOwnerId, invitedOwnerId: newInvitedOwnerId } = newOwner;
+
+  // A notification fires only when the active owner actually changes (old owner
+  // removed and/or new owner added). `getChannels()` is a live Vault round-trip,
+  // so resolve it only then, and before the transaction (CORE-ARCH-011).
+  const willNotify =
+    (oldOwnerId !== null && oldOwnerId !== newOwnerId) ||
+    (newOwnerId !== null && newOwnerId !== oldOwnerId);
+  const channels = willNotify ? await getChannels() : [];
 
   return db.transaction(async (tx) => {
     if (promoteGuest) {
