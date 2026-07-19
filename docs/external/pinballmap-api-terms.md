@@ -5,6 +5,26 @@ sources: the vendored `pinballmap-llms.txt` (API guidance) and PBM's
 [FAQ](https://pinballmap.com/faq). When this summary and `pinballmap-llms.txt`
 disagree, **`pinballmap-llms.txt` wins** — fix this file.
 
+## Authentication (llms.txt — changed 2026-07-18)
+
+**As of 2026-07-30, every request requires an `api_token`** — including
+read-only GETs, which were previously public. (Lone exception:
+`location_machine_xrefs/most_recent_by_lat_lon`, which PBM does not gate.)
+
+- **Request the token now** at <https://pinballmap.com/api_token> (needs a
+  Pinball Map account; approval is manual). "Request a token now, even if you
+  don't need it yet — do not wait until requests start failing."
+- Send it as the **`X-Api-Token` header** on every request. PBM's `llms.txt`
+  documents an `api_token=` query param, and their source accepts both; we use
+  the header to keep the credential out of URLs and logs.
+- **Writes need a second, separate credential** on top of the `api_token`: the
+  `user_email` + `user_token` identity (obtained once via `auth_details`, then
+  stored — never re-fetched per request). So a write carries **both** layers.
+- Store the `api_token` in Vault; it is app-level and revocable.
+
+→ Obtaining + wiring the token is tracked in bead **PP-uusr** (blocks the prod
+rollout `PP-o355.10`).
+
 ## Attribution (FAQ)
 
 > Users must include attribution and a link back to this site when using
