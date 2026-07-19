@@ -19,7 +19,11 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { type Result, ok, err } from "~/lib/result";
-import { syncLocationSnapshot } from "~/lib/pinballmap/state";
+import {
+  getPinballMapState,
+  syncLocationSnapshot,
+} from "~/lib/pinballmap/state";
+import { PBM_MANUAL_SYNC_MIN_INTERVAL_MS } from "~/lib/pinballmap/config";
 import { reconcileAfterSync } from "~/lib/pinballmap/sync";
 import { log } from "~/lib/logger";
 import {
@@ -120,7 +124,7 @@ export async function resolvePinballMapLinkAction(
 /** Result of an on-demand "Sync now" — the machine count and heals applied. */
 export type SyncPinballMapNowResult = Result<
   { machineCount: number; healed: number },
-  "UNAUTHORIZED" | "SERVER"
+  "UNAUTHORIZED" | "THROTTLED" | "SERVER"
 >;
 
 /**
@@ -129,14 +133,16 @@ export type SyncPinballMapNowResult = Result<
  *
  * Unlike the hourly cron, this does NOT gate on `state.enabled`: it's an
  * explicit human-initiated refresh, so the human is the caller who owns the
- * decision (CORE-PBM-001 is respected — a click is naturally rate-limited, and
- * the permission is technician+). Form-action shaped `(prevState, formData)` so
- * a `<form action={...}>` + `useActionState` button (control room, PP-o355.7)
- * can drop it in for progressive enhancement (CORE-ARCH-002).
+ * decision (CORE-PBM-001 is respected — the permission is technician+ and manual
+ * refreshes are throttled to `PBM_MANUAL_SYNC_MIN_INTERVAL_MS`, at most 20/hour).
+ * Pass a `force=true` form field to bypass the throttle. Form-action shaped
+ * `(prevState, formData)` so a `<form action={...}>` + `useActionState` button
+ * (control room, PP-o355.7) can drop it in for progressive enhancement
+ * (CORE-ARCH-002).
  */
 export async function syncPinballMapNowAction(
   _prevState: SyncPinballMapNowResult | undefined,
-  _formData: FormData
+  formData: FormData
 ): Promise<SyncPinballMapNowResult> {
   const supabase = await createClient();
   const {
@@ -156,6 +162,26 @@ export async function syncPinballMapNowAction(
       "UNAUTHORIZED",
       "Only technicians and admins can trigger a Pinball Map sync."
     );
+  }
+
+  // Conduct throttle (CORE-PBM-001): refuse a manual sync within
+  // PBM_MANUAL_SYNC_MIN_INTERVAL_MS of the last *successful* one, unless forced.
+  // `lastSyncedAt` is only written on the ok path, so a prior failure never
+  // blocks a retry.
+  if (formData.get("force") !== "true") {
+    const state = await getPinballMapState();
+    if (state?.lastSyncStatus === "ok" && state.lastSyncedAt) {
+      const sinceLastMs = Date.now() - state.lastSyncedAt.getTime();
+      if (sinceLastMs < PBM_MANUAL_SYNC_MIN_INTERVAL_MS) {
+        const retryMin = Math.ceil(
+          (PBM_MANUAL_SYNC_MIN_INTERVAL_MS - sinceLastMs) / 60_000
+        );
+        return err(
+          "THROTTLED",
+          `Pinball Map was synced moments ago. Try again in about ${retryMin} minute${retryMin === 1 ? "" : "s"}.`
+        );
+      }
+    }
   }
 
   try {

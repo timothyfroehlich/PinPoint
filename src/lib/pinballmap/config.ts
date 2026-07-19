@@ -29,3 +29,16 @@ export const PBM_USER_AGENT =
 
 /** Austin Pinball Collective's PBM location id. */
 export const APC_LOCATION_ID = 26454;
+
+/**
+ * Minimum gap between *manual* ("Sync now") location snapshot syncs — 3 minutes,
+ * i.e. at most 20 manual syncs/hour (CORE-PBM-001).
+ *
+ * The hourly cron already covers automated freshness; PBM's conduct concern is
+ * repeated polling loops, not a human clicking Sync-now a handful of times, so a
+ * strict one-call-per-hour cap on manual refreshes is needless friction. 20/hour
+ * is negligible against PBM's real limits while still killing stuck-key /
+ * double-click bursts. Enforced against the singleton's last *successful*
+ * `lastSyncedAt`; an explicit force bypasses it. (PP-fwe1, Tim 2026-07-19.)
+ */
+export const PBM_MANUAL_SYNC_MIN_INTERVAL_MS = 3 * 60 * 1000;

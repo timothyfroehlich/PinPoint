@@ -140,4 +140,34 @@ describe("syncPinballMapNowAction", () => {
       expect(result.value.healed).toBe(0);
     }
   });
+
+  it("throttles a second manual sync within the min interval (CORE-PBM-001)", async () => {
+    const id = await seedUser("technician");
+    mockGetUser
+      .mockResolvedValueOnce({ data: { user: { id } } })
+      .mockResolvedValueOnce({ data: { user: { id } } });
+
+    const first = await syncPinballMapNowAction(undefined, new FormData());
+    expect(first.ok).toBe(true);
+
+    // A second click moments later is refused rather than hitting PBM again.
+    const second = await syncPinballMapNowAction(undefined, new FormData());
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.code).toBe("THROTTLED");
+  });
+
+  it("force=true bypasses the throttle", async () => {
+    const id = await seedUser("technician");
+    mockGetUser
+      .mockResolvedValueOnce({ data: { user: { id } } })
+      .mockResolvedValueOnce({ data: { user: { id } } });
+
+    const first = await syncPinballMapNowAction(undefined, new FormData());
+    expect(first.ok).toBe(true);
+
+    const forced = new FormData();
+    forced.set("force", "true");
+    const second = await syncPinballMapNowAction(undefined, forced);
+    expect(second.ok).toBe(true);
+  });
 });
