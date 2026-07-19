@@ -17,6 +17,15 @@
 //   --force-auth  Regenerate e2e/.auth/*.json storage state even if present
 //                 (use when a previous session looks stale/expired).
 //
+// Browser selection (env var):
+//   PR_SHOTS_BROWSER=chromium|firefox  Force a specific renderer. When unset,
+//   the default is Chromium with automatic fallback to Firefox if Chromium's
+//   renderer crashes. Playwright's bundled Chromium segfaults mid-render on
+//   OSes it doesn't officially support (e.g. Fedora Atomic / Bazzite — top-level
+//   libs resolve so it launches, but a subtle ABI mismatch SIGSEGVs the renderer
+//   on complex pages); Firefox is tolerant there. CI (Ubuntu) keeps Chromium.
+//   (PP-rsy3.)
+//
 // Preconditions (best-effort, not auto-provisioned by this script):
 //   - Local dev server running at http://localhost:<PORT> (`pnpm run dev`).
 //     PORT is read from .env.local the same way playwright.config.ts does —
@@ -39,7 +48,7 @@
 //     reaper) — it will grow unbounded over time.
 //   - PR-number/branch mismatch is a warning, not a hard failure.
 
-import { chromium } from "@playwright/test";
+import { chromium, firefox } from "@playwright/test";
 import nextEnv from "@next/env";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
@@ -178,12 +187,22 @@ function ensureAuthStorageState(rolesNeeded, forceAuth) {
   }
 }
 
-async function captureScreenshots(baseUrl, pages, workDir) {
+const BROWSERS = { chromium, firefox };
+
+/**
+ * Capture every page×viewport with the given browser type. Returns the captured
+ * shots plus a `crashed` flag — the renderer segfaulting (Playwright's bundled
+ * Chromium does this on OSes it doesn't officially support, e.g. Fedora Atomic /
+ * Bazzite) surfaces as a page "crash" event or a "crash"-worded goto error, which
+ * the caller uses to decide whether to fall back to another browser.
+ */
+async function captureScreenshots(browserType, baseUrl, pages, workDir) {
   const rolesNeeded = [...new Set(pages.map((p) => p.authRole))];
-  const browser = await chromium.launch();
+  const browser = await browserType.launch();
   /** @type {Map<string, import("@playwright/test").BrowserContext>} */
   const contexts = new Map();
   const captured = [];
+  let crashed = false;
 
   try {
     for (const role of rolesNeeded) {
@@ -201,6 +220,9 @@ async function captureScreenshots(baseUrl, pages, workDir) {
       for (const vpName of Object.keys(VIEWPORTS)) {
         const ctx = contexts.get(`${page.authRole}:${vpName}`);
         const pw = await ctx.newPage();
+        pw.on("crash", () => {
+          crashed = true;
+        });
         console.log(`📸 ${vpName} — ${page.label} (${page.route})`);
         try {
           await pw.goto(page.route, {
@@ -218,22 +240,58 @@ async function captureScreenshots(baseUrl, pages, workDir) {
             outPath,
           });
         } catch (error) {
-          console.error(
-            `⚠️  Failed to capture ${vpName}/${page.id}: ${error instanceof Error ? error.message : error}`
-          );
+          const message = error instanceof Error ? error.message : String(error);
+          if (/crash/i.test(message)) crashed = true;
+          console.error(`⚠️  Failed to capture ${vpName}/${page.id}: ${message}`);
         } finally {
-          await pw.close();
+          await pw.close().catch(() => {});
         }
       }
     }
   } finally {
     for (const ctx of contexts.values()) {
-      await ctx.close();
+      await ctx.close().catch(() => {});
     }
-    await browser.close();
+    await browser.close().catch(() => {});
   }
 
-  return captured;
+  return { captured, crashed };
+}
+
+/**
+ * Run the capture with the selected browser, falling back to Firefox if
+ * Chromium's renderer crashes. Honors PR_SHOTS_BROWSER=chromium|firefox as an
+ * explicit override (no fallback when forced). (PP-rsy3.)
+ */
+async function captureWithFallback(baseUrl, pages, workDir) {
+  const forced = process.env.PR_SHOTS_BROWSER;
+  if (forced && !BROWSERS[forced]) {
+    throw new Error(
+      `PR_SHOTS_BROWSER="${forced}" is invalid — expected one of: ${Object.keys(BROWSERS).join(", ")}`
+    );
+  }
+  const order = forced ? [forced] : ["chromium", "firefox"];
+
+  for (let i = 0; i < order.length; i++) {
+    const name = order[i];
+    console.log(`🖥️  Capturing with ${name}${forced ? " (forced)" : ""}`);
+    const { captured, crashed } = await captureScreenshots(
+      BROWSERS[name],
+      baseUrl,
+      pages,
+      workDir
+    );
+    const hasNext = i < order.length - 1;
+    if (crashed && hasNext) {
+      console.warn(
+        `⚠️  ${name} renderer crashed (known on OSes Playwright doesn't officially ` +
+          `support, e.g. Fedora Atomic / Bazzite) — retrying with ${order[i + 1]}.`
+      );
+      continue;
+    }
+    return captured;
+  }
+  return [];
 }
 
 function git(args, opts = {}) {
@@ -423,7 +481,7 @@ async function main() {
   const workDir = mkdtempSync(join(tmpdir(), "pr-screenshots-capture-"));
   let captured;
   try {
-    captured = await captureScreenshots(baseUrl, pages, workDir);
+    captured = await captureWithFallback(baseUrl, pages, workDir);
     if (captured.length === 0) {
       throw new Error(
         "No screenshots captured — every page failed. See errors above."
