@@ -1176,6 +1176,15 @@ export const pinballmapState = pgTable(
     locationId: integer("location_id").notNull().default(26454),
     snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>(),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    // Timestamp of the last sync ATTEMPT (success OR failure), stamped at the
+    // START of the attempt. Distinct from `lastSyncedAt` ("last SUCCESSFUL
+    // sync"): the manual-refresh throttle (PP-hbi0) rate-limits against the last
+    // attempt so a failed fetch (429/500) can't reset the clock and let repeat
+    // clicks re-hit PBM — inverting CORE-PBM-001's backoff. The cron path does
+    // not enforce the interval but still records its attempt here.
+    lastSyncAttemptAt: timestamp("last_sync_attempt_at", {
+      withTimezone: true,
+    }),
     lastSyncStatus: text("last_sync_status", {
       enum: ["unknown", "ok", "error"],
     })
