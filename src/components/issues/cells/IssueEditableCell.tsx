@@ -70,7 +70,7 @@ export function IssueEditableCell({
             )}
           >
             {isUpdating ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none shrink-0 text-muted-foreground" />
             ) : (
               <config.icon
                 className={cn("h-3.5 w-3.5 shrink-0", config.iconColor)}

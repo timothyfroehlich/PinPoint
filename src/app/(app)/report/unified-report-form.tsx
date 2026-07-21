@@ -24,22 +24,17 @@ import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
 import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
 import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
 import { StatusSelect } from "~/components/issues/fields/StatusSelect";
-import type {
-  IssueSeverity,
-  IssueFrequency,
-  IssuePriority,
-  IssueStatus,
-} from "~/lib/types";
 import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
-import { type ImageMetadata } from "~/types/images";
 import type { AccessLevel } from "~/lib/permissions/matrix";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 import { getLoginUrl } from "~/lib/login-url";
 import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
+import { docIsEmpty } from "~/lib/tiptap/types";
 import { MachineCombobox } from "~/components/machines/MachineCombobox";
-import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import { useReportDraft } from "./report-draft-store";
+import { defaultEntry, emptySingle } from "./report-draft-schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -79,6 +74,17 @@ interface UnifiedReportFormProps {
   initialMachineInitials: string;
 }
 
+// Type-only fallback so `entries[0]` reads are non-optional. The provider always
+// guarantees at least one entry, so this is never actually rendered.
+const FALLBACK_ENTRY = defaultEntry("00000000-0000-0000-0000-000000000000");
+
+// Session cache of recent issues keyed by machine initials. The Single form
+// unmounts/remounts on every Single↔Multiple tab switch (they're separate
+// routes), so without this the panel re-fetches and flashes a skeleton each
+// time. The cache lets a return to Single paint the last-known issues instantly
+// while the effect revalidates in the background. Cleared on full page reload.
+const recentIssuesCache = new Map<string, RecentIssueData[]>();
+
 export function UnifiedReportForm({
   machinesList,
   defaultMachineId,
@@ -90,39 +96,29 @@ export function UnifiedReportForm({
   initialMachineInitials,
 }: UnifiedReportFormProps): React.JSX.Element {
   const searchParams = useSearchParams();
-  const hasRestored = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const [isClearOpen, setIsClearOpen] = useState(false);
   const [editorResetKey, setEditorResetKey] = useState(0);
   // Bumped to remount the Turnstile widget on reset — its internal "solved"
   // state is otherwise out of sync with the cleared hidden token.
   const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0);
-  const [selectedMachineId, setSelectedMachineId] = useState(
-    defaultMachineId ?? ""
-  );
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState<ProseMirrorDoc | null>(null);
-  const [severity, setSeverity] = useState<IssueSeverity | "">("minor");
-  const [priority, setPriority] = useState<IssuePriority | "">("medium");
-  const [frequency, setFrequency] = useState<IssueFrequency | "">("constant");
-  const [status, setStatus] = useState<IssueStatus>("new");
-  const [assignedTo, setAssignedTo] = useState("");
-  const [watchIssue, setWatchIssue] = useState(true);
-
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-
-  const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
+  // CAPTCHA token is ephemeral (never persisted in the shared draft).
   const [turnstileToken, setTurnstileToken] = useState("");
-  // Idempotency key: a UUID generated ONCE per fresh form, stable across
-  // re-renders (lazy state initializer, never recomputed). Submitted as a
-  // hidden field so a retried submission (same key) is deduped server-side
-  // (PP-2053.7). Regenerated on every reset (success + Clear) so the next
-  // genuine report gets a distinct key and is not deduped against the last one.
-  const [idempotencyKey, setIdempotencyKey] = useState(() =>
-    crypto.randomUUID()
-  );
+
+  // The shared draft is the single source of truth for the synced entry-#1
+  // fields + the reporter identity/photos. Persistence + hydration + legacy
+  // migration all live in the provider now — the form owns none of it.
+  const {
+    entries,
+    single,
+    patchEntry,
+    patchSingle,
+    resetEntryZero,
+    clearAll,
+    hydrated,
+  } = useReportDraft();
+  const entry = entries[0] ?? FALLBACK_ENTRY;
+
   // CAPTCHA is only required for anonymous reporters. Logged-in users skip it
   // both client-side (no widget rendered) and server-side (action checks
   // auth.getUser() before calling verifyTurnstileToken).
@@ -130,13 +126,25 @@ export function UnifiedReportForm({
   const enforceCaptcha =
     hasTurnstile && process.env.NODE_ENV !== "test" && !userAuthenticated;
 
-  // Recent issues panel state
-  const [issues, setIssues] = useState<RecentIssueData[]>(initialIssues ?? []);
+  // Recent issues panel state. Seed from the session cache for the currently
+  // selected machine (survives a tab remount) before falling back to the
+  // server prefetch — so returning to Single paints instantly, no skeleton.
+  const [issues, setIssues] = useState<RecentIssueData[]>(() => {
+    const initials =
+      machinesList.find((m) => m.id === entry.machineId)?.initials ?? "";
+    return recentIssuesCache.get(initials) ?? initialIssues ?? [];
+  });
   const [isLoadingIssues, setIsLoadingIssues] = useState(false);
-  const [issuesError, setIssuesError] = useState(
-    initialIssues === null && initialMachineInitials !== ""
-  );
-  const prevMachineRef = useRef(initialMachineInitials);
+  const [issuesError, setIssuesError] = useState(false);
+
+  // Seed the cache from the server prefetch once, so the fetch effect below
+  // cache-hits (no skeleton) for the initially-requested machine.
+  useEffect(() => {
+    if (initialMachineInitials && initialIssues) {
+      recentIssuesCache.set(initialMachineInitials, initialIssues);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only seed; props are the server prefetch snapshot and never change for a given mount
+  }, []);
 
   const handleTurnstileVerify = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -148,8 +156,8 @@ export function UnifiedReportForm({
   );
 
   const selectedMachine = useMemo(
-    () => machinesList.find((m) => m.id === selectedMachineId),
-    [machinesList, selectedMachineId]
+    () => machinesList.find((m) => m.id === entry.machineId),
+    [machinesList, entry.machineId]
   );
 
   // The report form submits the machine's id (as `machineId`), so each option's
@@ -169,7 +177,7 @@ export function UnifiedReportForm({
   // or a "Log in" round-trip lands back on the same machine.
   const handleMachineChange = useCallback(
     (newId: string) => {
-      setSelectedMachineId(newId);
+      patchEntry(0, { machineId: newId });
       const machine = machinesList.find((m) => m.id === newId);
       if (machine) {
         const params = new URLSearchParams(searchParams.toString());
@@ -177,30 +185,33 @@ export function UnifiedReportForm({
         window.history.replaceState(null, "", `?${params.toString()}`);
       }
     },
-    [machinesList, searchParams]
+    [machinesList, searchParams, patchEntry]
   );
 
-  // Reset form state before navigating away on success (defense in depth).
-  // Even though we navigate, clearing first ensures: (1) if navigation fails
-  // the user sees an empty form, not stale values; (2) localStorage persistence
-  // effect (which short-circuits on state.success) sees clean values; (3) any
-  // back-button return to a still-mounted component shows a clean form.
-  useEffect(() => {
-    if (!state.success) return;
-
-    window.localStorage.removeItem("report_form_state");
-
-    // Native form reset — clears the website honeypot and any browser autofill
-    // that bypassed controlled inputs. firstName/lastName/email are now controlled
-    // and reset below via their state setters.
+  // Reset the single view back to a fresh report: blank entry #1 (fresh
+  // idempotency key), empty reporter identity/photos, remounted rich editor +
+  // CAPTCHA. Shared by the success effect and the Clear dialog. Machine is
+  // preserved when it came from the URL (?machine=), matching prior behavior.
+  //
+  // When entry #1 is the whole draft, clear everything (storage included). When
+  // extra unsubmitted grid rows exist, reset ONLY entry #1 + identity so the
+  // batch in progress survives — the Single form owns entry #1, not the whole
+  // batch (PP-2m17 #2).
+  const resetSingleForm = useCallback(() => {
+    if (entries.length <= 1) {
+      clearAll();
+    } else {
+      resetEntryZero();
+      patchSingle(emptySingle());
+    }
+    if (defaultMachineId) patchEntry(0, { machineId: defaultMachineId });
+    // Native form reset — clears the honeypot and any browser autofill that
+    // bypassed controlled inputs.
     formRef.current?.reset();
-
-    // Controlled state — preserve machine when URL param drove the page,
-    // since the user came here specifically to report on that machine.
-    setSelectedMachineId(defaultMachineId ?? "");
-    // If the machine was user-picked (URL didn't seed it), strip the
-    // ?machine= the dropdown's onChange wrote into the URL. Mirrors the
-    // Clear-button path so a back-nav or failed redirect leaves a clean URL.
+    // If the machine was user-picked (URL didn't seed it), strip the ?machine=
+    // the combobox's onChange wrote via replaceState so a reload/back-nav leaves
+    // a clean URL. Read window.location.search (not the searchParams hook), since
+    // replaceState mutations don't update useSearchParams.
     if (!defaultMachineId && typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.has("machine")) {
@@ -213,218 +224,77 @@ export function UnifiedReportForm({
         );
       }
     }
-    setTitle("");
-    setDescription(null);
-    setSeverity("minor");
-    setPriority("medium");
-    setFrequency("constant");
-    setStatus("new");
-    setAssignedTo("");
-    setWatchIssue(true);
-    setFirstName("");
-    setLastName("");
-    setEmail("");
-    setUploadedImages([]);
     setTurnstileToken("");
-    // Fresh idempotency key for the next report — the submitted one is now tied
-    // to a committed issue, so reusing it would dedup a genuine new submission.
-    setIdempotencyKey(crypto.randomUUID());
-    // RichTextEditor and TurnstileWidget are uncontrolled internally —
-    // bumping their keys remounts them so visible state matches the cleared
-    // controlled state.
     setEditorResetKey((k) => k + 1);
     setTurnstileWidgetKey((k) => k + 1);
+  }, [
+    entries.length,
+    clearAll,
+    resetEntryZero,
+    patchSingle,
+    patchEntry,
+    defaultMachineId,
+  ]);
 
+  // Reset form state before navigating away on success (defense in depth): if
+  // navigation fails the user sees an empty form, not stale values, and a
+  // back-button return to a still-mounted component shows a clean form.
+  useEffect(() => {
+    if (!state.success) return;
+    resetSingleForm();
     if (state.redirectTo) {
       window.location.assign(state.redirectTo);
     }
-  }, [state.success, state.redirectTo, defaultMachineId]);
+  }, [state.success, state.redirectTo, resetSingleForm]);
 
-  // Persistence: Restore from localStorage on mount
+  // Honor a URL ?machine= over a restored draft. Gated on `hydrated` so it runs
+  // AFTER the provider's mount-time restore (which would otherwise clobber the
+  // seed, since the provider is an ancestor and its effect runs last). Machine
+  // wins; the rest of the draft (title/description/…) is preserved.
   useEffect(() => {
-    if (typeof window === "undefined" || hasRestored.current) return;
-    hasRestored.current = true;
+    if (!hydrated) return;
+    if (defaultMachineId) patchEntry(0, { machineId: defaultMachineId });
+  }, [hydrated, defaultMachineId, patchEntry]);
 
-    const savedDraft = window.localStorage.getItem("report_form_state");
-    if (!savedDraft) return;
-
-    try {
-      const parsed = JSON.parse(savedDraft) as Partial<{
-        machineId: string;
-        title: string;
-        description: ProseMirrorDoc;
-        severity: IssueSeverity | "";
-        priority: IssuePriority | "";
-        frequency: IssueFrequency | "";
-        watchIssue: boolean;
-        firstName: string;
-        lastName: string;
-        email: string;
-        uploadedImages: ImageMetadata[];
-        idempotencyKey: string;
-      }>;
-
-      // If URL points to a different machine than the draft, treat this as a new report.
-      // If machine matches, keep restoring (this is the login redirect case).
-      if (
-        defaultMachineId &&
-        parsed.machineId &&
-        defaultMachineId !== parsed.machineId
-      ) {
-        window.localStorage.removeItem("report_form_state");
-        return;
-      }
-
-      if (parsed.machineId && !defaultMachineId) {
-        // PP-lql: Only restore the machineId if it still exists in the current
-        // machinesList. A stale UUID (deleted machine, different tenant,
-        // abandoned draft) would otherwise sit in selectedMachineId while the
-        // native <select> silently displays — and submits — the first option's
-        // value instead.
-        const machine = machinesList.find((m) => m.id === parsed.machineId);
-        if (machine) {
-          setSelectedMachineId(parsed.machineId);
-
-          // Sync URL with the restored machine when no machine param is present.
-          const params = new URLSearchParams(searchParams.toString());
-          params.set("machine", machine.initials);
-          window.history.replaceState(null, "", `?${params.toString()}`);
-        }
-      }
-
-      if (parsed.title) setTitle(parsed.title);
-      if (parsed.description) setDescription(parsed.description);
-      if (parsed.severity) setSeverity(parsed.severity);
-      if (parsed.priority) setPriority(parsed.priority);
-      if (parsed.frequency) setFrequency(parsed.frequency);
-      if (typeof parsed.watchIssue === "boolean")
-        setWatchIssue(parsed.watchIssue);
-      if (parsed.firstName) setFirstName(parsed.firstName);
-      if (parsed.lastName) setLastName(parsed.lastName);
-      if (parsed.email) setEmail(parsed.email);
-      // Restore the idempotency key so a retry after a remount (a 504 + the
-      // report error boundary, a login redirect, or a manual reload) reuses the
-      // SAME key. Otherwise the resubmit mints a fresh key and createIssue
-      // creates a DUPLICATE — defeating PP-2053.7 for its primary retry path.
-      if (parsed.idempotencyKey) setIdempotencyKey(parsed.idempotencyKey);
-      if (
-        Array.isArray(parsed.uploadedImages) &&
-        parsed.uploadedImages.length > 0
-      ) {
-        // Restore the FULL image metadata. The hidden imagesMetadata input
-        // re-serialises this on every render and the submit action validates it
-        // against imagesMetadataArraySchema, which requires originalFilename,
-        // fileSizeBytes, and mimeType. Restoring placeholder values (""/0) would
-        // fail that parse — and the parse is swallowed by a non-blocking
-        // try/catch — silently dropping the user's photos. Keep only rows that
-        // carry the required fields so a malformed legacy draft can't poison
-        // submission. (PP-2053.6 review)
-        setUploadedImages(
-          parsed.uploadedImages.filter(
-            (img): img is ImageMetadata =>
-              typeof img.blobUrl === "string" &&
-              typeof img.blobPathname === "string" &&
-              typeof img.originalFilename === "string" &&
-              img.originalFilename.length > 0 &&
-              typeof img.fileSizeBytes === "number" &&
-              img.fileSizeBytes > 0 &&
-              typeof img.mimeType === "string" &&
-              img.mimeType.startsWith("image/")
-          )
-        );
-      }
-    } catch {
-      // Clear corrupted localStorage
-      window.localStorage.removeItem("report_form_state");
-    }
-  }, [defaultMachineId, machinesList, searchParams]);
-
-  // Persistence: Save to localStorage on change (skip after successful submission)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (state.success) return;
-    const stateToSave = {
-      machineId: selectedMachineId,
-      title,
-      description,
-      severity,
-      priority,
-      frequency,
-      watchIssue,
-      firstName,
-      lastName,
-      email,
-      idempotencyKey,
-      // Persist the FULL image metadata (NOT the image bytes — those live in blob
-      // storage, referenced by blobUrl). originalFilename/fileSizeBytes/mimeType
-      // are tiny and MUST be kept: imagesMetadataArraySchema in actions.ts
-      // requires them (originalFilename.min(1), fileSizeBytes.positive(),
-      // mimeType.startsWith("image/")). Persisting only blobUrl+blobPathname
-      // would make a restored draft fail that parse — which is swallowed by a
-      // non-blocking try/catch — silently dropping the user's photos.
-      // (PP-2053.6 review)
-      uploadedImages,
-    };
-    window.localStorage.setItem(
-      "report_form_state",
-      JSON.stringify(stateToSave)
-    );
-  }, [
-    selectedMachineId,
-    title,
-    description,
-    severity,
-    priority,
-    frequency,
-    watchIssue,
-    firstName,
-    lastName,
-    email,
-    idempotencyKey,
-    uploadedImages,
-    state.success,
-  ]);
-
-  // Sync with defaultMachineId prop when it changes (from URL)
-  useEffect(() => {
-    if (defaultMachineId) {
-      setSelectedMachineId(defaultMachineId);
-    }
-  }, [defaultMachineId]);
-
-  // PP-lql defense in depth: if selectedMachineId references a machine that
-  // is not in the current list (deleted, tenant switched, etc.), reset to "".
-  // The native <select value="<stale-uuid>"> silently shows — and submits —
-  // the first option's value otherwise, leading to issues being filed against
-  // the wrong machine without any user-visible error.
+  // PP-lql defense in depth: if entry #1 references a machine no longer in the
+  // list (deleted, tenant switched), reset it to "". A stale UUID would
+  // otherwise sit selected while the combobox submits nothing meaningful.
   useEffect(() => {
     if (
-      selectedMachineId &&
-      !machinesList.some((m) => m.id === selectedMachineId)
+      entry.machineId &&
+      !machinesList.some((m) => m.id === entry.machineId)
     ) {
-      setSelectedMachineId("");
+      patchEntry(0, { machineId: "" });
     }
-  }, [selectedMachineId, machinesList]);
+  }, [entry.machineId, machinesList, patchEntry]);
 
-  // Fetch recent issues when selected machine changes
+  // Fetch recent issues for the selected machine, revalidating on every change.
+  // Cache-hits paint immediately (no skeleton); a background fetch refreshes the
+  // cache. No "skip if unchanged" ref guard — that collided with StrictMode's
+  // double-invoked effect and left the loading flag stuck. Cancellation ignores
+  // a stale in-flight result instead.
+  const currentInitials = selectedMachine?.initials ?? "";
   useEffect(() => {
-    const currentInitials = selectedMachine?.initials ?? "";
-
-    // Skip if machine hasn't actually changed
-    if (currentInitials === prevMachineRef.current) return;
-    prevMachineRef.current = currentInitials;
-
-    // No machine selected — clear issues
     if (!currentInitials) {
       setIssues([]);
       setIssuesError(false);
+      setIsLoadingIssues(false);
       return;
     }
 
-    const cancellation = { cancelled: false };
-    setIsLoadingIssues(true);
-    setIssuesError(false);
+    const cached = recentIssuesCache.get(currentInitials);
+    if (cached) {
+      setIssues(cached);
+      setIssuesError(false);
+      setIsLoadingIssues(false);
+    } else {
+      setIsLoadingIssues(true);
+      setIssuesError(false);
+    }
 
+    // Object (not a `let`) so the async closure sees the mutation without
+    // tripping no-unnecessary-condition (TS can't narrow a captured `let`).
+    const cancellation = { cancelled: false };
     void (async () => {
       try {
         const result = await getRecentIssuesAction(currentInitials, 5);
@@ -432,6 +302,7 @@ export function UnifiedReportForm({
         setIsLoadingIssues(false);
         if (result.ok) {
           setIssues(result.value);
+          recentIssuesCache.set(currentInitials, result.value);
         } else {
           setIssuesError(true);
         }
@@ -445,7 +316,7 @@ export function UnifiedReportForm({
     return () => {
       cancellation.cancelled = true;
     };
-  }, [selectedMachine?.initials]);
+  }, [currentInitials]);
 
   const canSetWorkflowFields =
     accessLevel === "admin" ||
@@ -481,7 +352,11 @@ export function UnifiedReportForm({
               autoComplete="off"
             />
             {/* Idempotency key — stable per fresh form; dedupes retries (PP-2053.7) */}
-            <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+            <input
+              type="hidden"
+              name="idempotencyKey"
+              value={entry.idempotencyKey}
+            />
             <div className="space-y-1.5">
               <Label htmlFor="machineId" className="text-foreground">
                 Machine *
@@ -490,7 +365,7 @@ export function UnifiedReportForm({
                 id="machineId"
                 name="machineId"
                 machines={machineOptions}
-                value={selectedMachineId}
+                value={entry.machineId}
                 onValueChange={handleMachineChange}
                 ariaLabel="Select Machine"
                 placeholder="Select a machine…"
@@ -519,11 +394,11 @@ export function UnifiedReportForm({
                 <span
                   className={cn(
                     "text-xs text-muted-foreground transition-opacity duration-150",
-                    title.length < 40 && "opacity-0 select-none"
+                    entry.title.length < 40 && "opacity-0 select-none"
                   )}
-                  aria-hidden={title.length < 40}
+                  aria-hidden={entry.title.length < 40}
                 >
-                  {60 - title.length}/60
+                  {60 - entry.title.length}/60
                 </span>
               </div>
               <Input
@@ -531,9 +406,10 @@ export function UnifiedReportForm({
                 name="title"
                 required
                 maxLength={60}
+                enterKeyHint="next"
                 placeholder="e.g., Left flipper not responding"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                value={entry.title}
+                onChange={(e) => patchEntry(0, { title: e.target.value })}
                 className="h-9 border-outline-variant bg-surface text-foreground focus:border-primary"
               />
             </div>
@@ -542,8 +418,8 @@ export function UnifiedReportForm({
               <Label className="text-foreground">Description</Label>
               <RichTextEditor
                 key={editorResetKey}
-                content={description}
-                onChange={setDescription}
+                content={entry.description}
+                onChange={(doc) => patchEntry(0, { description: doc })}
                 mentionsEnabled={userAuthenticated}
                 placeholder="Tell us what happened, and how often it occurs."
                 ariaLabel="Description"
@@ -552,7 +428,14 @@ export function UnifiedReportForm({
               <input
                 type="hidden"
                 name="description"
-                value={description ? JSON.stringify(description) : ""}
+                // Route an empty editor (e.g. typed-then-cleared) to "" so the
+                // server stores null — matches the grid's docIsEmpty handling so
+                // a junk empty-paragraph doc is never persisted (spec §4, PP-2m17 #4).
+                value={
+                  entry.description && !docIsEmpty(entry.description)
+                    ? JSON.stringify(entry.description)
+                    : ""
+                }
               />
             </div>
 
@@ -562,11 +445,11 @@ export function UnifiedReportForm({
                 <Label htmlFor="severity" className="text-foreground">
                   Severity *
                 </Label>
-                <input type="hidden" name="severity" value={severity} />
+                <input type="hidden" name="severity" value={entry.severity} />
                 <SeveritySelect
                   id="severity"
-                  value={severity}
-                  onValueChange={setSeverity}
+                  value={entry.severity}
+                  onValueChange={(v) => patchEntry(0, { severity: v })}
                 />
               </div>
 
@@ -574,11 +457,11 @@ export function UnifiedReportForm({
                 <Label htmlFor="frequency" className="text-foreground">
                   Frequency *
                 </Label>
-                <input type="hidden" name="frequency" value={frequency} />
+                <input type="hidden" name="frequency" value={entry.frequency} />
                 <FrequencySelect
                   id="frequency"
-                  value={frequency}
-                  onValueChange={setFrequency}
+                  value={entry.frequency}
+                  onValueChange={(v) => patchEntry(0, { frequency: v })}
                   testId="issue-frequency-select"
                 />
               </div>
@@ -591,22 +474,22 @@ export function UnifiedReportForm({
                   <Label htmlFor="priority" className="text-foreground">
                     Priority *
                   </Label>
-                  <input type="hidden" name="priority" value={priority} />
+                  <input type="hidden" name="priority" value={entry.priority} />
                   <PrioritySelect
                     id="priority"
-                    value={priority}
-                    onValueChange={setPriority}
+                    value={entry.priority}
+                    onValueChange={(v) => patchEntry(0, { priority: v })}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="status" className="text-foreground">
                     Status *
                   </Label>
-                  <input type="hidden" name="status" value={status} />
+                  <input type="hidden" name="status" value={entry.status} />
                   <StatusSelect
                     id="status"
-                    value={status}
-                    onValueChange={setStatus}
+                    value={entry.status}
+                    onValueChange={(v) => patchEntry(0, { status: v })}
                   />
                 </div>
               </div>
@@ -622,8 +505,10 @@ export function UnifiedReportForm({
                   id="assignedTo"
                   name="assignedTo"
                   data-testid="assigned-to-select"
-                  value={assignedTo}
-                  onChange={(e) => setAssignedTo(e.target.value)}
+                  value={entry.assignedTo}
+                  onChange={(e) =>
+                    patchEntry(0, { assignedTo: e.target.value })
+                  }
                   className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-[color,background-color,border-color,box-shadow] duration-150"
                 >
                   <option value="">Unassigned</option>
@@ -642,19 +527,21 @@ export function UnifiedReportForm({
                 <div className="space-y-1.5">
                   <ImageUploadButton
                     issueId="new"
-                    currentCount={uploadedImages.length}
+                    currentCount={single.uploadedImages.length}
                     maxCount={userAuthenticated ? 4 : 2}
                     onUploadComplete={(img) =>
-                      setUploadedImages((prev) => [...prev, img])
+                      patchSingle({
+                        uploadedImages: [...single.uploadedImages, img],
+                      })
                     }
                     disabled={isPending}
                   />
                 </div>
 
-                {uploadedImages.length > 0 && (
+                {single.uploadedImages.length > 0 && (
                   <div>
                     <ImageGallery
-                      images={uploadedImages.map((img) => ({
+                      images={single.uploadedImages.map((img) => ({
                         id: img.blobPathname,
                         fullImageUrl: img.blobUrl,
                         originalFilename: img.originalFilename,
@@ -665,7 +552,7 @@ export function UnifiedReportForm({
                 <input
                   type="hidden"
                   name="imagesMetadata"
-                  value={JSON.stringify(uploadedImages)}
+                  value={JSON.stringify(single.uploadedImages)}
                 />
               </div>
             </div>
@@ -691,8 +578,11 @@ export function UnifiedReportForm({
                         id="firstName"
                         name="firstName"
                         autoComplete="given-name"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
+                        enterKeyHint="next"
+                        value={single.firstName}
+                        onChange={(e) =>
+                          patchSingle({ firstName: e.target.value })
+                        }
                         className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
@@ -707,8 +597,11 @@ export function UnifiedReportForm({
                         id="lastName"
                         name="lastName"
                         autoComplete="family-name"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
+                        enterKeyHint="next"
+                        value={single.lastName}
+                        onChange={(e) =>
+                          patchSingle({ lastName: e.target.value })
+                        }
                         className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                       />
                     </div>
@@ -722,8 +615,9 @@ export function UnifiedReportForm({
                       name="email"
                       type="email"
                       autoComplete="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      enterKeyHint="send"
+                      value={single.email}
+                      onChange={(e) => patchSingle({ email: e.target.value })}
                       className="h-8 border-outline-variant bg-surface text-sm text-foreground"
                     />
                     <p className="text-[10px] text-muted-foreground leading-none">
@@ -751,8 +645,10 @@ export function UnifiedReportForm({
               <div className="flex items-start gap-3 py-1">
                 <Checkbox
                   id="watchIssue"
-                  checked={watchIssue}
-                  onCheckedChange={(checked) => setWatchIssue(checked === true)}
+                  checked={entry.watch}
+                  onCheckedChange={(checked) =>
+                    patchEntry(0, { watch: checked === true })
+                  }
                   className="mt-0.5 border-outline-variant data-[state=checked]:border-primary"
                 />
                 <div className="space-y-0.5">
@@ -769,7 +665,7 @@ export function UnifiedReportForm({
                 <input
                   type="hidden"
                   name="watchIssue"
-                  value={watchIssue ? "true" : "false"}
+                  value={entry.watch ? "true" : "false"}
                 />
               </div>
             )}
@@ -810,7 +706,7 @@ export function UnifiedReportForm({
                   // can't `required`-validate — gate the button instead so a
                   // report can't be filed without a machine (replaces the native
                   // <select required>).
-                  !selectedMachineId ||
+                  !entry.machineId ||
                   (enforceCaptcha && !turnstileToken)
                 }
               >
@@ -835,45 +731,7 @@ export function UnifiedReportForm({
                 <AlertDialogAction
                   variant="destructive"
                   onClick={() => {
-                    window.localStorage.removeItem("report_form_state");
-                    formRef.current?.reset();
-                    setSelectedMachineId(defaultMachineId ?? "");
-                    // If the machine was user-picked (URL didn't seed it), the
-                    // dropdown's onChange wrote ?machine=… into the URL via
-                    // history.replaceState. Strip it so a reload doesn't re-select.
-                    // Read window.location.search (not the searchParams hook),
-                    // since replaceState mutations don't update useSearchParams.
-                    if (!defaultMachineId) {
-                      const params = new URLSearchParams(
-                        window.location.search
-                      );
-                      if (params.has("machine")) {
-                        params.delete("machine");
-                        const query = params.toString();
-                        window.history.replaceState(
-                          null,
-                          "",
-                          query ? `?${query}` : window.location.pathname
-                        );
-                      }
-                    }
-                    setTitle("");
-                    setDescription(null);
-                    setSeverity("minor");
-                    setPriority("medium");
-                    setFrequency("constant");
-                    setStatus("new");
-                    setAssignedTo("");
-                    setWatchIssue(true);
-                    setFirstName("");
-                    setLastName("");
-                    setEmail("");
-                    setUploadedImages([]);
-                    setTurnstileToken("");
-                    // Fresh idempotency key — Clear starts a brand-new report.
-                    setIdempotencyKey(crypto.randomUUID());
-                    setEditorResetKey((k) => k + 1);
-                    setTurnstileWidgetKey((k) => k + 1);
+                    resetSingleForm();
                     setIsClearOpen(false);
                   }}
                 >

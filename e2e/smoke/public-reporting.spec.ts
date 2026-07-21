@@ -182,9 +182,9 @@ test.describe("Public Issue Reporting", () => {
       page.getByRole("heading", { name: "Issue Sent!" })
     ).toBeVisible();
 
-    // Verify localStorage was cleared on success page
+    // Verify the unified draft was cleared on the success page
     const draftAfterSuccess = await page.evaluate(() =>
-      window.localStorage.getItem("report_form_state")
+      window.localStorage.getItem("report_draft")
     );
     expect(draftAfterSuccess).toBeNull();
 

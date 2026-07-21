@@ -35,7 +35,11 @@ export type IssueListItem = Pick<
   assignedToUser?: Pick<UserProfile, "id" | "name"> | null;
 };
 
-export type IssueWithAllRelations = Issue & {
+// reporterEmail is intentionally excluded: the only query that produces this
+// shape sets `columns: { reporterEmail: false }` to enforce CORE-SEC-007 email
+// privacy at runtime, and no consumer of this type reads it. Omitting it here
+// keeps the type honest and lets the exclusion be checked by the compiler.
+export type IssueWithAllRelations = Omit<Issue, "reporterEmail"> & {
   machine: Pick<Machine, "id" | "name" | "ownerRequirements"> & {
     owner?: Pick<UserProfile, "id" | "name"> | null;
     invitedOwner?: {

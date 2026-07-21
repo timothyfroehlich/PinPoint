@@ -393,9 +393,9 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
       },
       {
         id: "machines.pinballmap.link",
-        label: "Link machines to PinballMap",
+        label: "Link machines to Pinball Map",
         description:
-          "Set or change a machine's PinballMap catalog link, or mark it as not on PinballMap",
+          "Set or change a machine's Pinball Map catalog link, or mark it as not on Pinball Map",
         access: {
           unauthenticated: false,
           guest: false,
@@ -419,9 +419,9 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
       },
       {
         id: "machines.pinballmap.sync",
-        label: "Trigger a PinballMap sync",
+        label: "Trigger a Pinball Map sync",
         description:
-          "Manually refresh the stored PinballMap location snapshot ('Sync now'). The hourly cron does this automatically; this grants the on-demand action.",
+          "Manually refresh the stored Pinball Map location snapshot ('Sync now'). The hourly cron does this automatically; this grants the on-demand action.",
         access: {
           unauthenticated: false,
           guest: false,

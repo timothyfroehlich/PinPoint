@@ -52,7 +52,6 @@ function createIssue(
     reportedBy: "reporter-1",
     invitedReportedBy: null,
     reporterName: null,
-    reporterEmail: null,
     assignedTo: "assignee-1",
     idempotencyKey: null,
     closedAt: null,

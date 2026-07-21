@@ -449,19 +449,25 @@ export function EditMachineDialog({
            * server actions (link / verify) via its own <form> elements, and
            * nested forms are invalid HTML. The disabled "List on PinballMap"
            * checkbox it replaces was display-only (PP-o355.12 read side).
+           *
+           * NOT gated on `canLink`: the "Listed" badge + pinballmap.com
+           * link-back are attribution that CORE-PBM-001 requires for everyone
+           * who can see PBM data, not just linkers. The control gates the
+           * link/verify affordances internally on its own `canLink` prop, so a
+           * non-linker still sees the listing state and attribution without the
+           * mutating controls. It self-hides when the machine has no catalog
+           * link (`hasCatalogLink` false).
            */}
-          {canLink && (
-            <div className="mt-4">
-              <PinballmapListingControl
-                machineId={machine.id}
-                hasCatalogLink={machine.pinballmapMachineId !== null}
-                listed={machine.pinballmapListed}
-                lmxId={machine.pinballmapLmxId}
-                canLink={canLink}
-                pinballmapUrl={pinballmapUrl}
-              />
-            </div>
-          )}
+          <div className="mt-4">
+            <PinballmapListingControl
+              machineId={machine.id}
+              hasCatalogLink={machine.pinballmapMachineId !== null}
+              listed={machine.pinballmapListed}
+              lmxId={machine.pinballmapLmxId}
+              canLink={canLink}
+              pinballmapUrl={pinballmapUrl}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

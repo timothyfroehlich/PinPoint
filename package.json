@@ -1,7 +1,7 @@
 {
   "name": "pinpoint",
   "version": "0.2.0",
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@11.8.0+sha512.c1f5e7c4cb241c8f174b743851d82f42b802324afc8b0f116b96adb15aa06664948dde36960a3ba1079ba5b4b29dd0140135b94b5b5f5263592249d68e555f26",
   "type": "module",
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
@@ -89,6 +89,7 @@
     "@marsidev/react-turnstile": "^1.5.0",
     "@mdx-js/loader": "^3.1.1",
     "@mdx-js/react": "^3.1.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@next/env": "^16.2.3",
     "@next/mdx": "^16.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -127,6 +128,7 @@
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.0.1",
+    "mcp-handler": "1.1.0",
     "next": "^16.2.6",
     "nodemailer": "^9.0.1",
     "pino": "^10.3.1",

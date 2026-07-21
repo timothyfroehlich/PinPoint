@@ -33,18 +33,26 @@ interface Props {
   currentName: string;
   allMachines: { id: string; initials: string; name: string }[];
   currentIds: string[];
+  /**
+   * Owner-only: show the "Delete collection" control. Editor collaborators can
+   * edit content (name + machines) but cannot delete, so the layout passes
+   * `false` for them (PP-wqit.7).
+   */
+  canDelete: boolean;
 }
 
 /**
- * Owner-only "Edit collection" modal: renames the collection and edits its
- * machine set in one place, saved together via `updateCollectionAction`. A
- * footer "Delete collection" button removes it behind a nested confirm.
+ * "Edit collection" modal: renames the collection and edits its machine set in
+ * one place, saved together via `updateCollectionAction`. Available to the owner
+ * and editor collaborators; the footer "Delete collection" button is owner-only
+ * (gated by `canDelete`).
  */
 export function EditCollectionDialog({
   collectionId,
   currentName,
   allMachines,
   currentIds,
+  canDelete,
 }: Props): React.JSX.Element {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -125,41 +133,43 @@ export function EditCollectionDialog({
         )}
 
         <div className="@container flex flex-row items-center justify-between gap-2">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                type="button"
-                variant="destructive"
-                data-testid="collection-delete-trigger"
-              >
-                {/* Narrow footer (mobile dialog): shorten the label to one row. */}
-                <span className="@sm:hidden">Delete</span>
-                <span className="hidden @sm:inline">Delete collection</span>
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete this collection?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This removes the collection and its machine list. The machines
-                  themselves and their issues are not affected. This cannot be
-                  undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="gap-2 sm:gap-0">
-                <AlertDialogCancel>Keep collection</AlertDialogCancel>
+          {canDelete && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
                 <Button
                   type="button"
                   variant="destructive"
-                  onClick={remove}
-                  disabled={deletePending}
-                  data-testid="collection-delete-confirm"
+                  data-testid="collection-delete-trigger"
                 >
-                  {deletePending ? "Deleting…" : "Delete collection"}
+                  {/* Narrow footer (mobile dialog): shorten the label to one row. */}
+                  <span className="@sm:hidden">Delete</span>
+                  <span className="hidden @sm:inline">Delete collection</span>
                 </Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this collection?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This removes the collection and its machine list. The
+                    machines themselves and their issues are not affected. This
+                    cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="gap-2 sm:gap-0">
+                  <AlertDialogCancel>Keep collection</AlertDialogCancel>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={remove}
+                    disabled={deletePending}
+                    data-testid="collection-delete-confirm"
+                  >
+                    {deletePending ? "Deleting…" : "Delete collection"}
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
 
           <div className="flex gap-2">
             <Button

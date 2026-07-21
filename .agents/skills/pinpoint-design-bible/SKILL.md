@@ -173,6 +173,8 @@ When building a new page, pick the closest archetype and follow its pattern.
 
 `max-w-2xl` -- Form inside a card, back button + title in header.
 
+**Tabbed variant — the report page (`/report`, PP-idrb).** "Report an Issue" is one `PageContainer size="wide"` page with a **boxed**, URL-driven tab bar (Single issue / Multiple) hosted in `report/layout.tsx`. Unlike the underline Tabbed Detail archetype above, these tabs are boxed (segmented look: `rounded-lg border bg-muted p-1`; active tab `bg-card shadow-sm`) with icons (`AlertCircle` / `ListPlus`), default Single. A `"use client"` `ReportDraftProvider` in the layout holds one shared draft so **entry #1** syncs between the detailed Single form and the grid's first row and survives the tab switch (layouts don't remount across sibling-route nav). The one lock (spec `docs/superpowers/specs/2026-07-16-tabbed-report-page-design.md` §5): 2+ grid rows with content disable the Single tab (`aria-disabled`, tapping reveals a one-line reason). Still route-driven — `<Link>` + `usePathname()`, no shadcn `<Tabs>`.
+
 ### Settings Page
 
 `max-w-3xl` -- Vertical sections separated by `Separator` components.
@@ -623,6 +625,20 @@ These are not in PinPoint today. They require a per-feature opt-in here in §19 
 - **`text-wrap: balance`** — partially adopted (we use `text-balance` selectively per §9), but treat as Newly available and check support per use.
 - **`interestfor` attribute** for tooltips — Chrome-only as of late 2025; defer.
 - **`closedby` attribute** on `<dialog>` — Limited availability (no Safari).
+
+### Adopted below the Baseline floor (safe-no-op progressive enhancements)
+
+A feature below the Widely-available floor may still be used **when the browsers
+that lack it degrade to a harmless no-op** (never a broken experience) and a
+Widely-available primitive already covers the same need as the floor. Each such
+feature is listed here with its status, why it degrades safely, and the
+cross-browser floor that carries the non-supporting browsers.
+
+| Feature                                         | Status                  | Degrades to                            | Cross-browser floor                                                 |
+| :---------------------------------------------- | :---------------------- | :------------------------------------- | :------------------------------------------------------------------ |
+| `interactive-widget=resizes-content` (viewport) | Limited (Chromium-only) | The browser default (`resizes-visual`) | `scrollIntoView`-on-focus + `scroll-margin` in the settings editors |
+
+- **`interactive-widget=resizes-content`** — exported once from the root layout (`src/app/layout.tsx`, PP-a0pl). On Chromium (Chrome/Edge/Android) the on-screen keyboard shrinks the **layout** viewport so content reflows above it; **iOS Safari and Firefox ignore it** and keep their own native focus-scroll. That's a strict improvement where honored and a no-op elsewhere — never a regression. The cross-browser floor that actually reaches a focused field on iOS is the `scrollIntoView({ block: "nearest" })` + `scroll-margin` on focus in `RowEditSheet`, `EditableCell`, and `InlineEditableField`. **Verification limit:** no headless tool has a real virtual keyboard, so the Playwright guard (`e2e/full/soft-keyboard-reflow.spec.ts`) proves reachability/reflow under a keyboard-open-height viewport, not pixel-exact keyboard geometry — the latter needs a real device (deferred; PP-a0pl Part 3).
 
 ### How to verify a feature's Baseline status
 

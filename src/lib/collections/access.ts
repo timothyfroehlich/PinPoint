@@ -22,10 +22,28 @@ export function canViewCollection(
   return viewer.role === "admin";
 }
 
-/** Manage (rename, delete, edit membership) is owner-only in MVP. */
+/**
+ * Manage (delete, view-link toggle, manage collaborators) is owner-only.
+ * Note: content editing (name + machines) is broader — see canEditCollection.
+ */
 export function canManageCollection(
   collection: { owner: { id: string } },
   viewer: CollectionViewer
 ): boolean {
   return viewer.userId !== undefined && viewer.userId === collection.owner.id;
+}
+
+/**
+ * Content edit (name + machines) is allowed for the owner OR a signed-in editor
+ * collaborator (PP-wqit.7). `isEditorCollaborator` is resolved by the caller
+ * (a membership-row lookup) so this stays pure. Admins do NOT get edit-any —
+ * an admin edits a collection only via an explicit grant.
+ */
+export function canEditCollection(
+  collection: { owner: { id: string } },
+  viewer: CollectionViewer,
+  isEditorCollaborator: boolean
+): boolean {
+  if (canManageCollection(collection, viewer)) return true;
+  return viewer.userId !== undefined && isEditorCollaborator;
 }

@@ -35,6 +35,19 @@ export const proseMirrorDocSchema = z.object({
 });
 
 /**
+ * A `ProseMirrorDoc`-typed schema for use as a field in larger schemas. Because
+ * `proseMirrorDocSchema` types `content` as `unknown[]` (Tiptap owns node
+ * validation), its inferred type isn't assignable to the strict `ProseMirrorDoc`
+ * that editors/actions consume. This `z.custom` validates with the loose schema
+ * but exposes `ProseMirrorDoc` as its output type — so a parsed value is usable
+ * directly with no unsafe cast (CORE-TS-007). Used by the report draft store and
+ * the quick-report row schema.
+ */
+export const proseMirrorDocValueSchema = z.custom<ProseMirrorDoc>(
+  (v) => proseMirrorDocSchema.safeParse(v).success
+);
+
+/**
  * Convert plain text to a minimal ProseMirror document.
  * Splits on double newlines for paragraphs. Single newlines become hard breaks.
  */

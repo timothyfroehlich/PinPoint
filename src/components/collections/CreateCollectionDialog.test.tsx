@@ -39,7 +39,7 @@ describe("CreateCollectionDialog", () => {
     render(<CreateCollectionDialog allMachines={allMachines} />);
 
     await userEvent.click(screen.getByTestId("create-collection-trigger"));
-    await userEvent.type(screen.getByLabelText("Name"), "Tournament Bank");
+    await userEvent.type(screen.getByLabelText(/name/i), "Tournament Bank");
     await userEvent.click(screen.getByTestId("create-collection-submit"));
 
     await waitFor(() =>
@@ -48,9 +48,7 @@ describe("CreateCollectionDialog", () => {
         machineIds: [],
       })
     );
-    await waitFor(() =>
-      expect(push).toHaveBeenCalledWith("/c/collection/new-id")
-    );
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/c/new-id"));
   });
 
   it("keeps submit disabled until a name is entered", async () => {
@@ -59,7 +57,7 @@ describe("CreateCollectionDialog", () => {
     await userEvent.click(screen.getByTestId("create-collection-trigger"));
     expect(screen.getByTestId("create-collection-submit")).toBeDisabled();
 
-    await userEvent.type(screen.getByLabelText("Name"), "X");
+    await userEvent.type(screen.getByLabelText(/name/i), "X");
     expect(screen.getByTestId("create-collection-submit")).toBeEnabled();
   });
 
@@ -68,7 +66,7 @@ describe("CreateCollectionDialog", () => {
     render(<CreateCollectionDialog allMachines={allMachines} />);
 
     await userEvent.click(screen.getByTestId("create-collection-trigger"));
-    await userEvent.type(screen.getByLabelText("Name"), "Nope");
+    await userEvent.type(screen.getByLabelText(/name/i), "Nope");
     await userEvent.click(screen.getByTestId("create-collection-submit"));
 
     expect(await screen.findByText("Forbidden")).toBeInTheDocument();

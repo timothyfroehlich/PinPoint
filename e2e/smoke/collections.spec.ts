@@ -34,7 +34,7 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     await page.getByTestId("create-collection-trigger").click();
     await page.getByLabel("Name").fill(name);
     await page.getByTestId("create-collection-submit").click();
-    await expect(page).toHaveURL(/\/c\/collection\//);
+    await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}/);
 
     // Fresh collection is empty — the owner sees the inline add-machines picker.
     await expect(
@@ -60,5 +60,63 @@ test.describe("Personal collections (PP-wqit.1)", () => {
     await page.getByTestId("collection-tab-timeline").click();
     await expect(page).toHaveURL(/\/timeline$/);
     await expect(page.getByTestId("collection-summary")).toBeVisible();
+  });
+
+  test("share a collection and open the view link anonymously (Wave 0b)", async ({
+    page,
+    browser,
+  }) => {
+    const name = `${getTestPrefix()} Shared`;
+
+    // Owner creates a collection with a machine so the shared Overview has content.
+    await page.goto("/c/collections");
+    await page.getByTestId("create-collection-trigger").click();
+    await page.getByLabel("Name").fill(name);
+    await page.getByTestId("create-collection-submit").click();
+    await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}/);
+    await page.getByTestId("collection-machines-multiselect").click();
+    await page.getByPlaceholder("Search machines…").fill("Slick Chick");
+    await page.getByRole("option", { name: /Slick Chick/ }).click();
+    await page.keyboard.press("Escape");
+    await page.getByTestId("collection-add-machines").click();
+    await expect(page.getByTestId("collection-overview-body")).toBeVisible();
+
+    // Enable view sharing and grab the generated link.
+    await page.getByTestId("collection-share-trigger").click();
+    await page.getByTestId("collection-share-toggle").click();
+    const shareUrl = await page
+      .getByTestId("collection-share-url")
+      .inputValue();
+    expect(shareUrl).toMatch(/\/c\/[^/]+$/);
+
+    // A genuinely signed-out context opens the link — no login redirect, and
+    // the read-only Overview renders without any owner controls. Force an empty
+    // storageState: under this file's `test.use({ storageState: member })`, a
+    // bare newContext() inherits the member session (it would NOT be anonymous).
+    const anon = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
+    try {
+      const anonPage = await anon.newPage();
+      await anonPage.goto(shareUrl);
+      await expect(
+        anonPage.getByTestId("collection-overview-body")
+      ).toBeVisible();
+      await expect(anonPage).toHaveURL(/\/c\/[^/]+$/);
+      await expect(
+        anonPage.getByTestId("collection-share-trigger")
+      ).toHaveCount(0);
+      await expect(anonPage.getByTestId("collection-edit-trigger")).toHaveCount(
+        0
+      );
+    } finally {
+      await anon.close();
+    }
+
+    // The OWNER opening their own share link still sees full controls — access
+    // is permission-based, not URL-based (the token only widens who can read).
+    await page.goto(shareUrl);
+    await expect(page.getByTestId("collection-share-trigger")).toBeVisible();
+    await expect(page.getByTestId("collection-edit-trigger")).toBeVisible();
   });
 });

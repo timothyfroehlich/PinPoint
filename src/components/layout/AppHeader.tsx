@@ -5,9 +5,8 @@ import { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { AlertCircle, ListPlus } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { cn } from "~/lib/utils";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { Button } from "~/components/ui/button";
 import {
   NotificationList,
@@ -48,10 +47,6 @@ export function AppHeader({
   newChangelogCount,
 }: AppHeaderProps): React.JSX.Element {
   const pathname = usePathname();
-  const canQuickReport = checkPermission(
-    "issues.report.quick",
-    getAccessLevel(role)
-  );
 
   const navLinks = useMemo(
     () =>
@@ -120,9 +115,9 @@ export function AppHeader({
           >
             <item.icon className="size-4 shrink-0" aria-hidden="true" />
             {/* Labels appear at xl (not lg): at the 1024px lg breakpoint the
-                nav (now 4 items incl. Collections) plus the Report + Quick
-                actions overflow the header — icon-only keeps it within the
-                viewport until there's room for text. */}
+                nav (now 4 items incl. Collections) plus the Report action
+                overflow the header — icon-only keeps it within the viewport
+                until there's room for text. */}
             <span className="hidden xl:inline" aria-hidden="true">
               {item.title}
             </span>
@@ -150,22 +145,6 @@ export function AppHeader({
             </span>
           </Link>
         </Button>
-        {canQuickReport ? (
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            className="gap-2"
-            data-testid="nav-quick-report"
-          >
-            <Link href="/report/quick" aria-label="Quick report">
-              <ListPlus className="size-4 shrink-0" aria-hidden="true" />
-              <span className="hidden lg:inline" aria-hidden="true">
-                Quick
-              </span>
-            </Link>
-          </Button>
-        ) : null}
         <HelpMenu newChangelogCount={newChangelogCount} />
       </div>
 

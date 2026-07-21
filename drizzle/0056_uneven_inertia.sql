@@ -1,0 +1,1 @@
+ALTER TABLE "pinballmap_state" ADD COLUMN "last_sync_attempt_at" timestamp with time zone;

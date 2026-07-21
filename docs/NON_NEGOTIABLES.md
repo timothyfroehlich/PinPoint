@@ -5,8 +5,8 @@ trigger: always_on
 
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-06-18
-**Version**: 2.3 (PinballMap API conduct added — CORE-PBM-001)
+**Last Updated**: 2026-07-17
+**Version**: 2.4 (form-token/status corrections; SMTP, quick-report-grid, and confirm-delete sanctioned exceptions — audit PP-9vh3/PP-h9lb)
 
 > **Sync contract**: `AGENTS.md` §2.1 is a one-line index of these rules. Every §2.1 entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
 
@@ -218,7 +218,8 @@ trigger: always_on
 - **Severity:** Critical
 - **Why:** Browser cookies set on `localhost` are not sent to `127.0.0.1`. Mixing the two across Supabase site URL, Next.js dev server, and Playwright `baseURL` breaks SSR auth — Server Actions see anonymous users after a successful login.
 - **Do:** Use `localhost` in `supabase/config.toml`, `.env*`, Playwright `baseURL`, health-check scripts, and any local HTTP endpoint.
-- **Don't:** Use `127.0.0.1:NNNN` for any local URL agents or the dev stack will read. CSP rules and validation checks that intentionally cover both forms are the only exception.
+- **Don't:** Use `127.0.0.1:NNNN` for any local URL agents or the dev stack will read.
+- **Exceptions:** CSP rules and validation checks that intentionally cover both forms; and server-to-server connections where no browser or cookie is involved — e.g. the local Mailpit SMTP client in `src/lib/email/transport.ts` defaults `host` to `127.0.0.1`, and the cookie-isolation rationale above simply does not apply to a Node SMTP socket.
 
 **CORE-SEC-009:** Production-required env vars go in the central build registry; no secret coupling
 
@@ -317,6 +318,7 @@ trigger: always_on
 - **Why:** Forms work without JavaScript
 - **Do:** Use Server Actions with `<form action={serverAction}>`
 - **Don't:** Require client-side JavaScript for core functionality
+- **Sanctioned exception:** The member+ bulk quick-report grid (`src/app/(app)/report/(tabbed)/quick/quick-report-grid.tsx`, PP-sn34) submits each row through an `onClick`-triggered Server Action instead of a single `<form action>`, because per-row async submit with independent partial-failure handling across many rows cannot be expressed as one native form. This is acceptable **only because** the unified single-issue report form (`/report`) is the fully progressive-enhancement path — the grid is a technician-oriented power tool layered on top, not the only way to file an issue. A new no-`<form>` submission path that is the _sole_ way to perform an action is still a violation.
 
 **CORE-ARCH-004:** Issues always per-machine
 
@@ -385,7 +387,7 @@ trigger: always_on
 
 - **Severity:** High
 - **Why:** PinballMap is a third-party community service we both read from and write to publicly. Their `llms.txt` sets explicit conduct (use bulk endpoints, don't poll in loops, store-and-reuse tokens, real-but-generous rate limits) and their `robots.txt` blocks AI crawlers from the website — the documented JSON API is the only sanctioned channel. Their FAQ requires attribution + a link back when displaying their data. Ignoring this risks rate-limit bans and violates their terms.
-- **Do:** Route all PBM access through the `PinballMapClient` seam (`~/lib/pinballmap`). Use the documented JSON API per the vendored `docs/external/pinballmap-llms.txt`; one location call per hour for sync; store and reuse tokens in Supabase Vault; send a descriptive User-Agent with a contact URL; back off on 429; render attribution + a link back to pinballmap.com wherever PBM data appears. Re-read the vendored `docs/external/pinballmap-*` files (kept current by the drift GHA) before changing integration code.
+- **Do:** Route all PBM access through the `PinballMapClient` seam (`~/lib/pinballmap`). Use the documented JSON API per the vendored `docs/external/pinballmap-llms.txt`. Sync cadence: the automated cron does one location call per hour; human-initiated "Sync now"/verify refreshes are throttled at the `syncLocationSnapshot` seam to at most one per `PBM_MANUAL_SYNC_MIN_INTERVAL_MS` (3 min → ≤20/hour), enforced against the last ATTEMPT so a failed fetch can't fail-open the guard (PP-hbi0). Store and reuse tokens in Supabase Vault; send a descriptive User-Agent with a contact URL; back off on 429; render attribution + a link back to pinballmap.com wherever PBM data appears. Re-read the vendored `docs/external/pinballmap-*` files (kept current by the drift GHA) before changing integration code.
 - **Don't:** Crawl or scrape pinballmap.com HTML; poll the API in loops to detect changes; call `auth_details` per request; use undocumented/web-only routes; or reach pinballmap.com from any test (that is also CORE-TEST-006 — mock at the client seam).
 
 ---
@@ -437,7 +439,7 @@ trigger: always_on
 - **Why:** JS viewport checks create hydration mismatches, add resize listeners, and duplicate CSS's job
 - **Do:** Use Tailwind breakpoint classes or container queries
 - **Don't:** `window.innerWidth`, `window.matchMedia`, `useMediaQuery` hooks
-- **Sanctioned exceptions** (behavior swaps CSS can't express, not styling): `use-table-responsive-columns` (PP-rs9), `use-is-mobile` (PP-43q3 — swaps inline cell editing for a bottom-sheet editor on mobile)
+- **Sanctioned exceptions** (behavior swaps CSS can't express, not styling): `use-table-responsive-columns` (PP-rs9); `use-is-mobile` (PP-43q3) — two consumers: it swaps inline cell editing for a bottom-sheet editor, and swaps the arm/confirm-tap delete affordance for a modal confirm in `ConfirmingDeleteButton`
 
 **CORE-RESP-003:** sm: is padding only
 
@@ -532,12 +534,13 @@ trigger: always_on
 - **Why:** `type="email"` triggers the email keyboard on mobile and enables free native format validation; `type="tel"` triggers the numeric keypad; `type="url"` adds URL hints. `type="text"` is the wrong default for typed identity inputs — it loses the keyboard hint and the validation.
 - **Do:** `type="email"` for any email field (login, signup, anonymous-reporter contact, password reset). `type="tel"` for phone. `type="url"` for URLs. `type="password"` for any secret. `type="number"` only when the value is a number you'll do math on — for postal codes, IDs, and similar, use `type="text" inputMode="numeric"`.
 - **Don't:** Ship `<input type="text">` for an email field. Don't suppress the type to bypass a mobile keyboard quirk — fix the quirk.
+- **Exception:** A combined email-or-username sign-in field uses `type="text" inputMode="email"` (see `src/app/(auth)/login/login-form.tsx`) — it accepts either an email address or a bare username, so native `type="email"` validation (which would reject a username) is deliberately traded away while `inputMode` keeps the email keyboard hint.
 
 **CORE-FORM-002:** Autocomplete tokens on every credential/identity input
 
 - **Severity:** Critical
 - **Why:** Password managers and browser autofill key on the `autocomplete` attribute. Wrong or missing tokens mean credentials don't autofill, generated passwords aren't offered, and the confirm-password field gets autofilled with the user's existing password — silently breaking the flow.
-- **Do:** Sign-in form: `autocomplete="username"` on email + `id="current-password"` on the password field with `autocomplete="current-password"`. Sign-up form: `autocomplete="username"` on email, `autocomplete="new-password"` on the new password field, `autocomplete="off"` on the confirm-password field. Anonymous-reporter forms get `autocomplete="given-name"`, `autocomplete="family-name"`, `autocomplete="email"`. Domain-specific pickers that should NOT be autofilled (e.g., machine selector) set `autocomplete="off"` explicitly.
+- **Do:** Sign-in form: `autocomplete="username"` on the email/username field (it is the account login identifier) + `id="current-password"` on the password field with `autocomplete="current-password"`. Sign-up form: `autocomplete="username"` on the email field (the email is the account login identifier), `autocomplete="new-password"` on the new password field, `autocomplete="off"` on the confirm-password field. Anonymous-reporter forms get `autocomplete="given-name"`, `autocomplete="family-name"`, `autocomplete="email"`. Domain-specific pickers that should NOT be autofilled (e.g., machine selector) set `autocomplete="off"` explicitly.
 - **Don't:** Put `autocomplete="new-password"` on the confirm field. Don't share an `id` between login and signup password fields. Don't omit the attribute on anonymous-reporter forms.
 - **Reference:** modern-web-guidance `autofill-sign-in-form`, `autofill-sign-up-form`, `autofill-address-form`.
 
@@ -545,19 +548,19 @@ trigger: always_on
 
 - **Severity:** Required
 - **Why:** `:user-invalid` (Baseline Widely available) flips a CSS pseudo-class on form controls only **after** the user has interacted with them — no premature red rings on page load, no JS state mirroring, no event listeners. The shared `<Input>` already has `aria-invalid:` styling; pair it with `:user-invalid:` and the browser does the rest.
-- **Do:** `src/components/ui/input.tsx` (and `textarea.tsx`, `select.tsx`) must carry the equivalent of `[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40` so every input automatically picks up post-interaction invalid styling. Add to the primitive once — don't copy this per form.
+- **Do:** `src/components/ui/input.tsx` and `textarea.tsx` carry the equivalent of `[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40` so every input automatically picks up post-interaction invalid styling. Add to the primitive once — don't copy this per form. (`select.tsx` is a Radix trigger, not a native form control, so the `:user-invalid` pseudo-class does not apply to it — it uses `aria-invalid:` styling only.)
 - **Don't:** Hand-roll `useState` + `onBlur` to mirror invalid state. Don't paint inputs red on initial render.
 - **Reference:** modern-web-guidance `validate-input-after-interaction`.
-- **Status:** Not yet implemented; tracked under PP-kqbk.2.
+- **Status:** Implemented in `input.tsx` and `textarea.tsx` (PP-kqbk.2). `select.tsx` is out of scope — see the Do note.
 
 **CORE-FORM-004:** `aria-invalid` synced for screen readers
 
 - **Severity:** Required
 - **Why:** `:user-invalid` is a CSS pseudo-class — visual only. Screen readers need `aria-invalid="true"` to announce "invalid" alongside the field label. Without it, AT users get only the form-level alert after a server round-trip.
-- **Do:** Add the `onBlur` listener to `src/components/ui/input.tsx` (and `textarea.tsx`, `select.tsx`) **once** so every form picks it up automatically — same primitive that hosts CORE-FORM-003 styling. The listener sets `aria-invalid="true"` on inputs that fail `checkValidity()` after first interaction, and `aria-invalid="false"` when the value becomes valid again. Do not copy the listener per form.
+- **Do:** Add the `onBlur` listener to `src/components/ui/input.tsx` and `textarea.tsx` **once** so every form picks it up automatically — same primitive that hosts CORE-FORM-003 styling. The listener sets `aria-invalid="true"` on inputs that fail `checkValidity()` after first interaction, and `aria-invalid="false"` when the value becomes valid again, and skips the sync when the caller already controls `aria-invalid` (react-hook-form / Radix `FormControl`). Do not copy the listener per form.
 - **Don't:** Set `aria-invalid="true"` on initial render. Don't rely solely on the form-level `<Alert>` to communicate per-field errors.
 - **Reference:** modern-web-guidance `accessible-error-announcement`, `required-field-feedback`.
-- **Status:** Not yet implemented; tracked under PP-kqbk.2 (bundled with CORE-FORM-003).
+- **Status:** Implemented in `input.tsx` and `textarea.tsx` (PP-kqbk.2, bundled with CORE-FORM-003). `select.tsx` (a Radix trigger) has no native `checkValidity()`; a caller-controlled `aria-invalid` is the mechanism there.
 
 **CORE-FORM-005:** Required fields are visually marked before interaction
 
