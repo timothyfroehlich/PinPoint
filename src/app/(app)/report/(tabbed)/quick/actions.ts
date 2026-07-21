@@ -5,9 +5,10 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { machines } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { checkPermission } from "~/lib/permissions/helpers";
+import { getUserAccessLevel } from "~/lib/permissions/access";
 import { createIssue } from "~/services/issues";
 import { dispatchNotification } from "~/lib/notifications";
 import { reportError } from "~/lib/observability/report-error";
@@ -30,11 +31,7 @@ async function requireQuickReporter(): Promise<{ userId: string } | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-  const accessLevel = getAccessLevel(profile?.role);
+  const accessLevel = await getUserAccessLevel(user.id);
   if (!checkPermission("issues.report.quick", accessLevel)) return null;
   return { userId: user.id };
 }

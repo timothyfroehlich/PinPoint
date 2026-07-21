@@ -626,6 +626,20 @@ These are not in PinPoint today. They require a per-feature opt-in here in §19 
 - **`interestfor` attribute** for tooltips — Chrome-only as of late 2025; defer.
 - **`closedby` attribute** on `<dialog>` — Limited availability (no Safari).
 
+### Adopted below the Baseline floor (safe-no-op progressive enhancements)
+
+A feature below the Widely-available floor may still be used **when the browsers
+that lack it degrade to a harmless no-op** (never a broken experience) and a
+Widely-available primitive already covers the same need as the floor. Each such
+feature is listed here with its status, why it degrades safely, and the
+cross-browser floor that carries the non-supporting browsers.
+
+| Feature                                         | Status                  | Degrades to                            | Cross-browser floor                                                 |
+| :---------------------------------------------- | :---------------------- | :------------------------------------- | :------------------------------------------------------------------ |
+| `interactive-widget=resizes-content` (viewport) | Limited (Chromium-only) | The browser default (`resizes-visual`) | `scrollIntoView`-on-focus + `scroll-margin` in the settings editors |
+
+- **`interactive-widget=resizes-content`** — exported once from the root layout (`src/app/layout.tsx`, PP-a0pl). On Chromium (Chrome/Edge/Android) the on-screen keyboard shrinks the **layout** viewport so content reflows above it; **iOS Safari and Firefox ignore it** and keep their own native focus-scroll. That's a strict improvement where honored and a no-op elsewhere — never a regression. The cross-browser floor that actually reaches a focused field on iOS is the `scrollIntoView({ block: "nearest" })` + `scroll-margin` on focus in `RowEditSheet`, `EditableCell`, and `InlineEditableField`. **Verification limit:** no headless tool has a real virtual keyboard, so the Playwright guard (`e2e/full/soft-keyboard-reflow.spec.ts`) proves reachability/reflow under a keyboard-open-height viewport, not pixel-exact keyboard geometry — the latter needs a real device (deferred; PP-a0pl Part 3).
+
 ### How to verify a feature's Baseline status
 
 The Google Chrome `modern-web-guidance` catalog tags each guide with its Baseline status. Search it before adopting any pattern:

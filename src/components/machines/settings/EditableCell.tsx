@@ -102,7 +102,9 @@ export function EditableCell({
       ref={inputRef}
       value={draft}
       className={cn(
-        "h-7 px-1.5 py-0 max-md:text-[13px]",
+        // `scroll-my-2` reserves a gap so the focus `scrollIntoView` below lands
+        // the cell clear of the on-screen keyboard's top edge (PP-a0pl).
+        "h-7 scroll-my-2 px-1.5 py-0 max-md:text-[13px]",
         EDITABLE_FIELD_CLASS,
         EDITABLE_TEXT_CLASS,
         inputClassName
@@ -120,8 +122,14 @@ export function EditableCell({
             spellCheck: false,
           }
         : {})}
-      onFocus={() => {
+      onFocus={(e) => {
         isFocused.current = true;
+        // Pull the focused cell above the on-screen keyboard once it resizes the
+        // content area. Belt-and-suspenders beyond the root `interactive-widget=
+        // resizes-content` viewport (PP-a0pl), which iOS Safari ignores.
+        // `block: "nearest"` is a no-op when the cell is already visible, so
+        // desktop tab-through between inline cells never jumps.
+        e.currentTarget.scrollIntoView({ block: "nearest" });
       }}
       onChange={(e) => {
         const raw = e.target.value;

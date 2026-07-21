@@ -31,13 +31,14 @@ const allMachines = [
   { id: "m2", initials: "BB", name: "Beta" },
 ];
 
-function renderDialog(): void {
+function renderDialog(canDelete = true): void {
   render(
     <EditCollectionDialog
       collectionId="c1"
       currentName="My Faves"
       allMachines={allMachines}
       currentIds={["m1"]}
+      canDelete={canDelete}
     />
   );
 }
@@ -95,5 +96,15 @@ describe("EditCollectionDialog", () => {
       expect(deleteAction).toHaveBeenCalledWith({ collectionId: "c1" })
     );
     await waitFor(() => expect(push).toHaveBeenCalledWith("/c/collections"));
+  });
+
+  it("hides the delete control for an editor (canDelete=false)", async () => {
+    renderDialog(false);
+    await userEvent.click(screen.getByTestId("collection-edit-trigger"));
+    expect(
+      screen.queryByTestId("collection-delete-trigger")
+    ).not.toBeInTheDocument();
+    // Save is still available — editors can edit content.
+    expect(screen.getByTestId("collection-save")).toBeInTheDocument();
   });
 });

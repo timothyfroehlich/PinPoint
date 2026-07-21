@@ -47,7 +47,8 @@ import type {
   IssuePriority,
   IssueFrequency,
 } from "~/lib/types";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { checkPermission } from "~/lib/permissions/helpers";
+import { getUserAccessLevel } from "~/lib/permissions/access";
 
 const recentIssuesParamsSchema = z.object({
   machineInitials: z
@@ -226,12 +227,7 @@ export async function submitPublicIssueAction(
   if (reportedBy) {
     // Optimization: Check if we have the profile already?
     // We don't have it in scope if it came from `user.id`.
-    const profile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, reportedBy),
-      columns: { role: true },
-    });
-
-    const accessLevel = getAccessLevel(profile?.role);
+    const accessLevel = await getUserAccessLevel(reportedBy);
     const canSetStatus = checkPermission("issues.report.status", accessLevel);
     const canSetPriority = checkPermission(
       "issues.report.priority",

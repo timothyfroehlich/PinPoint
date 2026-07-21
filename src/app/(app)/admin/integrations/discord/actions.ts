@@ -2,13 +2,14 @@
 
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { discordIntegrationConfig, userProfiles } from "~/server/db/schema";
+import { discordIntegrationConfig } from "~/server/db/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { saveDiscordConfigSchema, validateServerIdSchema } from "./schema";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { checkPermission } from "~/lib/permissions/helpers";
+import { getUserAccessLevel } from "~/lib/permissions/access";
 import { getDiscordTokenForAdmin } from "~/lib/discord/config";
 
 async function verifyIntegrationsAdmin(): Promise<{ userId: string }> {
@@ -18,11 +19,7 @@ async function verifyIntegrationsAdmin(): Promise<{ userId: string }> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-  const accessLevel = getAccessLevel(profile?.role);
+  const accessLevel = await getUserAccessLevel(user.id);
   if (!checkPermission("admin.integrations.manage", accessLevel)) {
     throw new Error(
       "Forbidden: You do not have permission to manage integrations"

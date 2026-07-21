@@ -1,10 +1,8 @@
 import type React from "react";
-import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
 import { createClient } from "~/lib/supabase/server";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { checkPermission } from "~/lib/permissions/helpers";
+import { getUserAccessLevel } from "~/lib/permissions/access";
 import { getLoginUrl } from "~/lib/url";
 import { QuickReportGrid } from "./quick-report-grid";
 
@@ -19,11 +17,7 @@ export default async function QuickReportPage(): Promise<React.JSX.Element> {
 
   if (!user) redirect(getLoginUrl("/report/quick"));
 
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-  const accessLevel = getAccessLevel(profile?.role);
+  const accessLevel = await getUserAccessLevel(user.id);
 
   if (!checkPermission("issues.report.quick", accessLevel)) {
     redirect("/report");
