@@ -216,14 +216,21 @@ export async function linkPinballmapEntryAction(
   if (machine.pinballmapMachineId === null)
     return err("VALIDATION", "Machine isn't linked to a PinballMap title yet");
 
+  // Idempotency guard: an already-listed + linked machine must not be re-linked.
+  // A direct re-submit would rewrite the row and append a duplicate `linked`
+  // timeline event; no-op back to the captured handle instead (state 3 is a
+  // fixed point — nothing to capture that isn't already captured).
+  if (machine.pinballmapListed && machine.pinballmapLmxId !== null)
+    return ok({ lmxId: machine.pinballmapLmxId });
+
   // Read the freshest stored lineup; sync once if we've never captured one.
   let state = await getPinballMapState();
   if (!state?.snapshotJson) {
-    await syncLocationSnapshot();
+    await syncLocationSnapshot({ updatedBy: userId, trigger: "manual" });
     state = await getPinballMapState();
   }
   const snapshot = state?.snapshotJson;
-  if (!snapshot) return err("SERVER", "PinballMap lineup unavailable");
+  if (!snapshot) return err("SERVER", "Pinball Map lineup unavailable");
 
   const lmx = findLmxForMachine(snapshot, machine.pinballmapMachineId);
   if (!lmx)
@@ -271,7 +278,7 @@ export async function linkPinballmapEntryAction(
 
 export type VerifyPinballmapResult = Result<
   { state: "ok" | "stale" | "healed" },
-  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER" | "THROTTLED"
 >;
 
 /**
@@ -282,6 +289,14 @@ export type VerifyPinballmapResult = Result<
  *  - stored lmx still present  → `ok`      (nothing to do)
  *  - title resolves to a NEW id → `healed`  (update the stored handle + timeline)
  *  - title absent from lineup   → `stale`   (leave the stored id; UI shows Reconnect)
+ *
+ * Crucially, a fresh sync is a PRECONDITION for any of those verdicts: "Verify"
+ * promises the answer reflects PinballMap's CURRENT lineup. If the refresh can't
+ * complete — the fetch errored, or the manual-refresh throttle (PP-hbi0) refused
+ * it — we must NOT resolve against the possibly-stale STORED snapshot and claim
+ * it's current (that silent stale-verify was the original bug). Instead we
+ * surface the sync outcome (`SERVER` / `THROTTLED`) and leave the stored link
+ * untouched.
  *
  * Continuous background desync detection stays in the hourly snapshot (PP-o355.11);
  * this is the user-triggered spot-check, so a single sync per click is within
@@ -297,10 +312,26 @@ export async function verifyPinballmapLinkAction(
   if (machine.pinballmapMachineId === null)
     return err("VALIDATION", "Machine isn't linked to a PinballMap title yet");
 
-  // Verify means "check right now" — force a fresh sync before resolving.
-  await syncLocationSnapshot();
+  // Verify means "check right now" — force a fresh sync before resolving. Bail
+  // out (rather than resolve against a stale snapshot) if the sync didn't land.
+  const sync = await syncLocationSnapshot({
+    updatedBy: userId,
+    trigger: "manual",
+  });
+  if (!sync.ok) {
+    if (sync.reason === "throttled")
+      return err(
+        "THROTTLED",
+        "Pinball Map was refreshed moments ago. Wait a minute, then re-check this link."
+      );
+    return err(
+      "SERVER",
+      "Couldn't reach Pinball Map to re-check this link. Its listing status may be out of date — try again shortly."
+    );
+  }
+
   const snapshot = (await getPinballMapState())?.snapshotJson;
-  if (!snapshot) return err("SERVER", "PinballMap lineup unavailable");
+  if (!snapshot) return err("SERVER", "Pinball Map lineup unavailable");
 
   const lmx = findLmxForMachine(snapshot, machine.pinballmapMachineId);
   if (!lmx) return ok({ state: "stale" });

@@ -22,6 +22,7 @@ import {
   userProfiles,
   authUsers,
   timelineEvents,
+  pinballmapState,
 } from "~/server/db/schema";
 
 vi.mock("~/server/db", async () => {
@@ -42,27 +43,39 @@ vi.mock("next/cache", () => ({
 // force-sync in verify read it. Never touches pinballmap.com.
 const pbm = vi.hoisted(() => ({
   lineup: [] as { id: number; machineId: number }[],
+  // When set, the next fetch rejects — models a PBM/network failure so we can
+  // assert verify never resolves against a stale stored snapshot on a bad sync.
+  fail: false,
 }));
+
+function snapshotFor(
+  locationId: number,
+  lineup: { id: number; machineId: number }[]
+): Record<string, unknown> {
+  return {
+    locationId,
+    name: "APC",
+    dateLastUpdated: null,
+    lastUpdatedByUsername: null,
+    machineCount: lineup.length,
+    lmxes: lineup.map((l) => ({
+      id: l.id,
+      machineId: l.machineId,
+      icEnabled: null,
+      lastUpdatedByUsername: null,
+      conditions: [],
+    })),
+    fetchedAtIso: new Date().toISOString(),
+    raw: { mock: true },
+  };
+}
 
 vi.mock("~/lib/pinballmap/client", () => ({
   getPinballMapClient: () => ({
     fetchLocation: (locationId: number) =>
-      Promise.resolve({
-        locationId,
-        name: "APC",
-        dateLastUpdated: null,
-        lastUpdatedByUsername: null,
-        machineCount: pbm.lineup.length,
-        lmxes: pbm.lineup.map((l) => ({
-          id: l.id,
-          machineId: l.machineId,
-          icEnabled: null,
-          lastUpdatedByUsername: null,
-          conditions: [],
-        })),
-        fetchedAtIso: new Date().toISOString(),
-        raw: { mock: true },
-      }),
+      pbm.fail
+        ? Promise.reject(new Error("PinballMap unreachable"))
+        : Promise.resolve(snapshotFor(locationId, pbm.lineup)),
   }),
 }));
 
@@ -123,8 +136,30 @@ function fdFor(machineId: string): FormData {
   return fd;
 }
 
+/**
+ * Seed the singleton snapshot directly (not via syncLocationSnapshot), so a
+ * stored lineup exists WITHOUT stamping `lastSyncAttemptAt`. That lets a
+ * follow-up manual sync actually attempt (and, with `pbm.fail`, fail) instead of
+ * tripping the manual-refresh throttle — the setup the stale-verify guard needs.
+ */
+async function seedState(
+  lineup: { id: number; machineId: number }[]
+): Promise<void> {
+  const db = await getTestDb();
+  const now = new Date();
+  await db.insert(pinballmapState).values({
+    id: "singleton",
+    locationId: 26454,
+    snapshotJson: snapshotFor(26454, lineup) as never,
+    lastSyncedAt: now,
+    lastSyncStatus: "ok",
+    updatedAt: now,
+  });
+}
+
 beforeEach(() => {
   pbm.lineup = [];
+  pbm.fail = false;
 });
 
 describe("linkPinballmapEntryAction (PGlite)", () => {
@@ -200,6 +235,36 @@ describe("linkPinballmapEntryAction (PGlite)", () => {
     const res = await linkPinballmapEntryAction(undefined, fdFor(machine.id));
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.code).toBe("ABSENT");
+  });
+
+  it("no-ops (no duplicate timeline event) when already listed + linked", async () => {
+    const db = await getTestDb();
+    const { linkPinballmapEntryAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 900, machineId: 42 }];
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    const res = await linkPinballmapEntryAction(undefined, fdFor(machine.id));
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value.lmxId).toBe(900);
+
+    // Row unchanged and NO second `linked` event appended.
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapLmxId).toBe(900);
+    const events = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(events).toHaveLength(0);
   });
 
   it("rejects a member linking someone else's machine", async () => {
@@ -285,6 +350,69 @@ describe("verifyPinballmapLinkAction (PGlite)", () => {
       action: "reconnected",
       lmxId: 950,
     });
+  });
+
+  it("returns SERVER (not a stale ok) when the forced sync fails over a prior snapshot", async () => {
+    const db = await getTestDb();
+    const { verifyPinballmapLinkAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    // A stored snapshot still lists the machine (lmx 900 present)...
+    await seedState([{ id: 900, machineId: 42 }]);
+    // ...but the FRESH fetch fails. The naive path would resolve against the
+    // stale snapshot and claim "ok"; the guard must surface the sync failure.
+    pbm.fail = true;
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    const res = await verifyPinballmapLinkAction(undefined, fdFor(machine.id));
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("SERVER");
+
+    // Stored link untouched; no verify verdict claimed.
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapLmxId).toBe(900);
+    const events = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(events).toHaveLength(0);
+  });
+
+  it("returns THROTTLED when a second verify races inside the refresh window", async () => {
+    const { verifyPinballmapLinkAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 900, machineId: 42 }];
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    // First verify forces a fresh sync (stamps the attempt) and confirms.
+    const first = await verifyPinballmapLinkAction(
+      undefined,
+      fdFor(machine.id)
+    );
+    expect(first.ok).toBe(true);
+    // Second verify moments later is refused by the manual-refresh throttle —
+    // it must NOT silently re-confirm against the just-synced snapshot.
+    const second = await verifyPinballmapLinkAction(
+      undefined,
+      fdFor(machine.id)
+    );
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.code).toBe("THROTTLED");
   });
 
   it("flags the link stale (unchanged) when the title is absent", async () => {

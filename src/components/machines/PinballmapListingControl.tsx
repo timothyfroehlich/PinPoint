@@ -212,6 +212,22 @@ export function PinballmapListingControl({
           ) : null}
         </div>
       )}
+
+      {/* Failure feedback for every non-ABSENT link outcome and every failed
+          verify — a server error (incl. the duplicate-lister 23505 message),
+          an unauthorized/validation reject, or the manual-refresh throttle.
+          ABSENT is handled inline above with its own actionable copy. Without
+          this the actions could fail silently and leave the operator guessing. */}
+      {linkState && !linkState.ok && linkState.code !== "ABSENT" ? (
+        <p className="text-xs text-destructive" role="alert">
+          {linkState.message}
+        </p>
+      ) : null}
+      {verifyState && !verifyState.ok ? (
+        <p className="text-xs text-destructive" role="alert">
+          {verifyState.message}
+        </p>
+      ) : null}
     </section>
   );
 }
