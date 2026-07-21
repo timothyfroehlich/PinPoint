@@ -3,8 +3,12 @@ ALTER TABLE "pinballmap_state" ADD COLUMN "api_token_vault_id" uuid;--> statemen
 -- SECURITY DEFINER RPC that returns the decrypted PinballMap API token (the
 -- mandatory blanket X-Api-Token gate; PP-uusr / CORE-PBM-001). Callable only by
 -- service_role; app code reaches it via createAdminClient(). Returns NULL when no
--- vault secret is linked yet (integration not provisioned). Mirrors the shape of
--- public.get_discord_config() in 0028 — the same Vault-decrypt-via-DEFINER pattern.
+-- vault secret is linked yet (integration not provisioned). Mirrors the shape AND
+-- the enforcement of public.get_discord_config() (0028 + 0029): the REVOKE/GRANT
+-- below is defense-in-depth, but PostgREST re-exposes public functions and
+-- Supabase's default privileges re-grant EXECUTE to anon/authenticated, so the
+-- in-body auth.role() guard is the actual gate — without it any authenticated
+-- caller could POST /rest/v1/rpc/get_pinballmap_api_token and read the token.
 CREATE OR REPLACE FUNCTION public.get_pinballmap_api_token()
 RETURNS text
 LANGUAGE plpgsql
@@ -14,6 +18,11 @@ AS $$
 DECLARE
   token text;
 BEGIN
+  IF COALESCE(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'permission denied for function get_pinballmap_api_token'
+      USING ERRCODE = '42501';
+  END IF;
+
   SELECT v.decrypted_secret::text
     INTO token
     FROM pinballmap_state s

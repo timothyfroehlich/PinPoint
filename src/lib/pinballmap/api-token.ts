@@ -29,7 +29,7 @@ export async function getPinballMapApiToken(): Promise<string | null> {
   assertNotInTransaction("getPinballMapApiToken");
 
   const supabase = createAdminClient();
-  // The `get_pinballmap_api_token` RPC (0055) returns a scalar `text` and is not
+  // The `get_pinballmap_api_token` RPC (0057) returns a scalar `text` and is not
   // present in Supabase's generated types. Cast to the shape the function returns.
   const response = (await supabase.rpc("get_pinballmap_api_token")) as {
     data: string | null;

@@ -1,9 +1,9 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { pinballmapState } from "~/server/db/schema";
 import { getPinballMapClient } from "./client";
-import { APC_LOCATION_ID } from "./config";
+import { APC_LOCATION_ID, PBM_MANUAL_SYNC_MIN_INTERVAL_MS } from "./config";
 import type { NewPinballmapState, PinballmapState } from "~/lib/types/database";
 
 /**
@@ -32,10 +32,24 @@ export async function getPinballMapState(): Promise<PinballmapState | null> {
   return row ?? null;
 }
 
+/**
+ * Which caller kicked off a sync — decides throttle policy (PP-hbi0).
+ *
+ * - `"cron"`: the hourly automated refresh (the sanctioned one-call/hour,
+ *   CORE-PBM-001). Never throttled; still records its attempt so a manual
+ *   refresh right after respects the fresh snapshot.
+ * - `"manual"`: any human-initiated refresh (Sync now, verify/reconnect, …).
+ *   Rate-limited to at most one per `PBM_MANUAL_SYNC_MIN_INTERVAL_MS`. This is
+ *   the default so every future live-fetch caller inherits the chokepoint
+ *   unless it explicitly opts into the automated path.
+ */
+export type SyncTrigger = "manual" | "cron";
+
 /** Outcome of a sync attempt. */
 export type SyncResult =
   | { ok: true; machineCount: number; syncedAt: Date }
-  | { ok: false; error: string };
+  | { ok: false; reason: "error"; error: string }
+  | { ok: false; reason: "throttled"; retryAfterMs: number };
 
 /**
  * Upsert the singleton, writing the given health fields. `id` is fixed and the
@@ -54,10 +68,76 @@ async function upsertState(
 }
 
 /**
+ * Stamp `last_sync_attempt_at` at the START of a sync attempt.
+ *
+ * This is the single throttle chokepoint (PP-hbi0). It's a conditional upsert,
+ * so the read-check-then-write is done atomically in one statement — a row-level
+ * lock on the singleton serializes concurrent double-clicks and only one wins the
+ * claim (TOCTOU-safe; `lastSyncedAt`-style completion timestamps could not
+ * express this because they only advance after the fetch returns).
+ *
+ * - `guardIntervalMs === null` (cron/automated): unconditional stamp, always
+ *   proceeds — returns `true`.
+ * - `guardIntervalMs` a number (manual): the `DO UPDATE` only fires when the
+ *   prior attempt is older than the interval (or absent). `RETURNING` yields no
+ *   row when the guard refuses → returns `false` (throttled). Crucially the
+ *   guard is against the last ATTEMPT, not the last success, so a failed fetch
+ *   (429/500) still blocks repeat clicks instead of fail-opening (CORE-PBM-001).
+ */
+async function stampSyncAttempt(
+  locationId: number,
+  attemptAt: Date,
+  guardIntervalMs: number | null
+): Promise<boolean> {
+  const values = {
+    id: SINGLETON_ID,
+    locationId,
+    lastSyncAttemptAt: attemptAt,
+    updatedAt: attemptAt,
+  };
+  const set = { lastSyncAttemptAt: attemptAt, updatedAt: attemptAt };
+
+  if (guardIntervalMs === null) {
+    await db
+      .insert(pinballmapState)
+      .values(values)
+      .onConflictDoUpdate({ target: pinballmapState.id, set });
+    return true;
+  }
+
+  const threshold = new Date(attemptAt.getTime() - guardIntervalMs);
+  const claimed = await db
+    .insert(pinballmapState)
+    .values(values)
+    .onConflictDoUpdate({
+      target: pinballmapState.id,
+      set,
+      setWhere: sql`${pinballmapState.lastSyncAttemptAt} is null or ${pinballmapState.lastSyncAttemptAt} < ${threshold}`,
+    })
+    .returning({ id: pinballmapState.id });
+  return claimed.length > 0;
+}
+
+/** Milliseconds the caller should wait before a throttled manual retry. */
+function retryAfterMs(lastAttempt: Date | null | undefined, now: Date): number {
+  if (!lastAttempt) return PBM_MANUAL_SYNC_MIN_INTERVAL_MS;
+  const elapsed = now.getTime() - lastAttempt.getTime();
+  return Math.max(0, PBM_MANUAL_SYNC_MIN_INTERVAL_MS - elapsed);
+}
+
+/**
  * Fetch the configured location's snapshot from PBM and store it whole, updating
  * sync health. Never throws on a PBM/network failure: it records the error on the
- * singleton and returns `{ ok: false }` so callers (cron, "Sync now") can surface
- * it without a 500.
+ * singleton and returns `{ ok: false, reason: "error" }` so callers (cron, "Sync
+ * now") can surface it without a 500.
+ *
+ * Throttle chokepoint (PP-hbi0): a `manual` trigger (the default) is rate-limited
+ * to at most one call per `PBM_MANUAL_SYNC_MIN_INTERVAL_MS` and returns
+ * `{ ok: false, reason: "throttled" }` when refused — enforced HERE so every
+ * live-fetch caller (Sync now, verify/reconnect, any future caller) inherits one
+ * guard. The `cron` trigger bypasses the interval (the sanctioned hourly refresh)
+ * but still records its attempt, so a manual refresh moments after a cron respects
+ * the just-fetched snapshot.
  *
  * Does NOT gate on `state.enabled` — this is the pure read-path mechanism and the
  * caller owns the "should we sync at all" decision (the PP-o355.11 cron checks
@@ -68,11 +148,28 @@ async function upsertState(
  */
 export async function syncLocationSnapshot(opts?: {
   updatedBy?: string;
+  trigger?: SyncTrigger;
 }): Promise<SyncResult> {
+  const trigger = opts?.trigger ?? "manual";
   const state = await getPinballMapState();
   const locationId = state?.locationId ?? APC_LOCATION_ID;
   const syncedAt = new Date();
   const actor = opts?.updatedBy ? { updatedBy: opts.updatedBy } : {};
+
+  // Chokepoint: stamp the attempt before the fetch. Manual is guarded (throttled
+  // + TOCTOU-safe); cron records unconditionally.
+  const claimed = await stampSyncAttempt(
+    locationId,
+    syncedAt,
+    trigger === "manual" ? PBM_MANUAL_SYNC_MIN_INTERVAL_MS : null
+  );
+  if (!claimed) {
+    return {
+      ok: false,
+      reason: "throttled",
+      retryAfterMs: retryAfterMs(state?.lastSyncAttemptAt, syncedAt),
+    };
+  }
 
   try {
     const snapshot = await (
@@ -99,6 +196,6 @@ export async function syncLocationSnapshot(opts?: {
       updatedAt: syncedAt,
       ...actor,
     });
-    return { ok: false, error: message };
+    return { ok: false, reason: "error", error: message };
   }
 }
