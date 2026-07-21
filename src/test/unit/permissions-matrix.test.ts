@@ -423,6 +423,20 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.pinballmap.link", "admin")).toBe(true);
     });
 
+    it("should restrict pushing listing changes to PinballMap to admins", () => {
+      // Writes go through the shared operator token, so unlike read-only
+      // linking (owner/tech/admin) this is admin-only in v1 (PP-o355.12).
+      expect(getPermission("machines.pinballmap.push", "unauthenticated")).toBe(
+        false
+      );
+      expect(getPermission("machines.pinballmap.push", "guest")).toBe(false);
+      expect(getPermission("machines.pinballmap.push", "member")).toBe(false);
+      expect(getPermission("machines.pinballmap.push", "technician")).toBe(
+        false
+      );
+      expect(getPermission("machines.pinballmap.push", "admin")).toBe(true);
+    });
+
     it("should restrict PinballMap sync to technicians and admins", () => {
       expect(getPermission("machines.pinballmap.sync", "unauthenticated")).toBe(
         false

@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Eye,
   FileText,
+  MapPin,
   Pencil,
   Plus,
   Settings,
@@ -64,6 +65,9 @@ export const MACHINE_EVENT_ICONS: Record<
   settings_set_updated: { Icon: Settings, colorClass: "text-muted-foreground" },
   settings_set_deleted: { Icon: Trash2, colorClass: "text-muted-foreground" },
   settings_set_preferred: { Icon: Star, colorClass: "text-warning" },
+
+  // PinballMap listing link (PP-o355.12)
+  pinballmap_listing: { Icon: MapPin, colorClass: "text-muted-foreground" },
 
   // Issue events
   issue_opened: { Icon: CircleDot, colorClass: "text-secondary" },
