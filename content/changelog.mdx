@@ -4,11 +4,19 @@
 
 ### New Features
 
+- **Machine Collections** — Members can now create a private collection of machines and view combined Overview, Issues, and Timeline for that whole set at once; share a view link with anyone — no sign-in required — for tournament scoreboards or event walk-throughs
+- **Service Tab** — Each machine's detail page now has a Service tab with an Open Issues card (toggleable to show all issues), service notes, and the owner-private configuration fields that used to live on the Info tab
+- **Unified Report Page** — "Report an Issue" and "Quick Report" are now one tabbed page at /report; the machine picker is shared between tabs so you don't have to re-select after switching views
+- **Quick-Report Grid** — Technicians and admins have a new Multiple tab for bulk issue entry: fill in a grid of machine + description rows and submit each one independently for fast floor-sweep reporting
+- **PinballMap Status on Info Tab** — Each machine's Info tab now shows a status card reflecting whether the machine is currently listed on PinballMap, recently added or removed, or out of sync; the status updates automatically every hour
+- **Searchable Machine Picker** — The report-an-issue machine picker is now a type-to-filter combobox; type a machine name or its initials (e.g. "GZ" for Godzilla) to narrow the list instantly, especially useful on large collections
 - **Redesigned Machine Info Tab** — The Info tab on each machine's detail page (the first thing you see when you scan a QR code) now shows the machine's current status, a peek at up to three known issues, a direct "Report a problem" link, and a Details card with the machine description and owner
 
 ### Bug Fixes
 
 - Login, sign-up, forgot-password, and reset-password forms no longer get permanently stuck with a disabled button when the security verification widget loads slowly or encounters a network error
+- Active filter chips on the Issues list no longer overlap the search bar or fall off-screen on phones; remove buttons are now always visible and tappable on touch screens
+- Animations throughout the app now pause when you have "reduce motion" turned on in your system settings; filter dropdowns and other controls are now fully keyboard-navigable
 
 ---
 
