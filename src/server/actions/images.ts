@@ -4,12 +4,7 @@ import { createClient } from "~/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "~/server/db";
-import {
-  issueImages,
-  issues,
-  issueComments,
-  userProfiles,
-} from "~/server/db/schema";
+import { issueImages, issues, issueComments } from "~/server/db/schema";
 import { uploadToBlob, deleteFromBlob } from "~/lib/blob/client";
 import { validateImageFile } from "~/lib/blob/validation";
 import { BLOB_CONFIG } from "~/lib/blob/config";
@@ -22,7 +17,8 @@ import {
 import { eq, count, and, isNull } from "drizzle-orm";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { checkPermission } from "~/lib/permissions/helpers";
+import { getUserAccessLevel } from "~/lib/permissions/access";
 
 const uploadSchema = z.object({
   issueId: z.string(), // Can be real UUID or 'new'
@@ -101,12 +97,7 @@ export async function uploadIssueImage(formData: FormData): Promise<
         return err("VALIDATION", "Issue not found");
       }
 
-      const userProfile = await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: { role: true },
-      });
-
-      const accessLevel = getAccessLevel(userProfile?.role);
+      const accessLevel = await getUserAccessLevel(user.id);
       const ownershipCtx = {
         userId: user.id,
         reporterId: currentIssue.reportedBy,

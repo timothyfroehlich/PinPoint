@@ -340,13 +340,13 @@ export function CreateMachineForm({
                 htmlFor="pinballmap-listed"
                 className="text-muted-foreground"
               >
-                List on PinballMap
+                List on Pinball Map
               </Label>
             </div>
           </TooltipTrigger>
           <TooltipContent>
-            Coming soon — PinPoint can&apos;t push listing changes to
-            PinballMap.com yet.
+            Coming soon — PinPoint can&apos;t push listing changes to Pinball
+            Map yet.
           </TooltipContent>
         </Tooltip>
 

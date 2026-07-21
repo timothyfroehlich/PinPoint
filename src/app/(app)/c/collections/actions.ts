@@ -7,12 +7,14 @@ import { z } from "zod";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import type { UserRole } from "~/lib/types";
 import { canManageCollection } from "~/lib/collections/access";
+import { isEditorCollaborator } from "~/lib/collections/collaborators";
 import { generateViewToken } from "~/lib/collections/tokens";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import {
   collections,
   collectionMachines,
+  collectionCollaborators,
   machines,
   userProfiles,
 } from "~/server/db/schema";
@@ -121,7 +123,14 @@ export async function updateCollectionAction(input: {
   if (!actor) return { success: false, error: "Not authenticated" };
   const collection = await loadOwner(input.collectionId);
   if (!collection) return { success: false, error: "Not found" };
-  if (!canManageCollection(collection, { userId: actor.userId })) {
+  // The owner (manage) short-circuits without the collaborator lookup; only a
+  // non-owner needs the editor-membership query (avoids a needless query per
+  // owner edit).
+  const viewer = { userId: actor.userId };
+  const canEdit =
+    canManageCollection(collection, viewer) ||
+    (await isEditorCollaborator(db, input.collectionId, actor.userId));
+  if (!canEdit) {
     return { success: false, error: "Forbidden" };
   }
 
@@ -205,30 +214,43 @@ export async function updateCollectionAction(input: {
  * Returns the resulting token (null when disabled) so the Share dialog can
  * render the link without a re-fetch.
  */
+const setCollectionSharingSchema = z.object({
+  collectionId: z.uuid(),
+  enabled: z.boolean(),
+});
+
 export async function setCollectionSharingAction(input: {
   collectionId: string;
   enabled: boolean;
 }): Promise<ActionResult<{ viewToken: string | null }>> {
+  // Validate before any branching: `enabled` gates a security-sensitive
+  // choice (revoke vs. keep a live share link). Without z.boolean(), a
+  // stringified "false" would be truthy and silently take the *enable*
+  // branch — leaving a collection shareable after the owner revoked it.
+  const parsed = setCollectionSharingSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
+  const { collectionId, enabled } = parsed.data;
+
   const actor = await resolveActor();
   if (!actor) return { success: false, error: "Not authenticated" };
-  const collection = await loadOwner(input.collectionId);
+  const collection = await loadOwner(collectionId);
   if (!collection) return { success: false, error: "Not found" };
   if (!canManageCollection(collection, { userId: actor.userId })) {
     return { success: false, error: "Forbidden" };
   }
 
-  if (!input.enabled) {
+  if (!enabled) {
     await db
       .update(collections)
       .set({ viewToken: null, updatedAt: new Date() })
-      .where(eq(collections.id, input.collectionId));
-    revalidatePath(`/c/${input.collectionId}`);
+      .where(eq(collections.id, collectionId));
+    revalidatePath(`/c/${collectionId}`);
     return { success: true, data: { viewToken: null } };
   }
 
   // Enable: reuse an existing token if present, else mint one.
   const existing = await db.query.collections.findFirst({
-    where: eq(collections.id, input.collectionId),
+    where: eq(collections.id, collectionId),
     columns: { viewToken: true },
   });
   const token = existing?.viewToken ?? generateViewToken();
@@ -236,9 +258,9 @@ export async function setCollectionSharingAction(input: {
     await db
       .update(collections)
       .set({ viewToken: token, updatedAt: new Date() })
-      .where(eq(collections.id, input.collectionId));
+      .where(eq(collections.id, collectionId));
   }
-  revalidatePath(`/c/${input.collectionId}`);
+  revalidatePath(`/c/${collectionId}`);
   return { success: true, data: { viewToken: token } };
 }
 
@@ -254,6 +276,92 @@ export async function deleteCollectionAction(input: {
   }
   // collection_machines rows cascade-delete via the FK.
   await db.delete(collections).where(eq(collections.id, input.collectionId));
+  revalidatePath("/c/collections");
+  return { success: true };
+}
+
+const collaboratorSchema = z.object({
+  collectionId: z.uuid(),
+  userId: z.uuid(),
+});
+
+/**
+ * Grant a member editor access to a collection (PP-wqit.7). Owner-only
+ * (managing access). Idempotent: re-granting the same person is a no-op, so the
+ * UI can fire without first checking existing membership. No transaction — a
+ * single insert with no external side effects (CORE-ARCH-011).
+ */
+export async function addCollectionCollaboratorAction(input: {
+  collectionId: string;
+  userId: string;
+}): Promise<ActionResult> {
+  const actor = await resolveActor();
+  if (!actor) return { success: false, error: "Not authenticated" };
+  const parsed = collaboratorSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid request" };
+
+  const collection = await loadOwner(parsed.data.collectionId);
+  if (!collection) return { success: false, error: "Not found" };
+  if (!canManageCollection(collection, { userId: actor.userId })) {
+    return { success: false, error: "Forbidden" };
+  }
+  if (parsed.data.userId === collection.owner.id) {
+    return { success: false, error: "The owner already has full access" };
+  }
+  const target = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, parsed.data.userId),
+    columns: { id: true, role: true },
+  });
+  if (!target) return { success: false, error: "Unknown user" };
+  // Guests (default signup role) can't create collections, so they can't be
+  // granted edit access either — enforced here, not just hidden in the picker
+  // (PP-wqit.7, "all members").
+  // permissions-audit-allow: collaborator eligibility on the target, not an actor gate
+  if (target.role === "guest") {
+    return { success: false, error: "Guests can't be given edit access" };
+  }
+
+  await db
+    .insert(collectionCollaborators)
+    .values({
+      collectionId: parsed.data.collectionId,
+      userId: parsed.data.userId,
+      role: "editor",
+      addedBy: actor.userId,
+    })
+    .onConflictDoNothing();
+
+  revalidatePath(`/c/${parsed.data.collectionId}`);
+  revalidatePath("/c/collections");
+  return { success: true };
+}
+
+/** Revoke a collaborator's access (PP-wqit.7). Owner-only. */
+export async function removeCollectionCollaboratorAction(input: {
+  collectionId: string;
+  userId: string;
+}): Promise<ActionResult> {
+  const actor = await resolveActor();
+  if (!actor) return { success: false, error: "Not authenticated" };
+  const parsed = collaboratorSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid request" };
+
+  const collection = await loadOwner(parsed.data.collectionId);
+  if (!collection) return { success: false, error: "Not found" };
+  if (!canManageCollection(collection, { userId: actor.userId })) {
+    return { success: false, error: "Forbidden" };
+  }
+
+  await db
+    .delete(collectionCollaborators)
+    .where(
+      and(
+        eq(collectionCollaborators.collectionId, parsed.data.collectionId),
+        eq(collectionCollaborators.userId, parsed.data.userId)
+      )
+    );
+
+  revalidatePath(`/c/${parsed.data.collectionId}`);
   revalidatePath("/c/collections");
   return { success: true };
 }

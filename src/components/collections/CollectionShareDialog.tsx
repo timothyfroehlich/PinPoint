@@ -17,11 +17,19 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { setCollectionSharingAction } from "~/app/(app)/c/collections/actions";
+import { CollectionCollaborators } from "./CollectionCollaborators";
+import type { CollaboratorUser } from "~/lib/collections/collaborators";
 
 interface Props {
   collectionId: string;
   /** Current view-share token (null = sharing off). */
   viewToken: string | null;
+  /** Owner's display name, for the top row of "People with access". */
+  ownerName: string;
+  /** Current editor collaborators. */
+  editors: CollaboratorUser[];
+  /** All grantable members (owner excluded) for the add-people picker. */
+  grantableMembers: CollaboratorUser[];
 }
 
 /**
@@ -32,6 +40,9 @@ interface Props {
 export function CollectionShareDialog({
   collectionId,
   viewToken,
+  ownerName,
+  editors,
+  grantableMembers,
 }: Props): React.JSX.Element {
   const router = useRouter();
   const pathname = usePathname();
@@ -137,6 +148,15 @@ export function CollectionShareDialog({
             {error}
           </p>
         )}
+
+        <div className="h-px bg-border" />
+
+        <CollectionCollaborators
+          collectionId={collectionId}
+          ownerName={ownerName}
+          editors={editors}
+          grantableMembers={grantableMembers}
+        />
       </DialogContent>
     </Dialog>
   );

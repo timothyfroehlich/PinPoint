@@ -5,6 +5,7 @@ import { createTestMachine, createTestUser } from "~/test/helpers/factories";
 import {
   collections,
   collectionMachines,
+  collectionCollaborators,
   machines,
   userProfiles,
 } from "~/server/db/schema";
@@ -400,6 +401,46 @@ describe("collection actions", () => {
     expect(await tokenOf(collection.id)).toBeNull();
   });
 
+  it("setCollectionSharingAction: rejects a stringified enabled without touching sharing", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values(owner);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Bank", ownerId: owner.id })
+      .returning();
+
+    const { setCollectionSharingAction } =
+      await import("~/app/(app)/c/collections/actions");
+    signIn(owner.id);
+
+    // A form/RPC caller can smuggle the string "false" past the compile-time
+    // boolean type. Pre-fix, `!"false"` is falsy so the action took the ENABLE
+    // branch and minted a token — the opposite of the owner's intent. Zod's
+    // z.boolean() (no coercion) must reject it, leaving sharing untouched.
+    const result = await setCollectionSharingAction({
+      collectionId: collection.id,
+      enabled: "false",
+    } as unknown as { collectionId: string; enabled: boolean });
+    expect(result.success).toBe(false);
+    expect(await tokenOf(collection.id)).toBeNull();
+  });
+
+  it("setCollectionSharingAction: rejects a non-uuid collectionId", async () => {
+    const { setCollectionSharingAction } =
+      await import("~/app/(app)/c/collections/actions");
+    const owner = createTestUser({ role: "member" });
+    const db = await getTestDb();
+    await db.insert(userProfiles).values(owner);
+    signIn(owner.id);
+
+    const result = await setCollectionSharingAction({
+      collectionId: "not-a-uuid",
+      enabled: true,
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("deleteCollectionAction: owner only", async () => {
     const db = await getTestDb();
     const owner = createTestUser({ role: "member" });
@@ -436,5 +477,185 @@ describe("collection actions", () => {
         where: eq(collections.id, collection.id),
       })
     ).toBeUndefined();
+  });
+
+  it("updateCollectionAction: an editor collaborator can edit; a stranger cannot", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    const editor = createTestUser({ role: "member" });
+    const stranger = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values([owner, editor, stranger]);
+    const a = createTestMachine({ initials: "AA", name: "A" });
+    const b = createTestMachine({ initials: "BB", name: "B" });
+    await db.insert(machines).values([a, b]);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Set", ownerId: owner.id })
+      .returning();
+    await db
+      .insert(collectionMachines)
+      .values({ collectionId: collection.id, machineId: a.id });
+    await db.insert(collectionCollaborators).values({
+      collectionId: collection.id,
+      userId: editor.id,
+      role: "editor",
+      addedBy: owner.id,
+    });
+
+    const { updateCollectionAction } =
+      await import("~/app/(app)/c/collections/actions");
+
+    // The granted editor can rename + change machines.
+    signIn(editor.id);
+    const ok = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "Renamed",
+      machineIds: [b.id],
+    });
+    expect(ok.success).toBe(true);
+    expect(await nameOf(collection.id)).toBe("Renamed");
+    expect(await membershipOf(collection.id)).toEqual(new Set([b.id]));
+
+    // A signed-in non-collaborator cannot.
+    signIn(stranger.id);
+    const denied = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "Nope",
+      machineIds: [],
+    });
+    expect(denied.success).toBe(false);
+  });
+
+  it("addCollectionCollaboratorAction: owner-only, idempotent", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    const target = createTestUser({ role: "member" });
+    const other = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values([owner, target, other]);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Bank", ownerId: owner.id })
+      .returning();
+
+    const { addCollectionCollaboratorAction } =
+      await import("~/app/(app)/c/collections/actions");
+
+    signIn(owner.id);
+    expect(
+      (
+        await addCollectionCollaboratorAction({
+          collectionId: collection.id,
+          userId: target.id,
+        })
+      ).success
+    ).toBe(true);
+    // Second grant of the same person is a no-op, not a duplicate row.
+    expect(
+      (
+        await addCollectionCollaboratorAction({
+          collectionId: collection.id,
+          userId: target.id,
+        })
+      ).success
+    ).toBe(true);
+    const rows = await db
+      .select()
+      .from(collectionCollaborators)
+      .where(eq(collectionCollaborators.collectionId, collection.id));
+    expect(rows).toHaveLength(1);
+
+    // A non-owner cannot grant.
+    signIn(target.id);
+    const denied = await addCollectionCollaboratorAction({
+      collectionId: collection.id,
+      userId: other.id,
+    });
+    expect(denied.success).toBe(false);
+  });
+
+  it("addCollectionCollaboratorAction: rejects a guest target", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    const guest = createTestUser({ role: "guest" });
+    await db.insert(userProfiles).values([owner, guest]);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Bank", ownerId: owner.id })
+      .returning();
+
+    const { addCollectionCollaboratorAction } =
+      await import("~/app/(app)/c/collections/actions");
+
+    // Guests can't create collections, so they can't be granted edit access.
+    signIn(owner.id);
+    const denied = await addCollectionCollaboratorAction({
+      collectionId: collection.id,
+      userId: guest.id,
+    });
+    expect(denied.success).toBe(false);
+    const rows = await db
+      .select()
+      .from(collectionCollaborators)
+      .where(eq(collectionCollaborators.collectionId, collection.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("removeCollectionCollaboratorAction: owner removes; editor then loses edit", async () => {
+    const db = await getTestDb();
+    const owner = createTestUser({ role: "member" });
+    const editor = createTestUser({ role: "member" });
+    await db.insert(userProfiles).values([owner, editor]);
+    const [collection] = await db
+      .insert(collections)
+      .values({ name: "Bank", ownerId: owner.id })
+      .returning();
+    await db.insert(collectionCollaborators).values({
+      collectionId: collection.id,
+      userId: editor.id,
+      role: "editor",
+      addedBy: owner.id,
+    });
+
+    const { updateCollectionAction, removeCollectionCollaboratorAction } =
+      await import("~/app/(app)/c/collections/actions");
+
+    // Editor can edit while granted.
+    signIn(editor.id);
+    expect(
+      (
+        await updateCollectionAction({
+          collectionId: collection.id,
+          name: "By Editor",
+          machineIds: [],
+        })
+      ).success
+    ).toBe(true);
+
+    // Owner revokes; a non-owner cannot revoke.
+    signIn(editor.id);
+    const revokeDenied = await removeCollectionCollaboratorAction({
+      collectionId: collection.id,
+      userId: editor.id,
+    });
+    expect(revokeDenied.success).toBe(false);
+
+    signIn(owner.id);
+    expect(
+      (
+        await removeCollectionCollaboratorAction({
+          collectionId: collection.id,
+          userId: editor.id,
+        })
+      ).success
+    ).toBe(true);
+
+    // The removed editor immediately loses edit access.
+    signIn(editor.id);
+    const denied = await updateCollectionAction({
+      collectionId: collection.id,
+      name: "Nope",
+      machineIds: [],
+    });
+    expect(denied.success).toBe(false);
   });
 });
