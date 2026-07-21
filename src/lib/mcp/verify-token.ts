@@ -87,10 +87,16 @@ async function verifyClaimsWithSupabase(
   if (typeof sub !== "string" || sub.length === 0) {
     return null;
   }
-  return {
-    userId: sub,
-    clientId: typeof clientIdClaim === "string" ? clientIdClaim : "",
-  };
+  // Require the OAuth `client_id` claim. Tokens minted by Supabase's OAuth
+  // server (the intended path — the caller went through DCR/consent) carry it;
+  // plain web-session access tokens (cookie auth) do NOT. Rejecting tokens
+  // without it enforces the OAuth-consent boundary at the token layer, so a
+  // leaked/stolen admin *session* token cannot drive this write-capable MCP
+  // surface. (PR #1707 review finding.)
+  if (typeof clientIdClaim !== "string" || clientIdClaim.length === 0) {
+    return null;
+  }
+  return { userId: sub, clientId: clientIdClaim };
 }
 
 const defaultDeps: VerifyTokenDeps = {

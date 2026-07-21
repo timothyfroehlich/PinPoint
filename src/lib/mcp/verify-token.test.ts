@@ -159,6 +159,22 @@ describe("verifyToken (default Supabase boundary)", () => {
     expect(result).toBeUndefined();
     expect(getUserAccessLevelMock).not.toHaveBeenCalled();
   });
+
+  it("rejects a web-session token that carries no client_id", async () => {
+    setSupabaseEnv();
+    mockGetClaims();
+    // A cookie/session access token: valid signature, real sub, but no
+    // OAuth `client_id` — it never went through the OAuth consent flow.
+    getClaimsMock.mockResolvedValue({
+      data: { claims: { sub: "user-42" } },
+      error: null,
+    });
+
+    const result = await verifyToken(request, "session.jwt");
+
+    expect(result).toBeUndefined();
+    expect(getUserAccessLevelMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("requireMcpAuthContext", () => {
