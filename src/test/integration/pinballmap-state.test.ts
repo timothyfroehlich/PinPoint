@@ -25,7 +25,7 @@ vi.mock("~/server/db", async () => {
 // so the sync can never reach pinballmap.com regardless of PINBALLMAP_MODE.
 vi.mock("~/lib/pinballmap/client", async () => {
   const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-  return { getPinballMapClient: () => getMockClient() };
+  return { getPinballMapClient: () => Promise.resolve(getMockClient()) };
 });
 
 describe("PinballMap shared read path (PGlite)", () => {

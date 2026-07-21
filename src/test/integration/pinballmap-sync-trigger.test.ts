@@ -37,7 +37,7 @@ vi.mock("~/server/db", async () => {
 // Pin the PBM client to the in-memory mock at the seam (CORE-TEST-006).
 vi.mock("~/lib/pinballmap/client", async () => {
   const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-  return { getPinballMapClient: () => getMockClient() };
+  return { getPinballMapClient: () => Promise.resolve(getMockClient()) };
 });
 
 // Import AFTER the db mock so route + action pick up PGlite.
