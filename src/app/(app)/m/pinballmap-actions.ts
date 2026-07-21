@@ -120,7 +120,7 @@ export async function resolvePinballMapLinkAction(
 /** Result of an on-demand "Sync now" — the machine count and heals applied. */
 export type SyncPinballMapNowResult = Result<
   { machineCount: number; healed: number },
-  "UNAUTHORIZED" | "SERVER"
+  "UNAUTHORIZED" | "SERVER" | "THROTTLED"
 >;
 
 /**
@@ -129,10 +129,13 @@ export type SyncPinballMapNowResult = Result<
  *
  * Unlike the hourly cron, this does NOT gate on `state.enabled`: it's an
  * explicit human-initiated refresh, so the human is the caller who owns the
- * decision (CORE-PBM-001 is respected — a click is naturally rate-limited, and
- * the permission is technician+). Form-action shaped `(prevState, formData)` so
- * a `<form action={...}>` + `useActionState` button (control room, PP-o355.7)
- * can drop it in for progressive enhancement (CORE-ARCH-002).
+ * decision. Rate-limiting is NOT left to "a click is naturally slow" — it's
+ * enforced at the `syncLocationSnapshot` seam (`trigger: "manual"`, PP-hbi0),
+ * which refuses repeat refreshes inside `PBM_MANUAL_SYNC_MIN_INTERVAL_MS` and
+ * surfaces `THROTTLED` here (CORE-PBM-001). Form-action shaped
+ * `(prevState, formData)` so a `<form action={...}>` + `useActionState` button
+ * (control room, PP-o355.7) can drop it in for progressive enhancement
+ * (CORE-ARCH-002).
  */
 export async function syncPinballMapNowAction(
   _prevState: SyncPinballMapNowResult | undefined,
@@ -159,8 +162,19 @@ export async function syncPinballMapNowAction(
   }
 
   try {
-    const result = await syncLocationSnapshot({ updatedBy: user.id });
-    if (!result.ok) return err("SERVER", result.error);
+    const result = await syncLocationSnapshot({
+      updatedBy: user.id,
+      trigger: "manual",
+    });
+    if (!result.ok) {
+      if (result.reason === "throttled") {
+        return err(
+          "THROTTLED",
+          "Pinball Map was just refreshed. Please wait a moment before syncing again."
+        );
+      }
+      return err("SERVER", result.error);
+    }
 
     const { healed } = await reconcileAfterSync();
     // Desync badges on machine Info cards derive from the stored snapshot, so
