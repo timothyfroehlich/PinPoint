@@ -407,6 +407,13 @@
       "when": 1784636028764,
       "tag": "0057_superb_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1784687613386,
+      "tag": "0058_greedy_firelord",
+      "breakpoints": true
     }
   ]
 }
