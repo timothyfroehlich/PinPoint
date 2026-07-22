@@ -1,13 +1,18 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { asc } from "drizzle-orm";
+import { Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines as machinesTable } from "~/server/db/schema";
 import { getLoginUrl } from "~/lib/url";
-import { getMyCollections, getSharedWithMe } from "~/lib/collections/list";
+import {
+  getMyCollections,
+  getOwnedMachineCount,
+  getSharedWithMe,
+} from "~/lib/collections/list";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { CreateCollectionDialog } from "~/components/collections/CreateCollectionDialog";
@@ -25,13 +30,14 @@ export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
     redirect(getLoginUrl("/c/collections"));
   }
 
-  const [owned, shared, allMachines] = await Promise.all([
+  const [owned, shared, allMachines, ownedMachineCount] = await Promise.all([
     getMyCollections(undefined, user.id),
     getSharedWithMe(undefined, user.id),
     db.query.machines.findMany({
       columns: { id: true, initials: true, name: true },
       orderBy: [asc(machinesTable.name)],
     }),
+    getOwnedMachineCount(undefined, user.id),
   ]);
 
   return (
@@ -42,7 +48,9 @@ export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
           actions={<CreateCollectionDialog allMachines={allMachines} />}
         />
 
-        {owned.length === 0 && shared.length === 0 ? (
+        {owned.length === 0 &&
+        shared.length === 0 &&
+        ownedMachineCount === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             You haven&apos;t created any collections yet. Create one to get
             started.
@@ -53,12 +61,33 @@ export default async function MyCollectionsPage(): Promise<React.JSX.Element> {
               <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Your collections
               </h2>
-              {owned.length === 0 ? (
+              {owned.length === 0 && ownedMachineCount === 0 ? (
                 <p className="px-1 py-2 text-sm text-muted-foreground">
                   You haven&apos;t created any collections yet.
                 </p>
               ) : (
                 <ul className="divide-y divide-outline-variant rounded-md border border-outline-variant">
+                  {ownedMachineCount > 0 && (
+                    <li>
+                      <Link
+                        href={`/c/owner/${user.id}`}
+                        data-testid="my-machines-collection-link"
+                        className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-surface-variant"
+                      >
+                        <span className="flex items-center gap-2 font-medium text-foreground">
+                          <Gamepad2
+                            aria-hidden="true"
+                            className="size-4 text-muted-foreground"
+                          />
+                          My Machines
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {ownedMachineCount}{" "}
+                          {ownedMachineCount === 1 ? "machine" : "machines"}
+                        </span>
+                      </Link>
+                    </li>
+                  )}
                   {owned.map((collection) => (
                     <li key={collection.id}>
                       <Link
