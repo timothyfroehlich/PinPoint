@@ -1,1 +1,0 @@
-ALTER TABLE "pinballmap_state" ENABLE ROW LEVEL SECURITY;

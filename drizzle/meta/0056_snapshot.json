@@ -1,5 +1,5 @@
 {
-  "id": "b7f1b6fc-1731-44f4-b613-5a4cbc396c52",
+  "id": "275aeb8a-30de-4066-a827-ff53fbf8e69c",
   "prevId": "3f5d3e76-cd95-4081-8396-cba4999f9a73",
   "version": "7",
   "dialect": "postgresql",
@@ -2105,6 +2105,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "last_sync_attempt_at": {
+          "name": "last_sync_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "last_sync_status": {
           "name": "last_sync_status",
           "type": "text",
@@ -2159,7 +2165,7 @@
           "value": "last_sync_status IN ('unknown', 'ok', 'error')"
         }
       },
-      "isRLSEnabled": true
+      "isRLSEnabled": false
     },
     "public.timeline_event_people": {
       "name": "timeline_event_people",

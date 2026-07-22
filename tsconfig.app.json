@@ -23,6 +23,10 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "src/**/*",
+    // TS include globs skip dot-prefixed directories, so `.well-known/` route
+    // handlers (RFC-mandated path) must be named explicitly or they go
+    // untypechecked and ESLint's project service can't resolve them.
+    "src/app/.well-known/**/*",
     "middleware.ts"
   ],
   "exclude": [
