@@ -1196,7 +1196,7 @@ export const pinballmapState = pgTable(
       sql`last_sync_status IN ('unknown', 'ok', 'error')`
     ),
   })
-);
+).enableRLS();
 
 /**
  * Type exports
