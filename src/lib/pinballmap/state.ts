@@ -172,7 +172,9 @@ export async function syncLocationSnapshot(opts?: {
   }
 
   try {
-    const snapshot = await getPinballMapClient().fetchLocation(locationId);
+    const snapshot = await (
+      await getPinballMapClient()
+    ).fetchLocation(locationId);
     await upsertState({
       locationId,
       snapshotJson: snapshot,

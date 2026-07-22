@@ -5,7 +5,6 @@ import { useState, useRef, useEffect, startTransition } from "react";
 import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "~/components/ui/button";
-import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
@@ -32,11 +31,7 @@ import {
   VALID_MACHINE_PRESENCE_STATUSES,
   getMachinePresenceLabel,
 } from "~/lib/machines/presence";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
+import { MapPin } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -329,26 +324,20 @@ export function CreateMachineForm({
           </Select>
         </div>
 
-        {/* List on PinballMap — display-only until outbound sync
-            (PP-o355.11) exists; a new machine always starts unlisted. */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex items-center gap-2">
-              <Checkbox id="pinballmap-listed" checked={false} disabled />
-              <input type="hidden" name="pinballmapListed" value="" />
-              <Label
-                htmlFor="pinballmap-listed"
-                className="text-muted-foreground"
-              >
-                List on Pinball Map
-              </Label>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            Coming soon — PinPoint can&apos;t push listing changes to Pinball
-            Map yet.
-          </TooltipContent>
-        </Tooltip>
+        {/* PinballMap listing — a brand-new machine always starts unlisted.
+            Connecting it to a PinballMap entry (the state-aware control) happens
+            from the machine's Edit dialog once it exists and has an id to act on
+            (PP-o355.12 read side). */}
+        <div className="flex items-start gap-2">
+          <MapPin
+            aria-hidden="true"
+            className="mt-0.5 size-4 text-muted-foreground"
+          />
+          <p className="text-sm text-muted-foreground">
+            Connect this machine to its PinballMap listing after creating it —
+            open its Edit dialog and use &ldquo;Connect to PinballMap&rdquo;.
+          </p>
+        </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-2">

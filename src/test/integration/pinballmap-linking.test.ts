@@ -35,7 +35,7 @@ vi.mock("~/lib/supabase/server", () => ({
 // leaks into the test environment.
 vi.mock("~/lib/pinballmap/client", async () => {
   const { getMockClient } = await import("~/lib/pinballmap/client-mock");
-  return { getPinballMapClient: () => getMockClient() };
+  return { getPinballMapClient: () => Promise.resolve(getMockClient()) };
 });
 
 vi.mock("next/cache", () => ({

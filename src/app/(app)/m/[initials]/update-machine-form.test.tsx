@@ -86,6 +86,7 @@ function makeMachine(description: ProseMirrorDoc | null): Machine {
     pinballmapExcludedReason: null,
     pinballmapTitleName: null,
     pinballmapListed: false,
+    pinballmapLmxId: null,
     description,
   };
 }
@@ -97,6 +98,7 @@ function makeProps(description: ProseMirrorDoc | null) {
     canEditAnyMachine: false,
     isOwner: false,
     canLink: false,
+    pinballmapUrl: "https://pinballmap.com/map/?by_location_id=26454",
   };
 }
 

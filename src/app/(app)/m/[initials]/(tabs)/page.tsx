@@ -173,6 +173,7 @@ export default async function MachineInfoTab({
           pinballmapExcluded: machine.pinballmapExcluded,
           pinballmapExcludedReason: machine.pinballmapExcludedReason,
           pinballmapListed: machine.pinballmapListed,
+          pinballmapLmxId: machine.pinballmapLmxId,
           pinballmapTitleName,
           description: machine.description,
         }}
@@ -180,6 +181,7 @@ export default async function MachineInfoTab({
         canEditAnyMachine={canEditAnyMachine}
         isOwner={isOwner}
         canLink={canLink}
+        pinballmapUrl={pinballmapLocationUrl()}
       />
     ) : user && editDeniedReason !== null ? (
       <EditButtonWithTooltip reason={editDeniedReason} />
