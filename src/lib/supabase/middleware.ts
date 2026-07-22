@@ -139,8 +139,12 @@ export async function updateSession(
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    // Preserve original destination
-    url.searchParams.set("next", path);
+    // Preserve the original destination, including its query string. Routes like
+    // /oauth/consent?authorization_id=… carry a required query param that must
+    // survive the login round-trip. `searchParams.set` percent-encodes the value
+    // so an inner "?"/"&" can't leak into the login URL as sibling params — do
+    // NOT hand-build this as `?next=${path}${search}` (that would mis-encode).
+    url.searchParams.set("next", `${path}${request.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
 
