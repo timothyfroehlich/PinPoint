@@ -38,16 +38,17 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: true, skipped: "disabled" });
   }
 
-  const result = await syncLocationSnapshot();
+  // Automated hourly refresh — the sanctioned one-call/hour path, exempt from
+  // the manual-refresh throttle (PP-hbi0, CORE-PBM-001).
+  const result = await syncLocationSnapshot({ trigger: "cron" });
   if (!result.ok) {
+    // The cron path is never throttled, but narrow defensively for type safety.
+    const error = result.reason === "throttled" ? "throttled" : result.error;
     log.error(
-      { err: result.error, action: "pinballmap.syncLocationSnapshot" },
+      { err: error, action: "pinballmap.syncLocationSnapshot" },
       "PinballMap snapshot sync failed"
     );
-    return NextResponse.json(
-      { ok: false, error: result.error },
-      { status: 502 }
-    );
+    return NextResponse.json({ ok: false, error }, { status: 502 });
   }
 
   const { healed, desynced } = await reconcileAfterSync();

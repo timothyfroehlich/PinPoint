@@ -247,4 +247,22 @@ describe("updateSession public route access", () => {
       expect(location).toContain("/login");
     }
   );
+
+  it("preserves the query string in `next` when redirecting to /login", async () => {
+    // /oauth/consent carries a required `authorization_id` query param that must
+    // survive the login round-trip (Supabase OAuth consent, PP-u4ab.5).
+    const supabase = createSupabaseAuthMocks(null, null);
+    createServerClientMock.mockReturnValue(supabase);
+
+    const request = makeRequest(
+      "http://localhost/oauth/consent?authorization_id=abc123"
+    );
+    const response = await updateSession(request);
+
+    const location = response.headers.get("location");
+    expect(location).not.toBeNull();
+    const next = new URL(location!).searchParams.get("next");
+    // `next` decodes back to the full path+query, not just the pathname.
+    expect(next).toBe("/oauth/consent?authorization_id=abc123");
+  });
 });

@@ -259,6 +259,18 @@ export function InlineEditableField({
 
   const hasPresets = presets != null && presets.length > 0;
 
+  // Pull the focused editor above the on-screen keyboard once it resizes the
+  // content area. Belt-and-suspenders beyond the root `interactive-widget=
+  // resizes-content` viewport (PP-a0pl) — which iOS Safari ignores — mirroring
+  // RowEditSheet's focus handler. `scroll-margin` on the wrapper reserves the
+  // gap; `block: "nearest"` scrolls the minimum needed (a no-op when already
+  // fully visible, so desktop tab-through never jumps).
+  function handleEditorFocus(e: React.FocusEvent<HTMLDivElement>): void {
+    if (e.target instanceof HTMLElement) {
+      e.target.scrollIntoView({ block: "nearest" });
+    }
+  }
+
   function renderPresetControl(): React.JSX.Element | null {
     if (!presets || presets.length === 0) return null;
     return (
@@ -313,7 +325,10 @@ export function InlineEditableField({
       {editorOpen && hasPresets && <div>{renderPresetControl()}</div>}
 
       {editorOpen ? (
-        <div className="space-y-2">
+        <div
+          className="space-y-2 scroll-mt-4 scroll-mb-4"
+          onFocus={handleEditorFocus}
+        >
           <RichTextEditor
             key={editorSeed}
             content={editValue}
