@@ -29,13 +29,15 @@ const REQUIRED_ALL_DEPLOYMENTS: readonly RequiredEnvGroup[] = [
 // Required in Production only.
 // - NEXT_PUBLIC_SITE_URL: Preview resolves the canonical site URL from
 //   VERCEL_URL (see src/lib/url.ts getSiteUrl), so it is not required there.
-// - MCP_BEARER_TOKEN / MCP_ADMIN_USER_ID: the remote-admin MCP server is a
-//   production surface; previews have no MCP client pointed at them and its
-//   auth fails closed when either is unset (src/lib/mcp/verify-token.ts).
+//
+// This registry gates vars PinPoint itself cannot run correctly without. A var
+// that only configures an optional surface does NOT belong here, even when that
+// surface is production-only — see docs/ENV_VARS.md §4.2. MCP_BEARER_TOKEN /
+// MCP_ADMIN_USER_ID were briefly listed here and are the cautionary case: the
+// MCP server needs them, PinPoint does not, and gating the build on them turned
+// an unconfigured optional feature into a failed production deploy (PP-ogzs).
 const REQUIRED_PRODUCTION_ONLY: readonly RequiredEnvGroup[] = [
   ["NEXT_PUBLIC_SITE_URL"],
-  ["MCP_BEARER_TOKEN"],
-  ["MCP_ADMIN_USER_ID"],
 ];
 
 function assertVercelDeploymentEnv(): void {
