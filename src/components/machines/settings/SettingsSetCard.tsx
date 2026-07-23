@@ -2,7 +2,13 @@
 
 import type React from "react";
 import { useState } from "react";
-import { ChevronRight, ChevronDown, MoreVertical, Plus } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronDown,
+  MoreVertical,
+  Plus,
+  Trophy,
+} from "lucide-react";
 import {
   DndContext,
   KeyboardSensor,
@@ -63,16 +69,25 @@ import {
 interface SettingsSetCardProps {
   set: SettingsSetData;
   isExpanded: boolean;
-  /** Permission to edit at all (owner/tech+). Governs whether always-live
-   *  field inputs, section kebabs/grips, the set kebab, and "Add section"
-   *  render at all. Read-only viewers see none of it. */
+  /** Per-set permission to edit (owner/community rules). Governs whether
+   *  always-live field inputs, section kebabs/grips, the set kebab, "Add
+   *  section", Publish, and Tournament tagging render. Read-only viewers see
+   *  none of it. */
   canEdit: boolean;
-  /** Unsaved set (temp id). Preferred/Duplicate target a persisted row, so
-   *  they are disabled until the first save. */
+  /** Whether this viewer may set the set as the Owner's default (owner/admin on
+   *  an owner set). Gates the "Set as Owner's default" menu item specifically —
+   *  a community set is never eligible even to an editor. */
+  canSetDefault: boolean;
+  /** Unsaved set (temp id). Preferred/Duplicate/Publish target a persisted row,
+   *  so they are disabled until the first save. */
   isNew: boolean;
   onMoveSection: (sectionId: string, direction: "up" | "down") => void;
   onToggleExpand: () => void;
   onTogglePreferred: () => void;
+  /** Toggle the non-exclusive Tournament tag. */
+  onToggleTournament: () => void;
+  /** Publish / unpublish the set (private draft ↔ public). */
+  onTogglePublish: () => void;
   onRename: (newName: string) => void;
   /** Called after the set-name blur so the parent can flush the auto-save
    *  debounce (plain-text blur path — Task 6 Step 9). */
@@ -229,10 +244,13 @@ export function SettingsSetCard({
   set,
   isExpanded,
   canEdit,
+  canSetDefault,
   isNew,
   onMoveSection,
   onToggleExpand,
   onTogglePreferred,
+  onToggleTournament,
+  onTogglePublish,
   onRename,
   onNameBlur,
   onDuplicate,
@@ -359,7 +377,8 @@ export function SettingsSetCard({
     }
   }
 
-  // Preferred badge leads the title (after the chevron).
+  // Badges lead the title (after the chevron). "Owner's default" is exclusive
+  // (one per machine); "Tournament" is non-exclusive and can coexist with it.
   const preferredBadge = set.isPreferred && (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -368,15 +387,58 @@ export function SettingsSetCard({
             className="border-warning/30 bg-warning/10 text-warning"
             variant="outline"
           >
-            ★<span className="max-md:hidden">&nbsp;Preferred</span>
-            <span className="sr-only md:hidden">Preferred</span>
+            ★<span className="max-md:hidden">&nbsp;Owner's default</span>
+            <span className="sr-only md:hidden">Owner's default</span>
           </Badge>
         </span>
       </TooltipTrigger>
       <TooltipContent>
-        {canEdit ? "Preferred set — change in the ⋮ menu" : "Preferred set"}
+        {canEdit
+          ? "Owner's default set — change in the ⋮ menu"
+          : "Owner's default set"}
       </TooltipContent>
     </Tooltip>
+  );
+
+  const tournamentBadge = set.isTournament && (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>
+          <Badge
+            className="border-primary/30 bg-primary/10 text-primary"
+            variant="outline"
+          >
+            <Trophy className="size-3" aria-hidden="true" />
+            <span className="max-md:hidden">&nbsp;Tournament</span>
+            <span className="sr-only md:hidden">Tournament</span>
+          </Badge>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {canEdit ? "Tournament set — change in the ⋮ menu" : "Tournament set"}
+      </TooltipContent>
+    </Tooltip>
+  );
+
+  // Kind / visibility chip. A private draft is flagged prominently so its
+  // creator knows it isn't shared yet; the ★ Owner's default badge already
+  // implies an owner set, so the default gets no extra kind chip.
+  const kindBadge = !set.isPublic ? (
+    <Badge
+      className="border-outline-variant bg-muted text-muted-foreground"
+      variant="outline"
+    >
+      Private draft
+    </Badge>
+  ) : set.isPreferred ? null : set.isOwnerSet ? (
+    <Badge
+      className="border-warning/25 bg-warning/5 text-warning"
+      variant="outline"
+    >
+      Owner
+    </Badge>
+  ) : (
+    <Badge variant="secondary">Community</Badge>
   );
 
   // The set name — always-live input for permitted users, plain text for
@@ -388,9 +450,11 @@ export function SettingsSetCard({
     // <div>-in-<button> nesting when the user is a viewer.
     <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
       <span className="min-w-0 text-sm font-semibold text-foreground [overflow-wrap:anywhere]">
-        {preferredBadge && (
-          <span className="mr-2 inline-flex align-middle">
+        {(preferredBadge || tournamentBadge || kindBadge) && (
+          <span className="mr-2 inline-flex flex-wrap items-center gap-1 align-middle">
             {preferredBadge}
+            {kindBadge}
+            {tournamentBadge}
           </span>
         )}
         <InlineEditableText
@@ -475,13 +539,34 @@ export function SettingsSetCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {/* Preferred + Duplicate act on a persisted row, so they're
-                      disabled until an unsaved (temp-id) set is first saved. */}
+                  {/* These act on a persisted row, so they're disabled until an
+                      unsaved (temp-id) set is first saved. The Owner's default
+                      is always public, so it gets no Publish toggle. */}
+                  {!set.isPreferred && (
+                    <DropdownMenuItem
+                      disabled={isNew}
+                      onSelect={onTogglePublish}
+                    >
+                      {set.isPublic ? "Make private" : "Publish"}
+                    </DropdownMenuItem>
+                  )}
+                  {canSetDefault && (
+                    <DropdownMenuItem
+                      disabled={isNew}
+                      onSelect={onTogglePreferred}
+                    >
+                      {set.isPreferred
+                        ? "Unset owner's default"
+                        : "Set as owner's default"}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     disabled={isNew}
-                    onSelect={onTogglePreferred}
+                    onSelect={onToggleTournament}
                   >
-                    {set.isPreferred ? "Unset preferred" : "Set preferred"}
+                    {set.isTournament
+                      ? "Remove Tournament tag"
+                      : "Tag as Tournament"}
                   </DropdownMenuItem>
                   <DropdownMenuItem disabled={isNew} onSelect={onDuplicate}>
                     Duplicate
@@ -535,6 +620,7 @@ export function SettingsSetCard({
               canEdit={canEdit}
               placeholder="Add a short description…"
               compact
+              clickToEdit
               onValueChange={onUpdateDescription}
               onBlur={onDescriptionBlur}
             />

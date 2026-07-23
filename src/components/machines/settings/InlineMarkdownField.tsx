@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { useState } from "react";
 import { cn } from "~/lib/utils";
 import {
   docIsEmpty,
@@ -9,20 +10,18 @@ import {
 } from "~/lib/tiptap/types";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
-import { EDITABLE_FIELD_CLASS } from "~/components/machines/settings/affordance";
+import {
+  EDITABLE_FIELD_CLASS,
+  EDITABLE_TEXT_CLASS,
+} from "~/components/machines/settings/affordance";
 
 interface InlineMarkdownFieldProps {
   value: ProseMirrorDoc | null;
   /**
-   * Permission to edit (PP-43q3 always-live model). True → always render the
-   * full RichTextEditor; every keystroke streams up via `onValueChange` so the
-   * auto-save debounce in SettingsTab can persist it. False → RichTextDisplay
-   * (or null when empty). There is no explicit Edit/Save/Cancel — auto-save
-   * debounce is the only write boundary.
-   *
-   * Rich text keeps its 800 ms debounce AND now flushes on blur (via `onBlur`),
-   * symmetric with the plain-text inputs — leaving the editor persists
-   * immediately instead of waiting out the debounce.
+   * Permission to edit (PP-43q3 always-live model). True → render the editor
+   * (always-open, unless `clickToEdit`); every keystroke streams up via
+   * `onValueChange` so the auto-save debounce in SettingsTab can persist it.
+   * False → RichTextDisplay (or null when empty). No explicit Edit/Save/Cancel.
    */
   canEdit: boolean;
   /**
@@ -40,6 +39,13 @@ interface InlineMarkdownFieldProps {
   placeholder?: string;
   /** Smaller (xs, muted) rendering for the card-header description. */
   compact?: boolean;
+  /**
+   * Opt-in click-to-edit: at rest show the finished text (or a one-line
+   * placeholder), opening the editor only on click. Keeps at-rest cards
+   * compact — used by the card-header description. Section bodies leave this
+   * off and stay always-live. (PP-tn6t)
+   */
+  clickToEdit?: boolean;
 }
 
 /** Normalize a draft for storage: a whitespace-only doc becomes null. */
@@ -52,12 +58,11 @@ function normalize(doc: ProseMirrorDoc | null): ProseMirrorDoc | null {
  * header description and the Rubbers / Post positions / Notes section bodies.
  *
  * Interaction model (PP-43q3 always-live auto-save):
- *  - `canEdit` true → the editor is ALWAYS open. No separate Save/Cancel.
- *    Every change streams up via `onValueChange` so the auto-save debounce
- *    can persist it. The editor carries a bordered black box so it reads as
- *    an editable field even when the toolbar is collapsed.
+ *  - `canEdit` true → the editor is open. Every change streams up via
+ *    `onValueChange` so the auto-save debounce can persist it; no Save/Cancel.
+ *    With `clickToEdit`, the editor opens on click and closes on blur, showing
+ *    finished text / a placeholder at rest.
  *  - `canEdit` false → finished text via RichTextDisplay (or null when empty).
- *    No pencil, no hover tint, no click target.
  */
 export function InlineMarkdownField({
   value,
@@ -67,38 +72,80 @@ export function InlineMarkdownField({
   label,
   placeholder = "Add text…",
   compact = false,
+  clickToEdit = false,
 }: InlineMarkdownFieldProps): React.JSX.Element | null {
   const isEmpty = docIsEmpty(value);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Both modes render body text at the same size (14px) — "compact" only kills
-  // prose's vertical rhythm so the field can sit flush with its container
-  // (used by the card-header description).
+  // prose's vertical rhythm so the field can sit flush with its container.
   const textSize = "text-sm";
+  const displayClassName = cn(
+    textSize,
+    compact &&
+      "text-muted-foreground [&_*]:!my-0 [&_*]:!text-sm [&_*]:!leading-snug",
+    !compact &&
+      "max-md:leading-snug max-md:[&_p]:!my-1 max-md:[&_*]:!leading-snug"
+  );
+  const wrapperClassName = compact ? undefined : "space-y-1.5";
+  const labelEl = label ? (
+    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      {label}
+    </p>
+  ) : null;
 
   if (canEdit) {
+    // Click-to-edit, at rest: finished text or a one-line placeholder button.
+    if (clickToEdit && !isEditing) {
+      return (
+        <div className={wrapperClassName}>
+          {labelEl}
+          <button
+            type="button"
+            onClick={() => {
+              setIsEditing(true);
+            }}
+            aria-label={`Edit ${label ?? "description"}`}
+            className={cn(
+              "block w-full rounded text-left",
+              EDITABLE_TEXT_CLASS
+            )}
+          >
+            {isEmpty ? (
+              <span className={cn(textSize, "italic text-muted-foreground")}>
+                {placeholder}
+              </span>
+            ) : (
+              <RichTextDisplay content={value} className={displayClassName} />
+            )}
+          </button>
+        </div>
+      );
+    }
+
     return (
-      <div className={compact ? undefined : "space-y-1.5"}>
-        {label && (
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            {label}
-          </p>
-        )}
-        {/* Bordered black box so the editor reads as an editable field.
-            EDITABLE_FIELD_CLASS carries bg-black + border + focus ring.
-            We apply it to the wrapper div, not the editor itself, since the
-            editor's focus ring is managed by Tiptap internally. */}
+      <div className={wrapperClassName}>
+        {labelEl}
+        {/* Bordered black box so the editor reads as an editable field. */}
         <div className={cn(EDITABLE_FIELD_CLASS, "rounded p-1")}>
           <RichTextEditor
             content={value}
             onChange={(doc) => {
               onValueChange(normalize(doc));
             }}
-            onBlur={onBlur}
+            onBlur={() => {
+              if (clickToEdit) setIsEditing(false);
+              onBlur?.();
+            }}
             // Settings descriptions/notes are documentation, not
             // conversation — @-mentions (which notify) make no sense here.
             mentionsEnabled={false}
             placeholder={placeholder}
             ariaLabel={label ?? "Edit text"}
+            // Focus straight into the editor when opened via click-to-edit —
+            // the user just clicked to edit, so focus follows their action.
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate focus-on-open for click-to-edit, PP-tn6t
+            autoFocus={clickToEdit}
             // Always the full editor (toolbar shown) — no mini/full toggle.
             showToolbar
             compact={false}
@@ -114,22 +161,9 @@ export function InlineMarkdownField({
   if (isEmpty) return null;
 
   return (
-    <div className={compact ? undefined : "space-y-1.5"}>
-      {label && (
-        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          {label}
-        </p>
-      )}
-      <RichTextDisplay
-        content={value}
-        className={cn(
-          textSize,
-          compact &&
-            "text-muted-foreground [&_*]:!my-0 [&_*]:!text-sm [&_*]:!leading-snug",
-          !compact &&
-            "max-md:leading-snug max-md:[&_p]:!my-1 max-md:[&_*]:!leading-snug"
-        )}
-      />
+    <div className={wrapperClassName}>
+      {labelEl}
+      <RichTextDisplay content={value} className={displayClassName} />
     </div>
   );
 }

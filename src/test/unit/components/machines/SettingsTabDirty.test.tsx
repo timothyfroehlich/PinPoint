@@ -17,6 +17,7 @@ import {
   act,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { type ReactNode } from "react";
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 
 import { SettingsTab } from "~/components/machines/settings/SettingsTab";
@@ -79,8 +80,20 @@ vi.mock("~/app/(app)/m/[initials]/(tabs)/settings/actions", () => ({
   deleteSettingsSetAction: vi.fn(),
   duplicateSettingsSetAction: vi.fn(),
   setPreferredSettingsSetAction: vi.fn(),
+  setTournamentTagAction: vi.fn(),
+  publishSettingsSetAction: vi.fn(),
   updateMachineSettingsInstructionsAction: vi.fn(),
   updateMachineSettingsRequestsAction: vi.fn(),
+}));
+
+// The badges use shadcn Tooltip, which needs a TooltipProvider ancestor the
+// bare render() lacks. Render tooltip parts as pass-throughs (their text isn't
+// asserted here).
+vi.mock("~/components/ui/tooltip", () => ({
+  TooltipProvider: ({ children }: { children: ReactNode }) => children,
+  Tooltip: ({ children }: { children: ReactNode }) => children,
+  TooltipTrigger: ({ children }: { children: ReactNode }) => children,
+  TooltipContent: () => null,
 }));
 
 const saveMock = vi.mocked(saveSettingsSetAction);
@@ -116,11 +129,33 @@ beforeEach(() => {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function oneSet(): SettingsSetData {
+// Shared defaults for the sharing/visibility fields (PP-tn6t). Tests that care
+// about read-only rendering pass `{ canEdit: false }`.
+function setDefaults(): Pick<
+  SettingsSetData,
+  | "isOwnerSet"
+  | "isPublic"
+  | "isTournament"
+  | "createdById"
+  | "canEdit"
+  | "canSetDefault"
+> {
+  return {
+    isOwnerSet: false,
+    isPublic: true,
+    isTournament: false,
+    createdById: "u1",
+    canEdit: true,
+    canSetDefault: false,
+  };
+}
+
+function oneSet(over: Partial<SettingsSetData> = {}): SettingsSetData {
   return {
     id: "set-1",
-    name: "Tournament",
+    name: "Comp rules",
     isPreferred: false,
+    ...setDefaults(),
     updatedBy: "You",
     updatedAt: "2026-06-09",
     description: null,
@@ -134,14 +169,16 @@ function oneSet(): SettingsSetData {
         ],
       },
     ],
+    ...over,
   };
 }
 
-function twoNoteSet(): SettingsSetData {
+function twoNoteSet(over: Partial<SettingsSetData> = {}): SettingsSetData {
   return {
     id: "set-1",
-    name: "Tournament",
+    name: "Comp rules",
     isPreferred: false,
+    ...setDefaults(),
     updatedBy: "You",
     updatedAt: "2026-06-09",
     description: null,
@@ -161,14 +198,16 @@ function twoNoteSet(): SettingsSetData {
         customTitle: false,
       },
     ],
+    ...over,
   };
 }
 
-function dipSet(): SettingsSetData {
+function dipSet(over: Partial<SettingsSetData> = {}): SettingsSetData {
   return {
     id: "set-1",
-    name: "Tournament",
+    name: "Comp rules",
     isPreferred: false,
+    ...setDefaults(),
     updatedBy: "You",
     updatedAt: "2026-06-09",
     description: null,
@@ -180,6 +219,7 @@ function dipSet(): SettingsSetData {
         switches: [{ _key: "sw1", switch: "DS-1", position: "OFF", note: "" }],
       },
     ],
+    ...over,
   };
 }
 
@@ -191,7 +231,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   it("(a) a permitted user sees the set-name input immediately — no Edit button", () => {
     render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
@@ -211,12 +254,20 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   it("(a) software-settings table cells are always-live inputs for permitted users", () => {
     render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
         settingsInstructions={null}
       />
+    );
+
+    // Cards render collapsed by default (PP-tn6t) — expand to reach the body.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Comp rules settings set/ })
     );
 
     // The pre-existing row cells are always open.
@@ -234,7 +285,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -274,7 +328,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   it("(b) blurring the set-name input flushes the save immediately (no 800 ms wait)", async () => {
     render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
@@ -303,9 +360,12 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   it("(c) read-only viewer sees plain text for set name — no input", () => {
     render(
       <SettingsTab
-        canEdit={false}
+        canCreate={false}
+        viewerId="u2"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
-        initialSets={[oneSet()]}
+        initialSets={[oneSet({ canEdit: false })]}
         settingsRequests={null}
         settingsInstructions={null}
       />
@@ -315,18 +375,26 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     expect(
       screen.queryByRole("textbox", { name: "set name" })
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Tournament")).toBeInTheDocument();
+    expect(screen.getByText("Comp rules")).toBeInTheDocument();
   });
 
   it("(c) read-only viewer sees no table-cell inputs — only plain spans", () => {
     render(
       <SettingsTab
-        canEdit={false}
+        canCreate={false}
+        viewerId="u2"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
-        initialSets={[oneSet()]}
+        initialSets={[oneSet({ canEdit: false })]}
         settingsRequests={null}
         settingsInstructions={null}
       />
+    );
+
+    // Cards render collapsed by default (PP-tn6t) — expand to reach the body.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Comp rules settings set/ })
     );
 
     // No text inputs for the settings rows.
@@ -339,12 +407,15 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
 
   it("(c) read-only viewer sees RichTextDisplay, not RichTextEditor, for description", () => {
     const setWithDesc: SettingsSetData = {
-      ...oneSet(),
+      ...oneSet({ canEdit: false }),
       description: SAMPLE_DOC,
     };
     render(
       <SettingsTab
-        canEdit={false}
+        canCreate={false}
+        viewerId="u2"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[setWithDesc]}
         settingsRequests={null}
@@ -360,12 +431,20 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   it("(c) read-only viewer sees no DIP-bank-name input", () => {
     render(
       <SettingsTab
-        canEdit={false}
+        canCreate={false}
+        viewerId="u2"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
-        initialSets={[dipSet()]}
+        initialSets={[dipSet({ canEdit: false })]}
         settingsRequests={null}
         settingsInstructions={null}
       />
+    );
+
+    // Cards render collapsed by default (PP-tn6t) — expand to reach the body.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Comp rules settings set/ })
     );
 
     expect(
@@ -377,9 +456,12 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   it("(c) read-only viewer sees no Edit/Save/Cancel buttons and no Add section", () => {
     render(
       <SettingsTab
-        canEdit={false}
+        canCreate={false}
+        viewerId="u2"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
-        initialSets={[oneSet()]}
+        initialSets={[oneSet({ canEdit: false })]}
         settingsRequests={null}
         settingsInstructions={null}
       />
@@ -406,7 +488,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   it("(d) the always-on set-name input has autocomplete='off'", () => {
     render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
@@ -426,7 +511,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     const user = userEvent.setup();
     render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[
           {
@@ -445,6 +533,11 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         settingsRequests={null}
         settingsInstructions={null}
       />
+    );
+
+    // Cards render collapsed by default (PP-tn6t) — expand to reach the body.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Comp rules settings set/ })
     );
 
     // The section title is an always-live input (customTitle=true).
@@ -484,12 +577,20 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     const user = userEvent.setup();
     render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[twoNoteSet()]}
         settingsRequests={null}
         settingsInstructions={null}
       />
+    );
+
+    // Cards render collapsed by default (PP-tn6t) — expand to reach the body.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Comp rules settings set/ })
     );
 
     await user.click(
@@ -513,7 +614,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     const user = userEvent.setup();
     render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[]}
         settingsRequests={null}
@@ -555,7 +659,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     });
     render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[]}
         settingsRequests={null}
@@ -590,7 +697,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[]}
           settingsRequests={null}
@@ -641,7 +751,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[]}
           settingsRequests={null}
@@ -677,7 +790,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     const user = userEvent.setup();
     render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[]}
         settingsRequests={null}
@@ -690,14 +806,17 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
       screen.getByRole("button", { name: "More options for this set" })
     );
 
-    const preferred = await screen.findByRole("menuitem", {
-      name: "Set preferred",
+    // The new set is the owner's first, so it is optimistically the Owner's
+    // default — the menu item reads "Unset owner's default". Both it and
+    // Duplicate act on a persisted row, so they're disabled until first save.
+    const ownerDefault = await screen.findByRole("menuitem", {
+      name: /owner's default/i,
     });
     const duplicate = screen.getByRole("menuitem", { name: "Duplicate" });
-    expect(preferred).toHaveAttribute("aria-disabled", "true");
+    expect(ownerDefault).toHaveAttribute("aria-disabled", "true");
     expect(duplicate).toHaveAttribute("aria-disabled", "true");
 
-    await user.click(preferred);
+    await user.click(ownerDefault);
     expect(vi.mocked(setPreferredSettingsSetAction)).not.toHaveBeenCalled();
     expect(vi.mocked(duplicateSettingsSetAction)).not.toHaveBeenCalled();
   });
@@ -712,7 +831,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -764,7 +886,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -818,7 +943,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -870,7 +998,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -925,7 +1056,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -984,7 +1118,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -1040,7 +1177,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -1099,7 +1239,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -1138,7 +1281,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
   it("(unmount) unmounting the tab with a pending debounce flushes it (the edit persists)", async () => {
     const { unmount } = render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
@@ -1173,7 +1319,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     const setWithDescOpen: SettingsSetData = { ...oneSet() };
     render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[setWithDescOpen]}
         settingsRequests={null}
@@ -1181,20 +1330,19 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
       />
     );
 
+    // The description is click-to-edit (PP-tn6t): open the editor first.
+    fireEvent.click(screen.getByRole("button", { name: "Edit description" }));
+
     // Edit the description via the mock editor's onChange (markDirty + schedule,
     // debounce pending). Then blur the editor → onBlur → flush.
-    const descEditors = screen.getAllByRole("button", {
+    const descEditor = screen.getByRole("button", {
       name: "type-in-Edit text",
     });
-    const descEditor = descEditors[0];
-    if (!descEditor) throw new Error("description editor not rendered");
     fireEvent.click(descEditor);
     expect(saveMock).not.toHaveBeenCalled();
 
     // Blur the description editor's textarea → onBlur fires → autoSave.flush.
-    const textareas = screen.getAllByRole("textbox", { name: "Edit text" });
-    const descTextarea = textareas[0];
-    if (!descTextarea) throw new Error("description textarea not rendered");
+    const descTextarea = screen.getByRole("textbox", { name: "Edit text" });
     fireEvent.blur(descTextarea);
 
     await waitFor(() => {
@@ -1213,7 +1361,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     try {
       render(
         <SettingsTab
-          canEdit
+          canCreate
+          viewerId="u1"
+          machineOwnerId="u1"
+          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -1258,7 +1409,10 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
     saveMock.mockResolvedValueOnce({ success: false, error: "Network error" });
     const { unmount } = render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
@@ -1335,7 +1489,10 @@ describe("SettingsTab — data-loss regression (A1, 🔴)", () => {
 
     render(
       <SettingsTab
-        canEdit
+        canCreate
+        viewerId="u1"
+        machineOwnerId="u1"
+        ownerName="Owner"
         machineId="m1"
         initialSets={[]}
         settingsRequests={null}
@@ -1392,5 +1549,69 @@ describe("SettingsTab — data-loss regression (A1, 🔴)", () => {
     expect(rerunPayload?.id).toBe("server-uuid");
     const secA = rerunPayload?.sections.find((s) => s.kind === "note");
     expect(secA?.kind === "note" ? secA.body : null).toEqual(SAMPLE_DOC);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category filter chip counts (PP-tn6t) — "Owner's" and "Community" are KINDS
+// and must partition "All" regardless of visibility. Regression: a community
+// PRIVATE draft used to fall out of the Community count (isPublic gate), so the
+// chips didn't sum to All.
+// ---------------------------------------------------------------------------
+
+describe("SettingsTab — category chip counts partition by kind", () => {
+  it("Owner's + Community counts sum to All, including private drafts of each kind", () => {
+    // A viewer who is neither the owner nor any set's creator: "Owner's" shows
+    // (viewer isn't the owner) and "Mine" hides (0 authored), so the two kind
+    // chips are the whole partition.
+    const sets: SettingsSetData[] = [
+      oneSet({
+        id: "owner-public",
+        isOwnerSet: true,
+        isPublic: true,
+        createdById: "owner-y",
+      }),
+      oneSet({
+        id: "owner-draft",
+        isOwnerSet: true,
+        isPublic: false, // owner private draft
+        createdById: "owner-y",
+      }),
+      oneSet({
+        id: "community-public",
+        isOwnerSet: false,
+        isPublic: true,
+        createdById: "tech-z",
+      }),
+      oneSet({
+        id: "community-draft",
+        isOwnerSet: false,
+        isPublic: false, // community private draft — the regression case
+        createdById: "tech-z",
+      }),
+    ];
+
+    render(
+      <SettingsTab
+        canCreate
+        viewerId="viewer-x"
+        machineOwnerId="owner-y"
+        ownerName="Owner"
+        machineId="m1"
+        initialSets={sets}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    // Chips read "<label> <count>"; both kinds count their private drafts, so
+    // Owner's 2 + Community 2 = All 4.
+    expect(screen.getByRole("button", { name: /^All 4$/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Owner's 2$/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Community 2$/ })
+    ).toBeInTheDocument();
   });
 });

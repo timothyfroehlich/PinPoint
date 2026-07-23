@@ -182,8 +182,13 @@ test.describe("Machine Settings (PP-43q3)", () => {
       ]);
 
       await page.goto(`/m/${machineInitials}/settings`);
-      // The seeded (and only) set is expanded by default, so both section
-      // headings are visible up front.
+      // Sets render collapsed by default (PP-tn6t) — expand the seeded set so its
+      // section headings are visible.
+      await page
+        .getByRole("button", {
+          name: `Expand ${PREFIX} Delete target settings set`,
+        })
+        .click();
       await expect(page.getByText("Software settings")).toBeVisible();
       const rubbersHeading = page.getByRole("paragraph").filter({
         hasText: /^Rubbers$/,
@@ -207,6 +212,12 @@ test.describe("Machine Settings (PP-43q3)", () => {
       // render right after revalidate, so retry the reload.
       await expect(async () => {
         await page.reload();
+        // Collapsed again after reload — re-expand to read the sections.
+        await page
+          .getByRole("button", {
+            name: `Expand ${PREFIX} Delete target settings set`,
+          })
+          .click();
         await expect(page.getByText("Software settings")).toBeVisible({
           timeout: 8_000,
         });
@@ -239,6 +250,12 @@ test.describe("Machine Settings (PP-43q3)", () => {
       };
 
       await page.goto(`/m/${machineInitials}/settings`);
+      // Sets render collapsed by default (PP-tn6t) — expand the seeded set.
+      await page
+        .getByRole("button", {
+          name: `Expand ${PREFIX} Reorder target settings set`,
+        })
+        .click();
       await expect(page.getByText("Software settings")).toBeVisible();
       expect(await sectionOrder()).toEqual([
         "More options for the Software settings section",
@@ -257,6 +274,12 @@ test.describe("Machine Settings (PP-43q3)", () => {
       // And the new order survives a reload (persisted to the DB).
       await expect(async () => {
         await page.reload();
+        // Collapsed again after reload — re-expand to read the section order.
+        await page
+          .getByRole("button", {
+            name: `Expand ${PREFIX} Reorder target settings set`,
+          })
+          .click();
         await expect(page.getByText("Software settings")).toBeVisible({
           timeout: 8_000,
         });
@@ -275,7 +298,11 @@ test.describe("Machine Settings (PP-43q3)", () => {
       page,
     }) => {
       await page.goto(`/m/${machine}/settings`);
-      await expect(page.getByText(/game settings/i)).toBeVisible();
+      // TAF has no owner and no sets a non-owner member can see, so the tab
+      // shows its read-only empty state (PP-tn6t) and offers no "New set".
+      await expect(
+        page.getByText(/no settings sets recorded yet/i)
+      ).toBeVisible();
       await expect(page.getByRole("button", { name: /new set/i })).toHaveCount(
         0
       );

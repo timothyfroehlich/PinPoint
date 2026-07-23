@@ -66,7 +66,13 @@ test.describe("Soft-keyboard reflow (PP-a0pl)", () => {
       "machine-settings-requests",
       "machine-settings-instructions",
     ]) {
-      const editor = page.getByTestId(testId).locator(".ProseMirror").first();
+      const field = page.getByTestId(testId);
+      // "How to change settings" is a collapsible <details>, collapsed by
+      // default (PP-tn6t) — open it via its summary before reaching the editor.
+      // "Before you change anything" is always-open and has no summary.
+      const summary = field.locator("summary");
+      if ((await summary.count()) > 0) await summary.click();
+      const editor = field.locator(".ProseMirror").first();
       await editor.click();
       await expect(editor).toBeFocused();
       await expectReachable(editor);
@@ -102,6 +108,14 @@ test.describe("Soft-keyboard reflow (PP-a0pl)", () => {
     }) => {
       test.slow();
       await page.goto(`/m/${machineInitials}/settings`);
+
+      // Sets render collapsed by default (PP-tn6t) — expand the seeded set to
+      // reveal its rows.
+      await page
+        .getByRole("button", {
+          name: "Expand PP-a0pl keyboard set settings set",
+        })
+        .click();
 
       // Below md (390px < 767px) the settings row is tap-to-edit: tapping it
       // opens the bottom RowEditSheet rather than an inline cell.

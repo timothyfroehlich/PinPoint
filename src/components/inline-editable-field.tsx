@@ -4,7 +4,8 @@
 import type React from "react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
-import { Pencil, ChevronDown } from "lucide-react";
+import { Pencil, ChevronDown, ChevronRight } from "lucide-react";
+import { cn } from "~/lib/utils";
 import {
   type ProseMirrorDoc,
   docIsEmpty,
@@ -95,6 +96,12 @@ interface InlineEditableFieldProps {
    * changes guard to warn before navigating away from an uncommitted edit.
    */
   onDirtyChange?: (dirty: boolean) => void;
+  /** Render inside a native <details> disclosure, using the heading as the
+   *  <summary>, so a bulky reference block (e.g. "How to change settings") can
+   *  collapse. */
+  collapsible?: boolean;
+  /** Initial open state when `collapsible` (default true = expanded). */
+  defaultOpen?: boolean;
 }
 
 export function InlineEditableField({
@@ -110,6 +117,8 @@ export function InlineEditableField({
   headingProminent = false,
   icon,
   onDirtyChange,
+  collapsible = false,
+  defaultOpen = true,
 }: InlineEditableFieldProps): React.JSX.Element | null {
   // `isEditing` only tracks an EXPLICIT edit opened from the filled state (the
   // Pencil). The empty state for a permitted user is ALSO an open editor, but it
@@ -298,32 +307,18 @@ export function InlineEditableField({
     );
   }
 
-  return (
-    <div
-      data-testid={testId}
-      className={
-        headingProminent
-          ? "space-y-1.5 rounded-lg border border-outline-variant/60 border-l-[3px] border-l-primary bg-primary/5 p-4"
-          : "space-y-1.5"
-      }
-    >
-      {/* The heading always renders for a permitted user (the empty state is an
-          open box, so there's always something below it) and for anyone viewing
-          filled content; the only no-heading case is empty + viewer, handled by
-          the early return above. `headingProminent` swaps the tiny uppercase
-          field-label style for a 14px bold section title with an optional
-          leading icon (the machine-wide callout blocks). */}
-      <p
-        className={
-          headingProminent
-            ? "flex items-center gap-2 text-sm font-bold text-foreground"
-            : "text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
-        }
-      >
-        {headingProminent && icon}
-        {label}
-      </p>
-
+  const headingClassName = headingProminent
+    ? "flex items-center gap-2 text-sm font-bold text-foreground"
+    : "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+  const rootClassName = cn(
+    headingProminent ? "space-y-1" : "space-y-1.5",
+    headingProminent &&
+      "rounded-lg border border-outline-variant/60 border-l-[3px] border-l-primary bg-primary/5 px-3 py-2"
+  );
+  // Body = everything under the heading (presets + editor/display + the preset
+  // confirm dialog). Shared by the plain and collapsible (<details>) layouts.
+  const body = (
+    <>
       {/* Presets (section 2) sit directly UNDER the title as a "Start from a
           preset" control; picking one inserts its text into the editor below for
           the owner to edit. Shown only while the editor is open. */}
@@ -345,7 +340,7 @@ export function InlineEditableField({
             // (non-compact) so the placeholder/content sits comfortably INSIDE
             // the box; compact one-line mode stays for the name/notes callers.
             compact={!openWhenEmpty}
-            className={openWhenEmpty ? "min-h-[140px]" : "min-h-[40px]"}
+            className={openWhenEmpty ? "min-h-[88px]" : "min-h-[40px]"}
           />
           {error && (
             <p className="text-xs text-destructive" role="alert">
@@ -452,6 +447,43 @@ export function InlineEditableField({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </>
+  );
+
+  // Collapsible layout: the heading becomes a <summary>; the body is the
+  // disclosure content. Collapsed by default when `defaultOpen` is false.
+  if (collapsible) {
+    return (
+      <details
+        data-testid={testId}
+        open={defaultOpen}
+        className={cn("group", rootClassName)}
+      >
+        <summary
+          className={cn(
+            "flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden",
+            headingClassName
+          )}
+        >
+          <ChevronRight
+            className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90 motion-reduce:transition-none"
+            aria-hidden="true"
+          />
+          {headingProminent && icon}
+          <span>{label}</span>
+        </summary>
+        {body}
+      </details>
+    );
+  }
+
+  return (
+    <div data-testid={testId} className={rootClassName}>
+      <p className={headingClassName}>
+        {headingProminent && icon}
+        {label}
+      </p>
+      {body}
     </div>
   );
 }
