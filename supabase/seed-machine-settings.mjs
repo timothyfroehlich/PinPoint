@@ -1,19 +1,24 @@
 #!/usr/bin/env node
 /* eslint-disable no-undef */
 /**
- * Machine Settings Sets Demo Seed (PP-43q3) — LOCAL ONLY
+ * Machine Settings Sets Demo Seed (PP-43q3, PP-tn6t) — LOCAL ONLY
  *
  * Populates the `machine_settings_sets` table for ONE showcase machine, Attack
  * from Mars (AFM), so the Machine Settings tab always has something meaningful
- * to demo in local dev / design review. AFM gets two sets:
+ * to demo in local dev / design review. The four sets are spread across every
+ * axis of the PP-tn6t ownership/visibility model so all the badges appear:
  *
- *   1. "Tournament (competition)" — isPreferred=true — a realistic, accurate
- *      competition setup: a `software` section (WPC standard adjustments) + a
- *      `note` section using the "Post positions" preset title.
- *   2. "Full reference (every section type)" — isPreferred=false — a kitchen-sink
- *      set that exercises EVERY section kind and fills every field, so the UI's
- *      full range is visible at once: `software`, two `table` sections, a `dip`
- *      bank, and three `note` sections (both presets + a custom title).
+ *   1. "Tournament (competition)" — the Owner's default (owner set, public,
+ *      preferred) AND Tournament-tagged, showing the tag is orthogonal to the
+ *      default. Created by AFM's owner. Realistic WPC competition adjustments.
+ *   2. "Full reference (every section type)" — an owner set, public, not the
+ *      default — a kitchen-sink set exercising EVERY section kind (software,
+ *      two tables, a dip bank, three notes) so the UI's full range shows.
+ *   3. "Weekly league setup" — a Community set (public, Tournament-tagged)
+ *      created by a technician, showing the co-edited kind + a non-owner author.
+ *   4. "Draft — testing steeper tilt" — a Community Private draft created by a
+ *      technician, showing the private-draft badge (visible to its creator and
+ *      admins only).
  *
  * The data shape mirrors the `SettingsSection` union in
  * src/lib/machines/settings-types.ts. Persisted rows do NOT carry the
@@ -25,7 +30,7 @@
  * A.1 01 Balls Per Game, A.1 02 Tilt Warnings, A.1 03 Maximum Extra Balls,
  * A.1 05 Replay System, A.1 14 Replay Award, A.1 26 Tournament Play).
  *
- * Deterministic: every run wipes AFM's existing sets and re-inserts these two,
+ * Deterministic: every run wipes AFM's existing sets and re-inserts these four,
  * so re-seeding never duplicates or leaves stale demo rows.
  *
  * Demo data — DO NOT point at prod. Like the other seed scripts (seed-users.mjs)
@@ -58,19 +63,29 @@ function doc(text) {
 }
 
 /**
- * The two AFM settings sets, defined as a function of the looked-up machine id.
- * `sections` matches the persist-ready `SettingsSection[]` shape (no client
- * `_key`); the display order of `sections` is the array order here.
+ * The AFM settings sets, defined as a function of the looked-up machine id plus
+ * the two authors we distribute them across: `ownerId` (AFM's owner — makes the
+ * protected "owner" sets) and `techId` (a technician — makes the co-edited
+ * "community" sets). `sections` matches the persist-ready `SettingsSection[]`
+ * shape (no client `_key`); the display order of `sections` is the array order
+ * here. Each set carries its own `isOwnerSet` / `isPublic` / `isPreferred` /
+ * `isTournament` / `createdBy` so the demo covers every PP-tn6t badge combo.
  */
-function buildSets(afmId) {
+function buildSets(afmId, ownerId, techId) {
   return [
     // --------------------------------------------------------------------
-    // 1. Preferred, realistic — a competition floor setup.
+    // 1. The Owner's default (owner set + public + preferred) AND a
+    //    Tournament set — the tag is orthogonal to the default. Realistic
+    //    competition floor setup, authored by the owner.
     // --------------------------------------------------------------------
     {
       machineId: afmId,
       name: "Tournament (competition)",
+      isOwnerSet: true,
+      isPublic: true,
       isPreferred: true,
+      isTournament: true,
+      createdBy: ownerId,
       description: doc(
         "Competition setup for league and tournament play: 3 balls, no extra balls, replays off."
       ),
@@ -103,12 +118,17 @@ function buildSets(afmId) {
     // --------------------------------------------------------------------
     // 2. Everything-filled reference — one of each section kind (with the
     //    repeatable ones doubled) and no blank fields, so the full UI range
-    //    shows at once. NOT a real AFM setup; demo content.
+    //    shows at once. An owner set, public, but NOT the default. NOT a real
+    //    AFM setup; demo content.
     // --------------------------------------------------------------------
     {
       machineId: afmId,
       name: "Full reference (every section type)",
+      isOwnerSet: true,
+      isPublic: true,
       isPreferred: false,
+      isTournament: false,
+      createdBy: ownerId,
       description: doc(
         "Reference set exercising every section type and field — software adjustments, two generic tables, a DIP bank, and preset + custom notes. Demo content, not a competition setup."
       ),
@@ -210,6 +230,83 @@ function buildSets(afmId) {
         },
       ],
     },
+
+    // --------------------------------------------------------------------
+    // 3. A Community set (co-edited by technicians+, the owner, and admins),
+    //    public and Tournament-tagged, authored by a technician — the
+    //    non-owner, shared-ownership case.
+    // --------------------------------------------------------------------
+    {
+      machineId: afmId,
+      name: "Weekly league setup",
+      isOwnerSet: false,
+      isPublic: true,
+      isPreferred: false,
+      isTournament: true,
+      createdBy: techId,
+      description: doc(
+        "Shared setup the crew keeps current for the Tuesday league night — mirrors the owner's competition floor but with a shorter ball saver for pace."
+      ),
+      sections: [
+        {
+          id: "afm-league-software",
+          kind: "software",
+          baseline: "3-ball",
+          rows: [
+            { id: "A.1 01", name: "Balls Per Game", value: "3" },
+            { id: "A.1 26", name: "Tournament Play", value: "Yes" },
+            { id: "A.1 03", name: "Maximum Extra Balls", value: "0" },
+            { id: "A.2 09", name: "Ball Saver", value: "On (3 seconds)" },
+          ],
+        },
+        {
+          id: "afm-league-note",
+          kind: "note",
+          title: "Post positions",
+          customTitle: false,
+          body: doc(
+            "Left outlane post in the tight (upper) position for league night; drop it back to the middle for casual play afterward."
+          ),
+        },
+      ],
+    },
+
+    // --------------------------------------------------------------------
+    // 4. A Community Private draft (visible only to its creator + admins),
+    //    authored by a technician — an in-progress experiment not yet shared.
+    // --------------------------------------------------------------------
+    {
+      machineId: afmId,
+      name: "Draft — testing steeper tilt",
+      isOwnerSet: false,
+      isPublic: false,
+      isPreferred: false,
+      isTournament: false,
+      createdBy: techId,
+      description: doc(
+        "Work in progress — trying a tighter tilt before proposing it to the group. Not shared yet."
+      ),
+      sections: [
+        {
+          id: "afm-draft-software",
+          kind: "software",
+          baseline: "3-ball",
+          rows: [
+            { id: "A.1 02", name: "Tilt Warnings", value: "1" },
+            { id: "A.2 01", name: "Tilt Sensitivity", value: "Sensitive" },
+          ],
+        },
+        {
+          id: "afm-draft-note",
+          kind: "note",
+          title: "Work in progress",
+          customTitle: true,
+          body: doc(
+            "Need to confirm the plumb bob doesn't false-trigger on a hard nudge before making this public."
+          ),
+        },
+      ],
+    },
   ];
 }
 
@@ -218,7 +315,7 @@ async function run() {
 
   try {
     const [afm] = await sql`
-      SELECT id FROM machines WHERE initials = 'AFM' LIMIT 1
+      SELECT id, owner_id FROM machines WHERE initials = 'AFM' LIMIT 1
     `;
     if (!afm) {
       console.log(
@@ -227,14 +324,28 @@ async function run() {
       return;
     }
 
-    // Pick a "created_by"/"updated_by" author: prefer an admin seed user,
-    // fall back to any user profile. Both columns are ON DELETE SET NULL, so
-    // a null author is acceptable if no users exist yet.
+    // Distribute authorship across two roles so the demo's owner vs community
+    // sets have plausible creators. `owner_id` on AFM authors the protected
+    // owner sets; a technician authors the co-edited community sets. Both
+    // `created_by`/`updated_by` are ON DELETE SET NULL, so a null author is
+    // acceptable if the expected user isn't present.
     const userRows = await sql`
-      SELECT id, role FROM user_profiles ORDER BY role LIMIT 5
+      SELECT id, role FROM user_profiles ORDER BY role LIMIT 20
     `;
+    const ownerId =
+      afm.owner_id ??
+      userRows.find((u) => u.role === "member")?.id ??
+      userRows.find((u) => u.role === "admin")?.id ??
+      userRows[0]?.id ??
+      null;
+    // A technician for community sets; fall back to any non-owner, then owner.
+    const techId =
+      userRows.find((u) => u.role === "technician")?.id ??
+      userRows.find((u) => u.id !== ownerId)?.id ??
+      ownerId;
+    // Owner/admin author for the machine-level reference metadata below.
     const author =
-      userRows.find((u) => u.role === "admin")?.id ?? userRows[0]?.id ?? null;
+      userRows.find((u) => u.role === "admin")?.id ?? ownerId ?? null;
 
     // Machine-level "How to change settings" (shared by every set; rendered at
     // the top of the Settings tab). AFM is a Bally/Williams WPC game, so this is
@@ -296,7 +407,7 @@ async function run() {
       WHERE id = ${afm.id}
     `;
 
-    const sets = buildSets(afm.id);
+    const sets = buildSets(afm.id, ownerId, techId);
 
     // Deterministic: wipe AFM's existing sets, then insert this pair. Clearing
     // first also sidesteps the partial unique index on is_preferred (a stale
@@ -306,16 +417,20 @@ async function run() {
     for (const set of sets) {
       await sql`
         INSERT INTO machine_settings_sets (
-          machine_id, name, description, sections, is_preferred,
+          machine_id, name, description, sections,
+          is_owner_set, is_public, is_preferred, is_tournament,
           created_by, updated_by, created_at, updated_at
         ) VALUES (
           ${set.machineId},
           ${set.name},
           ${set.description ? sql.json(set.description) : null},
           ${sql.json(set.sections)},
+          ${set.isOwnerSet},
+          ${set.isPublic},
           ${set.isPreferred},
-          ${author},
-          ${author},
+          ${set.isTournament},
+          ${set.createdBy ?? author},
+          ${set.createdBy ?? author},
           NOW(),
           NOW()
         )
@@ -323,7 +438,7 @@ async function run() {
     }
 
     console.log(
-      `✅ Machine settings seeded: ${sets.length} sets + owner requests + access instructions on Attack from Mars (AFM).`
+      `✅ Machine settings seeded: ${sets.length} sets (owner default + owner public + community public + community draft) + owner requests + access instructions on Attack from Mars (AFM).`
     );
   } finally {
     await sql.end();
