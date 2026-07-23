@@ -19,6 +19,7 @@ import {
   timelineEvents,
   userProfiles,
 } from "~/server/db/schema";
+import { type AccessLevel } from "~/lib/permissions/matrix";
 import {
   NAME_MAX,
   type SettingsSetPayload,
@@ -792,6 +793,512 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
       expect(e.sourceType).toBe("lifecycle");
       expect(e.authorId).toBe(owner.id);
     }
+  });
+
+  // -- PP-tn6t: ownership + visibility + per-set edit auth -------------------
+
+  /** Insert a settings-set row directly with explicit ownership/visibility. */
+  async function insertSet(
+    machineId: string,
+    overrides: Partial<{
+      name: string;
+      isOwnerSet: boolean;
+      isPublic: boolean;
+      isPreferred: boolean;
+      isTournament: boolean;
+      createdBy: string | null;
+    }> = {}
+  ) {
+    const db = await getTestDb();
+    const [row] = await db
+      .insert(machineSettingsSets)
+      .values({
+        machineId,
+        name: overrides.name ?? "A set",
+        sections: [],
+        isOwnerSet: overrides.isOwnerSet ?? false,
+        isPublic: overrides.isPublic ?? true,
+        isPreferred: overrides.isPreferred ?? false,
+        isTournament: overrides.isTournament ?? false,
+        createdBy: overrides.createdBy ?? null,
+      })
+      .returning();
+    if (!row) throw new Error("setup insert failed");
+    return row;
+  }
+
+  async function reload(setId: string) {
+    const db = await getTestDb();
+    return db.query.machineSettingsSets.findFirst({
+      where: eq(machineSettingsSets.id, setId),
+    });
+  }
+
+  // --- per-set edit gate (owner-set protection vs community co-editing) -----
+
+  it("save/update: a technician cannot edit an owner set (owner-set protection)", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const ownerSet = await insertSet(machine.id, {
+      name: "Owner set",
+      isOwnerSet: true,
+      isPublic: true,
+      createdBy: owner.id,
+    });
+
+    const tech = await makeUser("technician");
+    await mockAuth(tech.id);
+    const { saveSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+    const res = await saveSettingsSetAction({
+      machineId: machine.id,
+      id: ownerSet.id,
+      name: "Hijacked",
+      description: null,
+      sections: sampleSections(),
+    });
+    expect(res.success).toBe(false);
+    if (res.success === false) expect(res.error).toBe("Forbidden");
+    expect((await reload(ownerSet.id))?.name).toBe("Owner set");
+  });
+
+  it("save/update: a technician CAN edit a community set (co-editing role)", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const community = await insertSet(machine.id, {
+      name: "Community",
+      isOwnerSet: false,
+      isPublic: true,
+      createdBy: owner.id,
+    });
+
+    const tech = await makeUser("technician");
+    await mockAuth(tech.id);
+    const { saveSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+    const res = await saveSettingsSetAction({
+      machineId: machine.id,
+      id: community.id,
+      name: "Edited by tech",
+      description: null,
+      sections: sampleSections(),
+    });
+    expect(res.success).toBe(true);
+    const row = await reload(community.id);
+    expect(row?.name).toBe("Edited by tech");
+    expect(row?.updatedBy).toBe(tech.id);
+  });
+
+  it("save/update: the machine owner CAN edit a community set a technician created", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const tech = await makeUser("technician");
+    const community = await insertSet(machine.id, {
+      name: "Tech's community set",
+      isOwnerSet: false,
+      isPublic: true,
+      createdBy: tech.id,
+    });
+
+    await mockAuth(owner.id);
+    const { saveSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+    const res = await saveSettingsSetAction({
+      machineId: machine.id,
+      id: community.id,
+      name: "Owner tweaked it",
+      description: null,
+      sections: sampleSections(),
+    });
+    expect(res.success).toBe(true);
+    expect((await reload(community.id))?.name).toBe("Owner tweaked it");
+  });
+
+  it("delete: a technician cannot delete an owner set, but can delete a community set", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const ownerSet = await insertSet(machine.id, {
+      name: "Owner set",
+      isOwnerSet: true,
+      isPublic: true,
+      createdBy: owner.id,
+    });
+    const community = await insertSet(machine.id, {
+      name: "Community",
+      isOwnerSet: false,
+      isPublic: true,
+      createdBy: owner.id,
+    });
+
+    const tech = await makeUser("technician");
+    await mockAuth(tech.id);
+    const { deleteSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    const denied = await deleteSettingsSetAction({ id: ownerSet.id });
+    expect(denied.success).toBe(false);
+    if (denied.success === false) expect(denied.error).toBe("Forbidden");
+    expect(await reload(ownerSet.id)).toBeDefined();
+
+    const ok = await deleteSettingsSetAction({ id: community.id });
+    expect(ok.success).toBe(true);
+    expect(await reload(community.id)).toBeUndefined();
+  });
+
+  // --- publish (visibility) gate --------------------------------------------
+
+  it("publish: a technician can publish their own community draft but not an owner draft", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const ownerDraft = await insertSet(machine.id, {
+      name: "Owner draft",
+      isOwnerSet: true,
+      isPublic: false,
+      createdBy: owner.id,
+    });
+
+    const tech = await makeUser("technician");
+    const communityDraft = await insertSet(machine.id, {
+      name: "Community draft",
+      isOwnerSet: false,
+      isPublic: false,
+      createdBy: tech.id,
+    });
+
+    await mockAuth(tech.id);
+    const { publishSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    // The owner draft is invisible to the tech (private, not theirs) → Forbidden.
+    const denied = await publishSettingsSetAction({
+      id: ownerDraft.id,
+      isPublic: true,
+    });
+    expect(denied.success).toBe(false);
+    expect((await reload(ownerDraft.id))?.isPublic).toBe(false);
+
+    // Their own community draft → allowed.
+    const ok = await publishSettingsSetAction({
+      id: communityDraft.id,
+      isPublic: true,
+    });
+    expect(ok.success).toBe(true);
+    expect((await reload(communityDraft.id))?.isPublic).toBe(true);
+  });
+
+  it("publish: refuses to unpublish the Owner's default", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const def = await insertSet(machine.id, {
+      name: "Default",
+      isOwnerSet: true,
+      isPublic: true,
+      isPreferred: true,
+      createdBy: owner.id,
+    });
+
+    await mockAuth(owner.id);
+    const { publishSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+    const res = await publishSettingsSetAction({
+      id: def.id,
+      isPublic: false,
+    });
+    expect(res.success).toBe(false);
+    if (res.success === false)
+      expect(res.error).toBe(
+        "Unset the Owner's default before making it private."
+      );
+    expect((await reload(def.id))?.isPublic).toBe(true);
+  });
+
+  // --- tournament tag gate ---------------------------------------------------
+
+  it("tournament tag: needs edit rights — tech tags a community set, not an owner set", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const ownerSet = await insertSet(machine.id, {
+      name: "Owner set",
+      isOwnerSet: true,
+      isPublic: true,
+      createdBy: owner.id,
+    });
+    const community = await insertSet(machine.id, {
+      name: "Community",
+      isOwnerSet: false,
+      isPublic: true,
+      createdBy: owner.id,
+    });
+
+    const tech = await makeUser("technician");
+    await mockAuth(tech.id);
+    const { setTournamentTagAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    const denied = await setTournamentTagAction({
+      id: ownerSet.id,
+      isTournament: true,
+    });
+    expect(denied.success).toBe(false);
+    expect((await reload(ownerSet.id))?.isTournament).toBe(false);
+
+    const ok = await setTournamentTagAction({
+      id: community.id,
+      isTournament: true,
+    });
+    expect(ok.success).toBe(true);
+    expect((await reload(community.id))?.isTournament).toBe(true);
+  });
+
+  // --- owner's default (setPreferred → canSetOwnerDefault) -------------------
+
+  it("owner's default: a technician cannot set it; the owner can", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const ownerSet = await insertSet(machine.id, {
+      name: "Owner set",
+      isOwnerSet: true,
+      isPublic: true,
+      createdBy: owner.id,
+    });
+
+    const tech = await makeUser("technician");
+    await mockAuth(tech.id);
+    const { setPreferredSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+    const denied = await setPreferredSettingsSetAction({
+      id: ownerSet.id,
+      isPreferred: true,
+    });
+    expect(denied.success).toBe(false);
+    expect((await reload(ownerSet.id))?.isPreferred).toBe(false);
+
+    await mockAuth(owner.id);
+    const ok = await setPreferredSettingsSetAction({
+      id: ownerSet.id,
+      isPreferred: true,
+    });
+    expect(ok.success).toBe(true);
+    expect((await reload(ownerSet.id))?.isPreferred).toBe(true);
+  });
+
+  it("owner's default: a community set can never become the default", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const community = await insertSet(machine.id, {
+      name: "Community",
+      isOwnerSet: false,
+      isPublic: true,
+      createdBy: owner.id,
+    });
+
+    await mockAuth(owner.id);
+    const { setPreferredSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+    const res = await setPreferredSettingsSetAction({
+      id: community.id,
+      isPreferred: true,
+    });
+    expect(res.success).toBe(false);
+    expect((await reload(community.id))?.isPreferred).toBe(false);
+  });
+
+  // --- read-path visibility (getMachineSettingsSets → canViewSet/canEdit) ----
+
+  it("visibility: a private draft is hidden from other techs, visible to its creator (editable) and admin", async () => {
+    const db = await getTestDb();
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const tech = await makeUser("technician");
+    const draft = await insertSet(machine.id, {
+      name: "Tech draft",
+      isOwnerSet: false,
+      isPublic: false,
+      createdBy: tech.id,
+    });
+    const { getMachineSettingsSets } =
+      await import("~/lib/machines/settings-queries");
+    const viewer = (id: string | null, access: AccessLevel) =>
+      getMachineSettingsSets(asDbOrTx(db), machine.id, {
+        viewerId: id,
+        access,
+        machineOwnerId: owner.id,
+      });
+
+    // A different technician cannot see it.
+    const other = await makeUser("technician");
+    const asOther = await viewer(other.id, "technician");
+    expect(asOther.find((s) => s.id === draft.id)).toBeUndefined();
+
+    // The creator sees it and may edit it.
+    const asCreator = await viewer(tech.id, "technician");
+    const mine = asCreator.find((s) => s.id === draft.id);
+    expect(mine).toBeDefined();
+    expect(mine?.canEdit).toBe(true);
+
+    // Admin can always see it.
+    const admin = await makeUser("admin");
+    const asAdmin = await viewer(admin.id, "admin");
+    expect(asAdmin.find((s) => s.id === draft.id)).toBeDefined();
+  });
+
+  it("visibility: public sets and the owner's default are visible (read-only) to anonymous viewers; private ones are not", async () => {
+    const db = await getTestDb();
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await insertSet(machine.id, {
+      name: "Public",
+      isOwnerSet: false,
+      isPublic: true,
+      createdBy: owner.id,
+    });
+    await insertSet(machine.id, {
+      name: "Default",
+      isOwnerSet: true,
+      isPublic: true,
+      isPreferred: true,
+      createdBy: owner.id,
+    });
+    await insertSet(machine.id, {
+      name: "Secret",
+      isOwnerSet: false,
+      isPublic: false,
+      createdBy: owner.id,
+    });
+
+    const { getMachineSettingsSets } =
+      await import("~/lib/machines/settings-queries");
+    const anon = await getMachineSettingsSets(asDbOrTx(db), machine.id, {
+      viewerId: null,
+      access: "unauthenticated",
+      machineOwnerId: owner.id,
+    });
+    expect(anon.map((s) => s.name).sort()).toEqual(["Default", "Public"]);
+    // Nothing is editable anonymously.
+    expect(anon.every((s) => !s.canEdit)).toBe(true);
+  });
+
+  // --- duplicate: re-derived ownership + carried tag + private draft ---------
+
+  it("duplicate: a technician's copy of an owner set becomes an editable community private draft carrying the Tournament tag", async () => {
+    const db = await getTestDb();
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const ownerSet = await insertSet(machine.id, {
+      name: "Owner tourney",
+      isOwnerSet: true,
+      isPublic: true,
+      isTournament: true,
+      createdBy: owner.id,
+    });
+
+    const tech = await makeUser("technician");
+    await mockAuth(tech.id);
+    const { duplicateSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+    const res = await duplicateSettingsSetAction({ id: ownerSet.id });
+    expect(res.success).toBe(true);
+    if (!res.success) return;
+
+    const copy = await db.query.machineSettingsSets.findFirst({
+      where: eq(machineSettingsSets.id, res.id),
+    });
+    expect(copy?.isOwnerSet).toBe(false); // re-derived: a tech's copy is community
+    expect(copy?.isPublic).toBe(false); // private draft
+    expect(copy?.isPreferred).toBe(false);
+    expect(copy?.isTournament).toBe(true); // carries the tag
+    expect(copy?.createdBy).toBe(tech.id);
+  });
+
+  it("duplicate: cannot copy another user's private draft (hidden source)", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const draft = await insertSet(machine.id, {
+      name: "Owner's secret",
+      isOwnerSet: false,
+      isPublic: false,
+      createdBy: owner.id,
+    });
+
+    const tech = await makeUser("technician");
+    await mockAuth(tech.id);
+    const { duplicateSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+    const res = await duplicateSettingsSetAction({ id: draft.id });
+    expect(res.success).toBe(false);
+    if (res.success === false) expect(res.error).toBe("Settings set not found");
+  });
+
+  // --- auto-default on create ------------------------------------------------
+
+  it("auto-default: the owner's first set becomes the public Owner's default; a technician's set does not", async () => {
+    const db = await getTestDb();
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    const { saveSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    await mockAuth(owner.id);
+    const first = await saveSettingsSetAction({
+      machineId: machine.id,
+      name: "Owner first",
+      description: null,
+      sections: sampleSections(),
+    });
+    if (!first.success) throw new Error("owner insert failed");
+    const firstRow = await db.query.machineSettingsSets.findFirst({
+      where: eq(machineSettingsSets.id, first.id),
+    });
+    expect(firstRow?.isOwnerSet).toBe(true);
+    expect(firstRow?.isPublic).toBe(true);
+    expect(firstRow?.isPreferred).toBe(true);
+
+    const tech = await makeUser("technician");
+    await mockAuth(tech.id);
+    const techSet = await saveSettingsSetAction({
+      machineId: machine.id,
+      name: "Tech set",
+      description: null,
+      sections: sampleSections(),
+    });
+    if (!techSet.success) throw new Error("tech insert failed");
+    const techRow = await db.query.machineSettingsSets.findFirst({
+      where: eq(machineSettingsSets.id, techSet.id),
+    });
+    expect(techRow?.isOwnerSet).toBe(false);
+    expect(techRow?.isPublic).toBe(false); // private draft
+    expect(techRow?.isPreferred).toBe(false);
+  });
+
+  it("auto-default: only the owner's FIRST set auto-defaults; a second owner set is a private draft", async () => {
+    const db = await getTestDb();
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    await mockAuth(owner.id);
+    const { saveSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+
+    const first = await saveSettingsSetAction({
+      machineId: machine.id,
+      name: "First",
+      description: null,
+      sections: sampleSections(),
+    });
+    const second = await saveSettingsSetAction({
+      machineId: machine.id,
+      name: "Second",
+      description: null,
+      sections: sampleSections(),
+    });
+    if (!first.success || !second.success)
+      throw new Error("owner inserts failed");
+
+    const secondRow = await db.query.machineSettingsSets.findFirst({
+      where: eq(machineSettingsSets.id, second.id),
+    });
+    expect(secondRow?.isOwnerSet).toBe(true); // still owner-made
+    expect(secondRow?.isPublic).toBe(false); // but a private draft
+    expect(secondRow?.isPreferred).toBe(false);
   });
 
   // -- machine-level "How to change settings" -------------------------------
