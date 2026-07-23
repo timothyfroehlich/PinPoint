@@ -40,6 +40,6 @@
     "label": "Machine Settings (Attack from Mars)",
     "route": "/m/AFM/settings",
     "authRole": "admin",
-    "seedNeeds": "seeded AFM settings sets (supabase/seed-machine-settings.mjs) — 4 sets spanning owner/community kinds + public/private-draft + the Tournament tag; admin sees all four"
+    "seedNeeds": "seeded AFM settings sets (supabase/seed-machine-settings.mjs) — 6 sets spanning both owner/community kinds × public/private-draft + the Tournament tag; admin sees all six"
   }
 }

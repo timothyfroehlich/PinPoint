@@ -5,8 +5,10 @@
  *
  * Populates the `machine_settings_sets` table for ONE showcase machine, Attack
  * from Mars (AFM), so the Machine Settings tab always has something meaningful
- * to demo in local dev / design review. The four sets are spread across every
- * axis of the PP-tn6t ownership/visibility model so all the badges appear:
+ * to demo in local dev / design review. The six sets are spread across every
+ * axis of the PP-tn6t ownership/visibility model so all the badges appear —
+ * both kinds (owner/community) × both visibilities (public/private draft), with
+ * the Tournament tag present on some and absent on others:
  *
  *   1. "Tournament (competition)" — the Owner's default (owner set, public,
  *      preferred) AND Tournament-tagged, showing the tag is orthogonal to the
@@ -19,6 +21,10 @@
  *   4. "Draft — testing steeper tilt" — a Community Private draft created by a
  *      technician, showing the private-draft badge (visible to its creator and
  *      admins only).
+ *   5. "House standard" — a Community set, public, NOT Tournament-tagged (the
+ *      contrast to set 3): a plain community badge. Created by a technician.
+ *   6. "New ruleset (draft)" — an Owner Private draft (owner-authored, not
+ *      public, not the default): an owner set still in the draft state.
  *
  * The data shape mirrors the `SettingsSection` union in
  * src/lib/machines/settings-types.ts. Persisted rows do NOT carry the
@@ -30,7 +36,7 @@
  * A.1 01 Balls Per Game, A.1 02 Tilt Warnings, A.1 03 Maximum Extra Balls,
  * A.1 05 Replay System, A.1 14 Replay Award, A.1 26 Tournament Play).
  *
- * Deterministic: every run wipes AFM's existing sets and re-inserts these four,
+ * Deterministic: every run wipes AFM's existing sets and re-inserts these six,
  * so re-seeding never duplicates or leaves stale demo rows.
  *
  * Demo data — DO NOT point at prod. Like the other seed scripts (seed-users.mjs)
@@ -307,6 +313,77 @@ function buildSets(afmId, ownerId, techId) {
         },
       ],
     },
+
+    // --------------------------------------------------------------------
+    // 5. A Community set that is public but NOT Tournament-tagged — the
+    //    everyday "house" setup the crew keeps current. Shows the Community
+    //    badge without the Tournament tag (contrast with set 3). Authored by
+    //    a technician.
+    // --------------------------------------------------------------------
+    {
+      machineId: afmId,
+      name: "House standard",
+      isOwnerSet: false,
+      isPublic: true,
+      isPreferred: false,
+      isTournament: false,
+      createdBy: techId,
+      description: doc(
+        "Everyday casual setup for open play — a little more forgiving than the competition floor. Kept current by the crew."
+      ),
+      sections: [
+        {
+          id: "afm-house-software",
+          kind: "software",
+          baseline: "3-ball",
+          rows: [
+            { id: "A.1 01", name: "Balls Per Game", value: "3" },
+            { id: "A.1 03", name: "Maximum Extra Balls", value: "2" },
+            { id: "A.1 14", name: "Replay Award", value: "Extra Ball" },
+            { id: "A.2 09", name: "Ball Saver", value: "On (8 seconds)" },
+          ],
+        },
+      ],
+    },
+
+    // --------------------------------------------------------------------
+    // 6. An Owner Private draft — the machine owner working on a new ruleset
+    //    they haven't shared yet. Shows an owner set that is still a private
+    //    draft (owner-authored, not public, not the default).
+    // --------------------------------------------------------------------
+    {
+      machineId: afmId,
+      name: "New ruleset (draft)",
+      isOwnerSet: true,
+      isPublic: false,
+      isPreferred: false,
+      isTournament: false,
+      createdBy: ownerId,
+      description: doc(
+        "Sketching out a slightly harder house ruleset. Not ready to make this the default yet — still testing it on location."
+      ),
+      sections: [
+        {
+          id: "afm-newruleset-software",
+          kind: "software",
+          baseline: "3-ball",
+          rows: [
+            { id: "A.1 01", name: "Balls Per Game", value: "3" },
+            { id: "A.1 02", name: "Tilt Warnings", value: "2" },
+            { id: "A.1 03", name: "Maximum Extra Balls", value: "1" },
+          ],
+        },
+        {
+          id: "afm-newruleset-note",
+          kind: "note",
+          title: "Operator notes",
+          customTitle: true,
+          body: doc(
+            "Trying one extra ball max as a middle ground between the house standard and the competition floor. Gather feedback before publishing."
+          ),
+        },
+      ],
+    },
   ];
 }
 
@@ -438,7 +515,7 @@ async function run() {
     }
 
     console.log(
-      `✅ Machine settings seeded: ${sets.length} sets (owner default + owner public + community public + community draft) + owner requests + access instructions on Attack from Mars (AFM).`
+      `✅ Machine settings seeded: ${sets.length} sets (owner default+tournament, owner public, owner draft, community public+tournament, community public, community draft) + owner requests + access instructions on Attack from Mars (AFM).`
     );
   } finally {
     await sql.end();
