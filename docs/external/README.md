@@ -6,9 +6,21 @@ read before touching the PinballMap integration (`src/lib/pinballmap/`).
 
 | File                      | What                                                                                   | Provenance                                                             |
 | :------------------------ | :------------------------------------------------------------------------------------- | :--------------------------------------------------------------------- |
-| `pinballmap-llms.txt`     | PBM's own API guidance for AI assistants — auth, rate limits, anti-patterns, endpoints | Fetched verbatim from `https://pinballmap.com/llms.txt` (2026-07-18)   |
+| `pinballmap-llms.txt`     | PBM's own API guidance for AI assistants — auth, rate limits, anti-patterns, endpoints | Fetched verbatim from `https://pinballmap.com/llms.txt` (2026-07-23)   |
 | `pinballmap-robots.txt`   | PBM's robots policy — blocks AI crawlers from the site                                 | Fetched verbatim from `https://pinballmap.com/robots.txt` (2026-07-18) |
 | `pinballmap-api-terms.md` | Our distilled conduct + attribution notes, with sources                                | Authored by us, cites llms.txt + FAQ                                   |
+
+> **2026-07-23 refresh — client-side token ban + a self-dating header.** PBM's
+> `llms.txt` now carries a `Last updated:` date (currently 2026-07-22) and asks
+> readers to diff against the previously-seen version — so future refreshes have
+> a cheap staleness check. Substantive additions: (a) **keep `api_token` /
+> `user_token` server-side only** — never call the API from browser JS, now also
+> listed under "Do Not"; (b) the default (non-`no_details`) `GET /locations/:id.json`
+> already embeds each LMX's machine `name`/`manufacturer`/`year`, so no separate
+> `/machines.json` call is needed just to label a location's machines. Auth text,
+> the rate-limit table, and the endpoint list are unchanged. **We already comply**
+> with (a): all PBM access is server-only via `~/lib/pinballmap`, and no client
+> component imports the live client. `robots.txt` unchanged since 2026-07-18.
 
 > **2026-07-18 refresh — mandatory `api_token` incoming.** PBM is closing its
 > previously-public read API behind a required `api_token` **on 2026-07-30**
