@@ -15,7 +15,7 @@ export interface McpToolAudit {
   tool: string;
   /** Authenticated caller's UUID. */
   userId: string;
-  /** OAuth `client_id` claim (empty string when the token carried none). */
+  /** How the caller authenticated. Always `"claude-code-bearer"` since PP-u4ab.7. */
   clientId: string;
   /** Outcome of the call. */
   outcome: "ok" | "denied" | "error";
