@@ -591,7 +591,20 @@ export const machineSettingsSets = pgTable(
       .$type<SettingsSection[]>()
       .notNull()
       .default([]),
+    // The machine owner's canonical set. Exactly one per machine (partial
+    // unique index below). Always an owner set + public.
     isPreferred: boolean("is_preferred").notNull().default(false),
+    // Kind (drives who may EDIT — see ~/lib/machines/settings-permissions):
+    // true = owner set (created by the machine owner; only owner + admin edit,
+    // protected from techs). false = community set (co-edited by technicians+
+    // and the machine owner). Captured at creation; stored not derived, so it
+    // survives machine-ownership transfer.
+    isOwnerSet: boolean("is_owner_set").notNull().default(false),
+    // Visibility (drives who may SEE): false = private draft (creator only),
+    // true = public. New sets are born private drafts.
+    isPublic: boolean("is_public").notNull().default(false),
+    // The orthogonal "Tournament" tag. Tagging requires edit rights on the set.
+    isTournament: boolean("is_tournament").notNull().default(false),
     createdBy: uuid("created_by").references(() => userProfiles.id, {
       onDelete: "set null",
     }),

@@ -82,7 +82,26 @@ export type AddSectionSpec =
 export interface SettingsSetData {
   id: string;
   name: string;
+  /** The machine owner's canonical set — renders the "Owner's default" badge.
+   *  Exactly one per machine (partial unique index). */
   isPreferred: boolean;
+  /** Kind: true = owner set (protected; only owner + admin edit), false =
+   *  community set (co-edited by technicians+ and the owner). Drives the
+   *  "Owner's" filter and per-set edit rules. */
+  isOwnerSet: boolean;
+  /** Visibility: false = private draft (creator only), true = public. */
+  isPublic: boolean;
+  /** The orthogonal, non-exclusive "Tournament" tag. */
+  isTournament: boolean;
+  /** Creator's user id — drives the "Mine" filter (=== viewer). Null when the
+   *  creating user was later deleted (created_by is ON DELETE SET NULL). */
+  createdById: string | null;
+  /** Whether the CURRENT viewer may edit this set (owner/community rules,
+   *  computed server-side in getMachineSettingsSets). */
+  canEdit: boolean;
+  /** Whether the current viewer may set this set as the Owner's default
+   *  (owner/admin on an owner set). False for community sets. */
+  canSetDefault: boolean;
   updatedBy: string;
   updatedAt: string;
   description: ProseMirrorDoc | null;

@@ -1,16 +1,22 @@
 /**
- * Machine Settings Server Actions (PP-43q3)
+ * Machine Settings Server Actions (PP-43q3, PP-tn6t)
  *
- * Owner/technician/admin CRUD over a machine's settings sets. Authorization is
- * the matrix entry `machines.settings.manage` (member → owner-scoped;
- * technician/admin → any), checked via `checkPermission` per AGENTS.md rule 12.
+ * CRUD over a machine's settings sets. Two authorization layers:
+ * - **Creating** rides on the matrix entry `machines.settings.manage`
+ *   (member → owner-scoped; technician/admin → any), via `checkPermission`.
+ * - **Editing an existing set** is per-set (`~/lib/machines/settings-permissions`):
+ *   owner sets are owner+admin only (protected); community sets are co-edited
+ *   by technicians+, the owner, and admin. Publish / tag Tournament need edit
+ *   rights; setting the Owner's default needs owner/admin on an owner set.
  *
  * Save model: whole-set save-on-Done. `saveSettingsSetAction` upserts the
- * entire set; Delete / Duplicate / SetPreferred are instant single-set ops.
+ * entire set; Delete / Duplicate / SetPreferred / Publish / TournamentTag are
+ * instant single-set ops. New sets are born private drafts.
  *
- * Each mutation also emits a `settings`-tagged timeline event
- * (`emitSettingsSetEvent`) inside its transaction, so the event commits
- * atomically with the write. No-op saves and un-preferring emit nothing.
+ * Create/update/delete emit a `settings`-tagged timeline event inside their
+ * transaction. Setting the default, publishing, and tagging Tournament emit
+ * nothing (per PP-tn6t; the old `settings_set_preferred` event is no longer
+ * emitted — full removal of the event type is a follow-up).
  */
 
 "use server";
@@ -23,6 +29,13 @@ import { z } from "zod";
 
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { type AccessLevel } from "~/lib/permissions/matrix";
+import {
+  canEditSet,
+  canSetOwnerDefault,
+  canViewSet,
+  type SettingsSetAuth,
+} from "~/lib/machines/settings-permissions";
 import {
   NAME_MAX,
   type SettingsSection,
@@ -60,6 +73,11 @@ const setPreferredSchema = z.object({
   id: z.uuid(),
   isPreferred: z.boolean(),
 });
+const publishSchema = z.object({ id: z.uuid(), isPublic: z.boolean() });
+const tournamentTagSchema = z.object({
+  id: z.uuid(),
+  isTournament: z.boolean(),
+});
 const settingsInstructionsSchema = z.object({
   machineId: z.uuid(),
   value: proseMirrorDocSchema.nullable(),
@@ -69,13 +87,26 @@ const settingsInstructionsSchema = z.object({
 // ProseMirror column, nullable, no timeline event.
 const settingsRequestsSchema = settingsInstructionsSchema;
 
-/**
- * Resolve the authed user and confirm they may manage settings on a machine
- * with the given owner. Returns the actor id or a failure result.
- */
-async function authorizeManage(
-  machineOwnerId: string | null
-): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
+/** Project a settings-set row's auth-relevant columns to `SettingsSetAuth`. */
+function toAuth(row: {
+  isOwnerSet: boolean;
+  isPublic: boolean;
+  isPreferred: boolean;
+  createdBy: string | null;
+}): SettingsSetAuth {
+  return {
+    isOwnerSet: row.isOwnerSet,
+    isPublic: row.isPublic,
+    isPreferred: row.isPreferred,
+    createdById: row.createdBy,
+  };
+}
+
+/** Resolve the authed user's id + access level, or a failure. */
+async function getActor(): Promise<
+  | { ok: true; userId: string; access: AccessLevel }
+  | { ok: false; error: string }
+> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -88,14 +119,31 @@ async function authorizeManage(
   });
   if (!profile) return { ok: false, error: "Profile not found" };
 
-  const allowed = checkPermission(
-    "machines.settings.manage",
-    getAccessLevel(profile.role),
-    { userId: user.id, machineOwnerId }
-  );
+  return { ok: true, userId: user.id, access: getAccessLevel(profile.role) };
+}
+
+/**
+ * Confirm the actor may CREATE/manage settings on a machine with the given
+ * owner (matrix `machines.settings.manage`: member→owner-scoped, tech/admin→
+ * any). Returns the actor id + access level. Per-set edit rights (owner-set
+ * protection) are enforced separately via `canEditSet`.
+ */
+async function authorizeManage(
+  machineOwnerId: string | null
+): Promise<
+  | { ok: true; userId: string; access: AccessLevel }
+  | { ok: false; error: string }
+> {
+  const actor = await getActor();
+  if (!actor.ok) return actor;
+
+  const allowed = checkPermission("machines.settings.manage", actor.access, {
+    userId: actor.userId,
+    machineOwnerId,
+  });
   if (!allowed) return { ok: false, error: "Forbidden" };
 
-  return { ok: true, userId: user.id };
+  return { ok: true, userId: actor.userId, access: actor.access };
 }
 
 function revalidateMachine(initials: string): void {
@@ -151,6 +199,23 @@ export async function saveSettingsSetAction(
 
   // ---- Insert ----
   if (!id) {
+    // Kind is captured at creation: a set the machine owner makes is an owner
+    // set (protected); anyone else's is a community set. New sets are private
+    // drafts — EXCEPT the owner's very first set with no existing default,
+    // which auto-becomes the Owner's default (and so is published).
+    const isOwnerSet =
+      machine.ownerId !== null && auth.userId === machine.ownerId;
+    const existingPreferred = isOwnerSet
+      ? await db.query.machineSettingsSets.findFirst({
+          where: and(
+            eq(machineSettingsSets.machineId, machineId),
+            eq(machineSettingsSets.isPreferred, true)
+          ),
+          columns: { id: true },
+        })
+      : undefined;
+    const autoDefault = isOwnerSet && !existingPreferred;
+
     const newId = await db.transaction(async (tx) => {
       const [inserted] = await tx
         .insert(machineSettingsSets)
@@ -159,6 +224,9 @@ export async function saveSettingsSetAction(
           name,
           description,
           sections,
+          isOwnerSet,
+          isPublic: autoDefault,
+          isPreferred: autoDefault,
           createdBy: auth.userId,
           updatedBy: auth.userId,
         })
@@ -188,12 +256,23 @@ export async function saveSettingsSetAction(
       name: true,
       description: true,
       sections: true,
+      isOwnerSet: true,
+      isPublic: true,
+      isPreferred: true,
+      createdBy: true,
     },
   });
   if (!existing) return { success: false, error: "Settings set not found" };
   // IDOR guard: a set cannot be re-parented to another machine via the input.
   if (existing.machineId !== machineId) {
     return { success: false, error: "Settings set not found" };
+  }
+  // Per-set edit gate: `authorizeManage` cleared machine-wide create rights, but
+  // editing an OWNER set is restricted to the owner + admin (techs excluded).
+  if (
+    !canEditSet(toAuth(existing), machine.ownerId, auth.userId, auth.access)
+  ) {
+    return { success: false, error: "Forbidden" };
   }
 
   // No-op guard: skip the write (and its timeline emit) when nothing changed.
@@ -237,12 +316,30 @@ export async function saveSettingsSetAction(
  * Load a set + its machine for the single-set (id-only) operations.
  */
 async function loadSetWithMachine(setId: string): Promise<{
-  set: { id: string; machineId: string; name: string; isPreferred: boolean };
+  set: {
+    id: string;
+    machineId: string;
+    name: string;
+    isPreferred: boolean;
+    isOwnerSet: boolean;
+    isPublic: boolean;
+    isTournament: boolean;
+    createdBy: string | null;
+  };
   machine: { id: string; initials: string; ownerId: string | null };
 } | null> {
   const set = await db.query.machineSettingsSets.findFirst({
     where: eq(machineSettingsSets.id, setId),
-    columns: { id: true, machineId: true, name: true, isPreferred: true },
+    columns: {
+      id: true,
+      machineId: true,
+      name: true,
+      isPreferred: true,
+      isOwnerSet: true,
+      isPublic: true,
+      isTournament: true,
+      createdBy: true,
+    },
   });
   if (!set) return null;
   const machine = await db.query.machines.findFirst({
@@ -263,8 +360,18 @@ export async function deleteSettingsSetAction(
   const loaded = await loadSetWithMachine(parsed.data.id);
   if (!loaded) return { success: false, error: "Settings set not found" };
 
-  const auth = await authorizeManage(loaded.machine.ownerId);
-  if (!auth.ok) return { success: false, error: auth.error };
+  const actor = await getActor();
+  if (!actor.ok) return { success: false, error: actor.error };
+  if (
+    !canEditSet(
+      toAuth(loaded.set),
+      loaded.machine.ownerId,
+      actor.userId,
+      actor.access
+    )
+  ) {
+    return { success: false, error: "Forbidden" };
+  }
 
   await db.transaction(async (tx) => {
     await tx
@@ -274,7 +381,7 @@ export async function deleteSettingsSetAction(
       loaded.machine.id,
       "settings_set_deleted",
       loaded.set.name,
-      auth.userId,
+      actor.userId,
       tx
     );
   });
@@ -284,7 +391,9 @@ export async function deleteSettingsSetAction(
 }
 
 /**
- * Duplicate a settings set (never preferred; fresh authorship/timestamps).
+ * Duplicate a settings set into a fresh private draft owned by the duplicator:
+ * carries the Tournament tag, re-derives ownership (a tech's copy of an owner
+ * set is a community set), never preferred, fresh authorship/timestamps.
  * Returns the new id so the client can reconcile its optimistic copy.
  */
 export async function duplicateSettingsSetAction(
@@ -295,7 +404,17 @@ export async function duplicateSettingsSetAction(
 
   const original = await db.query.machineSettingsSets.findFirst({
     where: eq(machineSettingsSets.id, parsed.data.id),
-    columns: { machineId: true, name: true, description: true, sections: true },
+    columns: {
+      machineId: true,
+      name: true,
+      description: true,
+      sections: true,
+      isTournament: true,
+      isOwnerSet: true,
+      isPublic: true,
+      isPreferred: true,
+      createdBy: true,
+    },
   });
   if (!original) return { success: false, error: "Settings set not found" };
 
@@ -307,6 +426,11 @@ export async function duplicateSettingsSetAction(
 
   const auth = await authorizeManage(machine.ownerId);
   if (!auth.ok) return { success: false, error: auth.error };
+  // Must be able to SEE the source to copy it — blocks duplicating another
+  // user's private draft.
+  if (!canViewSet(toAuth(original), auth.userId, auth.access)) {
+    return { success: false, error: "Settings set not found" };
+  }
 
   // Cap the copy name so a long original (up to NAME_MAX) plus the " (copy)"
   // suffix can't exceed NAME_MAX — otherwise the duplicate would persist but
@@ -321,7 +445,13 @@ export async function duplicateSettingsSetAction(
         name: copyName,
         description: original.description,
         sections: original.sections,
+        // The copy is a fresh private draft owned by the duplicator: ownership
+        // is re-derived (a tech's copy of an owner set is a community set they
+        // can edit), never preferred, but it CARRIES the Tournament tag.
+        isOwnerSet: machine.ownerId !== null && auth.userId === machine.ownerId,
+        isPublic: false,
         isPreferred: false,
+        isTournament: original.isTournament,
         createdBy: auth.userId,
         updatedBy: auth.userId,
       })
@@ -355,10 +485,22 @@ export async function setPreferredSettingsSetAction(
   const loaded = await loadSetWithMachine(parsed.data.id);
   if (!loaded) return { success: false, error: "Settings set not found" };
 
-  const auth = await authorizeManage(loaded.machine.ownerId);
-  if (!auth.ok) return { success: false, error: auth.error };
+  // The Owner's default is owner-scoped: only the owner/admin may set it, and
+  // only an owner set is eligible (a community set can't become the default).
+  const actor = await getActor();
+  if (!actor.ok) return { success: false, error: actor.error };
+  if (
+    !canSetOwnerDefault(
+      toAuth(loaded.set),
+      loaded.machine.ownerId,
+      actor.userId,
+      actor.access
+    )
+  ) {
+    return { success: false, error: "Forbidden" };
+  }
 
-  // Idempotent: already in the requested state → no write, no timeline event.
+  // Idempotent: already in the requested state → no write.
   if (loaded.set.isPreferred === parsed.data.isPreferred) {
     return { success: true };
   }
@@ -382,21 +524,11 @@ export async function setPreferredSettingsSetAction(
         .update(machineSettingsSets)
         .set({
           isPreferred: parsed.data.isPreferred,
-          updatedBy: auth.userId,
+          updatedBy: actor.userId,
           updatedAt: new Date(),
         })
         .where(eq(machineSettingsSets.id, parsed.data.id));
-
-      // Only promotion is timeline-worthy; un-preferring has no event kind.
-      if (parsed.data.isPreferred) {
-        await emitSettingsSetEvent(
-          loaded.machine.id,
-          "settings_set_preferred",
-          loaded.set.name,
-          auth.userId,
-          tx
-        );
-      }
+      // No timeline event for the Owner's default (PP-tn6t).
     });
   } catch (error) {
     // Two callers promoting different sets concurrently can collide on the
@@ -410,6 +542,101 @@ export async function setPreferredSettingsSetAction(
     }
     throw error;
   }
+
+  revalidateMachine(loaded.machine.initials);
+  return { success: true };
+}
+
+/**
+ * Publish or unpublish a set (visibility toggle). Publishing makes a private
+ * draft visible to everyone; both directions need edit rights on the set. The
+ * Owner's default must stay public, so unpublishing it is refused.
+ */
+export async function publishSettingsSetAction(
+  input: z.input<typeof publishSchema>
+): Promise<ActionResult> {
+  const parsed = publishSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
+
+  const loaded = await loadSetWithMachine(parsed.data.id);
+  if (!loaded) return { success: false, error: "Settings set not found" };
+
+  const actor = await getActor();
+  if (!actor.ok) return { success: false, error: actor.error };
+  if (
+    !canEditSet(
+      toAuth(loaded.set),
+      loaded.machine.ownerId,
+      actor.userId,
+      actor.access
+    )
+  ) {
+    return { success: false, error: "Forbidden" };
+  }
+
+  // The Owner's default is always public — unset it before hiding.
+  if (!parsed.data.isPublic && loaded.set.isPreferred) {
+    return {
+      success: false,
+      error: "Unset the Owner's default before making it private.",
+    };
+  }
+
+  // Idempotent.
+  if (loaded.set.isPublic === parsed.data.isPublic) return { success: true };
+
+  await db
+    .update(machineSettingsSets)
+    .set({
+      isPublic: parsed.data.isPublic,
+      updatedBy: actor.userId,
+      updatedAt: new Date(),
+    })
+    .where(eq(machineSettingsSets.id, parsed.data.id));
+
+  revalidateMachine(loaded.machine.initials);
+  return { success: true };
+}
+
+/**
+ * Toggle the orthogonal "Tournament" tag on a set. Needs edit rights on the
+ * set; no timeline event (PP-tn6t).
+ */
+export async function setTournamentTagAction(
+  input: z.input<typeof tournamentTagSchema>
+): Promise<ActionResult> {
+  const parsed = tournamentTagSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
+
+  const loaded = await loadSetWithMachine(parsed.data.id);
+  if (!loaded) return { success: false, error: "Settings set not found" };
+
+  const actor = await getActor();
+  if (!actor.ok) return { success: false, error: actor.error };
+  if (
+    !canEditSet(
+      toAuth(loaded.set),
+      loaded.machine.ownerId,
+      actor.userId,
+      actor.access
+    )
+  ) {
+    return { success: false, error: "Forbidden" };
+  }
+
+  // Idempotent.
+  if (loaded.set.isTournament === parsed.data.isTournament) {
+    return { success: true };
+  }
+
+  await db
+    .update(machineSettingsSets)
+    .set({
+      isTournament: parsed.data.isTournament,
+      updatedBy: actor.userId,
+      updatedAt: new Date(),
+    })
+    .where(eq(machineSettingsSets.id, parsed.data.id));
 
   revalidateMachine(loaded.machine.initials);
   return { success: true };

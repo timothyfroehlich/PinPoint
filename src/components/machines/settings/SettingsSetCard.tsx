@@ -2,7 +2,13 @@
 
 import type React from "react";
 import { useState } from "react";
-import { ChevronRight, ChevronDown, MoreVertical, Plus } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronDown,
+  MoreVertical,
+  Plus,
+  Trophy,
+} from "lucide-react";
 import {
   DndContext,
   KeyboardSensor,
@@ -73,6 +79,8 @@ interface SettingsSetCardProps {
   onMoveSection: (sectionId: string, direction: "up" | "down") => void;
   onToggleExpand: () => void;
   onTogglePreferred: () => void;
+  /** Toggle the non-exclusive Tournament tag (prototype: client-only). */
+  onToggleTournament: () => void;
   onRename: (newName: string) => void;
   /** Called after the set-name blur so the parent can flush the auto-save
    *  debounce (plain-text blur path — Task 6 Step 9). */
@@ -233,6 +241,7 @@ export function SettingsSetCard({
   onMoveSection,
   onToggleExpand,
   onTogglePreferred,
+  onToggleTournament,
   onRename,
   onNameBlur,
   onDuplicate,
@@ -359,7 +368,8 @@ export function SettingsSetCard({
     }
   }
 
-  // Preferred badge leads the title (after the chevron).
+  // Badges lead the title (after the chevron). "Owner's default" is exclusive
+  // (one per machine); "Tournament" is non-exclusive and can coexist with it.
   const preferredBadge = set.isPreferred && (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -368,13 +378,35 @@ export function SettingsSetCard({
             className="border-warning/30 bg-warning/10 text-warning"
             variant="outline"
           >
-            ★<span className="max-md:hidden">&nbsp;Preferred</span>
-            <span className="sr-only md:hidden">Preferred</span>
+            ★<span className="max-md:hidden">&nbsp;Owner's default</span>
+            <span className="sr-only md:hidden">Owner's default</span>
           </Badge>
         </span>
       </TooltipTrigger>
       <TooltipContent>
-        {canEdit ? "Preferred set — change in the ⋮ menu" : "Preferred set"}
+        {canEdit
+          ? "Owner's default set — change in the ⋮ menu"
+          : "Owner's default set"}
+      </TooltipContent>
+    </Tooltip>
+  );
+
+  const tournamentBadge = set.isTournament && (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>
+          <Badge
+            className="border-primary/30 bg-primary/10 text-primary"
+            variant="outline"
+          >
+            <Trophy className="size-3" aria-hidden="true" />
+            <span className="max-md:hidden">&nbsp;Tournament</span>
+            <span className="sr-only md:hidden">Tournament</span>
+          </Badge>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {canEdit ? "Tournament set — change in the ⋮ menu" : "Tournament set"}
       </TooltipContent>
     </Tooltip>
   );
@@ -388,9 +420,10 @@ export function SettingsSetCard({
     // <div>-in-<button> nesting when the user is a viewer.
     <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
       <span className="min-w-0 text-sm font-semibold text-foreground [overflow-wrap:anywhere]">
-        {preferredBadge && (
-          <span className="mr-2 inline-flex align-middle">
+        {(preferredBadge || tournamentBadge) && (
+          <span className="mr-2 inline-flex flex-wrap items-center gap-1 align-middle">
             {preferredBadge}
+            {tournamentBadge}
           </span>
         )}
         <InlineEditableText
@@ -481,7 +514,17 @@ export function SettingsSetCard({
                     disabled={isNew}
                     onSelect={onTogglePreferred}
                   >
-                    {set.isPreferred ? "Unset preferred" : "Set preferred"}
+                    {set.isPreferred
+                      ? "Unset owner's default"
+                      : "Set as owner's default"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={isNew}
+                    onSelect={onToggleTournament}
+                  >
+                    {set.isTournament
+                      ? "Remove Tournament tag"
+                      : "Tag as Tournament"}
                   </DropdownMenuItem>
                   <DropdownMenuItem disabled={isNew} onSelect={onDuplicate}>
                     Duplicate

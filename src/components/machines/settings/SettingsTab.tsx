@@ -24,6 +24,7 @@ import {
   type SettingsSetData,
 } from "~/lib/machines/settings-types";
 import { type ProseMirrorDoc } from "~/lib/tiptap/types";
+import { cn } from "~/lib/utils";
 import {
   deleteSettingsSetAction,
   duplicateSettingsSetAction,
@@ -230,13 +231,19 @@ export function SettingsTab({
   settingsInstructions,
 }: SettingsTabProps): React.JSX.Element {
   const [sets, setSets] = useState<SettingsSetData[]>(initialSets);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() =>
-    initialSets[0] ? new Set([initialSets[0].id]) : new Set()
-  );
+  // Sets render COLLAPSED by default so every set can be scanned at once; the
+  // user expands the ones they want to read.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   // Sets created this session that haven't been persisted yet (temp id). The
   // first auto-save inserts them and swaps the temp id for the server UUID.
   // Preferred/Duplicate target a persisted row, so they're gated on this.
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
+
+  // Two filter toggles that AND together (intersection). "By Owner" = created
+  // by the machine owner; "Tournament" = tagged Tournament. Neither active =
+  // All (everything); both active = the intersection.
+  const [byOwnerFilter, setByOwnerFilter] = useState(false);
+  const [tournamentFilter, setTournamentFilter] = useState(false);
 
   // -- Dirty explicit-save machine-level drafts (PP-8a5r) ----------------------
   // The two machine-level InlineEditableField sections ("Before you change
@@ -571,6 +578,17 @@ export function SettingsTab({
   const orderedSets = [...sets].sort(
     (a, b) => Number(b.isPreferred) - Number(a.isPreferred)
   );
+  // Active toggles AND together (intersection); neither active shows all.
+  const matchesFilter = (s: SettingsSetData): boolean => {
+    if (byOwnerFilter && !s.createdByOwner) return false;
+    if (tournamentFilter && !s.isTournament) return false;
+    return true;
+  };
+  const visibleSets = orderedSets.filter(matchesFilter);
+  const showingAll = !byOwnerFilter && !tournamentFilter;
+  const ownerCount = sets.filter((s) => s.createdByOwner).length;
+  const tournamentCount = sets.filter((s) => s.isTournament).length;
+  const atSetLimit = sets.length >= 10;
 
   function removeLocal(id: string): void {
     mutateSets((prev) => prev.filter((s) => s.id !== id));
@@ -628,6 +646,24 @@ export function SettingsTab({
     }
   }
 
+  // PROTOTYPE (backend stubbed): client-only optimistic toggle of the
+  // non-exclusive Tournament tag. The real implementation wires
+  // setTournamentSettingsSetAction (mirrors setPreferredSettingsSetAction minus
+  // the exclusive-clear, no unique index, no timeline emit) against a migrated
+  // `isTournament` column. See the .prototype-mode ledger.
+  function toggleTournament(id: string): void {
+    if (newIds.has(id)) return;
+    const set = sets.find((s) => s.id === id);
+    if (!set) return;
+    const next = !set.isTournament;
+    const apply = (s: SettingsSetData): SettingsSetData =>
+      s.id === id ? { ...s, isTournament: next } : s;
+    mutateSets((prev) => prev.map(apply));
+    for (const [bid, b] of baselineRef.current) {
+      baselineRef.current.set(bid, apply(b));
+    }
+  }
+
   function renameSet(id: string, name: string): void {
     editSet(id, (s) => ({ ...s, name }));
   }
@@ -647,6 +683,8 @@ export function SettingsTab({
       id: result.id,
       name: `${original.name.slice(0, NAME_MAX - COPY_SUFFIX.length)}${COPY_SUFFIX}`,
       isPreferred: false,
+      isTournament: false,
+      createdByOwner: false,
       updatedBy: "You",
       updatedAt: today(),
       sections: original.sections.map(cloneSection),
@@ -679,6 +717,10 @@ export function SettingsTab({
       id,
       name: "",
       isPreferred: false,
+      isTournament: false,
+      // PROTOTYPE: the client doesn't know if the viewer is the owner, so a
+      // new set isn't marked owner-created. Real impl derives from createdBy.
+      createdByOwner: false,
       updatedBy: "You",
       updatedAt: today(),
       description: null,
@@ -1026,7 +1068,7 @@ export function SettingsTab({
   }
 
   return (
-    <div className="space-y-4 max-md:space-y-2.5">
+    <div className="space-y-3 max-md:space-y-2.5">
       {/* Failure-only banner. Retry re-enqueues all failed sets. */}
       <SaveFailureBanner
         failedCount={saveStatus.failedIds.size}
@@ -1038,9 +1080,9 @@ export function SettingsTab({
         }}
       />
 
-      {/* The two machine-wide guidance callouts. Their own 14px (gap-3.5)
-          inter-block gap is independent of the page-level space-y-4 rhythm. */}
-      <div className="flex flex-col gap-3.5">
+      {/* The two machine-wide guidance callouts. Kept vertically compact
+          (tight padding + gap) so they don't dominate the tab. */}
+      <div className="flex flex-col gap-2">
         {/* SECTION 1 — the owner's requests ("Before you change anything"). */}
         <InlineEditableField
           label="Before you change anything"
@@ -1076,6 +1118,8 @@ export function SettingsTab({
           presets={SETTINGS_INSTRUCTIONS_PRESETS}
           openWhenEmpty
           headingProminent
+          collapsible
+          defaultOpen={false}
           onDirtyChange={onInstructionsDirty}
           onSave={async (id, value) => {
             const result = await updateMachineSettingsInstructionsAction({
@@ -1089,18 +1133,81 @@ export function SettingsTab({
         />
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-foreground">
-          Game settings{" "}
-          <span className="text-muted-foreground">
-            · {String(sets.length)} set{sets.length !== 1 ? "s" : ""}
-          </span>
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div
+          className="flex flex-wrap items-center gap-1.5"
+          role="group"
+          aria-label="Filter settings sets"
+        >
+          {(
+            [
+              {
+                key: "all",
+                label: "All",
+                count: sets.length,
+                active: showingAll,
+                onClick: () => {
+                  setByOwnerFilter(false);
+                  setTournamentFilter(false);
+                },
+              },
+              {
+                key: "owner",
+                label: "By Owner",
+                count: ownerCount,
+                active: byOwnerFilter,
+                onClick: () => {
+                  setByOwnerFilter((v) => !v);
+                },
+              },
+              {
+                key: "tournament",
+                label: "Tournament",
+                count: tournamentCount,
+                active: tournamentFilter,
+                onClick: () => {
+                  setTournamentFilter((v) => !v);
+                },
+              },
+            ] as const
+          ).map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              aria-pressed={chip.active}
+              onClick={chip.onClick}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors motion-reduce:transition-none",
+                chip.active
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-outline-variant text-muted-foreground hover:bg-muted"
+              )}
+            >
+              {chip.label}{" "}
+              <span className={chip.active ? "opacity-80" : "opacity-60"}>
+                {String(chip.count)}
+              </span>
+            </button>
+          ))}
+        </div>
         {canEdit && (
-          <Button size="sm" onClick={addNewSet}>
-            <Plus aria-hidden="true" />
-            New set
-          </Button>
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "text-xs tabular-nums",
+                atSetLimit
+                  ? "font-medium text-warning"
+                  : "text-muted-foreground"
+              )}
+              title="Up to 10 settings sets per machine"
+            >
+              {String(sets.length)} / 10
+            </span>
+            <Button size="sm" onClick={addNewSet} disabled={atSetLimit}>
+              <Plus aria-hidden="true" />
+              New set
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1115,9 +1222,19 @@ export function SettingsTab({
             "No settings sets recorded yet."
           )}
         </p>
+      ) : visibleSets.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-outline-variant py-8 text-center text-sm text-muted-foreground">
+          No{" "}
+          {byOwnerFilter && tournamentFilter
+            ? "owner-created Tournament"
+            : byOwnerFilter
+              ? "owner-created"
+              : "Tournament"}{" "}
+          sets on this machine.
+        </p>
       ) : (
         <div className="space-y-3 max-md:space-y-2">
-          {orderedSets.map((set) => (
+          {visibleSets.map((set) => (
             <SettingsSetCard
               key={set.id}
               set={set}
@@ -1136,6 +1253,9 @@ export function SettingsTab({
               }}
               onTogglePreferred={() => {
                 void togglePreferred(set.id);
+              }}
+              onToggleTournament={() => {
+                toggleTournament(set.id);
               }}
               onRename={(name) => {
                 renameSet(set.id, name);

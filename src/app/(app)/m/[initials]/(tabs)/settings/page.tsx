@@ -60,18 +60,29 @@ export default async function MachineSettingsTab({
       })
     : null;
 
-  const canEdit = checkPermission(
-    "machines.settings.manage",
-    getAccessLevel(profile?.role),
-    { userId: user?.id, machineOwnerId: machine.owner?.id ?? null }
-  );
+  const access = getAccessLevel(profile?.role);
+  const machineOwnerId = machine.owner?.id ?? null;
 
-  const sets = await getMachineSettingsSets(db, machine.id);
+  // Machine-wide gate for the "Add set" button (creating rides on the existing
+  // matrix entry); per-set edit rights are computed per row in the query.
+  const canCreate = checkPermission("machines.settings.manage", access, {
+    userId: user?.id,
+    machineOwnerId,
+  });
+
+  const sets = await getMachineSettingsSets(db, machine.id, {
+    viewerId: user?.id ?? null,
+    access,
+    machineOwnerId,
+  });
 
   return (
     <div className="space-y-6">
       <SettingsTab
-        canEdit={canEdit}
+        canCreate={canCreate}
+        viewerId={user?.id ?? null}
+        machineOwnerId={machineOwnerId}
+        ownerName={machine.owner?.name ?? null}
         machineId={machine.id}
         initialSets={sets}
         settingsRequests={machine.settingsRequests ?? null}

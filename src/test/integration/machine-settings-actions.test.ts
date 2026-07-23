@@ -173,7 +173,11 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
     if (!created.success) return;
 
     const db = await getTestDb();
-    const sets = await getMachineSettingsSets(asDbOrTx(db), machine.id);
+    const sets = await getMachineSettingsSets(asDbOrTx(db), machine.id, {
+      viewerId: owner.id,
+      access: "member",
+      machineOwnerId: owner.id,
+    });
     expect(sets).toHaveLength(1);
     const section = sets[0].sections[0];
     expect(section.kind).toBe("table");
@@ -244,7 +248,11 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
     expect(updated.changed).toBe(true);
 
     // The persisted state reflects both changes from the single auto-save call.
-    const sets = await getMachineSettingsSets(asDbOrTx(db), machine.id);
+    const sets = await getMachineSettingsSets(asDbOrTx(db), machine.id, {
+      viewerId: owner.id,
+      access: "member",
+      machineOwnerId: owner.id,
+    });
     expect(sets).toHaveLength(1);
     const section = sets[0].sections[0];
     expect(section.kind).toBe("software");
@@ -529,7 +537,15 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
     const longName = "n".repeat(NAME_MAX);
     const [inserted] = await db
       .insert(machineSettingsSets)
-      .values({ machineId: machine.id, name: longName, sections: [] })
+      .values({
+        machineId: machine.id,
+        name: longName,
+        sections: [],
+        // Owner's own set, so the owner can see it to duplicate it.
+        createdBy: owner.id,
+        isOwnerSet: true,
+        isPublic: true,
+      })
       .returning({ id: machineSettingsSets.id });
     if (!inserted) throw new Error("setup insert failed");
 
@@ -717,7 +733,7 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
       .where(eq(timelineEvents.machineId, machineId));
   }
 
-  it("emits a settings-tagged timeline event for create/update/delete/preferred and skips no-ops", async () => {
+  it("emits a settings-tagged timeline event for create/update/delete and skips no-ops (and the Owner's default, PP-tn6t)", async () => {
     const owner = await makeUser("member");
     const machine = await makeMachine(owner.id);
     await mockAuth(owner.id);
@@ -754,6 +770,8 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
       sections: sampleSections(),
     });
 
+    // Toggling the Owner's default emits NO timeline event (PP-tn6t). The set
+    // is the owner's first, so it is already the auto-default — this is a no-op.
     await setPreferredSettingsSetAction({ id: created.id, isPreferred: true });
     await deleteSettingsSetAction({ id: created.id });
 
@@ -762,11 +780,11 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
       .filter((e) => e.tag === "settings")
       .map((e) => (e.eventData as { kind: string } | null)?.kind)
       .sort();
-    // created + updated (one real, the no-op skipped) + preferred + deleted = 4
+    // created + updated (one real, the no-op skipped) + deleted = 3.
+    // No settings_set_preferred event any more.
     expect(kinds).toEqual([
       "settings_set_created",
       "settings_set_deleted",
-      "settings_set_preferred",
       "settings_set_updated",
     ]);
     // All carry the actor + the settings tag.

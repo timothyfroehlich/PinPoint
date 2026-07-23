@@ -2,6 +2,12 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { type DbTransaction } from "~/server/db";
 import { machineSettingsSets } from "~/server/db/schema";
+import { type AccessLevel } from "~/lib/permissions/matrix";
+import {
+  canEditSet,
+  canSetOwnerDefault,
+  canViewSet,
+} from "~/lib/machines/settings-permissions";
 import type {
   SettingsSection,
   SettingsSetData,
@@ -35,14 +41,27 @@ function withRenderKeys(sections: SettingsSection[]): SettingsSection[] {
   });
 }
 
+/** Who is asking — determines set visibility and each set's `canEdit`. */
+export interface SettingsSetsViewer {
+  /** The authed user's id, or null for an anonymous visitor. */
+  viewerId: string | null;
+  /** The viewer's permission level (from their role). */
+  access: AccessLevel;
+  /** The machine owner's user id, or null if unowned. */
+  machineOwnerId: string | null;
+}
+
 /**
- * Load every settings set for a machine as the client view-model. Preferred
- * set first, then oldest-created. `updatedBy` resolves to the editor's display
- * NAME (CORE-SEC-007: never an email).
+ * Load the settings sets for a machine that the given viewer may SEE, as the
+ * client view-model: public sets + the owner's default + the viewer's own
+ * private drafts. Owner's default first, then oldest-created. Each row carries
+ * a per-viewer `canEdit`. `updatedBy` resolves to the editor's display NAME
+ * (CORE-SEC-007: never an email).
  */
 export async function getMachineSettingsSets(
   dbi: DbTransaction,
-  machineId: string
+  machineId: string,
+  viewer: SettingsSetsViewer
 ): Promise<SettingsSetData[]> {
   const rows = await dbi.query.machineSettingsSets.findMany({
     where: eq(machineSettingsSets.machineId, machineId),
@@ -50,6 +69,10 @@ export async function getMachineSettingsSets(
       id: true,
       name: true,
       isPreferred: true,
+      isOwnerSet: true,
+      isPublic: true,
+      isTournament: true,
+      createdBy: true,
       description: true,
       sections: true,
       updatedAt: true,
@@ -58,13 +81,40 @@ export async function getMachineSettingsSets(
     orderBy: (s, { asc, desc }) => [desc(s.isPreferred), asc(s.createdAt)],
   });
 
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    isPreferred: row.isPreferred,
-    description: row.description ?? null,
-    sections: withRenderKeys(row.sections),
-    updatedBy: row.updatedByUser?.name ?? "Unknown",
-    updatedAt: row.updatedAt.toISOString().slice(0, 10),
-  }));
+  return rows
+    .map((row) => ({
+      auth: {
+        isOwnerSet: row.isOwnerSet,
+        isPublic: row.isPublic,
+        isPreferred: row.isPreferred,
+        createdById: row.createdBy,
+      },
+      row,
+    }))
+    .filter(({ auth }) => canViewSet(auth, viewer.viewerId, viewer.access))
+    .map(({ auth, row }) => ({
+      id: row.id,
+      name: row.name,
+      isPreferred: row.isPreferred,
+      isOwnerSet: row.isOwnerSet,
+      isPublic: row.isPublic,
+      isTournament: row.isTournament,
+      createdById: row.createdBy,
+      canEdit: canEditSet(
+        auth,
+        viewer.machineOwnerId,
+        viewer.viewerId,
+        viewer.access
+      ),
+      canSetDefault: canSetOwnerDefault(
+        auth,
+        viewer.machineOwnerId,
+        viewer.viewerId,
+        viewer.access
+      ),
+      description: row.description ?? null,
+      sections: withRenderKeys(row.sections),
+      updatedBy: row.updatedByUser?.name ?? "Unknown",
+      updatedAt: row.updatedAt.toISOString().slice(0, 10),
+    }));
 }
