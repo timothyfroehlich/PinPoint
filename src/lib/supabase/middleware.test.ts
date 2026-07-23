@@ -211,7 +211,6 @@ describe("updateSession public route access", () => {
     "/terms",
     "/api/health",
     "/issues",
-    "/.well-known/oauth-protected-resource",
   ];
 
   it.each(publicRoutes)("allows unauthenticated access to %s", async (path) => {

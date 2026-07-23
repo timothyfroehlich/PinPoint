@@ -1,22 +1,42 @@
 import "server-only";
 
+import { createHash, timingSafeEqual } from "node:crypto";
+
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 
 import { log } from "~/lib/logger";
 import { getUserAccessLevel } from "~/lib/permissions/access";
 import { ACCESS_LEVELS, type AccessLevel } from "~/lib/permissions/matrix";
-import { getSupabaseEnv } from "~/lib/supabase/env";
 
 /**
- * The minimum access level an OAuth caller must hold to reach ANY MCP tool.
+ * The minimum access level the bearer-mapped user must hold to reach ANY MCP
+ * tool.
  *
- * This is the v1 security posture (spec §"verifyToken"): a leaked non-admin
- * token gets nothing at the door. Per-tool `checkPermission()` still runs
- * underneath each tool as defense in depth — the admin gate is not a substitute
- * for it.
+ * Re-checked on every request rather than baked into the token: if the mapped
+ * user's role is ever demoted, the token stops working immediately. Per-tool
+ * `checkPermission()` still runs underneath each tool as defense in depth — the
+ * admin gate is not a substitute for it.
  */
 const REQUIRED_ACCESS_LEVEL: AccessLevel = "admin";
+
+/**
+ * Minimum accepted length for `MCP_BEARER_TOKEN`. `openssl rand -hex 32` (the
+ * documented way to generate it) yields 64 chars; this rejects a hand-typed
+ * weak secret at startup-of-request rather than letting it quietly guard a
+ * write-capable production surface.
+ */
+const MIN_BEARER_TOKEN_LENGTH = 32;
+
+/**
+ * Synthetic `client_id` recorded for every bearer-authenticated call. There is
+ * no OAuth client registration behind a static token, but the audit trail
+ * (`logMcpToolCall`) and {@link McpAuthContext} both want a stable identifier
+ * for how the caller got in.
+ */
+const BEARER_CLIENT_ID = "claude-code-bearer";
+
+const adminUserIdSchema = z.string().uuid();
 
 /**
  * Resolved identity attached to every authorized MCP request, carried in
@@ -29,89 +49,123 @@ const REQUIRED_ACCESS_LEVEL: AccessLevel = "admin";
 export interface McpAuthContext {
   userId: string;
   accessLevel: AccessLevel;
-  /** OAuth `client_id` claim, for the audit trail. Empty string when absent. */
+  /** How the caller authenticated. Always {@link BEARER_CLIENT_ID} today. */
   clientId: string;
 }
 
 /**
- * The subset of verified JWT claims the MCP layer consumes. Kept minimal and
- * injectable so unit tests mock the Supabase verification at its boundary
- * (CORE-TEST-006) without synthesizing a full GoTrue response.
+ * The two env vars that configure bearer auth, resolved together so a partial
+ * configuration fails closed instead of half-working.
  */
-export interface VerifiedClaims {
-  /** The authenticated user's UUID (`sub`). */
-  userId: string;
-  /** The OAuth `client_id` claim, or `""` when the token carries none. */
-  clientId: string;
+export interface McpBearerConfig {
+  /** Shared secret the client must present as `Authorization: Bearer …`. */
+  bearerToken: string;
+  /** Supabase user UUID that every MCP tool call acts as. */
+  adminUserId: string;
 }
 
 export interface VerifyTokenDeps {
   /**
-   * Validate a bearer JWT at the Supabase boundary. Returns the claims we need,
-   * or `null` for any expired / malformed / bad-signature token.
+   * Read the bearer configuration. Returns `undefined` when either var is
+   * missing or malformed — the caller then rejects the request (fail closed).
+   * Injectable so unit tests stay hermetic and don't mutate `process.env`.
    */
-  verifyClaims: (token: string) => Promise<VerifiedClaims | null>;
+  getConfig: () => McpBearerConfig | undefined;
   getUserAccessLevel: (userId: string) => Promise<AccessLevel>;
 }
 
 /**
- * A lazily-created, session-less Supabase client used only for JWT verification.
- * `getClaims()` caches the project JWKS on the client instance, so we reuse one
- * client across requests rather than paying a JWKS fetch per call.
+ * Default configuration source: `MCP_BEARER_TOKEN` + `MCP_ADMIN_USER_ID` from
+ * the environment (CORE-SEC-009 — both registered in the `next.config.ts` build
+ * registry, neither reused as another var's fallback, neither `NEXT_PUBLIC_`).
+ *
+ * Every rejection here is a deployment misconfiguration, so it warns loudly
+ * rather than failing silently — the resulting 401 would otherwise be
+ * indistinguishable from a wrong token.
  */
-let claimsClient: SupabaseClient | undefined;
+function readConfigFromEnv(): McpBearerConfig | undefined {
+  const bearerToken = process.env["MCP_BEARER_TOKEN"];
+  const adminUserId = process.env["MCP_ADMIN_USER_ID"];
 
-function getClaimsClient(): SupabaseClient {
-  if (!claimsClient) {
-    const { url, publishableKey } = getSupabaseEnv();
-    claimsClient = createClient(url, publishableKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+  if (!bearerToken || !adminUserId) {
+    log.warn(
+      {
+        scope: "mcp.auth",
+        outcome: "rejected",
+        reason: "not_configured",
+        hasBearerToken: Boolean(bearerToken),
+        hasAdminUserId: Boolean(adminUserId),
+      },
+      "mcp.auth rejected"
+    );
+    return undefined;
   }
-  return claimsClient;
-}
 
-/**
- * Default boundary implementation: verify the JWT against the project JWKS via
- * `supabase.auth.getClaims()` (local signature + `exp` validation, no per-call
- * network hop once the JWKS is cached).
- */
-async function verifyClaimsWithSupabase(
-  token: string
-): Promise<VerifiedClaims | null> {
-  const { data, error } = await getClaimsClient().auth.getClaims(token);
-  if (error || !data) {
-    return null;
+  if (bearerToken.length < MIN_BEARER_TOKEN_LENGTH) {
+    log.warn(
+      {
+        scope: "mcp.auth",
+        outcome: "rejected",
+        reason: "bearer_token_too_short",
+        minLength: MIN_BEARER_TOKEN_LENGTH,
+      },
+      "mcp.auth rejected"
+    );
+    return undefined;
   }
-  const { sub, client_id: clientIdClaim } = data.claims;
-  if (typeof sub !== "string" || sub.length === 0) {
-    return null;
+
+  // The mapped id goes into a `uuid` column lookup; a malformed value would
+  // surface as a Postgres cast error (500) instead of a clean 401.
+  if (!adminUserIdSchema.safeParse(adminUserId).success) {
+    log.warn(
+      {
+        scope: "mcp.auth",
+        outcome: "rejected",
+        reason: "admin_user_id_not_uuid",
+      },
+      "mcp.auth rejected"
+    );
+    return undefined;
   }
-  // Require the OAuth `client_id` claim. Tokens minted by Supabase's OAuth
-  // server (the intended path — the caller went through DCR/consent) carry it;
-  // plain web-session access tokens (cookie auth) do NOT. Rejecting tokens
-  // without it enforces the OAuth-consent boundary at the token layer, so a
-  // leaked/stolen admin *session* token cannot drive this write-capable MCP
-  // surface. (PR #1707 review finding.)
-  if (typeof clientIdClaim !== "string" || clientIdClaim.length === 0) {
-    return null;
-  }
-  return { userId: sub, clientId: clientIdClaim };
+
+  return { bearerToken, adminUserId };
 }
 
 const defaultDeps: VerifyTokenDeps = {
-  verifyClaims: verifyClaimsWithSupabase,
+  getConfig: readConfigFromEnv,
   getUserAccessLevel,
 };
 
 /**
+ * Compare two secrets without leaking their contents through timing.
+ *
+ * Hashing first is what makes this safe: `timingSafeEqual` throws on
+ * mismatched buffer lengths, so comparing the raw strings would both crash and
+ * leak the secret's length. Fixed-width SHA-256 digests sidestep the
+ * length-based early return entirely.
+ */
+function secretsMatch(presented: string, expected: string): boolean {
+  const digest = (value: string): Buffer =>
+    createHash("sha256").update(value, "utf8").digest();
+  return timingSafeEqual(digest(presented), digest(expected));
+}
+
+/**
  * Build the `verifyToken` callback for `withMcpAuth`.
  *
- * Flow: extract bearer → verify JWT at the Supabase boundary → resolve the
- * user's access level → require {@link REQUIRED_ACCESS_LEVEL} → hand back an
- * {@link AuthInfo} whose `extra` carries the {@link McpAuthContext}. Any failure
- * (missing/invalid token, unknown user, non-admin) returns `undefined`, which
+ * Flow: extract bearer → constant-time compare against `MCP_BEARER_TOKEN` →
+ * resolve `MCP_ADMIN_USER_ID`'s access level → require
+ * {@link REQUIRED_ACCESS_LEVEL} → hand back an {@link AuthInfo} whose `extra`
+ * carries the {@link McpAuthContext}. Any failure (missing token, wrong token,
+ * unconfigured server, non-admin mapped user) returns `undefined`, which
  * `withMcpAuth` turns into a 401.
+ *
+ * Security posture: a static bearer token is a long-lived admin secret, chosen
+ * deliberately for this private single-user server (see
+ * `docs/plans/2026-07-22-mcp-bearer-token-pivot-handoff.md`). It is
+ * server-only, HTTPS-only, hashed before comparison, fails closed when unset,
+ * and re-checks the mapped user's role on every call. Rotate by changing the
+ * env var.
  */
 export function createVerifyToken(deps: VerifyTokenDeps = defaultDeps) {
   return async function verifyToken(
@@ -122,22 +176,36 @@ export function createVerifyToken(deps: VerifyTokenDeps = defaultDeps) {
       return undefined;
     }
 
-    const claims = await deps.verifyClaims(bearerToken);
-    if (!claims) {
+    const config = deps.getConfig();
+    if (!config) {
       return undefined;
     }
 
-    const accessLevel = await deps.getUserAccessLevel(claims.userId);
+    if (!secretsMatch(bearerToken, config.bearerToken)) {
+      log.warn(
+        {
+          scope: "mcp.auth",
+          outcome: "rejected",
+          reason: "bad_token",
+        },
+        "mcp.auth rejected"
+      );
+      return undefined;
+    }
+
+    const { adminUserId } = config;
+    const accessLevel = await deps.getUserAccessLevel(adminUserId);
     if (accessLevel !== REQUIRED_ACCESS_LEVEL) {
-      // A valid token for a real, non-admin user. Log the rejection — this is a
-      // write-capable production surface and a denied admin gate is audit-worthy.
+      // The token is right but the user it maps to is no longer an admin (or
+      // never was). This is a write-capable production surface — a denied admin
+      // gate is audit-worthy.
       log.warn(
         {
           scope: "mcp.auth",
           outcome: "rejected",
           reason: "not_admin",
-          userId: claims.userId,
-          clientId: claims.clientId,
+          userId: adminUserId,
+          clientId: BEARER_CLIENT_ID,
           accessLevel,
         },
         "mcp.auth rejected"
@@ -147,12 +215,12 @@ export function createVerifyToken(deps: VerifyTokenDeps = defaultDeps) {
 
     return {
       token: bearerToken,
-      clientId: claims.clientId,
+      clientId: BEARER_CLIENT_ID,
       scopes: [],
       extra: {
-        userId: claims.userId,
+        userId: adminUserId,
         accessLevel,
-        clientId: claims.clientId,
+        clientId: BEARER_CLIENT_ID,
       } satisfies McpAuthContext,
     };
   };

@@ -130,10 +130,8 @@ export async function updateSession(
     path.startsWith("/whats-new") ||
     path.startsWith("/privacy") ||
     path.startsWith("/terms") ||
-    // `.well-known` discovery endpoints (e.g. OAuth Protected Resource Metadata
-    // for the MCP server, RFC 9728) are fetched by clients BEFORE they hold a
-    // token, so they must never redirect to /login.
-    path.startsWith("/.well-known/") ||
+    // API routes authenticate themselves (e.g. the MCP server's bearer gate) and
+    // must return 401/403 to their callers rather than a /login redirect.
     path.startsWith("/api");
 
   if (!user && !isPublic) {

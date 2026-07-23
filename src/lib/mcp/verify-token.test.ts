@@ -1,19 +1,13 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createClientMock, getClaimsMock, getUserAccessLevelMock } = vi.hoisted(
-  () => ({
-    createClientMock: vi.fn(),
-    getClaimsMock: vi.fn(),
-    getUserAccessLevelMock: vi.fn(),
-  })
-);
+const { getUserAccessLevelMock, warnMock } = vi.hoisted(() => ({
+  getUserAccessLevelMock: vi.fn(),
+  warnMock: vi.fn(),
+}));
 
 vi.mock("server-only", () => ({}));
 vi.mock("~/lib/logger", () => ({
-  log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: createClientMock,
+  log: { info: vi.fn(), warn: warnMock, error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock("~/lib/permissions/access", () => ({
   getUserAccessLevel: getUserAccessLevelMock,
@@ -23,154 +17,182 @@ import {
   createVerifyToken,
   requireMcpAuthContext,
   verifyToken,
+  type McpBearerConfig,
   type VerifyTokenDeps,
 } from "./verify-token";
 
 const request = new Request("https://pinpoint.test/api/mcp/mcp");
 
-// Bracket access via a variable key keeps the `dot-notation` rule (which the
-// tests tsconfig applies to `process.env` string literals) from firing.
-function setSupabaseEnv(): void {
-  const env: Record<string, string> = {
-    NEXT_PUBLIC_SUPABASE_URL: "https://ref.supabase.co",
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon",
-  };
-  for (const [key, value] of Object.entries(env)) {
-    process.env[key] = value;
-  }
-}
+/** 64 hex chars, matching what `openssl rand -hex 32` produces. */
+const TOKEN = "a".repeat(64);
+const ADMIN_USER_ID = "3fe49d22-af58-47ac-aecb-9345a882ba0c";
 
 function deps(overrides: Partial<VerifyTokenDeps> = {}): VerifyTokenDeps {
   return {
-    verifyClaims: vi.fn().mockResolvedValue({
-      userId: "user-1",
-      clientId: "claude-code",
-    }),
+    getConfig: vi
+      .fn<() => McpBearerConfig | undefined>()
+      .mockReturnValue({ bearerToken: TOKEN, adminUserId: ADMIN_USER_ID }),
     getUserAccessLevel: vi.fn().mockResolvedValue("admin"),
     ...overrides,
   };
 }
 
+// `vi.stubEnv` (rather than assigning to `process.env`) so `unstubAllEnvs`
+// restores the ambient environment, and so `undefined` cleanly means "unset".
+function setEnv(values: Record<string, string | undefined>): void {
+  for (const [key, value] of Object.entries(values)) {
+    vi.stubEnv(key, value);
+  }
+}
+
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("createVerifyToken", () => {
-  it("returns AuthInfo carrying the resolved context for a valid admin token", async () => {
+  it("returns AuthInfo carrying the mapped admin identity for the right token", async () => {
     const verify = createVerifyToken(deps());
 
-    const result = await verify(request, "good.admin.jwt");
+    const result = await verify(request, TOKEN);
 
     expect(result).toEqual({
-      token: "good.admin.jwt",
-      clientId: "claude-code",
+      token: TOKEN,
+      clientId: "claude-code-bearer",
       scopes: [],
       extra: {
-        userId: "user-1",
+        userId: ADMIN_USER_ID,
         accessLevel: "admin",
-        clientId: "claude-code",
+        clientId: "claude-code-bearer",
       },
     });
   });
 
-  it("rejects a valid token whose user is not an admin", async () => {
-    const getUserAccessLevel = vi.fn().mockResolvedValue("technician");
+  it("rejects a wrong token without resolving an access level", async () => {
+    const getUserAccessLevel = vi.fn();
     const verify = createVerifyToken(deps({ getUserAccessLevel }));
 
-    const result = await verify(request, "good.tech.jwt");
+    const result = await verify(request, "b".repeat(64));
 
     expect(result).toBeUndefined();
-    expect(getUserAccessLevel).toHaveBeenCalledWith("user-1");
-  });
-
-  it("rejects a garbage / expired token (claims fail verification)", async () => {
-    const verifyClaims = vi.fn().mockResolvedValue(null);
-    const getUserAccessLevel = vi.fn();
-    const verify = createVerifyToken(
-      deps({ verifyClaims, getUserAccessLevel })
-    );
-
-    const result = await verify(request, "garbage");
-
-    expect(result).toBeUndefined();
-    // Never resolves an access level for an unverifiable token.
     expect(getUserAccessLevel).not.toHaveBeenCalled();
   });
 
+  it("rejects a token that is a prefix of the secret (no truncation match)", async () => {
+    const verify = createVerifyToken(deps());
+
+    expect(await verify(request, TOKEN.slice(0, 32))).toBeUndefined();
+    expect(await verify(request, `${TOKEN}extra`)).toBeUndefined();
+  });
+
   it("rejects a request with no bearer token", async () => {
-    const verifyClaims = vi.fn();
-    const verify = createVerifyToken(deps({ verifyClaims }));
+    const getConfig = vi.fn();
+    const verify = createVerifyToken(deps({ getConfig }));
 
     const result = await verify(request, undefined);
 
     expect(result).toBeUndefined();
-    expect(verifyClaims).not.toHaveBeenCalled();
+    expect(getConfig).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the server is not configured", async () => {
+    const getUserAccessLevel = vi.fn();
+    const verify = createVerifyToken(
+      deps({ getConfig: () => undefined, getUserAccessLevel })
+    );
+
+    const result = await verify(request, TOKEN);
+
+    expect(result).toBeUndefined();
+    expect(getUserAccessLevel).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the mapped user is no longer an admin", async () => {
+    const getUserAccessLevel = vi.fn().mockResolvedValue("technician");
+    const verify = createVerifyToken(deps({ getUserAccessLevel }));
+
+    const result = await verify(request, TOKEN);
+
+    expect(result).toBeUndefined();
+    expect(getUserAccessLevel).toHaveBeenCalledWith(ADMIN_USER_ID);
+    expect(warnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: "not_admin",
+        accessLevel: "technician",
+      }),
+      expect.any(String)
+    );
   });
 });
 
-describe("verifyToken (default Supabase boundary)", () => {
-  function mockGetClaims(): void {
-    createClientMock.mockReturnValue({ auth: { getClaims: getClaimsMock } });
-  }
+describe("verifyToken (default env-backed config)", () => {
+  beforeEach(() => {
+    setEnv({ MCP_BEARER_TOKEN: TOKEN, MCP_ADMIN_USER_ID: ADMIN_USER_ID });
+  });
 
-  it("verifies via supabase.auth.getClaims and admits an admin", async () => {
-    setSupabaseEnv();
-    mockGetClaims();
-    getClaimsMock.mockResolvedValue({
-      data: { claims: { sub: "user-42", client_id: "claude-code" } },
-      error: null,
-    });
+  it("admits the configured token and acts as the configured admin", async () => {
     getUserAccessLevelMock.mockResolvedValue("admin");
 
-    const result = await verifyToken(request, "real.jwt");
+    const result = await verifyToken(request, TOKEN);
 
-    expect(getClaimsMock).toHaveBeenCalledWith("real.jwt");
+    expect(getUserAccessLevelMock).toHaveBeenCalledWith(ADMIN_USER_ID);
     expect(result?.extra).toEqual({
-      userId: "user-42",
+      userId: ADMIN_USER_ID,
       accessLevel: "admin",
-      clientId: "claude-code",
+      clientId: "claude-code-bearer",
     });
   });
 
-  it("rejects when getClaims returns an error", async () => {
-    setSupabaseEnv();
-    mockGetClaims();
-    getClaimsMock.mockResolvedValue({
-      data: null,
-      error: { name: "AuthError", message: "invalid JWT" },
-    });
+  it("fails closed when MCP_BEARER_TOKEN is unset", async () => {
+    setEnv({ MCP_BEARER_TOKEN: undefined });
 
-    const result = await verifyToken(request, "expired.jwt");
+    const result = await verifyToken(request, TOKEN);
+
+    expect(result).toBeUndefined();
+    expect(getUserAccessLevelMock).not.toHaveBeenCalled();
+    expect(warnMock).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "not_configured" }),
+      expect.any(String)
+    );
+  });
+
+  it("fails closed when MCP_ADMIN_USER_ID is unset", async () => {
+    setEnv({ MCP_ADMIN_USER_ID: undefined });
+
+    const result = await verifyToken(request, TOKEN);
 
     expect(result).toBeUndefined();
     expect(getUserAccessLevelMock).not.toHaveBeenCalled();
   });
 
-  it("rejects a token missing a sub claim", async () => {
-    setSupabaseEnv();
-    mockGetClaims();
-    getClaimsMock.mockResolvedValue({
-      data: { claims: { client_id: "claude-code" } },
-      error: null,
-    });
+  it("rejects a too-short MCP_BEARER_TOKEN rather than guarding with a weak secret", async () => {
+    const weak = "hunter2";
+    setEnv({ MCP_BEARER_TOKEN: weak });
 
-    const result = await verifyToken(request, "no.sub.jwt");
+    const result = await verifyToken(request, weak);
+
+    expect(result).toBeUndefined();
+    expect(warnMock).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "bearer_token_too_short" }),
+      expect.any(String)
+    );
+  });
+
+  it("rejects a non-UUID MCP_ADMIN_USER_ID before it reaches the uuid column", async () => {
+    setEnv({ MCP_ADMIN_USER_ID: "tim" });
+
+    const result = await verifyToken(request, TOKEN);
 
     expect(result).toBeUndefined();
     expect(getUserAccessLevelMock).not.toHaveBeenCalled();
+    expect(warnMock).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "admin_user_id_not_uuid" }),
+      expect.any(String)
+    );
   });
 
-  it("rejects a web-session token that carries no client_id", async () => {
-    setSupabaseEnv();
-    mockGetClaims();
-    // A cookie/session access token: valid signature, real sub, but no
-    // OAuth `client_id` — it never went through the OAuth consent flow.
-    getClaimsMock.mockResolvedValue({
-      data: { claims: { sub: "user-42" } },
-      error: null,
-    });
-
-    const result = await verifyToken(request, "session.jwt");
+  it("rejects a wrong token", async () => {
+    const result = await verifyToken(request, "c".repeat(64));
 
     expect(result).toBeUndefined();
     expect(getUserAccessLevelMock).not.toHaveBeenCalled();
@@ -181,15 +203,19 @@ describe("requireMcpAuthContext", () => {
   it("returns the context from a well-formed authInfo", () => {
     const ctx = requireMcpAuthContext({
       token: "t",
-      clientId: "claude-code",
+      clientId: "claude-code-bearer",
       scopes: [],
-      extra: { userId: "u", accessLevel: "admin", clientId: "claude-code" },
+      extra: {
+        userId: "u",
+        accessLevel: "admin",
+        clientId: "claude-code-bearer",
+      },
     });
 
     expect(ctx).toEqual({
       userId: "u",
       accessLevel: "admin",
-      clientId: "claude-code",
+      clientId: "claude-code-bearer",
     });
   });
 
