@@ -1551,3 +1551,67 @@ describe("SettingsTab — data-loss regression (A1, 🔴)", () => {
     expect(secA?.kind === "note" ? secA.body : null).toEqual(SAMPLE_DOC);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Category filter chip counts (PP-tn6t) — "Owner's" and "Community" are KINDS
+// and must partition "All" regardless of visibility. Regression: a community
+// PRIVATE draft used to fall out of the Community count (isPublic gate), so the
+// chips didn't sum to All.
+// ---------------------------------------------------------------------------
+
+describe("SettingsTab — category chip counts partition by kind", () => {
+  it("Owner's + Community counts sum to All, including private drafts of each kind", () => {
+    // A viewer who is neither the owner nor any set's creator: "Owner's" shows
+    // (viewer isn't the owner) and "Mine" hides (0 authored), so the two kind
+    // chips are the whole partition.
+    const sets: SettingsSetData[] = [
+      oneSet({
+        id: "owner-public",
+        isOwnerSet: true,
+        isPublic: true,
+        createdById: "owner-y",
+      }),
+      oneSet({
+        id: "owner-draft",
+        isOwnerSet: true,
+        isPublic: false, // owner private draft
+        createdById: "owner-y",
+      }),
+      oneSet({
+        id: "community-public",
+        isOwnerSet: false,
+        isPublic: true,
+        createdById: "tech-z",
+      }),
+      oneSet({
+        id: "community-draft",
+        isOwnerSet: false,
+        isPublic: false, // community private draft — the regression case
+        createdById: "tech-z",
+      }),
+    ];
+
+    render(
+      <SettingsTab
+        canCreate
+        viewerId="viewer-x"
+        machineOwnerId="owner-y"
+        ownerName="Owner"
+        machineId="m1"
+        initialSets={sets}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    // Chips read "<label> <count>"; both kinds count their private drafts, so
+    // Owner's 2 + Community 2 = All 4.
+    expect(screen.getByRole("button", { name: /^All 4$/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Owner's 2$/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Community 2$/ })
+    ).toBeInTheDocument();
+  });
+});

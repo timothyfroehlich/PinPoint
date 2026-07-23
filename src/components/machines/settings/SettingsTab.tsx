@@ -264,8 +264,8 @@ export function SettingsTab({
   // Category is single-select (All / Mine / Owner's / Community); the Tournament
   // toggle is independent and ANDs with the category.
   //  · Mine       — created by the viewer
-  //  · Owner's    — owner sets (the machine owner's)
-  //  · Community  — community sets that are public
+  //  · Owner's    — owner-kind sets (the machine owner's)
+  //  · Community  — community-kind sets (co-edited); mirror of Owner's
   const [category, setCategory] = useState<
     "all" | "mine" | "owners" | "community"
   >("all");
@@ -608,8 +608,11 @@ export function SettingsTab({
     (a, b) => Number(b.isPreferred) - Number(a.isPreferred)
   );
   // Single-select category, then the independent Tournament toggle ANDs on top.
-  const isCommunity = (s: SettingsSetData): boolean =>
-    !s.isOwnerSet && s.isPublic;
+  // "Community" is a KIND (the mirror of "Owner's"), independent of visibility —
+  // a community private draft the viewer can see still belongs to Community, so
+  // the counts partition cleanly (All = Owner's + Community). Visibility is
+  // already enforced upstream by the query (canViewSet).
+  const isCommunity = (s: SettingsSetData): boolean => !s.isOwnerSet;
   const isMine = (s: SettingsSetData): boolean =>
     viewerId !== null && s.createdById === viewerId;
   const matchesCategory = (s: SettingsSetData): boolean => {
