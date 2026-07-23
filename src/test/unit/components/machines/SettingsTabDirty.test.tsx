@@ -1330,20 +1330,19 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
       />
     );
 
+    // The description is click-to-edit (PP-tn6t): open the editor first.
+    fireEvent.click(screen.getByRole("button", { name: "Edit description" }));
+
     // Edit the description via the mock editor's onChange (markDirty + schedule,
     // debounce pending). Then blur the editor → onBlur → flush.
-    const descEditors = screen.getAllByRole("button", {
+    const descEditor = screen.getByRole("button", {
       name: "type-in-Edit text",
     });
-    const descEditor = descEditors[0];
-    if (!descEditor) throw new Error("description editor not rendered");
     fireEvent.click(descEditor);
     expect(saveMock).not.toHaveBeenCalled();
 
     // Blur the description editor's textarea → onBlur fires → autoSave.flush.
-    const textareas = screen.getAllByRole("textbox", { name: "Edit text" });
-    const descTextarea = textareas[0];
-    if (!descTextarea) throw new Error("description textarea not rendered");
+    const descTextarea = screen.getByRole("textbox", { name: "Edit text" });
     fireEvent.blur(descTextarea);
 
     await waitFor(() => {

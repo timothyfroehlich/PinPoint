@@ -620,6 +620,7 @@ export function SettingsSetCard({
               canEdit={canEdit}
               placeholder="Add a short description…"
               compact
+              clickToEdit
               onValueChange={onUpdateDescription}
               onBlur={onDescriptionBlur}
             />

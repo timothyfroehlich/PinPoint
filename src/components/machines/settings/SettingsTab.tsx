@@ -212,6 +212,12 @@ function useUnsavedChangesGuard({
   }, [enabled, hasFailed, hasUnsaved, hasUnsavedDraft, flushUnsaved]);
 }
 
+// Filter-chip styling, shared by the category segment and the Tournament toggle.
+const chipClass =
+  "rounded-full border px-3 py-1 text-xs font-medium transition-colors motion-reduce:transition-none";
+const chipActive = "border-primary bg-primary text-primary-foreground";
+const chipIdle = "border-outline-variant text-muted-foreground hover:bg-muted";
+
 interface SettingsTabProps {
   /** Machine-wide gate: may this viewer CREATE a set + edit the machine-level
    *  guidance? Per-set edit rights live on each set's `canEdit`. */
@@ -255,21 +261,15 @@ export function SettingsTab({
   // Preferred/Duplicate target a persisted row, so they're gated on this.
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
 
-  // Filter toggles that AND together (intersection). None active = All.
+  // Category is single-select (All / Mine / Owner's / Community); the Tournament
+  // toggle is independent and ANDs with the category.
   //  · Mine       — created by the viewer
   //  · Owner's    — owner sets (the machine owner's)
-  //  · Community   — community sets that are public
-  //  · Tournament — tagged Tournament
-  const [mineFilter, setMineFilter] = useState(false);
-  const [ownersFilter, setOwnersFilter] = useState(false);
-  const [communityFilter, setCommunityFilter] = useState(false);
+  //  · Community  — community sets that are public
+  const [category, setCategory] = useState<
+    "all" | "mine" | "owners" | "community"
+  >("all");
   const [tournamentFilter, setTournamentFilter] = useState(false);
-  const clearFilters = (): void => {
-    setMineFilter(false);
-    setOwnersFilter(false);
-    setCommunityFilter(false);
-    setTournamentFilter(false);
-  };
   // The viewer owns this machine → their sets ARE the owner's, so the "Owner's"
   // chip is redundant with "Mine"; hide it.
   const viewerIsOwner = viewerId !== null && viewerId === machineOwnerId;
@@ -607,21 +607,26 @@ export function SettingsTab({
   const orderedSets = [...sets].sort(
     (a, b) => Number(b.isPreferred) - Number(a.isPreferred)
   );
-  // Active toggles AND together (intersection); none active shows all.
+  // Single-select category, then the independent Tournament toggle ANDs on top.
   const isCommunity = (s: SettingsSetData): boolean =>
     !s.isOwnerSet && s.isPublic;
   const isMine = (s: SettingsSetData): boolean =>
     viewerId !== null && s.createdById === viewerId;
-  const matchesFilter = (s: SettingsSetData): boolean => {
-    if (mineFilter && !isMine(s)) return false;
-    if (ownersFilter && !s.isOwnerSet) return false;
-    if (communityFilter && !isCommunity(s)) return false;
-    if (tournamentFilter && !s.isTournament) return false;
-    return true;
+  const matchesCategory = (s: SettingsSetData): boolean => {
+    switch (category) {
+      case "mine":
+        return isMine(s);
+      case "owners":
+        return s.isOwnerSet;
+      case "community":
+        return isCommunity(s);
+      case "all":
+        return true;
+    }
   };
+  const matchesFilter = (s: SettingsSetData): boolean =>
+    matchesCategory(s) && (!tournamentFilter || s.isTournament);
   const visibleSets = orderedSets.filter(matchesFilter);
-  const showingAll =
-    !mineFilter && !ownersFilter && !communityFilter && !tournamentFilter;
   const mineCount = sets.filter(isMine).length;
   const ownerCount = sets.filter((s) => s.isOwnerSet).length;
   const communityCount = sets.filter(isCommunity).length;
@@ -1221,79 +1226,71 @@ export function SettingsTab({
           role="group"
           aria-label="Filter settings sets"
         >
+          {/* Category — single-select (clicking the active one returns to All). */}
           {(
             [
-              {
-                key: "all",
-                label: "All",
-                count: sets.length,
-                active: showingAll,
-                show: true,
-                onClick: clearFilters,
-              },
+              { key: "all", label: "All", count: sets.length, show: true },
               {
                 key: "mine",
                 label: "Mine",
                 count: mineCount,
-                active: mineFilter,
                 show: viewerId !== null && mineCount > 0,
-                onClick: () => {
-                  setMineFilter((v) => !v);
-                },
               },
               {
-                key: "owner",
+                key: "owners",
                 label: "Owner's",
                 count: ownerCount,
-                active: ownersFilter,
                 // Redundant with "Mine" when the viewer is the machine owner.
                 show: !viewerIsOwner,
-                onClick: () => {
-                  setOwnersFilter((v) => !v);
-                },
               },
               {
                 key: "community",
                 label: "Community",
                 count: communityCount,
-                active: communityFilter,
                 show: true,
-                onClick: () => {
-                  setCommunityFilter((v) => !v);
-                },
-              },
-              {
-                key: "tournament",
-                label: "Tournament",
-                count: tournamentCount,
-                active: tournamentFilter,
-                show: true,
-                onClick: () => {
-                  setTournamentFilter((v) => !v);
-                },
               },
             ] as const
           )
             .filter((chip) => chip.show)
-            .map((chip) => (
-              <button
-                key={chip.key}
-                type="button"
-                aria-pressed={chip.active}
-                onClick={chip.onClick}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors motion-reduce:transition-none",
-                  chip.active
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-outline-variant text-muted-foreground hover:bg-muted"
-                )}
-              >
-                {chip.label}{" "}
-                <span className={chip.active ? "opacity-80" : "opacity-60"}>
-                  {String(chip.count)}
-                </span>
-              </button>
-            ))}
+            .map((chip) => {
+              const active = category === chip.key;
+              return (
+                <button
+                  key={chip.key}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    setCategory((c) =>
+                      chip.key === "all" || c === chip.key ? "all" : chip.key
+                    );
+                  }}
+                  className={cn(chipClass, active ? chipActive : chipIdle)}
+                >
+                  {chip.label}{" "}
+                  <span className={active ? "opacity-80" : "opacity-60"}>
+                    {String(chip.count)}
+                  </span>
+                </button>
+              );
+            })}
+          {/* Independent Tournament toggle (ANDs with the category). */}
+          <span
+            className="mx-1 h-4 w-px shrink-0 bg-outline-variant"
+            aria-hidden
+          />
+          <button
+            type="button"
+            aria-pressed={tournamentFilter}
+            onClick={() => {
+              setTournamentFilter((v) => !v);
+            }}
+            className={cn(chipClass, tournamentFilter ? chipActive : chipIdle)}
+          >
+            Tournament{" "}
+            <span className={tournamentFilter ? "opacity-80" : "opacity-60"}>
+              {String(tournamentCount)}
+            </span>
+          </button>
         </div>
         {canCreate && (
           <Button size="sm" onClick={addNewSet}>
