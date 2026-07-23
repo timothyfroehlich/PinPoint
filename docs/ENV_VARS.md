@@ -79,9 +79,21 @@ Sensitivity: 🔴 secret · 🟢 public config.
 | `NEXT_PUBLIC_SUPABASE_URL` (`SUPABASE_URL`)                              | 🟢    | ✅   | ✅             | ✅  | ✅        | `src/lib/supabase/env.ts`                         | throws in `getSupabaseEnv()`                   |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) | 🟢    | ✅   | ✅             | ✅  | ✅        | `src/lib/supabase/env.ts`                         | throws in `getSupabaseEnv()`                   |
 | `NEXT_PUBLIC_SITE_URL`                                                   | 🟢    | ✅   | 🔁`VERCEL_URL` | ⚪  | ✅        | `src/lib/url.ts`                                  | `requireSiteUrl()` throws in prod if localhost |
+| `MCP_BEARER_TOKEN`                                                       | 🔴    | ✅   | ⚪             | ⚪  | ⚪        | `src/lib/mcp/verify-token.ts`                     | MCP auth fails closed (401) if unset           |
+| `MCP_ADMIN_USER_ID`                                                      | 🔴    | ✅   | ⚪             | ⚪  | ⚪        | `src/lib/mcp/verify-token.ts`                     | MCP auth fails closed (401) if unset           |
 
 > `NEXT_PUBLIC_SUPABASE_*` are public (anon/publishable) keys — safe to expose —
 > but still **required** for the app to boot, so they're in the registry.
+
+> **MCP remote admin (PP-u4ab).** `MCP_BEARER_TOKEN` is the shared secret a
+> client presents as `Authorization: Bearer …` to `/api/mcp/mcp`; generate it
+> with `openssl rand -hex 32` (minimum 32 chars — shorter values are rejected).
+> `MCP_ADMIN_USER_ID` is the Supabase user UUID every MCP tool call acts as; it
+> must resolve to an `admin` access level, re-checked on every request. Both are
+> **Production-only** in the build registry: previews have no MCP client pointed
+> at them, and the auth path fails closed when either is missing, so a preview
+> build must not be blocked on them. Neither is `NEXT_PUBLIC_`; neither is reused
+> as another var's fallback. Rotate by changing `MCP_BEARER_TOKEN`.
 
 ### 4.2 Production-relevant but not build-gated (degrade or feature-gate)
 

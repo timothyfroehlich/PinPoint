@@ -1,7 +1,7 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 
 import { logMcpToolCall } from "~/lib/mcp/audit";
-import { MCP_BASE_PATH, MCP_RESOURCE_METADATA_PATH } from "~/lib/mcp/config";
+import { MCP_BASE_PATH } from "~/lib/mcp/config";
 import { registerPinpointTools } from "~/lib/mcp/tools";
 import { requireMcpAuthContext, verifyToken } from "~/lib/mcp/verify-token";
 
@@ -15,7 +15,7 @@ export const maxDuration = 60;
  * each tool additionally runs `checkPermission()` underneath (defense in depth).
  *
  * Tools: the six-tool v1 catalog ({@link registerPinpointTools}) plus a `whoami`
- * diagnostic used to validate the OAuth handshake end-to-end (spec §"Spike first").
+ * diagnostic used to validate the connection end-to-end.
  */
 const handler = createMcpHandler(
   (server) => {
@@ -24,7 +24,7 @@ const handler = createMcpHandler(
       {
         title: "Who am I",
         description:
-          "Return the PinPoint identity and access level resolved from the OAuth token. Use this to confirm the connection is authenticated and authorized.",
+          "Return the PinPoint identity and access level resolved from the bearer token. Use this to confirm the connection is authenticated and authorized.",
       },
       (extra) => {
         const auth = requireMcpAuthContext(extra.authInfo);
@@ -54,9 +54,10 @@ const handler = createMcpHandler(
   { basePath: MCP_BASE_PATH, disableSse: true }
 );
 
-const authHandler = withMcpAuth(handler, verifyToken, {
-  required: true,
-  resourceMetadataPath: MCP_RESOURCE_METADATA_PATH,
-});
+// Static-bearer auth (PP-u4ab.7): there is no OAuth authorization server to
+// discover, so no `resourceMetadataPath` is advertised. `withMcpAuth` still
+// does the useful part — pull the `Authorization: Bearer …` header, run
+// `verifyToken`, and 401 when it returns undefined.
+const authHandler = withMcpAuth(handler, verifyToken, { required: true });
 
 export { authHandler as GET, authHandler as POST };

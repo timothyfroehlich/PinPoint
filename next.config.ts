@@ -26,10 +26,16 @@ const REQUIRED_ALL_DEPLOYMENTS: readonly RequiredEnvGroup[] = [
   ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
 ];
 
-// Required in Production only. Preview resolves the canonical site URL from
-// VERCEL_URL (see src/lib/url.ts getSiteUrl), so it is not required there.
+// Required in Production only.
+// - NEXT_PUBLIC_SITE_URL: Preview resolves the canonical site URL from
+//   VERCEL_URL (see src/lib/url.ts getSiteUrl), so it is not required there.
+// - MCP_BEARER_TOKEN / MCP_ADMIN_USER_ID: the remote-admin MCP server is a
+//   production surface; previews have no MCP client pointed at them and its
+//   auth fails closed when either is unset (src/lib/mcp/verify-token.ts).
 const REQUIRED_PRODUCTION_ONLY: readonly RequiredEnvGroup[] = [
   ["NEXT_PUBLIC_SITE_URL"],
+  ["MCP_BEARER_TOKEN"],
+  ["MCP_ADMIN_USER_ID"],
 ];
 
 function assertVercelDeploymentEnv(): void {
