@@ -175,10 +175,19 @@ remaining fallbacks are benign same-value aliases.
 1. **Pick the scope(s)** using §3. Default to deny — only the scopes that need it.
 2. **Sensitivity:** secret → never `NEXT_PUBLIC_`; public config → `NEXT_PUBLIC_` only if the browser truly needs it (it ends up in page source).
 3. **No coupling:** give it its own value; never borrow another secret as a fallback (alias _names_ for the same value are fine).
-4. **If production-required:** add it to the registry in `next.config.ts`
-   (`REQUIRED_ALL_DEPLOYMENTS` or `REQUIRED_PRODUCTION_ONLY`), so a missing value
-   fails the build instead of degrading silently.
-5. **Document it here** (the right §4 table) and add it to `.env.example` (and
+4. **Set it in Vercel** for each chosen scope (Project Settings → Environment
+   Variables). Do this **before** step 5 — the registry assertion fires on the
+   first deploy after merge, never in CI, so registering a var whose value isn't
+   set yet fails that deploy.
+5. **Is it production-_required_?** This means **PinPoint is broken without it**
+   — not "it's a secret", not "it's production-only", not "a feature degrades".
+   The registry is a deploy gate; everything in it can fail a production deploy.
+   Ask: _if this were unset in prod right now, would users be silently harmed?_
+   - **Yes** → add it to `next.config.ts` (`REQUIRED_ALL_DEPLOYMENTS` or
+     `REQUIRED_PRODUCTION_ONLY`) so a missing value fails the build instead of
+     degrading silently. Example: `UNSUBSCRIBE_SIGNING_SECRET` (CAN-SPAM).
+   - **No** → leave it out and document the degradation in §4.2. Example: the
+     MCP vars — unset means `/api/mcp/mcp` 401s and nothing else changes, so
+     gating the build on them only ever costs you a deploy (PP-ogzs).
+6. **Document it here** (the right §4 table) and add it to `.env.example` (and
    `.env.ci` if the CI build reads it).
-6. **Set it in Vercel** for each chosen scope (Project Settings → Environment
-   Variables).
