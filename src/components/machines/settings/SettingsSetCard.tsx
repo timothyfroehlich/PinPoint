@@ -69,18 +69,25 @@ import {
 interface SettingsSetCardProps {
   set: SettingsSetData;
   isExpanded: boolean;
-  /** Permission to edit at all (owner/tech+). Governs whether always-live
-   *  field inputs, section kebabs/grips, the set kebab, and "Add section"
-   *  render at all. Read-only viewers see none of it. */
+  /** Per-set permission to edit (owner/community rules). Governs whether
+   *  always-live field inputs, section kebabs/grips, the set kebab, "Add
+   *  section", Publish, and Tournament tagging render. Read-only viewers see
+   *  none of it. */
   canEdit: boolean;
-  /** Unsaved set (temp id). Preferred/Duplicate target a persisted row, so
-   *  they are disabled until the first save. */
+  /** Whether this viewer may set the set as the Owner's default (owner/admin on
+   *  an owner set). Gates the "Set as Owner's default" menu item specifically —
+   *  a community set is never eligible even to an editor. */
+  canSetDefault: boolean;
+  /** Unsaved set (temp id). Preferred/Duplicate/Publish target a persisted row,
+   *  so they are disabled until the first save. */
   isNew: boolean;
   onMoveSection: (sectionId: string, direction: "up" | "down") => void;
   onToggleExpand: () => void;
   onTogglePreferred: () => void;
-  /** Toggle the non-exclusive Tournament tag (prototype: client-only). */
+  /** Toggle the non-exclusive Tournament tag. */
   onToggleTournament: () => void;
+  /** Publish / unpublish the set (private draft ↔ public). */
+  onTogglePublish: () => void;
   onRename: (newName: string) => void;
   /** Called after the set-name blur so the parent can flush the auto-save
    *  debounce (plain-text blur path — Task 6 Step 9). */
@@ -237,11 +244,13 @@ export function SettingsSetCard({
   set,
   isExpanded,
   canEdit,
+  canSetDefault,
   isNew,
   onMoveSection,
   onToggleExpand,
   onTogglePreferred,
   onToggleTournament,
+  onTogglePublish,
   onRename,
   onNameBlur,
   onDuplicate,
@@ -411,6 +420,27 @@ export function SettingsSetCard({
     </Tooltip>
   );
 
+  // Kind / visibility chip. A private draft is flagged prominently so its
+  // creator knows it isn't shared yet; the ★ Owner's default badge already
+  // implies an owner set, so the default gets no extra kind chip.
+  const kindBadge = !set.isPublic ? (
+    <Badge
+      className="border-outline-variant bg-muted text-muted-foreground"
+      variant="outline"
+    >
+      Private draft
+    </Badge>
+  ) : set.isPreferred ? null : set.isOwnerSet ? (
+    <Badge
+      className="border-warning/25 bg-warning/5 text-warning"
+      variant="outline"
+    >
+      Owner
+    </Badge>
+  ) : (
+    <Badge variant="secondary">Community</Badge>
+  );
+
   // The set name — always-live input for permitted users, plain text for
   // viewers. Edits buffer into the working copy via onRename; auto-save debounce
   // handles persistence. The input is always present for permitted users so
@@ -420,9 +450,10 @@ export function SettingsSetCard({
     // <div>-in-<button> nesting when the user is a viewer.
     <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
       <span className="min-w-0 text-sm font-semibold text-foreground [overflow-wrap:anywhere]">
-        {(preferredBadge || tournamentBadge) && (
+        {(preferredBadge || tournamentBadge || kindBadge) && (
           <span className="mr-2 inline-flex flex-wrap items-center gap-1 align-middle">
             {preferredBadge}
+            {kindBadge}
             {tournamentBadge}
           </span>
         )}
@@ -508,16 +539,27 @@ export function SettingsSetCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {/* Preferred + Duplicate act on a persisted row, so they're
-                      disabled until an unsaved (temp-id) set is first saved. */}
-                  <DropdownMenuItem
-                    disabled={isNew}
-                    onSelect={onTogglePreferred}
-                  >
-                    {set.isPreferred
-                      ? "Unset owner's default"
-                      : "Set as owner's default"}
-                  </DropdownMenuItem>
+                  {/* These act on a persisted row, so they're disabled until an
+                      unsaved (temp-id) set is first saved. The Owner's default
+                      is always public, so it gets no Publish toggle. */}
+                  {!set.isPreferred && (
+                    <DropdownMenuItem
+                      disabled={isNew}
+                      onSelect={onTogglePublish}
+                    >
+                      {set.isPublic ? "Make private" : "Publish"}
+                    </DropdownMenuItem>
+                  )}
+                  {canSetDefault && (
+                    <DropdownMenuItem
+                      disabled={isNew}
+                      onSelect={onTogglePreferred}
+                    >
+                      {set.isPreferred
+                        ? "Unset owner's default"
+                        : "Set as owner's default"}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     disabled={isNew}
                     onSelect={onToggleTournament}

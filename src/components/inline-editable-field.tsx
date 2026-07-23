@@ -303,7 +303,6 @@ export function InlineEditableField({
     headingProminent &&
       "rounded-lg border border-outline-variant/60 border-l-[3px] border-l-primary bg-primary/5 px-3 py-2"
   );
-
   // Body = everything under the heading (presets + editor/display + the preset
   // confirm dialog). Shared by the plain and collapsible (<details>) layouts.
   const body = (

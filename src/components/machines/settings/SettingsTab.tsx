@@ -28,8 +28,10 @@ import { cn } from "~/lib/utils";
 import {
   deleteSettingsSetAction,
   duplicateSettingsSetAction,
+  publishSettingsSetAction,
   saveSettingsSetAction,
   setPreferredSettingsSetAction,
+  setTournamentTagAction,
   updateMachineSettingsInstructionsAction,
   updateMachineSettingsRequestsAction,
 } from "~/app/(app)/m/[initials]/(tabs)/settings/actions";
@@ -211,7 +213,18 @@ function useUnsavedChangesGuard({
 }
 
 interface SettingsTabProps {
-  canEdit: boolean;
+  /** Machine-wide gate: may this viewer CREATE a set + edit the machine-level
+   *  guidance? Per-set edit rights live on each set's `canEdit`. */
+  canCreate: boolean;
+  /** The current viewer's user id (null if anonymous) — drives the "Mine"
+   *  filter and the optimistic ownership of newly-created sets. */
+  viewerId: string | null;
+  /** The machine owner's user id — hides the redundant "Owner's" chip when the
+   *  viewer IS the owner, and derives new-set ownership. */
+  machineOwnerId: string | null;
+  /** The machine owner's display name for the "Owned by" line (name only —
+   *  CORE-SEC-007). */
+  ownerName: string | null;
   machineId: string;
   initialSets: SettingsSetData[];
   /** Machine-level "Before you change anything" — the owner's honor-system
@@ -224,7 +237,10 @@ interface SettingsTabProps {
 }
 
 export function SettingsTab({
-  canEdit,
+  canCreate,
+  viewerId,
+  machineOwnerId,
+  ownerName,
   machineId,
   initialSets,
   settingsRequests,
@@ -239,11 +255,24 @@ export function SettingsTab({
   // Preferred/Duplicate target a persisted row, so they're gated on this.
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
 
-  // Two filter toggles that AND together (intersection). "By Owner" = created
-  // by the machine owner; "Tournament" = tagged Tournament. Neither active =
-  // All (everything); both active = the intersection.
-  const [byOwnerFilter, setByOwnerFilter] = useState(false);
+  // Filter toggles that AND together (intersection). None active = All.
+  //  · Mine       — created by the viewer
+  //  · Owner's    — owner sets (the machine owner's)
+  //  · Community   — community sets that are public
+  //  · Tournament — tagged Tournament
+  const [mineFilter, setMineFilter] = useState(false);
+  const [ownersFilter, setOwnersFilter] = useState(false);
+  const [communityFilter, setCommunityFilter] = useState(false);
   const [tournamentFilter, setTournamentFilter] = useState(false);
+  const clearFilters = (): void => {
+    setMineFilter(false);
+    setOwnersFilter(false);
+    setCommunityFilter(false);
+    setTournamentFilter(false);
+  };
+  // The viewer owns this machine → their sets ARE the owner's, so the "Owner's"
+  // chip is redundant with "Mine"; hide it.
+  const viewerIsOwner = viewerId !== null && viewerId === machineOwnerId;
 
   // -- Dirty explicit-save machine-level drafts (PP-8a5r) ----------------------
   // The two machine-level InlineEditableField sections ("Before you change
@@ -566,7 +595,7 @@ export function SettingsTab({
   // (timer-only) — so a failed set with no live timer still re-persists on the
   // popstate / beforeunload / not-failed-click paths.
   useUnsavedChangesGuard({
-    enabled: canEdit,
+    enabled: canCreate,
     hasFailed: saveStatus.failedIds.size > 0,
     hasUnsaved: saveStatus.hasUnsaved,
     hasUnsavedDraft,
@@ -578,17 +607,25 @@ export function SettingsTab({
   const orderedSets = [...sets].sort(
     (a, b) => Number(b.isPreferred) - Number(a.isPreferred)
   );
-  // Active toggles AND together (intersection); neither active shows all.
+  // Active toggles AND together (intersection); none active shows all.
+  const isCommunity = (s: SettingsSetData): boolean =>
+    !s.isOwnerSet && s.isPublic;
+  const isMine = (s: SettingsSetData): boolean =>
+    viewerId !== null && s.createdById === viewerId;
   const matchesFilter = (s: SettingsSetData): boolean => {
-    if (byOwnerFilter && !s.createdByOwner) return false;
+    if (mineFilter && !isMine(s)) return false;
+    if (ownersFilter && !s.isOwnerSet) return false;
+    if (communityFilter && !isCommunity(s)) return false;
     if (tournamentFilter && !s.isTournament) return false;
     return true;
   };
   const visibleSets = orderedSets.filter(matchesFilter);
-  const showingAll = !byOwnerFilter && !tournamentFilter;
-  const ownerCount = sets.filter((s) => s.createdByOwner).length;
+  const showingAll =
+    !mineFilter && !ownersFilter && !communityFilter && !tournamentFilter;
+  const mineCount = sets.filter(isMine).length;
+  const ownerCount = sets.filter((s) => s.isOwnerSet).length;
+  const communityCount = sets.filter(isCommunity).length;
   const tournamentCount = sets.filter((s) => s.isTournament).length;
-  const atSetLimit = sets.length >= 10;
 
   function removeLocal(id: string): void {
     mutateSets((prev) => prev.filter((s) => s.id !== id));
@@ -646,21 +683,46 @@ export function SettingsTab({
     }
   }
 
-  // PROTOTYPE (backend stubbed): client-only optimistic toggle of the
-  // non-exclusive Tournament tag. The real implementation wires
-  // setTournamentSettingsSetAction (mirrors setPreferredSettingsSetAction minus
-  // the exclusive-clear, no unique index, no timeline emit) against a migrated
-  // `isTournament` column. See the .prototype-mode ledger.
-  function toggleTournament(id: string): void {
+  // Write a boolean row-flag (Tournament / public) to both the working copy and
+  // every baseline so it never reads as a pending auto-save edit.
+  function writeFlag(
+    id: string,
+    key: "isTournament" | "isPublic",
+    value: boolean
+  ): void {
+    const apply = (s: SettingsSetData): SettingsSetData =>
+      s.id === id ? { ...s, [key]: value } : s;
+    mutateSets((prev) => prev.map(apply));
+    for (const [bid, b] of baselineRef.current) {
+      baselineRef.current.set(bid, apply(b));
+    }
+  }
+
+  // Toggle the non-exclusive Tournament tag (optimistic; revert on failure).
+  async function toggleTournament(id: string): Promise<void> {
     if (newIds.has(id)) return;
     const set = sets.find((s) => s.id === id);
     if (!set) return;
     const next = !set.isTournament;
-    const apply = (s: SettingsSetData): SettingsSetData =>
-      s.id === id ? { ...s, isTournament: next } : s;
-    mutateSets((prev) => prev.map(apply));
-    for (const [bid, b] of baselineRef.current) {
-      baselineRef.current.set(bid, apply(b));
+    writeFlag(id, "isTournament", next);
+    const result = await setTournamentTagAction({ id, isTournament: next });
+    if (!result.success) {
+      toast.error(result.error);
+      writeFlag(id, "isTournament", !next);
+    }
+  }
+
+  // Publish / unpublish a set (optimistic; revert on failure).
+  async function togglePublish(id: string): Promise<void> {
+    if (newIds.has(id)) return;
+    const set = sets.find((s) => s.id === id);
+    if (!set) return;
+    const next = !set.isPublic;
+    writeFlag(id, "isPublic", next);
+    const result = await publishSettingsSetAction({ id, isPublic: next });
+    if (!result.success) {
+      toast.error(result.error);
+      writeFlag(id, "isPublic", !next);
     }
   }
 
@@ -683,8 +745,14 @@ export function SettingsTab({
       id: result.id,
       name: `${original.name.slice(0, NAME_MAX - COPY_SUFFIX.length)}${COPY_SUFFIX}`,
       isPreferred: false,
-      isTournament: false,
-      createdByOwner: false,
+      // Fresh private draft owned by the duplicator; ownership re-derived, but
+      // the Tournament tag carries over from the original.
+      isOwnerSet: viewerIsOwner,
+      isPublic: false,
+      isTournament: original.isTournament,
+      createdById: viewerId,
+      canEdit: true,
+      canSetDefault: viewerIsOwner,
       updatedBy: "You",
       updatedAt: today(),
       sections: original.sections.map(cloneSection),
@@ -713,14 +781,21 @@ export function SettingsTab({
 
   function addNewSet(): void {
     const id = makeTempSetId();
+    // Mirror the server's create rules optimistically: a set the owner makes is
+    // an owner set; the owner's first set (no existing default) auto-becomes the
+    // Owner's default and is published. Everyone else's is a private draft.
+    const isOwnerSet = viewerIsOwner;
+    const autoDefault = isOwnerSet && !sets.some((s) => s.isPreferred);
     const newSet: SettingsSetData = {
       id,
       name: "",
-      isPreferred: false,
+      isPreferred: autoDefault,
+      isOwnerSet,
+      isPublic: autoDefault,
       isTournament: false,
-      // PROTOTYPE: the client doesn't know if the viewer is the owner, so a
-      // new set isn't marked owner-created. Real impl derives from createdBy.
-      createdByOwner: false,
+      createdById: viewerId,
+      canEdit: true,
+      canSetDefault: isOwnerSet,
       updatedBy: "You",
       updatedAt: today(),
       description: null,
@@ -1088,7 +1163,7 @@ export function SettingsTab({
           label="Before you change anything"
           value={settingsRequests}
           machineId={machineId}
-          canEdit={canEdit}
+          canEdit={canCreate}
           icon={<Info className="size-4 shrink-0 text-primary" aria-hidden />}
           placeholder="How would you like people to handle your machine's settings — who to ask, how to make changes, anything to avoid? Even one sentence protects the setup you've dialed in."
           testId="machine-settings-requests"
@@ -1111,7 +1186,7 @@ export function SettingsTab({
           label="How to change settings"
           value={settingsInstructions}
           machineId={machineId}
-          canEdit={canEdit}
+          canEdit={canCreate}
           icon={<Wrench className="size-4 shrink-0 text-primary" aria-hidden />}
           placeholder="How to change the settings on this machine — menus, button meanings, where the DIP switches are. Or start from a preset above."
           testId="machine-settings-instructions"
@@ -1133,6 +1208,13 @@ export function SettingsTab({
         />
       </div>
 
+      {ownerName !== null && (
+        <p className="text-xs text-muted-foreground">
+          Owned by{" "}
+          <span className="font-medium text-foreground">{ownerName}</span>
+        </p>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div
           className="flex flex-wrap items-center gap-1.5"
@@ -1146,18 +1228,38 @@ export function SettingsTab({
                 label: "All",
                 count: sets.length,
                 active: showingAll,
+                show: true,
+                onClick: clearFilters,
+              },
+              {
+                key: "mine",
+                label: "Mine",
+                count: mineCount,
+                active: mineFilter,
+                show: viewerId !== null && mineCount > 0,
                 onClick: () => {
-                  setByOwnerFilter(false);
-                  setTournamentFilter(false);
+                  setMineFilter((v) => !v);
                 },
               },
               {
                 key: "owner",
-                label: "By Owner",
+                label: "Owner's",
                 count: ownerCount,
-                active: byOwnerFilter,
+                active: ownersFilter,
+                // Redundant with "Mine" when the viewer is the machine owner.
+                show: !viewerIsOwner,
                 onClick: () => {
-                  setByOwnerFilter((v) => !v);
+                  setOwnersFilter((v) => !v);
+                },
+              },
+              {
+                key: "community",
+                label: "Community",
+                count: communityCount,
+                active: communityFilter,
+                show: true,
+                onClick: () => {
+                  setCommunityFilter((v) => !v);
                 },
               },
               {
@@ -1165,55 +1267,45 @@ export function SettingsTab({
                 label: "Tournament",
                 count: tournamentCount,
                 active: tournamentFilter,
+                show: true,
                 onClick: () => {
                   setTournamentFilter((v) => !v);
                 },
               },
             ] as const
-          ).map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              aria-pressed={chip.active}
-              onClick={chip.onClick}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors motion-reduce:transition-none",
-                chip.active
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-outline-variant text-muted-foreground hover:bg-muted"
-              )}
-            >
-              {chip.label}{" "}
-              <span className={chip.active ? "opacity-80" : "opacity-60"}>
-                {String(chip.count)}
-              </span>
-            </button>
-          ))}
+          )
+            .filter((chip) => chip.show)
+            .map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                aria-pressed={chip.active}
+                onClick={chip.onClick}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors motion-reduce:transition-none",
+                  chip.active
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-outline-variant text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {chip.label}{" "}
+                <span className={chip.active ? "opacity-80" : "opacity-60"}>
+                  {String(chip.count)}
+                </span>
+              </button>
+            ))}
         </div>
-        {canEdit && (
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                "text-xs tabular-nums",
-                atSetLimit
-                  ? "font-medium text-warning"
-                  : "text-muted-foreground"
-              )}
-              title="Up to 10 settings sets per machine"
-            >
-              {String(sets.length)} / 10
-            </span>
-            <Button size="sm" onClick={addNewSet} disabled={atSetLimit}>
-              <Plus aria-hidden="true" />
-              New set
-            </Button>
-          </div>
+        {canCreate && (
+          <Button size="sm" onClick={addNewSet}>
+            <Plus aria-hidden="true" />
+            New set
+          </Button>
         )}
       </div>
 
       {sets.length === 0 ? (
         <p className="rounded-lg border border-dashed border-outline-variant py-8 text-center text-sm text-muted-foreground">
-          {canEdit ? (
+          {canCreate ? (
             <>
               No settings sets yet. Click <strong>New set</strong> above to
               create one.
@@ -1224,13 +1316,7 @@ export function SettingsTab({
         </p>
       ) : visibleSets.length === 0 ? (
         <p className="rounded-lg border border-dashed border-outline-variant py-8 text-center text-sm text-muted-foreground">
-          No{" "}
-          {byOwnerFilter && tournamentFilter
-            ? "owner-created Tournament"
-            : byOwnerFilter
-              ? "owner-created"
-              : "Tournament"}{" "}
-          sets on this machine.
+          No settings sets match the current filters.
         </p>
       ) : (
         <div className="space-y-3 max-md:space-y-2">
@@ -1239,7 +1325,8 @@ export function SettingsTab({
               key={set.id}
               set={set}
               isExpanded={expandedIds.has(set.id)}
-              canEdit={canEdit}
+              canEdit={set.canEdit}
+              canSetDefault={set.canSetDefault}
               isNew={newIds.has(set.id)}
               onNameBlur={() => {
                 stagePayload(set.id);
@@ -1255,7 +1342,10 @@ export function SettingsTab({
                 void togglePreferred(set.id);
               }}
               onToggleTournament={() => {
-                toggleTournament(set.id);
+                void toggleTournament(set.id);
+              }}
+              onTogglePublish={() => {
+                void togglePublish(set.id);
               }}
               onRename={(name) => {
                 renameSet(set.id, name);
