@@ -174,23 +174,18 @@ check_unresolved_threads() {
 # it self-expiring — a later fix changes the head SHA and re-arms the gate.
 #   - Claude marker matches head SHA            → PASS
 #   - Copilot review covers head (review>=head) → PASS
-#   - Dependabot-authored PR, no review         → SKIP (see below)
 #   - no review, head age < threshold           → WAIT (still inside Copilot window)
 #   - no review, head age >= threshold          → FAIL
 #
-# Dependabot exemption (PP-c0uy): Copilot does not review Dependabot PRs — GitHub
-# never issues one, so the gate's "wait for Copilot" path can never resolve and the
-# gate hard-FAILs every Dependabot PR once head is >600s old (verified 2026-07-24 on
-# PRs #1725 and #1731: `FAIL: reviewed: head commit has no Copilot or Claude review`,
-# `SKIP: currency: no Copilot reviews exist for this PR`). Since `--dependabot` in
-# merge-pr.sh forbids `--force`, leaving this as a FAIL would make that path
-# permanently unusable. The exemption is deliberately keyed on *authorship*, not on
-# which merge-pr.sh flag was passed — the reason it applies (no Copilot review is
-# ever issued) is a property of the PR, not of who is merging it. The review
-# substitute for these PRs is the agent/human reading the diff before merging, plus
-# the `--dependabot` path's own authorship + all-commits + path-allowlist guards.
-# A Claude marker (mark-claude-review.sh) still PASSes ahead of this and is the
-# stronger option when you want an on-PR audit trail.
+# Dependabot PRs (PP-c0uy): GitHub never issues a Copilot review for these, so this
+# gate FAILs every one of them once head is >600s old (verified 2026-07-24 on #1725
+# and #1731). That is deliberate and is NOT exempted — the `--dependabot` merge path
+# forbids `--force`, so the ONLY way past this gate on a Dependabot PR is for an
+# agent to actually review the diff and then post the SHA-pinned marker with
+# `mark-claude-review.sh`. That ordering is the mechanical expression of "an agent
+# exercised judgement", which is the entire reason the carve-out exists. An
+# authorship-keyed SKIP was considered and rejected: it would have let Dependabot
+# PRs merge with nothing having reviewed them.
 check_review_happened() {
   local pr=$1
   local owner_repo head_sha head_date latest_review elapsed
@@ -234,15 +229,6 @@ check_review_happened() {
 
   if [ -n "$latest_review" ] && [ "$review_epoch" -ge "$head_epoch" ]; then
     echo "PASS: reviewed: Copilot review covers head commit"
-    return 0
-  fi
-
-  # Dependabot exemption — no Copilot review is ever issued for these, so neither
-  # WAIT nor FAIL below can ever resolve. See the header comment for the rationale.
-  local pr_author
-  pr_author=$(gh pr view "$pr" --json author --jq '.author.login')
-  if is_dependabot_login "$pr_author"; then
-    echo "SKIP: reviewed: Dependabot-authored PR (GitHub issues no Copilot review for these)"
     return 0
   fi
 

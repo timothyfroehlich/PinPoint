@@ -258,7 +258,7 @@ Combine `--force --bypass-merge-requirements` to bypass `currency` + `threads` +
 The `no_conflict` gate is NEVER bypassable — GitHub rejects conflicting merges regardless of `--admin`.
 Neither flag may be combined with `--dependabot` — the script rejects that outright.
 
-`merge-pr.sh` evaluates **5 gates**: `ci`, `currency`, `threads`, `reviewed`, `no_conflict`. The `reviewed` gate is the hard backstop that no head commit merges unreviewed — prefer running the Claude fallback (Phase 3.4) to satisfy it before handoff, rather than telling Tim to `--force` past it. The one structural exemption: on a **Dependabot-authored** PR the `reviewed` gate emits `SKIP` instead of `FAIL`, because GitHub never issues a Copilot review for those, so neither the WAIT nor the PASS path can ever resolve. That exemption is keyed on PR authorship, not on which flag was passed.
+`merge-pr.sh` evaluates **5 gates**: `ci`, `currency`, `threads`, `reviewed`, `no_conflict`. The `reviewed` gate is the hard backstop that no head commit merges unreviewed — prefer running the Claude fallback (Phase 3.4) to satisfy it before handoff, rather than telling Tim to `--force` past it. It has **no exemptions**, including for Dependabot PRs: since GitHub issues no Copilot review for those and `--dependabot` forbids `--force`, the SHA-pinned Claude marker is the only way past it (§4.6).
 
 ### 4.3 Interpret output (for reading over Tim's shoulder / diagnosing a FAIL he reports)
 
@@ -309,10 +309,26 @@ There is no hook bypass — that channel was removed entirely (PP-wi85). If a ho
 
 This is the **only** merge an agent may perform. Everything about it is deliberately narrow.
 
+**The required sequence is review → attest → merge. All three steps, in that order, every time:**
+
 ```bash
-scripts/workflow/merge-pr.sh <PR> --dependabot            # merge
-scripts/workflow/merge-pr.sh <PR> --dependabot --dry-run  # preview gates + preconditions
+# 1. Preview. Confirms the PR is carve-out-eligible before you spend review effort.
+scripts/workflow/merge-pr.sh <PR> --dependabot --dry-run
+
+# 2. REVIEW THE DIFF YOURSELF (4.6.2 / 4.6.3). This is the step the whole carve-out exists for.
+
+# 3. Attest to what you reviewed — SHA-pinned to the current head commit.
+bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings>"
+
+# 4. Merge.
+scripts/workflow/merge-pr.sh <PR> --dependabot
 ```
+
+Step 3 is **not optional and not a formality**. The `reviewed` gate is deliberately _not_ waived for Dependabot PRs: GitHub never issues a Copilot review for them, and `--dependabot` forbids `--force`, so the SHA-pinned Claude marker is the **only** way past that gate. That is by design — Tim declined a metadata-only CI auto-merge specifically because he wanted agent judgement in the loop, and the marker is the mechanical expression of "an agent looked at this head commit." An authorship-keyed SKIP was considered and rejected: it would have let Dependabot PRs merge with nothing having reviewed them at all.
+
+The marker is an **honesty contract** — `mark-claude-review.sh` only attests; it does not verify. Never post it for a diff you have not actually read. Because it is pinned to the head SHA, a `@dependabot rebase` or any new push invalidates it and you must review and re-attest.
+
+(The separate `currency` gate is _not_ a problem here — with zero Copilot reviews it emits `SKIP: currency: no Copilot reviews exist for this PR` and passes on its own.)
 
 #### 4.6.1 What the script enforces mechanically
 
@@ -336,11 +352,26 @@ A Dependabot PR body embeds the upstream package's release notes and changelog *
 - **Major version bumps go to Tim, not the agent.** The carve-out is mechanically capable of merging a major, but the standing guidance is to escalate: hand him `! scripts/workflow/merge-pr.sh <PR> --human` and say why. (This is a conservative default, not something Tim specified — he can relax it.)
 - **Anything anomalous → escalate, don't merge.** Unexpected files in the diff, a dependency nobody recognizes, a version jump that doesn't match the PR title, a lockfile diff far larger than the bump implies, a `postinstall`/script addition. When the shape of the change surprises you, the answer is Tim.
 
-#### 4.6.3 Before you run it
+#### 4.6.3 What "review the diff" actually means here
 
-- CI Gate green (the `ci` gate will refuse otherwise — there is no bypass on this path).
-- You have actually looked at the diff, not just the title.
-- No unresolved review threads (the `threads` gate enforces this).
+This is the substance you are attesting to in step 3. Work through it before posting the marker.
+
+- **CI Gate green.** The `ci` gate refuses otherwise and there is no bypass on this path.
+- **The version delta matches the title.** A PR titled "bump X from 2.1.1 to 3.0.0" whose diff moves something else, or moves further than claimed, is an escalation.
+- **The lockfile diff is proportionate.** A patch bump that rewrites hundreds of unrelated entries, or pulls in a dependency nobody recognizes, is an escalation.
+- **No `postinstall`/lifecycle-script additions** sneaking in with the bump.
+- **For GitHub Actions bumps: verify the pinned SHA actually corresponds to the claimed tag.** Actions are SHA-pinned with a `# ratchet:owner/action@vX.Y.Z` comment. The comment is _just a comment_ — nothing enforces that it matches the SHA next to it, so a lying ratchet comment is exactly how a malicious action bump would hide. Check it against the upstream tag:
+
+  ```bash
+  # Does the SHA in the diff really belong to the tag the ratchet comment claims?
+  gh api repos/<owner>/<action>/git/ref/tags/<vX.Y.Z> --jq '.object.sha, .object.type'
+  # For an annotated tag (type=tag), deref to the commit:
+  gh api repos/<owner>/<action>/git/tags/<tag_object_sha> --jq '.object.sha'
+  ```
+
+  A mismatch is not a nit — stop and escalate to Tim.
+
+- **No unresolved review threads** (the `threads` gate enforces this).
 - If two or more lockfile-touching Dependabot PRs are open, apply the rebase rule in 4.6.4 first.
 
 Say "merged" only after the script prints `MERGED: PR #<n>` — and then watch the production deploy land (AGENTS.md §9 step 6), same as any other merge.

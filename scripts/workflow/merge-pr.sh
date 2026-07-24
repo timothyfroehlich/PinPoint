@@ -220,6 +220,9 @@ if [ "$DEPENDABOT" = "true" ]; then
     exit 1
   fi
   echo "  PASS: dependabot-files: all changed files within the dependency-bump allowlist"
+  echo "  NOTE: the reviewed gate is NOT waived here. GitHub issues no Copilot review for"
+  echo "        Dependabot PRs, so it passes only via a SHA-pinned Claude review marker —"
+  echo "        review the diff first, then: bash scripts/workflow/mark-claude-review.sh $PR \"<findings>\""
 fi
 
 # --- Run all 5 gates, collect statuses ---
@@ -270,6 +273,13 @@ run_gate no_conflict check_no_merge_conflict   none
 # --- Decide ---
 if [ ${#GATE_FAILURES[@]} -gt 0 ]; then
   echo "RESULT: ${#GATE_FAILURES[@]} gate(s) failed: ${GATE_FAILURES[*]}"
+  # The reviewed gate is the expected first failure on a Dependabot PR — Copilot never
+  # reviews them, so it passes only once an agent has reviewed the diff and attested.
+  if [ "$DEPENDABOT" = "true" ] && [[ " ${GATE_FAILURES[*]} " == *" reviewed "* ]]; then
+    echo "HINT: review the diff yourself (version delta + lockfile + any workflow SHA pins),"
+    echo "      then attest: bash scripts/workflow/mark-claude-review.sh $PR \"<one-line findings>\""
+    echo "      Do NOT attest without actually reviewing — the marker is an honesty contract."
+  fi
   if [ "$DRY_RUN" = "true" ]; then
     echo "DRY RUN: would remove ready-for-review label if present"
     exit 1
