@@ -120,7 +120,11 @@ the degradation is a known, documented choice — not an oversight.
 > correctly stay in Vault: those are per-user identity arriving at runtime through
 > a connect flow. Set it in Vercel production only —
 > `vercel env add PINBALLMAP_API_TOKEN production --no-sensitive` (non-sensitive
-> so it stays readable back; the token grants reads only). **Deliberately not
+> so the value stays readable back — Vercel's default sensitive type is
+> write-only). The token alone cannot authorize a write: PBM writes additionally
+> require the per-operator `user_email` + `user_token`, so the blast radius of a
+> leak is quota abuse against our shared 120/min limit and traffic attributed to
+> us, not data modification. **Deliberately not
 > build-gated:** without it PBM sync degrades and every other surface works, so it
 > fails the §4.1 "is PinPoint broken without this?" test. Setting it does not turn
 > PBM on — `pinballmap_state.enabled` gates that separately (PP-o355.10).

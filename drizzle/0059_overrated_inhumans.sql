@@ -10,18 +10,31 @@
 --    with nothing left referencing it. NULL pointer (the expected state in prod,
 --    which was never provisioned) or a missing singleton row selects zero rows and
 --    is a no-op; local and preview DBs may have a real secret seeded by the
---    now-deleted db:reset step. Deleted straight from `vault.secrets` (which the
---    migrating `postgres` role has DELETE on) rather than through a
---    `vault.delete_secret()` helper — supabase_vault ships `create_secret` and
---    `update_secret` only, with no delete counterpart (verified against the local
---    stack; see PP-w3d9).
-DELETE FROM vault.secrets
- WHERE id IN (
-   SELECT api_token_vault_id
-     FROM pinballmap_state
-    WHERE id = 'singleton'
-      AND api_token_vault_id IS NOT NULL
- );--> statement-breakpoint
+--    now-deleted db:reset step. Deleted straight from `vault.secrets` rather than
+--    through a `vault.delete_secret()` helper — supabase_vault 0.3.1 ships
+--    `create_secret` and `update_secret` only, with no delete counterpart
+--    (verified against both the local stack and PinPoint-Prod; see PP-w3d9).
+--
+--    Wrapped so a missing DELETE privilege cannot abort the migration. Postgres
+--    checks the table ACL at execution time, NOT per row, so on a DB whose
+--    migrating role lacks DELETE on vault.secrets this would throw even though it
+--    matches zero rows — and `vercel-build` runs `migrate:production` BEFORE
+--    `next build`, so it would fail the deploy. Preview branch DBs are already
+--    known to be privilege-restricted (see scripts/migrate-production.ts on
+--    CREATE SCHEMA). Skipping cleanup there leaves an orphaned encrypted secret,
+--    which is strictly better than a broken deploy. Only insufficient_privilege is
+--    swallowed — anything else still fails loudly.
+DO $$ BEGIN
+  DELETE FROM vault.secrets
+   WHERE id IN (
+     SELECT api_token_vault_id
+       FROM pinballmap_state
+      WHERE id = 'singleton'
+        AND api_token_vault_id IS NOT NULL
+   );
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'skipping vault secret cleanup: no DELETE privilege on vault.secrets';
+END $$;--> statement-breakpoint
 
 -- 2. Drop the SECURITY DEFINER read RPC (0057). Nothing calls it: api-token.ts now
 --    reads process.env, so this also retires the hand-rolled auth.role() guard that
