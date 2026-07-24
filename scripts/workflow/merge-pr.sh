@@ -166,6 +166,14 @@ if [ "$DEPENDABOT" = "true" ]; then
     echo "REFUSE: --dependabot could not read the PR's commit authors (empty result) — failing closed." >&2
     exit 1
   fi
+  # gh's GraphQL commit list caps at 100. Dependabot force-pushes a single commit, so
+  # anywhere near the cap means either not-a-Dependabot-PR or a list we can't fully see.
+  COMMIT_COUNT=$(gh pr view "$PR" --json commits --jq '.commits | length')
+  if [ "$COMMIT_COUNT" -ge 100 ]; then
+    echo "REFUSE: --dependabot saw $COMMIT_COUNT commits — at/over gh's 100-commit list cap, so the" >&2
+    echo "        all-commits-Dependabot-authored check cannot see the whole history. Failing closed." >&2
+    exit 1
+  fi
   NON_BOT_COMMIT_AUTHORS=()
   while IFS= read -r commit_author; do
     [ -z "$commit_author" ] && continue
