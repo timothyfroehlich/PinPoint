@@ -62,6 +62,17 @@ updates:
     # 2 week cooldown for all GitHub Actions updates
     cooldown:
       default-days: 14
+    groups:
+      # One PR per weekly wave instead of one per action. Without this key every
+      # action bump opened its own PR (e.g. #1725 + #1726), multiplying the
+      # review/merge cycles for what is functionally a single maintenance batch.
+      # Mirrors the npm block's minor-patch-updates group; no patterns/update-types
+      # filter, so majors ride along in the same PR — the cooldown already holds
+      # them 14 days and the reviewer still sees each bump in the diff. (PP-c0uy)
+      github-actions:
+        applies-to: version-updates
+        patterns:
+          - "*"
     labels:
       - "dependencies"
       - "github-actions"

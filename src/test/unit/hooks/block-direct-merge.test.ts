@@ -1,8 +1,9 @@
 // Unit tests for .claude/hooks/block-direct-merge.cjs — the PreToolUse hook
-// that blocks ALL agent-initiated PR merges (PP-wi85). Merging is human-only:
-// there is no agent-usable bypass. The only merge channel is a human typing a
-// `!`-prefixed command in Claude Code, which never generates a PreToolUse
-// event and so is outside this hook's reach entirely.
+// that blocks agent-initiated PR merges (PP-wi85). Merging is human-only, with
+// exactly one carve-out (PP-c0uy): `merge-pr.sh <PR> --dependabot` with none of
+// --human/--force/--bypass-merge-requirements. Everything else stays blocked; the
+// human channel is a `!`-prefixed command in Claude Code, which never generates a
+// PreToolUse event and so is outside this hook's reach entirely.
 //
 // Exercises the hook as a subprocess (spawnSync node hookPath, JSON on stdin)
 // — matches the pattern used by verify-guard-stack.test.ts.
@@ -178,6 +179,101 @@ describe("block-direct-merge.cjs — merge-pr.sh (PP-wi85 hard gate)", () => {
       )
     );
     expect(status).toBe(0);
+  });
+});
+
+describe("block-direct-merge.cjs — Dependabot carve-out (PP-c0uy)", () => {
+  it("ALLOWS `merge-pr.sh <PR> --dependabot`", () => {
+    const { status } = runHook(
+      bashPayload("scripts/workflow/merge-pr.sh 123 --dependabot")
+    );
+    expect(status).toBe(0);
+  });
+
+  it("allows the carve-out with a path prefix and --dry-run", () => {
+    const { status } = runHook(
+      bashPayload("./scripts/workflow/merge-pr.sh 123 --dependabot --dry-run")
+    );
+    expect(status).toBe(0);
+  });
+
+  it("allows the carve-out under a `bash` wrapper", () => {
+    const { status } = runHook(
+      bashPayload("bash scripts/workflow/merge-pr.sh 123 --dependabot")
+    );
+    expect(status).toBe(0);
+  });
+
+  it("blocks `--dependabot --force`", () => {
+    const { status, stderr } = runHook(
+      bashPayload("scripts/workflow/merge-pr.sh 123 --dependabot --force")
+    );
+    expect(status).toBe(2);
+    expect(stderr).toContain("Merge is human-only.");
+  });
+
+  it("blocks `--dependabot --bypass-merge-requirements`", () => {
+    const { status } = runHook(
+      bashPayload(
+        "scripts/workflow/merge-pr.sh 123 --dependabot --bypass-merge-requirements"
+      )
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks `--dependabot --human`", () => {
+    const { status, stderr } = runHook(
+      bashPayload("scripts/workflow/merge-pr.sh 123 --dependabot --human")
+    );
+    expect(status).toBe(2);
+    expect(stderr).toContain("Merge is human-only.");
+  });
+
+  it("blocks two merge-pr.sh invocations even when the first carries --dependabot", () => {
+    // The flag scan is global over the command string, so a second invocation
+    // could otherwise ride in behind one allowed shape.
+    const { status } = runHook(
+      bashPayload(
+        "scripts/workflow/merge-pr.sh 123 --dependabot && scripts/workflow/merge-pr.sh 456 --dependabot"
+      )
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks a quoted `--dependabot` (fail closed — quote-stripping hides the flag)", () => {
+    const { status } = runHook(
+      bashPayload('scripts/workflow/merge-pr.sh 123 "--dependabot"')
+    );
+    expect(status).toBe(2);
+  });
+
+  it("still blocks plain `merge-pr.sh <PR>` with no --dependabot", () => {
+    const { status, stderr } = runHook(
+      bashPayload("scripts/workflow/merge-pr.sh 123")
+    );
+    expect(status).toBe(2);
+    expect(stderr).toContain("Merge is human-only.");
+  });
+
+  it("still blocks `gh pr merge` regardless of a --dependabot mention", () => {
+    const { status, stderr } = runHook(
+      bashPayload("gh pr merge 123 --squash --dependabot")
+    );
+    expect(status).toBe(2);
+    expect(stderr).toContain("Direct merge blocked: gh pr merge");
+  });
+
+  it("still blocks the MCP merge regardless of the carve-out", () => {
+    const { status } = runHook({
+      tool_name: "mcp__github__merge_pull_request",
+      tool_input: { owner: "o", repo: "r", pullNumber: 123 },
+    });
+    expect(status).toBe(2);
+  });
+
+  it("mentions the carve-out shape in the merge-pr.sh refusal message", () => {
+    const { stderr } = runHook(bashPayload("scripts/workflow/merge-pr.sh 123"));
+    expect(stderr).toContain("merge-pr.sh <PR> --dependabot");
   });
 });
 

@@ -1,16 +1,32 @@
 #!/usr/bin/env node
 // .claude/hooks/block-direct-merge.cjs
-// PreToolUse hook: blocks ALL agent-initiated PR merges. There is no agent-usable
-// bypass — merging is human-only (PP-wi85). The only merge channel left is a human
-// typing a `!`-prefixed command in Claude Code, which does not generate a
-// PreToolUse event and so is never seen by this hook.
+// PreToolUse hook: blocks agent-initiated PR merges (PP-wi85).
 //
-// Blocks three shapes:
+// Blocks four shapes:
 //   1. `gh pr merge` (direct CLI merge)
 //   2. `gh api .../pulls/N/merge` with a write method (REST merge)
 //   3. `scripts/workflow/merge-pr.sh` (the gate-enforced merge script itself —
 //      gate-enforcement is not a substitute for human sign-off)
 //   4. mcp__github__merge_pull_request (MCP merge)
+//
+// ONE exception (PP-c0uy — the Dependabot carve-out): a `merge-pr.sh` invocation
+// that carries `--dependabot` and none of `--human` / `--force` /
+// `--bypass-merge-requirements` is allowed through. Nothing else changes; shapes
+// 1, 2 and 4 stay blocked unconditionally, as does every other `merge-pr.sh` shape.
+//
+// HONEST STATEMENT OF WHAT THIS HOOK NOW GUARANTEES:
+// This hook sees only the command string. It CANNOT verify that the PR number in
+// that string is actually Dependabot-authored, that every commit on it is
+// bot-authored, or that the diff stays inside the dependency-bump path allowlist.
+// It is, for this one path, a coarse *shape* filter — nothing more. The
+// authoritative check is inside merge-pr.sh itself, which re-derives all three
+// preconditions from the GitHub API and hard-REFUSEs on any failure. Before
+// PP-c0uy this hook was a complete boundary ("no agent merge, period"); it is not
+// that anymore, and no amount of regex here can restore it. Treat merge-pr.sh's
+// preconditions as the security boundary and this hook as defense-in-depth.
+//
+// The human channel is unchanged: a `!`-prefixed command in Claude Code does not
+// generate a PreToolUse event and so is never seen by this hook.
 
 let input = "";
 process.stdin.on("data", (c) => (input += c));
@@ -71,8 +87,32 @@ process.stdin.on("end", () => {
         "merge-pr\\.sh\\b"
     );
     if (mergeScript.test(stripped)) {
-      isMergeScriptAttempt = true;
-      detail = "scripts/workflow/merge-pr.sh";
+      // Dependabot carve-out (PP-c0uy): permit exactly one shape — a SINGLE
+      // merge-pr.sh invocation carrying --dependabot and none of the flags that
+      // would widen it. Every check runs against `stripped`, so a flag mentioned
+      // inside quotes doesn't count as present (fail-closed: a quoted
+      // `"--dependabot"` reads as absent and stays blocked).
+      //
+      // The single-invocation requirement closes the compound-command seam:
+      // `merge-pr.sh 1 --dependabot && merge-pr.sh 2 --human` would otherwise
+      // present one allowed shape and smuggle a second call past the flag scan,
+      // which is done globally over the whole command string rather than
+      // per-segment.
+      const mergeScriptGlobal = new RegExp(mergeScript.source, "g");
+      const invocationCount = (stripped.match(mergeScriptGlobal) || []).length;
+      const wideningFlag =
+        /--human\b/.test(stripped) ||
+        /--force\b/.test(stripped) ||
+        /--bypass-merge-requirements\b/.test(stripped);
+      const dependabotCarveOut =
+        invocationCount === 1 &&
+        /--dependabot\b/.test(stripped) &&
+        !wideningFlag;
+
+      if (!dependabotCarveOut) {
+        isMergeScriptAttempt = true;
+        detail = "scripts/workflow/merge-pr.sh";
+      }
     }
   } else if (tool === "mcp__github__merge_pull_request") {
     isMergeAttempt = true;
@@ -83,7 +123,9 @@ process.stdin.on("end", () => {
     console.error(
       "Merge is human-only. You cannot run merge-pr.sh. Finish the PR (CI green, reviews " +
         "resolved, screenshots posted if UI), then hand Tim the exact command to run himself: " +
-        "! scripts/workflow/merge-pr.sh <PR> --human"
+        "! scripts/workflow/merge-pr.sh <PR> --human\n" +
+        "(The only agent-usable shape is `merge-pr.sh <PR> --dependabot` on a Dependabot " +
+        "dependency-bump PR, with no --human/--force/--bypass-merge-requirements.)"
     );
     process.exit(2);
   }
@@ -92,9 +134,11 @@ process.stdin.on("end", () => {
     process.exit(0);
   }
 
-  // Block. No bypass sentinel — merging has no agent-usable escape hatch under
-  // the hard gate (PP-wi85). If merge-pr.sh itself is broken and a hotfix must
-  // ship, that is a human decision made in a human-run shell, not a hook bypass.
+  // Block. No bypass sentinel — `gh pr merge`, `gh api ... /merge` and the MCP merge
+  // have no agent-usable escape hatch (PP-wi85); the Dependabot carve-out (PP-c0uy)
+  // applies only to merge-pr.sh, which enforces its own preconditions. If merge-pr.sh
+  // itself is broken and a hotfix must ship, that is a human decision made in a
+  // human-run shell, not a hook bypass.
   console.error(
     `Direct merge blocked: ${detail}. Merging is human-only — hand Tim the exact command to ` +
       "run himself: ! scripts/workflow/merge-pr.sh <PR> --human"
