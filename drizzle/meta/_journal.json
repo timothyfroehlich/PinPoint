@@ -414,6 +414,13 @@
       "when": 1784687613386,
       "tag": "0058_greedy_firelord",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1784933489546,
+      "tag": "0059_overrated_inhumans",
+      "breakpoints": true
     }
   ]
 }
