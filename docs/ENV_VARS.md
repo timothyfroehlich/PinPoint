@@ -79,21 +79,15 @@ Sensitivity: 🔴 secret · 🟢 public config.
 | `NEXT_PUBLIC_SUPABASE_URL` (`SUPABASE_URL`)                              | 🟢    | ✅   | ✅             | ✅  | ✅        | `src/lib/supabase/env.ts`                         | throws in `getSupabaseEnv()`                   |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) | 🟢    | ✅   | ✅             | ✅  | ✅        | `src/lib/supabase/env.ts`                         | throws in `getSupabaseEnv()`                   |
 | `NEXT_PUBLIC_SITE_URL`                                                   | 🟢    | ✅   | 🔁`VERCEL_URL` | ⚪  | ✅        | `src/lib/url.ts`                                  | `requireSiteUrl()` throws in prod if localhost |
-| `MCP_BEARER_TOKEN`                                                       | 🔴    | ✅   | ⚪             | ⚪  | ⚪        | `src/lib/mcp/verify-token.ts`                     | MCP auth fails closed (401) if unset           |
-| `MCP_ADMIN_USER_ID`                                                      | 🔴    | ✅   | ⚪             | ⚪  | ⚪        | `src/lib/mcp/verify-token.ts`                     | MCP auth fails closed (401) if unset           |
 
 > `NEXT_PUBLIC_SUPABASE_*` are public (anon/publishable) keys — safe to expose —
 > but still **required** for the app to boot, so they're in the registry.
 
-> **MCP remote admin (PP-u4ab).** `MCP_BEARER_TOKEN` is the shared secret a
-> client presents as `Authorization: Bearer …` to `/api/mcp/mcp`; generate it
-> with `openssl rand -hex 32` (minimum 32 chars — shorter values are rejected).
-> `MCP_ADMIN_USER_ID` is the Supabase user UUID every MCP tool call acts as; it
-> must resolve to an `admin` access level, re-checked on every request. Both are
-> **Production-only** in the build registry: previews have no MCP client pointed
-> at them, and the auth path fails closed when either is missing, so a preview
-> build must not be blocked on them. Neither is `NEXT_PUBLIC_`; neither is reused
-> as another var's fallback. Rotate by changing `MCP_BEARER_TOKEN`.
+> **What belongs here.** Membership is decided by "PinPoint cannot run correctly
+> without this", not by "this is a secret" or "this only matters in production".
+> A var that configures an **optional surface** belongs in §4.2 even when that
+> surface is production-only — gating the build on it converts an unconfigured
+> feature into a failed deploy. See the MCP vars in §4.2 for the worked example.
 
 ### 4.2 Production-relevant but not build-gated (degrade or feature-gate)
 
@@ -112,6 +106,24 @@ the degradation is a known, documented choice — not an oversight.
 | `DISCORD_CLIENT_ID` + `DISCORD_CLIENT_SECRET`             | 🔴    | ⚪                  | `src/lib/auth/providers.ts`               | Discord OAuth hidden end-to-end                                                                                                                                                                                                                                                     |
 | `PINBALLMAP_API_TOKEN`                                    | 🔴    | ⭕                  | `supabase/seed-pinballmap-token.mjs`      | seed-time only (→ Vault, `pinballmap_state.api_token_vault_id`, read via `get_pinballmap_api_token()` RPC / `api-token.ts`); absent → PBM `X-Api-Token` omitted, live reads/writes fail once PBM's REQUIRE_API_TOKEN gate flips (July 30 2026). Never `NEXT_PUBLIC_`, never reused. |
 | `NEXT_PUBLIC_SENTRY_DSN`                                  | 🟢    | ⭕                  | `src/components/SentryInitializer.tsx`    | Sentry not initialized                                                                                                                                                                                                                                                              |
+| `MCP_BEARER_TOKEN`                                        | 🔴    | ⚪                  | `src/lib/mcp/verify-token.ts`             | MCP auth fails closed — `/api/mcp/mcp` 401s, warns `reason: "not_configured"`. Rest of PinPoint unaffected.                                                                                                                                                                         |
+| `MCP_ADMIN_USER_ID`                                       | 🔴    | ⚪                  | `src/lib/mcp/verify-token.ts`             | as above                                                                                                                                                                                                                                                                            |
+
+> **MCP remote admin (PP-u4ab).** `MCP_BEARER_TOKEN` is the shared secret a
+> client presents as `Authorization: Bearer …` to `/api/mcp/mcp`; generate it
+> with `openssl rand -hex 32` (minimum 32 chars — shorter values are rejected).
+> `MCP_ADMIN_USER_ID` is the Supabase user UUID every MCP tool call acts as; it
+> must resolve to an `admin` access level, re-checked on every request. Neither
+> is `NEXT_PUBLIC_`; neither is reused as another var's fallback. Rotate by
+> changing `MCP_BEARER_TOKEN`.
+>
+> **Deliberately not build-gated.** These are required for **MCP** to work, not
+> for **PinPoint** to work. Both are unset → the MCP endpoint 401s and every
+> other surface is untouched, which is the correct degraded state for an
+> optional single-user admin tool. They were briefly added to the §4.1 registry
+> and the first production deploy after that change hard-failed at `next build`
+> with the vars simply not yet set — an optional feature taking prod deploys
+> down with it. Don't put them back (PP-ogzs).
 
 ### 4.3 Local / CI / test-only config
 
@@ -163,10 +175,19 @@ remaining fallbacks are benign same-value aliases.
 1. **Pick the scope(s)** using §3. Default to deny — only the scopes that need it.
 2. **Sensitivity:** secret → never `NEXT_PUBLIC_`; public config → `NEXT_PUBLIC_` only if the browser truly needs it (it ends up in page source).
 3. **No coupling:** give it its own value; never borrow another secret as a fallback (alias _names_ for the same value are fine).
-4. **If production-required:** add it to the registry in `next.config.ts`
-   (`REQUIRED_ALL_DEPLOYMENTS` or `REQUIRED_PRODUCTION_ONLY`), so a missing value
-   fails the build instead of degrading silently.
-5. **Document it here** (the right §4 table) and add it to `.env.example` (and
+4. **Set it in Vercel** for each chosen scope (Project Settings → Environment
+   Variables). Do this **before** step 5 — the registry assertion fires on the
+   first deploy after merge, never in CI, so registering a var whose value isn't
+   set yet fails that deploy.
+5. **Is it production-_required_?** This means **PinPoint is broken without it**
+   — not "it's a secret", not "it's production-only", not "a feature degrades".
+   The registry is a deploy gate; everything in it can fail a production deploy.
+   Ask: _if this were unset in prod right now, would users be silently harmed?_
+   - **Yes** → add it to `next.config.ts` (`REQUIRED_ALL_DEPLOYMENTS` or
+     `REQUIRED_PRODUCTION_ONLY`) so a missing value fails the build instead of
+     degrading silently. Example: `UNSUBSCRIBE_SIGNING_SECRET` (CAN-SPAM).
+   - **No** → leave it out and document the degradation in §4.2. Example: the
+     MCP vars — unset means `/api/mcp/mcp` 401s and nothing else changes, so
+     gating the build on them only ever costs you a deploy (PP-ogzs).
+6. **Document it here** (the right §4 table) and add it to `.env.example` (and
    `.env.ci` if the CI build reads it).
-6. **Set it in Vercel** for each chosen scope (Project Settings → Environment
-   Variables).
