@@ -88,10 +88,23 @@ The tier ordering is the placement rule. **A rule goes in the highest tier it qu
 | Environment      | 25     | Host prereqs, starting the stack, worktree ports, process safety               |
 | Key commands     | 15     | `check` / `preflight` / `smoke` / `db:migrate` and when each applies           |
 | Which tests      | 8      | The two "Never" rules + reproduce-CI-locally                                   |
-| Claude specifics | 32     | Worktree dispatch safety, status vocabulary, `gh`/`dev:status` notes           |
+| Claude specifics | 16     | Status vocabulary, worktree/subagent prohibitions, `gh`/`dev:status` notes     |
 | Pointers         | 10     | rules, skills, `NON_NEGOTIABLES.md`, `CODE_REVIEW.md`                          |
 
-Budget: ~143 lines.
+Budget: ~125 lines.
+
+**"Claude specifics" itemized**, since 32 lines was an unexamined estimate and it did not survive its own lens:
+
+| Today                      | Now | Disposition                                                                                                                                                                                                              |
+| -------------------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Worktree dispatch safety   | 20  | Becomes a **hook** (§6). One-line pointer remains; the 17-line technical record already lives in `pinpoint-orchestrator` Phase 2, which CLAUDE.md itself says                                                            |
+| Worktrees (Claude Code)    | 8   | Mostly describes what `post-checkout` / `WorktreeRemove` already do automatically — informational, not a rule. Keep only: manual `git worktree remove` / `rm -rf` skips the hook and leaks slot entries + Docker volumes |
+| Parallel Subagent Workflow | 10  | Procedure → `pinpoint-orchestrator`. Keep one gotcha: hooks don't fire for subagents, so `pnpm run check` is self-enforced via the dispatch prompt                                                                       |
+| Working Style (3 bullets)  | 5   | Not PinPoint-specific — agent-restraint preferences. → `~/.claude/CLAUDE.md`, with the §6 working-style block and the existing multi-agent scale gate                                                                    |
+| Status vocabulary          | 5   | **Keep.** Speech rule, always applies, unenforceable                                                                                                                                                                     |
+| Sandbox & Playwright       | 5   | Mach-port / `excludedCommands` half → `pinpoint-e2e`. `gh` TLS + `dev:status` stay                                                                                                                                       |
+| Session Completion         | 1   | Dies with §9                                                                                                                                                                                                             |
+| Antigravity                | 8   | Dies with the retirement (§4.5)                                                                                                                                                                                          |
 
 **No `@AGENTS.md` import.** CLAUDE.md stands alone.
 
@@ -178,7 +191,7 @@ SEC-007 (email privacy), ARCH-010 (Rule of Three, with Tim's at-TWO caveat for l
 
 This supersedes the earlier decision to keep all 20 inline — that decision assumed a ~14k AGENTS.md, which no longer exists.
 
-## 6. Hooks: two additions, both verified gaps
+## 6. Hooks: three additions, all verified gaps
 
 Verified by inspection on 2026-07-24, not assumed:
 
@@ -187,6 +200,16 @@ Verified by inspection on 2026-07-24, not assumed:
 
 **`block-loopback-literal.cjs`** (PreToolUse, Write|Edit) — CORE-SEC-008.
 Blocks writing the `127.0.0.1` literal into `supabase/config.toml`, `.env*`, Playwright config, and scripts. **No enforcement exists today** — `scripts/assert-local-db.mjs` actually _accepts_ `127.0.0.1` as a valid local host. Cookie host isolation breaks Supabase SSR auth across the two spellings.
+
+**`block-worktree-dispatch-from-linked.cjs`** (PreToolUse, `Agent`) — upstream bug [anthropics/claude-code#47548](https://github.com/anthropics/claude-code/issues/47548).
+
+Dispatching `Agent(isolation: "worktree")` from a linked worktree silently switches the **parent** worktree's branch to the subagent's new branch, even at N=1. Today's only mitigation is prose in CLAUDE.md instructing the agent to "refuse and explain" — which, per Anthropic's own framing, is a request rather than a guarantee. The existing `WorktreeCreate` hook (PP-bg45) explicitly cannot fix this one; it addresses the different race in #47266.
+
+The check is mechanically decidable: in a linked worktree `.git` is a **file** containing `gitdir: …/.git/worktrees/<name>`, while in the main worktree `.git` is a **directory**. The hook denies when cwd is a linked worktree and `tool_input.isolation === "worktree"`.
+
+Feasibility verified empirically rather than from documentation: `PreToolUse:Agent` fires 30 times in the 50-transcript scan window, so the tool name is `Agent` and PreToolUse matches it in this setup. PreToolUse can deny via exit code 2 or `permissionDecision: "deny"`, and receives `tool_input`.
+
+Rejected alternative: the `SubagentStart` event. It fires once the subagent is already spawned — too late to prevent the branch switch — and matches on agent type rather than tool input, so it cannot see `isolation`.
 
 ### Deliberately not hooked
 
@@ -255,7 +278,7 @@ This catches renames, deletions, and orphans — the drift that actually bites �
 
 **#1736 merges first.** Everything else is blocked on it (§7).
 
-**PR 1 — enforcement.** `block-drizzle-push.cjs`, `block-loopback-literal.cjs`, unit tests for both, `check:rule-ids`. Self-contained; useful the moment it lands; no doc churn.
+**PR 1 — enforcement.** `block-drizzle-push.cjs`, `block-loopback-literal.cjs`, `block-worktree-dispatch-from-linked.cjs`, unit tests for all three, `check:rule-ids`. Self-contained; useful the moment it lands; no doc churn. The worktree hook must be manually smoke-tested from inside a linked worktree before merge — a unit test proves the predicate, not that the hook fires on real `Agent` dispatch.
 
 **PR 2 — the context system.** CLAUDE.md rewrite, `.claude/rules/`, AGENTS.md stub, `CODE_REVIEW.md`, copilot-instructions stub, Antigravity retirement, skill merges. Kept together because CLAUDE.md points at `CODE_REVIEW.md` and at merged skill names — splitting leaves dangling pointers.
 
