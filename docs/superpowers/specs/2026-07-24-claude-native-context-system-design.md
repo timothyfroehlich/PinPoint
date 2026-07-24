@@ -80,19 +80,26 @@ The tier ordering is the placement rule. **A rule goes in the highest tier it qu
 
 ### 4.1 `CLAUDE.md` — under 200 lines
 
-| Section           | ~lines | Content                                                                        |
-| ----------------- | ------ | ------------------------------------------------------------------------------ |
-| Mission           | 8      | What PinPoint is; the 100+ machines / 1940s-EM-through-modern scale constraint |
-| Rule index        | 15     | The 20 non-negotiables grouped by _how each reaches you_ (§5)                  |
-| Prohibitions      | 30     | Only those neither mechanizable nor path-scopable                              |
-| Environment       | 25     | Host prereqs, starting the stack, worktree ports, process safety               |
-| Key commands      | 15     | `check` / `preflight` / `smoke` / `db:migrate` and when each applies           |
-| Which tests       | 8      | The two "Never" rules + reproduce-CI-locally                                   |
-| Claude specifics  | 40     | Sandbox/Playwright, worktree dispatch safety, status vocabulary                |
-| Landing the plane | 25     | Push → PR → CI → screenshots → merge handoff                                   |
-| Pointers          | 10     | rules, skills, `NON_NEGOTIABLES.md`, `CODE_REVIEW.md`                          |
+| Section          | ~lines | Content                                                                        |
+| ---------------- | ------ | ------------------------------------------------------------------------------ |
+| Mission          | 8      | What PinPoint is; the 100+ machines / 1940s-EM-through-modern scale constraint |
+| Rule index       | 15     | The 20 non-negotiables grouped by _how each reaches you_ (§5)                  |
+| Prohibitions     | 30     | Only those neither mechanizable nor path-scopable                              |
+| Environment      | 25     | Host prereqs, starting the stack, worktree ports, process safety               |
+| Key commands     | 15     | `check` / `preflight` / `smoke` / `db:migrate` and when each applies           |
+| Which tests      | 8      | The two "Never" rules + reproduce-CI-locally                                   |
+| Claude specifics | 32     | Worktree dispatch safety, status vocabulary, `gh`/`dev:status` notes           |
+| Pointers         | 10     | rules, skills, `NON_NEGOTIABLES.md`, `CODE_REVIEW.md`                          |
+
+Budget: ~143 lines.
 
 **No `@AGENTS.md` import.** CLAUDE.md stands alone.
+
+**§9 "Landing the plane" is NOT carried over.** It is PR-workflow procedure, and `merge-pr.sh`'s five gates plus the `block-direct-merge.cjs` hook already block a badly-done PR mechanically — tier 1 enforcement and tier 4 procedure, with nothing needing tier 2. What survives in CLAUDE.md is only the merge _prohibition_ (§2.2 rule 6 + the PP-c0uy carve-out, §7) and the status vocabulary, both of which govern behavior before any PR exists.
+
+Verified coverage before cutting: `pinpoint-pr-workflow` already carries the pre-push `check`/`preflight` decision (§Phase 1), UI screenshots (§3.5), and the merge handoff (§4.1). **One step has no coverage anywhere** — §9 step 6, "after Tim merges, watch the production deploy land and confirm no build, migration, or runtime errors." A grep for deploy/vercel/production across the skill returns nothing. That step moves into `pinpoint-pr-workflow` as a new **Phase 5: post-merge deploy watch**, rather than being lost.
+
+**Sandbox/Playwright troubleshooting** (Mach port IPC crashes, `excludedCommands` prefixes) moves to `pinpoint-e2e` — it is reactive troubleshooting that only matters once Playwright is already failing, which is exactly when that skill is loaded. The `gh` CLI TLS note and `pnpm run dev:status` stay in CLAUDE.md; they are general and two lines.
 
 ### 4.2 `AGENTS.md` — 3-line stub
 
@@ -148,7 +155,11 @@ Recoverable from git history if Antigravity is ever revisited.
 | Merge → `pinpoint-deployment` | `db-connections`, `migration-conflicts`, `preview-deployments`, `audit-override` | −3; 8,667 chars combined — smaller than `pinpoint-briefing` alone, with uses of 0/2/0/0. Four near-identical routing choices for one question ("something about deploying or the database is wrong") |
 | Keep separate                 | everything else                                                                  | See §9 for what was considered and rejected                                                                                                                                                          |
 
-Also: delete the duplicated "Which Tests to Run" decision tree from `pinpoint-e2e` (it exists verbatim in `pinpoint-testing`) and have the bridge point at `pinpoint-orchestrator` for worktree mechanics instead of restating them.
+Also:
+
+- Delete the duplicated "Which Tests to Run" decision tree from `pinpoint-e2e` (it exists verbatim in `pinpoint-testing`) and have the bridge point at `pinpoint-orchestrator` for worktree mechanics instead of restating them.
+- **`pinpoint-pr-workflow` gains Phase 5: post-merge deploy watch** — the one step of AGENTS.md §9 with no coverage anywhere else (§4.1).
+- **`pinpoint-e2e` gains the sandbox/Playwright troubleshooting** moved out of CLAUDE.md (§4.1).
 
 ## 5. The rule index
 
@@ -259,4 +270,5 @@ Both from `worktree-context-system-rebuild`, which already carries this session'
 | `CODE_REVIEW.md` written but never loaded                   | The `.github/copilot-instructions.md` stub is what makes it load; verify on the first PR after merge that Copilot's review cites a `CORE-*` ID |
 | Path-scoped rules don't fire for creation-type prohibitions | Those stay in CLAUDE.md by design (§4.3)                                                                                                       |
 | CLAUDE.md drifts back over 200 lines                        | No automated gate proposed; `/doctor` surfaces it on demand                                                                                    |
+| A rule cut from CLAUDE.md lands in no skill                 | Grep-verify every cut against its destination skill before removing it — doing this for §9 found a genuine hole (step 6, the deploy watch)     |
 | Antigravity retirement is premature                         | Everything is recoverable from git history                                                                                                     |
