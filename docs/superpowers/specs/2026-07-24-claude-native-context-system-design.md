@@ -262,9 +262,11 @@ The design leaves three derived expressions of the rules (CLAUDE.md index, `.cla
 
 **Instead: `check:rule-ids`**, a new fast gate in `pnpm run check`:
 
-1. Every `CORE-*` ID cited in `CLAUDE.md`, `.claude/rules/**`, `.github/instructions/**`, or `CODE_REVIEW.md` must exist in `docs/NON_NEGOTIABLES.md` → **fail** if not.
-2. Every rule in the catalog should be reachable from at least one of hook, rule file, instruction file, or CLAUDE.md → **warn** if orphaned.
-3. `AGENTS.md` must be ≤10 lines → **fail** if it has started growing again.
+1. Every `CORE-*` ID cited in `CLAUDE.md`, `AGENTS.md`, `.claude/rules/**`, `.github/instructions/**`, `.github/copilot-instructions.md`, `.claude/hooks/*.cjs`, or `CODE_REVIEW.md` must exist in `docs/NON_NEGOTIABLES.md` → **fail** if not. Missing optional paths are fine, so the gate ships in PR 1 before `.claude/rules/` and `CODE_REVIEW.md` exist.
+2. Catalog rules cited nowhere → **opt-in audit** via `pnpm run check:rule-ids:orphans`, never a default warning. The first run found **42 of 66** catalog rules "orphaned", because the catalog is deliberately broader than the set promoted into an always-loaded index or a path-scoped file. Printing 42 lines on every `check` would train everyone to ignore the gate — the same failure mode that keeps `block-loopback-literal`'s scope narrow (§6).
+3. `AGENTS.md` must be ≤10 lines → **fail** if it has started growing again. **Deferred to PR 2**, since AGENTS.md is still 24,865 chars until the rewrite lands.
+
+As of 2026-07-24 the repo has **zero** unknown IDs, so the gate lands green.
 
 This catches renames, deletions, and orphans — the drift that actually bites — without pretending to diff prose. The existing `AGENTS.md §2.1 ↔ NON_NEGOTIABLES.md` sync contract is deleted along with §2.1.
 
