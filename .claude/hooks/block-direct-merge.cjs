@@ -9,10 +9,12 @@
 //      gate-enforcement is not a substitute for human sign-off)
 //   4. mcp__github__merge_pull_request (MCP merge)
 //
-// ONE exception (PP-c0uy — the Dependabot carve-out): a `merge-pr.sh` invocation
-// that carries `--dependabot` and none of `--human` / `--force` /
-// `--bypass-merge-requirements` is allowed through. Nothing else changes; shapes
-// 1, 2 and 4 stay blocked unconditionally, as does every other `merge-pr.sh` shape.
+// ONE exception (PP-c0uy — the Dependabot carve-out): a command that is EXACTLY
+//   [bash|sh] [path/]merge-pr.sh <number> --dependabot [--dry-run]
+// and nothing else is allowed through. It is an anchored allowlist over the whole
+// raw command — no chaining, no pipes, no redirects, no comments, no quoting, no
+// env prefixes, no other flags. Shapes 1, 2 and 4 stay blocked unconditionally, as
+// does every other `merge-pr.sh` shape.
 //
 // HONEST STATEMENT OF WHAT THIS HOOK NOW GUARANTEES:
 // This hook sees only the command string. It CANNOT verify that the PR number in
@@ -80,6 +82,9 @@ process.stdin.on("end", () => {
     // (docs/echo mentions don't match).
     const mergeScript = new RegExp(
       cmdStart.source +
+        "(?:(?:do|then|else)\\s+)?" + // optional shell keyword — `for …; do merge-pr.sh …`
+        // slipped the gate entirely before PP-c0uy, since `do ` matched none of
+        // the prefixes below and the `;` cmdStart anchor stopped there.
         "(?:env\\s+)?" + // optional `env` wrapper
         "(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*" + // optional leading VAR=val assignments (bare or after env)
         "(?:(?:bash|sh)\\s+)?" + // optional interpreter wrapper
@@ -87,29 +92,29 @@ process.stdin.on("end", () => {
         "merge-pr\\.sh\\b"
     );
     if (mergeScript.test(stripped)) {
-      // Dependabot carve-out (PP-c0uy): permit exactly one shape — a SINGLE
-      // merge-pr.sh invocation carrying --dependabot and none of the flags that
-      // would widen it. Every check runs against `stripped`, so a flag mentioned
-      // inside quotes doesn't count as present (fail-closed: a quoted
-      // `"--dependabot"` reads as absent and stays blocked).
+      // Dependabot carve-out (PP-c0uy). This is an ALLOWLIST, not a blacklist:
+      // the ENTIRE raw command must be exactly one merge-pr.sh invocation with
+      // exactly the permitted arguments, anchored ^...$. Anything else at all —
+      // a second command, a pipe, a redirect, a `#` comment, an `env`/VAR= prefix,
+      // a quote anywhere, any extra flag — falls through and stays blocked.
       //
-      // The single-invocation requirement closes the compound-command seam:
-      // `merge-pr.sh 1 --dependabot && merge-pr.sh 2 --human` would otherwise
-      // present one allowed shape and smuggle a second call past the flag scan,
-      // which is done globally over the whole command string rather than
-      // per-segment.
-      const mergeScriptGlobal = new RegExp(mergeScript.source, "g");
-      const invocationCount = (stripped.match(mergeScriptGlobal) || []).length;
-      const wideningFlag =
-        /--human\b/.test(stripped) ||
-        /--force\b/.test(stripped) ||
-        /--bypass-merge-requirements\b/.test(stripped);
-      const dependabotCarveOut =
-        invocationCount === 1 &&
-        /--dependabot\b/.test(stripped) &&
-        !wideningFlag;
+      // WHY AN ALLOWLIST, AND WHY AGAINST `cmd` RATHER THAN `stripped`:
+      // The first cut of this scanned `stripped` for widening flags and blocked
+      // if it found one. That was fail-OPEN, because quote-stripping hides a flag
+      // from the scanner while the shell still passes it through. All of these
+      // were allowed, and all of them actually execute a full `--human` merge of
+      // an arbitrary PR:
+      //   merge-pr.sh 123 "--human" # --dependabot
+      //   merge-pr.sh 123 --hum""an # --dependabot
+      //   merge-pr.sh 123 --dependabot; eval "merge-pr.sh 456 --human"
+      // Matching a blacklist against a *mangled* copy of the string the shell
+      // will run is unsound in principle — every quoting trick is a bypass. An
+      // anchored allowlist against the raw string has the opposite failure mode:
+      // an unanticipated shape is refused, which is merely inconvenient.
+      const DEPENDABOT_CARVE_OUT =
+        /^\s*(?:(?:bash|sh)\s+)?(?:[A-Za-z0-9_.\-/]*\/)?merge-pr\.sh\s+\d+\s+--dependabot(?:\s+--dry-run)?\s*$/;
 
-      if (!dependabotCarveOut) {
+      if (!DEPENDABOT_CARVE_OUT.test(cmd)) {
         isMergeScriptAttempt = true;
         detail = "scripts/workflow/merge-pr.sh";
       }
@@ -124,8 +129,9 @@ process.stdin.on("end", () => {
       "Merge is human-only. You cannot run merge-pr.sh. Finish the PR (CI green, reviews " +
         "resolved, screenshots posted if UI), then hand Tim the exact command to run himself: " +
         "! scripts/workflow/merge-pr.sh <PR> --human\n" +
-        "(The only agent-usable shape is `merge-pr.sh <PR> --dependabot` on a Dependabot " +
-        "dependency-bump PR, with no --human/--force/--bypass-merge-requirements.)"
+        "(The only agent-usable shape is exactly `merge-pr.sh <PR> --dependabot [--dry-run]` " +
+        "on a Dependabot dependency-bump PR — as the WHOLE command. No chaining, pipes, " +
+        "redirects, comments, quoting, env prefixes, or other flags.)"
     );
     process.exit(2);
   }

@@ -176,6 +176,8 @@ Compare:
 - `pull_request_read(method: "get_reviews")` → latest `submitted_at` for a `copilot-pull-request-reviewer` / `copilot-pull-request-reviewer[bot]` review
 - `get_commit(sha: <head_sha>)` → `commit.committer.date`
 
+**Copilot can also be unavailable entirely, not just late.** It returns a review whose body is `Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.` — that is a _non-review_, even though `get_reviews` counts it as a review record. Quota exhaustion is a real, recurring operating condition (hit on 2026-07-24). Treat it exactly like a silent skip: don't wait out the window, go straight to the Claude fallback below. The marker is not a Dependabot-specific mechanism — it is the general fallback whenever Copilot cannot review, for any reason.
+
 If head is newer than the latest Copilot review:
 
 - Elapsed < 600s → wait, Copilot may still be reviewing.
@@ -226,7 +228,13 @@ The label is a hint to Tim that the PR is ready for **him** to merge — it does
 
 **Merging is human-only, via ANY path — with one narrow exception.** Direct `gh pr merge`, MCP `merge_pull_request`, AND `scripts/workflow/merge-pr.sh` itself are blocked for an agent by the `block-direct-merge.cjs` PreToolUse hook — including `merge-pr.sh --dry-run`. The old `.claude-merge-bypass` sentinel was removed entirely.
 
-The **only** shape an agent may run is `scripts/workflow/merge-pr.sh <PR> --dependabot`, on a Dependabot dependency-bump PR, with none of `--human` / `--force` / `--bypass-merge-requirements` (PP-c0uy — see §4.6). For every other PR: to sanity-check gate-relevant state without running the script, read it via MCP (`pull_request_read`) — you cannot invoke `merge-pr.sh` at all, not even to preview.
+The **only** thing an agent may run is exactly this, as the _whole_ command:
+
+```
+[bash] [path/]merge-pr.sh <PR> --dependabot [--dry-run]
+```
+
+The hook enforces that as an anchored allowlist over the raw command string — no chaining, pipes, redirects, `#` comments, quoting, `env`/`VAR=` prefixes, or any other flag. (It is an allowlist rather than a blacklist on purpose: a blacklist scanned against a quote-stripped copy of the command is unsound, because quoting hides a flag from the scanner while the shell still passes it. See the hook's header comment.) For every other PR: to sanity-check gate-relevant state without running the script, read it via MCP (`pull_request_read`) — you cannot invoke `merge-pr.sh` at all, not even to preview.
 
 ### 4.1 Agent's terminal state: handoff, not merge
 
@@ -335,7 +343,7 @@ The marker is an **honesty contract** — `mark-claude-review.sh` only attests; 
 `--dependabot` substitutes for `--human` and grants **zero** gate relief. All 5 gates run with their normal rules, and three extra preconditions must hold or the script hard-REFUSEs with no bypass:
 
 1. **PR author** is a trusted Dependabot identity (`app/dependabot`, `dependabot[bot]`, `dependabot`).
-2. **Every commit** on the PR is Dependabot-authored. A human commit pushed onto a `dependabot/*` branch disqualifies the whole PR — it goes back to the `--human` path.
+2. **Every commit** on the PR is Dependabot-authored **and carries a valid GitHub signature** (`verification.verified == true`). The signature half is what makes this real: a commit's author is settable metadata (`git commit --author="dependabot[bot] <…>"` reports `login: dependabot[bot]`), so a login-only check would not stop a forged commit pushed onto a `dependabot/*` branch. GitHub GPG-signs genuine Dependabot commits; a locally-forged one is `unsigned`. Either failure disqualifies the whole PR — it goes back to the `--human` path.
 3. **Every changed file** is in the dependency-bump allowlist: `pnpm-lock.yaml`, `package.json`, `pnpm-workspace.yaml`, `.github/workflows/**`, `.github/dependabot.yml`. Anything else → REFUSE.
 
 `--force` and `--bypass-merge-requirements` are rejected outright in combination with `--dependabot`. If a gate genuinely needs bypassing, that is Tim's call on the `--human` path.

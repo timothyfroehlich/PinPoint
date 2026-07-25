@@ -1,9 +1,11 @@
 // Unit tests for .claude/hooks/block-direct-merge.cjs — the PreToolUse hook
 // that blocks agent-initiated PR merges (PP-wi85). Merging is human-only, with
-// exactly one carve-out (PP-c0uy): `merge-pr.sh <PR> --dependabot` with none of
-// --human/--force/--bypass-merge-requirements. Everything else stays blocked; the
-// human channel is a `!`-prefixed command in Claude Code, which never generates a
-// PreToolUse event and so is outside this hook's reach entirely.
+// exactly one carve-out (PP-c0uy): a command that is EXACTLY
+// `[bash] [path/]merge-pr.sh <number> --dependabot [--dry-run]` and nothing else.
+// That is an anchored allowlist over the raw command, so the interesting tests
+// below are the ones proving quote-hidden widening flags and smuggled second
+// invocations stay blocked. The human channel is a `!`-prefixed command in Claude
+// Code, which never generates a PreToolUse event and is outside this hook's reach.
 //
 // Exercises the hook as a subprocess (spawnSync node hookPath, JSON on stdin)
 // — matches the pattern used by verify-guard-stack.test.ts.
@@ -146,6 +148,25 @@ describe("block-direct-merge.cjs — merge-pr.sh (PP-wi85 hard gate)", () => {
     expect(status).toBe(2);
   });
 
+  it("blocks an invocation inside a `for … do … done` loop body", () => {
+    // Pre-existing hole found while reviewing PP-c0uy: `do ` matched none of the
+    // optional prefixes, so the `;` command-start anchor stopped there and a
+    // loop-wrapped `--human` merge slipped the gate entirely on origin/main.
+    const { status } = runHook(
+      bashPayload(
+        "for f in 1 2; do scripts/workflow/merge-pr.sh $f --human; done"
+      )
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks an invocation in a `then` branch", () => {
+    const { status } = runHook(
+      bashPayload("if true; then scripts/workflow/merge-pr.sh 123 --human; fi")
+    );
+    expect(status).toBe(2);
+  });
+
   it("blocks `env VAR=val bash scripts/workflow/merge-pr.sh <PR>`", () => {
     const { status } = runHook(
       bashPayload("env FOO=bar bash scripts/workflow/merge-pr.sh 123")
@@ -197,6 +218,11 @@ describe("block-direct-merge.cjs — Dependabot carve-out (PP-c0uy)", () => {
     expect(status).toBe(0);
   });
 
+  it("allows a bare `merge-pr.sh <PR> --dependabot` with no path prefix", () => {
+    const { status } = runHook(bashPayload("merge-pr.sh 123 --dependabot"));
+    expect(status).toBe(0);
+  });
+
   it("allows the carve-out under a `bash` wrapper", () => {
     const { status } = runHook(
       bashPayload("bash scripts/workflow/merge-pr.sh 123 --dependabot")
@@ -230,8 +256,6 @@ describe("block-direct-merge.cjs — Dependabot carve-out (PP-c0uy)", () => {
   });
 
   it("blocks two merge-pr.sh invocations even when the first carries --dependabot", () => {
-    // The flag scan is global over the command string, so a second invocation
-    // could otherwise ride in behind one allowed shape.
     const { status } = runHook(
       bashPayload(
         "scripts/workflow/merge-pr.sh 123 --dependabot && scripts/workflow/merge-pr.sh 456 --dependabot"
@@ -240,9 +264,96 @@ describe("block-direct-merge.cjs — Dependabot carve-out (PP-c0uy)", () => {
     expect(status).toBe(2);
   });
 
-  it("blocks a quoted `--dependabot` (fail closed — quote-stripping hides the flag)", () => {
+  it("blocks a quoted `--dependabot` (fail closed)", () => {
     const { status } = runHook(
       bashPayload('scripts/workflow/merge-pr.sh 123 "--dependabot"')
+    );
+    expect(status).toBe(2);
+  });
+
+  // --- Regression: quote-hidden widening flags (found in review of PP-c0uy) ---
+  // The first cut scanned the QUOTE-STRIPPED string for --human/--force/etc. and
+  // blocked if found. Quoting hides a flag from that scan while the shell still
+  // passes it, so each of these executed a full `--human` merge of an arbitrary PR
+  // while the hook said yes. The fix is an anchored allowlist over the RAW command.
+  it("blocks a quote-hidden --human with a trailing `# --dependabot` comment", () => {
+    const { status } = runHook(
+      bashPayload('scripts/workflow/merge-pr.sh 123 "--human" # --dependabot')
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks a single-quote-hidden --human with a trailing comment", () => {
+    const { status } = runHook(
+      bashPayload("scripts/workflow/merge-pr.sh 123 '--human' # --dependabot")
+    );
+    expect(status).toBe(2);
+  });
+
+  it('blocks an intra-word quote-split --human (--hum""an)', () => {
+    const { status } = runHook(
+      bashPayload('scripts/workflow/merge-pr.sh 123 --hum""an # --dependabot')
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks a quote-split --bypass-merge-requirements alongside --dependabot", () => {
+    const { status } = runHook(
+      bashPayload(
+        "scripts/workflow/merge-pr.sh 123 --dependabot --bypass-merge-req''uirements"
+      )
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks an eval'd second invocation hidden behind an allowed first one", () => {
+    const { status } = runHook(
+      bashPayload(
+        'scripts/workflow/merge-pr.sh 123 --dependabot; eval "scripts/workflow/merge-pr.sh 456 --human"'
+      )
+    );
+    expect(status).toBe(2);
+  });
+
+  // --- Allowlist strictness: anything but the exact shape is refused ---
+  it("blocks the carve-out shape with a trailing pipe", () => {
+    const { status } = runHook(
+      bashPayload("scripts/workflow/merge-pr.sh 123 --dependabot | tee out.txt")
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks the carve-out shape with a redirect", () => {
+    const { status } = runHook(
+      bashPayload("scripts/workflow/merge-pr.sh 123 --dependabot > out.txt")
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks an env-var prefix on the carve-out shape", () => {
+    const { status } = runHook(
+      bashPayload("FOO=bar scripts/workflow/merge-pr.sh 123 --dependabot")
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks flags in the wrong order (--dependabot before the PR number)", () => {
+    const { status } = runHook(
+      bashPayload("scripts/workflow/merge-pr.sh --dependabot 123")
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks a non-numeric PR argument", () => {
+    const { status } = runHook(
+      bashPayload("scripts/workflow/merge-pr.sh abc --dependabot")
+    );
+    expect(status).toBe(2);
+  });
+
+  it("blocks an unrecognized extra flag alongside --dependabot", () => {
+    const { status } = runHook(
+      bashPayload("scripts/workflow/merge-pr.sh 123 --dependabot --admin")
     );
     expect(status).toBe(2);
   });

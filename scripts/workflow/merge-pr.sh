@@ -153,41 +153,53 @@ if [ "$DEPENDABOT" = "true" ]; then
   fi
   echo "  PASS: dependabot-author: $PR_AUTHOR"
 
-  # Precondition 2: EVERY commit on the PR is Dependabot-authored. This is the guard
-  # against someone pushing a commit onto a dependabot/* branch and riding it through
-  # the carve-out. Commits with zero authors, or an author GitHub can't map to a login,
-  # count as a failure — fail closed.
-  COMMIT_AUTHORS=$(gh pr view "$PR" --json commits --jq '
-    .commits[] |
-    if (.authors | length) == 0 then "<no-author>"
-    else (.authors[] | if (.login // "") == "" then "<no-login>" else .login end)
-    end')
-  if [ -z "$COMMIT_AUTHORS" ]; then
-    echo "REFUSE: --dependabot could not read the PR's commit authors (empty result) — failing closed." >&2
+  # Precondition 2: EVERY commit on the PR is Dependabot-authored AND carries a valid
+  # signature. This is the guard against someone pushing a commit onto a dependabot/*
+  # branch and riding it through the carve-out.
+  #
+  # The signature half is what makes this guard real. A commit's *author* is just
+  # settable metadata — `git commit --author="dependabot[bot] <49699333+dependabot[bot]
+  # @users.noreply.github.com>"` reports `login: dependabot[bot]` and would sail past a
+  # login-only check. GitHub GPG-signs genuine Dependabot commits, so they come back
+  # `verification.verified = true` (confirmed on #1725/#1731), while a locally-forged
+  # commit is `false`/`unsigned` (confirmed on #1661's human commits). Requiring BOTH
+  # closes the spoof: an attacker would need GitHub's signing key.
+  #
+  # This matters concretely because `.github/workflows/**` is in the path allowlist —
+  # a spoofed commit merged to main is CI execution with repo secrets.
+  #
+  # Uses the paginated REST commits endpoint; a null `.author` (email GitHub can't map
+  # to an account) reads as `<no-login>` and fails closed.
+  COMMIT_META=$(gh api --paginate "repos/$(_repo_slug)/pulls/${PR}/commits" \
+    --jq '.[] | "\(.author.login // "<no-login>")\t\(.commit.verification.verified)"')
+  if [ -z "$COMMIT_META" ]; then
+    echo "REFUSE: --dependabot could not read the PR's commits (empty result) — failing closed." >&2
     exit 1
   fi
-  # gh's GraphQL commit list caps at 100. Dependabot force-pushes a single commit, so
-  # anywhere near the cap means either not-a-Dependabot-PR or a list we can't fully see.
-  COMMIT_COUNT=$(gh pr view "$PR" --json commits --jq '.commits | length')
-  if [ "$COMMIT_COUNT" -ge 100 ]; then
-    echo "REFUSE: --dependabot saw $COMMIT_COUNT commits — at/over gh's 100-commit list cap, so the" >&2
-    echo "        all-commits-Dependabot-authored check cannot see the whole history. Failing closed." >&2
+  # GitHub caps this endpoint at 250 commits. Dependabot force-pushes a single commit,
+  # so anywhere near the cap means a history we cannot fully see.
+  COMMIT_COUNT=$(printf '%s\n' "$COMMIT_META" | wc -l | tr -d ' ')
+  if [ "$COMMIT_COUNT" -ge 250 ]; then
+    echo "REFUSE: --dependabot saw $COMMIT_COUNT commits — at/over GitHub's 250-commit list cap, so" >&2
+    echo "        the all-commits check cannot see the whole history. Failing closed." >&2
     exit 1
   fi
-  NON_BOT_COMMIT_AUTHORS=()
-  while IFS= read -r commit_author; do
+  BAD_COMMITS=()
+  while IFS=$'\t' read -r commit_author commit_verified; do
     [ -z "$commit_author" ] && continue
     if ! is_dependabot_login "$commit_author"; then
-      NON_BOT_COMMIT_AUTHORS+=("$commit_author")
+      BAD_COMMITS+=("$commit_author (not Dependabot)")
+    elif [ "$commit_verified" != "true" ]; then
+      BAD_COMMITS+=("$commit_author (unverified signature — possible spoof)")
     fi
-  done <<< "$COMMIT_AUTHORS"
-  if [ ${#NON_BOT_COMMIT_AUTHORS[@]} -gt 0 ]; then
-    echo "REFUSE: --dependabot requires EVERY commit to be Dependabot-authored." >&2
-    echo "        Non-Dependabot commit author(s): ${NON_BOT_COMMIT_AUTHORS[*]}" >&2
+  done <<< "$COMMIT_META"
+  if [ ${#BAD_COMMITS[@]} -gt 0 ]; then
+    echo "REFUSE: --dependabot requires EVERY commit to be Dependabot-authored AND signature-verified." >&2
+    echo "        Offending commit(s): ${BAD_COMMITS[*]}" >&2
     echo "        A human commit on a Dependabot branch makes this a human-reviewed PR: $0 $PR --human" >&2
     exit 1
   fi
-  echo "  PASS: dependabot-commits: all commits Dependabot-authored"
+  echo "  PASS: dependabot-commits: all $COMMIT_COUNT commit(s) Dependabot-authored + signature-verified"
 
   # Precondition 3: every changed file is inside the dependency-bump allowlist.
   # Uses the paginated REST files endpoint (field is `filename`, unlike `gh pr view
