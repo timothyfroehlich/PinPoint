@@ -498,11 +498,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Setup Supabase
         uses: ./.github/actions/setup-supabase
@@ -561,11 +560,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Setup Supabase
         uses: ./.github/actions/setup-supabase
@@ -618,11 +616,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -701,11 +698,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -784,11 +780,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -868,11 +863,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
