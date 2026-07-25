@@ -6,24 +6,15 @@ export const metadata = {
 
 <HelpPage breadcrumb="Machine Settings" title="Machine Settings" description="Record a machine's configuration — software adjustments, DIP switches, post positions — as one or more named settings sets.">
 
-## Start here
+## Which set do I want?
 
-Most people want one thing: the machine's normal setup. That's the set badged
-**★ Owner's default**, always first in the list. Want the competition config
-instead? Filter to **🏆 Tournament**.
+The one badged **★ Owner's default** — the setup the machine's owner considers
+canonical. There's at most one per machine and it always sorts first.
+**🏆 Tournament** marks competition-ready sets; a set can be both.
 
-Two boxes sit above the sets, both machine-wide:
+## Who can edit what
 
-- **Before you change anything** — the owner's request for how to treat this
-  machine: who to ask, what to avoid.
-- **How to change settings** — how to reach the adjustments: coin-door buttons
-  (back / value− / value+ / enter), where the DIP switches are, the
-  launch-button sequence on a P3.
-
-## Sets and who can edit them
-
-A **settings set** is one named configuration (_Tournament_, _Home_, _Factory
-defaults_). Its badges tell you who may change it:
+A set's kind is fixed when it's created, and decides who may change it:
 
 <div className="overflow-x-auto mt-3">
   <table className="w-full text-sm border-collapse">
@@ -47,84 +38,46 @@ defaults_). Its badges tell you who may change it:
       </tr>
       <tr className="border-b">
         <td className="p-2 font-medium text-foreground whitespace-nowrap">Private draft</td>
-        <td className="p-2 text-muted-foreground">Not published yet — build it out before it's seen</td>
+        <td className="p-2 text-muted-foreground">Not published yet</td>
         <td className="p-2 text-muted-foreground">Its creator and admins, whatever the kind</td>
       </tr>
     </tbody>
   </table>
 </div>
 
-Anyone can view a published set. Creating a set at all takes **owner**,
-**technician**, or **admin** — see [Roles & Permissions](/help/permissions).
-Without edit rights on a set, its fields are read-only and its ⋮ menu doesn't
-appear.
+A private draft is invisible to everyone but its creator, so you can build one
+out before it's seen. Creating a set at all takes **owner**, **technician**, or
+**admin** — see [Roles & Permissions](/help/permissions).
 
-Two more badges are independent of the kind:
+Two things that catch people out:
 
-- **★ Owner's default** — the owner's canonical setup. One per machine, always
-  an owner set, always public.
-- **🏆 Tournament** — competition-ready. Any set can carry it, including the
-  Owner's default.
+- The Owner's default has to stay public. Unset it as the default before you
+  can make it private.
+- If you own the machine and it has no default yet, your **first** set skips
+  the draft stage — published and made the default straight away.
 
-## The ⋮ menu
+## Duplicating
 
-- **Publish** / **Make private** — shows or hides the set. The Owner's default
-  must stay public, so unset it as the default first.
-- **Set as owner's default** — owner or admin, owner sets only. Replaces
-  whichever set held the title.
-- **Tournament** — tags or untags; needs edit rights on the set.
-- **Duplicate** — copies as "_name_ (copy)", a private draft owned by you. It
-  carries the Tournament tag but never the default status, and its kind is
-  re-derived from whoever copied it — so your copy of someone else's owner set
-  becomes a **Community** set you can actually edit.
-- **Delete** — removes the set and everything in it. Can't be undone.
+A copy starts as a private draft owned by you, and its kind is re-derived from
+who copied it — so your copy of someone else's **Owner** set becomes a
+**Community** set you can actually edit. It carries the Tournament tag over; it
+never inherits the default.
 
-One quirk worth knowing: if you own the machine and it has no Owner's default
-yet, your first set skips the draft stage — it's published and made the default
-straight away. Every set after that starts as a private draft.
+## Saving
 
-## Filtering the list
+There's no Save button. Every field is live and saves a moment after you stop
+typing. If a save fails you get a banner with **Retry** and your edits stay
+put.
 
-Pick one of **All / Mine / Owner's / Community**, then layer the independent
-**Tournament** toggle on top. **All** clears everything. **Mine** appears once
-you've made a set; **Owner's** is hidden if you _are_ the owner, since **Mine**
-already covers it.
+## Also worth knowing
 
-## Sections
-
-A set's body is an ordered list of **sections** from **Add section**. Drag by
-the grip to reorder; the ⋮ on a section deletes it.
-
-- **Software settings** — the adjustments menu. **ID / Setting / Value** rows
-  (`A.1 01` / `Balls Per Game` / `5`) plus a **baseline** picker (Factory,
-  Competition, …). One per set.
-- **DIP switch bank** — physical switches on EMs and early solid-state games:
-  number, **ON/OFF**, description. Add one bank per physical bank.
-- **Other table** — a free **ID / Setting / Value** table under your own
-  heading, for Jones plugs, transformer taps, board jumpers. Repeats.
-- **Post positions** / **Rubbers** — preset notes with fixed headings, for the
-  two most common physical-setup notes. One each per set.
-- **Other / Notes** — a free note under your own heading. Repeats.
-
-Note sections take rich text — headings, lists, bold, links.
-
-## Editing
-
-Every field is live. Changes save on their own a moment after you stop typing
-or move on; there's no Edit/Done step. Deletes and reorders save immediately.
-
-- **Desktop** — click a value to change it. **Add row**, **Add section**, and
-  the trash icon do what they say.
-- **Mobile** — tap a row to edit it in a sheet.
-
-If a save fails, a banner appears at the top and **Retry** re-sends it — your
-edits stay put. Leaving the tab flushes anything unsaved in the background.
-
-## Timeline
-
-Creating, editing, and deleting a set record a **settings** entry on the
-machine's Timeline. Publishing, tagging Tournament, and changing the Owner's
-default don't. The **settings** filter is off by default — turn it on to see
-configuration history.
+- **Before you change anything** and **How to change settings** are
+  machine-wide — shared by every set, editable by anyone who can create one.
+- Software settings, Post positions and Rubbers are one per set; they leave the
+  **Add section** menu once you've used them. DIP banks, tables and notes
+  repeat.
+- Creating, editing and deleting a set record a **settings** entry on the
+  machine's Timeline; publishing, tagging and changing the default don't. That
+  filter is off by default.
 
 </HelpPage>
