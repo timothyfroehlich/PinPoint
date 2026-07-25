@@ -63,6 +63,29 @@ describe("block-drizzle-push.cjs — sanctioned drizzle-kit subcommands", () => 
   });
 });
 
+describe("block-drizzle-push.cjs — prose that merely NAMES the command", () => {
+  // Regression: the hook's first real-world firing blocked a `bd comments add`
+  // whose prose mentioned "drizzle-kit push". A hook that fires on prose is
+  // noise, and a noisy hook gets bypassed. The classifier now resolves the
+  // effective command of each shell segment instead of substring-matching.
+  it.each([
+    ["echo", 'echo "drizzle-kit push"'],
+    ["echo unquoted", "echo drizzle-kit push"],
+    ["bd comment", 'bd comments add PP-1 "do not run drizzle-kit push"'],
+    ["gh pr comment", 'gh pr comment 1 --body "blocks drizzle-kit push"'],
+    ["grep", 'rg -n "drizzle-kit push" docs/'],
+    ["git commit -m", 'git commit -m "docs: explain drizzle-kit push ban"'],
+    ["printf", 'printf "%s\\n" "drizzle-kit push"'],
+  ])("allows %s", (_label, command) => {
+    expect(runHook(bash(command)).status).toBe(0);
+  });
+
+  it("still blocks a real invocation chained after prose", () => {
+    const command = 'echo "about to run drizzle-kit push" && drizzle-kit push';
+    expect(runHook(bash(command)).status).toBe(2);
+  });
+});
+
 describe("block-drizzle-push.cjs — fails open", () => {
   it("allows a heredoc that merely mentions the command", () => {
     // Commit messages and docs legitimately explain why push is banned.

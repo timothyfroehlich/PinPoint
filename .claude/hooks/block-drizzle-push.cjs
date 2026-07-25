@@ -21,28 +21,84 @@
 // Fails OPEN on malformed payloads and non-Bash tools.
 
 // --- Pure classifier (unit-testable) -----------------------------------------
-// Does this shell command invoke `drizzle-kit push` anywhere in it?
+// Does this shell command actually INVOKE `drizzle-kit push`?
 //
-// Matches the binary followed by the `push` subcommand, allowing any runner
-// prefix (pnpm exec / pnpm dlx / npx / bunx / yarn) and any flags between them
-// (`drizzle-kit push --force`, `drizzle-kit push:pg` in older versions).
-// Deliberately does NOT match other drizzle-kit subcommands — `generate`,
-// `migrate`, `check`, `export`, and `studio` are all sanctioned.
+// A naive substring match is wrong, and wrong in a way that bites immediately:
+// the first real-world firing of this hook blocked a `bd comments add "...
+// drizzle-kit push ..."` whose prose merely NAMED the command. A hook that
+// fires on prose is noise, and a noisy hook gets bypassed.
+//
+// So this resolves the effective command of each shell segment — the same
+// technique block-main-worktree-branch-switch.cjs uses — and only blocks when
+// that resolved command really is drizzle-kit (directly or via a package
+// runner) with `push` as its subcommand.
+//
+// Deliberately does NOT match the sanctioned subcommands: generate, migrate,
+// check, export, studio.
+
+// Wrappers that don't consume the command slot themselves.
+const WRAPPERS = new Set(["sudo", "env", "command", "time", "nice"]);
+// Package runners, and the runner subcommands that precede the real binary.
+const RUNNERS = new Set(["pnpm", "npm", "npx", "yarn", "bunx", "bun", "pnpx"]);
+const RUNNER_SUBCOMMANDS = new Set(["exec", "dlx", "run", "x"]);
+const ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*[+:]?=/;
+
+// Is this token the drizzle-kit binary? Accepts a bare name, a .js/.cjs/.mjs
+// suffix, and any path ending in it (./node_modules/.bin/drizzle-kit).
+function isDrizzleKit(token) {
+  const base = String(token || "")
+    .replace(/^["']|["']$/g, "")
+    .split("/")
+    .pop();
+  return /^drizzle-kit(\.[cm]?js)?$/.test(base || "");
+}
+
 function classifyCommand(command) {
   const cmd = String(command || "");
 
-  // Strip heredoc bodies first: commit messages and docs legitimately contain
-  // the string "drizzle-kit push" while explaining why it's banned.
-  // Same technique as block-dangerous-commands.cjs.
+  // Strip heredoc bodies first — commit messages legitimately explain why push
+  // is banned. Same technique as block-dangerous-commands.cjs.
   const stripped = cmd.replace(/<<-?'?(\w+)'?[\s\S]*?\n\1/g, "");
 
-  // `drizzle-kit` (or drizzle-kit.js / .cjs / a path ending in it), then the
-  // `push` subcommand, with optional flags in between.
-  const regex = /\bdrizzle-kit(?:\.[cm]?js)?\b(?:\s+-[^\s]*)*\s+push\b/;
+  for (const rawSegment of stripped.split(/&&|\|\||;|\|/)) {
+    const tokens = rawSegment.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) continue;
 
-  if (regex.test(stripped)) {
-    return { block: true, detail: "drizzle-kit push" };
+    // Resolve the effective command: skip leading env assignments and wrappers.
+    let i = 0;
+    while (i < tokens.length) {
+      const t = tokens[i];
+      if (ENV_ASSIGN.test(t) || WRAPPERS.has(t)) {
+        i++;
+        continue;
+      }
+      break;
+    }
+    if (i >= tokens.length) continue;
+
+    // Then step through a package runner and its subcommand, if present.
+    if (RUNNERS.has(tokens[i])) {
+      i++;
+      while (i < tokens.length && RUNNER_SUBCOMMANDS.has(tokens[i])) i++;
+    }
+    if (i >= tokens.length) continue;
+
+    // The resolved command must BE drizzle-kit. `echo "drizzle-kit push"`
+    // resolves to `echo`; `bd comments add "... drizzle-kit push ..."` to `bd`.
+    if (!isDrizzleKit(tokens[i])) continue;
+
+    // Find the subcommand: the first non-flag token after the binary.
+    for (let j = i + 1; j < tokens.length; j++) {
+      const t = tokens[j];
+      if (t.startsWith("-")) continue; // --config=x.ts, --force, ...
+      // `push` or a legacy dialect-suffixed form like `push:pg`.
+      if (/^push(:|$)/.test(t.replace(/^["']|["']$/g, ""))) {
+        return { block: true, detail: "drizzle-kit push" };
+      }
+      break; // A different subcommand (generate/migrate/...) → sanctioned.
+    }
   }
+
   return { block: false, detail: "" };
 }
 
