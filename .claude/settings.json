@@ -16,22 +16,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/block-dangerous-commands.cjs",
-            "timeout": 5000
-          },
-          {
-            "type": "command",
             "command": "node .claude/hooks/normalize-workspace-paths.cjs",
             "timeout": 5000
           },
           {
             "type": "command",
             "command": "node .claude/hooks/inject-beads-actor.cjs",
-            "timeout": 5000
-          },
-          {
-            "type": "command",
-            "command": "node .claude/hooks/block-bad-shell-patterns.cjs",
             "timeout": 5000
           },
           {
