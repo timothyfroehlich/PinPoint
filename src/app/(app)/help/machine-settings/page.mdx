@@ -14,7 +14,9 @@ canonical. There's at most one per machine and it always sorts first.
 
 ## Who can edit what
 
-A set's kind is fixed when it's created, and decides who may change it:
+Two separate things decide that: a set's **kind** — Owner or Community, fixed
+when it's created — and whether it's still a **private draft**. A draft is
+creator-only whatever its kind.
 
 <div className="overflow-x-auto mt-3">
   <table className="w-full text-sm border-collapse">
@@ -39,15 +41,15 @@ A set's kind is fixed when it's created, and decides who may change it:
       <tr className="border-b">
         <td className="p-2 font-medium text-foreground whitespace-nowrap">Private draft</td>
         <td className="p-2 text-muted-foreground">Not published yet</td>
-        <td className="p-2 text-muted-foreground">Its creator and admins, whatever the kind</td>
+        <td className="p-2 text-muted-foreground">Its creator and admins</td>
       </tr>
     </tbody>
   </table>
 </div>
 
-A private draft is invisible to everyone but its creator, so you can build one
-out before it's seen. Creating a set at all takes **owner**, **technician**, or
-**admin** — see [Roles & Permissions](/help/permissions).
+Drafts are invisible to everyone else, so you can build a set out before it's
+seen. Creating a set at all takes **owner**, **technician**, or **admin** — see
+[Roles & Permissions](/help/permissions).
 
 Two things that catch people out:
 
