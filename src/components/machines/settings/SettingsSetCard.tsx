@@ -639,7 +639,7 @@ export function SettingsSetCard({
           <p className="min-w-0 text-xs text-muted-foreground">
             updated by {set.updatedBy}
             {updatedByIsOwner && (
-              <OwnerBadge size="sm" className="mx-1 align-middle" />
+              <OwnerBadge tone="inline" className="mx-1" />
             )}{" "}
             {formatShortDate(set.updatedAt)}
           </p>
