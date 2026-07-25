@@ -1,6 +1,6 @@
 {
-  "id": "d792e603-792a-45af-ab36-22d942616459",
-  "prevId": "3ed08ed1-c287-49e5-83a2-e6cf2d2ffb89",
+  "id": "0899347f-10c1-4e27-b053-fd7eeb1429af",
+  "prevId": "d792e603-792a-45af-ab36-22d942616459",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1212,6 +1212,27 @@
         },
         "is_preferred": {
           "name": "is_preferred",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_owner_set": {
+          "name": "is_owner_set",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_public": {
+          "name": "is_public",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_tournament": {
+          "name": "is_tournament",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,

@@ -1,6 +1,4 @@
 import "server-only";
-import { createAdminClient } from "~/lib/supabase/admin";
-import { assertNotInTransaction } from "~/server/db/transaction-context";
 
 /**
  * Mandatory PinballMap blanket API token (X-Api-Token) accessor.
@@ -12,36 +10,24 @@ import { assertNotInTransaction } from "~/server/db/transaction-context";
  * identify the writer. The live client sends it as the `X-Api-Token` header on
  * every request.
  *
- * The token lives in Supabase Vault, referenced by `pinballmap_state.api_token_
- * vault_id`; the `get_pinballmap_api_token()` SECURITY DEFINER RPC decrypts it and
- * is EXECUTE-able only by `service_role`, so we reach it through the service-role
- * admin client. Returns null when the integration isn't provisioned yet — the
- * live client then omits the header (fine while PBM's gate is still off; the
- * integration is dormant until the PP-o355.10 rollout).
+ * The token is a **platform capability, not tenant data** — PBM issues it to an
+ * approved account against a use-plan, i.e. to PinPoint-the-application. Even
+ * under future multi-tenancy every tenant inherits it and none may touch it,
+ * which makes it a deploy-time constant rather than runtime state. So it reads
+ * from a plain `PINBALLMAP_API_TOKEN` env var, not Supabase Vault (PP-o355.23;
+ * the Vault path from PP-uusr / migration 0057 is gone). Deliberately NOT in the
+ * `next.config.ts` build registry: without it PBM sync degrades and every other
+ * surface still works, so it is optional per CORE-SEC-009 (docs/ENV_VARS.md §4.2).
  *
- * SECURITY: server-only; uses the service-role client and exposes secret
- * material. The "server-only" import guards against accidental client imports.
+ * Returns null when unset — the live client then omits the header (fine while
+ * PBM's gate is still off; the integration is dormant until the PP-o355.10
+ * rollout). Local dev and CI never set it: PBM must never be reached from tests
+ * (CORE-TEST-006), and `pinballmap_state.enabled` gates the integration anyway.
+ *
+ * SECURITY: server-only; exposes secret material. The "server-only" import
+ * guards against accidental client imports.
  */
-export async function getPinballMapApiToken(): Promise<string | null> {
-  // CORE-ARCH-011 tripwire: the Vault decrypt RPC is an external round-trip and
-  // must run before opening a transaction, never inside one (the Doodle Bug,
-  // PP-2053). PBM fetches already run outside transactions (state.ts/catalog.ts).
-  assertNotInTransaction("getPinballMapApiToken");
-
-  const supabase = createAdminClient();
-  // The `get_pinballmap_api_token` RPC (0057) returns a scalar `text` and is not
-  // present in Supabase's generated types. Cast to the shape the function returns.
-  const response = (await supabase.rpc("get_pinballmap_api_token")) as {
-    data: string | null;
-    error: { message: string } | null;
-  };
-
-  if (response.error) {
-    throw new Error(
-      `Failed to load PinballMap API token: ${response.error.message}`
-    );
-  }
-
-  const token = response.data;
-  return typeof token === "string" && token.length > 0 ? token : null;
+export function getPinballMapApiToken(): string | null {
+  const token = process.env["PINBALLMAP_API_TOKEN"]?.trim() ?? "";
+  return token.length > 0 ? token : null;
 }
