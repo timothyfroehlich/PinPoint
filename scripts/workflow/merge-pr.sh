@@ -157,13 +157,24 @@ if [ "$DEPENDABOT" = "true" ]; then
   # signature. This is the guard against someone pushing a commit onto a dependabot/*
   # branch and riding it through the carve-out.
   #
-  # The signature half is what makes this guard real. A commit's *author* is just
-  # settable metadata — `git commit --author="dependabot[bot] <49699333+dependabot[bot]
-  # @users.noreply.github.com>"` reports `login: dependabot[bot]` and would sail past a
-  # login-only check. GitHub GPG-signs genuine Dependabot commits, so they come back
-  # `verification.verified = true` (confirmed on #1725/#1731), while a locally-forged
-  # commit is `false`/`unsigned` (confirmed on #1661's human commits). Requiring BOTH
-  # closes the spoof: an attacker would need GitHub's signing key.
+  # A commit's *author* is settable metadata, so the login check alone is weak:
+  # `git commit --author="dependabot[bot] <49699333+dependabot[bot]@users.noreply.
+  # github.com>"` reports `login: dependabot[bot]` and sails past it. The signature
+  # requirement is what makes the guard bite.
+  #
+  # WHAT THE SIGNATURE CHECK IS KNOWN TO BUY, AND WHAT IS STILL OPEN (PP-c0uy):
+  #   Settled: it kills the locally-forged `git commit --author=…` spoof. Genuine
+  #   Dependabot commits come back `verification.verified = true` (confirmed on
+  #   #1725/#1731); a locally-signed-by-nobody commit is `false`/`unsigned`
+  #   (confirmed on #1661's human commits).
+  #   OPEN: whether a commit created through the Contents API (which sets `author`
+  #   independently of `committer`) can come back BOTH `verified = true` and
+  #   `author.login = dependabot[bot]`. GitHub web-flow-signs commits it creates on
+  #   your behalf, and `committer` cannot discriminate here — genuine Dependabot
+  #   commits are themselves API-created and already report `committer: GitHub`.
+  #   Nobody has run the experiment (it writes commits to the remote, which is Tim's
+  #   call), so do NOT read this check as "an attacker would need GitHub's signing
+  #   key". It raises the bar; it is not proven airtight.
   #
   # This matters concretely because `.github/workflows/**` is in the path allowlist —
   # a spoofed commit merged to main is CI execution with repo secrets.

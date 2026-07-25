@@ -148,22 +148,39 @@ describe("block-direct-merge.cjs — merge-pr.sh (PP-wi85 hard gate)", () => {
     expect(status).toBe(2);
   });
 
-  it("blocks an invocation inside a `for … do … done` loop body", () => {
-    // Pre-existing hole found while reviewing PP-c0uy: `do ` matched none of the
-    // optional prefixes, so the `;` command-start anchor stopped there and a
-    // loop-wrapped `--human` merge slipped the gate entirely on origin/main.
-    const { status } = runHook(
-      bashPayload(
-        "for f in 1 2; do scripts/workflow/merge-pr.sh $f --human; done"
-      )
-    );
-    expect(status).toBe(2);
-  });
-
-  it("blocks an invocation in a `then` branch", () => {
-    const { status } = runHook(
-      bashPayload("if true; then scripts/workflow/merge-pr.sh 123 --human; fi")
-    );
+  // --- Shell-wrapper class (pre-existing holes, closed by PP-c0uy) ---
+  // The trigger used to require a recognized command-start position, which made it
+  // an open-ended blacklist of invocation wrappers — every one of these reached a
+  // full `--human` merge on origin/main. The fix stopped enumerating wrappers and
+  // made the trigger "is merge-pr.sh named at all", letting the anchored allowlist
+  // adjudicate. These are the shapes that motivated it; the point is the class,
+  // not the list.
+  it.each([
+    [
+      "for … do … done loop body",
+      "for f in 1 2; do scripts/workflow/merge-pr.sh $f --human; done",
+    ],
+    [
+      "then branch",
+      "if true; then scripts/workflow/merge-pr.sh 123 --human; fi",
+    ],
+    [
+      "else branch",
+      "if false; then :; else scripts/workflow/merge-pr.sh 123 --human; fi",
+    ],
+    ["eval wrapper", "eval scripts/workflow/merge-pr.sh 123 --human"],
+    ["exec wrapper", "exec scripts/workflow/merge-pr.sh 123 --human"],
+    ["command wrapper", "command scripts/workflow/merge-pr.sh 123 --human"],
+    ["time wrapper", "time scripts/workflow/merge-pr.sh 123 --human"],
+    ["nohup wrapper", "nohup scripts/workflow/merge-pr.sh 123 --human"],
+    ["brace group", "{ scripts/workflow/merge-pr.sh 123 --human; }"],
+    [
+      "case branch",
+      "case x in x) scripts/workflow/merge-pr.sh 123 --human;; esac",
+    ],
+    ["xargs", "xargs -I{} scripts/workflow/merge-pr.sh {} --human <<< 123"],
+  ])("blocks a merge-pr.sh invocation via %s", (_label, command) => {
+    const { status } = runHook(bashPayload(command));
     expect(status).toBe(2);
   });
 

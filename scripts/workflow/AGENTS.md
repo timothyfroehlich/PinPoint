@@ -8,6 +8,8 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 **Merging is human-only (PP-wi85), with one carve-out (PP-c0uy).** `merge-pr.sh` is blocked for agents by the `block-direct-merge.cjs` PreToolUse hook in every invocation shape (including `--dry-run`) **except** `merge-pr.sh <PR> --dependabot` with no `--human` / `--force` / `--bypass-merge-requirements`. Agents run every other script in this directory freely, including `pr-screenshots.mjs` and `mark-claude-review.sh`. For anything that isn't a Dependabot dependency bump, Tim runs the merge directly (`scripts/workflow/merge-pr.sh <PR> --human`) once an agent hands the PR off as ready.
 
+> **Quote the path when you merely _mention_ the merge script in a command.** The hook triggers on any unquoted occurrence of its basename in the command string — so `shellcheck scripts/workflow/merge-pr.sh` is refused, while `shellcheck "scripts/workflow/merge-pr.sh"` is fine. Same for `rg`, `git diff -- <path>`, and heredocs (which aren't quote-stripped). That bluntness is deliberate: the trigger stopped trying to enumerate shell invocation wrappers (`eval`, `exec`, `command`, `time`, `{ …; }`, `for … do`, `case`) — each was a bypass — and now defers every decision to one anchored whole-command allowlist.
+
 ## Scripts
 
 ### PR Monitoring

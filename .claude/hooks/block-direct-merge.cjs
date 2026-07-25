@@ -75,23 +75,26 @@ process.stdin.on("end", () => {
       }
     }
 
-    // scripts/workflow/merge-pr.sh — detect at a command-start position, tolerating
-    // `bash`/`sh` wrappers, leading `VAR=val` assignments (bare or after `env`),
-    // and a relative/absolute path prefix ahead of the basename. Quote-stripped
-    // `stripped` reuses the same false-positive protection as the gh checks above
-    // (docs/echo mentions don't match).
-    const mergeScript = new RegExp(
-      cmdStart.source +
-        "(?:(?:do|then|else)\\s+)?" + // optional shell keyword — `for …; do merge-pr.sh …`
-        // slipped the gate entirely before PP-c0uy, since `do ` matched none of
-        // the prefixes below and the `;` cmdStart anchor stopped there.
-        "(?:env\\s+)?" + // optional `env` wrapper
-        "(?:[A-Za-z_][A-Za-z0-9_]*=\\S+\\s+)*" + // optional leading VAR=val assignments (bare or after env)
-        "(?:(?:bash|sh)\\s+)?" + // optional interpreter wrapper
-        "(?:\\S*/)?" + // optional path prefix (relative or absolute)
-        "merge-pr\\.sh\\b"
-    );
-    if (mergeScript.test(stripped)) {
+    // scripts/workflow/merge-pr.sh — TRIGGER on any mention in the quote-stripped
+    // command, then allow through only the one exact carve-out shape below.
+    //
+    // The trigger deliberately does NOT try to recognize a command-start position.
+    // It used to, and that was an open-ended blacklist of invocation wrappers: it
+    // grew `env`, then bare `VAR=val`, then `do|then|else`, and STILL let a full
+    // `--human` merge through under `eval`, `exec`, `command`, `time`, `nohup`,
+    // `xargs`, `{ …; }`, and `case … in … esac`. Enumerating shell wrappers never
+    // converges. Since the carve-out is now an anchored whole-command allowlist,
+    // the trigger doesn't need to locate a command start at all — it only needs to
+    // notice that merge-pr.sh is named at all, and let the allowlist adjudicate.
+    // That kills the entire wrapper class at once, including wrappers nobody has
+    // thought of yet.
+    //
+    // Keeping the trigger on `stripped` preserves the quoted-mention exemptions:
+    // `echo "…merge-pr.sh…"` and `rg "merge-pr.sh" docs/` are unaffected. The cost
+    // is that an *unquoted* mention (`rg merge-pr.sh docs/`, `shellcheck
+    // scripts/workflow/merge-pr.sh`) now gets refused — quote the path and it works.
+    // That is the correct direction to be wrong in.
+    if (/merge-pr\.sh/.test(stripped)) {
       // Dependabot carve-out (PP-c0uy). This is an ALLOWLIST, not a blacklist:
       // the ENTIRE raw command must be exactly one merge-pr.sh invocation with
       // exactly the permitted arguments, anchored ^...$. Anything else at all —
@@ -111,8 +114,17 @@ process.stdin.on("end", () => {
       // will run is unsound in principle — every quoting trick is a bypass. An
       // anchored allowlist against the raw string has the opposite failure mode:
       // an unanticipated shape is refused, which is merely inconvenient.
+      //
+      // Regex notes:
+      //   [ \t] not \s   — \s matches newlines, which would let a second line ride
+      //                    along inside the anchors. Horizontal space only.
+      //   \/?[A-Za-z0-9_.] — the path may start with `/` or `./` but NOT `-`, so
+      //                    `sh -c/merge-pr.sh …` can't pass `-c` off as a path.
+      //   \d             — ASCII 0-9 (no /u flag), so no Unicode-digit surprises.
+      //   $              — end-of-input in JS without /m; a trailing newline does
+      //                    not satisfy it.
       const DEPENDABOT_CARVE_OUT =
-        /^\s*(?:(?:bash|sh)\s+)?(?:[A-Za-z0-9_.\-/]*\/)?merge-pr\.sh\s+\d+\s+--dependabot(?:\s+--dry-run)?\s*$/;
+        /^[ \t]*(?:(?:bash|sh)[ \t]+)?(?:\/?[A-Za-z0-9_.][A-Za-z0-9_.\-/]*\/)?merge-pr\.sh[ \t]+\d+[ \t]+--dependabot(?:[ \t]+--dry-run)?[ \t]*$/;
 
       if (!DEPENDABOT_CARVE_OUT.test(cmd)) {
         isMergeScriptAttempt = true;
