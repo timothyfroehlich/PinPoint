@@ -58,6 +58,31 @@
             "type": "command",
             "command": "node .claude/hooks/block-main-worktree-branch-switch.cjs",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-drizzle-push.cjs",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-loopback-literal.cjs",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-worktree-dispatch-from-linked.cjs",
+            "timeout": 5000
           }
         ]
       }
