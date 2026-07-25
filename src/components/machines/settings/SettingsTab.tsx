@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, Info, Wrench } from "lucide-react";
+import { Plus, Info, Wrench, Check } from "lucide-react";
 import { toast } from "sonner";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Button } from "~/components/ui/button";
@@ -212,11 +212,17 @@ function useUnsavedChangesGuard({
   }, [enabled, hasFailed, hasUnsaved, hasUnsavedDraft, flushUnsaved]);
 }
 
-// Filter-chip styling, shared by the category segment and the Tournament toggle.
+// Filter-chip styling. The category segment and the Tournament toggle are two
+// DIFFERENT kinds of control, so they must not look alike: a solid fill means
+// "this is the one selected category", while the independent toggle uses a
+// checked outline. Rendering both as solid pills read as one multi-select row,
+// which is how a stuck Tournament filter hid in plain sight (PP-tn6t review).
 const chipClass =
-  "rounded-full border px-3 py-1 text-xs font-medium transition-colors motion-reduce:transition-none";
+  "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors motion-reduce:transition-none";
 const chipActive = "border-primary bg-primary text-primary-foreground";
 const chipIdle = "border-outline-variant text-muted-foreground hover:bg-muted";
+/** Independent toggle in its ON state — checked outline, never a solid fill. */
+const chipToggleActive = "border-primary bg-primary/10 text-primary";
 
 interface SettingsTabProps {
   /** Machine-wide gate: may this viewer CREATE a set + edit the machine-level
@@ -1229,7 +1235,10 @@ export function SettingsTab({
           role="group"
           aria-label="Filter settings sets"
         >
-          {/* Category — single-select (clicking the active one returns to All). */}
+          {/* Category — single-select (clicking the active one returns to All).
+              "All" is the row's reset: it clears the category AND the
+              Tournament toggle, because "All" reads as "no filters" and a user
+              who clicks it expects to see every set again (PP-tn6t review). */}
           {(
             [
               { key: "all", label: "All", count: sets.length, show: true },
@@ -1256,16 +1265,25 @@ export function SettingsTab({
           )
             .filter((chip) => chip.show)
             .map((chip) => {
-              const active = category === chip.key;
+              // "All" only reads as selected when NOTHING is filtered — a lit
+              // "All" next to a filtered list is exactly the contradiction that
+              // made the Tournament filter feel un-clearable.
+              const active =
+                chip.key === "all"
+                  ? category === "all" && !tournamentFilter
+                  : category === chip.key;
               return (
                 <button
                   key={chip.key}
                   type="button"
                   aria-pressed={active}
                   onClick={() => {
-                    setCategory((c) =>
-                      chip.key === "all" || c === chip.key ? "all" : chip.key
-                    );
+                    if (chip.key === "all") {
+                      setCategory("all");
+                      setTournamentFilter(false);
+                      return;
+                    }
+                    setCategory((c) => (c === chip.key ? "all" : chip.key));
                   }}
                   className={cn(chipClass, active ? chipActive : chipIdle)}
                 >
@@ -1287,8 +1305,14 @@ export function SettingsTab({
             onClick={() => {
               setTournamentFilter((v) => !v);
             }}
-            className={cn(chipClass, tournamentFilter ? chipActive : chipIdle)}
+            className={cn(
+              chipClass,
+              tournamentFilter ? chipToggleActive : chipIdle
+            )}
           >
+            {tournamentFilter && (
+              <Check className="size-3" aria-hidden="true" />
+            )}
             Tournament{" "}
             <span className={tournamentFilter ? "opacity-80" : "opacity-60"}>
               {String(tournamentCount)}
