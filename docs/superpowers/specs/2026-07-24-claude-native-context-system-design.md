@@ -207,7 +207,20 @@ Dispatching `Agent(isolation: "worktree")` from a linked worktree silently switc
 
 The check is mechanically decidable: in a linked worktree `.git` is a **file** containing `gitdir: …/.git/worktrees/<name>`, while in the main worktree `.git` is a **directory**. The hook denies when cwd is a linked worktree and `tool_input.isolation === "worktree"`.
 
-Feasibility verified empirically rather than from documentation: `PreToolUse:Agent` fires 30 times in the 50-transcript scan window, so the tool name is `Agent` and PreToolUse matches it in this setup. PreToolUse can deny via exit code 2 or `permissionDecision: "deny"`, and receives `tool_input`.
+**Feasibility status — partially verified, one open question.**
+
+What is established:
+
+- The subagent tool is named `Agent`. Hook attachment records use `hookName: "PreToolUse:<tool>"`, and `PreToolUse:Agent` appears 30 times in the 50-transcript scan.
+- PreToolUse hooks **do** fire on `Agent` tool calls — those 30 fires came from a wildcard-matcher plugin hook (`${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.py`), 20 in PinPoint and 10 in the pinballmap worktree.
+- PreToolUse can deny via exit code 2 or `permissionDecision: "deny"`, and receives `tool_input`.
+- The hook's own logic is correct against real worktrees: fed a realistic payload it exits 2 from a linked worktree and 0 from the main worktree.
+
+What is **not** established: that the literal matcher `"Agent"` matches. `hookName` reflects the tool being invoked, not the configured matcher — PinPoint's settings matched only `Bash`, yet `PreToolUse:Read`, `:ToolSearch`, and `:TaskUpdate` all appear in the scan. So the 30 fires prove a _wildcard_ matcher catches `Agent`, not that an exact one does. The docs describe matchers as exact-string-or-regex against tool names, which makes `"Agent"` the documented form, but that is inference rather than observation.
+
+**A live smoke test on 2026-07-24 was inconclusive, and the reason is itself worth recording: hooks in `.claude/settings.json` do not hot-reload.** Registering all three hooks mid-session left them inert — a worktree dispatch from a linked worktree went through unblocked, and a probe command matching `block-drizzle-push`'s regex also passed, even though that hook was added to an already-existing `Bash` matcher block. One cause explains both. Confirming the `Agent` matcher therefore requires a **fresh session started after the hooks are committed**, and that is a pre-merge gate on PR 1 (§11).
+
+(Incidentally, that dispatch did **not** reproduce #47548 — the parent worktree stayed on its own branch. The bug may be intermittent or fixed upstream in 2.1.219. That is not a reason to drop the hook: an intermittent silent branch switch is worse than a consistent one, and the guard costs nothing when the bug does not fire.)
 
 Rejected alternative: the `SubagentStart` event. It fires once the subagent is already spawned — too late to prevent the branch switch — and matches on agent type rather than tool input, so it cannot see `isolation`.
 
@@ -278,7 +291,15 @@ This catches renames, deletions, and orphans — the drift that actually bites �
 
 **#1736 merges first.** Everything else is blocked on it (§7).
 
-**PR 1 — enforcement.** `block-drizzle-push.cjs`, `block-loopback-literal.cjs`, `block-worktree-dispatch-from-linked.cjs`, unit tests for all three, `check:rule-ids`. Self-contained; useful the moment it lands; no doc churn. The worktree hook must be manually smoke-tested from inside a linked worktree before merge — a unit test proves the predicate, not that the hook fires on real `Agent` dispatch.
+**PR 1 — enforcement.** `block-drizzle-push.cjs`, `block-loopback-literal.cjs`, `block-worktree-dispatch-from-linked.cjs`, unit tests for all three, `check:rule-ids`. Self-contained; useful the moment it lands; no doc churn.
+
+**Pre-merge gate on PR 1 — a fresh session must smoke-test all three hooks.** Unit tests prove the predicates; they cannot prove the harness invokes the hooks, and hooks do not hot-reload, so this is impossible from the session that wrote them (§6). In a session started after the hooks are committed, from inside a linked worktree:
+
+1. `echo drizzle-kit push` → expect a block citing CORE-ARCH-009.
+2. Write `127.0.0.1` into `supabase/config.toml` → expect a block citing CORE-SEC-008.
+3. Dispatch `Agent(isolation: "worktree")` → expect a block citing #47548. **This is the one that can fail for a second reason** — if it passes while 1 and 2 block, the `"Agent"` matcher is not exact-matching and needs a regex or wildcard form instead.
+
+Step 3 carries a small risk: an unblocked dispatch can trigger #47548 and switch the worktree's branch. Commit first; recovery is `git checkout <branch>`, and the stray worktree needs `scripts/worktree_cleanup.py`.
 
 **PR 2 — the context system.** CLAUDE.md rewrite, `.claude/rules/`, AGENTS.md stub, `CODE_REVIEW.md`, copilot-instructions stub, Antigravity retirement, skill merges. Kept together because CLAUDE.md points at `CODE_REVIEW.md` and at merged skill names — splitting leaves dangling pointers.
 
@@ -286,12 +307,14 @@ Both from `worktree-context-system-rebuild`, which already carries this session'
 
 ## 12. Risks
 
-| Risk                                                        | Mitigation                                                                                                                                     |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| PP-c0uy carve-out silently lost in conflict resolution      | §7 records the exact wording; `check:rule-ids` will not catch this — it is a manual verification step                                          |
-| A rule falls through the tiers and lands nowhere            | `check:rule-ids` rule 2 warns on orphaned catalog entries                                                                                      |
-| `CODE_REVIEW.md` written but never loaded                   | The `.github/copilot-instructions.md` stub is what makes it load; verify on the first PR after merge that Copilot's review cites a `CORE-*` ID |
-| Path-scoped rules don't fire for creation-type prohibitions | Those stay in CLAUDE.md by design (§4.3)                                                                                                       |
-| CLAUDE.md drifts back over 200 lines                        | No automated gate proposed; `/doctor` surfaces it on demand                                                                                    |
-| A rule cut from CLAUDE.md lands in no skill                 | Grep-verify every cut against its destination skill before removing it — doing this for §9 found a genuine hole (step 6, the deploy watch)     |
-| Antigravity retirement is premature                         | Everything is recoverable from git history                                                                                                     |
+| Risk                                                                        | Mitigation                                                                                                                                     |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| PP-c0uy carve-out silently lost in conflict resolution                      | §7 records the exact wording; `check:rule-ids` will not catch this — it is a manual verification step                                          |
+| A rule falls through the tiers and lands nowhere                            | `check:rule-ids` rule 2 warns on orphaned catalog entries                                                                                      |
+| `CODE_REVIEW.md` written but never loaded                                   | The `.github/copilot-instructions.md` stub is what makes it load; verify on the first PR after merge that Copilot's review cites a `CORE-*` ID |
+| Path-scoped rules don't fire for creation-type prohibitions                 | Those stay in CLAUDE.md by design (§4.3)                                                                                                       |
+| CLAUDE.md drifts back over 200 lines                                        | No automated gate proposed; `/doctor` surfaces it on demand                                                                                    |
+| A rule cut from CLAUDE.md lands in no skill                                 | Grep-verify every cut against its destination skill before removing it — doing this for §9 found a genuine hole (step 6, the deploy watch)     |
+| `"matcher": "Agent"` does not exact-match, so the worktree hook never fires | Pre-merge smoke test step 3 (§11) detects exactly this; fallback is a regex or wildcard matcher                                                |
+| A hook is edited and assumed live in the same session                       | Hooks load at session start and do not hot-reload (§6). Any hook change needs a fresh session before it can be tested or trusted               |
+| Antigravity retirement is premature                                         | Everything is recoverable from git history                                                                                                     |
