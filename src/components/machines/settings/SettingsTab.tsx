@@ -234,9 +234,6 @@ interface SettingsTabProps {
   /** The machine owner's user id — hides the redundant "Owner's" chip when the
    *  viewer IS the owner, and derives new-set ownership. */
   machineOwnerId: string | null;
-  /** The machine owner's display name for the "Owned by" line (name only —
-   *  CORE-SEC-007). */
-  ownerName: string | null;
   machineId: string;
   initialSets: SettingsSetData[];
   /** Machine-level "Before you change anything" — the owner's honor-system
@@ -252,7 +249,6 @@ export function SettingsTab({
   canCreate,
   viewerId,
   machineOwnerId,
-  ownerName,
   machineId,
   initialSets,
   settingsRequests,
@@ -420,7 +416,13 @@ export function SettingsTab({
         mutateSets((prev) =>
           prev.map((s) =>
             s.id === setId
-              ? { ...s, id: realId, updatedBy: "You", updatedAt: today() }
+              ? {
+                  ...s,
+                  id: realId,
+                  updatedBy: "You",
+                  updatedById: viewerId,
+                  updatedAt: today(),
+                }
               : s
           )
         );
@@ -460,7 +462,14 @@ export function SettingsTab({
       if (result.changed) {
         mutateSets((prev) =>
           prev.map((s) =>
-            s.id === setId ? { ...s, updatedBy: "You", updatedAt: today() } : s
+            s.id === setId
+              ? {
+                  ...s,
+                  updatedBy: "You",
+                  updatedById: viewerId,
+                  updatedAt: today(),
+                }
+              : s
           )
         );
       }
@@ -478,7 +487,7 @@ export function SettingsTab({
       if (!newerPending) saveStatus.markClean(setId);
       return { outcome: { ok: true } };
     },
-    [machineId, mutateSets, saveStatus]
+    [machineId, mutateSets, saveStatus, viewerId]
   );
 
   const saveQueue = useSettingsSaveQueue(execute);
@@ -689,7 +698,9 @@ export function SettingsTab({
     const apply = (s: SettingsSetData): SettingsSetData => ({
       ...s,
       isPreferred: s.id === id ? next : next ? false : s.isPreferred,
-      ...(s.id === id && next ? { updatedBy: "You", updatedAt: today() } : {}),
+      ...(s.id === id && next
+        ? { updatedBy: "You", updatedById: viewerId, updatedAt: today() }
+        : {}),
     });
     mutateSets((prev) => prev.map(apply));
     for (const [bid, b] of baselineRef.current) {
@@ -768,6 +779,7 @@ export function SettingsTab({
       canEdit: true,
       canSetDefault: viewerIsOwner,
       updatedBy: "You",
+      updatedById: viewerId,
       updatedAt: today(),
       sections: original.sections.map(cloneSection),
     };
@@ -811,6 +823,7 @@ export function SettingsTab({
       canEdit: true,
       canSetDefault: isOwnerSet,
       updatedBy: "You",
+      updatedById: viewerId,
       updatedAt: today(),
       description: null,
       sections: [],
@@ -1222,13 +1235,6 @@ export function SettingsTab({
         />
       </div>
 
-      {ownerName !== null && (
-        <p className="text-xs text-muted-foreground">
-          Owned by{" "}
-          <span className="font-medium text-foreground">{ownerName}</span>
-        </p>
-      )}
-
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div
           className="flex flex-wrap items-center gap-1.5"
@@ -1351,6 +1357,9 @@ export function SettingsTab({
               isExpanded={expandedIds.has(set.id)}
               canEdit={set.canEdit}
               canSetDefault={set.canSetDefault}
+              updatedByIsOwner={
+                machineOwnerId !== null && set.updatedById === machineOwnerId
+              }
               isNew={newIds.has(set.id)}
               onNameBlur={() => {
                 stagePayload(set.id);

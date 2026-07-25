@@ -75,6 +75,7 @@ export async function getMachineSettingsSets(
       createdBy: true,
       description: true,
       sections: true,
+      updatedBy: true,
       updatedAt: true,
     },
     with: { updatedByUser: { columns: { name: true } } },
@@ -115,6 +116,7 @@ export async function getMachineSettingsSets(
       description: row.description ?? null,
       sections: withRenderKeys(row.sections),
       updatedBy: row.updatedByUser?.name ?? "Unknown",
+      updatedById: row.updatedBy,
       updatedAt: row.updatedAt.toISOString().slice(0, 10),
     }));
 }

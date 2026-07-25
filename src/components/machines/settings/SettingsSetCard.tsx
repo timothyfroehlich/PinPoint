@@ -39,6 +39,7 @@ import {
 } from "~/components/ui/alert-dialog";
 import { Card, CardContent } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
+import { OwnerBadge } from "~/components/issues/OwnerBadge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,6 +79,10 @@ interface SettingsSetCardProps {
    *  an owner set). Gates the "Set as Owner's default" menu item specifically —
    *  a community set is never eligible even to an editor. */
   canSetDefault: boolean;
+  /** The last editor IS the machine owner — the audit line carries the same
+   *  OwnerBadge the issue pages use, so "who touched this" reads consistently
+   *  across the app. Computed by the parent against the machine's owner id. */
+  updatedByIsOwner: boolean;
   /** Unsaved set (temp id). Preferred/Duplicate/Publish target a persisted row,
    *  so they are disabled until the first save. */
   isNew: boolean;
@@ -245,6 +250,7 @@ export function SettingsSetCard({
   isExpanded,
   canEdit,
   canSetDefault,
+  updatedByIsOwner,
   isNew,
   onMoveSection,
   onToggleExpand,
@@ -631,7 +637,11 @@ export function SettingsSetCard({
             when there is none). */}
         <div className="flex items-center gap-2 pb-3 pl-11 pr-4 max-md:px-0 max-md:pb-2">
           <p className="min-w-0 text-xs text-muted-foreground">
-            updated by {set.updatedBy} {formatShortDate(set.updatedAt)}
+            updated by {set.updatedBy}
+            {updatedByIsOwner && (
+              <OwnerBadge size="sm" className="mx-1 align-middle" />
+            )}{" "}
+            {formatShortDate(set.updatedAt)}
           </p>
         </div>
       </div>

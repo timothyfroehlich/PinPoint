@@ -103,6 +103,10 @@ export interface SettingsSetData {
    *  (owner/admin on an owner set). False for community sets. */
   canSetDefault: boolean;
   updatedBy: string;
+  /** Last editor's user id — lets the audit line flag an edit made by the
+   *  machine owner (the OwnerBadge). Null when that user was later deleted
+   *  (updated_by is ON DELETE SET NULL). */
+  updatedById: string | null;
   updatedAt: string;
   description: ProseMirrorDoc | null;
   sections: SettingsSection[];

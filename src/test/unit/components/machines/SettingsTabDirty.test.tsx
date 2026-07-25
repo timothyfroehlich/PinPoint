@@ -157,6 +157,7 @@ function oneSet(over: Partial<SettingsSetData> = {}): SettingsSetData {
     isPreferred: false,
     ...setDefaults(),
     updatedBy: "You",
+    updatedById: "u1",
     updatedAt: "2026-06-09",
     description: null,
     sections: [
@@ -180,6 +181,7 @@ function twoNoteSet(over: Partial<SettingsSetData> = {}): SettingsSetData {
     isPreferred: false,
     ...setDefaults(),
     updatedBy: "You",
+    updatedById: "u1",
     updatedAt: "2026-06-09",
     description: null,
     sections: [
@@ -209,6 +211,7 @@ function dipSet(over: Partial<SettingsSetData> = {}): SettingsSetData {
     isPreferred: false,
     ...setDefaults(),
     updatedBy: "You",
+    updatedById: "u1",
     updatedAt: "2026-06-09",
     description: null,
     sections: [
@@ -234,7 +237,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
@@ -257,7 +259,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
@@ -288,7 +289,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -331,7 +331,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
@@ -363,7 +362,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate={false}
         viewerId="u2"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet({ canEdit: false })]}
         settingsRequests={null}
@@ -384,7 +382,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate={false}
         viewerId="u2"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet({ canEdit: false })]}
         settingsRequests={null}
@@ -415,7 +412,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate={false}
         viewerId="u2"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[setWithDesc]}
         settingsRequests={null}
@@ -434,7 +430,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate={false}
         viewerId="u2"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[dipSet({ canEdit: false })]}
         settingsRequests={null}
@@ -459,7 +454,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate={false}
         viewerId="u2"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet({ canEdit: false })]}
         settingsRequests={null}
@@ -491,7 +485,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
@@ -514,7 +507,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[
           {
@@ -580,7 +572,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[twoNoteSet()]}
         settingsRequests={null}
@@ -617,7 +608,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[]}
         settingsRequests={null}
@@ -662,7 +652,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[]}
         settingsRequests={null}
@@ -700,7 +689,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[]}
           settingsRequests={null}
@@ -754,7 +742,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[]}
           settingsRequests={null}
@@ -793,7 +780,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[]}
         settingsRequests={null}
@@ -834,7 +820,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -889,7 +874,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -946,7 +930,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -1001,7 +984,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -1059,7 +1041,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -1121,7 +1102,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -1180,7 +1160,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -1242,7 +1221,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -1284,7 +1262,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
@@ -1322,7 +1299,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[setWithDescOpen]}
         settingsRequests={null}
@@ -1364,7 +1340,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
           canCreate
           viewerId="u1"
           machineOwnerId="u1"
-          ownerName="Owner"
           machineId="m1"
           initialSets={[oneSet()]}
           settingsRequests={null}
@@ -1412,7 +1387,6 @@ describe("SettingsTab — always-live auto-save model (PP-43q3 pivot)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[oneSet()]}
         settingsRequests={null}
@@ -1492,7 +1466,6 @@ describe("SettingsTab — data-loss regression (A1, 🔴)", () => {
         canCreate
         viewerId="u1"
         machineOwnerId="u1"
-        ownerName="Owner"
         machineId="m1"
         initialSets={[]}
         settingsRequests={null}
@@ -1596,7 +1569,6 @@ describe("SettingsTab — category chip counts partition by kind", () => {
         canCreate
         viewerId="viewer-x"
         machineOwnerId="owner-y"
-        ownerName="Owner"
         machineId="m1"
         initialSets={sets}
         settingsRequests={null}
@@ -1613,5 +1585,98 @@ describe("SettingsTab — category chip counts partition by kind", () => {
     expect(
       screen.getByRole("button", { name: /^Community 2$/ })
     ).toBeInTheDocument();
+  });
+});
+
+describe("SettingsTab — audit line credits the machine owner", () => {
+  // The tab used to carry a standalone "Owned by <name>" line above the list.
+  // That said who owns the MACHINE but nothing about who touched each SET, so
+  // it moved into the per-set audit line as the same OwnerBadge the issue pages
+  // use (PP-tn6t review).
+  it("badges the audit line when the last editor is the machine owner", () => {
+    render(
+      <SettingsTab
+        canCreate
+        viewerId="viewer-x"
+        machineOwnerId="owner-y"
+        machineId="m1"
+        initialSets={[
+          oneSet({
+            id: "by-owner",
+            name: "Owner's tweak",
+            updatedBy: "Owner Person",
+            updatedById: "owner-y",
+          }),
+        ]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    expect(screen.getByText(/updated by Owner Person/)).toBeInTheDocument();
+    expect(screen.getByTestId("owner-badge")).toBeInTheDocument();
+  });
+
+  it("shows no badge when the last editor is not the owner", () => {
+    render(
+      <SettingsTab
+        canCreate
+        viewerId="viewer-x"
+        machineOwnerId="owner-y"
+        machineId="m1"
+        initialSets={[
+          oneSet({
+            id: "by-tech",
+            name: "Tech tweak",
+            updatedBy: "Tech Person",
+            updatedById: "tech-z",
+          }),
+        ]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    expect(screen.getByText(/updated by Tech Person/)).toBeInTheDocument();
+    expect(screen.queryByTestId("owner-badge")).toBeNull();
+  });
+
+  it("shows no badge on an unowned machine, even for a null editor", () => {
+    // machineOwnerId null must never collide with a deleted user's null id.
+    render(
+      <SettingsTab
+        canCreate
+        viewerId="viewer-x"
+        machineOwnerId={null}
+        machineId="m1"
+        initialSets={[
+          oneSet({
+            id: "orphan",
+            updatedBy: "Unknown",
+            updatedById: null,
+          }),
+        ]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    expect(screen.queryByTestId("owner-badge")).toBeNull();
+  });
+
+  it("no longer renders the standalone 'Owned by' line", () => {
+    render(
+      <SettingsTab
+        canCreate
+        viewerId="viewer-x"
+        machineOwnerId="owner-y"
+        machineId="m1"
+        initialSets={[oneSet()]}
+        settingsRequests={null}
+        settingsInstructions={null}
+      />
+    );
+
+    expect(screen.queryByText(/owned by/i)).toBeNull();
   });
 });

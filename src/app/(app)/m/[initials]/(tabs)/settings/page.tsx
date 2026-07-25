@@ -65,7 +65,6 @@ export default async function MachineSettingsTab({
         canCreate={canCreate}
         viewerId={user?.id ?? null}
         machineOwnerId={machineOwnerId}
-        ownerName={machine.owner?.name ?? null}
         machineId={machine.id}
         initialSets={sets}
         settingsRequests={machine.settingsRequests ?? null}

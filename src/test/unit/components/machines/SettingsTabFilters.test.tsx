@@ -92,6 +92,7 @@ function makeSet(over: Partial<SettingsSetData> & { name: string }) {
     canEdit: false,
     canSetDefault: false,
     updatedBy: "Someone",
+    updatedById: null,
     updatedAt: "2026-07-24",
     description: null,
     sections: [],
@@ -148,7 +149,6 @@ function renderTab(
       canCreate={false}
       viewerId={viewerId}
       machineOwnerId={OWNER}
-      ownerName="Member User"
       machineId={MACHINE}
       initialSets={sets}
       settingsRequests={null}
