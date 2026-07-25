@@ -24,6 +24,30 @@
 #                                 Any precondition failure is a hard REFUSE with no bypass.
 #                                 --force and --bypass-merge-requirements are rejected
 #                                 outright in combination with --dependabot.
+#
+#                                 THE REVIEWED GATE IS THE LOAD-BEARING CONTROL HERE.
+#                                 The three preconditions above are metadata checks; the
+#                                 thing actually standing between a compromised or
+#                                 tampered dependency bump and production is a person or
+#                                 agent reading the diff. GitHub issues no Copilot review
+#                                 for Dependabot PRs, so the gate passes only via
+#                                 `mark-claude-review.sh`, which is an HONESTY CONTRACT:
+#                                 it attests that YOU personally read the diff at that
+#                                 exact head SHA. It verifies nothing. Never post it for a
+#                                 diff you did not read. It is SHA-pinned, so any new
+#                                 commit (including a @dependabot rebase) voids it and you
+#                                 must read and attest again.
+#
+#                                 WHAT TO LOOK FOR: anything that is not a dependency
+#                                 bump. A `.github/workflows/**` edit above all —
+#                                 that path is necessarily allowlisted (Dependabot bumps
+#                                 pinned action SHAs there), so a workflow change riding
+#                                 along in a "dependency bump" is CI execution with repo
+#                                 secrets. Also: a version delta that doesn't match the
+#                                 title, a lockfile diff out of proportion to the bump, an
+#                                 unrecognized dependency, added lifecycle scripts, and —
+#                                 for action bumps — a `# ratchet:` comment whose claimed
+#                                 tag doesn't match the SHA beside it. Escalate, don't merge.
 #   --dry-run                     Print would-do summary, take no action. Does not require --human.
 #   --force                       Bypass currency + threads + reviewed gates.
 #   --bypass-merge-requirements   Bypass ci gate AND pass --admin to gh pr merge
@@ -159,25 +183,29 @@ if [ "$DEPENDABOT" = "true" ]; then
   #
   # A commit's *author* is settable metadata, so the login check alone is weak:
   # `git commit --author="dependabot[bot] <49699333+dependabot[bot]@users.noreply.
-  # github.com>"` reports `login: dependabot[bot]` and sails past it. The signature
-  # requirement is what makes the guard bite.
+  # github.com>"` reports `login: dependabot[bot]` and sails past it.
   #
-  # WHAT THE SIGNATURE CHECK IS KNOWN TO BUY, AND WHAT IS STILL OPEN (PP-c0uy):
-  #   Settled: it kills the locally-forged `git commit --author=…` spoof. Genuine
-  #   Dependabot commits come back `verification.verified = true` (confirmed on
-  #   #1725/#1731); a locally-signed-by-nobody commit is `false`/`unsigned`
-  #   (confirmed on #1661's human commits).
-  #   OPEN: whether a commit created through the Contents API (which sets `author`
-  #   independently of `committer`) can come back BOTH `verified = true` and
-  #   `author.login = dependabot[bot]`. GitHub web-flow-signs commits it creates on
-  #   your behalf, and `committer` cannot discriminate here — genuine Dependabot
-  #   commits are themselves API-created and already report `committer: GitHub`.
-  #   Nobody has run the experiment (it writes commits to the remote, which is Tim's
-  #   call), so do NOT read this check as "an attacker would need GitHub's signing
-  #   key". It raises the bar; it is not proven airtight.
+  # WHAT THE SIGNATURE REQUIREMENT DOES AND DOES NOT ESTABLISH (PP-c0uy):
+  #   It kills the locally-forged `git commit --author=…` spoof. Genuine Dependabot
+  #   commits come back `verification.verified = true` (confirmed on #1725/#1731);
+  #   a locally-crafted commit is `unsigned` (confirmed on #1661's human commits).
+  #   It does NOT establish that only GitHub could have produced the commit. The
+  #   Contents API sets `author` independently of `committer`, and `committer` can
+  #   discriminate nothing here — genuine Dependabot commits are themselves
+  #   API-created and already report `committer: GitHub`.
   #
-  # This matters concretely because `.github/workflows/**` is in the path allowlist —
-  # a spoofed commit merged to main is CI execution with repo secrets.
+  # That gap is closed by design, not by more authorship machinery: the backstop
+  # against a commit appended to a Dependabot PR branch is the `reviewed` gate. An
+  # agent must read the diff at the current head SHA and attest to it before this
+  # script will merge, and the attestation is SHA-pinned so an appended commit voids
+  # it. Deliberately do not extend this chain with payload parsing, committer
+  # heuristics, or app-attribution checks — a human/agent reading the diff is the
+  # control, and stacking brittle metadata checks would only obscure that.
+  #
+  # This is why the reviewed gate matters concretely: `.github/workflows/**` is
+  # necessarily in the path allowlist (Dependabot bumps pinned action SHAs there), so
+  # a workflow edit riding along in a "dependency bump" is CI execution with repo
+  # secrets. That is the thing the reviewer is looking for.
   #
   # Uses the paginated REST commits endpoint; a null `.author` (email GitHub can't map
   # to an account) reads as `<no-login>` and fails closed.
@@ -243,9 +271,11 @@ if [ "$DEPENDABOT" = "true" ]; then
     exit 1
   fi
   echo "  PASS: dependabot-files: all changed files within the dependency-bump allowlist"
-  echo "  NOTE: the reviewed gate is NOT waived here. GitHub issues no Copilot review for"
-  echo "        Dependabot PRs, so it passes only via a SHA-pinned Claude review marker —"
-  echo "        review the diff first, then: bash scripts/workflow/mark-claude-review.sh $PR \"<findings>\""
+  echo "  NOTE: the preconditions above are metadata checks. The reviewed gate is the"
+  echo "        load-bearing control: GitHub issues no Copilot review for Dependabot PRs,"
+  echo "        so it passes ONLY via a SHA-pinned marker attesting that you read this diff."
+  echo "        Look for anything that isn't a dependency bump — a .github/workflows/**"
+  echo "        edit above all. Then: bash scripts/workflow/mark-claude-review.sh $PR \"<findings>\""
 fi
 
 # --- Run all 5 gates, collect statuses ---
@@ -299,9 +329,12 @@ if [ ${#GATE_FAILURES[@]} -gt 0 ]; then
   # The reviewed gate is the expected first failure on a Dependabot PR — Copilot never
   # reviews them, so it passes only once an agent has reviewed the diff and attested.
   if [ "$DEPENDABOT" = "true" ] && [[ " ${GATE_FAILURES[*]} " == *" reviewed "* ]]; then
-    echo "HINT: review the diff yourself (version delta + lockfile + any workflow SHA pins),"
-    echo "      then attest: bash scripts/workflow/mark-claude-review.sh $PR \"<one-line findings>\""
-    echo "      Do NOT attest without actually reviewing — the marker is an honesty contract."
+    echo "HINT: this is the expected first failure — no Copilot review exists for a Dependabot"
+    echo "      PR, and it is the gate that matters. Read the diff: is anything here NOT a"
+    echo "      dependency bump? A .github/workflows/** edit is the one to catch. Then attest:"
+    echo "        bash scripts/workflow/mark-claude-review.sh $PR \"<one-line findings>\""
+    echo "      The marker is an honesty contract — it attests YOU read this diff at this head"
+    echo "      SHA and verifies nothing. Never post it for a diff you did not read."
   fi
   if [ "$DRY_RUN" = "true" ]; then
     echo "DRY RUN: would remove ready-for-review label if present"
