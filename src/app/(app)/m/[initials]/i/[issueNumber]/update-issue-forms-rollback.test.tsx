@@ -29,7 +29,7 @@ vi.mock("~/app/(app)/issues/actions", () => ({
 // the PP-0fvr revert bug (a real `useActionState` + a real form submission
 // let Radix's form-reset listener replay a stale value). That bug class is
 // covered separately, with an unmocked `useActionState`, by
-// `src/test/unit/components/issues/status-form-reset-revert.test.tsx`.
+// `src/test/unit/components/issues/metadata-select-reset-revert.test.tsx`.
 const mockUseActionState = vi.fn();
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof React>();

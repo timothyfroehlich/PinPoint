@@ -156,15 +156,25 @@ describe("inline metadata forms: no Radix reset-driven revert (PP-0fvr)", () => 
       await user.click(screen.getByRole("combobox"));
       await user.click(screen.getByRole("option", { name: tc.newOptionLabel }));
 
-      // Wait for the (mocked) action to have been invoked and the pending
-      // state to settle, giving React 19's automatic post-action form
-      // reset a chance to fire if the bug is present.
+      // Wait for the (mocked) action to have been invoked...
       await waitFor(() => {
         expect(tc.action).toHaveBeenCalled();
       });
 
-      // Give any reset-driven second submit time to land.
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      // ...and then for the action transition to actually settle. The
+      // trigger is `disabled={isPending || ...}`, so it re-enabling is the
+      // observable signal that React committed the post-action state —
+      // which is the same commit in which React 19 would fire its
+      // automatic `<form action={...}>` reset (and therefore Radix's
+      // reset-driven second dispatch) if the bug were present. Waiting on
+      // this rather than a fixed sleep keeps the guard from silently
+      // passing on a slow machine where 200ms wasn't enough.
+      await waitFor(() => {
+        expect(screen.getByRole("combobox")).not.toBeDisabled();
+      });
+
+      // Belt and braces: let any straggling reset-driven submit land.
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       const calls = tc.action.mock.calls;
       const values = calls.map((call) => {
