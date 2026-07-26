@@ -238,10 +238,16 @@ def get_supabase_volumes() -> list[tuple[str, str]]:
     if not names:
         return []
 
-    # Tolerate a partial failure here on purpose: on a host running many agent
+    # Tolerate a *partial* failure on purpose: on a host running many agent
     # worktrees a volume can be removed between the `ls` and the `inspect`, and
-    # one racing removal shouldn't blind the whole sweep. A template/daemon
-    # failure yields no parseable output at all, and that still raises.
+    # one racing removal shouldn't blind the whole sweep. `inspect` still writes
+    # the volumes it did resolve to stdout, so those pairs stay trustworthy.
+    #
+    # Anything that leaves stdout empty is reported as unknown instead: a
+    # template or daemon failure, and also the (rare) case where every named
+    # volume raced away at once. Calling that last one "unknown" rather than
+    # "zero" is deliberate — under-claiming knowledge is the whole point of
+    # PP-5o7b, and the next sweep resolves it.
     inspect = subprocess.run(
         [
             "docker",
