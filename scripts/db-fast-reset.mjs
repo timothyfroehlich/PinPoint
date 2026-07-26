@@ -42,9 +42,17 @@ async function fastReset() {
 
     // Reseed
     console.log("🌱 Reseeding data...");
+    // Keep this list in the same ORDER as `db:reset` in package.json, and keep
+    // it COMPLETE for every table the TRUNCATE above reaches. `machines` is
+    // truncated CASCADE, which takes `collections` and `machine_settings_sets`
+    // with it — omitting their seeds left both permanently empty after any
+    // fast-reset, so `preflight`, local E2E runs, and `pr-screenshots` all
+    // silently rendered those pages in their empty state. (PP-tn6t.)
     const seedCommands = [
       "pnpm run db:_seed",
       "pnpm run db:_seed-users",
+      "pnpm run db:_seed-collections",
+      "pnpm run db:_seed-machine-settings",
       "pnpm run db:_seed-discord",
       "pnpm run db:_seed-timeline-backfill",
       "pnpm run db:_seed-timeline-demo",
