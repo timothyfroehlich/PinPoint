@@ -1082,6 +1082,33 @@ describe("Machine settings Server Actions (PP-43q3)", () => {
     expect((await reload(ownerSet.id))?.isPreferred).toBe(true);
   });
 
+  it("owner's default: promoting a private draft also publishes it", async () => {
+    const owner = await makeUser("member");
+    const machine = await makeMachine(owner.id);
+    // An owner-kind set still in the private-draft state (seed set 6's shape).
+    const draft = await insertSet(machine.id, {
+      name: "New ruleset (draft)",
+      isOwnerSet: true,
+      isPublic: false,
+      createdBy: owner.id,
+    });
+
+    await mockAuth(owner.id);
+    const { setPreferredSettingsSetAction } =
+      await import("~/app/(app)/m/[initials]/(tabs)/settings/actions");
+    const res = await setPreferredSettingsSetAction({
+      id: draft.id,
+      isPreferred: true,
+    });
+    expect(res.success).toBe(true);
+
+    // The default is visible to everyone, so it must not stay flagged private —
+    // its Publish toggle is hidden while preferred, so nothing could fix it.
+    const row = await reload(draft.id);
+    expect(row?.isPreferred).toBe(true);
+    expect(row?.isPublic).toBe(true);
+  });
+
   it("owner's default: a community set can never become the default", async () => {
     const owner = await makeUser("member");
     const machine = await makeMachine(owner.id);

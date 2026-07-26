@@ -77,6 +77,14 @@ describe("canEditSet", () => {
     );
   });
 
+  it("unowned machine: an owner-kind set stays technician-editable", () => {
+    // The 0060 backfill marks every pre-existing preferred set as an owner set,
+    // including on machines with no owner — those must not become admin-only.
+    const ownerSet = set({ isOwnerSet: true, isPreferred: true });
+    expect(canEditSet(ownerSet, null, TECH, "technician")).toBe(true);
+    expect(canEditSet(ownerSet, null, OTHER, "member")).toBe(false);
+  });
+
   it("private draft: only its creator (a tech) can edit — not other techs", () => {
     const draft = set({ isPublic: false, createdById: TECH });
     expect(canEditSet(draft, OWNER, TECH, "technician")).toBe(true);

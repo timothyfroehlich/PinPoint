@@ -216,31 +216,46 @@ export async function saveSettingsSetAction(
       : undefined;
     const autoDefault = isOwnerSet && !existingPreferred;
 
-    const newId = await db.transaction(async (tx) => {
-      const [inserted] = await tx
-        .insert(machineSettingsSets)
-        .values({
+    const insertSet = (asDefault: boolean): Promise<string | undefined> =>
+      db.transaction(async (tx) => {
+        const [inserted] = await tx
+          .insert(machineSettingsSets)
+          .values({
+            machineId,
+            name,
+            description,
+            sections,
+            isOwnerSet,
+            isPublic: asDefault,
+            isPreferred: asDefault,
+            createdBy: auth.userId,
+            updatedBy: auth.userId,
+          })
+          .returning({ id: machineSettingsSets.id });
+        if (!inserted) return undefined;
+        await emitSettingsSetEvent(
           machineId,
+          "settings_set_created",
           name,
-          description,
-          sections,
-          isOwnerSet,
-          isPublic: autoDefault,
-          isPreferred: autoDefault,
-          createdBy: auth.userId,
-          updatedBy: auth.userId,
-        })
-        .returning({ id: machineSettingsSets.id });
-      if (!inserted) return undefined;
-      await emitSettingsSetEvent(
-        machineId,
-        "settings_set_created",
-        name,
-        auth.userId,
-        tx
-      );
-      return inserted.id;
-    });
+          auth.userId,
+          tx
+        );
+        return inserted.id;
+      });
+
+    // The `existingPreferred` probe above runs OUTSIDE the transaction, so two
+    // concurrent first-set creates by the same owner (two tabs) both compute
+    // autoDefault=true and the second collides on the partial unique index
+    // `uniq_machine_settings_preferred`. Losing that race is not an error —
+    // a default now exists, so retry as an ordinary private draft rather than
+    // 500-ing and discarding the user's set.
+    let newId: string | undefined;
+    try {
+      newId = await insertSet(autoDefault);
+    } catch (error) {
+      if (!autoDefault || !isPgErrorCode(error, "23505")) throw error;
+      newId = await insertSet(false);
+    }
     if (!newId) return { success: false, error: "Could not create set" };
 
     revalidateMachine(machine.initials);
@@ -524,6 +539,13 @@ export async function setPreferredSettingsSetAction(
         .update(machineSettingsSets)
         .set({
           isPreferred: parsed.data.isPreferred,
+          // The Owner's default is ALWAYS public (`publishSettingsSetAction`
+          // refuses to unpublish it, and the ⋮ menu hides its Publish toggle).
+          // Promoting a private draft must therefore publish it too, or the row
+          // is left `isPublic: false` while everyone can see it — a "Private
+          // draft" badge on a public set, with no control left to correct it,
+          // and a silent disappearance for other viewers once it's unset.
+          ...(parsed.data.isPreferred ? { isPublic: true } : {}),
           updatedBy: actor.userId,
           updatedAt: new Date(),
         })

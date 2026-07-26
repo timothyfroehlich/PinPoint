@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useState } from "react";
+import { Pencil } from "lucide-react";
 import { cn } from "~/lib/utils";
 import {
   docIsEmpty,
@@ -40,10 +41,10 @@ interface InlineMarkdownFieldProps {
   /** Smaller (xs, muted) rendering for the card-header description. */
   compact?: boolean;
   /**
-   * Opt-in click-to-edit: at rest show the finished text (or a one-line
-   * placeholder), opening the editor only on click. Keeps at-rest cards
-   * compact — used by the card-header description. Section bodies leave this
-   * off and stay always-live. (PP-tn6t)
+   * Opt-in click-to-edit: at rest show the finished text with a pencil button
+   * (or a clickable one-line placeholder when empty), opening the editor only
+   * on demand. Keeps at-rest cards compact — used by the card-header
+   * description. Section bodies leave this off and stay always-live. (PP-tn6t)
    */
   clickToEdit?: boolean;
 }
@@ -95,30 +96,63 @@ export function InlineMarkdownField({
   ) : null;
 
   if (canEdit) {
-    // Click-to-edit, at rest: finished text or a one-line placeholder button.
+    // Click-to-edit, at rest.
     if (clickToEdit && !isEditing) {
-      return (
-        <div className={wrapperClassName}>
-          {labelEl}
-          <button
-            type="button"
-            onClick={() => {
-              setIsEditing(true);
-            }}
-            aria-label={`Edit ${label ?? "description"}`}
-            className={cn(
-              "block w-full rounded text-left",
-              EDITABLE_TEXT_CLASS
-            )}
-          >
-            {isEmpty ? (
+      const editLabel = `Edit ${label ?? "description"}`;
+
+      // Empty: the placeholder itself is the button. Its only child is a
+      // <span>, so there is no interactive-nesting problem, and the whole
+      // one-liner stays an easy target.
+      if (isEmpty) {
+        return (
+          <div className={wrapperClassName}>
+            {labelEl}
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditing(true);
+              }}
+              aria-label={editLabel}
+              className={cn(
+                "block w-full rounded text-left",
+                EDITABLE_TEXT_CLASS
+              )}
+            >
               <span className={cn(textSize, "italic text-muted-foreground")}>
                 {placeholder}
               </span>
-            ) : (
-              <RichTextDisplay content={value} className={displayClassName} />
-            )}
-          </button>
+            </button>
+          </div>
+        );
+      }
+
+      // Non-empty: render the rich text as real markup beside a pencil, NOT
+      // inside a <button>. RichTextDisplay emits block content and `autolink`
+      // turns any typed URL into an <a> — an anchor inside a button is invalid
+      // interactive nesting, makes the link unfollowable, and flattens
+      // headings/lists into the button's accessible name. (PP-tn6t review.)
+      return (
+        <div className={wrapperClassName}>
+          {labelEl}
+          <div className="flex items-start gap-1">
+            <RichTextDisplay
+              content={value}
+              className={cn(displayClassName, "min-w-0 flex-1")}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditing(true);
+              }}
+              aria-label={editLabel}
+              className={cn(
+                "shrink-0 rounded p-1 text-muted-foreground transition-colors hover:text-foreground motion-reduce:transition-none",
+                EDITABLE_FIELD_CLASS
+              )}
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
         </div>
       );
     }

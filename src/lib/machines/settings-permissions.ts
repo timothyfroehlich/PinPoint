@@ -59,6 +59,11 @@ export function canEditSet(
   if (!canViewSet(set, viewerId, access)) return false;
   if (access === "admin") return true;
   if (isMachineOwner(machineOwnerId, viewerId)) return true;
+  // An owner set on a machine with NO owner has nobody to protect it for — the
+  // 0060 backfill turns every pre-existing preferred set into an owner set,
+  // including those on unowned machines, which would otherwise leave them
+  // admin-only. Fall back to community rules there so technicians keep them.
+  if (machineOwnerId === null) return isTechPlus(access);
   // Community sets only: technicians+ co-edit. Owner sets stay protected.
   return !set.isOwnerSet && isTechPlus(access);
 }

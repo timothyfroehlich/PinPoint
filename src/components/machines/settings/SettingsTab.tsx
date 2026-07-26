@@ -698,8 +698,15 @@ export function SettingsTab({
     const apply = (s: SettingsSetData): SettingsSetData => ({
       ...s,
       isPreferred: s.id === id ? next : next ? false : s.isPreferred,
+      // Promotion also publishes (the Owner's default is always public) —
+      // mirror the server so the card doesn't keep its "Private draft" badge.
       ...(s.id === id && next
-        ? { updatedBy: "You", updatedById: viewerId, updatedAt: today() }
+        ? {
+            isPublic: true,
+            updatedBy: "You",
+            updatedById: viewerId,
+            updatedAt: today(),
+          }
         : {}),
     });
     mutateSets((prev) => prev.map(apply));
@@ -1252,7 +1259,11 @@ export function SettingsTab({
                 key: "mine",
                 label: "Mine",
                 count: mineCount,
-                show: viewerId !== null && mineCount > 0,
+                // Keep it rendered while it is the ACTIVE filter even at count
+                // 0 — deleting your last set would otherwise pull the lit chip
+                // out from under you, leaving an unexplained empty list.
+                show:
+                  viewerId !== null && (mineCount > 0 || category === "mine"),
               },
               {
                 key: "owners",
