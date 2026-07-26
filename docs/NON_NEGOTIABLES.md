@@ -231,6 +231,17 @@ trigger: always_on
 - **Don't:** Rely on runtime logs/graceful degradation for a var that must exist in prod; reuse one secret as a fallback for a different purpose; prefix a secret `NEXT_PUBLIC_` (it inlines into the client bundle). Same-value alias _names_ (e.g. `SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_SECRET_KEY`) are fine.
 - **Reference:** `docs/ENV_VARS.md` — full catalog, scope matrix, and "adding a new env var" checklist.
 
+**CORE-SEC-010:** Prod-mutating Supabase surfaces stay behind a permission prompt
+
+- **Severity:** Critical
+- **Why:** `pinpoint-prod` (`udhesuizjsgxfeotqybn`) is the **only** project in the Supabase org, so any remote-targeting Supabase call lands on live member data — there is no staging project to hit by mistake. PITR is off; the recovery floor is the previous nightly backup, i.e. up to ~24h of data loss. MCP tool calls do not go through Bash at all, so neither the `PreToolUse` hook stack nor the script-level guards (`assertNotDrizzlePush()`, `scripts/assert-local-db.mjs`) can see them, and the destructive Supabase CLI verbs beyond `db push` had no rule of any kind.
+- **Do:** Keep two lists in `.claude/settings.json` current:
+  - **MCP** — every write-capable tool on `permissions.ask` as a bare tool name (`mcp__claude_ai_Supabase__execute_sql`, `…__apply_migration`, `…__deploy_edge_function`, `…__pause_project`, `…__restore_project`, `…__create_project`, and the branch mutators). MCP rules take no argument pattern: no `Bash(...)` wrapper, no `:*` suffix. Add newly-exposed write tools when the connector's surface grows.
+  - **CLI** — `ask` on `supabase db reset`, `supabase db remote commit`, `supabase migration repair`, `supabase branches delete`; `deny` on `supabase db push` and `supabase projects delete`. `deny` is reserved for verbs with **no** legitimate use here (prod is the only project, and a deleted project is not recoverable from a nightly backup). `db reset` stays on `ask` rather than `deny` because the local form is routine and a prefix rule cannot reliably distinguish it from `--linked` — the prompt shows the full command, so the human sees `--linked` before approving.
+- **Don't:** Put a write surface on `allow`, or leave a newly-exposed one unlisted (unlisted defaults to unprompted). Don't gate the read-only MCP tools (`list_*`, `get_*`, `search_docs`, `generate_typescript_types`) — prompting on those trains the reflex to click through. Don't add a `PreToolUse` hook to chase wrapper evasion; this repo tried twice (PRs #1736, #1738) and concluded effect-rules belong at the lowest layer.
+- **Scope — these rules are a speed bump, not a security boundary.** Bash permission rules are prefix matchers over the command string, so a wrapper shape (`sh -c "…"`, `eval`, env indirection) walks straight past them, exactly as it does past the hook stack. `ask` is a prompt, not a block. They stop accidents, not intent. They also do not reach child processes: `e2e/global-setup.ts` shells out to `supabase db reset --yes` against the **local** stack from inside the Playwright global-setup process, which is not an agent Bash call and is therefore unaffected — as is `pnpm run db:reset`, which is `supabase stop && supabase start` + drop + migrate + seed and never calls `supabase db reset`.
+- **Enforced by:** `permissions.deny` / `permissions.ask` in `.claude/settings.json`; the `verify-guard-stack.cjs` SessionStart canary warns if either list is emptied or dropped.
+
 ---
 
 ## Performance & Caching

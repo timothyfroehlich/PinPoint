@@ -1,11 +1,27 @@
 {
   "permissions": {
     "deny": [
-      "Bash(supabase db push:*)"
+      "Bash(supabase db push:*)",
+      "Bash(supabase projects delete:*)"
     ],
     "ask": [
       "Bash(*merge-pr.sh*--force*)",
-      "Bash(*merge-pr.sh*--bypass-merge-requirements*)"
+      "Bash(*merge-pr.sh*--bypass-merge-requirements*)",
+      "Bash(supabase db reset:*)",
+      "Bash(supabase db remote commit:*)",
+      "Bash(supabase migration repair:*)",
+      "Bash(supabase branches delete:*)",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__deploy_edge_function",
+      "mcp__claude_ai_Supabase__pause_project",
+      "mcp__claude_ai_Supabase__restore_project",
+      "mcp__claude_ai_Supabase__create_project",
+      "mcp__claude_ai_Supabase__create_branch",
+      "mcp__claude_ai_Supabase__delete_branch",
+      "mcp__claude_ai_Supabase__merge_branch",
+      "mcp__claude_ai_Supabase__rebase_branch",
+      "mcp__claude_ai_Supabase__reset_branch"
     ]
   },
   "enableAllProjectMcpServers": true,
