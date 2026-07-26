@@ -21,6 +21,12 @@ This script reconciles three sources of truth:
 
 Defaults to dry-run; pass `--apply` to actually deallocate orphan slots and
 remove orphan Docker containers/volumes.
+
+**Unknown is never zero.** If Docker can't be queried, this script reports the
+Docker half of the sweep as UNKNOWN and refuses to reclaim Docker resources —
+it never prints `0 volume(s)` for a query it couldn't run. A false zero reads
+as "there are none", which is how ~557 MB of orphan volumes accumulated
+unnoticed behind the 6-hourly SessionStart nudge (PP-5o7b).
 """
 
 import argparse
@@ -28,8 +34,10 @@ import fcntl
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -38,6 +46,13 @@ from worktree_cleanup import MANIFEST_PATH, deallocate_slot  # noqa: E402
 from worktree_setup import branch_to_project_id  # noqa: E402
 
 _PROJECT_ID_LINE_RE = re.compile(r'^project_id\s*=\s*"([^"]+)"')
+
+SUPABASE_PROJECT_LABEL = "com.supabase.cli.project"
+
+#: Exit status when the Docker half of the sweep could not be enumerated. The
+#: SessionStart hook swallows exit codes, but a human (or any future caller)
+#: gets a non-zero signal that the report is incomplete.
+EXIT_DOCKER_UNKNOWN = 1
 
 
 def get_active_worktree_branches(repo_dir: Path) -> dict[str, str]:
@@ -134,71 +149,160 @@ def get_orphan_slot_paths() -> list[str]:
     return orphans
 
 
-def _docker_label_query(args: list[str], not_quiet: bool) -> list[tuple[str, str]]:
-    """Run a Docker command emitting `name|project_id` lines; return parsed pairs.
+class DockerNotInstalledError(RuntimeError):
+    """The `docker` binary is absent, so there are genuinely no Docker resources."""
 
-    Returns [] when Docker is missing or the daemon is unreachable; the SessionStart
-    hook must never block on Docker being down.
+
+class DockerUnavailableError(RuntimeError):
+    """Docker is installed but could not be enumerated.
+
+    Callers MUST surface this as *unknown*, never as an empty result. Swallowing
+    it into `[]` is what produced the `0 volume(s)` false zero in PP-5o7b:
+    `--apply` then removed the containers, reported success, and left the
+    volumes on disk.
     """
+
+
+@dataclass(frozen=True)
+class DockerSweepResult:
+    """Supabase Docker resources grouped by project_id, or an explicit unknown.
+
+    `unknown_reason is None` means `by_project` is trustworthy — an empty dict
+    really means "no Supabase Docker resources". Otherwise `by_project` is empty
+    only because we couldn't look, and no count derived from it may be reported
+    or acted on.
+    """
+
+    by_project: dict[str, dict[str, list[str]]] = field(default_factory=dict)
+    unknown_reason: str | None = None
+
+    @property
+    def is_unknown(self) -> bool:
+        return self.unknown_reason is not None
+
+
+def _run_docker(args: list[str]) -> str:
+    """Run a docker command and return stdout, or raise rather than return empty."""
     try:
         result = subprocess.run(args, capture_output=True, text=True, check=True)
-    except FileNotFoundError:
-        if not_quiet:
-            print(
-                "Note: `docker` not installed; skipping Docker sweep.", file=sys.stderr
-            )
-        return []
+    except FileNotFoundError as exc:
+        raise DockerNotInstalledError("`docker` is not installed") from exc
+    except OSError as exc:
+        raise DockerUnavailableError(
+            f"could not run `{shlex.join(args)}`: {exc}"
+        ) from exc
     except subprocess.CalledProcessError as exc:
-        if not_quiet:
-            print(
-                f"Note: docker query failed ({exc.stderr.strip()}); skipping Docker sweep.",
-                file=sys.stderr,
-            )
+        detail = (
+            (exc.stderr or "").strip()
+            or (exc.stdout or "").strip()
+            or f"exit status {exc.returncode}"
+        )
+        raise DockerUnavailableError(f"`{shlex.join(args)}` failed: {detail}") from exc
+    return result.stdout
+
+
+def _parse_name_project_pairs(stdout: str) -> list[tuple[str, str]]:
+    """Parse `name|project_id` lines, keeping only PinPoint-owned projects."""
+    pairs: list[tuple[str, str]] = []
+    for line in stdout.splitlines():
+        name, sep, project = line.partition("|")
+        if sep and project.startswith("pinpoint-"):
+            pairs.append((name, project))
+    return pairs
+
+
+def get_supabase_volumes() -> list[tuple[str, str]]:
+    """Return `(volume_name, project_id)` for every Supabase-CLI-labeled volume.
+
+    Deliberately two calls. `docker volume ls --format '{{.Label "..."}}'` is NOT
+    portable: Podman's `*types.VolumeListReport` has no `Label` method, so the
+    whole command exits 125 with a template error (PP-5o7b). The label *filter*
+    is honoured by both engines, and `docker volume inspect` exposes the raw
+    `.Labels` map on both, so this pair works everywhere `docker volume rm` does.
+    """
+    names = [
+        line.strip()
+        for line in _run_docker(
+            [
+                "docker",
+                "volume",
+                "ls",
+                "--filter",
+                f"label={SUPABASE_PROJECT_LABEL}",
+                "--format",
+                "{{.Name}}",
+            ]
+        ).splitlines()
+        if line.strip()
+    ]
+    if not names:
         return []
 
-    out: list[tuple[str, str]] = []
-    for line in result.stdout.splitlines():
-        name, _, project = line.partition("|")
-        if project.startswith("pinpoint-"):
-            out.append((name, project))
-    return out
-
-
-def get_supabase_resources_by_project(
-    not_quiet: bool,
-) -> dict[str, dict[str, list[str]]]:
-    """Group Supabase Docker containers/volumes by their project_id label."""
-    grouped: dict[str, dict[str, list[str]]] = {}
-
-    volumes = _docker_label_query(
+    # Tolerate a partial failure here on purpose: on a host running many agent
+    # worktrees a volume can be removed between the `ls` and the `inspect`, and
+    # one racing removal shouldn't blind the whole sweep. A template/daemon
+    # failure yields no parseable output at all, and that still raises.
+    inspect = subprocess.run(
         [
             "docker",
             "volume",
-            "ls",
+            "inspect",
             "--format",
-            '{{.Name}}|{{.Label "com.supabase.cli.project"}}',
+            '{{.Name}}|{{index .Labels "' + SUPABASE_PROJECT_LABEL + '"}}',
+            *names,
         ],
-        not_quiet,
+        capture_output=True,
+        text=True,
     )
-    for name, project in volumes:
-        grouped.setdefault(project, {"volumes": [], "containers": []})
-        grouped[project]["volumes"].append(name)
+    pairs = _parse_name_project_pairs(inspect.stdout)
+    if inspect.returncode != 0 and not pairs:
+        detail = (inspect.stderr or "").strip() or f"exit status {inspect.returncode}"
+        raise DockerUnavailableError(f"`docker volume inspect` failed: {detail}")
+    return pairs
 
-    containers = _docker_label_query(
-        [
-            "docker",
-            "ps",
-            "-a",
-            "--format",
-            '{{.Names}}|{{.Label "com.supabase.cli.project"}}',
-        ],
-        not_quiet,
+
+def get_supabase_containers() -> list[tuple[str, str]]:
+    """Return `(container_name, project_id)` for every Supabase-CLI-labeled container."""
+    return _parse_name_project_pairs(
+        _run_docker(
+            [
+                "docker",
+                "ps",
+                "-a",
+                "--filter",
+                f"label={SUPABASE_PROJECT_LABEL}",
+                "--format",
+                '{{.Names}}|{{.Label "' + SUPABASE_PROJECT_LABEL + '"}}',
+            ]
+        )
     )
-    for name, project in containers:
-        grouped.setdefault(project, {"volumes": [], "containers": []})
-        grouped[project]["containers"].append(name)
 
-    return grouped
+
+def get_supabase_resources_by_project(not_quiet: bool) -> DockerSweepResult:
+    """Group Supabase Docker containers/volumes by their project_id label.
+
+    Any enumeration failure returns an *unknown* result rather than an empty
+    one — including a partial failure, since a project whose containers listed
+    but whose volumes didn't would otherwise report a false `0 volume(s)`.
+    """
+    try:
+        volumes = get_supabase_volumes()
+        containers = get_supabase_containers()
+    except DockerNotInstalledError as exc:
+        # No docker binary means there are genuinely no Docker resources here,
+        # so an empty (not unknown) result is the honest answer.
+        if not_quiet:
+            print(f"Note: {exc}; no Docker resources to sweep.", file=sys.stderr)
+        return DockerSweepResult()
+    except DockerUnavailableError as exc:
+        return DockerSweepResult(unknown_reason=str(exc))
+
+    grouped: dict[str, dict[str, list[str]]] = {}
+    for kind, pairs in (("volumes", volumes), ("containers", containers)):
+        for name, project in pairs:
+            grouped.setdefault(project, {"volumes": [], "containers": []})
+            grouped[project][kind].append(name)
+    return DockerSweepResult(by_project=grouped)
 
 
 def _is_main_worktree_path(path: str) -> bool:
@@ -256,13 +360,31 @@ def main() -> int:
         for path_str in orphan_slots:
             print(f"  - {path_str}", file=sys.stderr)
 
-    docker_by_project = get_supabase_resources_by_project(not_quiet)
+    docker = get_supabase_resources_by_project(not_quiet)
+    # An orphan is a project_id with no *active worktree*, never "a volume with
+    # no container": a live worktree whose Supabase is merely stopped keeps its
+    # volume and would be destroyed by a container-presence heuristic (or by
+    # `docker volume prune`). Don't reintroduce either.
     orphan_projects = {
         pid: res
-        for pid, res in docker_by_project.items()
+        for pid, res in docker.by_project.items()
         if pid not in active_project_ids
     }
-    if orphan_projects and not_quiet:
+
+    if docker.is_unknown:
+        # Never suppressed by --quiet: a silent false zero is worse than an error,
+        # and this is the line that keeps the SessionStart nudge honest.
+        print(
+            "worktree-orphan-sweep: Supabase Docker orphans are UNKNOWN, not zero — "
+            f"{docker.unknown_reason}. Containers/volumes were not counted"
+            + (
+                " and --apply will not reclaim any Docker resources."
+                if args.apply
+                else "."
+            ),
+            file=sys.stderr,
+        )
+    elif orphan_projects and not_quiet:
         print(
             f"Orphan Supabase Docker projects: {len(orphan_projects)}",
             file=sys.stderr,
@@ -276,8 +398,13 @@ def main() -> int:
 
     if not orphan_slots and not orphan_projects:
         if not_quiet:
-            print("No orphans found.", file=sys.stderr)
-        return 0
+            print(
+                "No slot orphans found; Docker orphans unknown (see above)."
+                if docker.is_unknown
+                else "No orphans found.",
+                file=sys.stderr,
+            )
+        return EXIT_DOCKER_UNKNOWN if docker.is_unknown else 0
 
     if not args.apply:
         if not_quiet:
@@ -285,13 +412,18 @@ def main() -> int:
         else:
             # Quiet dry-run still surfaces a single-line nudge so the SessionStart
             # hook isn't completely silent when there's something to reclaim.
+            docker_summary = (
+                "Supabase Docker project orphans UNKNOWN"
+                if docker.is_unknown
+                else f"{len(orphan_projects)} Supabase Docker project orphan(s)"
+            )
             print(
                 f"worktree-orphan-sweep: found {len(orphan_slots)} slot orphan(s), "
-                f"{len(orphan_projects)} Supabase Docker project orphan(s) "
+                f"{docker_summary} "
                 "(dry-run). Run: python3 scripts/worktree_orphan_sweep.py --apply",
                 file=sys.stderr,
             )
-        return 0
+        return EXIT_DOCKER_UNKNOWN if docker.is_unknown else 0
 
     for path_str in orphan_slots:
         if _is_main_worktree_path(path_str):
@@ -337,6 +469,14 @@ def main() -> int:
                     f"  removed {len(res['volumes'])} volume(s) for {pid}",
                     file=sys.stderr,
                 )
+
+    if docker.is_unknown:
+        print(
+            "Docker sweep SKIPPED (state unknown); no containers or volumes were "
+            "removed. Slot manifest orphans above were still reclaimed.",
+            file=sys.stderr,
+        )
+        return EXIT_DOCKER_UNKNOWN
 
     return 0
 
