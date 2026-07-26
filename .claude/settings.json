@@ -50,6 +50,16 @@
             "timeout": 5000
           }
         ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-worktree-dispatch-from-linked.cjs",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -165,14 +175,9 @@
     ]
   },
   "enabledPlugins": {
-    "code-review@claude-plugins-official": true,
-    "commit-commands@claude-plugins-official": true,
-    "code-simplifier@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
     "security-guidance@claude-plugins-official": true,
-    "pr-review-toolkit@claude-plugins-official": true,
-    "modern-web-guidance@googlechrome": true,
-    "claude-md-management@claude-plugins-official": true
+    "modern-web-guidance@googlechrome": true
   },
   "extraKnownMarketplaces": {
     "googlechrome": {
