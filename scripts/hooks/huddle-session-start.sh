@@ -132,11 +132,23 @@ case "$TRANSCRIPT_PATH" in
 esac
 
 # --- Rotation check ---
+# Emits the "rotation needed" notice and then FALLS THROUGH: rotation and
+# identity/registration are independent concerns, and a session that starts on a
+# new day before rotation has run still needs its session_id and its
+# registration prompt.
+#
+# PP-2m3l: this block used to `exit 0` right after the notice, so the identity /
+# registration block below was unreachable on the first sessions of every day.
+# Those sessions never registered, which broke the huddle self-filter (they saw
+# their own posts injected back as if from a peer) and degraded post attribution.
+# SessionStart fires once per session, so there was no second chance to re-prompt.
+ROTATION_PENDING=""
 ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
 if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
   # shellcheck source=huddle-rotation-check.sh disable=SC1091
   source "$ROTATION_CHECK_SCRIPT"
   if huddle_rotation_needed; then
+    ROTATION_PENDING=1
     STORED_DATE=""
     NOTES_STR_ROT=$(bd show "$ROOT_ID" --json 2>/dev/null | jq -r '.[0].notes // ""' 2>/dev/null || echo "")
     if [[ -n "$NOTES_STR_ROT" ]]; then
@@ -158,8 +170,7 @@ except Exception:
     printf 'previous day, create today'\''s bead, update pointers, and post\n'
     printf '"continued in" markers on closed beads. Safe even if a peer already\n'
     printf 'rotated (the subagent no-ops under a file lock).\n\n'
-    printf 'Dispatch template: .agents/skills/pinpoint-huddle/SKILL.md.\n'
-    exit 0
+    printf 'Dispatch template: .agents/skills/pinpoint-huddle/SKILL.md.\n\n'
   fi
 fi
 
@@ -168,7 +179,13 @@ fi
 # midnight race left two open dailies for today (two machines rotated before
 # either pushed), collapse them to the canonical here. No-op in the common case
 # (two cheap local reads); silent + fail-open.
-huddle_reconcile_today || true
+#
+# Skipped while rotation is pending: today's daily does not exist yet, so there
+# is nothing to dedup, and the rotation subagent is about to create it under its
+# own lock.
+if [[ -z "$ROTATION_PENDING" ]]; then
+  huddle_reconcile_today || true
+fi
 
 SESSION_ID=""
 SOURCE=""
