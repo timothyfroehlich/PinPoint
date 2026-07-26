@@ -22,6 +22,14 @@ vi.mock("~/app/(app)/issues/actions", () => ({
 // Mock useActionState so we can drive [state, action, isPending] across renders.
 // The form's optimistic-rollback fix runs inside a useEffect on `state`, so we
 // need to flip from `undefined` to an error payload between renders.
+//
+// Note: because this mock replaces `useActionState` entirely, no real React
+// action/form lifecycle ever runs here — this suite cannot see React 19's
+// automatic post-action form reset, which is exactly the mechanism behind
+// the PP-0fvr revert bug (a real `useActionState` + a real form submission
+// let Radix's form-reset listener replay a stale value). That bug class is
+// covered separately, with an unmocked `useActionState`, by
+// `src/test/unit/components/issues/metadata-select-reset-revert.test.tsx`.
 const mockUseActionState = vi.fn();
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof React>();
@@ -45,10 +53,14 @@ interface RollbackCase {
   // Re-render the form with the same prop but with an error state injected.
   initialValue: string;
   bumpedValue: string;
-  /** aria-label substring that proves the trigger reflects `value`. */
+  /**
+   * aria-label the combobox trigger carries for a given value — this is the
+   * only externally-observable proof of `selectedX` state now that the form
+   * has no hidden inputs (PP-0fvr removed them: `handleValueChange` calls
+   * the action's dispatch directly with a manually-built `FormData` instead
+   * of going through a native form submission).
+   */
   ariaLabelFor: (value: string) => string;
-  /** Hidden-input `name=` attribute used by the form. */
-  hiddenInputName: string;
 }
 
 const cases: RollbackCase[] = [
@@ -66,7 +78,6 @@ const cases: RollbackCase[] = [
     ),
     ariaLabelFor: (value) =>
       value === "new" ? "Status: New" : "Status: In Progress",
-    hiddenInputName: "status",
   },
   {
     name: "UpdateIssuePriorityForm",
@@ -82,7 +93,6 @@ const cases: RollbackCase[] = [
     ),
     ariaLabelFor: (value) =>
       value === "low" ? "Priority: Low" : "Priority: High",
-    hiddenInputName: "priority",
   },
   {
     name: "UpdateIssueSeverityForm",
@@ -98,7 +108,6 @@ const cases: RollbackCase[] = [
     ),
     ariaLabelFor: (value) =>
       value === "minor" ? "Severity: Minor" : "Severity: Major",
-    hiddenInputName: "severity",
   },
   {
     name: "UpdateIssueFrequencyForm",
@@ -116,7 +125,6 @@ const cases: RollbackCase[] = [
       value === "intermittent"
         ? "Frequency: Intermittent"
         : "Frequency: Frequent",
-    hiddenInputName: "frequency",
   },
 ];
 
@@ -144,13 +152,9 @@ describe("inline metadata forms: optimistic rollback on action error (PP-hob)", 
         "aria-label",
         tc.ariaLabelFor(tc.initialValue)
       );
-      // Hidden input matches initial prop.
-      expect(
-        document.querySelector(`input[name="${tc.hiddenInputName}"]`)
-      ).toHaveAttribute("value", tc.initialValue);
     });
 
-    it(`${tc.name} rolls back hidden-input value and toasts when the action errors`, async () => {
+    it(`${tc.name} rolls back trigger value and toasts when the action errors`, async () => {
       const { rerender } = renderWithProviders(
         tc.renderInitial(tc.initialValue)
       );
@@ -163,8 +167,8 @@ describe("inline metadata forms: optimistic rollback on action error (PP-hob)", 
       //
       // To prove rollback rather than "value never changed", we first force
       // selectedX to diverge by dispatching the action's error WHILE the
-      // hidden input still reflects the initial value, then check that the
-      // hidden input remains at initialValue AFTER the rollback effect runs
+      // trigger still reflects the initial value, then check that the
+      // trigger remains at initialValue AFTER the rollback effect runs
       // (i.e. setSelectedX(currentX) is a no-op visually but the effect ran
       // and called toast.error). The stronger divergence case is covered by
       // the dedicated "after a value change" test below.
@@ -179,9 +183,10 @@ describe("inline metadata forms: optimistic rollback on action error (PP-hob)", 
         expect(toast.error).toHaveBeenCalledWith("Permission denied");
       });
       // After rollback, selectedX === currentX === initialValue.
-      expect(
-        document.querySelector(`input[name="${tc.hiddenInputName}"]`)
-      ).toHaveAttribute("value", tc.initialValue);
+      expect(screen.getByRole("combobox")).toHaveAttribute(
+        "aria-label",
+        tc.ariaLabelFor(tc.initialValue)
+      );
     });
 
     it(`${tc.name} resets divergent selectedX back to currentX when error arrives`, async () => {
@@ -201,10 +206,11 @@ describe("inline metadata forms: optimistic rollback on action error (PP-hob)", 
       mockUseActionState.mockReturnValue([undefined, vi.fn(), false]);
       rerender(tc.renderInitial(tc.bumpedValue));
       // Selected state stays at initialValue (useState ignores prop changes),
-      // hidden input still shows initialValue.
-      expect(
-        document.querySelector(`input[name="${tc.hiddenInputName}"]`)
-      ).toHaveAttribute("value", tc.initialValue);
+      // trigger still shows initialValue.
+      expect(screen.getByRole("combobox")).toHaveAttribute(
+        "aria-label",
+        tc.ariaLabelFor(tc.initialValue)
+      );
 
       // Now the action errors. useEffect fires setSelectedX(currentX=bumpedValue).
       mockUseActionState.mockReturnValue([
@@ -215,9 +221,10 @@ describe("inline metadata forms: optimistic rollback on action error (PP-hob)", 
       rerender(tc.renderInitial(tc.bumpedValue));
 
       await waitFor(() => {
-        expect(
-          document.querySelector(`input[name="${tc.hiddenInputName}"]`)
-        ).toHaveAttribute("value", tc.bumpedValue);
+        expect(screen.getByRole("combobox")).toHaveAttribute(
+          "aria-label",
+          tc.ariaLabelFor(tc.bumpedValue)
+        );
       });
       expect(toast.error).toHaveBeenCalledWith("boom");
     });
