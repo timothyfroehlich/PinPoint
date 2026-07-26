@@ -71,39 +71,7 @@ function checkBrowserBinaries(config: FullConfig): void {
   }
 }
 
-/**
- * An engine that is *installed* but cannot render text is worse than one
- * that's missing: every spec fails later with an unrelated-looking assertion
- * instead of an error naming the real problem. Two real instances, both on
- * Fedora Atomic (Bazzite):
- *
- *   - Chromium: a stale `~/.cache/fontconfig` entry made fontconfig report
- *     zero fonts, so Skia CHECK-failed in SkFontMgr_FontConfigInterface and
- *     the renderer died the instant a spec typed into a field. It presented
- *     as `fill()` silently no-opping — auth-setup just kept landing on
- *     /login — and cost several days across sessions (PP-8b6j, PP-rsy3).
- *     It does not self-heal: ostree pins /usr/share/fonts to mtime 0, and
- *     fontconfig keys cache validity on directory mtime, so a bad entry is
- *     never invalidated.
- *   - WebKit: MiniBrowser needs libicudata.so.74, which Fedora 43 doesn't
- *     ship, so every Mobile Safari spec dies at launch (PP-5f22). Note this
- *     one is only *probed* when a config names webkit via `browserName`;
- *     our device-based projects carry the engine on `defaultBrowserType`,
- *     which Playwright leaves out of `use.browserName`, so in practice the
- *     probe covers chromium. That's the engine that matters — auth-setup
- *     runs there — and it's the failure mode that was silent.
- *
- * So probe each engine once: launch it and confirm it can shape a run of
- * text. Chromium is fatal — auth-setup runs there, so nothing downstream can
- * pass without it. Other engines only warn, letting a host with a broken
- * WebKit still run its Chromium and Firefox projects.
- *
- * Probes `needed ∩ installed`. Needed (not every installed engine) so CI's
- * chromium-only runs don't demand firefox/webkit, and so a config with no
- * projects probes nothing — the seam the unit tests rely on. Installed
- * (not merely needed) so a missing binary stays `checkBrowserBinaries`' story
- * and is never reported here as a font fault.
- */
+/** One engine that launched but failed its render check, and what to do. */
 interface BrowserProbeFailure {
   browser: BrowserName;
   detail: string;
@@ -171,6 +139,35 @@ async function probeBrowser(
   }
 }
 
+/**
+ * An engine that is *installed* but cannot render text is worse than one
+ * that's missing: every spec fails later with an unrelated-looking assertion
+ * instead of an error naming the real cause. The instance this exists for
+ * (PP-8b6j): a stale `~/.cache/fontconfig` entry made fontconfig report zero
+ * fonts, so Skia CHECK-failed in SkFontMgr_FontConfigInterface and Chromium's
+ * renderer died the instant a spec typed into a field. It presented as
+ * `fill()` silently no-opping — auth-setup just kept landing on /login — and
+ * cost several days across sessions. It does not self-heal: ostree pins
+ * /usr/share/fonts to mtime 0 and fontconfig keys cache validity on directory
+ * mtime, so a bad entry is never invalidated. The same zero-font state is why
+ * headless screenshots wouldn't rasterize text (PP-rsy3).
+ *
+ * So launch each engine once and confirm it can shape a run of text. Chromium
+ * is fatal — auth-setup runs there, so nothing downstream can pass without it.
+ * Other engines only warn, so one broken engine doesn't block the rest.
+ *
+ * Probes `needed ∩ installed`. Needed (not every installed engine) so CI's
+ * chromium-only runs don't demand firefox/webkit, and so a config with no
+ * projects probes nothing — the seam the unit tests rely on. Installed (not
+ * merely needed) so a missing binary stays `checkBrowserBinaries`' story and
+ * is never reported here as a font fault.
+ *
+ * Scope note: device-based projects carry their engine on
+ * `defaultBrowserType`, which Playwright leaves out of `use.browserName`, so
+ * `needed` resolves to chromium for our configs. That is the engine that
+ * matters here. WebKit's own breakage on this host is a separate, loud
+ * launch failure (PP-5f22), not a silent one.
+ */
 async function checkBrowsersRenderText(config: FullConfig): Promise<void> {
   const targets = [...neededBrowsers(config)].filter(isInstalled);
   const probes = await Promise.all(
