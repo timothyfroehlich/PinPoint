@@ -30,30 +30,37 @@ const BROWSER_ENGINES: Record<BrowserName, BrowserType> = {
 };
 
 /**
- * Verify Playwright browser binaries are installed for every project the
- * active config will run. Failing fast here turns a cryptic mid-run
- * `browserType.launch: Executable doesn't exist` into an actionable error.
- *
- * Only checks browsers the active config actually needs — CI installs
- * chromium only, so blanket-checking firefox/webkit would break CI.
+ * The engines the active config needs. Only browsers the config actually
+ * asks for — CI installs chromium only, so blanket-checking firefox/webkit
+ * would break CI. A config with no projects needs nothing, which is also the
+ * seam the unit tests use to disable browser checks entirely.
  */
-function checkBrowserBinaries(config: FullConfig): void {
+function neededBrowsers(config: FullConfig): Set<BrowserName> {
   const needed = new Set<BrowserName>();
   for (const project of config.projects) {
     const name = project.use.browserName ?? "chromium";
     if (name in BROWSER_ENGINES) needed.add(name);
   }
+  return needed;
+}
 
-  const missing: BrowserName[] = [];
-  for (const browser of needed) {
-    try {
-      if (!existsSync(BROWSER_ENGINES[browser].executablePath())) {
-        missing.push(browser);
-      }
-    } catch {
-      missing.push(browser);
-    }
+function isInstalled(browser: BrowserName): boolean {
+  try {
+    return existsSync(BROWSER_ENGINES[browser].executablePath());
+  } catch {
+    return false;
   }
+}
+
+/**
+ * Verify Playwright browser binaries are installed for every project the
+ * active config will run. Failing fast here turns a cryptic mid-run
+ * `browserType.launch: Executable doesn't exist` into an actionable error.
+ */
+function checkBrowserBinaries(config: FullConfig): void {
+  const needed = neededBrowsers(config);
+
+  const missing = [...needed].filter((browser) => !isInstalled(browser));
 
   if (missing.length > 0) {
     const names = missing.join(" ");
@@ -79,21 +86,23 @@ function checkBrowserBinaries(config: FullConfig): void {
  *     fontconfig keys cache validity on directory mtime, so a bad entry is
  *     never invalidated.
  *   - WebKit: MiniBrowser needs libicudata.so.74, which Fedora 43 doesn't
- *     ship, so every Mobile Safari spec dies at launch.
+ *     ship, so every Mobile Safari spec dies at launch (PP-5f22). Note this
+ *     one is only *probed* when a config names webkit via `browserName`;
+ *     our device-based projects carry the engine on `defaultBrowserType`,
+ *     which Playwright leaves out of `use.browserName`, so in practice the
+ *     probe covers chromium. That's the engine that matters — auth-setup
+ *     runs there — and it's the failure mode that was silent.
  *
  * So probe each engine once: launch it and confirm it can shape a run of
  * text. Chromium is fatal — auth-setup runs there, so nothing downstream can
  * pass without it. Other engines only warn, letting a host with a broken
  * WebKit still run its Chromium and Firefox projects.
  *
- * Probes the engines that are *installed* rather than the ones this config
- * declares, deliberately. `FullConfig.projects` is not filtered by
- * `--project`, and device-based projects leave `use.browserName` undefined
- * (the engine rides on `defaultBrowserType`), so config introspection would
- * demand firefox/webkit during CI's chromium-only runs. Keying off installed
- * binaries keeps CI honest — it installs exactly the engines it runs — while
- * still covering every engine a local run can reach. Missing binaries stay
- * `checkBrowserBinaries`' job.
+ * Probes `needed ∩ installed`. Needed (not every installed engine) so CI's
+ * chromium-only runs don't demand firefox/webkit, and so a config with no
+ * projects probes nothing — the seam the unit tests rely on. Installed
+ * (not merely needed) so a missing binary stays `checkBrowserBinaries`' story
+ * and is never reported here as a font fault.
  */
 interface BrowserProbeFailure {
   browser: BrowserName;
@@ -105,6 +114,12 @@ const TEXT_PROBE_HTML =
   '<!doctype html><meta charset="utf-8"><span id="probe">PinPoint</span>';
 
 function probeRemedy(browser: BrowserName, message: string): string {
+  if (message.includes("Executable doesn't exist")) {
+    return (
+      `${browser} is not installed\n` +
+      `      Install with: pnpm exec playwright install --with-deps ${browser}`
+    );
+  }
   const missingLib = /error while loading shared libraries: ([^\s:]+)/.exec(
     message
   );
@@ -156,21 +171,10 @@ async function probeBrowser(
   }
 }
 
-const BROWSER_NAMES: readonly BrowserName[] = ["chromium", "firefox", "webkit"];
-
-function installedBrowsers(): readonly BrowserName[] {
-  return BROWSER_NAMES.filter((browser) => {
-    try {
-      return existsSync(BROWSER_ENGINES[browser].executablePath());
-    } catch {
-      return false;
-    }
-  });
-}
-
-async function checkBrowsersRenderText(): Promise<void> {
+async function checkBrowsersRenderText(config: FullConfig): Promise<void> {
+  const targets = [...neededBrowsers(config)].filter(isInstalled);
   const probes = await Promise.all(
-    installedBrowsers().map((browser) => probeBrowser(browser))
+    targets.map((browser) => probeBrowser(browser))
   );
   const failures = probes.filter(
     (probe): probe is BrowserProbeFailure => probe !== null
@@ -288,7 +292,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   // need to be there for tests to launch.
   console.log("🔍 Checking Playwright browser binaries...");
   checkBrowserBinaries(config);
-  await checkBrowsersRenderText();
+  await checkBrowsersRenderText(config);
 
   console.log("🔍 Checking Docker daemon...");
   checkDocker();
