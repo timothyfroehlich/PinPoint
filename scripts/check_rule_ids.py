@@ -27,7 +27,8 @@ Two checks:
          42 lines on every run would train everyone to ignore the gate, so it
          is a coverage audit you run deliberately, not a default warning.
 
-Exit codes: 0 clean, 1 unknown IDs found, 2 catalog missing.
+Exit codes: 0 clean, 1 unknown IDs found, 2 catalog missing, 3 descending range
+cited.
 """
 
 from __future__ import annotations
@@ -44,7 +45,11 @@ RULE_ID = re.compile(r"\bCORE-[A-Z][A-Z0-9]*-\d{3}\b")
 # §2.1 uses this to cite a contiguous block without spelling out every ID).
 # Without expansion, RULE_ID alone only ever catches the range's start ID --
 # the end ID and every interior ID are never extracted, so a rename or
-# deletion of e.g. CORE-RESP-003 would go undetected.
+# deletion of e.g. CORE-RESP-003 would go undetected. extract_ids() expands
+# by sorted endpoints, so a backwards range (CORE-RESP-004..001) still gets
+# every interior ID extracted and validated instead of silently expanding to
+# nothing -- main() separately flags descending order itself as citation
+# drift to be fixed at the source, rather than quietly tolerating it.
 RANGE_ID = re.compile(r"\bCORE-([A-Z][A-Z0-9]*)-(\d{3})\.\.(\d{3})\b")
 
 CATALOG = "docs/NON_NEGOTIABLES.md"
@@ -76,25 +81,43 @@ def extract_ids(text: str) -> set[str]:
     ids = set(RULE_ID.findall(text))
     for category, start, end in RANGE_ID.findall(text):
         width = len(start)
-        for n in range(int(start), int(end) + 1):
+        lo, hi = sorted((int(start), int(end)))
+        for n in range(lo, hi + 1):
             ids.add(f"CORE-{category}-{n:0{width}d}")
     return ids
+
+
+def find_descending_ranges(text: str) -> list[str]:
+    """Return the literal text of any backwards range, e.g. CORE-RESP-004..001.
+
+    A range citation should always count up. Backwards order is drift at the
+    citation site regardless of whether extract_ids() can expand it correctly
+    -- reported by main() as its own failure so it gets fixed at the source
+    instead of silently tolerated.
+    """
+    return [
+        match.group(0)
+        for match in RANGE_ID.finditer(text)
+        if int(match.group(2)) > int(match.group(3))
+    ]
 
 
 def collect_catalog_ids(root: Path) -> set[str]:
     return extract_ids((root / CATALOG).read_text(encoding="utf-8"))
 
 
+def _glob_paths(root: Path, pattern: str) -> list[Path]:
+    if any(ch in pattern for ch in "*?["):
+        return sorted(root.glob(pattern))
+    candidate = root / pattern
+    return [candidate] if candidate.is_file() else []
+
+
 def collect_citations(root: Path) -> dict[str, set[str]]:
     """Map relative file path -> set of CORE-* IDs cited in it."""
     citations: dict[str, set[str]] = {}
     for pattern in CITING_SOURCES:
-        if any(ch in pattern for ch in "*?["):
-            paths = sorted(root.glob(pattern))
-        else:
-            candidate = root / pattern
-            paths = [candidate] if candidate.is_file() else []
-        for path in paths:
+        for path in _glob_paths(root, pattern):
             if not path.is_file():
                 continue
             rel = path.relative_to(root).as_posix()
@@ -104,6 +127,33 @@ def collect_citations(root: Path) -> dict[str, set[str]]:
             if found:
                 citations[rel] = found
     return citations
+
+
+def collect_descending_ranges(root: Path) -> dict[str, list[str]]:
+    """Map relative file path -> descending (backwards) ranges cited in it.
+
+    Scans the catalog itself plus every CITING_SOURCES file.
+    """
+    descending: dict[str, list[str]] = {}
+
+    catalog_path = root / CATALOG
+    if catalog_path.is_file():
+        found = find_descending_ranges(catalog_path.read_text(encoding="utf-8"))
+        if found:
+            descending[CATALOG] = found
+
+    for pattern in CITING_SOURCES:
+        for path in _glob_paths(root, pattern):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(root).as_posix()
+            if rel in descending:
+                continue  # Overlapping globs (rules/*.md and rules/**/*.md).
+            found = find_descending_ranges(path.read_text(encoding="utf-8"))
+            if found:
+                descending[rel] = found
+
+    return descending
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -126,6 +176,23 @@ def main(argv: list[str] | None = None) -> int:
     if not (root / CATALOG).is_file():
         print(f"check:rule-ids: catalog not found at {CATALOG}", file=sys.stderr)
         return 2
+
+    # ERROR: a descending (backwards) range, e.g. CORE-RESP-004..001. This is
+    # drift at the citation site itself -- a range must count up, so a
+    # backwards one gets fixed at the source, not silently repaired by
+    # expanding it in the safe direction.
+    descending = collect_descending_ranges(root)
+    if descending:
+        print("check:rule-ids: descending CORE-* range(s) cited\n", file=sys.stderr)
+        for rel in sorted(descending):
+            for range_text in descending[rel]:
+                print(f"  {rel}: {range_text}", file=sys.stderr)
+        print(
+            "\nA range must count up, low..high (e.g. CORE-RESP-001..004). Fix "
+            "the citation to ascending order.",
+            file=sys.stderr,
+        )
+        return 3
 
     catalog_ids = collect_catalog_ids(root)
     citations = collect_citations(root)

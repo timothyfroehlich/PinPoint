@@ -16,7 +16,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from check_rule_ids import (  # noqa: E402
     collect_catalog_ids,
     collect_citations,
+    collect_descending_ranges,
     extract_ids,
+    find_descending_ranges,
     find_repo_root,
     main,
 )
@@ -66,6 +68,19 @@ class TestExtractIds:
             "CORE-RESP-004",
         }
 
+    def test_expands_descending_range_shorthand(self):
+        # A backwards citation like CORE-RESP-004..001 (e.g. from an edit
+        # that swapped the endpoints by mistake) must still expand to the
+        # full span -- range(4, 2) is empty, so before sorting the endpoints
+        # this silently produced only the start ID and never checked 001-003
+        # against the catalog.
+        assert extract_ids("CORE-RESP-004..001") == {
+            "CORE-RESP-001",
+            "CORE-RESP-002",
+            "CORE-RESP-003",
+            "CORE-RESP-004",
+        }
+
     def test_expands_range_alongside_plain_ids(self):
         text = "CORE-ARCH-009 and CORE-FORM-001..006"
         assert extract_ids(text) == {
@@ -77,6 +92,17 @@ class TestExtractIds:
             "CORE-FORM-005",
             "CORE-FORM-006",
         }
+
+
+class TestFindDescendingRanges:
+    def test_flags_backwards_range(self):
+        assert find_descending_ranges("CORE-RESP-004..001") == ["CORE-RESP-004..001"]
+
+    def test_ascending_range_is_not_flagged(self):
+        assert find_descending_ranges("CORE-RESP-001..004") == []
+
+    def test_no_range_is_not_flagged(self):
+        assert find_descending_ranges("CORE-ARCH-009") == []
 
 
 class TestCatalogAndCitations:
@@ -114,6 +140,20 @@ class TestCatalogAndCitations:
     def test_files_without_ids_are_omitted(self, repo: Path):
         (repo / "CLAUDE.md").write_text("no rules here", encoding="utf-8")
         assert collect_citations(repo) == {}
+
+    def test_collect_descending_ranges_finds_citing_file(self, repo: Path):
+        (repo / "CLAUDE.md").write_text("CORE-RESP-004..001", encoding="utf-8")
+        assert collect_descending_ranges(repo) == {"CLAUDE.md": ["CORE-RESP-004..001"]}
+
+    def test_collect_descending_ranges_finds_catalog(self, repo: Path):
+        (repo / CATALOG_REL).write_text(
+            "# Catalog\n\n- CORE-RESP-004..001\n", encoding="utf-8"
+        )
+        assert collect_descending_ranges(repo) == {CATALOG_REL: ["CORE-RESP-004..001"]}
+
+    def test_collect_descending_ranges_clean_when_none(self, repo: Path):
+        (repo / "CLAUDE.md").write_text("CORE-RESP-001..004", encoding="utf-8")
+        assert collect_descending_ranges(repo) == {}
 
 
 class TestMain:
@@ -171,6 +211,22 @@ class TestMain:
         assert "CORE-RESP-002" in err
         assert "CORE-RESP-003" in err
 
+    def test_fails_on_descending_range_in_citing_file(self, repo: Path, capsys):
+        (repo / "CLAUDE.md").write_text("CORE-RESP-004..001", encoding="utf-8")
+        assert main(["--root", str(repo)]) == 3
+        err = capsys.readouterr().err
+        assert "CLAUDE.md" in err
+        assert "CORE-RESP-004..001" in err
+
+    def test_fails_on_descending_range_in_catalog(self, repo: Path, capsys):
+        (repo / CATALOG_REL).write_text(
+            "# Catalog\n\n- CORE-RESP-004..001\n", encoding="utf-8"
+        )
+        assert main(["--root", str(repo)]) == 3
+        err = capsys.readouterr().err
+        assert CATALOG_REL in err
+        assert "CORE-RESP-004..001" in err
+
     def test_orphans_clean_message(self, repo: Path, capsys):
         (repo / "CLAUDE.md").write_text(
             "CORE-ARCH-009 CORE-SEC-008 CORE-TS-007", encoding="utf-8"
@@ -215,5 +271,8 @@ class TestRealRepo:
         assert len(catalog_ids) > 50
         assert citations, "expected at least one real citing file to be found"
         assert sum(len(ids) for ids in citations.values()) > 20
+
+        # No descending ranges exist today either.
+        assert collect_descending_ranges(root) == {}
 
         assert main(["--root", str(root)]) == 0
