@@ -628,7 +628,9 @@ export function PinballmapSyncNow(): React.JSX.Element {
         {isPending ? "Syncing…" : "Sync now"}
       </button>
       {state && !state.ok && (
-        <span className="ml-2 text-destructive">{state.message}</span>
+        <span className="ml-2 text-destructive" role="alert">
+          {state.message}
+        </span>
       )}
     </form>
   );
@@ -676,7 +678,17 @@ const locationUrl = pinballmapLocationUrl();
 
 - [ ] **Step 4: Render the section**
 
-Add immediately after the Details `</section>`:
+First add the sync-visibility check beside the existing `canLink` check. `machines.pinballmap.link` is not the right gate for the Sync-now button: `syncPinballMapNowAction` enforces `machines.pinballmap.sync`, which the matrix grants to technicians and admins only, while `machines.pinballmap.link` also grants `member: "owner"`. Gating the button on `canLink` would show an owner-member a control guaranteed to fail server-side.
+
+```tsx
+const canSync = checkPermission(
+  "machines.pinballmap.sync",
+  accessLevel,
+  ownershipContext
+);
+```
+
+Then add immediately after the Details `</section>`:
 
 ```tsx
 {
@@ -703,9 +715,14 @@ Add immediately after the Details `</section>`:
     {canLink && (
       <p className="text-sm text-muted-foreground">
         {pbmState?.lastSyncedAt
-          ? `last synced ${formatDateTime(pbmState.lastSyncedAt)} · `
-          : "never synced · "}
-        <PinballmapSyncNow />
+          ? `last synced ${formatDateTime(pbmState.lastSyncedAt)}`
+          : "never synced"}
+        {canSync && (
+          <>
+            {" · "}
+            <PinballmapSyncNow />
+          </>
+        )}
       </p>
     )}
   </div>
@@ -721,12 +738,20 @@ Add immediately after the Details `</section>`:
 </section>;
 ```
 
-- [ ] **Step 5: Verify**
+- [ ] **Step 5: Cover the error branch (RTL)**
+
+Create `src/app/(app)/m/[initials]/edit/pinballmap-sync-now.test.tsx`. `PinballmapSyncNow`'s `state && !state.ok` branch is form-state lifecycle — class C, so RTL unit is the cheapest catching layer (CORE-TEST-005). The template lives one file away: `PinballmapListingControl.test.tsx` covers this exact bug class (an async server-action failure surfaced through `useActionState`) — mirror its structure rather than inventing a harness.
+
+- Mock `~/app/(app)/m/pinballmap-actions` at the module boundary so nothing reaches pinballmap.com (CORE-PBM-001 / CORE-TEST-006).
+- Test 1: resolve `err("THROTTLED", <message>)`, click the button, assert the message via `findByRole("alert")`.
+- Test 2: resolve `ok(...)`, click, `waitFor` the button to leave its disabled state, then assert `queryByRole("alert")` is null. Waiting on pending-to-false matters: `isPending` and `state` come off the same dispatch, so without it the assertion can pass vacuously before the action settles.
+
+- [ ] **Step 6: Verify**
 
 Run: `pnpm run check`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add "src/app/(app)/m/[initials]/edit"
