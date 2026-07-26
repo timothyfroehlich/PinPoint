@@ -23,6 +23,15 @@ import { getProfileIdByEmail } from "../support/supabase-admin.js";
 const machineInitials = seededMachines.addamsFamily.initials;
 const issueNum = seededIssue("TAF").num;
 
+// TAF is admin-owned (with an invited-owner override on top) — this file's
+// `ensureLoggedIn` calls default to the `member` role, which lacks
+// `machines.edit` on it. Routing the /edit entry at TAF would only ever
+// render the page's own permission-denied redirect back to /m/TAF, not the
+// edit page's content. Eight Ball Deluxe is member-owned (see the ownerMap
+// in supabase/seed-users.mjs), so this entry actually renders what it
+// claims to overflow-check.
+const ownedMachineInitials = seededMachines.eightBallDeluxe.initials;
+
 // Filter-heavy query for surfaces that render <IssueFilters>. Overflow bugs
 // live in the loaded, many-chips state — not the empty default — so exercise a
 // route variant where a wide set of active-filter chips is rendered. This is
@@ -50,7 +59,7 @@ const authenticatedRoutes = [
   `/m/${machineInitials}/settings`,
   `/m/${machineInitials}/maintenance`,
   `/m/${machineInitials}/timeline`,
-  `/m/${machineInitials}/edit`,
+  `/m/${ownedMachineInitials}/edit`,
   `/m/${machineInitials}/i/${issueNum}`,
   "/settings",
 ];

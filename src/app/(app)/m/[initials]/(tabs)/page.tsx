@@ -108,8 +108,8 @@ export default async function MachineInfoTab({
       ? await getPinballMapState()
       : null;
 
-  // Description renders read-only inside the Details card; editing happens in
-  // the Edit Machine dialog (not inline). Gate on docIsEmpty rather than just
+  // Description renders read-only inside the Details card; editing happens on
+  // the Edit Machine page (not inline). Gate on docIsEmpty rather than just
   // `!== null`: a legacy or semantically-empty ProseMirror doc renders nothing
   // in RichTextDisplay, but a truthy slot still paints an empty prose block and
   // a stray divider above the owner row. docIsEmpty covers null, undefined, and

@@ -164,7 +164,7 @@ export function CreateMachineForm({
 
       {/*
        * Promote-and-assign confirmation dialog.
-       * Duplicated from update-machine-form.tsx — pending extraction at 3rd consumer.
+       * Duplicated from machine-owner-transfer.tsx — pending extraction at 3rd consumer.
        *
        * Radix portals the DialogContent outside the form tree, so the confirm
        * button cannot use type="submit" to target the outer form. We build
