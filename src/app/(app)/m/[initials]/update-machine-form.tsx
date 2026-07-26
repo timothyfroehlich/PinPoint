@@ -203,7 +203,14 @@ export function EditMachineDialog({
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
-    // Always suppress native submission; `dispatchForm` drives the action.
+    // Ignore submits that bubbled up from a DESCENDANT form. React propagates
+    // events through the React tree, not the DOM tree, so the portalled
+    // `<form>` inside OwnerSelect's InviteUserDialog reaches this handler even
+    // though it is not a DOM descendant. Without this guard our
+    // `preventDefault()` cancelled the invite's own submission and the invited
+    // user never appeared (caught by e2e/full/machine-with-invite.spec.ts).
+    if (e.target !== e.currentTarget) return;
+    // Otherwise suppress native submission; `dispatchForm` drives the action.
     // (Native constraint validation still runs before this fires.)
     e.preventDefault();
     // Hold the submit and ask first when ownership is being transferred away

@@ -356,6 +356,13 @@ export function UnifiedReportForm({
            */}
           <form
             onSubmit={(e) => {
+              // Ignore submits bubbled up from a descendant form. React
+              // propagates events through the React tree, not the DOM tree, so a
+              // portalled `<form>` in any nested dialog would otherwise land
+              // here and be cancelled by our `preventDefault()`. There is no
+              // such form today; the guard keeps one from silently breaking
+              // later.
+              if (e.target !== e.currentTarget) return;
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
               // useActionState dispatch must run inside a transition — outside

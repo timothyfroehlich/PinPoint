@@ -231,6 +231,14 @@ export function CreateMachineForm({
       <form
         ref={formRef}
         onSubmit={(e) => {
+          // Ignore submits that bubbled up from a DESCENDANT form. React
+          // propagates events through the React tree, not the DOM tree, so the
+          // portalled `<form>` inside OwnerSelect's InviteUserDialog reaches
+          // this handler even though it is not a DOM descendant. Without this
+          // guard our `preventDefault()` cancelled the invite's own submission
+          // and the invited user never appeared (caught by
+          // e2e/full/machine-with-invite.spec.ts).
+          if (e.target !== e.currentTarget) return;
           e.preventDefault();
           // Snapshot the full submitted FormData for confirmPromote's re-dispatch.
           const fd = new FormData(e.currentTarget);
