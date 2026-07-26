@@ -22,6 +22,7 @@
  * Usage: pnpm run chores:backups
  */
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 /** PinPoint-Prod. Same hardcoded ref as scripts/backup-production.sh. */
 const PROD_REF = "udhesuizjsgxfeotqybn";
@@ -237,6 +238,13 @@ function main() {
 }
 
 // Only run when invoked directly, so `evaluate` can be imported for checks.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+// pathToFileURL (not a hand-built `file://` string) because any path segment
+// needing URL-encoding — a space, a non-ASCII char — would make the comparison
+// silently false, and a verification script that quietly no-ops and exits 0 is
+// worse than one that crashes.
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   main();
 }
