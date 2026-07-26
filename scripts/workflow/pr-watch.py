@@ -133,13 +133,18 @@ def _is_superseded(conclusion: str | None) -> bool:
 
 
 def _is_failing(conclusion: str | None) -> bool:
-    """True only for a real failure: not passing, not superseded, not empty.
+    """True for a real failure, given the conclusion of a COMPLETED run/check.
 
-    An empty conclusion means "not decided yet" and is never a failure here;
-    callers check `status` for that.
+    Fail-safe by construction: anything that isn't recognisably passing and
+    isn't a supersession counts as a failure, including an unrecognised
+    conclusion and an empty one. GitHub can briefly report a run as `completed`
+    before its conclusion is populated, and a watcher that shrugged at that
+    could report green without ever having observed the real outcome.
+
+    Every caller must gate on `status == "completed"` first — an empty
+    conclusion on a run that is still queued or in progress just means "not
+    decided yet", which `status` already tells you.
     """
-    if not conclusion:
-        return False
     return not _is_passing(conclusion) and not _is_superseded(conclusion)
 
 
@@ -308,7 +313,7 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
             # the watch loop waits for the replacement instead of hard-exiting.
             # Before PP-r63o this forced --force as a workaround.
             emit_event("CI Gate cancelled (superseded) — watching for a fresh run")
-        elif _is_failing(ci_conclusion) or not ci_conclusion:
+        elif _is_failing(ci_conclusion):
             return (
                 False,
                 f"CI Gate already failed (conclusion={ci_conclusion or 'unknown'})",

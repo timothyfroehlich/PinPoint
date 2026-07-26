@@ -142,10 +142,16 @@ def test_failing_conclusions(conclusion):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("conclusion", ["", None])
-def test_undecided_conclusion_is_not_a_failure(conclusion):
-    """An empty conclusion means "not decided yet" — status carries that state."""
-    assert not pr_watch._is_failing(conclusion)
+def test_completed_with_empty_conclusion_fails_safe(conclusion):
+    """A COMPLETED run whose conclusion hasn't populated must not read as green.
+
+    Callers gate on status first, so an empty conclusion reaching _is_failing
+    means GitHub called the run complete without saying how it went. Shrugging
+    at that would let the watcher report green on an unobserved outcome.
+    """
+    assert pr_watch._is_failing(conclusion)
     assert not pr_watch._is_passing(conclusion)
+    assert not pr_watch._is_superseded(conclusion)
 
 
 # ---------------------------------------------------------------------------
@@ -226,14 +232,29 @@ def test_ci_gate_state_prefers_live_gate_over_cancelled_leftover(monkeypatch):
 
 
 @pytest.mark.unit
-def test_ci_gate_state_picks_newest_when_all_superseded(monkeypatch):
+def test_ci_gate_state_prefers_older_failure_over_newer_cancellation(monkeypatch):
+    """Supersession must never mask a real verdict, even a newer cancellation.
+
+    Pins the FIRST key of the ranking (non-superseded wins) independently of
+    the second (recency): here the cancelled entry is the more recent one, so
+    a naive "newest wins" would hide the failure.
+    """
+    rollup = [
+        _gate("FAILURE", completed_at="2026-07-24T20:00:00Z"),
+        _gate("CANCELLED", completed_at="2026-07-24T23:26:45Z"),
+    ]
+    monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=rollup))
+    assert pr_watch._ci_gate_state(PR) == ("COMPLETED", "FAILURE")
+
+
+@pytest.mark.unit
+def test_ci_gate_state_reports_cancelled_when_every_gate_is_superseded(monkeypatch):
     rollup = [
         _gate("CANCELLED", completed_at="2026-07-24T20:00:00Z"),
         _gate("CANCELLED", completed_at="2026-07-24T23:26:45Z"),
     ]
     monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=rollup))
-    status, conclusion = pr_watch._ci_gate_state(PR)
-    assert (status, conclusion) == ("COMPLETED", "CANCELLED")
+    assert pr_watch._ci_gate_state(PR) == ("COMPLETED", "CANCELLED")
 
 
 @pytest.mark.unit
@@ -398,6 +419,42 @@ def test_main_all_runs_cancelled_defers_to_ci_gate(
 
     assert pr_watch.main() == 0
     assert "failure(s) detected" not in capsys.readouterr().out
+
+
+@pytest.mark.unit
+def test_main_fails_safe_on_completed_run_with_empty_conclusion(
+    monkeypatch, stub_watch_loop, capsys
+):
+    """GitHub can report `completed` before the conclusion populates. That is
+    not a supersession and must not be shrugged off as green."""
+    runs = [
+        _run(777, "completed", "", "CI"),
+        _run(778, "in_progress", "", "CI"),
+    ]
+    monkeypatch.setattr(
+        pr_watch, "gh", make_gh(runs=runs, rollup=[_gate("", status="IN_PROGRESS")])
+    )
+
+    assert pr_watch.main() == 1
+    assert "1 failure(s) detected before watching started" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+def test_main_announces_a_superseded_run_only_once(
+    monkeypatch, stub_watch_loop, capsys
+):
+    """The startup loop re-lists runs on every retry — don't re-announce."""
+    runs = [_run(30133783967, "completed", "cancelled", "Preview Auto-Resync")]
+    monkeypatch.setattr(pr_watch, "gh", make_gh(runs=runs, rollup=[_gate("SUCCESS")]))
+    monkeypatch.setattr(pr_watch, "STARTUP_RETRIES", 3)
+    # main() drives VERBOSE_MODE off argv, so ask for verbosity there — the
+    # superseded notice is an emit_event, suppressed in the default quiet mode.
+    monkeypatch.setattr(sys, "argv", ["pr-watch.py", "--verbose", str(PR)])
+    monkeypatch.setattr(pr_watch, "VERBOSE_MODE", pr_watch.VERBOSE_MODE)
+
+    assert pr_watch.main() == 0
+    out = capsys.readouterr().out
+    assert out.count("Preview Auto-Resync — superseded (cancelled)") == 1
 
 
 # ---------------------------------------------------------------------------
