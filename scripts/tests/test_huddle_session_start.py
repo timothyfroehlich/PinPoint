@@ -257,6 +257,37 @@ def test_rotation_pending_still_injects_recent_activity(repo: Path) -> None:
     assert "Yesterday's digest." in out
 
 
+def test_rotation_pending_skips_stale_day_reconcile(repo: Path) -> None:
+    # huddle_reconcile_today keys off root notes' today_bead.date, which is still
+    # YESTERDAY while rotation is pending — so falling through must NOT drag it
+    # along. Two open dailies for that stale date are left alone here; rotation
+    # repoints the field under its own lock and the next session start dedups.
+    set_rotation_pending(repo)
+    _write_json(
+        repo / "children.json",
+        [
+            {
+                "id": YESTERDAY_DAILY_ID,
+                "title": f"Huddle daily {YESTERDAY}",
+                "status": "open",
+            },
+            # Sorts ahead of YESTERDAY_DAILY_ID, so an unguarded reconcile would
+            # both repoint root notes (bd update) and close the loser (bd close).
+            {
+                "id": "PP-lt12.10",
+                "title": f"Huddle daily {YESTERDAY}",
+                "status": "open",
+            },
+        ],
+    )
+    rc, out, err = run_hook(repo)
+    assert rc == 0, err
+    assert ROTATION_MARKER in out
+    bd_log = (repo / "bd.log").read_text()
+    assert "update" not in bd_log
+    assert "close" not in bd_log
+
+
 # --- Unchanged behaviour on the up-to-date path -----------------------------
 
 

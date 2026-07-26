@@ -180,9 +180,11 @@ fi
 # either pushed), collapse them to the canonical here. No-op in the common case
 # (two cheap local reads); silent + fail-open.
 #
-# Skipped while rotation is pending: today's daily does not exist yet, so there
-# is nothing to dedup, and the rotation subagent is about to create it under its
-# own lock.
+# Skipped while rotation is pending — preserving the pre-PP-2m3l behaviour, where
+# this only ever ran on the up-to-date path. The function keys off root notes'
+# `today_bead.date`, which is still YESTERDAY's date until rotation runs, so
+# calling it now would reconcile (and close dupes of) a stale day. Rotation
+# repoints that field under its own lock; the next session start reconciles.
 if [[ -z "$ROTATION_PENDING" ]]; then
   huddle_reconcile_today || true
 fi
