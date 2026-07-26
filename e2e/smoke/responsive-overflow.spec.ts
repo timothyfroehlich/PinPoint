@@ -50,6 +50,7 @@ const authenticatedRoutes = [
   `/m/${machineInitials}/settings`,
   `/m/${machineInitials}/maintenance`,
   `/m/${machineInitials}/timeline`,
+  `/m/${machineInitials}/edit`,
   `/m/${machineInitials}/i/${issueNum}`,
   "/settings",
 ];

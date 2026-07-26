@@ -28,9 +28,16 @@ test.describe("Technician Role Permissions", () => {
     const editButton = page.getByTestId("edit-machine-button");
     await expect(editButton).toBeVisible();
     await editButton.click();
+    await expect(page).toHaveURL(/\/edit$/);
     const nameInput = page.getByLabel("Machine Name");
     await nameInput.fill(seededMachines.addamsFamily.name);
-    await page.getByRole("button", { name: "Update Machine" }).click();
+    await page.getByRole("button", { name: "Save details" }).click();
+    // The save is an async server-action transition — wait for the section's
+    // own "Saved" indicator before navigating, or the goto below can race the
+    // DB write (a bare click() only dispatches the DOM event, it doesn't wait
+    // for the round trip).
+    await expect(page.getByTestId("details-dirty-note")).toHaveText("Saved");
+    await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
     await expect(
       page.getByRole("heading", { name: seededMachines.addamsFamily.name })
     ).toBeVisible();
@@ -88,14 +95,18 @@ test.describe("Technician Role Permissions", () => {
     await expect(editButton).toBeVisible();
 
     await editButton.click();
+    await expect(page).toHaveURL(/\/edit$/);
 
     // Should be able to change the name
     const nameInput = page.getByLabel("Machine Name");
     await nameInput.fill("TAF Technician Edit");
 
-    await page.getByRole("button", { name: "Update Machine" }).click();
+    await page.getByRole("button", { name: "Save details" }).click();
+    // Wait for the save transition to resolve before navigating — see the
+    // afterEach hook above for why a bare click() isn't enough here.
+    await expect(page.getByTestId("details-dirty-note")).toHaveText("Saved");
 
-    // Verify change persisted
+    await page.goto("/m/TAF");
     await expect(
       page.getByRole("heading", { name: "TAF Technician Edit" })
     ).toBeVisible();

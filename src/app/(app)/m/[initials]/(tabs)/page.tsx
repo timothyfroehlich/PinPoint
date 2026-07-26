@@ -1,13 +1,14 @@
 import type React from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { getUnifiedUsers } from "~/lib/users/queries";
+import { Pencil } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
+import { userProfiles } from "~/server/db/schema";
 import { deriveMachineStatus } from "~/lib/machines/status";
+import { Button } from "~/components/ui/button";
 import { EditButtonWithTooltip } from "../edit-button-tooltip";
-import { EditMachineDialog } from "../update-machine-form";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { docIsEmpty } from "~/lib/tiptap/types";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
@@ -81,20 +82,16 @@ export default async function MachineInfoTab({
     accessLevel,
     ownershipContext
   );
-  const canEditAnyMachine =
-    accessLevel === "admin" || accessLevel === "technician";
-  const isOwner =
-    !!user &&
-    (user.id === machine.ownerId || user.id === machine.invitedOwnerId);
 
   const canCompose = checkPermission(
     "machines.timeline.comment.add",
     accessLevel
   );
 
-  // PinballMap linking (bead B / PP-o355.2): the edit dialog exposes the picker
-  // only to users who may link, and needs the linked title's display name (the
-  // machine row stores only the PBM id + metadata, not the catalog name).
+  // PinballMap linking (bead B / PP-o355.2) gates the maintainer-facing desync
+  // signal below. The catalog picker itself moved to the edit page
+  // (PP-o355.19), so this landing no longer resolves the linked title's display
+  // name or the unified-user list — both were dialog-only reads.
   const canLink = checkPermission(
     "machines.pinballmap.link",
     accessLevel,
@@ -102,46 +99,14 @@ export default async function MachineInfoTab({
   );
   const machineStatus = deriveMachineStatus(openIssues);
 
-  // Both reads are independent — resolve them concurrently so the QR-scan
-  // landing doesn't stack the PinballMap lookup and the unified-user list.
-  const pinballmapTitlePromise: Promise<string | null> =
-    canLink && machine.pinballmapMachineId !== null
-      ? db.query.pinballmapCatalog
-          .findFirst({
-            where: eq(
-              pinballmapCatalog.pinballmapMachineId,
-              machine.pinballmapMachineId
-            ),
-            columns: { name: true },
-          })
-          .then((linkedTitle) => linkedTitle?.name ?? null)
-      : Promise.resolve(null);
-  const allUsersPromise: Promise<Awaited<ReturnType<typeof getUnifiedUsers>>> =
-    canEdit ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]);
   // The stored PBM snapshot drives the desync signal, which is a maintainer-
   // facing alert (it points at a mismatch to resolve). Only read it when the
   // viewer may act on it (`canLink`) AND the machine is linked — so the public
   // QR-scan landing never pays for (or shows) it. Location-wide singleton.
-  const pbmStatePromise: Promise<
-    Awaited<ReturnType<typeof getPinballMapState>>
-  > =
+  const pbmState =
     canLink && machine.pinballmapMachineId !== null
-      ? getPinballMapState()
-      : Promise.resolve(null);
-
-  const [pinballmapTitleName, allUsersRaw, pbmState] = await Promise.all([
-    pinballmapTitlePromise,
-    allUsersPromise,
-    pbmStatePromise,
-  ]);
-  const allUsers = allUsersRaw.map((u) => ({
-    id: u.id,
-    name: u.name,
-    lastName: u.lastName,
-    machineCount: u.machineCount,
-    status: u.status,
-    role: u.role,
-  }));
+      ? await getPinballMapState()
+      : null;
 
   // Description renders read-only inside the Details card; editing happens in
   // the Edit Machine dialog (not inline). Gate on docIsEmpty rather than just
@@ -153,36 +118,25 @@ export default async function MachineInfoTab({
     <RichTextDisplay content={machine.description} />
   ) : null;
 
-  // Edit-machine control lives in the owner card. PP-o355.2 PinballMap fields
-  // are wired through the dialog for users who may link.
+  // Edit-machine control lives in the owner card. Editing is a full page
+  // (/m/[initials]/edit, PP-o355.19) rather than a modal — the sections there
+  // have different save models, which a single-Save dialog cannot express.
   const editControl =
     canEdit && user ? (
-      <EditMachineDialog
-        machine={{
-          id: machine.id,
-          name: machine.name,
-          initials: machine.initials,
-          presenceStatus: machine.presenceStatus,
-          ownerId: machine.ownerId,
-          invitedOwnerId: machine.invitedOwnerId,
-          owner: machine.owner ? { name: machine.owner.name } : null,
-          invitedOwner: machine.invitedOwner
-            ? { name: machine.invitedOwner.name }
-            : null,
-          pinballmapMachineId: machine.pinballmapMachineId,
-          pinballmapExcluded: machine.pinballmapExcluded,
-          pinballmapExcludedReason: machine.pinballmapExcludedReason,
-          pinballmapListed: machine.pinballmapListed,
-          pinballmapLmxId: machine.pinballmapLmxId,
-          pinballmapTitleName,
-          description: machine.description,
-        }}
-        allUsers={allUsers}
-        canEditAnyMachine={canEditAnyMachine}
-        isOwner={isOwner}
-        canLink={canLink}
-        pinballmapUrl={pinballmapLocationUrl()}
-      />
+      <Button
+        asChild
+        variant="outline"
+        size="sm"
+        className="w-full border-outline text-foreground hover:bg-surface-variant"
+      >
+        <Link
+          href={`/m/${machine.initials}/edit`}
+          data-testid="edit-machine-button"
+        >
+          <Pencil className="mr-2 size-4" aria-hidden="true" />
+          Edit Machine
+        </Link>
+      </Button>
     ) : user && editDeniedReason !== null ? (
       <EditButtonWithTooltip reason={editDeniedReason} />
     ) : null;
