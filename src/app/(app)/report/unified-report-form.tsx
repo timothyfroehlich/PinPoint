@@ -199,6 +199,23 @@ export function UnifiedReportForm({
   // batch in progress survives — the Single form owns entry #1, not the whole
   // batch (PP-2m17 #2).
   const resetSingleForm = useCallback(() => {
+    // Native form reset — clears the honeypot and any browser autofill that
+    // bypassed controlled inputs.
+    //
+    // This MUST run before the draft-clearing calls below (PP-1ajq). `reset()`
+    // synchronously fires the form-`reset` event, and @radix-ui/react-select
+    // >=2.3.3 answers it by replaying each Select's MOUNT-TIME value through
+    // `onValueChange` — i.e. `patchEntry(0, { severity: … })`. Everything here
+    // is one React batch, so whichever update is queued last wins. Reset first
+    // and the stale replay is superseded by the clear; clear first and the
+    // replay overwrites it.
+    //
+    // The mount-time value is only stale after a remount that starts from a
+    // non-default draft: the Single form unmounts on every Single↔Multiple tab
+    // switch while the provider (see the `(tabbed)` layout) does not, so a
+    // return to Single mounts the Selects at the user's current choices. Clear
+    // then restored those instead of resetting them.
+    formRef.current?.reset();
     if (entries.length <= 1) {
       clearAll();
     } else {
@@ -206,9 +223,6 @@ export function UnifiedReportForm({
       patchSingle(emptySingle());
     }
     if (defaultMachineId) patchEntry(0, { machineId: defaultMachineId });
-    // Native form reset — clears the honeypot and any browser autofill that
-    // bypassed controlled inputs.
-    formRef.current?.reset();
     // If the machine was user-picked (URL didn't seed it), strip the ?machine=
     // the combobox's onChange wrote via replaceState so a reload/back-nav leaves
     // a clean URL. Read window.location.search (not the searchParams hook), since

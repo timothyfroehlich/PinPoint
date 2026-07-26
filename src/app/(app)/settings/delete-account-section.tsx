@@ -82,12 +82,6 @@ export function DeleteAccountSection({
 
   return (
     <div className="space-y-4">
-      {state && !state.ok && (
-        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive">
-          <p className="text-sm font-medium">{state.message}</p>
-        </div>
-      )}
-
       {isSoleAdmin && (
         <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive">
           <p className="text-sm font-medium">
@@ -119,6 +113,24 @@ export function DeleteAccountSection({
         <AlertDialogContent className="sm:max-w-[500px]">
           {/* No `action={formAction}` on purpose — see `handleSubmit` (PP-1ajq). */}
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/*
+              The failure banner belongs INSIDE the dialog. A failed delete
+              leaves this dialog open (there is no close-on-failure path), so a
+              banner rendered on the settings page behind the modal overlay was
+              invisible at exactly the moment it mattered — the button simply
+              flipped back from "Deleting…" and the user re-clicked. Keeping it
+              here is also what makes the preserved reassignment (see
+              `handleSubmit`) observable rather than merely correct.
+            */}
+            {state && !state.ok && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive"
+              >
+                <p className="text-sm font-medium">{state.message}</p>
+              </div>
+            )}
+
             <AlertDialogHeader>
               <AlertDialogTitle>Delete your account?</AlertDialogTitle>
               <AlertDialogDescription asChild>

@@ -93,20 +93,33 @@ function seedDraftWithMachine(): void {
   localStorage.setItem(REPORT_DRAFT_KEY, serializeDraft(draft));
 }
 
-function wrapped(): React.JSX.Element {
+/**
+ * Mirrors the `(tabbed)` layout: the provider outlives the Single form, which
+ * unmounts on every Single↔Multiple tab switch. Toggling `showSingle` is how a
+ * test reproduces a remount that starts from a non-default draft.
+ */
+function Tabbed({ showSingle }: { showSingle: boolean }): React.JSX.Element {
   return (
     <ReportDraftProvider machines={MACHINE_OPTIONS} assignees={[]}>
-      <UnifiedReportForm
-        machinesList={[MACHINE]}
-        defaultMachineId={undefined}
-        userAuthenticated={false}
-        accessLevel="unauthenticated"
-        assignees={[]}
-        initialIssues={[]}
-        initialMachineInitials=""
-      />
+      {showSingle ? (
+        <UnifiedReportForm
+          machinesList={[MACHINE]}
+          defaultMachineId={undefined}
+          userAuthenticated={false}
+          accessLevel="unauthenticated"
+          assignees={[]}
+          initialIssues={[]}
+          initialMachineInitials=""
+        />
+      ) : (
+        <div data-testid="quick-tab" />
+      )}
     </ReportDraftProvider>
   );
+}
+
+function wrapped(): React.JSX.Element {
+  return <Tabbed showSingle={true} />;
 }
 
 function severityHidden(): HTMLInputElement {
@@ -153,5 +166,46 @@ describe("UnifiedReportForm — a failed submit must not revert the metadata Sel
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(severityHidden().value).toBe("major");
+  });
+
+  /**
+   * The same Radix replay reaches the EXPLICIT reset too. `resetSingleForm()`
+   * still calls `formRef.current.reset()` to clear the honeypot, so the order
+   * of that call against the draft-clearing state updates decides who wins —
+   * they all land in one React batch. Reset must go first.
+   *
+   * The replay is only harmful when the Selects mounted at a non-default value,
+   * which is what the tab switch below sets up: mount-time "major" is stale
+   * once the user moves to "unplayable", so a Clear restored "major".
+   */
+  it("clears the Selects when the mount-time value is stale after a tab switch", async () => {
+    const user = userEvent.setup();
+    seedDraftWithMachine();
+    const { rerender } = render(<Tabbed showSingle={true} />);
+
+    await waitFor(() => {
+      expect(severityHidden().value).toBe("minor");
+    });
+    await user.click(screen.getByLabelText(/Severity/));
+    await user.click(screen.getByRole("option", { name: "Major" }));
+    expect(severityHidden().value).toBe("major");
+
+    // Single → Multiple → Single. The form remounts; the draft does not.
+    rerender(<Tabbed showSingle={false} />);
+    rerender(<Tabbed showSingle={true} />);
+    await waitFor(() => {
+      expect(severityHidden().value).toBe("major");
+    });
+
+    // Now move off the mount-time value, so a replay of it would be stale.
+    await user.click(screen.getByLabelText(/Severity/));
+    await user.click(screen.getByRole("option", { name: "Unplayable" }));
+    expect(severityHidden().value).toBe("unplayable");
+
+    await user.click(screen.getByRole("button", { name: /Clear/i }));
+    await user.click(screen.getByRole("button", { name: "Clear fields" }));
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(severityHidden().value).toBe("minor");
   });
 });
