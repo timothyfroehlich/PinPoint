@@ -6,7 +6,11 @@
 # orphan slot manifest entries and orphan Supabase Docker resources from
 # the failure modes documented in PP-qlzu (rm -rf without the hook, Claude
 # in Web sandbox sessions). When orphans are found the sweep prints a
-# single-line nudge to stderr telling you to run `--apply` manually.
+# single-line nudge to stderr telling you to run `--apply` manually. If Docker
+# can't be enumerated the nudge says UNKNOWN rather than reporting zero — a
+# false zero here is what let ~557 MB of orphan volumes accumulate unseen
+# (PP-5o7b) — and the sweep exits non-zero, which this hook deliberately
+# swallows so session start is never blocked.
 #
 # Why dry-run (not auto-apply): SessionStart fires on every Claude Code
 # session and can affect Docker resources across the host; we want the
