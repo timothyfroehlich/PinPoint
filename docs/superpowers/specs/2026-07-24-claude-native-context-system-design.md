@@ -35,21 +35,21 @@ AGENTS.md exists because non-Claude agents read it. With Codex and Antigravity g
 > **Size**: target under 200 lines per CLAUDE.md file. Longer files consume more context and reduce adherence.
 > — [How Claude remembers your project](https://code.claude.com/docs/en/memory)
 
-Current combined: ~700 lines.
+Current combined: ~325 lines.
 
-## 2. Current state (measured 2026-07-24)
+## 2. Current state (re-measured 2026-07-25, post-#1740/#1741 merge)
 
-| Artifact                          | Size                     | Note                                                                |
-| --------------------------------- | ------------------------ | ------------------------------------------------------------------- |
-| `AGENTS.md`                       | 24,865 chars             | Was 31,915; this session cut the skills table + 6 sections          |
-| `CLAUDE.md`                       | 6,115 chars              | Imports AGENTS.md wholesale                                         |
-| `docs/NON_NEGOTIABLES.md`         | 48,361 chars             | Canonical catalog; `trigger: always_on` frontmatter for Antigravity |
-| `.agents/skills/`                 | 21 skills, 297,438 chars | `.claude/skills` symlinks to it                                     |
-| `.claude/hooks/`                  | 15 files                 | 7 blocking, 8 informational                                         |
-| `.github/instructions/`           | 6 files                  | Path-scoped, `applyTo:` globs — **already working**                 |
-| `.github/copilot-instructions.md` | 3,482 chars              | Review-voice rule summary                                           |
-| `.agents/rules/AGY.md`            | 931 chars                | Antigravity-only                                                    |
-| `.claude/rules/`                  | —                        | **does not exist**                                                  |
+| Artifact                          | Size                     | Note                                                                                                                                                                                        |
+| --------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AGENTS.md`                       | 32,510 chars (245 lines) | Grew back since the 2026-07-24 cut — #1741's env-registry note and PP-o355.23's PBM token wording landed                                                                                    |
+| `CLAUDE.md`                       | 6,394 chars (80 lines)   | Imports AGENTS.md wholesale                                                                                                                                                                 |
+| `docs/NON_NEGOTIABLES.md`         | 50,031 chars             | Canonical catalog; `trigger: always_on` frontmatter for Antigravity                                                                                                                         |
+| `.agents/skills/`                 | 21 skills, 310,820 chars | `.claude/skills` symlinks to it                                                                                                                                                             |
+| `.claude/hooks/`                  | 13 files                 | 4 blocking, 9 informational — `block-bad-shell-patterns.cjs`/`block-dangerous-commands.cjs` deleted by #1740; `block-drizzle-push.cjs`/`block-loopback-literal.cjs` deleted by this PR (§6) |
+| `.github/instructions/`           | 6 files                  | Path-scoped, `applyTo:` globs — **already working**                                                                                                                                         |
+| `.github/copilot-instructions.md` | 3,482 chars              | Review-voice rule summary                                                                                                                                                                   |
+| `.agents/rules/AGY.md`            | 931 chars                | Antigravity-only                                                                                                                                                                            |
+| `.claude/rules/`                  | —                        | **does not exist**                                                                                                                                                                          |
 
 Rules currently live in three hand-maintained places (`AGENTS.md` §2.1, `docs/NON_NEGOTIABLES.md`, `.github/instructions/`) with one declared sync contract between the first two.
 
@@ -191,17 +191,19 @@ SEC-007 (email privacy), ARCH-010 (Rule of Three, with Tim's at-TWO caveat for l
 
 This supersedes the earlier decision to keep all 20 inline — that decision assumed a ~14k AGENTS.md, which no longer exists.
 
-## 6. Hooks: three additions, all verified gaps
+## 6. Hooks: one addition ships; two superseded
 
-Verified by inspection on 2026-07-24, not assumed:
+The 2026-07-24 design proposed three new PreToolUse hooks, each covering a verified gap. A subsequent full review of PinPoint's blocking hook layer reached an organizing conclusion that drops two of the three: **a rule about an _effect_ should move to the lowest layer that can express it**, where it becomes airtight and cannot misfire on prose. **A rule about _intent_** ("who/what initiated this action") can only be expressed at the hook layer, and should be tuned for **low false positives** rather than completeness. The threat model throughout is explicitly non-adversarial — a well-meaning agent doing something dumb, not an attacker evading a filter — so no evasion-resistance machinery is warranted.
 
-**`block-drizzle-push.cjs`** (PreToolUse, Bash) — CORE-ARCH-009.
-`block-dangerous-commands.cjs` covers only `chmod` / `chown` / `chgrp` / `git update-index --chmod`. The settings deny rule is `Bash(supabase db push:*)` only. **`drizzle-kit push` is blocked by nothing today** and would bypass the migration chain, corrupting the `prevId` sequence that `drizzle/meta` depends on.
+**Dropped — `block-drizzle-push.cjs`** (was PreToolUse, Bash) — CORE-ARCH-009.
+Superseded by PR #1741: `scripts/lib/drizzle-push-guard.ts` exports `assertNotDrizzlePush()`, called as the first statement in `drizzle.config.ts`, ahead of `loadEnvConfig()` and any `POSTGRES_URL` read. Drizzle Kit always reads its own config before doing anything else, so this is the lowest layer that can express the rule — airtight regardless of invocation shape (`pnpm exec` / `npx` / `dlx` / `bunx` / direct `node_modules` path) — and, unlike the hook, it cannot fire on prose that merely names the command. The hook version shipped without effective-command resolution and blocked an unrelated `bd comments add` on its first real firing (§12); that failure mode is moot now that the hook is deleted.
 
-**`block-loopback-literal.cjs`** (PreToolUse, Write|Edit) — CORE-SEC-008.
-Blocks writing the `127.0.0.1` literal into `supabase/config.toml`, `.env*`, Playwright config, and scripts. **No enforcement exists today** — `scripts/assert-local-db.mjs` actually _accepts_ `127.0.0.1` as a valid local host. Cookie host isolation breaks Supabase SSR auth across the two spellings.
+**Dropped — `block-loopback-literal.cjs`** (was PreToolUse, Write|Edit) — CORE-SEC-008.
+Tim's call: `localhost`-not-`127.0.0.1` is already a documented non-negotiable, and the hook was structurally blind to the two write paths that matter most — generators and heredocs — so it could only ever catch a narrow slice of violations while adding hook-stack surface. Deleted outright, with no replacement content-check hook; this rule stays prose-enforced (the "yours to remember" tier in §5's rule index).
 
-**`block-worktree-dispatch-from-linked.cjs`** (PreToolUse, `Agent`) — upstream bug [anthropics/claude-code#47548](https://github.com/anthropics/claude-code/issues/47548).
+**Kept — `block-worktree-dispatch-from-linked.cjs`** (PreToolUse, `Agent`) — upstream bug [anthropics/claude-code#47548](https://github.com/anthropics/claude-code/issues/47548).
+
+This one survives the review because it is squarely an _intent_ rule — "was this dispatch initiated from a linked worktree" — that cannot be pushed to a lower layer, and because it is tuned for low false positives: it reads structured fields (`tool_name`, `tool_input.isolation`), is three-state on worktree classification so non-repos and git errors fail **open**, and takes cwd from the payload rather than `CLAUDE_PROJECT_DIR`.
 
 Dispatching `Agent(isolation: "worktree")` from a linked worktree silently switches the **parent** worktree's branch to the subagent's new branch, even at N=1. Today's only mitigation is prose in CLAUDE.md instructing the agent to "refuse and explain" — which, per Anthropic's own framing, is a request rather than a guarantee. The existing `WorktreeCreate` hook (PP-bg45) explicitly cannot fix this one; it addresses the different race in #47266.
 
@@ -218,7 +220,7 @@ What is established:
 
 What is **not** established: that the literal matcher `"Agent"` matches. `hookName` reflects the tool being invoked, not the configured matcher — PinPoint's settings matched only `Bash`, yet `PreToolUse:Read`, `:ToolSearch`, and `:TaskUpdate` all appear in the scan. So the 30 fires prove a _wildcard_ matcher catches `Agent`, not that an exact one does. The docs describe matchers as exact-string-or-regex against tool names, which makes `"Agent"` the documented form, but that is inference rather than observation.
 
-**Hook registration is not immediately live, but it is not permanent either.** Right after all three hooks were registered mid-session they were inert: a worktree dispatch from a linked worktree went through unblocked, and `echo drizzle-kit push` — which `block-drizzle-push` matches — also passed, despite that hook sitting in an already-existing `Bash` matcher block. Roughly an hour later, in the same session, the identical probe **blocked**. So hooks do reload; the trigger and latency were not identified.
+**Hook registration is not immediately live, but it is not permanent either.** Right after this hook was registered mid-session it was inert: a worktree dispatch from a linked worktree went through unblocked. Roughly an hour later, in the same session, the identical probe **blocked**. So hooks do reload; the trigger and latency were not identified.
 
 The operational rule that follows is the useful part: **never assume a newly-registered hook is active. Verify with a probe before trusting it, and never conclude a hook is broken from a single negative observation right after registering it.** (An earlier revision of this spec asserted flatly that hooks "do not hot-reload" — that was wrong, drawn from exactly such a single observation.)
 
@@ -267,7 +269,7 @@ The design leaves three derived expressions of the rules (CLAUDE.md index, `.cla
 **Instead: `check:rule-ids`**, a new fast gate in `pnpm run check`:
 
 1. Every `CORE-*` ID cited in `CLAUDE.md`, `AGENTS.md`, `.claude/rules/**`, `.github/instructions/**`, `.github/copilot-instructions.md`, `.claude/hooks/*.cjs`, or `CODE_REVIEW.md` must exist in `docs/NON_NEGOTIABLES.md` → **fail** if not. Missing optional paths are fine, so the gate ships in PR 1 before `.claude/rules/` and `CODE_REVIEW.md` exist.
-2. Catalog rules cited nowhere → **opt-in audit** via `pnpm run check:rule-ids:orphans`, never a default warning. The first run found **42 of 66** catalog rules "orphaned", because the catalog is deliberately broader than the set promoted into an always-loaded index or a path-scoped file. Printing 42 lines on every `check` would train everyone to ignore the gate — the same failure mode that keeps `block-loopback-literal`'s scope narrow (§6).
+2. Catalog rules cited nowhere → **opt-in audit** via `pnpm run check:rule-ids:orphans`, never a default warning. The first run found **42 of 66** catalog rules "orphaned", because the catalog is deliberately broader than the set promoted into an always-loaded index or a path-scoped file. Printing 42 lines on every `check` would train everyone to ignore the gate — the same over-eager-noise failure mode that got `block-loopback-literal` deleted outright rather than narrowed (§6).
 3. `AGENTS.md` must be ≤10 lines → **fail** if it has started growing again. **Deferred to PR 2**, since AGENTS.md is still 24,865 chars until the rewrite lands.
 
 As of 2026-07-24 the repo has **zero** unknown IDs, so the gate lands green.
@@ -297,15 +299,13 @@ This catches renames, deletions, and orphans — the drift that actually bites �
 
 **#1736 merges first.** Everything else is blocked on it (§7).
 
-**PR 1 — enforcement.** `block-drizzle-push.cjs`, `block-loopback-literal.cjs`, `block-worktree-dispatch-from-linked.cjs`, unit tests for all three, `check:rule-ids`. Self-contained; useful the moment it lands; no doc churn.
+**PR 1 — enforcement.** Originally scoped as three new hooks; landed as one. `block-drizzle-push.cjs` and `block-loopback-literal.cjs` were cut post-review — CORE-ARCH-009 is enforced instead by `assertNotDrizzlePush()` in `drizzle.config.ts` (PR #1741), and CORE-SEC-008 stays prose-only (§6). What ships: `block-worktree-dispatch-from-linked.cjs`, its unit tests, and `check:rule-ids`. Self-contained; useful the moment it lands; no doc churn.
 
-**Pre-merge gate on PR 1 — a fresh session must smoke-test all three hooks.** Unit tests prove the predicates; they cannot prove the harness invokes the hooks, and hooks do not hot-reload, so this is impossible from the session that wrote them (§6). In a session started after the hooks are committed, from inside a linked worktree:
+**Pre-merge gate on PR 1 — a fresh session must smoke-test the surviving hook.** Unit tests prove the predicate; they cannot prove the harness invokes the hook, and hook registration does not go live immediately (§6), so this is impossible from the session that wrote it. In a session started after the hook is committed, from inside a linked worktree:
 
-1. `echo drizzle-kit push` → expect a block citing CORE-ARCH-009.
-2. Write `127.0.0.1` into `supabase/config.toml` → expect a block citing CORE-SEC-008.
-3. Dispatch `Agent(isolation: "worktree")` → expect a block citing #47548. **This is the one that can fail for a second reason** — if it passes while 1 and 2 block, the `"Agent"` matcher is not exact-matching and needs a regex or wildcard form instead.
+1. Dispatch `Agent(isolation: "worktree")` → expect a block citing #47548. **This is the one case that can fail for a second reason** — if the dispatch passes, either the hook hasn't gone live yet (retry after a pause) or the `"Agent"` matcher is not exact-matching and needs a regex or wildcard form instead.
 
-Step 3 carries a small risk: an unblocked dispatch can trigger #47548 and switch the worktree's branch. Commit first; recovery is `git checkout <branch>`, and the stray worktree needs `scripts/worktree_cleanup.py`.
+This step carries a small risk: an unblocked dispatch can trigger #47548 and switch the worktree's branch. Commit first; recovery is `git checkout <branch>`, and the stray worktree needs `scripts/worktree_cleanup.py`.
 
 **PR 2 — the context system.** CLAUDE.md rewrite, `.claude/rules/`, AGENTS.md stub, `CODE_REVIEW.md`, copilot-instructions stub, Antigravity retirement, skill merges. Kept together because CLAUDE.md points at `CODE_REVIEW.md` and at merged skill names — splitting leaves dangling pointers.
 
@@ -313,15 +313,15 @@ Both from `worktree-context-system-rebuild`, which already carries this session'
 
 ## 12. Risks
 
-| Risk                                                                        | Mitigation                                                                                                                                                                                                                                           |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PP-c0uy carve-out silently lost in conflict resolution                      | §7 records the exact wording; `check:rule-ids` will not catch this — it is a manual verification step                                                                                                                                                |
-| A rule falls through the tiers and lands nowhere                            | `check:rule-ids` rule 2 warns on orphaned catalog entries                                                                                                                                                                                            |
-| `CODE_REVIEW.md` written but never loaded                                   | The `.github/copilot-instructions.md` stub is what makes it load; verify on the first PR after merge that Copilot's review cites a `CORE-*` ID                                                                                                       |
-| Path-scoped rules don't fire for creation-type prohibitions                 | Those stay in CLAUDE.md by design (§4.3)                                                                                                                                                                                                             |
-| CLAUDE.md drifts back over 200 lines                                        | No automated gate proposed; `/doctor` surfaces it on demand                                                                                                                                                                                          |
-| A rule cut from CLAUDE.md lands in no skill                                 | Grep-verify every cut against its destination skill before removing it — doing this for §9 found a genuine hole (step 6, the deploy watch)                                                                                                           |
-| `"matcher": "Agent"` does not exact-match, so the worktree hook never fires | Pre-merge smoke test step 3 (§11) detects exactly this; fallback is a regex or wildcard matcher                                                                                                                                                      |
-| A hook is edited and assumed live in the same session                       | Registration is not immediately live and the reload latency is unpredictable (§6). Probe before trusting; never call a hook broken from one negative observation right after registering it                                                          |
-| A guard hook fires on prose that merely names the thing it blocks           | Resolve the effective command per shell segment instead of substring-matching — the technique `block-main-worktree-branch-switch.cjs` already uses. `block-drizzle-push` shipped without it and blocked a `bd comments add` on its first real firing |
-| Antigravity retirement is premature                                         | Everything is recoverable from git history                                                                                                                                                                                                           |
+| Risk                                                                        | Mitigation                                                                                                                                                                                                                                                                                                                                                           |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PP-c0uy carve-out silently lost in conflict resolution                      | §7 records the exact wording; `check:rule-ids` will not catch this — it is a manual verification step                                                                                                                                                                                                                                                                |
+| A rule falls through the tiers and lands nowhere                            | `check:rule-ids` rule 2 warns on orphaned catalog entries                                                                                                                                                                                                                                                                                                            |
+| `CODE_REVIEW.md` written but never loaded                                   | The `.github/copilot-instructions.md` stub is what makes it load; verify on the first PR after merge that Copilot's review cites a `CORE-*` ID                                                                                                                                                                                                                       |
+| Path-scoped rules don't fire for creation-type prohibitions                 | Those stay in CLAUDE.md by design (§4.3)                                                                                                                                                                                                                                                                                                                             |
+| CLAUDE.md drifts back over 200 lines                                        | No automated gate proposed; `/doctor` surfaces it on demand                                                                                                                                                                                                                                                                                                          |
+| A rule cut from CLAUDE.md lands in no skill                                 | Grep-verify every cut against its destination skill before removing it — doing this for §9 found a genuine hole (step 6, the deploy watch)                                                                                                                                                                                                                           |
+| `"matcher": "Agent"` does not exact-match, so the worktree hook never fires | Pre-merge smoke test step 3 (§11) detects exactly this; fallback is a regex or wildcard matcher                                                                                                                                                                                                                                                                      |
+| A hook is edited and assumed live in the same session                       | Registration is not immediately live and the reload latency is unpredictable (§6). Probe before trusting; never call a hook broken from one negative observation right after registering it                                                                                                                                                                          |
+| A guard hook fires on prose that merely names the thing it blocks           | Resolve the effective command per shell segment instead of substring-matching — the technique `block-main-worktree-branch-switch.cjs` already uses. `block-drizzle-push` shipped without it and blocked a `bd comments add` on its first real firing; it has since been deleted in favor of the `drizzle.config.ts` guard (§6), which cannot misfire on prose at all |
+| Antigravity retirement is premature                                         | Everything is recoverable from git history                                                                                                                                                                                                                                                                                                                           |

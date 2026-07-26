@@ -40,6 +40,13 @@ from pathlib import Path
 # CORE-<CATEGORY>-<NNN>. Category is uppercase letters/digits (TS, A11Y, PBM).
 RULE_ID = re.compile(r"\bCORE-[A-Z][A-Z0-9]*-\d{3}\b")
 
+# Range shorthand, e.g. CORE-RESP-001..004 or CORE-FORM-001..006 (AGENTS.md
+# §2.1 uses this to cite a contiguous block without spelling out every ID).
+# Without expansion, RULE_ID alone only ever catches the range's start ID --
+# the end ID and every interior ID are never extracted, so a rename or
+# deletion of e.g. CORE-RESP-003 would go undetected.
+RANGE_ID = re.compile(r"\bCORE-([A-Z][A-Z0-9]*)-(\d{3})\.\.(\d{3})\b")
+
 CATALOG = "docs/NON_NEGOTIABLES.md"
 
 # Files and globs whose CORE-* citations must resolve. Missing paths are fine:
@@ -66,7 +73,12 @@ def find_repo_root(start: Path) -> Path:
 
 
 def extract_ids(text: str) -> set[str]:
-    return set(RULE_ID.findall(text))
+    ids = set(RULE_ID.findall(text))
+    for category, start, end in RANGE_ID.findall(text):
+        width = len(start)
+        for n in range(int(start), int(end) + 1):
+            ids.add(f"CORE-{category}-{n:0{width}d}")
+    return ids
 
 
 def collect_catalog_ids(root: Path) -> set[str]:

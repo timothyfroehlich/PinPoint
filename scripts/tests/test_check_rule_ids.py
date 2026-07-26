@@ -54,6 +54,30 @@ class TestExtractIds:
     def test_returns_empty_for_no_matches(self):
         assert extract_ids("nothing to see") == set()
 
+    def test_expands_dotdot_range_shorthand(self):
+        # AGENTS.md §2.1 cites contiguous blocks as e.g. CORE-RESP-001..004
+        # instead of spelling out every ID. Without expansion, only the
+        # range's start ID is ever extracted -- the end ID and every
+        # interior ID are silently never checked against the catalog.
+        assert extract_ids("CORE-RESP-001..004") == {
+            "CORE-RESP-001",
+            "CORE-RESP-002",
+            "CORE-RESP-003",
+            "CORE-RESP-004",
+        }
+
+    def test_expands_range_alongside_plain_ids(self):
+        text = "CORE-ARCH-009 and CORE-FORM-001..006"
+        assert extract_ids(text) == {
+            "CORE-ARCH-009",
+            "CORE-FORM-001",
+            "CORE-FORM-002",
+            "CORE-FORM-003",
+            "CORE-FORM-004",
+            "CORE-FORM-005",
+            "CORE-FORM-006",
+        }
+
 
 class TestCatalogAndCitations:
     def test_reads_catalog_ids(self, repo: Path):
@@ -133,6 +157,20 @@ class TestMain:
         assert "CORE-TS-007" in err
         assert "CORE-ARCH-009" not in err  # cited, so not an orphan
 
+    def test_range_citation_catches_missing_interior_id(self, repo: Path, capsys):
+        # CORE-RESP-002 and -003 were renamed/removed from the catalog, but
+        # CLAUDE.md still cites the whole block as a range. Before range
+        # expansion this passed silently -- only the range's start ID
+        # (CORE-RESP-001) was ever extracted and checked.
+        (repo / CATALOG_REL).write_text(
+            "# Catalog\n\n- CORE-RESP-001\n- CORE-RESP-004\n", encoding="utf-8"
+        )
+        (repo / "CLAUDE.md").write_text("CORE-RESP-001..004", encoding="utf-8")
+        assert main(["--root", str(repo)]) == 1
+        err = capsys.readouterr().err
+        assert "CORE-RESP-002" in err
+        assert "CORE-RESP-003" in err
+
     def test_orphans_clean_message(self, repo: Path, capsys):
         (repo / "CLAUDE.md").write_text(
             "CORE-ARCH-009 CORE-SEC-008 CORE-TS-007", encoding="utf-8"
@@ -152,9 +190,30 @@ class TestFindRepoRoot:
 
 
 class TestRealRepo:
-    """The gate must be green against the actual repository."""
+    """The gate must be green against the actual repository.
+
+    A bare `main(...) == 0` assertion here is vacuous: if a CITING_SOURCES
+    glob silently stopped matching anything (a moved file, a typo'd
+    pattern), or the catalog parse regressed to finding zero IDs,
+    `collect_citations` would return `{}` and the gate would report "no
+    unknown IDs" with nothing actually checked -- passing for the wrong
+    reason. The non-triviality assertions below force the test to fail if
+    that ever happens, rather than passing regardless of whether the gate
+    is doing real work.
+    """
 
     def test_no_unknown_ids_in_this_repo(self):
         root = find_repo_root(Path(__file__).resolve().parent)
         assert (root / CATALOG_REL).is_file()
+
+        catalog_ids = collect_catalog_ids(root)
+        citations = collect_citations(root)
+
+        # Non-triviality: the real catalog has 60+ rules and several real
+        # files cite them. If either collection came back empty or tiny,
+        # the gate isn't actually checking anything.
+        assert len(catalog_ids) > 50
+        assert citations, "expected at least one real citing file to be found"
+        assert sum(len(ids) for ids in citations.values()) > 20
+
         assert main(["--root", str(root)]) == 0
