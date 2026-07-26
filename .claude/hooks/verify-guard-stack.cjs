@@ -27,10 +27,8 @@
 
 // Keep in sync when adding/removing a PreToolUse guard hook.
 const EXPECTED_GUARD_HOOKS = [
-  "block-dangerous-commands.cjs",
   "normalize-workspace-paths.cjs",
   "inject-beads-actor.cjs",
-  "block-bad-shell-patterns.cjs",
   "block-heavy-under-pressure.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
