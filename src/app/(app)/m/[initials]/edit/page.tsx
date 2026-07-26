@@ -17,9 +17,11 @@ import { PinballmapListingControl } from "~/components/machines/PinballmapListin
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
 import { formatDateTime } from "~/lib/dates";
+import { getUnifiedUsers } from "~/lib/users/queries";
 import { getMachineForLayout } from "../_data";
 import { MachineDetailsForm } from "./machine-details-form";
 import { PinballmapSyncNow } from "./pinballmap-sync-now";
+import { MachineOwnerTransfer } from "./machine-owner-transfer";
 
 /**
  * Machine edit page (/m/[initials]/edit) — PP-o355.19.
@@ -105,10 +107,25 @@ export default async function MachineEditPage({
           .then((linkedTitle) => linkedTitle?.name ?? null)
       : Promise.resolve(null);
 
-  const [pinballmapTitleName, pbmState] = await Promise.all([
+  const [pinballmapTitleName, pbmState, allUsersRaw] = await Promise.all([
     pinballmapTitlePromise,
     canLink ? getPinballMapState() : Promise.resolve(null),
+    getUnifiedUsers({ includeEmails: false }),
   ]);
+
+  const allUsers = allUsersRaw.map((u) => ({
+    id: u.id,
+    name: u.name,
+    lastName: u.lastName,
+    machineCount: u.machineCount,
+    status: u.status,
+    role: u.role,
+  }));
+
+  const canEditAnyMachine =
+    accessLevel === "admin" || accessLevel === "technician";
+  const isOwner =
+    user.id === machine.ownerId || user.id === machine.invitedOwnerId;
 
   const locationUrl = pinballmapLocationUrl();
 
@@ -184,6 +201,30 @@ export default async function MachineEditPage({
           canLink={canLink}
           pinballmapUrl={locationUrl}
         />
+      </section>
+
+      {/* Danger zone — applies immediately. Machine deletion joins this
+          section in PP-o355.25. */}
+      <section
+        className="space-y-4 border-t border-outline-variant pt-6"
+        aria-labelledby="section-danger"
+      >
+        <h2 id="section-danger" className="text-base font-semibold">
+          Danger zone
+        </h2>
+        <div className="rounded-lg border border-destructive/35 px-4 py-2">
+          <MachineOwnerTransfer
+            machineId={machine.id}
+            machineName={machine.name}
+            ownerId={machine.ownerId}
+            invitedOwnerId={machine.invitedOwnerId}
+            ownerName={machine.owner?.name ?? null}
+            invitedOwnerName={machine.invitedOwner?.name ?? null}
+            allUsers={allUsers}
+            canEditAnyMachine={canEditAnyMachine}
+            isOwner={isOwner}
+          />
+        </div>
       </section>
     </PageContainer>
   );
