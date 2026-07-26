@@ -94,15 +94,27 @@ describe("MachineDetailsForm", () => {
     );
   });
 
-  it("restores the original description and clears the dirty note on Cancel", async () => {
+  it("restores the original name, availability, and description on Cancel", async () => {
     const user = userEvent.setup();
     render(<MachineDetailsForm {...baseProps} />);
+
+    const nameInput = screen.getByLabelText(/Machine Name/);
+    await user.type(nameInput, "!");
+    expect(nameInput).toHaveValue("Godzilla (Premium)!");
+
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByRole("option", { name: "Off the Floor" }));
+    expect(screen.getByRole("combobox")).toHaveTextContent("Off the Floor");
 
     await user.type(screen.getByLabelText("Machine description"), "draft");
     expect(hiddenDescription().value).not.toBe("");
 
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
+    expect(screen.getByLabelText(/Machine Name/)).toHaveValue(
+      "Godzilla (Premium)"
+    );
+    expect(screen.getByRole("combobox")).toHaveTextContent("On the Floor");
     expect(hiddenDescription().value).toBe("");
     expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
       "No unsaved changes"
