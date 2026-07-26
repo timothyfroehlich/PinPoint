@@ -29,10 +29,8 @@ const { evaluateGuardStack } = require(hookPath) as {
 // Fixture builders
 // ---------------------------------------------------------------------------
 const ALL_EXPECTED_HOOKS = [
-  "block-dangerous-commands.cjs",
   "normalize-workspace-paths.cjs",
   "inject-beads-actor.cjs",
-  "block-bad-shell-patterns.cjs",
   "block-heavy-under-pressure.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
@@ -67,7 +65,7 @@ function settingsWithHooks(
 // Fast path: pure evaluateGuardStack
 // ---------------------------------------------------------------------------
 describe("evaluateGuardStack — healthy", () => {
-  it("reports no problems when all 7 hooks + non-empty permissions present", () => {
+  it("reports no problems when all 5 hooks + non-empty permissions present", () => {
     const settings = settingsWithHooks(ALL_EXPECTED_HOOKS);
     expect(evaluateGuardStack(settings)).toEqual([]);
   });
@@ -80,14 +78,14 @@ describe("evaluateGuardStack — healthy", () => {
         PreToolUse: [
           {
             matcher: "Bash",
-            hooks: ALL_EXPECTED_HOOKS.slice(0, 4).map((b) => ({
+            hooks: ALL_EXPECTED_HOOKS.slice(0, 3).map((b) => ({
               type: "command",
               command: `node .claude/hooks/${b}`,
             })),
           },
           {
             matcher: "Bash|mcp__github__merge_pull_request",
-            hooks: ALL_EXPECTED_HOOKS.slice(4).map((b) => ({
+            hooks: ALL_EXPECTED_HOOKS.slice(3).map((b) => ({
               type: "command",
               command: `node .claude/hooks/${b}`,
             })),
@@ -113,12 +111,12 @@ describe("evaluateGuardStack — missing hooks", () => {
   it("lists multiple missing hooks in one problem string", () => {
     const remaining = ALL_EXPECTED_HOOKS.filter(
       (b) =>
-        b !== "block-dangerous-commands.cjs" &&
+        b !== "normalize-workspace-paths.cjs" &&
         b !== "block-main-worktree-branch-switch.cjs"
     );
     const problems = evaluateGuardStack(settingsWithHooks(remaining));
     expect(problems).toEqual([
-      "missing PreToolUse hooks: block-dangerous-commands.cjs, block-main-worktree-branch-switch.cjs",
+      "missing PreToolUse hooks: normalize-workspace-paths.cjs, block-main-worktree-branch-switch.cjs",
     ]);
   });
 
