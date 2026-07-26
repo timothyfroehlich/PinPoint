@@ -1,6 +1,13 @@
 import { loadEnvConfig } from "@next/env";
 import { defineConfig } from "drizzle-kit";
 
+import { assertNotDrizzlePush } from "./scripts/lib/drizzle-push-guard";
+
+// Safety: `drizzle-kit push` is banned (CORE-ARCH-009). This runs FIRST — before
+// env loading and before any credential is resolved — so a refusal can never
+// surface a connection string. Rationale: scripts/lib/drizzle-push-guard.ts.
+assertNotDrizzlePush();
+
 // Load Next.js environment variables (respects .env.local priority)
 loadEnvConfig(process.cwd());
 
