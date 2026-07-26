@@ -39,7 +39,16 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 ### Checklist
 
 1. **Stale version-pin checks** (Supabase CLI — PP-nlv6; pnpm corepack pin — PP-w0eq)
-   - **Supabase CLI pin.** Compare the pinned Supabase CLI version against the latest release. The pin lives in CI setup / config; a version-drift nudge belongs here, not in per-session briefing. If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
+   - **Supabase CLI pin.** Compare the pinned Supabase CLI version against the latest release. A version-drift nudge belongs here, not in per-session briefing. If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
+     - The pin is **9 sites across 4 files** — `ci.yml` (×6), plus `preview-control.yaml`, `preview-sync.yaml`, `preview-reaper.yaml` (×1 each). A bump is a multi-site edit: change **all nine or none**. A partial bump leaves jobs on mismatched CLI versions, which surfaces as a job-specific CI failure that reads like a flake rather than a bad edit.
+     - List every pin, then compare against the newest release:
+
+       ```bash
+       rg -n -A6 'uses: supabase/setup-cli' .github/workflows/*.y*ml | rg 'version:'
+       gh api /repos/supabase/cli/releases/latest --jq .tag_name
+       ```
+
+       (`-A6` matters — one call site has an extra `if:` line before `with:`, so a smaller window silently misses it and you'd bump 8 of 9.)
    - **pnpm corepack pin.** The pnpm binary is pinned in the `packageManager` field of `package.json` (corepack). **Dependabot cannot bump this field** — it's an open, unimplemented feature request ([dependabot-core#4830](https://github.com/dependabot/dependabot-core/issues/4830)); Dependabot's pnpm support only updates deps _inside_ the lockfile, never the corepack pin. So this is the only watcher it has, and it silently rots without it (that's how we ended up 9 months behind on 10.2.0 until npm's audit-endpoint retirement forced the jump — PP-w0eq).
      - **Apply a 30-day cooldown** (supply-chain soak — same rationale as the Dependabot npm cooldown): bump only to the newest stable pnpm ≥30 days old, never the just-released `latest`.
      - Find the newest eligible version:
