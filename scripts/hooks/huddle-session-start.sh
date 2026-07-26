@@ -183,8 +183,13 @@ fi
 # Skipped while rotation is pending — preserving the pre-PP-2m3l behaviour, where
 # this only ever ran on the up-to-date path. The function keys off root notes'
 # `today_bead.date`, which is still YESTERDAY's date until rotation runs, so
-# calling it now would reconcile (and close dupes of) a stale day. Rotation
-# repoints that field under its own lock; the next session start reconciles.
+# calling it now would reconcile (and close dupes of) a stale day.
+#
+# Note this net never collapses stale-day duplicates at all: it only ever targets
+# the date root notes point at, and rotation moves that pointer to today. That
+# gap is pre-existing (this call was unreachable on the rotation-pending path
+# before PP-2m3l too) and out of scope here — do NOT read the skip as "the next
+# session start will catch it".
 if [[ -z "$ROTATION_PENDING" ]]; then
   huddle_reconcile_today || true
 fi
@@ -232,6 +237,15 @@ if [[ -n "$NAME" ]]; then
   # Resolve today_bead_id for the copy-paste command (fail-open: fall back to placeholder)
   _TODAY_ID_REG=$(huddle_today_bead_id 2>/dev/null) || _TODAY_ID_REG="<today-bead-id>"
   [[ -n "$_TODAY_ID_REG" ]] || _TODAY_ID_REG="<today-bead-id>"
+  # With rotation pending, today's daily does not exist yet, so the resolver
+  # always misses and every command below renders the literal placeholder. Say so
+  # — otherwise the first session of each day pastes `<today-bead-id>` into bash
+  # and gets a redirect error instead of a clear failure.
+  if [[ -n "$ROTATION_PENDING" ]]; then
+    printf 'NOTE: rotation is still pending, so today'\''s bead does not exist yet and the id\n'
+    printf 'in the commands below is a literal placeholder. Dispatch the rotation subagent\n'
+    printf 'first — it reports the new bead id — then substitute it before posting.\n\n'
+  fi
   printf 'Once you understand what this session is tackling — and it'\''s real work or an\n'
   printf 'investigation (not a quick question or one-line fix) — post a ONE-LINE kickoff to\n'
   printf 'today'\''s bead, once, so parallel sessions know and anyone with context can chime in:\n'

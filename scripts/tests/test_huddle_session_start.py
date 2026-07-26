@@ -241,10 +241,16 @@ def test_rotation_pending_emits_identity_block_for_registered_session(
     assert ROTATION_MARKER in out
     assert "Registered as: **Claude-DoctorAudit**" in out
     assert REGISTRATION_MARKER not in out
-    # Today's daily does not exist yet, so the kickoff command must fall back to
-    # the placeholder rather than pointing at yesterday's (stale) bead.
+    # Today's daily does not exist yet, so the kickoff command falls back to the
+    # placeholder rather than pointing at yesterday's (stale) bead — and the
+    # block must SAY that, so nobody pastes the literal placeholder into bash.
     assert "<today-bead-id>" in out
+    assert "rotation is still pending, so today's bead does not exist yet" in out
     assert YESTERDAY_DAILY_ID not in out.split("## Huddle recent activity")[0]
+    # The blank line between the rotation notice and the identity heading is
+    # load-bearing: without it the notice's last line butts against the heading
+    # and the markdown collapses into one paragraph.
+    assert "SKILL.md.\n\n## Huddle identity" in out
 
 
 def test_rotation_pending_still_injects_recent_activity(repo: Path) -> None:
@@ -260,8 +266,12 @@ def test_rotation_pending_still_injects_recent_activity(repo: Path) -> None:
 def test_rotation_pending_skips_stale_day_reconcile(repo: Path) -> None:
     # huddle_reconcile_today keys off root notes' today_bead.date, which is still
     # YESTERDAY while rotation is pending — so falling through must NOT drag it
-    # along. Two open dailies for that stale date are left alone here; rotation
-    # repoints the field under its own lock and the next session start dedups.
+    # along. Two open dailies for that stale date are left alone here.
+    #
+    # They are never collapsed later either: rotation moves the pointer to today,
+    # and this net only targets whatever date the pointer names. That gap is
+    # pre-existing and out of scope for PP-2m3l — this test pins the skip, not a
+    # claim that something else cleans up.
     set_rotation_pending(repo)
     _write_json(
         repo / "children.json",
@@ -283,9 +293,16 @@ def test_rotation_pending_skips_stale_day_reconcile(repo: Path) -> None:
     rc, out, err = run_hook(repo)
     assert rc == 0, err
     assert ROTATION_MARKER in out
-    bd_log = (repo / "bd.log").read_text()
-    assert "update" not in bd_log
-    assert "close" not in bd_log
+    # Match on the subcommand only — a whole-log substring check would flip on any
+    # future bead id or flag that happens to contain "update"/"close".
+    subcommands = {
+        line.split()[0]
+        for line in (repo / "bd.log").read_text().splitlines()
+        if line.strip()
+    }
+    assert "update" not in subcommands
+    assert "close" not in subcommands
+    assert "comments" not in subcommands
 
 
 # --- Unchanged behaviour on the up-to-date path -----------------------------
