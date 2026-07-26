@@ -6,17 +6,17 @@ export const metadata = {
 
 <HelpPage breadcrumb="Machine Settings" title="Machine Settings" description="Record a machine's configuration — software adjustments, DIP switches, post positions — as one or more named settings sets.">
 
-## Which set do I want?
+## Choosing a set
 
-The one badged **★ Owner's default** — the setup the machine's owner considers
-canonical. There's at most one per machine and it always sorts first.
-**🏆 Tournament** marks competition-ready sets; a set can be both.
+The set badged **★ Owner's default** is the configuration the machine's owner
+considers canonical. Each machine has at most one, and it always sorts first.
+**🏆 Tournament** marks a set as competition-ready. A set can carry both badges.
 
-## Who can edit what
+## Who can edit a set
 
-Two separate things decide that: a set's **kind** — Owner or Community, fixed
-when it's created — and whether it's still a **private draft**. A draft is
-creator-only whatever its kind.
+Two independent properties decide this: a set's **kind** — Owner or Community,
+fixed when it is created — and whether it is still a **private draft**. A draft
+is limited to its creator and admins regardless of kind.
 
 <div className="overflow-x-auto mt-3">
   <table className="w-full text-sm border-collapse">
@@ -30,56 +30,56 @@ creator-only whatever its kind.
     <tbody>
       <tr className="border-b">
         <td className="p-2 font-medium text-foreground whitespace-nowrap">Owner</td>
-        <td className="p-2 text-muted-foreground">The machine owner made it — protected</td>
-        <td className="p-2 text-muted-foreground">Owner and admins only, not technicians</td>
+        <td className="p-2 text-muted-foreground">Made by the machine owner</td>
+        <td className="p-2 text-muted-foreground">The owner and admins only — not technicians</td>
       </tr>
       <tr className="border-b">
         <td className="p-2 font-medium text-foreground whitespace-nowrap">Community</td>
-        <td className="p-2 text-muted-foreground">A technician or admin made it</td>
+        <td className="p-2 text-muted-foreground">Made by a technician or admin</td>
         <td className="p-2 text-muted-foreground">Any technician, plus the owner and admins</td>
       </tr>
       <tr className="border-b">
         <td className="p-2 font-medium text-foreground whitespace-nowrap">Private draft</td>
-        <td className="p-2 text-muted-foreground">Not published yet</td>
+        <td className="p-2 text-muted-foreground">Not yet published</td>
         <td className="p-2 text-muted-foreground">Its creator and admins</td>
       </tr>
     </tbody>
   </table>
 </div>
 
-Drafts are invisible to everyone else, so you can build a set out before it's
-seen. Creating a set at all takes **owner**, **technician**, or **admin** — see
+Drafts are hidden from everyone but their creator and admins, so a set can be
+built out before it is published. Creating a set at all requires the **owner**,
+**technician**, or **admin** role — see
 [Roles & Permissions](/help/permissions).
 
-Two things that catch people out:
+Two exceptions are worth knowing:
 
-- The Owner's default has to stay public. Unset it as the default before you
-  can make it private.
+- The Owner's default must stay public. Remove the default designation before
+  making the set private.
 - If you own the machine and it has no default yet, your **first** set skips
-  the draft stage — published and made the default straight away.
+  the draft stage: it is published and made the default immediately.
 
-## Duplicating
+## Duplicating a set
 
-A copy starts as a private draft owned by you, and its kind is re-derived from
-who copied it — so your copy of someone else's **Owner** set becomes a
-**Community** set you can actually edit. It carries the Tournament tag over; it
-never inherits the default.
+A duplicate starts as a private draft owned by you, and its kind is re-derived
+from who copied it — so a copy of someone else's **Owner** set becomes a
+**Community** set you can edit. The duplicate carries the Tournament tag over.
+It never inherits the Owner's default designation.
 
 ## Saving
 
-There's no Save button. Every field is live and saves a moment after you stop
-typing. If a save fails you get a banner with **Retry** and your edits stay
-put.
+Settings save automatically. Every field is live and commits a moment after you
+stop typing, so there is no Save button.
 
-## Also worth knowing
+## Additional notes
 
 - **Before you change anything** and **How to change settings** are
-  machine-wide — shared by every set, editable by anyone who can create one.
-- Software settings, Post positions and Rubbers are one per set; they leave the
-  **Add section** menu once you've used them. DIP banks, tables and notes
-  repeat.
-- Creating, editing and deleting a set record a **settings** entry on the
-  machine's Timeline; publishing, tagging and changing the default don't. That
-  filter is off by default.
+  machine-wide: shared by every set, and editable by anyone who can create one.
+- Software settings, Post positions, and Rubbers are limited to one per set,
+  and leave the **Add section** menu once used. DIP banks, tables, and notes
+  can repeat.
+- Creating, editing, and deleting a set record a **settings** entry on the
+  machine's Timeline; publishing, tagging, and changing the default do not.
+  That Timeline filter is off by default.
 
 </HelpPage>
