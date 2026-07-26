@@ -82,6 +82,15 @@ export default async function MachineEditPage({
     accessLevel,
     ownershipContext
   );
+  // Sync is a stricter grant than Link — "machines.pinballmap.link" allows the
+  // owning member, but "machines.pinballmap.sync" is technician/admin only.
+  // Gating "Sync now" on `canLink` would show a button that 403s for an
+  // owner-only member (PP-o355.19 review).
+  const canSync = checkPermission(
+    "machines.pinballmap.sync",
+    accessLevel,
+    ownershipContext
+  );
 
   const pinballmapTitlePromise: Promise<string | null> =
     canLink && machine.pinballmapMachineId !== null
@@ -155,9 +164,14 @@ export default async function MachineEditPage({
           {canLink && (
             <p className="text-sm text-muted-foreground">
               {pbmState?.lastSyncedAt
-                ? `last synced ${formatDateTime(pbmState.lastSyncedAt)} · `
-                : "never synced · "}
-              <PinballmapSyncNow />
+                ? `last synced ${formatDateTime(pbmState.lastSyncedAt)}`
+                : "never synced"}
+              {canSync && (
+                <>
+                  {" · "}
+                  <PinballmapSyncNow />
+                </>
+              )}
             </p>
           )}
         </div>
