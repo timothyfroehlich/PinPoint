@@ -2,7 +2,7 @@ import type React from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
@@ -13,8 +13,13 @@ import {
 } from "~/lib/permissions/index";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { PageHeader } from "~/components/layout/PageHeader";
+import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
+import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
+import { getPinballMapState } from "~/lib/pinballmap/state";
+import { formatDateTime } from "~/lib/dates";
 import { getMachineForLayout } from "../_data";
 import { MachineDetailsForm } from "./machine-details-form";
+import { PinballmapSyncNow } from "./pinballmap-sync-now";
 
 /**
  * Machine edit page (/m/[initials]/edit) — PP-o355.19.
@@ -78,18 +83,25 @@ export default async function MachineEditPage({
     ownershipContext
   );
 
-  const pinballmapTitleName =
+  const pinballmapTitlePromise: Promise<string | null> =
     canLink && machine.pinballmapMachineId !== null
-      ? ((
-          await db.query.pinballmapCatalog.findFirst({
+      ? db.query.pinballmapCatalog
+          .findFirst({
             where: eq(
               pinballmapCatalog.pinballmapMachineId,
               machine.pinballmapMachineId
             ),
             columns: { name: true },
           })
-        )?.name ?? null)
-      : null;
+          .then((linkedTitle) => linkedTitle?.name ?? null)
+      : Promise.resolve(null);
+
+  const [pinballmapTitleName, pbmState] = await Promise.all([
+    pinballmapTitlePromise,
+    canLink ? getPinballMapState() : Promise.resolve(null),
+  ]);
+
+  const locationUrl = pinballmapLocationUrl();
 
   return (
     <PageContainer size="narrow">
@@ -118,6 +130,45 @@ export default async function MachineEditPage({
           pinballmapExcluded={machine.pinballmapExcluded}
           pinballmapExcludedReason={machine.pinballmapExcludedReason}
           pinballmapTitleName={pinballmapTitleName}
+        />
+      </section>
+
+      {/* Pinball Map — no save bar: each control here acts on its own.
+          PP-o355.21 rebuilds the listing control and moves the catalog title
+          row in from Details, where it currently rides the Details save. */}
+      <section
+        className="space-y-4 border-t border-outline-variant pt-6"
+        aria-labelledby="section-pinballmap"
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="section-pinballmap" className="text-base font-semibold">
+            <a
+              href={locationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-primary underline underline-offset-2 hover:no-underline"
+            >
+              Pinball Map
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+            </a>
+          </h2>
+          {canLink && (
+            <p className="text-sm text-muted-foreground">
+              {pbmState?.lastSyncedAt
+                ? `last synced ${formatDateTime(pbmState.lastSyncedAt)} · `
+                : "never synced · "}
+              <PinballmapSyncNow />
+            </p>
+          )}
+        </div>
+
+        <PinballmapListingControl
+          machineId={machine.id}
+          hasCatalogLink={machine.pinballmapMachineId !== null}
+          listed={machine.pinballmapListed}
+          lmxId={machine.pinballmapLmxId}
+          canLink={canLink}
+          pinballmapUrl={locationUrl}
         />
       </section>
     </PageContainer>
