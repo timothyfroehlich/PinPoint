@@ -205,7 +205,10 @@ export function MachineOwnerTransfer({
           <input type="hidden" name="name" value={machineName} />
 
           {state && !state.ok && state.code !== "ASSIGNEE_NOT_MEMBER" && (
-            <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-destructive">
+            <div
+              className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-destructive"
+              role="alert"
+            >
               <p className="text-sm font-medium">{state.message}</p>
             </div>
           )}

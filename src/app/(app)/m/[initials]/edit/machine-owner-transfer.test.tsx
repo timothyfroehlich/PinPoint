@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MachineOwnerTransfer } from "./machine-owner-transfer";
+import { updateMachineAction } from "~/app/(app)/m/actions";
+import { err } from "~/lib/result";
 
 vi.mock("~/app/(app)/m/actions", () => ({
   updateMachineAction: vi.fn(),
@@ -84,5 +86,23 @@ describe("MachineOwnerTransfer", () => {
     await user.click(screen.getByTestId("open-owner-transfer"));
 
     expect(document.querySelector('input[name="description"]')).toBeNull();
+  });
+
+  it("announces a failed transfer as a live-region alert", async () => {
+    vi.mocked(updateMachineAction).mockResolvedValue(
+      err("SERVER", "Something went wrong transferring ownership.")
+    );
+    const user = userEvent.setup();
+    render(<MachineOwnerTransfer {...baseProps} />);
+    await user.click(screen.getByTestId("open-owner-transfer"));
+    await user.selectOptions(screen.getByLabelText("Owner"), "owner-2");
+    await user.click(
+      screen.getByRole("button", { name: "Transfer ownership" })
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "Something went wrong transferring ownership."
+    );
   });
 });
