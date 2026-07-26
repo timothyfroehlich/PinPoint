@@ -212,6 +212,8 @@ check_review_happened() {
     return 2
   fi
   echo "FAIL: reviewed: head commit has no Copilot or Claude review"
+  echo "  remedy: review the PR yourself, then attest the head commit with:"
+  echo "    bash scripts/workflow/mark-claude-review.sh $pr \"<one-line findings>\""
   return 1
 }
 

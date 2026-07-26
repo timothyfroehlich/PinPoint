@@ -53,7 +53,7 @@ Scripts emit machine-parseable status with these prefixes:
 | `WAIT:`  | Transient state (e.g., GitHub computing mergeable)          | Retry; may resolve on its own |
 | `BLOCK:` | State mismatch requiring user action (e.g., merge conflict) | Resolve, push, retry          |
 
-The agent reads these tokens from script stdout to decide next steps. Scripts never emit prescriptive advice; the skill (pinpoint-pr-workflow) documents what to do for each token.
+The agent reads these tokens from script stdout to decide next steps. The skill (pinpoint-pr-workflow) documents what to do for each token; scripts emit prescriptive advice only where the remedy is otherwise undiscoverable. The one such case today is the `reviewed` gate, whose `FAIL:` line is followed by indented `remedy:` lines naming `mark-claude-review.sh` with the PR number already substituted (PP-jw0s). Continuation lines are indented and carry no status token, so token parsing is unaffected.
 
 ## MCP vs Script — When to use which
 
