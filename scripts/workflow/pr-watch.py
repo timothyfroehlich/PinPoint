@@ -23,6 +23,11 @@ Usage: ./scripts/workflow/pr-watch.py [--check-ready | --force] [--verbose] <PR_
                  running under Claude Code's Monitor doesn't wake the
                  agent on every job transition.
 
+Cancelled runs are neither a pass nor a failure — they are reported as
+"superseded" (⊘) and never produce a failure artifact. Cancellation is routine
+here: pushing a second commit cancels the in-flight run via concurrency groups,
+and the Preview Auto-Resync workflow cancels itself the same way. (PP-r63o)
+
 Exit 0: all checks passed, or stopped for new Copilot review,
         or (with --check-ready) the PR is ready for human review.
 Exit 1: one or more checks failed, no matching runs found,
@@ -52,6 +57,11 @@ REVIEW_POLL_INTERVAL = 60  # seconds — GitHub rate limit friendly
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
 STARTUP_WAIT = 10  # seconds between startup retries
 LOG_DIR = "tmp/gh-monitor"
+
+# How long to keep polling for a replacement CI Gate after the current one came
+# back cancelled. A cancel almost always means a newer run is already queued;
+# this bounds the wait so a genuinely abandoned run still terminates.
+SUPERSEDED_GATE_GRACE = 180  # seconds
 
 _lock = threading.Lock()
 
@@ -92,6 +102,50 @@ def gh(*args: str) -> str:
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"gh {args[0]} failed")
     return result.stdout.strip()
+
+
+# ---------------------------------------------------------------------------
+# Run/check conclusion classification
+# ---------------------------------------------------------------------------
+#
+# Three classes, not two. `gh run list` reports conclusions lowercase and the
+# statusCheckRollup reports them uppercase, so every comparison goes through
+# these helpers rather than an inline set membership test.
+
+_PASSING_CONCLUSIONS = {"success", "skipped", "neutral"}
+
+# A cancelled run is neither a pass nor a failure — it is *superseded*. Pushing
+# a second commit cancels the in-flight run via concurrency groups, and the
+# Preview Auto-Resync workflow cancels itself the same way, so cancellation is
+# routine rather than exceptional. A cancelled run has no failed step, which is
+# why any failure artifact written for one reads "(no log available)". Treating
+# it as a failure produced false "✗ CI — failed" alarms and, worse, hard-exited
+# the watcher on every subsequent invocation at the same head SHA. (PP-r63o)
+_SUPERSEDED_CONCLUSIONS = {"cancelled"}
+
+
+def _is_passing(conclusion: str | None) -> bool:
+    return (conclusion or "").lower() in _PASSING_CONCLUSIONS
+
+
+def _is_superseded(conclusion: str | None) -> bool:
+    return (conclusion or "").lower() in _SUPERSEDED_CONCLUSIONS
+
+
+def _is_failing(conclusion: str | None) -> bool:
+    """True for a real failure, given the conclusion of a COMPLETED run/check.
+
+    Fail-safe by construction: anything that isn't recognisably passing and
+    isn't a supersession counts as a failure, including an unrecognised
+    conclusion and an empty one. GitHub can briefly report a run as `completed`
+    before its conclusion is populated, and a watcher that shrugged at that
+    could report green without ever having observed the real outcome.
+
+    Every caller must gate on `status == "completed"` first — an empty
+    conclusion on a run that is still queued or in progress just means "not
+    decided yet", which `status` already tells you.
+    """
+    return not _is_passing(conclusion) and not _is_superseded(conclusion)
 
 
 # ---------------------------------------------------------------------------
@@ -143,13 +197,28 @@ def _unresolved_copilot(threads: list[dict]) -> int:
 
 
 def _ci_gate_state(pr: int) -> tuple[str, str]:
-    """Return (status, conclusion) for the CI Gate check, or ("", "") if absent."""
+    """Return (status, conclusion) for the CI Gate check, or ("", "") if absent.
+
+    GitHub scopes statusCheckRollup to the PR's current head commit, but that
+    commit can still carry MORE THAN ONE `CI Gate` entry — a re-run, or a run
+    cancelled by a concurrency group, leaves its superseded check behind next to
+    the live one. Returning the first match let a cancelled leftover shadow the
+    run we actually care about, so prefer a non-superseded entry and, among
+    equals, the most recent one. (PP-r63o)
+    """
     raw = gh("pr", "view", str(pr), "--json", "statusCheckRollup")
     rollup = json.loads(raw).get("statusCheckRollup", [])
-    for check in rollup:
-        if check.get("name") == CI_GATE_NAME:
-            return check.get("status", ""), check.get("conclusion", "")
-    return "", ""
+    gates = [c for c in rollup if c.get("name") == CI_GATE_NAME]
+    if not gates:
+        return "", ""
+
+    def rank(check: dict) -> tuple[int, str]:
+        not_superseded = 0 if _is_superseded(check.get("conclusion")) else 1
+        when = check.get("completedAt") or check.get("startedAt") or ""
+        return not_superseded, when
+
+    newest = max(gates, key=rank)
+    return newest.get("status", ""), newest.get("conclusion", "")
 
 
 def _finalize_via_ci_gate(pr: int, timeout_sec: int = 1200, poll_sec: int = 10) -> int:
@@ -162,16 +231,35 @@ def _finalize_via_ci_gate(pr: int, timeout_sec: int = 1200, poll_sec: int = 10) 
     """
     deadline = time.monotonic() + timeout_sec
     last_status = ""
+    superseded_deadline: float | None = None
     while time.monotonic() < deadline:
         status, conclusion = _ci_gate_state(pr)
         if status == "COMPLETED":
             # Match run_audit's pass criteria (SUCCESS / NEUTRAL / SKIPPED) so
             # the watcher and the audit can't disagree on the same CI Gate state.
-            if conclusion in ("SUCCESS", "NEUTRAL", "SKIPPED"):
+            if _is_passing(conclusion):
                 emit(f"CI Gate passed (conclusion={conclusion}) ✓")
                 return 0
+            if _is_superseded(conclusion):
+                # Cancelled is neither pass nor fail. A replacement run is
+                # normally already queued, so give it a bounded grace period to
+                # post a fresh CI Gate rather than declaring failure. (PP-r63o)
+                if superseded_deadline is None:
+                    superseded_deadline = time.monotonic() + SUPERSEDED_GATE_GRACE
+                    emit_event(
+                        "CI Gate cancelled (superseded) — waiting for a replacement run"
+                    )
+                elif time.monotonic() >= superseded_deadline:
+                    emit(
+                        "⊘  CI Gate cancelled (superseded) — no replacement run appeared"
+                    )
+                    return 1
+                time.sleep(poll_sec)
+                continue
             emit(f"CI Gate failed (conclusion={conclusion or 'unknown'})")
             return 1
+        # A fresh run posted a new gate — restart the supersession grace clock.
+        superseded_deadline = None
         if status != last_status:
             emit_event(
                 f"CI Gate {status.lower() or 'not yet posted'} — continuing to wait"
@@ -218,15 +306,18 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
         return False, f"merge state {merge_state} — resolve before watching"
 
     ci_status, ci_conclusion = _ci_gate_state(pr)
-    if ci_status == "COMPLETED" and ci_conclusion not in (
-        "SUCCESS",
-        "NEUTRAL",
-        "SKIPPED",
-    ):
-        return (
-            False,
-            f"CI Gate already failed (conclusion={ci_conclusion or 'unknown'})",
-        )
+    if ci_status == "COMPLETED":
+        if _is_superseded(ci_conclusion):
+            # Cancelled is not failed. A newer commit — or a self-cancelling
+            # side workflow like Preview Auto-Resync — superseded this gate;
+            # the watch loop waits for the replacement instead of hard-exiting.
+            # Before PP-r63o this forced --force as a workaround.
+            emit_event("CI Gate cancelled (superseded) — watching for a fresh run")
+        elif _is_failing(ci_conclusion):
+            return (
+                False,
+                f"CI Gate already failed (conclusion={ci_conclusion or 'unknown'})",
+            )
 
     unresolved = _unresolved_copilot(get_review_threads(pr))
     if unresolved > 0:
@@ -248,9 +339,14 @@ def run_audit(pr: int) -> bool:
         ci_check = (False, "CI Gate check not found")
     elif ci_status != "COMPLETED":
         ci_check = (False, f"in progress (status={ci_status})")
+    elif _is_superseded(ci_conclusion):
+        # Not a failure, but not a green gate either — the PR genuinely isn't
+        # ready until a replacement run posts one. Say why, so the reader
+        # pushes/re-runs rather than hunting for a broken test. (PP-r63o)
+        ci_check = (False, "cancelled (superseded) — needs a re-run or a new push")
     else:
         ci_check = (
-            ci_conclusion in ("SUCCESS", "NEUTRAL", "SKIPPED"),
+            _is_passing(ci_conclusion),
             f"conclusion={ci_conclusion or 'unknown'}",
         )
 
@@ -283,8 +379,6 @@ def run_audit(pr: int) -> bool:
 # ---------------------------------------------------------------------------
 # CI run watcher
 # ---------------------------------------------------------------------------
-
-_PASSING_CONCLUSIONS = {"success", "skipped", "neutral"}
 
 
 def _run_conclusion(run_id: int) -> tuple[str, str]:
@@ -328,7 +422,7 @@ def watch_run(
         status, conclusion = _run_conclusion(run_id)
 
         if proc.returncode == 0 and status not in ("queued", "in_progress"):
-            if conclusion in _PASSING_CONCLUSIONS:
+            if _is_passing(conclusion):
                 emit_event(f"✓  {name} — passed")
                 return
             # Exited 0 but API says non-passing — fall through to failure handling.
@@ -341,8 +435,15 @@ def watch_run(
             emit_event(f"↻  {name} — watcher restarted (run still in progress)")
             continue
 
-        if conclusion in _PASSING_CONCLUSIONS:
+        if _is_passing(conclusion):
             emit_event(f"✓  {name} — passed")
+            return
+
+        if _is_superseded(conclusion):
+            # Neither pass nor fail — a newer commit, or a self-cancelling side
+            # workflow, superseded this run. There is no failed step to log, so
+            # record no failure and write no artifact. (PP-r63o)
+            emit_event(f"⊘  {name} — superseded (cancelled)")
             return
 
         # Confirmed failure (or unrecognised conclusion — fail safe).
@@ -475,6 +576,7 @@ def main() -> int:
 
     active: list[dict] = []
     runs: list[dict] = []
+    announced_superseded: set[int] = set()
     for attempt in range(STARTUP_RETRIES):
         runs = json.loads(
             gh(
@@ -488,15 +590,24 @@ def main() -> int:
                 "databaseId,status,conclusion,name,headSha",
             )
         )
+        # Every scan below is scoped to the CURRENT head SHA. `gh run list`
+        # returns the branch's whole recent history, so an older commit's run —
+        # in particular one cancelled when this commit superseded it — must
+        # never influence the verdict for the commit we're watching. (PP-r63o)
         sha_runs = [r for r in runs if r["headSha"] == head_sha]
         active = [r for r in sha_runs if r["status"] in ("queued", "in_progress")]
 
-        # Fail fast if any run for this SHA already completed with a non-passing
-        # conclusion (e.g., a fast lint job failed before we started watching).
+        # Fail fast if any run for this SHA already completed with a real
+        # failure (e.g., a fast lint job failed before we started watching).
+        # Cancelled runs are excluded — they're superseded, not failed.
         completed = [r for r in sha_runs if r["status"] == "completed"]
-        early_failures = [
-            r for r in completed if r.get("conclusion") not in _PASSING_CONCLUSIONS
-        ]
+        for r in completed:
+            if _is_superseded(r.get("conclusion")) and r["databaseId"] not in (
+                announced_superseded
+            ):
+                announced_superseded.add(r["databaseId"])
+                emit_event(f"⊘  {r['name']} — superseded (cancelled)")
+        early_failures = [r for r in completed if _is_failing(r.get("conclusion"))]
         if early_failures:
             for r in early_failures:
                 path = write_failure_artifact(r["databaseId"])
@@ -519,9 +630,7 @@ def main() -> int:
         ]
         if completed:
             failures = [
-                r["databaseId"]
-                for r in completed
-                if r.get("conclusion") not in ("success", "skipped", "neutral")
+                r["databaseId"] for r in completed if _is_failing(r.get("conclusion"))
             ]
             if failures:
                 for run_id in failures:

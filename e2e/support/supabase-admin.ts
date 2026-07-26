@@ -96,6 +96,12 @@ export async function createTestMachine(ownerId: string, initials?: string) {
  * Seed a machine settings set (PP-43q3) directly in the database for E2E setup.
  * `sections` is the persist-ready `SettingsSection[]` shape (no client `_key`).
  * Returns the inserted set's id.
+ *
+ * PP-tn6t: seeds a PUBLIC set so it is visible to every viewer (a private draft
+ * would only show to its creator/admin — the pre-visibility-model default these
+ * specs assume). Left as a community-kind set (is_owner_set defaults false) so
+ * it stays broadly editable by staff; the owner-set-protection paths are covered
+ * at the action layer.
  */
 export async function seedSettingsSet(
   machineId: string,
@@ -109,6 +115,7 @@ export async function seedSettingsSet(
       name,
       sections,
       is_preferred: false,
+      is_public: true,
     })
     .select("id")
     .single();
