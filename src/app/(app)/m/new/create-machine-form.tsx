@@ -211,12 +211,35 @@ export function CreateMachineForm({
         </DialogContent>
       </Dialog>
 
+      {/*
+       * No `action={formAction}` on purpose (PP-1ajq). React 19 auto-resets a
+       * `<form action={...}>` once the action settles — on failure as well as
+       * success — and this form stays on screen after a failed create.
+       * @radix-ui/react-select >=2.3.3 replays each Select's mount-time value
+       * through `onValueChange` on that reset, so a failed create silently
+       * threw the Availability choice back to "On the Floor" (and the
+       * PinballMap edition picker back to its mount state) while the user was
+       * still reading the error. The text fields were already made controlled
+       * for exactly this reason; dispatching `useActionState` directly closes
+       * the same hole for the Selects, because no form submission ever
+       * completes and React never fires the reset. Sanctioned exception to
+       * CORE-ARCH-002 — this form already depends on JS end to end (the
+       * success path is a `window.location.assign` redirect), so there is no
+       * no-JS story to preserve. Success still resets explicitly via
+       * `resetForm()`.
+       */}
       <form
-        action={formAction}
         ref={formRef}
         onSubmit={(e) => {
+          e.preventDefault();
           // Snapshot the full submitted FormData for confirmPromote's re-dispatch.
-          submittedDataRef.current = new FormData(e.currentTarget);
+          const fd = new FormData(e.currentTarget);
+          submittedDataRef.current = fd;
+          // useActionState dispatch must be called inside a transition — calling it
+          // outside a transition silently skips the server action (React 19 requirement).
+          startTransition(() => {
+            formAction(fd);
+          });
         }}
         id="create-machine-form"
         className="space-y-4"

@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  startTransition,
 } from "react";
 import Link from "next/link";
 import { Label } from "~/components/ui/label";
@@ -338,8 +339,31 @@ export function UnifiedReportForm({
             </Alert>
           )}
 
+          {/*
+           * No `action={formAction}` on purpose (PP-1ajq). React 19 auto-resets
+           * a `<form action={...}>` once the action settles — on failure as well
+           * as success — and this form stays on screen after a rejected report.
+           * @radix-ui/react-select >=2.3.3 replays each Select's mount-time
+           * value through `onValueChange` on that reset, which writes the stale
+           * value straight back into the draft, so a failed submit silently
+           * undid the reporter's Severity/Priority/Status/Frequency choices.
+           * Dispatching `useActionState` directly means no form submission ever
+           * completes, so React never fires the reset. Sanctioned exception to
+           * CORE-ARCH-002 — this form already depends on JS end to end
+           * (Turnstile token, draft persistence, `window.location.assign`
+           * redirect), so there is no no-JS story to preserve. Success still
+           * resets explicitly via `resetSingleForm()`.
+           */}
           <form
-            action={formAction}
+            onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              // useActionState dispatch must run inside a transition — outside
+              // one React 19 silently skips the server action.
+              startTransition(() => {
+                formAction(fd);
+              });
+            }}
             ref={formRef}
             className="space-y-3 md:space-y-4"
           >
