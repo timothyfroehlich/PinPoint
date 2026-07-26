@@ -426,7 +426,7 @@ export function PinballMapLinkField({
         ) : (
           <div
             data-testid="pinballmap-edition-placeholder"
-            className="flex h-9 w-full items-center rounded-md border border-outline bg-surface px-3 text-sm text-muted-foreground opacity-60"
+            className="flex h-9 w-full items-center rounded-md border border-outline bg-surface px-3 text-sm text-muted-foreground"
           >
             {family ? "Only one edition" : "Pick a model first"}
           </div>
