@@ -33,6 +33,8 @@ Run the command, then start or resume your session normally. Bootstrap is idempo
 
 **Stop and dispatch the rotation subagent before continuing your work.** See the "Rotation" section below for the exact dispatch.
 
+This notice does **not** replace your identity block — rotation and registration are independent, so the identity/registration block still follows it. Dispatch the rotation subagent first, then register if you're new. (Before PP-2m3l the notice short-circuited the rest of session-start, leaving the day's first sessions permanently unregistered.)
+
 ### Identity announcement (you're registered)
 
     ## Huddle identity

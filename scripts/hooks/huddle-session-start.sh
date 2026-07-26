@@ -132,11 +132,23 @@ case "$TRANSCRIPT_PATH" in
 esac
 
 # --- Rotation check ---
+# Emits the "rotation needed" notice and then FALLS THROUGH: rotation and
+# identity/registration are independent concerns, and a session that starts on a
+# new day before rotation has run still needs its session_id and its
+# registration prompt.
+#
+# PP-2m3l: this block used to `exit 0` right after the notice, so the identity /
+# registration block below was unreachable on the first sessions of every day.
+# Those sessions never registered, which broke the huddle self-filter (they saw
+# their own posts injected back as if from a peer) and degraded post attribution.
+# SessionStart fires once per session, so there was no second chance to re-prompt.
+ROTATION_PENDING=""
 ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
 if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
   # shellcheck source=huddle-rotation-check.sh disable=SC1091
   source "$ROTATION_CHECK_SCRIPT"
   if huddle_rotation_needed; then
+    ROTATION_PENDING=1
     STORED_DATE=""
     NOTES_STR_ROT=$(bd show "$ROOT_ID" --json 2>/dev/null | jq -r '.[0].notes // ""' 2>/dev/null || echo "")
     if [[ -n "$NOTES_STR_ROT" ]]; then
@@ -158,8 +170,7 @@ except Exception:
     printf 'previous day, create today'\''s bead, update pointers, and post\n'
     printf '"continued in" markers on closed beads. Safe even if a peer already\n'
     printf 'rotated (the subagent no-ops under a file lock).\n\n'
-    printf 'Dispatch template: .agents/skills/pinpoint-huddle/SKILL.md.\n'
-    exit 0
+    printf 'Dispatch template: .agents/skills/pinpoint-huddle/SKILL.md.\n\n'
   fi
 fi
 
@@ -168,7 +179,20 @@ fi
 # midnight race left two open dailies for today (two machines rotated before
 # either pushed), collapse them to the canonical here. No-op in the common case
 # (two cheap local reads); silent + fail-open.
-huddle_reconcile_today || true
+#
+# Skipped while rotation is pending — preserving the pre-PP-2m3l behaviour, where
+# this only ever ran on the up-to-date path. The function keys off root notes'
+# `today_bead.date`, which is still YESTERDAY's date until rotation runs, so
+# calling it now would reconcile (and close dupes of) a stale day.
+#
+# Note this net never collapses stale-day duplicates at all: it only ever targets
+# the date root notes point at, and rotation moves that pointer to today. That
+# gap is pre-existing (this call was unreachable on the rotation-pending path
+# before PP-2m3l too) and out of scope here — do NOT read the skip as "the next
+# session start will catch it".
+if [[ -z "$ROTATION_PENDING" ]]; then
+  huddle_reconcile_today || true
+fi
 
 SESSION_ID=""
 SOURCE=""
@@ -213,6 +237,15 @@ if [[ -n "$NAME" ]]; then
   # Resolve today_bead_id for the copy-paste command (fail-open: fall back to placeholder)
   _TODAY_ID_REG=$(huddle_today_bead_id 2>/dev/null) || _TODAY_ID_REG="<today-bead-id>"
   [[ -n "$_TODAY_ID_REG" ]] || _TODAY_ID_REG="<today-bead-id>"
+  # With rotation pending, today's daily does not exist yet, so the resolver
+  # always misses and every command below renders the literal placeholder. Say so
+  # — otherwise the first session of each day pastes `<today-bead-id>` into bash
+  # and gets a redirect error instead of a clear failure.
+  if [[ -n "$ROTATION_PENDING" ]]; then
+    printf 'NOTE: rotation is still pending, so today'\''s bead does not exist yet and the id\n'
+    printf 'in the commands below is a literal placeholder. Dispatch the rotation subagent\n'
+    printf 'first — it reports the new bead id — then substitute it before posting.\n\n'
+  fi
   printf 'Once you understand what this session is tackling — and it'\''s real work or an\n'
   printf 'investigation (not a quick question or one-line fix) — post a ONE-LINE kickoff to\n'
   printf 'today'\''s bead, once, so parallel sessions know and anyone with context can chime in:\n'
