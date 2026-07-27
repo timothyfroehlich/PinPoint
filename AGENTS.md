@@ -39,7 +39,7 @@
 2. **Run `pnpm run check` before committing** (~12s — the default floor). Reserve `pnpm run preflight` (the slower check + build + integration) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
-5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md` and `.agents/rules/AGY.md`. (PP-46z, PP-bg45.)
+5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
 6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **Merging is human-only, via ANY path** — never `gh pr merge`, never MCP `merge_pull_request`, and never `scripts/workflow/merge-pr.sh` (even though it enforces the merge gates, running it is still an agent merge). An agent's terminal state on a PR is: ready-for-review, CI green, reviews resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
 
@@ -47,28 +47,25 @@
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
-| Category    | Skill                          | When to use                                                                                                                              |
-| :---------- | :----------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
-| UI          | `pinpoint-ui`                  | Components, shadcn/ui, forms, responsive design                                                                                          |
-| UI          | `pinpoint-design-bible`        | Design system, page archetypes, spacing, surfaces                                                                                        |
-| TypeScript  | `pinpoint-typescript`          | Type errors, generics, Drizzle types                                                                                                     |
-| Testing     | `pinpoint-testing`             | Writing tests, PGlite, test-layer decisions                                                                                              |
-| Testing     | `pinpoint-e2e`                 | E2E tests, worker isolation, Playwright stability                                                                                        |
-| Security    | `pinpoint-security`            | Auth, CSP, Zod, Supabase SSR                                                                                                             |
-| Patterns    | `pinpoint-patterns`            | Server Actions, data fetching, architecture                                                                                              |
-| Workflow    | `pinpoint-prototype-mode`      | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt                                                                  |
-| Workflow    | `pinpoint-briefing`            | Session-start health review                                                                                                              |
-| Workflow    | `pinpoint-pr-workflow`         | Full PR lifecycle: commit, push, CI, merge                                                                                               |
-| Workflow    | `pinpoint-orchestrator`        | Parallel subagent work in worktrees: dispatch, monitor, follow-up                                                                        |
-| Workflow    | `pinpoint-huddle`              | Inter-session coordination via daily/monthly beads (the huddle hooks)                                                                    |
-| Workflow    | `pinpoint-superpowers-bridge`  | Running the superpowers lifecycle in PinPoint: bead field pointers + overrides for the conflicting finish/worktree/review/subagent steps |
-| Deployment  | `pinpoint-db-connections`      | Supabase/Postgres pooler & connection-string reference                                                                                   |
-| Deployment  | `pinpoint-migration-conflicts` | Resolving drizzle/meta conflicts on merge                                                                                                |
-| Deployment  | `pinpoint-preview-deployments` | On-demand TTL'd Supabase preview branches, `/preview` command                                                                            |
-| Deployment  | `pinpoint-audit-override`      | Per-PR `/audit-override` escape hatch for unrelated audit failures                                                                       |
-| Antigravity | `pinpoint-agy-triage`          | Grooming: evaluate whether a bead is agy-ready/agy-ui                                                                                    |
-| Antigravity | `pinpoint-agy-dispatch`        | Emit an Antigravity copy-paste prompt for a chosen bead                                                                                  |
-| Antigravity | `pinpoint-agy-execute`         | Runbook for Antigravity to execute an agy-ready bead end-to-end                                                                          |
+| Category   | Skill                          | When to use                                                                                                                              |
+| :--------- | :----------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| UI         | `pinpoint-ui`                  | Components, shadcn/ui, forms, responsive design                                                                                          |
+| UI         | `pinpoint-design-bible`        | Design system, page archetypes, spacing, surfaces                                                                                        |
+| TypeScript | `pinpoint-typescript`          | Type errors, generics, Drizzle types                                                                                                     |
+| Testing    | `pinpoint-testing`             | Writing tests, PGlite, test-layer decisions                                                                                              |
+| Testing    | `pinpoint-e2e`                 | E2E tests, worker isolation, Playwright stability                                                                                        |
+| Security   | `pinpoint-security`            | Auth, CSP, Zod, Supabase SSR                                                                                                             |
+| Patterns   | `pinpoint-patterns`            | Server Actions, data fetching, architecture                                                                                              |
+| Workflow   | `pinpoint-prototype-mode`      | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt                                                                  |
+| Workflow   | `pinpoint-briefing`            | Session-start health review                                                                                                              |
+| Workflow   | `pinpoint-pr-workflow`         | Full PR lifecycle: commit, push, CI, merge                                                                                               |
+| Workflow   | `pinpoint-orchestrator`        | Parallel subagent work in worktrees: dispatch, monitor, follow-up                                                                        |
+| Workflow   | `pinpoint-huddle`              | Inter-session coordination via daily/monthly beads (the huddle hooks)                                                                    |
+| Workflow   | `pinpoint-superpowers-bridge`  | Running the superpowers lifecycle in PinPoint: bead field pointers + overrides for the conflicting finish/worktree/review/subagent steps |
+| Deployment | `pinpoint-db-connections`      | Supabase/Postgres pooler & connection-string reference                                                                                   |
+| Deployment | `pinpoint-migration-conflicts` | Resolving drizzle/meta conflicts on merge                                                                                                |
+| Deployment | `pinpoint-preview-deployments` | On-demand TTL'd Supabase preview branches, `/preview` command                                                                            |
+| Deployment | `pinpoint-audit-override`      | Per-PR `/audit-override` escape hatch for unrelated audit failures                                                                       |
 
 ## 4. Environment
 

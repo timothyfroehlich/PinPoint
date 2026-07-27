@@ -1,14 +1,9 @@
----
-trigger: always_on
-# For Antigravity
----
-
 # PinPoint Non‑Negotiables
 
 **Last Updated**: 2026-07-27
-**Version**: 2.5 (progressive-enhancement rule 002 retired; CORE-ARCH-012 honest-failure added — PP-nw80)
+**Version**: 2.5 (progressive-enhancement non-negotiable retired; CORE-ARCH-012 honest-failure added — PP-nw80)
 
-> **Sync contract**: `AGENTS.md` §2.1 is a one-line index of these rules. Every §2.1 entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
+> **Sync contract**: `AGENTS.md`'s rule index is a one-line summary of these rules. Every index entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
 
 ## Overview
 
@@ -303,7 +298,7 @@ trigger: always_on
 **CORE-TEST-005:** Interaction Coverage at the Cheapest Catching Layer
 
 - **Severity:** Required
-- **Why:** Tests that verify element existence without exercising the handler miss broken wiring (PR #894 pattern). But E2E is not always the cheapest layer that catches that bug class — see AGENTS.md §2.1 "Interaction Coverage at the Cheapest Layer" and the 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`).
+- **Why:** Tests that verify element existence without exercising the handler miss broken wiring (PR #894 pattern). But E2E is not always the cheapest layer that catches that bug class — see the 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`).
 - **Do:** Every clickable user-facing element must be exercised by at least one test that actually invokes its handler. Pick the layer by bug class: multi-step journeys → E2E; Server Action wiring / permissions / DB queries → integration (PGlite + direct action call); pure form-state / UI logic → RTL unit.
 - **Don't:** Only assert `toBeVisible()` without testing the interaction. Also don't reflexively write E2E for every clickable — integration or RTL is usually faster and more thorough for class-B / E / I bugs.
 
@@ -388,7 +383,7 @@ trigger: always_on
 **CORE-ARCH-012:** A control that cannot act must not report that it did
 
 - **Severity:** Required
-- **Why:** PinPoint does not support JavaScript-disabled browsers, and a visibly broken control is an acceptable outcome when JavaScript fails to load — the user can see something is wrong and retry. What is not acceptable is a control that reports success for an action it could not perform: the user walks away believing the change was saved. Visible breakage is recoverable; false confirmation is not. Replaces the progressive-enhancement rule (002), retired 2026-07-27 after an audit found that only ~7 of ~28 submission surfaces worked without JavaScript and that the public `/report` entry point — the rule's flagship surface — was unconditionally broken. Audit and reasoning: `docs/superpowers/specs/2026-07-27-core-arch-002-scope-design.md` (PP-nw80).
+- **Why:** PinPoint does not support JavaScript-disabled browsers, and a visibly broken control is an acceptable outcome when JavaScript fails to load — the user can see something is wrong and retry. What is not acceptable is a control that reports success for an action it could not perform: the user walks away believing the change was saved. Visible breakage is recoverable; false confirmation is not. Replaces the progressive-enhancement non-negotiable retired on 2026-07-27 (see the Rule IDs appendix), after an audit found that only ~7 of ~28 submission surfaces worked without JavaScript and that the public `/report` entry point — the rule's flagship surface — was unconditionally broken. Audit and reasoning: `docs/superpowers/specs/2026-07-27-core-arch-002-scope-design.md` (PP-nw80).
 - **Do:** When a control cannot perform its action — a dependency is unavailable, JavaScript is not running, a precondition is unmet — let it visibly do nothing, or surface a real error. Rely on server-side validation to reject submissions that could not have carried valid input.
 - **Don't:** Render a success message, toast, or confirmation for a submission whose input could not have been collected. Don't wire a save control that submits unchanged state and confirms it as a change.
 

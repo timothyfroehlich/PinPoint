@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  startTransition,
 } from "react";
 import Link from "next/link";
 import { Label } from "~/components/ui/label";
@@ -198,6 +199,23 @@ export function UnifiedReportForm({
   // batch in progress survives — the Single form owns entry #1, not the whole
   // batch (PP-2m17 #2).
   const resetSingleForm = useCallback(() => {
+    // Native form reset — clears the honeypot and any browser autofill that
+    // bypassed controlled inputs.
+    //
+    // This MUST run before the draft-clearing calls below (PP-1ajq). `reset()`
+    // synchronously fires the form-`reset` event, and @radix-ui/react-select
+    // >=2.3.3 answers it by replaying each Select's MOUNT-TIME value through
+    // `onValueChange` — i.e. `patchEntry(0, { severity: … })`. Everything here
+    // is one React batch, so whichever update is queued last wins. Reset first
+    // and the stale replay is superseded by the clear; clear first and the
+    // replay overwrites it.
+    //
+    // The mount-time value is only stale after a remount that starts from a
+    // non-default draft: the Single form unmounts on every Single↔Multiple tab
+    // switch while the provider (see the `(tabbed)` layout) does not, so a
+    // return to Single mounts the Selects at the user's current choices. Clear
+    // then restored those instead of resetting them.
+    formRef.current?.reset();
     if (entries.length <= 1) {
       clearAll();
     } else {
@@ -205,9 +223,6 @@ export function UnifiedReportForm({
       patchSingle(emptySingle());
     }
     if (defaultMachineId) patchEntry(0, { machineId: defaultMachineId });
-    // Native form reset — clears the honeypot and any browser autofill that
-    // bypassed controlled inputs.
-    formRef.current?.reset();
     // If the machine was user-picked (URL didn't seed it), strip the ?machine=
     // the combobox's onChange wrote via replaceState so a reload/back-nav leaves
     // a clean URL. Read window.location.search (not the searchParams hook), since
@@ -338,8 +353,37 @@ export function UnifiedReportForm({
             </Alert>
           )}
 
+          {/*
+           * No `action={formAction}` on purpose (PP-1ajq). React 19 auto-resets
+           * a `<form action={...}>` once the action settles — on failure as well
+           * as success — and this form stays on screen after a rejected report.
+           * @radix-ui/react-select >=2.3.3 replays each Select's mount-time
+           * value through `onValueChange` on that reset, which writes the stale
+           * value straight back into the draft, so a failed submit silently
+           * undid the reporter's Severity/Priority/Status/Frequency choices.
+           * Dispatching `useActionState` directly means no form submission ever
+           * completes, so React never fires the reset. This form depends on JS
+           * end to end regardless (Turnstile token, draft persistence,
+           * `window.location.assign` redirect). Success still resets
+           * explicitly via `resetSingleForm()`.
+           */}
           <form
-            action={formAction}
+            onSubmit={(e) => {
+              // Ignore submits bubbled up from a descendant form. React
+              // propagates events through the React tree, not the DOM tree, so a
+              // portalled `<form>` in any nested dialog would otherwise land
+              // here and be cancelled by our `preventDefault()`. There is no
+              // such form today; the guard keeps one from silently breaking
+              // later.
+              if (e.target !== e.currentTarget) return;
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              // useActionState dispatch must run inside a transition — outside
+              // one React 19 silently skips the server action.
+              startTransition(() => {
+                formAction(fd);
+              });
+            }}
             ref={formRef}
             className="space-y-3 md:space-y-4"
           >

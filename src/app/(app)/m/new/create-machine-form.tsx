@@ -211,12 +211,41 @@ export function CreateMachineForm({
         </DialogContent>
       </Dialog>
 
+      {/*
+       * No `action={formAction}` on purpose (PP-1ajq). React 19 auto-resets a
+       * `<form action={...}>` once the action settles — on failure as well as
+       * success — and this form stays on screen after a failed create.
+       * @radix-ui/react-select >=2.3.3 replays each Select's mount-time value
+       * through `onValueChange` on that reset, so a failed create silently
+       * threw the Availability choice back to "On the Floor" (and the
+       * PinballMap edition picker back to its mount state) while the user was
+       * still reading the error. The text fields were already made controlled
+       * for exactly this reason; dispatching `useActionState` directly closes
+       * the same hole for the Selects, because no form submission ever
+       * completes and React never fires the reset. This form depends on JS end
+       * to end regardless (the success path is a `window.location.assign`
+       * redirect). Success still resets explicitly via `resetForm()`.
+       */}
       <form
-        action={formAction}
         ref={formRef}
         onSubmit={(e) => {
+          // Ignore submits that bubbled up from a DESCENDANT form. React
+          // propagates events through the React tree, not the DOM tree, so the
+          // portalled `<form>` inside OwnerSelect's InviteUserDialog reaches
+          // this handler even though it is not a DOM descendant. Without this
+          // guard our `preventDefault()` cancelled the invite's own submission
+          // and the invited user never appeared (caught by
+          // e2e/full/machine-with-invite.spec.ts).
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
           // Snapshot the full submitted FormData for confirmPromote's re-dispatch.
-          submittedDataRef.current = new FormData(e.currentTarget);
+          const fd = new FormData(e.currentTarget);
+          submittedDataRef.current = fd;
+          // useActionState dispatch must be called inside a transition — calling it
+          // outside a transition silently skips the server action (React 19 requirement).
+          startTransition(() => {
+            formAction(fd);
+          });
         }}
         id="create-machine-form"
         className="space-y-4"

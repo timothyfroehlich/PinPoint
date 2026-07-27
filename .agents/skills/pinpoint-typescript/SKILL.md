@@ -246,14 +246,14 @@ import { publicIssueSchema } from "~/app/(app)/report/schemas";
 const data: any = await fetchData();
 
 // ❌ Never: Non-null assertion without justification
-const user = getUser()!.email; // Dangerous (Rule #7)
+const user = getUser()!.email; // Dangerous (CORE-TS-007)
 
 // ❌ Never: Ignoring TypeScript errors
 // @ts-ignore
 const result = dangerousOperation();
 
 // ❌ Never: Unsafe type assertions
-const user = data as UserProfile; // Without validation (Rule #7)
+const user = data as UserProfile; // Without validation (CORE-TS-007)
 
 // ✅ Instead: Proper validation / Type guards
 if (isUserProfile(data)) {

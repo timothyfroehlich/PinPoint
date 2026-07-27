@@ -37,7 +37,7 @@ const PAGE_SIZE = 25;
  * level, runs the matrix-driven `getMachineTimeline` query, and dispatches
  * each row to the appropriate row renderer (comment, system, tombstone).
  *
- * Permissions (AGENTS.md rule 12 — Matrix-Only):
+ * Permissions (CORE-ARCH-008, matrix-only):
  * - `canDelete` per row uses `checkPermission("machines.timeline.comment.delete", …)`
  *   with the matrix's `admin: true` + `member/technician: own_or_owner` semantics.
  * - The composer is gated by `checkPermission("machines.timeline.comment.add", …)`
@@ -74,7 +74,7 @@ export default async function MachineTimelinePage({
     : [];
 
   // Resolve current user + access level for canDelete + composer gating.
-  // AGENTS.md rule 5 (Supabase SSR): createClient() -> auth.getUser() with
+  // CORE-SSR-001/002 (Supabase SSR): createClient() -> auth.getUser() with
   // no logic between.
   const supabase = await createClient();
   const {
@@ -128,7 +128,7 @@ export default async function MachineTimelinePage({
   const groups = bucketTimelineRows(rows);
 
   // Comment edit/delete capability per row. Matrix-only permission checks
-  // (AGENTS.md rule 12): edit uses `own` semantics (author only — even
+  // (CORE-ARCH-008, matrix-only): edit uses `own` semantics (author only — even
   // admin/owner can't put words in someone else's mouth); delete uses
   // `own_or_owner` with an admin override. Non-comment rows have no capability.
   function commentCapabilities(row: Row): {

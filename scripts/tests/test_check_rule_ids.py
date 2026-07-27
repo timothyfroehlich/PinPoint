@@ -3,7 +3,9 @@
 The gate exists because PinPoint states its rules in several hand-written
 places (catalog, CLAUDE.md, .claude/rules/, .github/instructions/) that are
 deliberately NOT generated from one source. It catches the drift that bites:
-a rule renamed or deleted while citations linger.
+a rule renamed or deleted while citations linger, and (PP-22e4) a fragile
+"rule N" / "AGENTS.md §2.1" citation that a future restructuring of AGENTS.md
+would turn into a pointer to nothing.
 """
 
 import sys
@@ -17,8 +19,10 @@ from check_rule_ids import (  # noqa: E402
     collect_catalog_ids,
     collect_citations,
     collect_descending_ranges,
+    collect_legacy_citations,
     extract_ids,
     find_descending_ranges,
+    find_legacy_citations,
     find_repo_root,
     main,
 )
@@ -57,7 +61,7 @@ class TestExtractIds:
         assert extract_ids("nothing to see") == set()
 
     def test_expands_dotdot_range_shorthand(self):
-        # AGENTS.md §2.1 cites contiguous blocks as e.g. CORE-RESP-001..004
+        # Citing files reference contiguous blocks as e.g. CORE-RESP-001..004
         # instead of spelling out every ID. Without expansion, only the
         # range's start ID is ever extracted -- the end ID and every
         # interior ID are silently never checked against the catalog.
@@ -103,6 +107,100 @@ class TestFindDescendingRanges:
 
     def test_no_range_is_not_flagged(self):
         assert find_descending_ranges("CORE-ARCH-009") == []
+
+
+class TestFindLegacyCitations:
+    def test_finds_numbered_rule_citation(self):
+        assert find_legacy_citations("see AGENTS.md rule 10 for the reason") == [
+            (1, "AGENTS.md rule 10")
+        ]
+
+    def test_finds_bare_rule_citation_without_agents_md_prefix(self):
+        # PP-22e4 found several of these mid-sentence with no "AGENTS.md" in
+        # sight -- still a fragile pointer into the numbered list.
+        assert find_legacy_citations("Email is never persisted (rule 10).") == [
+            (1, "rule 10")
+        ]
+
+    def test_finds_commandment_form(self):
+        assert find_legacy_citations("AGENTS.md commandment #12") == [
+            (1, "AGENTS.md commandment #12")
+        ]
+
+    def test_finds_section_21_citation(self):
+        assert find_legacy_citations('AGENTS.md §2.1 "Progressive Enhancement"') == [
+            (1, "AGENTS.md §2.1")
+        ]
+
+    def test_tolerates_backtick_between_filename_and_keyword(self):
+        # `AGENTS.md` §2.1 -- code-fenced filename immediately followed by
+        # the section mark broke a naive "AGENTS\.md\s*§2\.1" regex on main
+        # (docs/NON_NEGOTIABLES.md's own sync-contract line had this shape).
+        assert find_legacy_citations("see `AGENTS.md` §2.1 for the index") == [
+            (1, "AGENTS.md` §2.1")
+        ]
+
+    def test_ignores_core_id_citations(self):
+        assert find_legacy_citations("Email privacy (CORE-SEC-007).") == []
+
+    def test_ignores_rule_of_three_prose(self):
+        # "Rule" followed by a word, not a number, must not match.
+        assert find_legacy_citations("Rule of Three before abstracting") == []
+
+    def test_reports_correct_line_number(self):
+        text = "line one\nline two\nAGENTS.md rule 9 here\n"
+        assert find_legacy_citations(text) == [(3, "AGENTS.md rule 9")]
+
+    def test_reports_multiple_hits_in_order(self):
+        text = "AGENTS.md rule 5\nAGENTS.md §2.1\n"
+        assert find_legacy_citations(text) == [
+            (1, "AGENTS.md rule 5"),
+            (2, "AGENTS.md §2.1"),
+        ]
+
+
+class TestCollectLegacyCitations:
+    def test_collects_from_agents_md(self, repo: Path):
+        (repo / "AGENTS.md").write_text("see rule 10", encoding="utf-8")
+        assert collect_legacy_citations(repo) == {"AGENTS.md": [(1, "rule 10")]}
+
+    def test_collects_from_source_tree(self, repo: Path):
+        src = repo / "src" / "lib"
+        src.mkdir(parents=True)
+        (src / "example.ts").write_text(
+            "// Email is never persisted (rule 10).", encoding="utf-8"
+        )
+        assert collect_legacy_citations(repo) == {
+            "src/lib/example.ts": [(1, "rule 10")]
+        }
+
+    def test_clean_tree_returns_empty(self, repo: Path):
+        (repo / "AGENTS.md").write_text(
+            "see CORE-SEC-007 (email privacy)", encoding="utf-8"
+        )
+        assert collect_legacy_citations(repo) == {}
+
+    def test_dated_records_are_not_scanned(self, repo: Path):
+        # docs/superpowers/ and friends are historical records (AGENTS.md
+        # §8) and are not in LEGACY_CITATION_SOURCES at all -- a rule-number
+        # citation there must not surface, unlike a real source file.
+        specs = repo / "docs" / "superpowers" / "specs"
+        specs.mkdir(parents=True)
+        (specs / "2026-05-01-old-design.md").write_text(
+            "per AGENTS.md rule #16", encoding="utf-8"
+        )
+        assert collect_legacy_citations(repo) == {}
+
+    def test_self_excludes_its_own_module(self, repo: Path):
+        # check_rule_ids.py and its test necessarily spell out example
+        # citation forms in prose/docstrings while documenting the pattern
+        # this check bans -- they must not trigger against themselves.
+        scripts = repo / "scripts"
+        scripts.mkdir()
+        (scripts / "check_rule_ids.py").write_text(
+            "# e.g. AGENTS.md rule 10", encoding="utf-8"
+        )
+        assert collect_legacy_citations(repo) == {}
 
 
 class TestCatalogAndCitations:
@@ -169,6 +267,41 @@ class TestMain:
         err = capsys.readouterr().err
         assert "CORE-ARCH-999" in err
         assert "CLAUDE.md" in err
+
+    def test_fails_on_legacy_rule_citation(self, repo: Path, capsys):
+        (repo / "AGENTS.md").write_text(
+            "email privacy is AGENTS.md rule 10", encoding="utf-8"
+        )
+        assert main(["--root", str(repo)]) == 4
+        err = capsys.readouterr().err
+        assert "AGENTS.md" in err
+        assert "rule 10" in err
+        assert "CORE-*" in err
+
+    def test_fails_on_legacy_section_21_citation(self, repo: Path, capsys):
+        (repo / "CLAUDE.md").write_text(
+            'per AGENTS.md §2.1 "Progressive Enhancement"', encoding="utf-8"
+        )
+        assert main(["--root", str(repo)]) == 4
+        err = capsys.readouterr().err
+        assert "CLAUDE.md" in err
+
+    def test_core_id_citation_does_not_trigger_legacy_check(self, repo: Path, capsys):
+        # The fix for a legacy citation is a CORE-* ID -- confirm that form
+        # passes clean rather than merely not being what we were testing for.
+        (repo / "AGENTS.md").write_text(
+            "localhost not 127.0.0.1 is CORE-SEC-008", encoding="utf-8"
+        )
+        assert main(["--root", str(repo)]) == 0
+
+    def test_legacy_check_runs_before_unknown_id_check(self, repo: Path, capsys):
+        # Both a legacy citation and an unknown CORE-* ID are present; the
+        # legacy check (exit 4) must fire first so its more actionable
+        # "cite the ID instead" guidance isn't masked by the ID-typo error.
+        (repo / "AGENTS.md").write_text(
+            "AGENTS.md rule 10 and CORE-ARCH-999", encoding="utf-8"
+        )
+        assert main(["--root", str(repo)]) == 4
 
     def test_reports_every_unknown_id(self, repo: Path, capsys):
         (repo / "CLAUDE.md").write_text("CORE-ARCH-999", encoding="utf-8")
@@ -274,5 +407,9 @@ class TestRealRepo:
 
         # No descending ranges exist today either.
         assert collect_descending_ranges(root) == {}
+
+        # PP-22e4 converted every legacy rule-number/§2.1 citation in scope
+        # to a CORE-* ID; none should have crept back in.
+        assert collect_legacy_citations(root) == {}
 
         assert main(["--root", str(root)]) == 0

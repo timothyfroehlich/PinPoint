@@ -14,7 +14,8 @@
  * Passes through immediately in CI ($CI is set).
  *
  * Matched commands (each shell segment's RESOLVED command must be the runner —
- * a command that merely mentions one of these in an argument does NOT match):
+ * a command that merely mentions one of these in an argument, or names one on a
+ * line inside a heredoc body, does NOT match):
  *   pnpm run test:integration
  *   pnpm run test:integration:supabase
  *   pnpm run build
@@ -144,10 +145,25 @@ function isHeavySegment(segment) {
 
 /**
  * Does this command string invoke a heavy runner in ANY of its segments?
- * Split on shell separators: && || ; | and newlines.
+ * Split on shell separators: && || ; | — deliberately NOT on newlines.
+ *
+ * Newlines are excluded on purpose (PP-qota). We have no shell parser, so
+ * splitting on them made the classifier descend into heredoc bodies and
+ * multi-line quoted arguments: any LINE beginning with a heavy invocation
+ * became its own "segment" and fired a memory probe that can poll for five
+ * minutes. `cat <<EOF > notes.md` / `pnpm run build` / `EOF` is a `cat`, and
+ * `bd comments add PP-x "…\npnpm run e2e\n…"` is a `bd`.
+ *
+ * Accepted cost: a genuine multi-line sequence —
+ *   cd foo
+ *   pnpm run build
+ * — is no longer gated (false negative). That is the right trade under the
+ * same principle documented above at the runner-flag walk: a missed exotic
+ * invocation is cheaper than a false positive. Agents overwhelmingly write
+ * that shape as `cd foo && pnpm run build`, which still gates.
  */
 function isHeavyCommand(command) {
-  const segments = String(command || "").split(/&&|\|\||;|\||\r?\n/);
+  const segments = String(command || "").split(/&&|\|\||;|\|/);
   return segments.some((raw) => {
     const segment = raw.trim();
     return segment !== "" && isHeavySegment(segment);

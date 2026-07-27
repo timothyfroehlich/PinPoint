@@ -44,7 +44,7 @@
  * - 'owner' when the relationship is "owns/maintains this resource" (machine owner, etc.)
  * - 'own_or_owner' when EITHER of those grants permission (keeps the help page
  *   showing a single rule instead of two matrix entries that would need to be
- *   ORed at call sites — see AGENTS.md §2.1 "Matrix-Only Permissions").
+ *   ORed at call sites — see CORE-ARCH-008, "Matrix-Only Permissions").
  *
  * All three require ownership context to resolve. See checkPermission() in helpers.ts,
  * which resolves 'own' via userId === reporterId, 'owner' via userId === machineOwnerId,
