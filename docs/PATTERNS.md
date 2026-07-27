@@ -33,7 +33,7 @@ trigger: always_on
   - Database to Application Type Conversion
 - [Severity Naming](./patterns/severity-naming.md)
   - Player-Centric Language
-- [Progressive Enhancement](./patterns/progressive-enhancement.md)
+- [Server Action Forms](./patterns/server-action-forms.md)
   - Forms That Work Without JavaScript
 - [Machine Status Derivation](./patterns/machine-status-derivation.md)
   - Deriving Machine Status from Issues
