@@ -9,8 +9,8 @@
  * - `deleteMachineCommentAction` — soft-delete a comment. Authorization is
  *   delegated entirely to the matrix entry for
  *   `machines.timeline.comment.delete` (admin → always; member/technician →
- *   `own_or_owner`, i.e. comment author OR machine owner). Per AGENTS.md
- *   rule 12 (Matrix-Only Permissions), no layered ad-hoc auth checks live in
+ *   `own_or_owner`, i.e. comment author OR machine owner). Per CORE-ARCH-008
+ *   (Matrix-Only Permissions), no layered ad-hoc auth checks live in
  *   this action.
  */
 
@@ -267,7 +267,7 @@ export async function editMachineCommentAction(
  *   member/tech → own_or_owner  (comment author OR machine owner)
  *   guest       → false
  *
- * AGENTS.md rule 12 (Matrix-Only Permissions): authorization is ONLY the
+ * CORE-ARCH-008 (Matrix-Only Permissions): authorization is ONLY the
  * `checkPermission` call below. No additional ad-hoc admin/author/owner
  * checks live here — the matrix is the single source of truth.
  */

@@ -15,11 +15,18 @@ text, so they are hand-written. This gate catches the drift that actually bites
 -- a rule renamed or deleted in the catalog while citations linger, and catalog
 rules that no mechanism references at all -- without pretending to diff prose.
 
-Two checks:
+Three checks:
 
   ERROR  A cited CORE-* ID that does not exist in the catalog. Always a bug:
          either a typo or a rule that was renamed/removed without updating its
          citations. This is the check that runs in `pnpm run check`.
+  ERROR  A fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation
+         (PP-22e4). AGENTS.md §2.1 -- the numbered non-negotiables list -- is
+         being replaced by a grouped index, which turns every citation by
+         rule number or to "§2.1" itself into a pointer to nothing. Unlike a
+         CORE-* ID, neither form is machine-checkable against the catalog, so
+         the only sound gate is banning the pattern outright and requiring
+         the CORE-* ID instead.
   AUDIT  (--orphans) A catalog rule cited nowhere. Opt-in, never fails the
          build: as of 2026-07-24, 42 of ~62 catalog rules are "orphans" by this
          definition, because the catalog is deliberately broader than the set
@@ -27,8 +34,8 @@ Two checks:
          42 lines on every run would train everyone to ignore the gate, so it
          is a coverage audit you run deliberately, not a default warning.
 
-Exit codes: 0 clean, 1 unknown IDs found, 2 catalog missing, 3 descending range
-cited.
+Exit codes: 0 clean, 1 unknown IDs found, 2 catalog missing, 3 descending
+range cited, 4 fragile rule-number/§2.1 citation found.
 """
 
 from __future__ import annotations
@@ -41,8 +48,8 @@ from pathlib import Path
 # CORE-<CATEGORY>-<NNN>. Category is uppercase letters/digits (TS, A11Y, PBM).
 RULE_ID = re.compile(r"\bCORE-[A-Z][A-Z0-9]*-\d{3}\b")
 
-# Range shorthand, e.g. CORE-RESP-001..004 or CORE-FORM-001..006 (AGENTS.md
-# §2.1 uses this to cite a contiguous block without spelling out every ID).
+# Range shorthand, e.g. CORE-RESP-001..004 or CORE-FORM-001..006 (citing
+# files use this to cite a contiguous block without spelling out every ID).
 # Without expansion, RULE_ID alone only ever catches the range's start ID --
 # the end ID and every interior ID are never extracted, so a rename or
 # deletion of e.g. CORE-RESP-003 would go undetected. extract_ids() expands
@@ -51,6 +58,25 @@ RULE_ID = re.compile(r"\bCORE-[A-Z][A-Z0-9]*-\d{3}\b")
 # nothing -- main() separately flags descending order itself as citation
 # drift to be fixed at the source, rather than quietly tolerating it.
 RANGE_ID = re.compile(r"\bCORE-([A-Z][A-Z0-9]*)-(\d{3})\.\.(\d{3})\b")
+
+# A bare "rule N" / "commandment N" citation, with or without a leading
+# "AGENTS.md" (an optional closing backtick is tolerated between "AGENTS.md"
+# and the keyword, e.g. `` `AGENTS.md` rule 10 ``, since that shape shows up
+# in prose that code-fences the filename). PP-22e4 found ~30 of these across
+# the tree, several already wrong (citing the wrong number for the content
+# they described -- e.g. "rule 12" for email privacy, which is actually rule
+# 10 / CORE-SEC-007) because nothing ever validated them. A rule number is
+# never machine-checkable the way a CORE-* ID is (there's no catalog of
+# numbers to check against), so the only sound fix is banning the pattern and
+# requiring the ID.
+NUMBERED_RULE_CITATION = re.compile(
+    r"\b(?:AGENTS\.md`?\s+)?(?:[Rr]ule|[Cc]ommandment)\s*#?\d+\b"
+)
+
+# "AGENTS.md §2.1" itself (the numbered non-negotiables list being replaced by
+# a grouped index -- see module docstring). Tolerates the same optional
+# backtick as NUMBERED_RULE_CITATION.
+SECTION_21_CITATION = re.compile(r"AGENTS\.md`?\s*§\s*2\.1\b")
 
 CATALOG = "docs/NON_NEGOTIABLES.md"
 
@@ -66,6 +92,44 @@ CITING_SOURCES: tuple[str, ...] = (
     ".github/copilot-instructions.md",
     ".github/instructions/*.md",
     ".claude/hooks/*.cjs",
+)
+
+# Files and globs scanned for fragile rule-number/§2.1 citations (PP-22e4).
+# Deliberately an explicit allowlist, like CITING_SOURCES above, rather than
+# "every tracked file": several docs subtrees run their own independent
+# "Rule N" numbering with nothing to do with AGENTS.md (e.g.
+# docs/runbooks/sentry-alert-best-effort.md's "Rule 1 -- Primary-path error"
+# alerting tiers) and would false-positive under a blind scan. This list is
+# the source + script trees PP-22e4 actually found citations in, plus
+# AGENTS.md/CLAUDE.md themselves and the two docs PP-22e4 uses as durable
+# citation targets (docs/NON_NEGOTIABLES.md, docs/ENV_VARS.md). Dated-record
+# trees (docs/superpowers/, docs/plans/, the dated docs/testing/*-audit-*.md
+# files) are excluded on purpose -- they are historical records, not live
+# citations, per AGENTS.md §8. Add a path here only when a real citation
+# turns up in it.
+LEGACY_CITATION_SOURCES: tuple[str, ...] = (
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs/NON_NEGOTIABLES.md",
+    "docs/ENV_VARS.md",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "scripts/**/*.mjs",
+    "scripts/**/*.ts",
+    "scripts/**/*.py",
+    "e2e/**/*.ts",
+    "supabase/**/*.mjs",
+    ".agents/skills/**/*.md",
+    ".claude/hooks/*.cjs",
+    ".husky/*",
+)
+
+# This module and its test necessarily spell out example citation forms
+# ("AGENTS.md §2.1", "rule 10", ...) in prose while documenting the very
+# pattern this check bans -- scanning them would make the gate fail against
+# itself. Self-exclude rather than water down the docstrings.
+LEGACY_CITATION_SELF_EXCLUDE = frozenset(
+    {"scripts/check_rule_ids.py", "scripts/tests/test_check_rule_ids.py"}
 )
 
 
@@ -156,6 +220,42 @@ def collect_descending_ranges(root: Path) -> dict[str, list[str]]:
     return descending
 
 
+def find_legacy_citations(text: str) -> list[tuple[int, str]]:
+    """Return every fragile rule-number/§2.1 citation in text as (line, text).
+
+    1-indexed line numbers, so a failure message can point straight at the
+    offending line instead of just the file.
+    """
+    hits: list[tuple[int, str]] = []
+    for regex in (NUMBERED_RULE_CITATION, SECTION_21_CITATION):
+        for match in regex.finditer(text):
+            line_no = text.count("\n", 0, match.start()) + 1
+            hits.append((line_no, match.group(0)))
+    hits.sort()
+    return hits
+
+
+def collect_legacy_citations(root: Path) -> dict[str, list[tuple[int, str]]]:
+    """Map relative file path -> [(line, matched text), ...] for fragile
+    rule-number/§2.1 citations.
+
+    Scoped to LEGACY_CITATION_SOURCES -- see the comment there for why this is
+    an explicit allowlist rather than a scan of every tracked file.
+    """
+    found: dict[str, list[tuple[int, str]]] = {}
+    for pattern in LEGACY_CITATION_SOURCES:
+        for path in _glob_paths(root, pattern):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(root).as_posix()
+            if rel in found or rel in LEGACY_CITATION_SELF_EXCLUDE:
+                continue  # Overlapping globs, or this module's own docstrings.
+            hits = find_legacy_citations(path.read_text(encoding="utf-8"))
+            if hits:
+                found[rel] = hits
+    return found
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -193,6 +293,28 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 3
+
+    # ERROR: a fragile "rule N" / "commandment N" / "AGENTS.md §2.1" citation
+    # (PP-22e4). §2.1 is being replaced by a grouped index, so both forms
+    # break the moment that happens, and neither is machine-checkable against
+    # a catalog the way a CORE-* ID is -- ban the pattern outright.
+    legacy = collect_legacy_citations(root)
+    if legacy:
+        print(
+            "check:rule-ids: fragile AGENTS.md rule-number/§2.1 citation(s) found\n",
+            file=sys.stderr,
+        )
+        for rel in sorted(legacy):
+            for line_no, matched_text in legacy[rel]:
+                print(f"  {rel}:{line_no}: {matched_text!r}", file=sys.stderr)
+        print(
+            "\nAGENTS.md §2.1 is being replaced by a grouped index (PP-22e4) -- "
+            'a rule number or "§2.1" citation points at nothing once that '
+            "lands. Cite the CORE-* ID instead (look it up against "
+            f"{CATALOG}, or AGENTS.md §2.1's own list for now).",
+            file=sys.stderr,
+        )
+        return 4
 
     catalog_ids = collect_catalog_ids(root)
     citations = collect_citations(root)

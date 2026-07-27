@@ -699,7 +699,7 @@ describe("Issue Service Functions (Integration)", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Rule #12 regression guard (audit row 11, class-E integration test)
+  // CORE-SEC-007 regression guard (audit row 11, class-E integration test)
   //
   // Verifies that when an issue record has reporterEmail set (email-only
   // public reporter) and is fetched via the DB query path used by the issue
@@ -710,7 +710,7 @@ describe("Issue Service Functions (Integration)", () => {
   // If someone adds reporterEmail to IssueReporterInfo or to the query
   // column selection, this test will fail before it reaches production.
   // -----------------------------------------------------------------------
-  describe("reporter email privacy (Rule #12)", () => {
+  describe("reporter email privacy (CORE-SEC-007)", () => {
     it("resolveIssueReporter returns Anonymous for email-only guest, never the email", async () => {
       const db = await getTestDb();
 

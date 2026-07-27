@@ -18,8 +18,8 @@
  * Permission splits (admin/author/owner vs third-party) are class-E and
  * covered by integration tests at
  * src/test/integration/machine-timeline-permissions.test.ts — adding E2E
- * versions would be misallocation per AGENTS.md rule 9 (Interaction Coverage
- * at the Cheapest Layer).
+ * versions would be misallocation per CORE-TEST-005 (Interaction Coverage
+ * at the Cheapest Catching Layer).
  *
  * Reassign-flow selectors are stable per PP-3hb (issues-reassign-machine.spec.ts).
  */

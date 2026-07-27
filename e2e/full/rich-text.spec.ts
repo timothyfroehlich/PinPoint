@@ -147,7 +147,7 @@ test.describe("Rich Text and Mentions", () => {
     await editor.click();
     await page.keyboard.type("This is a ");
 
-    // Test toolbar button (Commandment #11)
+    // Test toolbar button
     await commentForm.getByRole("button", { name: "Toggle italic" }).click();
     await page.keyboard.type("rich text");
     await commentForm.getByRole("button", { name: "Toggle italic" }).click();
