@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MachineDetailsForm } from "./machine-details-form";
+import { updateMachineAction } from "~/app/(app)/m/actions";
+import { err } from "~/lib/result";
 
 vi.mock("~/app/(app)/m/actions", () => ({
   updateMachineAction: vi.fn(),
@@ -118,6 +120,21 @@ describe("MachineDetailsForm", () => {
     expect(hiddenDescription().value).toBe("");
     expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
       "No unsaved changes"
+    );
+  });
+
+  it("announces a failed save as a live-region alert", async () => {
+    vi.mocked(updateMachineAction).mockResolvedValue(
+      err("SERVER", "Something went wrong saving these details.")
+    );
+    const user = userEvent.setup();
+    render(<MachineDetailsForm {...baseProps} />);
+
+    await user.click(screen.getByRole("button", { name: "Save details" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "Something went wrong saving these details."
     );
   });
 });

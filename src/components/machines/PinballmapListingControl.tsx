@@ -36,8 +36,9 @@ import { Button } from "~/components/ui/button";
  * machine, Unlist) need the operator token and land in the follow-up PR; until
  * then the deep link to pinballmap.com is the fallback (CORE-PBM-001 link-back).
  *
- * Rendered as its own `<form>` region — NOT nested in the machine-edit form
- * (nested forms are invalid HTML), so it lives beside that form in the dialog.
+ * Rendered as its own `<form>` region — NOT nested in the Details form
+ * (nested forms are invalid HTML), so it lives in the Pinball Map section of
+ * the machine edit page, beside that form rather than inside it.
  */
 export interface PinballmapListingControlProps {
   machineId: string;

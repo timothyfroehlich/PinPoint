@@ -179,7 +179,7 @@ export default async function MachineEditPage({
             </a>
           </h2>
           {canLink && (
-            <p className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground">
               {pbmState?.lastSyncedAt
                 ? `last synced ${formatDateTime(pbmState.lastSyncedAt)}`
                 : "never synced"}
@@ -189,7 +189,7 @@ export default async function MachineEditPage({
                   <PinballmapSyncNow />
                 </>
               )}
-            </p>
+            </div>
           )}
         </div>
 

@@ -106,7 +106,9 @@ export function MachineDetailsForm({
 
       {state && !state.ok && (
         <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive">
-          <p className="text-sm font-medium">{state.message}</p>
+          <p className="text-sm font-medium" role="alert">
+            {state.message}
+          </p>
         </div>
       )}
 
