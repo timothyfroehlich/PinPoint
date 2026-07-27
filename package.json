@@ -1,7 +1,7 @@
 {
   "name": "pinpoint",
   "version": "0.2.0",
-  "packageManager": "pnpm@11.8.0+sha512.c1f5e7c4cb241c8f174b743851d82f42b802324afc8b0f116b96adb15aa06664948dde36960a3ba1079ba5b4b29dd0140135b94b5b5f5263592249d68e555f26",
+  "packageManager": "pnpm@11.9.0+sha512.bd682d5d03fe525ef7c9fd6780c6884d1e756ac4c9c9fe00c538782824310dcf90e3ddc4f53835f06dfaebd5085e41855e0bcbb3b60de2ac5bbab89e5036f03b",
   "type": "module",
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
@@ -59,12 +59,15 @@
     "audit:sm-structural": "bash scripts/audit/no-sm-structural-breakpoints.sh",
     "check:behind-main": "bash scripts/check-behind-main.sh",
     "check:pytest": "pytest scripts/tests/",
-    "check": "npm-run-all --silent --parallel typecheck typecheck:tests typecheck:e2e lint test format:fix check:linters check:pytest audit:role-checks audit:sm-structural check:behind-main",
+    "check:rule-ids": "python3 scripts/check_rule_ids.py",
+    "check:rule-ids:orphans": "python3 scripts/check_rule_ids.py --orphans",
+    "check": "npm-run-all --silent --parallel typecheck typecheck:tests typecheck:e2e lint test format:fix check:linters check:pytest check:rule-ids audit:role-checks audit:sm-structural check:behind-main",
     "preflight": "bash scripts/workflow/preflight-locked.sh",
     "preflight:unlocked": "npm-run-all --silent --parallel typecheck fix:lint-format test check:config --sequential db:fast-reset build test:integration test:integration:supabase smoke",
     "kill:zombies": "node --env-file=.env.local scripts/kill-zombies.mjs",
     "db:backup": "bash scripts/backup-production.sh",
     "db:seed:from-prod": "bash scripts/seed-from-backup.sh",
+    "chores:backups": "node scripts/check-prod-backups.mjs",
     "migrate:production": "tsx scripts/migrate-production.ts",
     "vercel-build": "pnpm run migrate:production && next build",
     "prepare": "husky"

@@ -39,7 +39,16 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 ### Checklist
 
 1. **Stale version-pin checks** (Supabase CLI — PP-nlv6; pnpm corepack pin — PP-w0eq)
-   - **Supabase CLI pin.** Compare the pinned Supabase CLI version against the latest release. The pin lives in CI setup / config; a version-drift nudge belongs here, not in per-session briefing. If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
+   - **Supabase CLI pin.** Compare the pinned Supabase CLI version against the latest release. A version-drift nudge belongs here, not in per-session briefing. If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
+     - The pin is **9 sites across 4 files** — `ci.yml` (×6), plus `preview-control.yaml`, `preview-sync.yaml`, `preview-reaper.yaml` (×1 each). A bump is a multi-site edit: change **all nine or none**. A partial bump leaves jobs on mismatched CLI versions, which surfaces as a job-specific CI failure that reads like a flake rather than a bad edit.
+     - List every pin, then compare against the newest release:
+
+       ```bash
+       rg -n -A6 'uses: supabase/setup-cli' .github/workflows/*.y*ml | rg 'version:'
+       gh api /repos/supabase/cli/releases/latest --jq .tag_name
+       ```
+
+       (`-A6` matters — one call site has an extra `if:` line before `with:`, so a smaller window silently misses it and you'd bump 8 of 9.)
    - **pnpm corepack pin.** The pnpm binary is pinned in the `packageManager` field of `package.json` (corepack). **Dependabot cannot bump this field** — it's an open, unimplemented feature request ([dependabot-core#4830](https://github.com/dependabot/dependabot-core/issues/4830)); Dependabot's pnpm support only updates deps _inside_ the lockfile, never the corepack pin. So this is the only watcher it has, and it silently rots without it (that's how we ended up 9 months behind on 10.2.0 until npm's audit-endpoint retirement forced the jump — PP-w0eq).
      - **Apply a 30-day cooldown** (supply-chain soak — same rationale as the Dependabot npm cooldown): bump only to the newest stable pnpm ≥30 days old, never the just-released `latest`.
      - Find the newest eligible version:
@@ -77,6 +86,13 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 8. **GHA infra-flake triage**
    - Run the weekly triage procedure in `docs/runbooks/gha-flake-log.md`: read the recent weekly `gha-flake-week` sighting beads (current ISO week + prior 2) plus the permanent `gha-flake-log` ledger, pull new sightings past the ledger cursor, cluster by signature, rule out non-issues, spin genuine recurring infra issues into child beads, catch regressions against `fixed` rows, close aged-out weekly beads, then rewrite the ledger and advance the cursor.
    - This is context-heavy — a good candidate to delegate to a subagent (see "Running the chores").
+
+9. **Prod backup validation**
+   - Run `pnpm run chores:backups`. It calls `supabase backups list` against PinPoint-Prod and asserts the daily physical backups are still happening: newest COMPLETED backup < 48h old, at least 7 retained, `walg_enabled` true. It warns on a 24–48h-old newest backup, any non-`COMPLETED` entry, and a >36h gap inside the window; it reports `pitr_enabled` so a posture change is visible.
+   - **What this proves and doesn't.** It attests that backups **exist** and are being **retained**. It does **not** prove they restore — a real restore drill means restoring a physical backup into a throwaway project, which isn't a weekly-cadence activity. Don't let a green run read as "DR is verified."
+   - On **FAIL**: check the Supabase dashboard and `status.supabase.com` before assuming the script is wrong, then file a **P1** bead. This is the only signal we have that the DR posture in `AGENTS.md` §7 is still true.
+   - On **WARN**: note it as a comment on the chores bead; a single skipped day isn't an incident, a pattern across weeks is.
+   - Requires the Supabase CLI to be logged in (`supabase login`) — auth comes from its stored token, not an env var. `pnpm run db:backup` is unrelated: that's a data-only `public`-schema dev-seeding dump with no schema and no `auth.users`, not a DR artifact.
 
 ## Finish: re-arm the nag
 

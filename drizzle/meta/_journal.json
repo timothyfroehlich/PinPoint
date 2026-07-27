@@ -421,6 +421,13 @@
       "when": 1784933489546,
       "tag": "0059_overrated_inhumans",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1784950793620,
+      "tag": "0060_cloudy_umar",
+      "breakpoints": true
     }
   ]
 }

@@ -1,13 +1,7 @@
 "use client";
 
 import type React from "react";
-import {
-  useState,
-  useActionState,
-  useRef,
-  useEffect,
-  startTransition,
-} from "react";
+import { useState, useActionState, useEffect, startTransition } from "react";
 import {
   updateIssueFrequencyAction,
   type UpdateIssueFrequencyResult,
@@ -52,11 +46,8 @@ export function UpdateIssueFrequencyForm({
   ownershipContext,
   compact = false,
 }: UpdateIssueFrequencyFormProps): React.JSX.Element {
-  const formRef = useRef<HTMLFormElement>(null);
   const [selectedFrequency, setSelectedFrequency] =
     useState<IssueFrequency>(currentFrequency);
-  const [pendingFrequency, setPendingFrequency] =
-    useState<IssueFrequency | null>(null);
   const [state, formAction, isPending] = useActionState<
     UpdateIssueFrequencyResult | undefined,
     FormData
@@ -82,20 +73,24 @@ export function UpdateIssueFrequencyForm({
         ownershipContext
       );
 
-  // Auto-submit form when pending frequency changes
-  useEffect(() => {
-    if (pendingFrequency !== null && formRef.current) {
-      const form = formRef.current;
-      startTransition(() => {
-        form.requestSubmit();
-      });
-      setPendingFrequency(null);
-    }
-  }, [pendingFrequency]);
-
+  // Dispatch the action directly instead of routing through a native
+  // `<form>` submission. `@radix-ui/react-select` >=2.3.3 attaches a
+  // `reset` listener to the form it participates in and replays the
+  // Select's *initial* value through `onValueChange` when that event fires;
+  // React 19 auto-resets a `<form action={...}>` once the action settles,
+  // so a native submit here would emit a second, spurious `onValueChange`
+  // carrying the stale value shortly after every real selection (PP-0fvr).
+  // Building `FormData` by hand and calling the `useActionState` dispatch
+  // ourselves means no `<form>` is ever submitted, so neither React's
+  // auto-reset nor Radix's reset listener ever fires.
   const handleValueChange = (newFrequency: IssueFrequency): void => {
     setSelectedFrequency(newFrequency);
-    setPendingFrequency(newFrequency);
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("frequency", newFrequency);
+    startTransition(() => {
+      formAction(formData);
+    });
   };
 
   if (
@@ -151,14 +146,20 @@ export function UpdateIssueFrequencyForm({
   );
 
   return (
+    // No `action` prop, no hidden inputs: submits are dispatched manually
+    // from `handleValueChange` above via `formAction(formData)`, never via
+    // native form submission (see comment there for why). Kept as a
+    // `<form>` element (rather than a `<div>`) purely so existing
+    // `form[data-form="update-frequency"]` selectors keep matching; it is
+    // not natively submittable, so don't add an `action` or a submit
+    // control back onto it.
     <form
-      ref={formRef}
-      action={formAction}
+      onSubmit={(event) => {
+        event.preventDefault();
+      }}
       className="space-y-2"
       data-form="update-frequency"
     >
-      <input type="hidden" name="issueId" value={issueId} />
-      <input type="hidden" name="frequency" value={selectedFrequency} />
       <div
         className={cn(
           "relative",

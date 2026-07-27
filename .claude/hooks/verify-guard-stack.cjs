@@ -32,6 +32,7 @@ const EXPECTED_GUARD_HOOKS = [
   "block-heavy-under-pressure.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
+  "block-worktree-dispatch-from-linked.cjs",
 ];
 
 // --- Pure evaluator (unit-testable without fs / exit / printing) -------------
