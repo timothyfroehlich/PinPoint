@@ -15,7 +15,7 @@
 1. **Drizzle migrations only** (CORE-ARCH-009): `db:generate` + `db:migrate`. Never `drizzle-kit push`. Supabase migration config is disabled.
 2. **Worker-scoped PGlite** (CORE-TEST-001): no per-test DB instances (causes lockups).
 3. **Server Components default** (CORE-ARCH-001): `"use client"` only for interaction leaves.
-4. **Progressive enhancement** (CORE-ARCH-002): `<form action={serverAction}>`. No inline handlers. Sanctioned exceptions: quick-report grid (PP-sn34); the 4 inline issue metadata forms dispatch `useActionState` directly to dodge a Radix Select reset-listener bug (PP-0fvr) — interim pending PP-nw80's broader review of this rule.
+4. **Honest failure** (CORE-ARCH-012): a control that cannot perform its action must not report that it did. Let it visibly do nothing or surface a real error — never a success toast for input that could not have been collected. There is no no-JS requirement; mutations still route through Server Actions (CORE-ARCH-005, CORE-ARCH-007).
 5. **Supabase SSR** (CORE-SSR-001, CORE-SSR-002): `createClient()` → `auth.getUser()` immediately. No logic between.
 6. **Type safety** (CORE-TS-007): ts-strictest. No `any`, no `!`, no unsafe `as`.
 7. **Path aliases** (CORE-TS-008): always `~/` (e.g. `~/lib/utils`).
