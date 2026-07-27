@@ -395,6 +395,13 @@ trigger: always_on
 - **Do:** Keep transaction callbacks to transactional DB work only. Fetch external inputs (e.g. the Discord Vault token via `getDiscordConfig()`) _before_ opening the transaction. Deliver external effects _after_ commit — use `after()` in a Server Action plus the two-phase `planNotification` (in-transaction writes) / `dispatchNotification` (post-commit fan-out) split. A runtime tripwire enforces this: `db.transaction` sets an in-transaction `AsyncLocalStorage` flag (`~/server/db/transaction-context`), and the email / Discord / blob / Vault-RPC client wrappers throw `SideEffectInTransactionError` if invoked while it is set — failing loudly in dev, test, and CI. A static ESLint backstop (`no-restricted-syntax`, options in `eslint-rules/no-side-effects-in-transaction.mjs`) catches the same violation at lint/CI time, before runtime: it flags calls to `sendEmail` / `sendDm` / `dispatchNotification` / `uploadToBlob` / `deleteFromBlob` / `getDiscordConfig` / `fetch` / `*.emails.send` inside a `db.transaction(...)` callback.
 - **Don't:** Call `sendEmail`, `sendDm`, `uploadToBlob`/`deleteFromBlob`, `getDiscordConfig`, `fetch`, or any other HTTP/IO from inside a `db.transaction(...)` callback. Don't "optimize" by moving a pre-fetch into the transaction. Don't catch and swallow `SideEffectInTransactionError` — fix the call site to run post-commit.
 
+**CORE-ARCH-012:** A control that cannot act must not report that it did
+
+- **Severity:** Required
+- **Why:** PinPoint does not support JavaScript-disabled browsers, and a visibly broken control is an acceptable outcome when JavaScript fails to load — the user can see something is wrong and retry. What is not acceptable is a control that reports success for an action it could not perform: the user walks away believing the change was saved. Visible breakage is recoverable; false confirmation is not. Replaces the progressive-enhancement rule (002), retired 2026-07-27 after an audit found that only ~7 of ~28 submission surfaces worked without JavaScript and that the public `/report` entry point — the rule's flagship surface — was unconditionally broken. Audit and reasoning: `docs/superpowers/specs/2026-07-27-core-arch-002-scope-design.md` (PP-nw80).
+- **Do:** When a control cannot perform its action — a dependency is unavailable, JavaScript is not running, a precondition is unmet — let it visibly do nothing, or surface a real error. Rely on server-side validation to reject submissions that could not have carried valid input.
+- **Don't:** Render a success message, toast, or confirmation for a submission whose input could not have been collected. Don't wire a save control that submits unchanged state and confirms it as a change.
+
 ---
 
 ## Integrations
