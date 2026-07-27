@@ -380,8 +380,7 @@ export type SyncPinballMapNowResult = Result<
  * which refuses repeat refreshes inside `PBM_MANUAL_SYNC_MIN_INTERVAL_MS` and
  * surfaces `THROTTLED` here (CORE-PBM-001). Form-action shaped
  * `(prevState, formData)` so a `<form action={...}>` + `useActionState` button
- * (control room, PP-o355.7) can drop it in for progressive enhancement
- * (CORE-ARCH-002).
+ * (control room, PP-o355.7) can drop it in directly (CORE-ARCH-005/007).
  */
 export async function syncPinballMapNowAction(
   _prevState: SyncPinballMapNowResult | undefined,
