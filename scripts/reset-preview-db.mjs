@@ -1,3 +1,4 @@
+import { assertNotPinPointProduction } from "./lib/db-target.mjs";
 import { createScriptClient } from "./lib/pg-client.mjs";
 
 // Use POSTGRES_URL (transaction pooler, :6543, IPv4) — NOT POSTGRES_URL_NON_POOLING
@@ -9,11 +10,17 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-// Production safety guard. This script DROPs schemas and DELETEs auth users, so
-// it must never touch the production project. The preview workflows pass the
+// Production safety guard, layer 1 (unconditional). This script DROPs schemas
+// and DELETEs auth users, so it must never touch the production project — and
+// the PROD_PROJECT_REF check below only fires when the caller supplies that var,
+// which a hand-run `node scripts/reset-preview-db.mjs` does not.
+assertNotPinPointProduction(databaseUrl, "POSTGRES_URL");
+
+// Layer 2: whatever ref the caller declared. The preview workflows pass the
 // production project ref as PROD_PROJECT_REF (= SUPABASE_PROJECT_ID); a real
-// preview branch connects as postgres.<branch-ref>, so the prod ref must NOT
-// appear anywhere in the branch connection string.
+// preview branch connects as postgres.<branch-ref>, so the declared ref must NOT
+// appear anywhere in the branch connection string. Kept alongside layer 1 so the
+// workflows stay authoritative about their own target even if the ref changes.
 const prodRef = process.env.PROD_PROJECT_REF;
 if (prodRef && databaseUrl.includes(prodRef)) {
   console.error(

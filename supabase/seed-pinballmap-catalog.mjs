@@ -20,6 +20,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { assertNotPinPointProduction } from "../scripts/lib/db-target.mjs";
 import { createScriptClient } from "../scripts/lib/pg-client.mjs";
 
 const POSTGRES_URL = process.env.POSTGRES_URL;
@@ -27,6 +28,12 @@ if (!POSTGRES_URL) {
   console.error("❌ Missing POSTGRES_URL");
   process.exit(1);
 }
+
+// Remote-capable — preview-migrate-seed.sh runs this against a preview branch —
+// so no loopback-only guard, but never production: prod fills this table from
+// the live PinballMap API on a weekly cron, and overwriting it with the offline
+// fixture mirror would silently shrink the machine-linking picker.
+assertNotPinPointProduction(POSTGRES_URL, "POSTGRES_URL");
 
 const fixturesDir = join(
   dirname(fileURLToPath(import.meta.url)),
