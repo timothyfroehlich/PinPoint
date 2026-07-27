@@ -20,7 +20,7 @@ interface Props {
  * Placeholder row for a soft-deleted timeline comment.
  *
  * Shows who deleted the comment and when. Server-renderable.
- * Email privacy (AGENTS.md rule 10): only the deleter's display name is
+ * Email privacy (CORE-SEC-007): only the deleter's display name is
  * rendered; email is never accepted or displayed.
  */
 export function MachineTimelineTombstoneRow({

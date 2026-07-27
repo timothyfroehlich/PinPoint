@@ -6,6 +6,10 @@
 // heavy-command regexes were tested against the WHOLE command string, so any
 // command that merely NAMED a heavy runner in an argument (echo, bd comments,
 // rg, a commit message) fired a memory probe that can poll for five minutes.
+//
+// They also cover the follow-up fix (PP-qota): newlines are no longer treated
+// as segment separators, so heredoc bodies and multi-line quoted arguments
+// stop tripping the gate.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -114,15 +118,12 @@ describe("package runners and absolute/relative paths → HEAVY", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Compound + multi-line commands — heavy if ANY segment invokes a heavy runner
+// Compound commands — heavy if ANY segment invokes a heavy runner.
+// Separators are && || ; | only; see the newline section below.
 // ---------------------------------------------------------------------------
-describe("compound and multi-line commands → HEAVY if any segment is", () => {
+describe("compound commands → HEAVY if any segment is", () => {
   it("detects a heavy command chained after cd", () => {
     expectHeavy("cd packages/app && pnpm run build");
-  });
-
-  it("detects a heavy command on the second line", () => {
-    expectHeavy("git fetch origin\npnpm run test:integration");
   });
 
   it("detects a heavy command after a semicolon", () => {
@@ -164,6 +165,54 @@ describe("prose mentioning a heavy command → NOT heavy (false-positive fix)", 
         "EOF",
       ].join("\n")
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Newlines are NOT segment separators (PP-qota).
+//
+// Without a shell parser, splitting on newlines made the classifier descend
+// into heredoc bodies and multi-line quoted arguments: any LINE that BEGAN
+// with a heavy invocation became its own "segment" and fired the (up to
+// five-minute) memory probe. Quoting was never the discriminator — a heredoc
+// line reading "Run pnpm run smoke first" only escaped because it started with
+// "Run". These cover the lines that DO start with a heavy invocation.
+// ---------------------------------------------------------------------------
+describe("newline bodies → NOT heavy (PP-qota)", () => {
+  it("allows a heredoc whose body LINE STARTS with a heavy invocation", () => {
+    expectNotHeavy(
+      ["cat <<EOF > notes.md", "pnpm run build", "EOF"].join("\n")
+    );
+  });
+
+  it("allows a heredoc body line starting with playwright test", () => {
+    expectNotHeavy(
+      [
+        "cat > /tmp/handoff.md <<'EOF'",
+        "playwright test e2e/foo.spec.ts",
+        "vitest run",
+        "EOF",
+      ].join("\n")
+    );
+  });
+
+  it("allows a multi-line quoted argument whose line starts with a heavy invocation", () => {
+    expectNotHeavy('bd comments add PP-x "line1\npnpm run e2e\nline3"');
+  });
+
+  it("allows a multi-line commit message body naming a heavy run", () => {
+    expectNotHeavy(
+      'git commit -m "fix: speed up CI\n\npnpm run build was slow"'
+    );
+  });
+
+  // Accepted cost of dropping the newline split: a GENUINE multi-line sequence
+  // is no longer gated. Correct trade — a missed exotic invocation is cheaper
+  // than a false positive, and agents write this as `cd foo && pnpm run build`,
+  // which still gates (see the compound-commands section).
+  it("accepts the false negative: a real newline-separated heavy sequence", () => {
+    expectNotHeavy("cd packages/app\npnpm run build");
+    expectNotHeavy("git fetch origin\npnpm run test:integration");
   });
 });
 
@@ -240,6 +289,14 @@ describe("hook subprocess — the precheck only runs for real heavy commands", (
 
   it("never reaches the precheck for prose naming a heavy command", () => {
     const { status, stdout } = runHook('echo "how to run pnpm run build"');
+    expect(status).toBe(0);
+    expect(stdout).toBe("");
+  });
+
+  it("never reaches the precheck for a heredoc body line starting with a heavy invocation", () => {
+    const { status, stdout } = runHook(
+      ["cat <<EOF > notes.md", "pnpm run build", "EOF"].join("\n")
+    );
     expect(status).toBe(0);
     expect(stdout).toBe("");
   });

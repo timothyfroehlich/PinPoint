@@ -5,7 +5,7 @@
  * `deleteMachineCommentAction` (matrix-driven permission scenarios for
  * `machines.timeline.comment.delete` — `own_or_owner` semantics).
  *
- * AGENTS.md rule 12: authorization is delegated to `checkPermission` against
+ * CORE-ARCH-008 (matrix-only permissions): authorization is delegated to `checkPermission` against
  * the matrix entry. These tests therefore exercise the four meaningful
  * actors (author, machine owner, site admin, unrelated member) to confirm
  * the matrix wiring + OwnershipContext are correct end-to-end.

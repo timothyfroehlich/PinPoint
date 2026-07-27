@@ -10,7 +10,7 @@
  * Permission splits (owner / technician / admin can edit; non-owner cannot) are
  * class-E and covered exhaustively at the action layer in
  * src/test/integration/machine-settings-actions.test.ts — duplicating them here
- * would be misallocation per AGENTS.md rule 9. We include only a single light
+ * would be misallocation per CORE-TEST-005. We include only a single light
  * read-only affordance check (a distinct rendered UI state).
  *
  * TAF (addamsFamily) has no member owner in the seed, so: admin can edit it

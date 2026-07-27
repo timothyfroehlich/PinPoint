@@ -13,12 +13,15 @@
  * of the same name (cascade clears its machine list) before re-inserting, so
  * re-seeding never duplicates.
  *
- * Demo data — DO NOT point at prod. Same no-host-guard model as the other seed
- * scripts (see seed-machine-settings.mjs): it targets whatever POSTGRES_URL is
- * set, which for db:reset / the preview pipeline is an ephemeral local/branch DB.
+ * Demo data, and local-only: `assertLocalDatabase` refuses any non-loopback
+ * POSTGRES_URL. Nothing wires this into the preview pipeline
+ * (scripts/workflow/preview/preview-migrate-seed.sh), so a hard loopback
+ * allowlist costs nothing and closes the "prod env loaded in this shell" path.
  */
 
 import postgres from "postgres";
+
+import { assertLocalDatabase } from "../scripts/assert-local-db.mjs";
 
 // Pooled POSTGRES_URL (:6543, IPv4) like the other seed scripts — NOT the
 // :5432 non-pooling URL, which is IPv6 and unreachable from CI runners.
@@ -28,6 +31,9 @@ if (!databaseUrl) {
   console.error("❌ POSTGRES_URL is not defined");
   process.exit(1);
 }
+
+// Before the client is constructed and before any network call: loopback only.
+assertLocalDatabase(databaseUrl);
 
 const COLLECTION_NAME = "APC Tournament Bank";
 // Fixed demo view-token (local only) so the shared-link flow is reachable in

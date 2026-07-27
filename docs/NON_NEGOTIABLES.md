@@ -1,14 +1,9 @@
----
-trigger: always_on
-# For Antigravity
----
-
 # PinPoint Non‑Negotiables
 
 **Last Updated**: 2026-07-17
 **Version**: 2.4 (form-token/status corrections; SMTP, quick-report-grid, and confirm-delete sanctioned exceptions — audit PP-9vh3/PP-h9lb)
 
-> **Sync contract**: `AGENTS.md` §2.1 is a one-line index of these rules. Every §2.1 entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
+> **Sync contract**: `AGENTS.md`'s rule index is a one-line summary of these rules. Every index entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
 
 ## Overview
 
@@ -231,6 +226,17 @@ trigger: always_on
 - **Don't:** Rely on runtime logs/graceful degradation for a var that must exist in prod; reuse one secret as a fallback for a different purpose; prefix a secret `NEXT_PUBLIC_` (it inlines into the client bundle). Same-value alias _names_ (e.g. `SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_SECRET_KEY`) are fine.
 - **Reference:** `docs/ENV_VARS.md` — full catalog, scope matrix, and "adding a new env var" checklist.
 
+**CORE-SEC-010:** Prod-mutating Supabase surfaces stay behind a permission prompt
+
+- **Severity:** Critical
+- **Why:** `pinpoint-prod` (`udhesuizjsgxfeotqybn`) is the **only** project in the Supabase org, so any remote-targeting Supabase call lands on live member data — there is no staging project to hit by mistake. PITR is off; the recovery floor is the previous nightly backup, i.e. up to ~24h of data loss. MCP tool calls do not go through Bash at all, so neither the `PreToolUse` hook stack nor the script-level guards (`assertNotDrizzlePush()`, `scripts/assert-local-db.mjs`) can see them, and the destructive Supabase CLI verbs beyond `db push` had no rule of any kind.
+- **Do:** Keep two lists in `.claude/settings.json` current:
+  - **MCP** — every write-capable tool on `permissions.ask` as a bare tool name (`mcp__claude_ai_Supabase__execute_sql`, `…__apply_migration`, `…__deploy_edge_function`, `…__pause_project`, `…__restore_project`, `…__create_project`, and the branch mutators). MCP rules take no argument pattern: no `Bash(...)` wrapper, no `:*` suffix. Add newly-exposed write tools when the connector's surface grows.
+  - **CLI** — `ask` on `supabase db reset`, `supabase db remote commit`, `supabase migration repair`, `supabase branches delete`; `deny` on `supabase db push` and `supabase projects delete`. `deny` is reserved for verbs with **no** legitimate use here (prod is the only project, and a deleted project is not recoverable from a nightly backup). `db reset` stays on `ask` rather than `deny` because the local form is routine and a prefix rule cannot reliably distinguish it from `--linked` — the prompt shows the full command, so the human sees `--linked` before approving.
+- **Don't:** Put a write surface on `allow`, or leave a newly-exposed one unlisted (unlisted defaults to unprompted). Don't gate the read-only MCP tools (`list_*`, `get_*`, `search_docs`, `generate_typescript_types`) — prompting on those trains the reflex to click through. Don't add a `PreToolUse` hook to chase wrapper evasion; this repo tried twice (PRs #1736, #1738) and concluded effect-rules belong at the lowest layer.
+- **Scope — these rules are a speed bump, not a security boundary.** Bash permission rules are prefix matchers over the command string, so a wrapper shape (`sh -c "…"`, `eval`, env indirection) walks straight past them, exactly as it does past the hook stack. `ask` is a prompt, not a block. They stop accidents, not intent. They also do not reach child processes: `e2e/global-setup.ts` shells out to `supabase db reset --yes` against the **local** stack from inside the Playwright global-setup process, which is not an agent Bash call and is therefore unaffected — as is `pnpm run db:reset`, which is `supabase stop && supabase start` + drop + migrate + seed and never calls `supabase db reset`.
+- **Enforced by:** `permissions.deny` / `permissions.ask` in `.claude/settings.json`; the `verify-guard-stack.cjs` SessionStart canary warns if either list is emptied or dropped.
+
 ---
 
 ## Performance & Caching
@@ -292,7 +298,7 @@ trigger: always_on
 **CORE-TEST-005:** Interaction Coverage at the Cheapest Catching Layer
 
 - **Severity:** Required
-- **Why:** Tests that verify element existence without exercising the handler miss broken wiring (PR #894 pattern). But E2E is not always the cheapest layer that catches that bug class — see AGENTS.md §2.1 "Interaction Coverage at the Cheapest Layer" and the 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`).
+- **Why:** Tests that verify element existence without exercising the handler miss broken wiring (PR #894 pattern). But E2E is not always the cheapest layer that catches that bug class — see the 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`).
 - **Do:** Every clickable user-facing element must be exercised by at least one test that actually invokes its handler. Pick the layer by bug class: multi-step journeys → E2E; Server Action wiring / permissions / DB queries → integration (PGlite + direct action call); pure form-state / UI logic → RTL unit.
 - **Don't:** Only assert `toBeVisible()` without testing the interaction. Also don't reflexively write E2E for every clickable — integration or RTL is usually faster and more thorough for class-B / E / I bugs.
 
@@ -320,9 +326,14 @@ trigger: always_on
 - **Why:** Forms work without JavaScript
 - **Do:** Use Server Actions with `<form action={serverAction}>`
 - **Don't:** Require client-side JavaScript for core functionality
+- **Status:** This rule is under active reconsideration (PP-nw80). The exception list below is now large enough that it describes the actual pattern rather than a set of one-off waivers — read it as a record of where native submission lost, not as a budget to spend.
 - **Sanctioned exceptions:**
-  - The member+ bulk quick-report grid (`src/app/(app)/report/(tabbed)/quick/quick-report-grid.tsx`, PP-sn34) submits each row through an `onClick`-triggered Server Action instead of a single `<form action>`, because per-row async submit with independent partial-failure handling across many rows cannot be expressed as one native form. This is acceptable **only because** the unified single-issue report form (`/report`) is the fully progressive-enhancement path — the grid is a technician-oriented power tool layered on top, not the only way to file an issue. A new no-`<form>` submission path that is the _sole_ way to perform an action is still a violation.
-  - The four inline issue-detail metadata forms (`src/app/(app)/m/[initials]/i/[issueNumber]/update-issue-{status,priority,severity,frequency}-form.tsx`, PP-0fvr) call their `useActionState` dispatch directly with a manually-built `FormData` instead of using `<form action={...}>`, because `@radix-ui/react-select` 2.3.3 attaches a form-`reset` listener that replays `onValueChange` with the Select's initial value, and React 19's automatic post-action form reset was triggering that listener — silently reverting every status/priority/severity/frequency change about a second after it was made. These controls are JS-dependent Radix Selects with no non-JS fallback to begin with, so removing the native submission path traded a real, user-visible bug for a theoretical no-JS regression. This carve-out is an interim measure pending PP-nw80's broader revisit of this rule.
+  - The member+ bulk quick-report grid (`src/app/(app)/report/(tabbed)/quick/quick-report-grid.tsx`, PP-sn34) submits each row through an `onClick`-triggered Server Action instead of a single `<form action>`, because per-row async submit with independent partial-failure handling across many rows cannot be expressed as one native form. The grid is a technician-oriented power tool layered on top of `/report`, not the only way to file an issue. (This carve-out previously rested on `/report` being "the fully progressive-enhancement path"; that is no longer accurate — see the Radix-Select exception below — and it was already only half-true, since an unauthenticated no-JS reporter never gets a Turnstile token.) A new no-`<form>` submission path that is the _sole_ way to perform an action is still a violation.
+  - **Every form containing a Radix Select** builds its `FormData` by hand and calls the `useActionState` dispatch directly inside `startTransition`, rather than carrying `action={...}` on the `<form>`. `@radix-ui/react-select` >=2.3.3 attaches a form-`reset` listener that replays `onValueChange` with the Select's mount-time value, and React 19 auto-resets a `<form action={...}>` once the action settles — **on failure as well as success**, since React only sees that the action returned. Dispatching directly means no form submission ever completes, so React never fires the reset. Affected files:
+    - The four inline issue-detail metadata forms (`src/app/(app)/m/[initials]/i/[issueNumber]/update-issue-{status,priority,severity,frequency}-form.tsx`, PP-0fvr). These auto-submitted from `onValueChange`, so the reset replay looked like a real user selection and fired a **second write carrying the stale value** — silently reverting every change about a second after it was made.
+    - `src/app/(app)/m/[initials]/edit/machine-details-form.tsx`, `src/app/(app)/m/new/create-machine-form.tsx`, `src/app/(app)/report/unified-report-form.tsx`, and `src/app/(app)/settings/delete-account-section.tsx` (PP-1ajq). These submit from a real button, so there is no bad write — instead a **failed** save silently wiped the user's unsaved edits while the form was still on screen (uncontrolled inputs snapped back to `defaultValue`; Selects snapped back to their mount value; controlled Selects had the stale value written back through `onValueChange`). Worst case was delete-account, where a reverted machine-reassignment left the confirmation text intact and the destructive button enabled. (PP-1ajq originally listed `m/[initials]/update-machine-form.tsx`; PP-o355.19 replaced that modal with the edit page and carried the remedy across.)
+    - `src/app/(app)/m/[initials]/edit/machine-owner-transfer.tsx` (PP-o355.19) takes the same remedy for a **different** symptom, so don't read this exception as being only about Radix Select. It has no Select at all — but a native reset blanks its _controlled_ hidden `id`/`name` inputs in the DOM without re-rendering React (the state behind them is unchanged, so React has no reason to re-sync), leaving a second attempt after a failed transfer to submit an empty machine id. The trigger is React 19's post-action reset itself; Radix's replay is one symptom riding on top of it.
+    - Note that making a Select **controlled does not help** — Radix's replay calls `onValueChange`, so the stale value is written straight into your state. Removing the native submission path is the remedy. Regression guards live in `src/test/unit/components/{issues,machines,settings,report}/*revert*.test.tsx`, plus the co-located `src/app/(app)/m/[initials]/edit/machine-details-form.test.tsx` for the edit page, and deliberately mock neither `react` nor the Select wrappers; mocking `useActionState` is precisely why this bug class stayed invisible to a green suite for five days.
 
 **CORE-ARCH-004:** Issues always per-machine
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, startTransition } from "react";
 import { useActionState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -51,14 +51,37 @@ export function DeleteAccountSection({
 
   const isConfirmed = confirmText === "DELETE";
 
+  // Snapshot the live form DOM and dispatch straight to the action, instead of
+  // carrying `action={formAction}` on the <form> (PP-1ajq).
+  //
+  // React 19 auto-resets a `<form action={...}>` once the action settles —
+  // failure included — and this dialog has no close-on-failure path.
+  // @radix-ui/react-select >=2.3.3 replays its mount-time value through
+  // `onValueChange` on that reset, so a failed delete silently threw away the
+  // new machine owner the user had picked (dropping the hidden `reassignTo`
+  // field back to ""), while the controlled confirmation text survived and
+  // kept the destructive button enabled. Dispatching directly means no form
+  // submission ever completes, so React never fires the reset. Same remedy as
+  // PP-0fvr; sanctioned exception to CORE-ARCH-002 — the form lives inside a
+  // Radix AlertDialog, so there is no no-JS story to preserve.
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+    // Ignore submits bubbled up from a descendant form. React propagates events
+    // through the React tree, not the DOM tree, so a portalled `<form>` in any
+    // nested dialog would otherwise land here and be cancelled by our
+    // `preventDefault()`. There is no such form today; the guard keeps one from
+    // silently breaking later.
+    if (e.target !== e.currentTarget) return;
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    // useActionState dispatch must run inside a transition — outside one React
+    // 19 silently skips the server action.
+    startTransition(() => {
+      formAction(fd);
+    });
+  };
+
   return (
     <div className="space-y-4">
-      {state && !state.ok && (
-        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive">
-          <p className="text-sm font-medium">{state.message}</p>
-        </div>
-      )}
-
       {isSoleAdmin && (
         <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive">
           <p className="text-sm font-medium">
@@ -88,7 +111,26 @@ export function DeleteAccountSection({
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent className="sm:max-w-[500px]">
-          <form action={formAction} className="space-y-6">
+          {/* No `action={formAction}` on purpose — see `handleSubmit` (PP-1ajq). */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/*
+              The failure banner belongs INSIDE the dialog. A failed delete
+              leaves this dialog open (there is no close-on-failure path), so a
+              banner rendered on the settings page behind the modal overlay was
+              invisible at exactly the moment it mattered — the button simply
+              flipped back from "Deleting…" and the user re-clicked. Keeping it
+              here is also what makes the preserved reassignment (see
+              `handleSubmit`) observable rather than merely correct.
+            */}
+            {state && !state.ok && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive"
+              >
+                <p className="text-sm font-medium">{state.message}</p>
+              </div>
+            )}
+
             <AlertDialogHeader>
               <AlertDialogTitle>Delete your account?</AlertDialogTitle>
               <AlertDialogDescription asChild>

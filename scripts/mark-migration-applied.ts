@@ -1,7 +1,10 @@
 #!/usr/bin/env tsx
 import postgres from "postgres";
+import { createInterface } from "node:readline/promises";
 import { readFileSync } from "fs";
 import { join } from "path";
+
+import { describeTarget, isCloudDatabaseUrl } from "./lib/db-target.mjs";
 
 interface MigrationEntry {
   idx: number;
@@ -22,11 +25,21 @@ interface MigrationJournal {
  * without actually running it. Use this when a migration was manually
  * applied before the auto-migration system was in place.
  *
- * Usage:
+ * Usage (local):
  *   POSTGRES_URL=<url> tsx scripts/mark-migration-applied.ts <migration-number>
  *
- * Example:
- *   POSTGRES_URL=postgres://... tsx scripts/mark-migration-applied.ts 0001
+ * Usage (production — the documented stuck-migration recovery path, AGENTS.md
+ * §7). This script stays prod-capable on purpose, so it takes an explicit
+ * opt-in token rather than a hard refusal:
+ *   MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<prod_url> \
+ *     tsx scripts/mark-migration-applied.ts <migration-number>
+ *
+ * Why the gate exists: this INSERTs straight into drizzle.__drizzle_migrations.
+ * Marking the WRONG number makes drizzle believe a migration ran when it did
+ * not, so the next `migrate:production` silently skips it and prod's schema
+ * diverges from the migration history permanently. That is slow-burn
+ * corruption — nightly backups do not catch it, because nothing looks broken
+ * until a later migration fails on a missing column.
  */
 
 const migrationNumber = process.argv[2];
@@ -65,6 +78,54 @@ if (!connectionString) {
     "❌ No database connection string found (checked POSTGRES_URL_NON_POOLING, POSTGRES_URL)"
   );
   process.exit(1);
+}
+
+// Production gate. Mirrors drizzle.config.ts's DRIZZLE_FORCE_PRODUCTION idiom
+// (same host match, same "set the token to mean it" shape) so there is one
+// convention here, not two. Runs BEFORE the client is constructed so a refusal
+// never opens a connection to prod. Not reachable from `vercel-build`, which
+// runs `migrate:production` only.
+const isProductionTarget = isCloudDatabaseUrl(connectionString);
+const forceProduction = Boolean(process.env["MARK_MIGRATION_FORCE_PRODUCTION"]);
+
+if (isProductionTarget && !forceProduction) {
+  console.error(
+    `❌ Refusing to write to drizzle.__drizzle_migrations on a remote database.\n` +
+      `   Target: ${describeTarget(connectionString)}\n` +
+      `   Migration: ${migrationNumber}\n\n` +
+      `   Marking a migration applied without running it makes future\n` +
+      `   \`migrate:production\` runs SKIP it — prod's schema then diverges from\n` +
+      `   the migration history permanently, and nightly backups do not catch it.\n\n` +
+      `   This IS the documented stuck-migration recovery path (AGENTS.md §7).\n` +
+      `   To proceed intentionally, re-run with:\n` +
+      `     MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<url> tsx scripts/mark-migration-applied.ts ${migrationNumber}`
+  );
+  process.exit(1);
+}
+
+/**
+ * Last-chance interactive confirm, shown only when a human is actually at the
+ * terminal. Non-TTY callers (CI, `| tee`, a wrapper script) never reach the
+ * prompt — the env token above is their whole gate — so this can never hang a
+ * pipeline.
+ */
+async function confirmProductionWrite(tag: string): Promise<boolean> {
+  if (!process.stdin.isTTY) return true;
+
+  console.log(`\n⚠️  About to mark a migration applied on a REMOTE database.`);
+  console.log(`   Target:    ${describeTarget(connectionString ?? "")}`);
+  console.log(`   Migration: ${tag}`);
+  console.log(
+    `   This records the migration as done WITHOUT running its SQL.\n`
+  );
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await rl.question("   Continue? (y/N) ");
+    return /^y(es)?$/i.test(answer.trim());
+  } finally {
+    rl.close();
+  }
 }
 
 // `prepare: false`: REQUIRED if this ever connects over the `:6543` transaction
@@ -113,6 +174,14 @@ async function main() {
       if (firstMigration && "created_at" in firstMigration) {
         console.log(`   Applied at: ${firstMigration["created_at"]}`);
       }
+      return;
+    }
+
+    if (
+      isProductionTarget &&
+      !(await confirmProductionWrite(migrationEntry.tag))
+    ) {
+      console.log("🚫 Aborted — nothing was written.");
       return;
     }
 

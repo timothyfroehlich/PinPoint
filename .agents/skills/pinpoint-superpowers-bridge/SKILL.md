@@ -38,7 +38,7 @@ Specs and plans stay as **files in git** (the superpowers default locations, kep
 2. **After each plan is written** (`writing-plans`): update the child bead's `--design` with the plan path + branch name.
 3. **Epics vs single-PR work:** a multi-PR epic may decompose into child beads (and MAY use a beads formula for the workflow). **Single-PR work must NOT** spawn per-task child beads — that creates sliver-beads. One bead, plan-file checkboxes for the steps.
 
-Everything above happens **in a worktree** — the root checkout is read-only (AGENTS.md §2.5). `brainstorming`/`writing-plans` commit spec/plan files to git, so enter a worktree first (`EnterWorktree`, or dispatch an `Agent(isolation:"worktree")`).
+Everything above happens **in a worktree** — the root checkout is read-only (AGENTS.md §2.2.5). `brainstorming`/`writing-plans` commit spec/plan files to git, so enter a worktree first (`EnterWorktree`, or dispatch an `Agent(isolation:"worktree")`).
 
 ---
 

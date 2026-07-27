@@ -23,7 +23,7 @@ End-to-end pipeline from "I have changes" to "merged in main". Replaces the depr
 - Verify NOT on main: `git rev-parse --abbrev-ref HEAD` ≠ `main`.
 - Verify branch follows naming convention: `feature/*`, `fix/*`, `chore/*`, `docs/*`, `test/*`, `refactor/*`.
 - Verify based on current main: `git merge-base HEAD origin/main` is recent.
-- Verify NO `git rebase origin/main` ever — commandment 18 (use `git merge origin/main` instead).
+- Verify NO `git rebase origin/main` ever — AGENTS.md §5 "Branches" (use `git merge origin/main` instead).
 
 ### 1.2 Pre-commit validation
 

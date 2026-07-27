@@ -4,7 +4,7 @@
     "PreInvocation": [
       {
         "type": "command",
-        "command": "node hooks/agy-beads-bootstrap.cjs",
+        "command": "node hooks/antigravity-bootstrap.cjs",
         "timeout": 15
       }
     ]
