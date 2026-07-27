@@ -8,7 +8,7 @@ trigger: always_on
 **Last Updated**: 2026-07-17
 **Version**: 2.4 (form-token/status corrections; SMTP, quick-report-grid, and confirm-delete sanctioned exceptions — audit PP-9vh3/PP-h9lb)
 
-> **Sync contract**: `AGENTS.md` §2.1 is a one-line index of these rules. Every §2.1 entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
+> **Sync contract**: `AGENTS.md`'s rule index is a one-line summary of these rules. Every index entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
 
 ## Overview
 
@@ -303,7 +303,7 @@ trigger: always_on
 **CORE-TEST-005:** Interaction Coverage at the Cheapest Catching Layer
 
 - **Severity:** Required
-- **Why:** Tests that verify element existence without exercising the handler miss broken wiring (PR #894 pattern). But E2E is not always the cheapest layer that catches that bug class — see AGENTS.md §2.1 "Interaction Coverage at the Cheapest Layer" and the 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`).
+- **Why:** Tests that verify element existence without exercising the handler miss broken wiring (PR #894 pattern). But E2E is not always the cheapest layer that catches that bug class — see the 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`).
 - **Do:** Every clickable user-facing element must be exercised by at least one test that actually invokes its handler. Pick the layer by bug class: multi-step journeys → E2E; Server Action wiring / permissions / DB queries → integration (PGlite + direct action call); pure form-state / UI logic → RTL unit.
 - **Don't:** Only assert `toBeVisible()` without testing the interaction. Also don't reflexively write E2E for every clickable — integration or RTL is usually faster and more thorough for class-B / E / I bugs.
 

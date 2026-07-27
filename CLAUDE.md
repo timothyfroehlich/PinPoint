@@ -50,7 +50,7 @@ See `pinpoint-orchestrator` skill Phase 2 for the full technical record.
 
 - **Dispatch**: `isolation: "worktree"` works out of the box — Claude Code creates the worktree, the `post-checkout` hook configures it (slot allocation, ports, `.env.local`, `.claude/launch.json`).
 - **Cleanup**: Claude Code's `WorktreeRemove` hook automatically runs `scripts/worktree_cleanup.py` (stops Supabase, removes Docker volumes, deallocates slot). Manual `git worktree remove /path` or `rm -rf` skips the hook — slot manifest entry and Docker volumes leak. `scripts/worktree_orphan_sweep.py` reconciles the slot manifest, active worktrees, and Supabase Docker resources; the SessionStart hook runs it in dry-run mode every 6h and surfaces a one-line nudge when orphans accumulate.
-- **Branch creation**: `Agent(isolation:"worktree")` handles branch creation automatically. AGENTS.md §4 "Branch Management" rules still apply if you create a branch manually inside an existing worktree.
+- **Branch creation**: `Agent(isolation:"worktree")` handles branch creation automatically. AGENTS.md §5 "Branches" rules still apply if you create a branch manually inside an existing worktree.
 
 ### Parallel Subagent Workflow
 

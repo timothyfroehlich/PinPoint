@@ -24,7 +24,7 @@ import { assertLocalDatabase } from "../scripts/assert-local-db.mjs";
 
 const databaseUrl = resolveScriptDatabaseUrl();
 
-// Hard refusal on non-local URLs (rule 3 / db safety: never seed prod).
+// Hard refusal on non-local URLs (db safety: never seed prod).
 assertLocalDatabase(databaseUrl);
 
 async function run() {
