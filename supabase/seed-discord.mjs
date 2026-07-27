@@ -17,6 +17,7 @@
  * Loaded by Node's --env-file flag in the package.json script invocation.
  */
 
+import { assertNotPinPointProduction } from "../scripts/lib/db-target.mjs";
 import { createScriptClient } from "../scripts/lib/pg-client.mjs";
 
 const POSTGRES_URL = process.env.POSTGRES_URL;
@@ -25,6 +26,12 @@ if (!POSTGRES_URL) {
   console.error("❌ Missing POSTGRES_URL");
   process.exit(1);
 }
+
+// Remote-capable (a fresh non-prod environment may legitimately bootstrap its
+// bot token this way), so no loopback-only guard — but never production: this
+// would write a DEV bot token into the prod Vault whenever prod's
+// bot_token_vault_id happens to be NULL.
+assertNotPinPointProduction(POSTGRES_URL, "POSTGRES_URL");
 
 const envBotToken = process.env.DISCORD_BOT_TOKEN?.trim();
 const envGuildId = process.env.DISCORD_GUILD_ID?.trim();

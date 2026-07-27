@@ -39,14 +39,18 @@
  * Deterministic: every run wipes AFM's existing sets and re-inserts these six,
  * so re-seeding never duplicates or leaves stale demo rows.
  *
- * Demo data — DO NOT point at prod. Like the other seed scripts (seed-users.mjs)
- * this runs against whatever POSTGRES_URL is set, with no host guard: local dev
- * (db:reset) and the on-demand preview pipeline both target ephemeral branch DBs.
- * Reaching prod requires deliberately exporting a prod POSTGRES_URL and running
- * by hand — which the read-only root checkout and AGENTS.md rules already forbid.
+ * Demo data, and local-only: `assertLocalDatabase` refuses any non-loopback
+ * POSTGRES_URL. Nothing currently wires this into the preview pipeline
+ * (scripts/workflow/preview/preview-migrate-seed.sh keeps it only as a
+ * commented-out example), so a hard loopback allowlist costs nothing and closes
+ * the "prod env loaded in this shell" path. If it is ever added to the preview
+ * pipeline, swap this for the `assertNotPinPointProduction` guard the
+ * remote-capable seeds use — do not just delete it.
  */
 
 import postgres from "postgres";
+
+import { assertLocalDatabase } from "../scripts/assert-local-db.mjs";
 
 // Use the pooled POSTGRES_URL (port :6543, IPv4) like seed-users.mjs — NOT
 // POSTGRES_URL_NON_POOLING (:5432), which resolves to IPv6 and is unreachable
@@ -59,6 +63,9 @@ if (!databaseUrl) {
   console.error("❌ POSTGRES_URL is not defined");
   process.exit(1);
 }
+
+// Before the client is constructed and before any network call: loopback only.
+assertLocalDatabase(databaseUrl);
 
 /** Wrap a single sentence of plain text in a minimal ProseMirror doc. */
 function doc(text) {
