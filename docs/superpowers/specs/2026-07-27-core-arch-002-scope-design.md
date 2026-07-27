@@ -31,7 +31,7 @@ Everything else failed through one of three mechanisms:
 ### What the rule cost
 
 - **A P0 bug** (PP-0fvr), described above.
-- **The same bug class, still live.** `update-machine-form.tsx` wraps an uncontrolled Name input and a Radix Availability Select in `<form action={formAction}>`. React 19 schedules the form reset on every action dispatch regardless of outcome. On success the dialog closes before anything is visible; on a _validation failure_ the dialog stays open and both fields silently reset to their pre-edit values underneath the error banner. No test covers that path. Not addressed here — it is a real defect independent of this decision and warrants its own bead.
+- **The same bug class, four more times over.** `update-machine-form.tsx` wraps an uncontrolled Name input and a Radix Availability Select in `<form action={formAction}>`. React 19 schedules the form reset on every action dispatch regardless of outcome. On success the dialog closes before anything is visible; on a _validation failure_ the dialog stays open and both fields silently reset to their pre-edit values underneath the error banner. This audit recorded it as an unfiled defect; it was in fact already being fixed in parallel as **PP-1ajq (PR #1751)**, which found the same bug in three further surfaces — create-machine, unified-report, and delete-account — and added a regression test per surface. That PR independently reached this audit's conclusion, rewriting the carve-out list as "every form that contains a Radix Select" and noting the list had become descriptive rather than a set of waivers. Its author also confirmed the `/report` finding below from the other direction: an unauthenticated no-JS reporter never receives a Turnstile token.
 - **Fragile shapes.** `requestSubmit()` called from effects and handlers to simulate native submission; hidden mirror inputs whose only job is to carry React state into a native submit; a single file (`update-machine-form.tsx`) using two different dispatch mechanisms for different sub-flows, the second justified in a comment as avoiding "the DOM `requestSubmit()` → `useActionState` wiring uncertainty."
 - **Undocumented divergence larger than the documented carve-outs.** The entire machine-settings surface (`InlineEditableText`, `InlineMarkdownField`, `NoteSection`, `DipBankSection`, `TableSection`, `SettingsSetCard`) has zero `<form>` elements — a debounced autosave model argued as a sanctioned exception in a plan doc that never reached the catalog. `machine-presence-select.tsx` is a silent violation nobody thought needed an exception.
 - **An adjacent rule pointing the opposite way.** CORE-ARCH-006 _mandates_ `onSelect` plus a direct async call inside dropdown menus, precisely because forms break there. Two ARCH rules one number apart give opposite instructions once a Radix primitive is involved.
@@ -118,7 +118,9 @@ The Rule IDs appendix currently reads `CORE-ARCH-001..010: Architecture (003 ret
 
 ### 5. Clean two stale code comments
 
-`src/app/(app)/admin/users/actions.ts` and `src/app/(app)/m/pinballmap-actions.ts` cite CORE-ARCH-002 in comments. Not gated by the checker, but they should not cite a retired rule.
+`src/app/(app)/admin/users/actions.ts` and `src/app/(app)/m/pinballmap-actions.ts` cite CORE-ARCH-002 in comments. Not gated by the checker, but they should not cite a retired rule. A third, `update-issue-priority-form.tsx`, claims "progressive enhancement" for a form that dispatches directly — factually wrong today, independent of this decision.
+
+**Four more arrive with PP-1ajq (PR #1751)**, which adds sanctioned-exception comments citing CORE-ARCH-002 to `update-machine-form.tsx`, `create-machine-form.tsx`, `unified-report-form.tsx`, and `delete-account-section.tsx`. That PR must merge first (it fixes live user-visible bugs; this one is doc-only), after which those four are cleaned in the same sweep.
 
 ## Out of scope
 

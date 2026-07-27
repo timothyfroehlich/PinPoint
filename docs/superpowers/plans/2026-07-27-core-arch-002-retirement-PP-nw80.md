@@ -542,7 +542,28 @@ Close PP-nw80 only after Tim merges.
 
 ---
 
+## Blocked on PR #1751 — mandatory re-sync before merge
+
+**PR #1751 (PP-1ajq, `fix/radix-select-form-reset-audit`) must merge first.** It fixes live user-visible bugs; this PR is doc-only. It also edits the same two blocks this PR deletes, so letting it land first makes conflict resolution trivial in one direction and painful in the other.
+
+Its author flagged the overlap in the huddle and asked for that order. Agreed and confirmed.
+
+After #1751 lands, run `git fetch origin && git merge origin/main` (merge, never rebase) and work this checklist:
+
+- [ ] **Resolve `AGENTS.md` §2.1 item 4** — #1751 rewrites the CORE-ARCH-002 line to list all 8 exception forms. This PR deletes that line entirely. **Take this branch's version** (the Honest-failure item 4); the expanded exception list describes a rule that no longer exists.
+- [ ] **Resolve `docs/NON_NEGOTIABLES.md`** — #1751 adds a `Status:` line to the CORE-ARCH-002 body and rewrites both carve-outs. This PR deletes the whole block. **Take this branch's version** (deleted). Verify afterwards that the literal `CORE-ARCH-002` appears nowhere in the file, or the gate is silently defeated (see Global Constraints).
+- [ ] **Extend Task 4 to the four new source comments.** #1751 adds sanctioned-exception comments citing CORE-ARCH-002 to:
+  - `src/app/(app)/m/[initials]/update-machine-form.tsx`
+  - `src/app/(app)/m/new/create-machine-form.tsx`
+  - `src/app/(app)/report/unified-report-form.tsx`
+  - `src/app/(app)/settings/delete-account-section.tsx`
+
+  Each says roughly "sanctioned exception to CORE-ARCH-002 — this form already depends on JS end to end." Rewrite to drop the retired citation while **keeping the Radix-Select reset rationale**, which is the load-bearing part and stays true: the fix, not the rule, is why the code looks that way. Reference PP-1ajq / PP-0fvr instead of the rule ID.
+
+- [ ] **Re-run the full verification**: `rg -n 'CORE-ARCH-002' --glob '!node_modules' . | rg -v '^\./docs/superpowers/|^\./docs/plans/'` must return nothing, then `pnpm run check`.
+
+#1751's four new regression tests (`*-failed-save-revert.test.tsx`) do not cite the rule ID and need no changes.
+
 ## Follow-ups (not this PR)
 
-- **`update-machine-form.tsx` reset bug.** `src/app/(app)/m/[initials]/update-machine-form.tsx:285-445` wraps an uncontrolled Name input (line 331, `defaultValue`) and a Radix Availability Select (line 411) in a single `<form>` driven by `useActionState`. On a validation failure the dialog stays open and both fields silently reset to their pre-edit values under the error banner — the same class as PP-0fvr, still live, untested. Independent of this decision; needs its own bead. Tim has not yet said whether to file it.
-- **Network resilience.** The audit found flaky-network handling is the venue's genuine risk and is entirely unaddressed (no service worker, no offline support, no client retry, no optimistic UI). Separate body of work.
+- **Network resilience.** The audit found flaky-network handling is the venue's genuine risk and is entirely unaddressed (no service worker, no offline support, no client retry, no optimistic UI). Separate body of work, not a rename of this rule.
