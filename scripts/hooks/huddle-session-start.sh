@@ -4,7 +4,7 @@
 #
 # Harness-agnostic. Fires at session start from any agent harness that supports
 # SessionStart-equivalent hooks (Claude Code via .claude/settings.json,
-# Antigravity via .agents/hooks/agy-beads-bootstrap.cjs, etc.). Reads stdin JSON
+# Antigravity via .agents/hooks/antigravity-bootstrap.cjs, etc.). Reads stdin JSON
 # for `session_id`, looks up the session's registered name in
 # <main-worktree>/.agents/huddle/session-names.json (see huddle-lib.sh for the
 # state-dir resolver), and emits a brief identity block on stdout which the
@@ -18,7 +18,7 @@
 # hook; this one is just identity announcement.
 #
 # Stdin payload schema (Claude Code shape; other harnesses adapt to this via
-# their bootstrap shim — see .agents/hooks/agy-beads-bootstrap.cjs for the
+# their bootstrap shim — see .agents/hooks/antigravity-bootstrap.cjs for the
 # Antigravity adapter):
 #   {
 #     "session_id":       "<UUID>",

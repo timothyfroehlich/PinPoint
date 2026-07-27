@@ -70,11 +70,3 @@ See `pinpoint-orchestrator` skill for the full workflow and known-bug details.
 ### Session Completion (Claude Code specifics)
 
 The "Landing the Plane" checklist in AGENTS.md applies to the lead agent and solo sessions.
-
-### Antigravity
-
-Antigravity is Google's CLI agent harness (currently Gemini) with full local environment access. Beads tagged `agy-ready` are cleared for autonomous execution; `agy-ui` additionally marks beads whose acceptance requires browser verification.
-
-- **Triage gates and tagging workflow:** `pinpoint-agy-triage` skill.
-- **Handing a bead to Antigravity:** `pinpoint-agy-dispatch` skill (run in Claude Code; emits a copy-paste prompt for the Antigravity 2.0 agent manager).
-- **Executing a bead inside Antigravity:** `pinpoint-agy-execute` skill.

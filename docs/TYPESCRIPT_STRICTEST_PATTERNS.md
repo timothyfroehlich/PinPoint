@@ -1,8 +1,3 @@
----
-trigger: always_on
-# For Antigravity
----
-
 # TypeScript Strictest Patterns
 
 **Last Updated**: November 10, 2025

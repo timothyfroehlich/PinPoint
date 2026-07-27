@@ -32,7 +32,7 @@
 # the transcript location Claude Code uses. Other harnesses (Antigravity,
 # Codex, etc.) do not write transcripts there and MUST pass session_id
 # explicitly — their bootstrap shims already do (see
-# .agents/hooks/agy-beads-bootstrap.cjs). Even within Claude Code the
+# .agents/hooks/antigravity-bootstrap.cjs). Even within Claude Code the
 # heuristic is racy when multiple sessions are active: it returns the newest
 # transcript, which is wrong for any non-newest session (2026-05-20 incident
 # on PP-lt12 — root cause of PP-sjkz). SESSION_ID is therefore REQUIRED for
