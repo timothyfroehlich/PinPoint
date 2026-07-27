@@ -1,6 +1,6 @@
 # PinPoint — Code Review Brief
 
-This is the canonical review rubric for PinPoint. It is harness-neutral: GitHub Copilot code review reads it natively from the repository root, the Antigravity adapter (`.agents/rules/antigravity.md`) pulls it in via `@REVIEW.md`, and Claude Code reads it via a pointer in `CLAUDE.md`. One brief, three reach paths — edit only here.
+This is the canonical review rubric for PinPoint. It is harness-neutral: GitHub Copilot code review is documented to read it natively from the repository root (per the [2026-07-17 changelog](https://github.blog/changelog/2026-07-17-copilot-code-review-customization-and-configurability-improvements/), unverified in practice until Copilot's quota resets ~2026-08-01), the Antigravity adapter (`.agents/rules/antigravity.md`) pulls it in via `@REVIEW.md`, and Claude Code reads it via a pointer in `CLAUDE.md`. One brief, three reach paths — edit only here.
 
 PinPoint is a **single-tenant** pinball issue tracker (Austin Pinball Collective), in live production with real user data. Stack: Next.js App Router (React Server Components by default), Drizzle ORM on Supabase Postgres, Supabase SSR auth, shadcn/ui + Tailwind CSS v4, TypeScript `ts-strictest`. There is no multi-tenancy, no RLS, and no tRPC — by design.
 
@@ -32,8 +32,6 @@ Cite the `CORE-*` rule ID (e.g. `CORE-SEC-007`) in a review comment when a chang
 
 If a PR changes roles, statuses, permissions, or user-facing terminology, check `src/app/(app)/help/` for content that becomes stale. Role names must match `src/lib/permissions/matrix.ts` (Guest, Member, Technician, Admin). Status labels must use the display labels in `STATUS_CONFIG` (`src/lib/issues/status.ts`), not raw database values.
 
-Detailed, path-scoped rules live in `.github/instructions/*.instructions.md`.
-
 ## Scope of the review
 
 A Copilot or Antigravity review is roughly equivalent to running the code-review skill at **low effort**, and is aimed at smaller changes — Tim triggers deeper reviews manually on bigger ones. In practice: prioritise the highest-priority rule violations above and genuine correctness defects. Don't editorialise about style a formatter or linter already owns (Prettier, ESLint, oxlint). A clean review — no comments — is a valid outcome; don't manufacture nits to justify the pass.
@@ -59,7 +57,7 @@ Reviewers never merge. Merging is human-only, via every path (PP-wi85) — no `g
 
 This is enforced two different ways depending on harness. In **Claude Code**, `block-direct-merge.cjs` is a PreToolUse hook that blocks these commands outright. It does **not** fire inside Antigravity, Codex, or Gemini — in those harnesses there is no hook backstop. What binds you instead is this written instruction plus `merge-pr.sh`'s own refusal to execute without a `--human` flag that only Tim should ever pass.
 
-Take note if you're not Claude Code: `.agents/skills/pinpoint-pr-workflow/SKILL.md` (around line 227) says direct merge paths are "ALL blocked for an agent by the `block-direct-merge.cjs` PreToolUse hook" with "no agent-usable bypass." That statement is true in Claude Code and **false in every other harness** — the hook simply isn't there. Don't take it at face value if you're reviewing or acting from Antigravity, Codex, or Gemini; the instruction in this section is what actually binds you.
+Take note if you're not Claude Code: `.agents/skills/pinpoint-pr-workflow/SKILL.md`, under "Phase 4: Merge — human-only," says direct merge paths are "ALL blocked for an agent by the `block-direct-merge.cjs` PreToolUse hook" with "no agent-usable bypass." That statement is true in Claude Code and **false in every other harness** — the hook simply isn't there. Don't take it at face value if you're reviewing or acting from Antigravity, Codex, or Gemini; the instruction in this section is what actually binds you.
 
 An agent's terminal state on a PR is: ready-for-review, CI green, review threads resolved, screenshots posted if UI-touching. Then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`.
 

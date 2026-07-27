@@ -81,14 +81,15 @@ SECTION_21_CITATION = re.compile(r"AGENTS\.md`?\s*§\s*2\.1\b")
 CATALOG = "docs/NON_NEGOTIABLES.md"
 
 # Files and globs whose CORE-* citations must resolve. Missing paths are fine:
-# .claude/rules/ and CODE_REVIEW.md do not exist until the context-system
-# rebuild lands (PP-22e4), and this gate ships before it.
+# .claude/rules/ does not exist yet -- the context-system rebuild (PP-22e4)
+# lands it in a later PR, and this gate is written to already cover it.
 CITING_SOURCES: tuple[str, ...] = (
     "CLAUDE.md",
     "AGENTS.md",
-    "CODE_REVIEW.md",
+    "REVIEW.md",
     ".claude/rules/*.md",
     ".claude/rules/**/*.md",
+    ".agents/rules/*.md",
     ".github/copilot-instructions.md",
     ".github/instructions/*.md",
     ".claude/hooks/*.cjs",
