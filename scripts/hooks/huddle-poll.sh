@@ -5,7 +5,7 @@
 # Harness-agnostic. Fires from per-harness hook configurations:
 #   - Claude Code:  UserPromptSubmit (no throttle) + PostToolUse (throttled),
 #                   registered in .claude/settings.json
-#   - Antigravity:  mid-trajectory invocation via .agents/hooks/agy-beads-bootstrap.cjs
+#   - Antigravity:  mid-trajectory invocation via .agents/hooks/antigravity-bootstrap.cjs
 #   - Other harnesses: route through their own bootstrap shim
 # Outputs new comments as a system-reminder block on stdout, or nothing if
 # nothing is new (zero stdout = no injection).
