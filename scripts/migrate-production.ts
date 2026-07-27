@@ -148,12 +148,14 @@ async function main() {
           "   1. Identify which migration failed (check error above)"
         );
         console.error(
-          "   2. Run: POSTGRES_URL=<url> tsx scripts/mark-migration-applied.ts <number>"
+          "   2. Run: MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<url> \\"
         );
-        console.error("   3. Redeploy to retry migrations");
+        console.error("        tsx scripts/mark-migration-applied.ts <number>");
         console.error(
-          "\n   Example: tsx scripts/mark-migration-applied.ts 0001"
+          "      (the token is required against a remote DB — the script refuses"
         );
+        console.error("       without it, and prompts once when run in a TTY)");
+        console.error("   3. Redeploy to retry migrations");
       }
     } else {
       console.error(error);

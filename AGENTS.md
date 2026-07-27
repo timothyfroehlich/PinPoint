@@ -15,7 +15,7 @@
 1. **Drizzle migrations only** (CORE-ARCH-009): `db:generate` + `db:migrate`. Never `drizzle-kit push`. Supabase migration config is disabled.
 2. **Worker-scoped PGlite** (CORE-TEST-001): no per-test DB instances (causes lockups).
 3. **Server Components default** (CORE-ARCH-001): `"use client"` only for interaction leaves.
-4. **Progressive enhancement** (CORE-ARCH-002): `<form action={serverAction}>`. No inline handlers. Sanctioned exceptions: quick-report grid (PP-sn34); the 4 inline issue metadata forms dispatch `useActionState` directly to dodge a Radix Select reset-listener bug (PP-0fvr) — interim pending PP-nw80's broader review of this rule.
+4. **Progressive enhancement** (CORE-ARCH-002): `<form action={serverAction}>`. No inline handlers. Sanctioned exceptions: quick-report grid (PP-sn34); and every form that contains a Radix Select, which dispatches `useActionState` directly to dodge the 2.3.3 form-`reset` replay bug — the 4 inline issue metadata forms (PP-0fvr) plus edit-machine, create-machine, unified-report, and delete-account (PP-1ajq). **The rule itself is under reconsideration** (PP-nw80); treat the exception list as descriptive, not as a budget to spend.
 5. **Supabase SSR** (CORE-SSR-001, CORE-SSR-002): `createClient()` → `auth.getUser()` immediately. No logic between.
 6. **Type safety** (CORE-TS-007): ts-strictest. No `any`, no `!`, no unsafe `as`.
 7. **Path aliases** (CORE-TS-008): always `~/` (e.g. `~/lib/utils`).
@@ -39,7 +39,7 @@
 2. **Run `pnpm run check` before committing** (~12s — the default floor). Reserve `pnpm run preflight` (the slower check + build + integration) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
-5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md` and `.agents/rules/AGY.md`. (PP-46z, PP-bg45.)
+5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
 6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **Merging is human-only, via ANY path** — never `gh pr merge`, never MCP `merge_pull_request`, and never `scripts/workflow/merge-pr.sh` (even though it enforces the merge gates, running it is still an agent merge). An agent's terminal state on a PR is: ready-for-review, CI green, reviews resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
 
@@ -47,28 +47,25 @@
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
-| Category    | Skill                          | When to use                                                                                                                              |
-| :---------- | :----------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
-| UI          | `pinpoint-ui`                  | Components, shadcn/ui, forms, responsive design                                                                                          |
-| UI          | `pinpoint-design-bible`        | Design system, page archetypes, spacing, surfaces                                                                                        |
-| TypeScript  | `pinpoint-typescript`          | Type errors, generics, Drizzle types                                                                                                     |
-| Testing     | `pinpoint-testing`             | Writing tests, PGlite, test-layer decisions                                                                                              |
-| Testing     | `pinpoint-e2e`                 | E2E tests, worker isolation, Playwright stability                                                                                        |
-| Security    | `pinpoint-security`            | Auth, CSP, Zod, Supabase SSR                                                                                                             |
-| Patterns    | `pinpoint-patterns`            | Server Actions, data fetching, architecture                                                                                              |
-| Workflow    | `pinpoint-prototype-mode`      | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt                                                                  |
-| Workflow    | `pinpoint-briefing`            | Session-start health review                                                                                                              |
-| Workflow    | `pinpoint-pr-workflow`         | Full PR lifecycle: commit, push, CI, merge                                                                                               |
-| Workflow    | `pinpoint-orchestrator`        | Parallel subagent work in worktrees: dispatch, monitor, follow-up                                                                        |
-| Workflow    | `pinpoint-huddle`              | Inter-session coordination via daily/monthly beads (the huddle hooks)                                                                    |
-| Workflow    | `pinpoint-superpowers-bridge`  | Running the superpowers lifecycle in PinPoint: bead field pointers + overrides for the conflicting finish/worktree/review/subagent steps |
-| Deployment  | `pinpoint-db-connections`      | Supabase/Postgres pooler & connection-string reference                                                                                   |
-| Deployment  | `pinpoint-migration-conflicts` | Resolving drizzle/meta conflicts on merge                                                                                                |
-| Deployment  | `pinpoint-preview-deployments` | On-demand TTL'd Supabase preview branches, `/preview` command                                                                            |
-| Deployment  | `pinpoint-audit-override`      | Per-PR `/audit-override` escape hatch for unrelated audit failures                                                                       |
-| Antigravity | `pinpoint-agy-triage`          | Grooming: evaluate whether a bead is agy-ready/agy-ui                                                                                    |
-| Antigravity | `pinpoint-agy-dispatch`        | Emit an Antigravity copy-paste prompt for a chosen bead                                                                                  |
-| Antigravity | `pinpoint-agy-execute`         | Runbook for Antigravity to execute an agy-ready bead end-to-end                                                                          |
+| Category   | Skill                          | When to use                                                                                                                              |
+| :--------- | :----------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| UI         | `pinpoint-ui`                  | Components, shadcn/ui, forms, responsive design                                                                                          |
+| UI         | `pinpoint-design-bible`        | Design system, page archetypes, spacing, surfaces                                                                                        |
+| TypeScript | `pinpoint-typescript`          | Type errors, generics, Drizzle types                                                                                                     |
+| Testing    | `pinpoint-testing`             | Writing tests, PGlite, test-layer decisions                                                                                              |
+| Testing    | `pinpoint-e2e`                 | E2E tests, worker isolation, Playwright stability                                                                                        |
+| Security   | `pinpoint-security`            | Auth, CSP, Zod, Supabase SSR                                                                                                             |
+| Patterns   | `pinpoint-patterns`            | Server Actions, data fetching, architecture                                                                                              |
+| Workflow   | `pinpoint-prototype-mode`      | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt                                                                  |
+| Workflow   | `pinpoint-briefing`            | Session-start health review                                                                                                              |
+| Workflow   | `pinpoint-pr-workflow`         | Full PR lifecycle: commit, push, CI, merge                                                                                               |
+| Workflow   | `pinpoint-orchestrator`        | Parallel subagent work in worktrees: dispatch, monitor, follow-up                                                                        |
+| Workflow   | `pinpoint-huddle`              | Inter-session coordination via daily/monthly beads (the huddle hooks)                                                                    |
+| Workflow   | `pinpoint-superpowers-bridge`  | Running the superpowers lifecycle in PinPoint: bead field pointers + overrides for the conflicting finish/worktree/review/subagent steps |
+| Deployment | `pinpoint-db-connections`      | Supabase/Postgres pooler & connection-string reference                                                                                   |
+| Deployment | `pinpoint-migration-conflicts` | Resolving drizzle/meta conflicts on merge                                                                                                |
+| Deployment | `pinpoint-preview-deployments` | On-demand TTL'd Supabase preview branches, `/preview` command                                                                            |
+| Deployment | `pinpoint-audit-override`      | Per-PR `/audit-override` escape hatch for unrelated audit failures                                                                       |
 
 ## 4. Environment
 
@@ -118,8 +115,9 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `pnpm run e2e:full`                   | Full E2E suite — **CI only; don't run locally.**                                                                                                                                                                                 |
 | `pnpm run e2e:all`                    | Full + smoke + roots, separate Playwright invocations (~10–15 min) — **CI only; don't run locally.**                                                                                                                             |
 | `pnpm run db:migrate`                 | Apply schema changes locally                                                                                                                                                                                                     |
-| `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups`                                                                                                                                                                                      |
+| `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups` (data-only dev seed, **not** a DR artifact)                                                                                                                                          |
 | `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                                                                                                                                                                       |
+| `pnpm run chores:backups`             | Verify prod Supabase daily physical backups exist + retention is intact (weekly chore; hits prod, not part of `check`)                                                                                                           |
 | `ruff check && ruff format`           | Python lint/format (no venv needed)                                                                                                                                                                                              |
 | `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                          |
 | `pnpm run dev:status`                 | Check whether Next.js / Supabase / Postgres are up — one command, worktree-port aware. Use it instead of ad-hoc `curl` health checks against localhost.                                                                          |
@@ -206,14 +204,15 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 ### Supabase
 
-- **`pinpoint-prod`** (Live, Pro plan): **real user data — strict safety.** Daily backups, 7-day retention.
+- **`pinpoint-prod`** (Live, Pro plan): **real user data — strict safety.** Daily backups, 7-day retention, no PITR — so the recovery floor is the previous nightly snapshot. That posture is asserted weekly by `pnpm run chores:backups` (chores checklist item 9); it verifies backups exist and are retained, not that they restore.
 - **Local**: `db:reset` OK. **Prod: NEVER `db:reset`. Only `db:migrate`.**
+- **Prod-mutating Supabase surfaces are gated in `.claude/settings.json`** (CORE-SEC-010): prod is the only project in the org, and MCP calls bypass both the Bash hook stack and the script-level `assertLocalDatabase` / `assertNotDrizzlePush` guards. So: every write-capable MCP tool (`execute_sql`, `apply_migration`, `deploy_edge_function`, `pause_project`, `restore_project`, `create_project`, the branch mutators) is on `permissions.ask`; the destructive CLI verbs `supabase db reset` / `db remote commit` / `migration repair` / `branches delete` are on `ask`, and `supabase db push` / `projects delete` on `deny`. Read-only MCP tools stay unprompted. These are prefix matchers over the command string — a speed bump against accidents, not a security boundary — and they don't reach child processes, so `pnpm run db:reset` and the E2E global-setup are unaffected. Add new write surfaces to the lists as the connector or CLI grows.
 - **Connection**: app + scripts use `POSTGRES_URL` — the Supavisor **transaction** pooler (`…pooler.supabase.com:6543`, IPv4), with `prepare:false` set on every porsager client that connects there (`src/server/db/index.ts`, `scripts/lib/pg-client.mjs`) — the transaction pooler does not support prepared statements, and a resolved incident (PP-d8l8) traced silent prod commit loss to this exact setting missing on the runtime client. **Never reintroduce `prepare:true` on a `:6543` client.** Full pooler/endpoint reference, connection string format, and the incident writeup: `pinpoint-db-connections` skill.
 
 ### Vercel
 
 - Vercel runs `pnpm run migrate:production` on build (production only).
-- Stuck migration fix: `POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`.
+- Stuck migration fix: `MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`. The token is required — the script refuses a remote target without it, and prompts once more when run in a TTY. It writes to `drizzle.__drizzle_migrations` without running the migration, so a wrong number makes prod's schema diverge from history permanently.
 
 ### Preview deployments (on-demand, TTL'd Supabase branches)
 
@@ -238,7 +237,7 @@ Work isn't done at "git push" — it's done when the change is **merged, deploye
 3. **Lean on CI for the full E2E suite** — don't run `e2e:full` locally; CI owns it once the PR is up. Do run **selected specs locally** while writing them or iterating on a feature they touch (`pnpm exec playwright test <spec> --project=chromium`).
 4. **UI-touching PRs: post screenshots before handoff.** `node scripts/workflow/pr-screenshots.mjs <PR>` shoots the manifest pages at desktop+mobile viewports and posts a sticky PR comment so Tim can eyeball them before merging. The commit-time `ui-screenshot-reminder.cjs` hook nudges when a commit touches a UI glob — don't ignore it.
 5. **Merging is human-only, via ANY path — including `merge-pr.sh`.** An agent never runs `merge-pr.sh` itself, even to enforce the gates; that hook is blocked (PP-wi85). The agent's terminal state on a PR is: ready-for-review, CI green, reviews resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`. (Bead close timing follows beads' defaults; there's no fixed at-merge rule.)
-6. **After Tim merges, watch the deployment.** Don't consider the work done at handoff — after Tim runs the merge, watch the production deploy land and confirm no build, migration, or runtime errors. A merge that breaks prod isn't done. If you're not present when Tim merges, this step is his to do or to ask you to pick back up.
+6. **After Tim merges, consider watching the deployment — only if the PR could break it.** A merge that breaks prod isn't done, so when the change actually reaches the deployed app, it's worth watching the production deploy land and confirming no build, migration, or runtime errors. That means: anything under `src/`, a migration, a dependency or `next.config.ts` change, an env-registry change, or anything on the `vercel-build` path. **Skip it otherwise** — docs, skills, beads, GitHub workflows, and dev-only scripts can't affect the deploy, and watching a run that was never at risk just burns time. This is a judgement call, not a mandate; if you're not present when Tim merges, it's his to do or to ask you to pick back up.
 7. **Cleanup — non-destructive now, destructive on confirmation.** Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
 8. **Hand off** for the next session, and post to the huddle daily bead if other sessions need to know what landed.
 

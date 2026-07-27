@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 //
-// agy-beads-bootstrap.cjs — Antigravity bootstrap shim for the
+// antigravity-bootstrap.cjs — Antigravity bootstrap shim for the
 // harness-agnostic beads + huddle hook scripts.
 //
 // Antigravity's PreInvocation hook payload uses different field names than
@@ -78,7 +78,7 @@ async function main() {
         combinedOutput += beadsOutput + '\n\n';
       }
     } catch (err) {
-      process.stderr.write(`[agy-beads-bootstrap] Error running bd prime: ${err.message}\n`);
+      process.stderr.write(`[antigravity-bootstrap] Error running bd prime: ${err.message}\n`);
     }
 
     // 2. Run huddle-session-start.sh to announce session identity
@@ -93,7 +93,7 @@ async function main() {
         combinedOutput += huddleOutput;
       }
     } catch (err) {
-      process.stderr.write(`[agy-beads-bootstrap] Error running huddle-session-start.sh: ${err.message}\n`);
+      process.stderr.write(`[antigravity-bootstrap] Error running huddle-session-start.sh: ${err.message}\n`);
     }
 
     if (combinedOutput.trim()) {
@@ -132,13 +132,13 @@ async function main() {
         process.stdout.write(JSON.stringify({ injectSteps: [] }));
       }
     } catch (err) {
-      process.stderr.write(`[agy-beads-bootstrap] Error running huddle-poll.sh: ${err.message}\n`);
+      process.stderr.write(`[antigravity-bootstrap] Error running huddle-poll.sh: ${err.message}\n`);
       process.stdout.write(JSON.stringify({ injectSteps: [] }));
     }
   }
 }
 
 main().catch((err) => {
-  process.stderr.write(`[agy-beads-bootstrap] Hook error: ${err.message}\n`);
+  process.stderr.write(`[antigravity-bootstrap] Hook error: ${err.message}\n`);
   process.exit(0);
 });

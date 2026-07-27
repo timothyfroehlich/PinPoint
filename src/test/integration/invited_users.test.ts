@@ -591,12 +591,12 @@ describe("Invited Users Integration", () => {
     expect(prefs?.inAppNotifyOnNewIssue).toBe(false);
   });
 
-  // Rule #12 (admin half): admins MUST be able to see real email addresses.
+  // CORE-SEC-007 (admin half): admins MUST be able to see real email addresses.
   // The admin user-listing page calls getUnifiedUsers({ includeEmails: true }).
   // These tests assert that the `email` field is present in each returned user
   // and equals the value that was seeded — confirming the field is not omitted
   // (which would happen if called without includeEmails: true).
-  describe("Admin email visibility (Rule #12 admin half)", () => {
+  describe("Admin email visibility (CORE-SEC-007 admin half)", () => {
     it("should return real email addresses for active users when includeEmails is true", async () => {
       const db = await getTestDb();
 

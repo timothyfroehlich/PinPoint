@@ -161,11 +161,19 @@ For preview and production, we use **Automated Migrations** via Vercel build hoo
 
    ```bash
    # 1. Identify the failed migration number from Vercel build logs
-   # 2. Mark it as applied (replace 0001 with actual migration number):
-   POSTGRES_URL=<production-url> tsx scripts/mark-migration-applied.ts 0001
+   # 2. Mark it as applied (replace 0001 with actual migration number).
+   #    MARK_MIGRATION_FORCE_PRODUCTION=1 is required against a remote database:
+   #    the script refuses without it, and prompts once more when run in a TTY.
+   MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<production-url> \
+     tsx scripts/mark-migration-applied.ts 0001
 
    # 3. Trigger a redeployment (push a trivial change or use Vercel UI)
    ```
+
+   This records the migration as applied **without running its SQL**. Marking the
+   wrong number makes every future `migrate:production` skip a migration that
+   never ran, so prod's schema diverges from the migration history permanently —
+   double-check the number before you set the token.
 
    **Prevention:** Always use the automated migration system. Avoid manually running migrations in production/preview unless absolutely necessary.
 

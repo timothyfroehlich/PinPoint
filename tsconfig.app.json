@@ -23,7 +23,11 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "src/**/*",
-    "middleware.ts"
+    "middleware.ts",
+    // Imported by scripts/mark-migration-applied.ts (a `**/*.ts` match). Under
+    // `composite: true` every file pulled into the program must be listed
+    // (TS6307), and the `**/*.ts` glob does not cover `.mjs`.
+    "scripts/lib/db-target.mjs"
   ],
   "exclude": [
     "node_modules",

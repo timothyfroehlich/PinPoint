@@ -355,7 +355,7 @@ export async function createIssue({
     // a real `reportedBy` becomes a `reporter` person-reference. A freeform
     // guest (no account, hence no id) keeps their typed name as
     // `guestReporterName` (rendered with a "(guest)" marker); a fully
-    // anonymous open carries neither. Email is never persisted (rule 10).
+    // anonymous open carries neither. Email is never persisted (CORE-SEC-007).
     await emitIssueOpened(tx, {
       machineId: updatedMachine.id,
       issueId: issue.id,

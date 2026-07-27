@@ -9,7 +9,7 @@
  * Identity resolution (PP-tv9l): reporter/assignee are stored as
  * `timeline_event_people` references (real or invited), not snapshotted names.
  * A freeform guest keeps a `guestReporterName`; anonymous opens carry neither.
- * Email is never persisted (AGENTS.md rule 10).
+ * Email is never persisted (CORE-SEC-007, email privacy).
  */
 
 import { describe, it, expect, vi } from "vitest";

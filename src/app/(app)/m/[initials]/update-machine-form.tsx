@@ -112,7 +112,6 @@ export function EditMachineDialog({
   const [isDirty, setIsDirty] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
-  const transferConfirmedRef = useRef(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState(
     machine.ownerId ?? machine.invitedOwnerId ?? ""
   );
@@ -166,7 +165,6 @@ export function EditMachineDialog({
     if (open) {
       setSelectedOwnerId(currentOwnerId);
       setDescriptionDoc(machine.description);
-      transferConfirmedRef.current = false;
       setPromoteAssignee(null);
       setIsPromoteOpen(false);
       setIsDirty(false);
@@ -181,26 +179,54 @@ export function EditMachineDialog({
   const needsTransferConfirm =
     !canEditAnyMachine && isOwner && selectedOwnerId !== currentOwnerId;
 
+  // Snapshot the live form DOM and dispatch straight to the action.
+  //
+  // This form deliberately does NOT carry `action={formAction}` (PP-1ajq).
+  // React 19 auto-resets a `<form action={...}>` once the action settles — on
+  // failure as well as success — and this dialog stays open on failure. That
+  // reset wiped the user's unsaved edits out from under them: uncontrolled
+  // inputs snapped back to their `defaultValue`, and @radix-ui/react-select
+  // >=2.3.3 replayed each Select's mount-time value through its own form-
+  // `reset` listener. Dispatching `useActionState` directly means no form
+  // submission ever completes, so React never fires that reset. Same remedy as
+  // the inline issue metadata forms (PP-0fvr); sanctioned exception to
+  // CORE-ARCH-002 (the form lives inside a Radix Dialog, so it has no no-JS
+  // story to preserve).
+  const dispatchForm = (): void => {
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    // useActionState dispatch must be called inside a transition — calling it
+    // outside a transition silently skips the server action (React 19 requirement).
+    startTransition(() => {
+      formAction(fd);
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
-    // If transfer was already confirmed via the dialog, skip the guard
-    if (transferConfirmedRef.current) {
-      transferConfirmedRef.current = false;
-      return;
-    }
-    // Only prevent default when we need to show the transfer confirmation dialog
+    // Ignore submits that bubbled up from a DESCENDANT form. React propagates
+    // events through the React tree, not the DOM tree, so the portalled
+    // `<form>` inside OwnerSelect's InviteUserDialog reaches this handler even
+    // though it is not a DOM descendant. Without this guard our
+    // `preventDefault()` cancelled the invite's own submission and the invited
+    // user never appeared (caught by e2e/full/machine-with-invite.spec.ts).
+    if (e.target !== e.currentTarget) return;
+    // Otherwise suppress native submission; `dispatchForm` drives the action.
+    // (Native constraint validation still runs before this fires.)
+    e.preventDefault();
+    // Hold the submit and ask first when ownership is being transferred away
+    // by a non-privileged owner.
     if (needsTransferConfirm) {
-      e.preventDefault();
       setShowTransferConfirm(true);
       return;
     }
-    // Otherwise, let the form submit naturally via the action attribute
+    dispatchForm();
   };
 
   const handleConfirmTransfer = (): void => {
     setShowTransferConfirm(false);
-    transferConfirmedRef.current = true;
-    // Use requestSubmit to trigger the form's action attribute
-    formRef.current?.requestSubmit();
+    // The fields already passed constraint validation on the submit that
+    // opened this dialog, so dispatch the snapshot directly.
+    dispatchForm();
   };
 
   const confirmPromote = (): void => {
@@ -284,7 +310,7 @@ export function EditMachineDialog({
 
           <form
             ref={formRef}
-            action={formAction}
+            // No `action={formAction}` on purpose — see `dispatchForm` (PP-1ajq).
             onSubmit={handleSubmit}
             // Any native input event (text fields + the contentEditable rich-text
             // description) marks the form dirty for the unsaved-changes guard.
