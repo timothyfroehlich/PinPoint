@@ -82,7 +82,7 @@ interface Props {
  * `machines.timeline.comment.delete` (own_or_owner; admin override). Both
  * checks happen in the parent page and are passed in.
  *
- * Email privacy (AGENTS.md rule 10): only `authorName` is rendered.
+ * Email privacy (CORE-SEC-007): only `authorName` is rendered.
  *
  * Marked `"use client"` because the edit form, kebab menu, delete dialog,
  * and action submissions need browser-side state and `useTransition`.

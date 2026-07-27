@@ -10,9 +10,18 @@
  *
  * Password for all test users: "TestPassword123"
  * DO NOT use these in production!
+ *
+ * Remote-capable ON PURPOSE: preview-migrate-seed.sh runs this against an
+ * ephemeral Supabase preview branch, so it cannot take the loopback-only
+ * `assertLocalDatabase` guard the demo seeds use. Instead it refuses the one
+ * target that is never legitimate — the production project — on BOTH endpoints
+ * it writes through. That distinction matters: this script creates real auth
+ * users via the Admin API against NEXT_PUBLIC_SUPABASE_URL, which is a
+ * DIFFERENT variable from POSTGRES_URL and could be pointed at prod on its own.
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { assertNotPinPointProduction } from "../scripts/lib/db-target.mjs";
 import { createScriptClient } from "../scripts/lib/pg-client.mjs";
 import machinesData from "../src/test/data/machines.json" with { type: "json" };
 import usersData from "../src/test/data/users.json" with { type: "json" };
@@ -30,6 +39,12 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !POSTGRES_URL) {
   console.error("  - POSTGRES_URL");
   process.exit(1);
 }
+
+// Both write endpoints, checked before either client is constructed and before
+// any network call. `supabase.auth.admin.createUser` would otherwise mint
+// admin@test.com et al. in production auth.
+assertNotPinPointProduction(SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL");
+assertNotPinPointProduction(POSTGRES_URL, "POSTGRES_URL");
 
 // Create Supabase Admin client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {

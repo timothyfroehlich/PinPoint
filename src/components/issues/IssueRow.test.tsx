@@ -8,9 +8,9 @@
  * output that the subtitle produces.  Any regression in reporter-name display
  * (wrong name, leaked email, missing fallback) would surface in both.
  *
- * Rule #12 regression guard: reporter email addresses must NEVER appear in any
+ * CORE-SEC-007 regression guard: reporter email addresses must NEVER appear in any
  * rendered output.  Test "email-only guest shows Anonymous, never the email"
- * below is the canonical coverage for AGENTS.md commandment #12.
+ * below is the canonical coverage for CORE-SEC-007 (email privacy).
  *
  * Audit row 11 (DOWNGRADE-unit): replaces 6 of 7 tests from
  * e2e/full/reporter-variations.spec.ts.  The remaining 1 test (class-E
@@ -118,13 +118,13 @@ describe("IssueRow reporter display (subtitle regression)", () => {
     expectReporterName("League Player");
   });
 
-  it("shows Anonymous when email-only guest (Rule #12 regression guard)", () => {
-    // Bug class D + Rule #12: when a public reporter supplied only their email
+  it("shows Anonymous when email-only guest (CORE-SEC-007 regression guard)", () => {
+    // Bug class D + CORE-SEC-007: when a public reporter supplied only their email
     // (reporterEmail is stored in the DB but NOT in the IssueReporterInfo
     // interface, so resolveIssueReporter() never sees it).  The display must
     // fall back to "Anonymous", never the email address.
     //
-    // This is the canonical regression guard for AGENTS.md commandment #12:
+    // This is the canonical regression guard for CORE-SEC-007 (email privacy):
     // if anyone accidentally adds reporterEmail to the interface or the
     // rendering path, this test fails.
     renderWithProviders(

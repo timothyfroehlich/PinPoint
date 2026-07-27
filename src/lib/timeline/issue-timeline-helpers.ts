@@ -16,7 +16,7 @@
  *   (sourceType, tag, eventData) shape lives in ONE place.
  * - Take stable id person-references (PP-tv9l), NOT snapshotted names. The
  *   reporter/assignee resolve to current names/links live at render — no
- *   `user_profiles.name` lookup here, no email leakage (AGENTS.md rule 10).
+ *   `user_profiles.name` lookup here, no email leakage (CORE-SEC-007, email privacy).
  *   The one exception is a freeform guest reporter (no account id to
  *   reference): their typed name is carried as `guestReporterName` and
  *   rendered with a "(guest)" marker.

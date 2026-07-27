@@ -49,6 +49,25 @@ if supabase db dump --data-only --schema public > "$BACKUP_FILE"; then
     # Show file size
     DU_OUT=$(du -h "$BACKUP_FILE" | cut -f1)
     echo -e "${BLUE}📊 Size: $DU_OUT${NC}"
+
+    # Residual-risk notice. This script REQUIRES the ambient `supabase link`
+    # state (it reads supabase/.temp/project-ref above and `supabase db dump`
+    # resolves the linked project + its stored DB password), so it deliberately
+    # does NOT unlink afterwards — that would turn one-time setup into a
+    # per-backup step and break the next `pnpm run db:backup`.
+    #
+    # Scope of the risk, stated precisely so nobody over- or under-reacts:
+    # a bare `supabase db reset` is LOCAL-only (verified against CLI 2.109.1 —
+    # remote requires an explicit `--linked` or `--db-url`). What DOES default
+    # to the linked project from this directory is `db dump`, `db push`,
+    # `db pull`, `migration up --linked`, `db reset --linked`, and `secrets`.
+    echo ""
+    echo -e "${YELLOW}⚠️  This directory is still linked to PRODUCTION ($PROD_REF).${NC}"
+    echo -e "${YELLOW}   Supabase CLI commands that default to the linked project —${NC}"
+    echo -e "${YELLOW}   db dump / db push / db pull / migration up --linked /${NC}"
+    echo -e "${YELLOW}   db reset --linked / secrets — will target prod from here.${NC}"
+    echo -e "${YELLOW}   (A bare 'supabase db reset' is local-only and is NOT affected.)${NC}"
+    echo -e "${BLUE}   Drop the link when you're done: supabase unlink${NC}"
 else
     echo -e "\033[0;31m❌ Backup failed!${NC}"
     # Remove empty or partial file
