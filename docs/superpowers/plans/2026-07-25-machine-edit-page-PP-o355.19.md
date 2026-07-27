@@ -713,7 +713,12 @@ Then add immediately after the Details `</section>`:
       </a>
     </h2>
     {canLink && (
-      <p className="text-sm text-muted-foreground">
+      // A `div`, not a `p`: `PinballmapSyncNow` renders a `<form>`, and the HTML
+      // parser closes an open `<p>` when it meets a `<form>` start tag — so the
+      // SSR bytes would parse into a tree where the form is a *sibling* of the
+      // paragraph, not the tree React rendered, giving a hydration mismatch on
+      // every render for anyone with `canSync`.
+      <div className="text-sm text-muted-foreground">
         {pbmState?.lastSyncedAt
           ? `last synced ${formatDateTime(pbmState.lastSyncedAt)}`
           : "never synced"}
@@ -723,7 +728,7 @@ Then add immediately after the Details `</section>`:
             <PinballmapSyncNow />
           </>
         )}
-      </p>
+      </div>
     )}
   </div>
 
