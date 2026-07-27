@@ -81,7 +81,27 @@ interface BrowserProbeFailure {
 const TEXT_PROBE_HTML =
   '<!doctype html><meta charset="utf-8"><span id="probe">PinPoint</span>';
 
-function probeRemedy(browser: BrowserName, message: string): string {
+/**
+ * The engine came up but shaped nothing — the case this guard was written for.
+ * Only ever reached by the measured-0px path, never by a launch failure.
+ */
+const FONT_REMEDY =
+  `launched but rendered no glyphs — the host font stack is broken\n` +
+  `      Try: rm -f ~/.cache/fontconfig/*.cache-* && fc-cache -f\n` +
+  `      ostree hosts pin /usr/share/fonts to mtime 0, so fontconfig never\n` +
+  `      invalidates a stale cache entry on its own. See PP-8b6j.`;
+
+/**
+ * Remedy for an engine that threw on the way up. Only failure shapes we can
+ * positively identify get a specific fix; everything else stays deliberately
+ * neutral. A confidently wrong remedy is worse than none — it sends the reader
+ * off to "repair" a healthy part of their machine while the real cause sits
+ * unread in the message above. Launch timeouts on a loaded host and sandboxed
+ * Chromium startup crashes both land in the neutral branch.
+ */
+function launchRemedy(browser: BrowserName, message: string): string {
+  // Reachable despite the isInstalled() filter: that check resolves the default
+  // executable, while a project pinning `channel` launches a different binary.
   if (message.includes("Executable doesn't exist")) {
     return (
       `${browser} is not installed\n` +
@@ -100,10 +120,8 @@ function probeRemedy(browser: BrowserName, message: string): string {
     );
   }
   return (
-    `launched but rendered no glyphs — the host font stack is broken\n` +
-    `      Try: rm -f ~/.cache/fontconfig/*.cache-* && fc-cache -f\n` +
-    `      ostree hosts pin /usr/share/fonts to mtime 0, so fontconfig never\n` +
-    `      invalidates a stale cache entry on its own. See PP-8b6j.`
+    `failed to launch — see the error above for the cause\n` +
+    `      The engine never got far enough to render, so this is not a font problem.`
   );
 }
 
@@ -125,14 +143,14 @@ async function probeBrowser(
     return {
       browser,
       detail: "text measured 0px wide",
-      remedy: probeRemedy(browser, ""),
+      remedy: FONT_REMEDY,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
       browser,
       detail: message.split("\n")[0] ?? message,
-      remedy: probeRemedy(browser, message),
+      remedy: launchRemedy(browser, message),
     };
   } finally {
     if (instance) await instance.close().catch(() => undefined);

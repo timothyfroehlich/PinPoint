@@ -294,8 +294,28 @@ describe("e2e/global-setup", () => {
     const setup = await loadSetup();
 
     // The font remedy would be actively misleading here, so it must not appear.
-    await expect(setup(CHROMIUM_CONFIG)).rejects.toThrow("libicudata.so.74");
-    await expect(setup(CHROMIUM_CONFIG)).rejects.not.toThrow("fc-cache");
+    const message = String(
+      await setup(CHROMIUM_CONFIG).catch((e: unknown) => e)
+    );
+    expect(message).toContain("libicudata.so.74");
+    expect(message).not.toContain("fc-cache");
+  });
+
+  // A launch failure we can't classify must stay neutral rather than guess.
+  // Naming fonts here would send the reader to wipe a cache that is fine while
+  // the real cause — load, a sandbox denial — goes unread.
+  it("does not blame fonts for an unrecognized launch failure", async () => {
+    launchMock.mockRejectedValue(
+      new Error("browserType.launch: Timeout 30000ms exceeded.")
+    );
+    const setup = await loadSetup();
+
+    const message = String(
+      await setup(CHROMIUM_CONFIG).catch((e: unknown) => e)
+    );
+    expect(message).toContain("Timeout 30000ms exceeded");
+    expect(message).not.toContain("fc-cache");
+    expect(message).not.toContain("font stack");
   });
 
   it("proceeds when the engine renders text", async () => {
