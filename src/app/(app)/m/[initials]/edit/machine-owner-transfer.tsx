@@ -89,7 +89,6 @@ export function MachineOwnerTransfer({
   const [selectedOwnerId, setSelectedOwnerId] = useState(currentOwnerId);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
-  const transferConfirmedRef = useRef(false);
 
   const [promoteAssignee, setPromoteAssignee] = useState<
     AssigneeNotMemberMeta["assignee"] | null
@@ -134,33 +133,55 @@ export function MachineOwnerTransfer({
   const needsTransferConfirm =
     !canEditAnyMachine && isOwner && selectedOwnerId !== currentOwnerId;
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
-    if (transferConfirmedRef.current) {
-      transferConfirmedRef.current = false;
-      return;
-    }
-    if (needsTransferConfirm) {
-      e.preventDefault();
-      setShowTransferConfirm(true);
-    }
-  };
-
-  const handleConfirmTransfer = (): void => {
-    setShowTransferConfirm(false);
-    transferConfirmedRef.current = true;
-    formRef.current?.requestSubmit();
-  };
-
-  const confirmPromote = (): void => {
-    if (!promoteAssignee || !formRef.current) return;
-    setIsPromoteOpen(false);
+  // Snapshot the live form DOM and dispatch straight to the action.
+  //
+  // This form deliberately does NOT carry `action={formAction}` (PP-1ajq).
+  // React 19 auto-resets a `<form action={...}>` once the action settles — on
+  // failure as well as success — and this disclosure stays open on failure.
+  // A native reset would blank the controlled hidden `id`/`name` inputs in the
+  // DOM without re-rendering React, so a second attempt would submit an empty
+  // machine id. Dispatching `useActionState` directly means no form submission
+  // ever completes, so React never fires that reset. Same remedy as
+  // `MachineDetailsForm` and `EditMachineDialog` (PP-1ajq).
+  const dispatchForm = (mutate?: (fd: FormData) => void): void => {
+    if (!formRef.current) return;
     const fd = new FormData(formRef.current);
-    fd.set("forcePromoteUserId", promoteAssignee.id);
+    mutate?.(fd);
     // useActionState dispatch must run inside a transition — outside one,
     // React 19 silently skips the server action.
     startTransition(() => {
       formAction(fd);
     });
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+    // Ignore submits that bubbled up from a DESCENDANT form. React propagates
+    // events through the React tree, not the DOM tree, so the portalled
+    // `<form>` inside OwnerSelect's InviteUserDialog reaches this handler even
+    // though it is not a DOM descendant. Without this guard our
+    // `preventDefault()` would cancel the invite's own submission.
+    if (e.target !== e.currentTarget) return;
+    // Otherwise suppress native submission; `dispatchForm` drives the action.
+    e.preventDefault();
+    // Hold the submit and ask first when ownership is being transferred away
+    // by a non-privileged owner.
+    if (needsTransferConfirm) {
+      setShowTransferConfirm(true);
+      return;
+    }
+    dispatchForm();
+  };
+
+  const handleConfirmTransfer = (): void => {
+    setShowTransferConfirm(false);
+    dispatchForm();
+  };
+
+  const confirmPromote = (): void => {
+    if (!promoteAssignee) return;
+    const { id } = promoteAssignee;
+    setIsPromoteOpen(false);
+    dispatchForm((fd) => fd.set("forcePromoteUserId", id));
   };
 
   const cancelTransfer = (): void => {
@@ -197,7 +218,7 @@ export function MachineOwnerTransfer({
       {isOpen && (
         <form
           ref={formRef}
-          action={formAction}
+          // No `action={formAction}` on purpose — see `dispatchForm` (PP-1ajq).
           onSubmit={handleSubmit}
           className="mt-4 space-y-3"
         >

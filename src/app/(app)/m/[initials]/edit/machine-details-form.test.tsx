@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MachineDetailsForm } from "./machine-details-form";
 import { updateMachineAction } from "~/app/(app)/m/actions";
-import { err } from "~/lib/result";
+import { err, ok } from "~/lib/result";
 
 vi.mock("~/app/(app)/m/actions", () => ({
   updateMachineAction: vi.fn(),
@@ -136,5 +136,70 @@ describe("MachineDetailsForm", () => {
     expect(alert).toHaveTextContent(
       "Something went wrong saving these details."
     );
+  });
+
+  it("submits the live DOM values, not the mount-time defaults", async () => {
+    vi.mocked(updateMachineAction).mockResolvedValue(
+      ok({ machineId: baseProps.machineId })
+    );
+    const user = userEvent.setup();
+    render(<MachineDetailsForm {...baseProps} />);
+
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByRole("option", { name: "Off the Floor" }));
+    await user.click(screen.getByRole("button", { name: "Save details" }));
+
+    await waitFor(() => {
+      expect(updateMachineAction).toHaveBeenCalled();
+    });
+    const fd = vi.mocked(updateMachineAction).mock.calls[0]?.[1];
+    expect(fd?.get("name")).toBe("Godzilla (Premium)!");
+    expect(fd?.get("presenceStatus")).toBe("off_the_floor");
+    expect(fd?.get("id")).toBe(baseProps.machineId);
+  });
+
+  /**
+   * Regression guard for PP-1ajq in this form.
+   *
+   * React 19 fires a `reset` on a `<form action={...}>` once the action
+   * settles — on failure as well as success. This page stays put on failure,
+   * so that reset used to snap the uncontrolled name Input back to its
+   * `defaultValue` and let @radix-ui/react-select >=2.3.3 replay Availability's
+   * mount-time value through its own form-`reset` listener: silent data loss
+   * under an error banner. `useActionState` is deliberately NOT mocked here —
+   * the point is to let React 19's real post-action mechanics run.
+   */
+  it("keeps the user's edits after a failed save (PP-1ajq)", async () => {
+    vi.mocked(updateMachineAction).mockResolvedValue(
+      err("SERVER", "Something went wrong saving these details.")
+    );
+    const user = userEvent.setup();
+    render(<MachineDetailsForm {...baseProps} />);
+
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByRole("option", { name: "Off the Floor" }));
+
+    await user.click(screen.getByRole("button", { name: "Save details" }));
+    await screen.findByRole("alert");
+
+    // The reset would land in a later commit than the error banner, so wait
+    // for the pending state to clear and give React room before asserting.
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Save details" })
+      ).not.toBeDisabled();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Soft so a regression reports BOTH halves of the revert rather than
+    // stopping at the first.
+    expect
+      .soft(screen.getByLabelText(/Machine Name/))
+      .toHaveValue("Godzilla (Premium)!");
+    expect
+      .soft(screen.getByRole("combobox"))
+      .toHaveTextContent("Off the Floor");
   });
 });

@@ -1,7 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useActionState, useEffect, useState } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -78,6 +84,7 @@ export function MachineDetailsForm({
   // Cancel remounts the subtree by changing the key — a native form reset
   // cannot restore a contenteditable widget.
   const [resetKey, setResetKey] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // A successful save makes the submitted values the new baseline.
   useEffect(() => {
@@ -85,6 +92,32 @@ export function MachineDetailsForm({
       setIsDirty(false);
     }
   }, [state]);
+
+  // Snapshot the live form DOM and dispatch straight to the action.
+  //
+  // This form deliberately does NOT carry `action={formAction}` (PP-1ajq).
+  // React 19 auto-resets a `<form action={...}>` once the action settles — on
+  // failure as well as success — which wiped the user's unsaved edits: the
+  // Machine Name input snapped back to its `defaultValue`, and
+  // @radix-ui/react-select >=2.3.3 replayed Availability's mount-time value
+  // through its own form-`reset` listener. On a failed save that is silent
+  // data loss under an error banner. Dispatching `useActionState` directly
+  // means no form submission ever completes, so React never fires that reset.
+  // Same remedy as `EditMachineDialog` (PP-1ajq) and the inline issue metadata
+  // forms (PP-0fvr).
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+    // Suppress native submission; the dispatch below drives the action.
+    // Native constraint validation (`required` on name) has already run by the
+    // time a submit event fires, so it is not lost.
+    e.preventDefault();
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    // useActionState dispatch must run inside a transition — outside one,
+    // React 19 silently skips the server action.
+    startTransition(() => {
+      formAction(fd);
+    });
+  };
 
   const handleCancel = (): void => {
     setDescriptionDoc(description);
@@ -95,7 +128,9 @@ export function MachineDetailsForm({
   return (
     <form
       key={resetKey}
-      action={formAction}
+      ref={formRef}
+      // No `action={formAction}` on purpose — see `handleSubmit` (PP-1ajq).
+      onSubmit={handleSubmit}
       // Any native input event marks the section dirty. Radix Select changes
       // do not bubble `input`, so Availability flags dirtiness explicitly.
       onInput={() => setIsDirty(true)}
