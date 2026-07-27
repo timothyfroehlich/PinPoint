@@ -16,7 +16,7 @@ What survives is the architecture, which was never justified by no-JS support:
 
 ### Forms with `useActionState`
 
-Use the `useActionState` hook (formerly `useFormState`) to handle form submissions with progressive enhancement automatically. This replaces older patterns like "Flash Messages" stored in cookies.
+Use the `useActionState` hook to handle form submission state — pending, errors, success — in one place. This replaces older patterns like "Flash Messages" stored in cookies.
 
 ```tsx
 "use client";
@@ -41,9 +41,40 @@ export function CreateMachineForm() {
 }
 ```
 
+### Any form containing a Radix Select: dispatch directly, not via `action={...}`
+
+**This is the single biggest footgun in this codebase.** It caused a P0 (PP-0fvr) and four more live data-loss bugs (PP-1ajq).
+
+`@radix-ui/react-select` >= 2.3.3 attaches a form-`reset` listener that replays `onValueChange` with the Select's **mount-time** value. React 19 auto-resets a `<form action={...}>` once the action settles — **on failure as well as success**, since React only sees that the action returned. Put those together and every Radix Select in the form snaps back about a second after submit.
+
+The remedy is to remove the native submission path: build `FormData` by hand and call the `useActionState` dispatch directly inside `startTransition`. No form submission ever completes, so React never fires the reset.
+
+```tsx
+const dispatchForm = (): void => {
+  if (!formRef.current) return;
+  const fd = new FormData(formRef.current);
+  startTransition(() => {
+    formAction(fd);
+  });
+};
+```
+
+How it surfaced in each shape:
+
+- **Auto-submitting from `onValueChange`** (the four inline issue-metadata forms, PP-0fvr): the replay looked like a real user selection and fired a **second write carrying the stale value** — silently reverting every status/priority/severity/frequency change.
+- **Submitting from a real button** (edit-machine, create-machine, unified-report, delete-account — PP-1ajq): no bad write, but a **failed** save silently wiped unsaved edits while the form was still on screen. Worst case was delete-account, where a reverted machine-reassignment left the confirmation text intact and the destructive button enabled.
+
+Two things worth knowing before you try to fix this some other way:
+
+- **Making the Select controlled does not help.** Radix's replay calls `onValueChange`, so the stale value is written straight into your state.
+- **Mocking `useActionState` is why this stayed invisible to a green suite for five days.** The regression guards (`src/test/unit/components/{issues,machines,settings,report}/*revert*.test.tsx`) deliberately mock neither `react` nor the Select wrappers. Keep it that way.
+
+Success-path resets are a separate concern — see [CREATE Form Reset Pattern](./create-form-reset.md).
+
 ### Key Takeaways
 
-- **✅ DO**: Use `<form action={serverAction}>`.
+- **✅ DO**: Use `<form action={serverAction}>` — **unless the form contains a Radix Select**, in which case dispatch directly (above).
 - **✅ DO**: Use `useActionState` for feedback and validation errors.
 - **❌ DON'T**: Manually `fetch()` to API routes unless absolutely necessary.
 - **❌ DON'T**: Rely on complex cookie-based "Flash Messages" for simple form feedback.
+- **❌ DON'T**: Mock `useActionState` in a test meant to catch form-reset regressions.
