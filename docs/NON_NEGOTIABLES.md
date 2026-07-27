@@ -5,8 +5,8 @@ trigger: always_on
 
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-07-17
-**Version**: 2.4 (form-token/status corrections; SMTP, quick-report-grid, and confirm-delete sanctioned exceptions — audit PP-9vh3/PP-h9lb)
+**Last Updated**: 2026-07-27
+**Version**: 2.5 (progressive-enhancement rule 002 retired; CORE-ARCH-012 honest-failure added — PP-nw80)
 
 > **Sync contract**: `AGENTS.md` §2.1 is a one-line index of these rules. Every §2.1 entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
 
@@ -30,7 +30,7 @@ trigger: always_on
 8. Never use `any`, non-null `!`, or unsafe `as` (CORE-TS-007)
 9. Default to Server Components, minimal Client Components (CORE-ARCH-001)
 10. Map data to minimal shapes before passing to Client Components (CORE-SEC-006)
-11. Forms work without JavaScript (CORE-ARCH-002)
+11. A control that cannot act must not report that it did (CORE-ARCH-012)
 12. Drizzle migrations only — no `drizzle-kit push` (CORE-ARCH-009)
 13. Use `localhost`, never `127.0.0.1`, for local URLs (CORE-SEC-008)
 14. Pick the cheapest test layer that catches the bug class (CORE-TEST-005)
@@ -324,16 +324,6 @@ trigger: always_on
 - **Why:** Better performance, SEO, reduced bundle size
 - **Do:** Default to Server Components, use "use client" only for interactivity
 - **Don't:** Make entire pages Client Components unnecessarily
-
-**CORE-ARCH-002:** Progressive enhancement
-
-- **Severity:** Required
-- **Why:** Forms work without JavaScript
-- **Do:** Use Server Actions with `<form action={serverAction}>`
-- **Don't:** Require client-side JavaScript for core functionality
-- **Sanctioned exceptions:**
-  - The member+ bulk quick-report grid (`src/app/(app)/report/(tabbed)/quick/quick-report-grid.tsx`, PP-sn34) submits each row through an `onClick`-triggered Server Action instead of a single `<form action>`, because per-row async submit with independent partial-failure handling across many rows cannot be expressed as one native form. This is acceptable **only because** the unified single-issue report form (`/report`) is the fully progressive-enhancement path — the grid is a technician-oriented power tool layered on top, not the only way to file an issue. A new no-`<form>` submission path that is the _sole_ way to perform an action is still a violation.
-  - The four inline issue-detail metadata forms (`src/app/(app)/m/[initials]/i/[issueNumber]/update-issue-{status,priority,severity,frequency}-form.tsx`, PP-0fvr) call their `useActionState` dispatch directly with a manually-built `FormData` instead of using `<form action={...}>`, because `@radix-ui/react-select` 2.3.3 attaches a form-`reset` listener that replays `onValueChange` with the Select's initial value, and React 19's automatic post-action form reset was triggering that listener — silently reverting every status/priority/severity/frequency change about a second after it was made. These controls are JS-dependent Radix Selects with no non-JS fallback to begin with, so removing the native submission path traded a real, user-visible bug for a theoretical no-JS regression. This carve-out is an interim measure pending PP-nw80's broader revisit of this rule.
 
 **CORE-ARCH-004:** Issues always per-machine
 
@@ -666,7 +656,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..008: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001..010: Architecture (003 retired)
+- CORE‑ARCH‑001..012: Architecture (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor
