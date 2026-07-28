@@ -27,7 +27,16 @@ readonly COPILOT_CURRENCY_THRESHOLD=600
 # covers head" goes green on a review that read nothing (PP-jw0s). Strictly worse than
 # no review at all, because no-review has its own honest path. Match them by body and
 # treat them as absent.
-readonly COPILOT_NON_REVIEW_BODY_RE='unable to review|was not able to review|wasn.t able to review|reached their quota limit|no files in this pull request'
+#
+# Deliberately matched on WHOLE-PR phrasings, not the bare words "unable to review".
+# Copilot's real reviews say things like "reviewed 3 out of 5 changed files" and can
+# mention files they could not analyse — a looser pattern would discard a genuine
+# review and push `reviewed` toward a FAIL that only --force or a marker clears,
+# which trains exactly the reflex this gate exists to prevent. Precision over recall:
+# an unrecognised NEW non-review wording slips through as a false green, but that is
+# the status quo ante for a wording nobody has seen, whereas eating real reviews would
+# be a fresh regression. Add wordings here as they are observed.
+readonly COPILOT_NON_REVIEW_BODY_RE='reached their quota limit|unable to review this pull request|not able to review any files|wasn.t able to review any files'
 
 # SHA-pinned Claude review marker, posted by mark-claude-review.sh.
 readonly CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
@@ -71,8 +80,15 @@ check_ci() {
   local rollup
   rollup=$(gh pr view "$pr" --json statusCheckRollup --jq '.statusCheckRollup[] | select(.name=="CI Gate")')
   if [ -z "$rollup" ]; then
-    echo "FAIL: ci: CI Gate check not found"
-    return 1
+    # Not a failure — GitHub has simply not registered the check run yet, which is
+    # the normal state for the first seconds after `gh pr create`. Reporting it as a
+    # hard FAIL made `--automerge` exit RED on its first poll and strip the
+    # ready-for-review label, breaking the very case it exists for. WAIT lets the
+    # poller keep looking; a genuinely absent workflow then ends in a timeout, which
+    # is the honest outcome. One-shot callers still block — they treat WAIT and FAIL
+    # alike — so this changes the token, not their exit code.
+    echo "WAIT: ci: CI Gate check not reported yet"
+    return 2
   fi
   local status conclusion
   status=$(jq -r '.status' <<< "$rollup")

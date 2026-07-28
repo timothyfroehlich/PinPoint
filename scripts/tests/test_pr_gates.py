@@ -152,6 +152,29 @@ def test_non_review_is_invisible_to_currency_gate(body: str) -> None:
     assert "SKIP: currency: no substantive Copilot review" in result.stdout
 
 
+def test_a_partial_review_is_not_mistaken_for_a_non_review() -> None:
+    """Copilot's real reviews say what they could NOT get to — that must still count.
+
+    Matching the bare words "unable to review" would discard this, pushing `reviewed`
+    toward a FAIL that only --force or a marker clears — training exactly the
+    click-through reflex the gate exists to prevent. The patterns are deliberately
+    scoped to whole-PR phrasings instead.
+    """
+    body = (
+        "Copilot reviewed 3 out of 5 changed files. It was unable to review "
+        "2 generated files. Comments: line 12 dereferences a possibly-null value."
+    )
+    with gate_env(
+        reviews=[copilot_review(body, age_seconds=10)],
+        comments=[],
+        head_age_seconds=FRESH_HEAD_AGE,
+    ) as env:
+        result = run_gate("check_review_happened", env)
+
+    assert result.returncode == 0, result.stdout
+    assert "PASS: reviewed: Copilot review covers head commit" in result.stdout
+
+
 def test_non_review_alongside_real_review_keeps_the_real_one() -> None:
     """Filtering must drop only the non-review, not every review on the PR."""
     with gate_env(

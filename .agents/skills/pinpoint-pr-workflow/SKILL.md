@@ -236,7 +236,7 @@ Once 3.1–3.6 are satisfied (CI green, threads resolved, head commit reviewed, 
 ! scripts/workflow/merge-pr.sh <PR> --human
 ```
 
-If anything is still pending (CI running, review not yet attested), hand him the automerge form instead — it waits for the gates rather than making him come back:
+If CI is still running, hand him the automerge form instead — it waits rather than making him come back. Attest the review first (Phase 3.4); automerge waits out CI, not an unreviewed head:
 
 ```
 ! scripts/workflow/merge-pr.sh <PR> --human --automerge
@@ -254,7 +254,7 @@ scripts/workflow/merge-pr.sh <PR> --human [-a|--automerge] [--dry-run] [--force]
 
 Other flags (stackable, order-independent):
 
-- `-a` / `--automerge` — poll the gates instead of evaluating once, and merge the moment they all pass. Meant to be fired as soon as the PR is up, without waiting for CI or a review first. Ends in exactly one of three states, each named on exit: `MERGED`, `RED` (a gate hard-failed — no merge, `ready-for-review` dropped), or `TIMED OUT` (still waiting when the budget expired — PR untouched, label intact, exit code 2). A WAIT keeps it polling; only a hard failure stops it. `AUTOMERGE_TIMEOUT` (default 3600s) and `AUTOMERGE_POLL_INTERVAL` (default 30s) tune it. Mutually exclusive with `--dry-run`. Prints the gate block on the first poll and again whenever the picture changes, so a long wait stays readable.
+- `-a` / `--automerge` — poll the gates instead of evaluating once, and merge the moment they all pass. Fire it while CI is still running; that's the point. It does **not** wait out an unreviewed head — `reviewed` hard-fails 600s after a head push with no Copilot review and no Claude marker, and a hard failure ends the run — so post the marker first when Copilot is quota-limited or has skipped. Ends in exactly one of three states, each named on exit: `MERGED`, `RED` (a gate hard-failed — no merge, `ready-for-review` dropped), or `TIMED OUT` (still waiting when the budget expired — PR untouched, label intact, exit code 2). A WAIT keeps it polling; only a hard failure stops it. `AUTOMERGE_TIMEOUT` (default 3600s) and `AUTOMERGE_POLL_INTERVAL` (default 30s) tune it. Mutually exclusive with `--dry-run`. Prints the gate block on the first poll and again whenever the picture changes, so a long wait stays readable.
 - `--force` — bypass `currency` + `threads` + `reviewed` (review-state) gates. Requires manual permission approval.
 - `--bypass-merge-requirements` — bypass `ci` gate AND pass `--admin` to `gh pr merge`,
   overriding GitHub branch-protection rules. Requires manual permission approval.

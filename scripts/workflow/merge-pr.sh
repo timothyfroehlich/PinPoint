@@ -12,9 +12,14 @@
 #                                 Code, block-direct-merge.cjs blocks an agent from
 #                                 invoking this script at all, --dry-run included.
 #   -a, --automerge               Poll the gates instead of evaluating them once, and merge
-#                                 as soon as they all pass. Run it the moment the PR is up;
-#                                 no need to wait for CI or a review first. Terminates on
-#                                 exactly three outcomes, each reported on exit:
+#                                 as soon as they all pass. Fire it while CI is still
+#                                 running — that is what it is for. It does NOT wait out
+#                                 an unreviewed head: `reviewed` hard-fails 600s after a
+#                                 head push with no Copilot review and no Claude marker,
+#                                 and a hard failure ends the run. So attest the review
+#                                 first (mark-claude-review.sh) if Copilot is quota-limited
+#                                 or has already skipped. Terminates on exactly three
+#                                 outcomes, each reported on exit:
 #                                   MERGED      — gates went green, PR squash-merged
 #                                   RED         — a gate hard-failed; no merge, label removed
 #                                   TIMED OUT   — still waiting when the budget ran out
@@ -193,6 +198,11 @@ run_all_gates() {
   GATE_FAILURES=()
   GATE_WAITS=()
   GATE_BLOCKED=()
+  # Head SHA as of the start of THIS evaluation. Each gate re-reads head itself, so
+  # this is what "the commit the gates approved" means — and it is what
+  # --match-head-commit must pin. Merging a head read *after* the loop would hand
+  # GitHub a commit that inherited another commit's CI, review and thread state.
+  POLL_HEAD_SHA=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)
   run_gate ci          check_ci                  admin
   run_gate currency    check_copilot_currency    force
   run_gate threads     check_unresolved_threads  force
@@ -201,7 +211,13 @@ run_all_gates() {
 }
 
 drop_ready_label() {
-  if [[ ",$PR_LABELS," == *",ready-for-review,"* ]]; then
+  # Re-read rather than trusting the startup snapshot: --automerge can run for an
+  # hour, and the label is often added by an agent minutes after Tim fires the
+  # command. A stale snapshot would silently skip the removal and break the
+  # documented RED contract.
+  local labels
+  labels=$(gh pr view "$PR" --json labels --jq '.labels | map(.name) | join(",")' 2>/dev/null || echo "$PR_LABELS")
+  if [[ ",$labels," == *",ready-for-review,"* ]]; then
     echo "Removing ready-for-review label..."
     gh pr edit "$PR" --remove-label ready-for-review 2>/dev/null || true
   fi
@@ -262,11 +278,11 @@ if [ "$AUTOMERGE" = "true" ]; then
     sleep "$AUTOMERGE_POLL_INTERVAL"
   done
 
-  # Gates were evaluated against whatever head is current; PR_HEAD_SHA was read before
-  # the wait began and may be stale if someone pushed. Re-read it so --match-head-commit
-  # pins the commit the gates actually just approved. A push in the remaining window
-  # still makes GitHub reject the merge, which is the outcome we want.
-  PR_HEAD_SHA=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)
+  # Merge the head the FINAL poll evaluated, not whatever is current now. Re-reading
+  # here would defeat --match-head-commit: a push landing during the wait would be
+  # merged carrying the previous commit's CI, review and thread state. Pinning the
+  # polled SHA means such a push makes GitHub reject the merge instead — fail closed.
+  PR_HEAD_SHA="$POLL_HEAD_SHA"
 else
   run_all_gates
   printf '%s' "$GATE_REPORT"

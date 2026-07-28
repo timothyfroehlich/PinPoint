@@ -44,18 +44,28 @@ EMPTY_THREADS = json.dumps(
 
 
 @contextmanager
-def stub_repo(*, ci_rollup: str, labels: list[str] | None = None) -> Iterator[dict]:
+def stub_repo(
+    *,
+    ci_rollup: str,
+    labels: list[str] | None = None,
+    live_labels: list[str] | None = None,
+) -> Iterator[dict]:
     """Yield paths + env for a run against a fully stubbed `gh`.
 
     The PR is set up to satisfy every gate except CI: authored by the current user,
     MERGEABLE, no unresolved threads, and carrying a Claude review marker pinned to
     head. That isolates CI as the single lever each test moves.
+
+    `live_labels` models labels changing after startup (an agent labelling the PR
+    while --automerge polls); it defaults to `labels`. Every `gh` invocation is
+    appended to a call log so tests can assert on ordering, not just outcomes.
     """
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         merged_marker = tmp_path / "merged"
         label_marker = tmp_path / "label-removed"
         bd_calls = tmp_path / "bd-calls"
+        gh_calls = tmp_path / "gh-calls"
 
         pr_info = json.dumps(
             {
@@ -81,11 +91,13 @@ def stub_repo(*, ci_rollup: str, labels: list[str] | None = None) -> Iterator[di
         gh_stub.write_text(
             "#!/usr/bin/env bash\n"
             'args="$*"\n'
+            'printf "%s\\n" "$args" >> "$STUB_GH_CALLS"\n'
             'case "$args" in\n'
             '  "pr merge"*) printf "%s\\n" "$args" > "$STUB_MERGED"; printf "merged\\n" ;;\n'
             '  "pr edit"*) printf "%s\\n" "$args" > "$STUB_LABEL_REMOVED" ;;\n'
             '  *"--json author"*) cat "$STUB_PR_INFO" ;;\n'
             '  *"--json statusCheckRollup"*) cat "$STUB_ROLLUP" ;;\n'
+            '  *"--json labels"*) printf "%s\\n" "$STUB_LIVE_LABELS" ;;\n'
             '  *"--json mergeable"*) printf "MERGEABLE\\n" ;;\n'
             '  *"--jq .headRefOid"*) printf "%s\\n" "$STUB_HEAD_SHA" ;;\n'
             '  *"--json headRefOid"*) printf \'{"headRefOid":"%s"}\\n\' "$STUB_HEAD_SHA" ;;\n'
@@ -127,6 +139,10 @@ def stub_repo(*, ci_rollup: str, labels: list[str] | None = None) -> Iterator[di
         env["STUB_MERGED"] = str(merged_marker)
         env["STUB_LABEL_REMOVED"] = str(label_marker)
         env["STUB_BD_CALLS"] = str(bd_calls)
+        env["STUB_GH_CALLS"] = str(gh_calls)
+        env["STUB_LIVE_LABELS"] = ",".join(
+            live_labels if live_labels is not None else (labels or [])
+        )
         env["AUTOMERGE_POLL_INTERVAL"] = "1"
         env["AUTOMERGE_TIMEOUT"] = "3"
 
@@ -135,6 +151,7 @@ def stub_repo(*, ci_rollup: str, labels: list[str] | None = None) -> Iterator[di
             "merged": merged_marker,
             "label_removed": label_marker,
             "bd_calls": bd_calls,
+            "gh_calls": gh_calls,
         }
 
 
@@ -165,6 +182,9 @@ class Outcome:
         self.merge_args = ctx["merged"].read_text() if self.merged else ""
         self.label_removed = ctx["label_removed"].exists()
         self.bd_calls = ctx["bd_calls"].read_text() if ctx["bd_calls"].exists() else ""
+        self.gh_calls = (
+            ctx["gh_calls"].read_text().splitlines() if ctx["gh_calls"].exists() else []
+        )
 
 
 def run_and_snapshot(ctx: dict, *args: str) -> Outcome:
@@ -211,6 +231,60 @@ def test_bd_is_shadowed_so_a_test_merge_cannot_reach_the_real_huddle() -> None:
     )
     assert out.returncode == 0, out.stdout + out.stderr
     assert "MERGED: PR #123" in out.stdout
+
+
+def test_head_is_not_re_read_between_the_last_gate_and_the_merge() -> None:
+    """--match-head-commit must pin the SHA the gates evaluated, not a fresher one.
+
+    Asserted structurally rather than by outcome: a stub that flips the SHA can't
+    tell the two implementations apart, because the version that re-read head after
+    the loop made that its *first* `--jq .headRefOid` call. What distinguishes them
+    is *when* the read happens — before the gates, or after them. A read in the
+    window between the final gate and the merge is the TOCTOU hole: it would merge
+    a commit that inherited the previous commit's CI, review and thread state.
+    """
+    with stub_repo(ci_rollup=CI_PASS) as ctx:
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert f"--match-head-commit={HEAD_SHA}" in out.merge_args
+
+    merge_idx = next(i for i, c in enumerate(out.gh_calls) if c.startswith("pr merge"))
+    last_gate_idx = max(
+        i for i, c in enumerate(out.gh_calls) if "--json mergeable" in c
+    )
+    between = out.gh_calls[last_gate_idx + 1 : merge_idx]
+    assert not [c for c in between if "--jq .headRefOid" in c], (
+        f"head re-read after gating, before merge: {between}"
+    )
+
+
+def test_ci_check_not_yet_registered_is_a_wait_not_a_failure() -> None:
+    """The seconds after `gh pr create` are the advertised moment to fire automerge.
+
+    GitHub has not registered the check run yet, which used to read as a hard FAIL —
+    so automerge exited RED on poll 1 and stripped the label, breaking its own
+    primary use case. It must poll instead, and time out if the check never appears.
+    """
+    with stub_repo(ci_rollup="", labels=["ready-for-review"]) as ctx:
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert out.returncode == 2, out.stdout + out.stderr
+    assert "WAIT: ci: CI Gate check not reported yet" in out.stdout
+    assert "AUTOMERGE: TIMED OUT" in out.stdout
+    assert not out.merged
+    assert not out.label_removed, "a check GitHub has not created yet is not a failure"
+
+
+def test_label_is_dropped_even_when_added_after_startup() -> None:
+    """--automerge can outlive the startup label snapshot by an hour."""
+    with stub_repo(
+        ci_rollup=CI_RED, labels=[], live_labels=["ready-for-review"]
+    ) as ctx:
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert out.returncode == 1, out.stdout + out.stderr
+    assert out.label_removed, "label added mid-run must still be dropped on RED"
 
 
 def test_automerge_stops_when_a_gate_goes_red() -> None:
