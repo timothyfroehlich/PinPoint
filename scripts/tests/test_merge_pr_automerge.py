@@ -55,6 +55,7 @@ def stub_repo(*, ci_rollup: str, labels: list[str] | None = None) -> Iterator[di
         tmp_path = Path(tmp)
         merged_marker = tmp_path / "merged"
         label_marker = tmp_path / "label-removed"
+        bd_calls = tmp_path / "bd-calls"
 
         pr_info = json.dumps(
             {
@@ -101,6 +102,20 @@ def stub_repo(*, ci_rollup: str, labels: list[str] | None = None) -> Iterator[di
             gh_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
         )
 
+        # `bd` MUST be stubbed too. After a successful merge, merge-pr.sh posts a
+        # coordination notice to the live daily huddle bead via `bd comments add`.
+        # Stubbing only `gh` let a test merge write real comments to real shared state
+        # — six "Merged PR #123 (PP-test)" notices reached the huddle before this was
+        # caught. Any test that drives a script to completion has to shadow every
+        # outward-facing binary it can reach, not just the obvious one.
+        bd_stub = tmp_path / "bd"
+        bd_stub.write_text(
+            '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$STUB_BD_CALLS"\nexit 0\n'
+        )
+        bd_stub.chmod(
+            bd_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
+        )
+
         env = dict(os.environ)
         env["PATH"] = f"{tmp}{os.pathsep}{env.get('PATH', '')}"
         env["STUB_HEAD_SHA"] = HEAD_SHA
@@ -111,7 +126,7 @@ def stub_repo(*, ci_rollup: str, labels: list[str] | None = None) -> Iterator[di
         env["STUB_ROLLUP"] = str(tmp_path / "rollup.json")
         env["STUB_MERGED"] = str(merged_marker)
         env["STUB_LABEL_REMOVED"] = str(label_marker)
-        # Keep the polling loop fast; the huddle notice is fail-open and needs no bd.
+        env["STUB_BD_CALLS"] = str(bd_calls)
         env["AUTOMERGE_POLL_INTERVAL"] = "1"
         env["AUTOMERGE_TIMEOUT"] = "3"
 
@@ -119,6 +134,7 @@ def stub_repo(*, ci_rollup: str, labels: list[str] | None = None) -> Iterator[di
             "env": env,
             "merged": merged_marker,
             "label_removed": label_marker,
+            "bd_calls": bd_calls,
         }
 
 
@@ -148,6 +164,7 @@ class Outcome:
         self.merged = ctx["merged"].exists()
         self.merge_args = ctx["merged"].read_text() if self.merged else ""
         self.label_removed = ctx["label_removed"].exists()
+        self.bd_calls = ctx["bd_calls"].read_text() if ctx["bd_calls"].exists() else ""
 
 
 def run_and_snapshot(ctx: dict, *args: str) -> Outcome:
@@ -164,6 +181,36 @@ def test_automerge_merges_once_gates_are_green() -> None:
     assert "MERGED: PR #123" in out.stdout
     assert out.merged, "gh pr merge should have been invoked"
     assert f"--match-head-commit={HEAD_SHA}" in out.merge_args
+
+
+def test_bd_is_shadowed_so_a_test_merge_cannot_reach_the_real_huddle() -> None:
+    """`bd` must resolve to the stub for every command the script can reach.
+
+    After a successful merge, merge-pr.sh posts a coordination notice to the LIVE
+    daily huddle bead via `bd comments add`. An earlier version of this harness
+    stubbed only `gh`, and test merges wrote six real "Merged PR #123 (PP-test)"
+    notices into shared state before anyone noticed.
+
+    The notice itself is fail-open and usually bails before `bd` on a synthetic repo,
+    so asserting on recorded calls would pass for the wrong reason. What must hold —
+    and what actually broke — is that `bd` is shadowed at all.
+    """
+    with stub_repo(ci_rollup=CI_PASS) as ctx:
+        resolved = subprocess.run(
+            ["bash", "-c", "command -v bd"],
+            capture_output=True,
+            text=True,
+            env=ctx["env"],
+        ).stdout.strip()
+        stub_dir = str(ctx["bd_calls"].parent)
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert resolved.startswith(stub_dir), (
+        f"bd must resolve into the stub dir, got {resolved!r} — "
+        "a test merge could write to the real huddle bead"
+    )
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "MERGED: PR #123" in out.stdout
 
 
 def test_automerge_stops_when_a_gate_goes_red() -> None:
