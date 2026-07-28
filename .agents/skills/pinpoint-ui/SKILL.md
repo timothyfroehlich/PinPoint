@@ -734,18 +734,23 @@ Essential motion (e.g., a sheet sliding into view — the slide is what tells th
   <button type="submit">Submit</button>
 </form>
 
-// BAD: hand-rolled client submit — bypasses the Server Action path
-<form onSubmit={(e) => {
+// Also fine: a form containing a Radix Select dispatches the same Server
+// Action directly. Carrying `action={...}` would let React 19's post-action
+// reset replay the Select's mount-time value. `onSubmit` is not the problem —
+// leaving the Server Action path is.
+<form onSubmit={(e) => { e.preventDefault(); dispatchForm(); }}>
+
+// BAD: hand-rolled fetch to an API route — bypasses the Server Action path
+<form onSubmit={async (e) => {
   e.preventDefault();
-  // Client-side only logic
+  await fetch("/api/issues", { method: "POST", body: payload });
 }}>
 ```
 
 There is no no-JS requirement — that rule was retired (PP-nw80). This is about
 keeping one mutation path (CORE-ARCH-005/007), not about surviving without
-JavaScript. **A form containing a Radix Select is the exception**: it must
-dispatch `useActionState` directly rather than carry `action={...}`, or React
-19's post-action reset replays the Select's mount-time value. See
+JavaScript. The Radix Select carve-out — why it exists, both shapes it bit, and
+why controlling the Select does not help — is in
 `docs/patterns/server-action-forms.md`.
 
 ## Layout Patterns

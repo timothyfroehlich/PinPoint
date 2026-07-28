@@ -651,7 +651,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..008: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001..012: Architecture (002, 003 retired)
+- CORE‑ARCH‑001, 004..012: Architecture (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor
