@@ -1,21 +1,16 @@
 import type React from "react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { Pencil } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { deriveMachineStatus } from "~/lib/machines/status";
-import { Button } from "~/components/ui/button";
-import { EditButtonWithTooltip } from "../edit-button-tooltip";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { docIsEmpty } from "~/lib/tiptap/types";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
 import {
   getAccessLevel,
   checkPermission,
-  getPermissionDeniedReason,
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
@@ -72,17 +67,6 @@ export default async function MachineInfoTab({
     machineOwnerId: machine.ownerId ?? undefined,
   };
 
-  const canEdit = checkPermission(
-    "machines.edit",
-    accessLevel,
-    ownershipContext
-  );
-  const editDeniedReason = getPermissionDeniedReason(
-    "machines.edit",
-    accessLevel,
-    ownershipContext
-  );
-
   const canCompose = checkPermission(
     "machines.timeline.comment.add",
     accessLevel
@@ -118,29 +102,6 @@ export default async function MachineInfoTab({
     <RichTextDisplay content={machine.description} />
   ) : null;
 
-  // Edit-machine control lives in the owner card. Editing is a full page
-  // (/m/[initials]/edit, PP-o355.19) rather than a modal — the sections there
-  // have different save models, which a single-Save dialog cannot express.
-  const editControl =
-    canEdit && user ? (
-      <Button
-        asChild
-        variant="outline"
-        size="sm"
-        className="w-full border-outline text-foreground hover:bg-surface-variant"
-      >
-        <Link
-          href={`/m/${machine.initials}/edit`}
-          data-testid="edit-machine-button"
-        >
-          <Pencil className="mr-2 size-4" aria-hidden="true" />
-          Edit Machine
-        </Link>
-      </Button>
-    ) : user && editDeniedReason !== null ? (
-      <EditButtonWithTooltip reason={editDeniedReason} />
-    ) : null;
-
   // PinballMap card (PP-o355.3 + desync PP-o355.11): everyone sees the plain
   // "View on PinballMap" card for listed machines. The desync alert is
   // maintainer-only (`canLink`) — for those users the card also appears on a
@@ -169,7 +130,6 @@ export default async function MachineInfoTab({
       invitedOwner={machine.invitedOwner}
       addedAt={machine.createdAt}
       descriptionSlot={descriptionSlot}
-      editSlot={editControl}
       pinballmapSlot={pinballmapCard}
     />
   );

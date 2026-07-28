@@ -11,11 +11,14 @@ interface MachineTabStripProps {
     openCount: number;
     status: MachineStatus;
   };
+  /** Viewer holds `machines.edit` — see the Edit tab note below. */
+  canEdit: boolean;
 }
 
 export function MachineTabStrip({
   initials,
   maintenance,
+  canEdit,
 }: MachineTabStripProps): React.JSX.Element {
   return (
     <RouteTabStrip
@@ -34,6 +37,10 @@ export function MachineTabStrip({
           badge: { count: maintenance.openCount, status: maintenance.status },
         },
         { slug: "timeline", label: "Timeline" },
+        // Edit is permission-gated and therefore LAST: appending it keeps every
+        // other tab at the same index for every role, so the strip doesn't
+        // reflow depending on who is looking at it.
+        ...(canEdit ? [{ slug: "edit", label: "Edit" }] : []),
       ]}
     />
   );

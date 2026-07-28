@@ -1,8 +1,7 @@
 import type React from "react";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
@@ -11,29 +10,29 @@ import {
   checkPermission,
   type OwnershipContext,
 } from "~/lib/permissions/index";
-import { PageContainer } from "~/components/layout/PageContainer";
-import { PageHeader } from "~/components/layout/PageHeader";
 import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
 import { formatDateTime } from "~/lib/dates";
 import { getUnifiedUsers } from "~/lib/users/queries";
-import { getMachineForLayout } from "../_data";
+import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
 import { MachineDetailsForm } from "./machine-details-form";
 import { PinballmapSyncNow } from "./pinballmap-sync-now";
 import { MachineOwnerTransfer } from "./machine-owner-transfer";
 
 /**
- * Machine edit page (/m/[initials]/edit) — PP-o355.19.
+ * Machine Edit tab (/m/[initials]/edit) — PP-o355.19.
  *
- * Replaces the Edit Machine modal. The driver was never size alone: **a page
+ * Replaces the Edit Machine modal. The driver was never size alone: **a route
  * lets sections have different save models.** Details fields belong to one
  * Save; ownership transfer is its own deliberate act; PinballMap operations
  * write to a third-party service, can fail, and need to report — none of which
  * a modal that dismisses on save can do.
  *
- * Deliberately OUTSIDE the `(tabs)` route group: this is a full page with its
- * own header, not another tab on the machine.
+ * Lives INSIDE the `(tabs)` group, so the machine header, tab strip, and
+ * translite come from the shared layout and this file renders only the panel.
+ * The Edit tab itself is hidden from viewers who lack `machines.edit`, so the
+ * redirect below is the deep-link guard, not the primary gate.
  *
  * Removing the Dialog wrapper also removes PP-o355.13's repro path — a Radix
  * popover portalled to <body> being read as an outside-click and dismissing the
@@ -69,9 +68,9 @@ export default async function MachineEditPage({
     machineOwnerId: machine.ownerId ?? undefined,
   };
 
-  // Send anyone who may not edit back to the machine, where the disabled Edit
-  // button explains why (edit-button-tooltip). A bare 404 would be a lie — the
-  // machine exists, the viewer just cannot edit it.
+  // Send anyone who may not edit back to the machine's Info tab. They never see
+  // the Edit tab, so this only fires on a deep link or a stale bookmark. A bare
+  // 404 would be a lie — the machine exists, the viewer just cannot edit it.
   if (
     !user ||
     !checkPermission("machines.edit", accessLevel, ownershipContext)
@@ -130,17 +129,10 @@ export default async function MachineEditPage({
   const locationUrl = pinballmapLocationUrl();
 
   return (
-    <PageContainer size="narrow">
-      <Link
-        href={`/m/${machine.initials}`}
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        {machine.initials} · {machine.name}
-      </Link>
-
-      <PageHeader title={`Edit ${machine.name}`} />
-
+    // The panel is narrower than the tab strip above it: these are form fields,
+    // and a full-width text input on desktop is a worse target than a measured
+    // column. `max-w-3xl` is what PageContainer size="narrow" used to give it.
+    <div className="max-w-3xl space-y-6">
       {/* Details — these fields save together. */}
       <section className="space-y-4" aria-labelledby="section-details">
         <h2 id="section-details" className="text-base font-semibold">
@@ -226,6 +218,6 @@ export default async function MachineEditPage({
           />
         </div>
       </section>
-    </PageContainer>
+    </div>
   );
 }

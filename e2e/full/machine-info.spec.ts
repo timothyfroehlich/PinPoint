@@ -68,5 +68,8 @@ test.describe("Machine Info tab — player landing", () => {
     await expect(
       page.getByRole("button", { name: "Save details" })
     ).not.toBeVisible();
+    // ...and the tab that would take them there is not offered in the first
+    // place. The redirect is the deep-link guard; hiding the tab is the gate.
+    await expect(page.getByTestId("machine-tab-edit")).toHaveCount(0);
   });
 });

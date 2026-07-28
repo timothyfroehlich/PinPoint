@@ -157,7 +157,7 @@ test.describe("User Invitation & Signup Flow", () => {
     ).toBeVisible();
 
     // Open the machine edit page (admin has edit permission)
-    await page.getByTestId("edit-machine-button").click();
+    await page.getByTestId("machine-tab-edit").click();
     await expect(page).toHaveURL(/\/edit$/);
 
     // Ownership lives in the Danger zone behind a disclosure (PP-o355.19).

@@ -25,9 +25,9 @@ test.describe("Technician Role Permissions", () => {
       return;
     }
     // Name was changed — restore it
-    const editButton = page.getByTestId("edit-machine-button");
-    await expect(editButton).toBeVisible();
-    await editButton.click();
+    const editTab = page.getByTestId("machine-tab-edit");
+    await expect(editTab).toBeVisible();
+    await editTab.click();
     await expect(page).toHaveURL(/\/edit$/);
     const nameInput = page.getByLabel("Machine Name");
     await nameInput.fill(seededMachines.addamsFamily.name);
@@ -90,11 +90,11 @@ test.describe("Technician Role Permissions", () => {
     // Navigate to a machine owned by admin (Addams Family initials are TAF in seed)
     await page.goto("/m/TAF");
 
-    // Edit button should be visible
-    const editButton = page.getByTestId("edit-machine-button");
-    await expect(editButton).toBeVisible();
+    // The Edit tab only renders for viewers holding `machines.edit`
+    const editTab = page.getByTestId("machine-tab-edit");
+    await expect(editTab).toBeVisible();
 
-    await editButton.click();
+    await editTab.click();
     await expect(page).toHaveURL(/\/edit$/);
 
     // Should be able to change the name
