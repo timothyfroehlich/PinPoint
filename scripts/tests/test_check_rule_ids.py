@@ -16,6 +16,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from check_rule_ids import (  # noqa: E402
+    CITING_SOURCES,
     collect_catalog_ids,
     collect_citations,
     collect_descending_ranges,
@@ -367,6 +368,30 @@ class TestMain:
         assert main(["--root", str(repo), "--orphans"]) == 0
         assert "every catalog rule is cited" in capsys.readouterr().err
 
+    def test_fails_on_unknown_id_in_review_md(self, repo: Path, capsys):
+        """Regression: CITING_SOURCES once named `CODE_REVIEW.md` (the
+        pre-PP-22e4 design-spec filename) while the file that actually
+        shipped is `REVIEW.md`. "Missing paths are fine" made that a silent
+        no-op -- the nine CORE-* citations that live in REVIEW.md were never
+        scanned, and a bogus ID there would pass clean. Plant one and require
+        the gate to catch it.
+        """
+        (repo / "REVIEW.md").write_text("CORE-ARCH-999 is fake", encoding="utf-8")
+        assert main(["--root", str(repo)]) == 1
+        err = capsys.readouterr().err
+        assert "CORE-ARCH-999" in err
+        assert "REVIEW.md" in err
+
+    def test_fails_on_unknown_id_in_agents_rules(self, repo: Path, capsys):
+        (repo / ".agents" / "rules").mkdir(parents=True)
+        (repo / ".agents" / "rules" / "antigravity.md").write_text(
+            "CORE-ARCH-999 is fake", encoding="utf-8"
+        )
+        assert main(["--root", str(repo)]) == 1
+        err = capsys.readouterr().err
+        assert "CORE-ARCH-999" in err
+        assert ".agents/rules/antigravity.md" in err
+
 
 class TestFindRepoRoot:
     def test_walks_up_to_the_catalog(self, repo: Path):
@@ -413,3 +438,22 @@ class TestRealRepo:
         assert collect_legacy_citations(root) == {}
 
         assert main(["--root", str(root)]) == 0
+
+    def test_citing_sources_literals_exist_on_disk(self):
+        """Every non-glob CITING_SOURCES entry must resolve to a real file.
+
+        Glob entries (e.g. `.claude/rules/*.md`) are exempt on purpose --
+        several of them are declared ahead of the file existing (PP-22e4
+        lands `.claude/rules/` in a later PR), and "missing paths are fine"
+        for those. A literal filename has no such excuse: if it's wrong, the
+        gate silently checks nothing for that file, which is exactly the bug
+        this module's REVIEW.md regression test above catches for one
+        specific case. This test would have caught it directly.
+        """
+        root = find_repo_root(Path(__file__).resolve().parent)
+        for pattern in CITING_SOURCES:
+            if "*" in pattern:
+                continue
+            assert (root / pattern).is_file(), (
+                f"CITING_SOURCES entry {pattern!r} does not exist on disk"
+            )
