@@ -103,8 +103,6 @@ Leave the stack running afterward — the user can stop it. Hand off what's runn
 
 Only stop services you started in this session, by specific PID or via worktree-local commands (e.g. `supabase stop` inside the worktree). Forbidden without explicit permission: `supabase stop --all`, `pkill`/`killall` against process names, `docker stop` on containers you didn't start. The system runs many environments in parallel; broad kills wipe out other agents' work.
 
-Those three are enforced, not just documented — `pkill`, `killall`, and `supabase stop --all` are on `permissions.deny` in the checked-in `.claude/settings.json`, which also puts `rm -rf`, `docker rm`, `kill`, and the history-rewriting git verbs on `ask`. Same scope caveat as CORE-SEC-010: prefix matchers, a speed bump against accidents, not a security boundary. (These live in the project file, duplicating user settings, because permission arrays are the only config that merges across scopes — don't consolidate them. PP-ah8o.)
-
 ## 5. Workflow
 
 ### Key commands
