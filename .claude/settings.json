@@ -2,7 +2,16 @@
   "permissions": {
     "deny": [
       "Bash(supabase db push:*)",
-      "Bash(supabase projects delete:*)"
+      "Bash(supabase projects delete:*)",
+      "Bash(supabase stop --all)",
+      "Bash(supabase stop --all *)",
+      "Bash(pkill:*)",
+      "Bash(killall:*)",
+      "Bash(gh issue delete *)",
+      "Bash(gh repo delete *)",
+      "Bash(shutdown:*)",
+      "Bash(reboot:*)",
+      "Bash(mkfs:*)"
     ],
     "ask": [
       "Bash(*merge-pr.sh*--force*)",
@@ -21,7 +30,30 @@
       "mcp__claude_ai_Supabase__delete_branch",
       "mcp__claude_ai_Supabase__merge_branch",
       "mcp__claude_ai_Supabase__rebase_branch",
-      "mcp__claude_ai_Supabase__reset_branch"
+      "mcp__claude_ai_Supabase__reset_branch",
+      "Bash(rm -rf:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker volume rm:*)",
+      "Bash(kill:*)",
+      "Bash(xargs kill:*)",
+      "Bash(git rebase *)",
+      "Bash(git -C * rebase *)",
+      "Bash(git reset --hard)",
+      "Bash(git reset --hard *)",
+      "Bash(git -C * reset --hard)",
+      "Bash(git -C * reset --hard *)",
+      "Bash(git clean -f *)",
+      "Bash(git clean -fd *)",
+      "Bash(git branch -D *)",
+      "Bash(git -C * branch -D *)",
+      "Bash(git push --force)",
+      "Bash(git push --force *)",
+      "Bash(git push --force-with-lease *)",
+      "Bash(git push -f *)",
+      "Bash(git -C * push --force)",
+      "Bash(git -C * push --force *)",
+      "Bash(git -C * push --force-with-lease *)",
+      "Bash(git -C * push -f *)"
     ]
   },
   "enableAllProjectMcpServers": true,
