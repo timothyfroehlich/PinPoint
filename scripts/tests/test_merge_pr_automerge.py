@@ -1,0 +1,236 @@
+"""Unit tests for merge-pr.sh --automerge.
+
+--automerge polls the gates and merges unattended, so its three terminal states are
+worth pinning down precisely: it must merge when the gates go green, stop when one
+hard-fails, and give up without touching the PR when the budget runs out. A WAIT
+(CI still running, review pending) must never be mistaken for either terminus.
+
+The whole script runs against a stubbed `gh`, including the real `_pr-gates.sh` it
+sources, so the gate wiring is exercised end to end. `gh pr merge` and `gh pr edit`
+write to marker files instead of acting, which is how "did not merge" is asserted.
+"""
+
+import json
+import os
+import stat
+import subprocess
+import tempfile
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+
+MERGE_SCRIPT = Path(__file__).parent.parent / "workflow" / "merge-pr.sh"
+
+HEAD_SHA = "d084c14a43af3ac021f0838f5c7bf4b77f72fb62"
+CI_PASS = '{"name":"CI Gate","status":"COMPLETED","conclusion":"SUCCESS"}'
+CI_RED = '{"name":"CI Gate","status":"COMPLETED","conclusion":"FAILURE"}'
+CI_RUNNING = '{"name":"CI Gate","status":"IN_PROGRESS","conclusion":null}'
+
+EMPTY_THREADS = json.dumps(
+    {
+        "data": {
+            "repository": {
+                "pullRequest": {
+                    "reviewThreads": {
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "nodes": [],
+                    }
+                }
+            }
+        }
+    }
+)
+
+
+@contextmanager
+def stub_repo(*, ci_rollup: str, labels: list[str] | None = None) -> Iterator[dict]:
+    """Yield paths + env for a run against a fully stubbed `gh`.
+
+    The PR is set up to satisfy every gate except CI: authored by the current user,
+    MERGEABLE, no unresolved threads, and carrying a Claude review marker pinned to
+    head. That isolates CI as the single lever each test moves.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        merged_marker = tmp_path / "merged"
+        label_marker = tmp_path / "label-removed"
+
+        pr_info = json.dumps(
+            {
+                "author": {"login": "tim"},
+                "title": "test PR (PP-test)",
+                "url": "https://example.invalid/pr/123",
+                "labels": [{"name": n} for n in (labels or [])],
+                "headRefOid": HEAD_SHA,
+                "mergeable": "MERGEABLE",
+            }
+        )
+        comments = json.dumps(
+            [{"body": f"<!-- pinpoint-claude-review: {HEAD_SHA} -->\nreviewed"}]
+        )
+        head_date = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 60))
+
+        (tmp_path / "pr_info.json").write_text(pr_info)
+        (tmp_path / "comments.json").write_text(comments)
+        (tmp_path / "threads.json").write_text(EMPTY_THREADS)
+        (tmp_path / "rollup.json").write_text(ci_rollup)
+
+        gh_stub = tmp_path / "gh"
+        gh_stub.write_text(
+            "#!/usr/bin/env bash\n"
+            'args="$*"\n'
+            'case "$args" in\n'
+            '  "pr merge"*) printf "%s\\n" "$args" > "$STUB_MERGED"; printf "merged\\n" ;;\n'
+            '  "pr edit"*) printf "%s\\n" "$args" > "$STUB_LABEL_REMOVED" ;;\n'
+            '  *"--json author"*) cat "$STUB_PR_INFO" ;;\n'
+            '  *"--json statusCheckRollup"*) cat "$STUB_ROLLUP" ;;\n'
+            '  *"--json mergeable"*) printf "MERGEABLE\\n" ;;\n'
+            '  *"--jq .headRefOid"*) printf "%s\\n" "$STUB_HEAD_SHA" ;;\n'
+            '  *"--json headRefOid"*) printf \'{"headRefOid":"%s"}\\n\' "$STUB_HEAD_SHA" ;;\n'
+            '  "api user"*) printf "tim\\n" ;;\n'
+            '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
+            '  *graphql*) cat "$STUB_THREADS" ;;\n'
+            '  *"/commits/"*) printf "%s\\n" "$STUB_HEAD_DATE" ;;\n'
+            '  *"/issues/"*"/comments") cat "$STUB_COMMENTS" ;;\n'
+            '  *"/pulls/"*"/reviews") printf "[]\\n" ;;\n'
+            '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
+            "esac\n"
+        )
+        gh_stub.chmod(
+            gh_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        env = dict(os.environ)
+        env["PATH"] = f"{tmp}{os.pathsep}{env.get('PATH', '')}"
+        env["STUB_HEAD_SHA"] = HEAD_SHA
+        env["STUB_HEAD_DATE"] = head_date
+        env["STUB_PR_INFO"] = str(tmp_path / "pr_info.json")
+        env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
+        env["STUB_THREADS"] = str(tmp_path / "threads.json")
+        env["STUB_ROLLUP"] = str(tmp_path / "rollup.json")
+        env["STUB_MERGED"] = str(merged_marker)
+        env["STUB_LABEL_REMOVED"] = str(label_marker)
+        # Keep the polling loop fast; the huddle notice is fail-open and needs no bd.
+        env["AUTOMERGE_POLL_INTERVAL"] = "1"
+        env["AUTOMERGE_TIMEOUT"] = "3"
+
+        yield {
+            "env": env,
+            "merged": merged_marker,
+            "label_removed": label_marker,
+        }
+
+
+def run_merge(env: dict, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["bash", str(MERGE_SCRIPT), "123", *args],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+    )
+
+
+class Outcome:
+    """Result plus a snapshot of the side-effect markers.
+
+    The markers live in the stub's temp dir, which is removed when the context exits —
+    so they must be read while it is still open. Asserting on the Path objects
+    afterwards would make every `not ... .exists()` check vacuously true.
+    """
+
+    def __init__(self, result: subprocess.CompletedProcess, ctx: dict) -> None:
+        self.result = result
+        self.stdout = result.stdout
+        self.stderr = result.stderr
+        self.returncode = result.returncode
+        self.merged = ctx["merged"].exists()
+        self.merge_args = ctx["merged"].read_text() if self.merged else ""
+        self.label_removed = ctx["label_removed"].exists()
+
+
+def run_and_snapshot(ctx: dict, *args: str) -> Outcome:
+    return Outcome(run_merge(ctx["env"], *args), ctx)
+
+
+def test_automerge_merges_once_gates_are_green() -> None:
+    with stub_repo(ci_rollup=CI_PASS) as ctx:
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "RESULT: all gates passed" in out.stdout
+    assert "AUTOMERGE: green after" in out.stdout
+    assert "MERGED: PR #123" in out.stdout
+    assert out.merged, "gh pr merge should have been invoked"
+    assert f"--match-head-commit={HEAD_SHA}" in out.merge_args
+
+
+def test_automerge_stops_when_a_gate_goes_red() -> None:
+    """A hard failure is terminal — polling past it would never turn it green."""
+    with stub_repo(ci_rollup=CI_RED, labels=["ready-for-review"]) as ctx:
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert out.returncode == 1, out.stdout + out.stderr
+    assert "FAIL: ci:" in out.stdout
+    assert "AUTOMERGE: RED after" in out.stdout
+    assert not out.merged, "must not merge on a red gate"
+    assert out.label_removed, "ready-for-review should be dropped"
+
+
+def test_automerge_times_out_without_touching_the_pr() -> None:
+    """CI still running is a WAIT: keep polling, then give up cleanly.
+
+    Distinct exit code (2) and an intact label — nothing failed, it just took too long.
+    """
+    with stub_repo(ci_rollup=CI_RUNNING, labels=["ready-for-review"]) as ctx:
+        out = run_and_snapshot(ctx, "--human", "--automerge")
+
+    assert out.returncode == 2, out.stdout + out.stderr
+    assert "AUTOMERGE: TIMED OUT" in out.stdout
+    assert "still waiting on: ci" in out.stdout
+    assert not out.merged, "must not merge on timeout"
+    assert not out.label_removed, "timeout is not a failure — keep the label"
+
+
+def test_automerge_requires_human() -> None:
+    with stub_repo(ci_rollup=CI_PASS) as ctx:
+        out = run_and_snapshot(ctx, "--automerge")
+
+    assert out.returncode == 1
+    assert "REFUSE: merges are human-authorized only" in out.stderr
+    assert not out.merged
+
+
+def test_automerge_and_dry_run_are_mutually_exclusive() -> None:
+    with stub_repo(ci_rollup=CI_PASS) as ctx:
+        out = run_and_snapshot(ctx, "--human", "--automerge", "--dry-run")
+
+    assert out.returncode == 1
+    assert "mutually exclusive" in out.stderr
+    assert not out.merged
+
+
+def test_short_flag_is_accepted() -> None:
+    with stub_repo(ci_rollup=CI_PASS) as ctx:
+        out = run_and_snapshot(ctx, "--human", "-a")
+
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert out.merged
+
+
+def test_one_shot_path_is_unchanged_by_the_refactor() -> None:
+    """Without --automerge the script must still evaluate once and exit.
+
+    The gate runner was restructured to accumulate output instead of printing it; this
+    pins the externally visible behaviour of the default path.
+    """
+    with stub_repo(ci_rollup=CI_RUNNING, labels=["ready-for-review"]) as ctx:
+        out = run_and_snapshot(ctx, "--human")
+
+    assert out.returncode == 1, out.stdout + out.stderr
+    assert "WAIT: ci: CI Gate status=IN_PROGRESS" in out.stdout
+    assert "RESULT: 1 gate(s) failed: ci" in out.stdout
+    assert "AUTOMERGE" not in out.stdout
+    assert not out.merged
+    assert out.label_removed, "one-shot still drops the label on a blocked gate"

@@ -21,9 +21,48 @@ readonly COPILOT_LOGINS=("copilot-pull-request-reviewer" "copilot-pull-request-r
 # (observed in PR #1342 and PR #1326).
 readonly COPILOT_CURRENCY_THRESHOLD=600
 
+# Copilot posts a review OBJECT even when it reviewed nothing — quota exhaustion, or
+# no files it could analyze. Those carry a real submitted_at and a Copilot login, so a
+# login-only filter counts them as reviews and every gate keyed on "a Copilot review
+# covers head" goes green on a review that read nothing (PP-jw0s). Strictly worse than
+# no review at all, because no-review has its own honest path. Match them by body and
+# treat them as absent.
+readonly COPILOT_NON_REVIEW_BODY_RE='unable to review|was not able to review|wasn.t able to review|reached their quota limit|no files in this pull request'
+
+# SHA-pinned Claude review marker, posted by mark-claude-review.sh.
+readonly CLAUDE_MARKER_PREFIX="<!-- pinpoint-claude-review:"
+
 # Parse owner/repo dynamically — avoid hardcoded slug.
 _repo_slug() {
   gh repo view --json nameWithOwner --jq .nameWithOwner
+}
+
+# Latest SUBSTANTIVE Copilot review timestamp for a PR, or empty if none.
+# Shared by the currency and reviewed gates: they asked the same question with the same
+# 3-line jq, and drifted — reviewed learned about the Claude marker, currency did not.
+# `jq -rs` (slurp) rather than gh's `--jq`, which runs per-page under --paginate and so
+# misses reviews on page 2+ of a busy PR.
+_latest_copilot_review_at() {
+  local pr=$1 owner_repo=$2
+  gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews" \
+    | jq -rs --argjson logins "$(printf '%s\n' "${COPILOT_LOGINS[@]}" | jq -R . | jq -s .)" \
+             --arg skip "$COPILOT_NON_REVIEW_BODY_RE" \
+        '[ .[] | flatten | .[]
+           | select(.user.login as $l | $logins | index($l))
+           | select(((.body // "") | test($skip; "i")) | not)
+         ] | sort_by(.submitted_at) | last | .submitted_at // empty'
+}
+
+# True when a Claude review marker pins THIS head SHA. The pin is what makes the
+# attestation self-expiring: a later fix changes the head SHA and re-arms the gates.
+# Issue-comments endpoint = PR conversation comments.
+_claude_marker_present() {
+  local pr=$1 owner_repo=$2 head_sha=$3
+  local count
+  count=$(gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
+    | jq -rs --arg marker "${CLAUDE_MARKER_PREFIX} ${head_sha} -->" \
+        '[.[] | flatten | .[] | select(.body | contains($marker))] | length')
+  [ "${count:-0}" -gt 0 ]
 }
 
 # Gate 1: CI Gate check has SUCCESS conclusion.
@@ -58,10 +97,14 @@ check_ci() {
   esac
 }
 
-# Gate 2: Latest Copilot review is newer than the PR head commit.
-# If head is newer than the latest Copilot review:
-#   - elapsed < COPILOT_CURRENCY_THRESHOLD → WAIT
-#   - elapsed >= threshold → WARN (proceed)
+# Gate 2: A reviewer has seen the current head commit. Soft by design — this gate
+# never FAILs, it only holds briefly to give Copilot a chance to catch up:
+#   - Claude marker pins head SHA                  → PASS
+#   - no substantive Copilot review on the PR      → SKIP (nothing to be stale about)
+#   - Copilot review covers head (review >= head)  → PASS
+#   - head newer, elapsed < COPILOT_CURRENCY_THRESHOLD → WAIT
+#   - head newer, elapsed >= threshold             → WARN (proceed)
+# The hard backstop is `reviewed` (gate 4), not this one.
 check_copilot_currency() {
   local pr=$1
   local owner_repo head_sha head_date latest_review elapsed
@@ -73,13 +116,19 @@ check_copilot_currency() {
   head_sha=$(jq -r '.headRefOid' <<< "$pr_data")
   head_date=$(gh api "repos/${owner_repo}/commits/${head_sha}" --jq '.commit.committer.date')
 
-  # Get latest Copilot review timestamp via paginated reviews (jq slurp fixes per-page jq bug).
-  latest_review=$(gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews" \
-    | jq -rs --argjson logins "$(printf '%s\n' "${COPILOT_LOGINS[@]}" | jq -R . | jq -s .)" \
-        '[.[] | flatten | .[] | select(.user.login as $l | $logins | index($l))] | sort_by(.submitted_at) | last | .submitted_at // empty')
+  # A Claude review pinned to this head answers currency's question — "has a reviewer
+  # seen THIS commit?" — with a stronger signal than a timestamp comparison. Without
+  # this check the gate sits out its full timer waiting on a reviewer that already has
+  # a documented substitute, which is dead time whenever Copilot is quota-limited.
+  if _claude_marker_present "$pr" "$owner_repo" "$head_sha"; then
+    echo "PASS: currency: Claude review covers head commit"
+    return 0
+  fi
+
+  latest_review=$(_latest_copilot_review_at "$pr" "$owner_repo")
 
   if [ -z "$latest_review" ]; then
-    echo "SKIP: currency: no Copilot reviews exist for this PR"
+    echo "SKIP: currency: no substantive Copilot review exists for this PR"
     return 0
   fi
 
@@ -171,24 +220,12 @@ check_review_happened() {
   head_sha=$(jq -r '.headRefOid' <<< "$pr_data")
   head_date=$(gh api "repos/${owner_repo}/commits/${head_sha}" --jq '.commit.committer.date')
 
-  # SHA-pinned Claude review marker in a PR conversation (issue) comment.
-  # Issue-comments endpoint = PR conversation comments; SHA-exact match gives free currency.
-  # Pipe to `jq -rs` (slurp) — same as the reviews query below — because gh's own `--jq`
-  # runs per-page under `--paginate`, which would miss a marker on page 2+ of a busy PR.
-  local marker claude_marked
-  marker="<!-- pinpoint-claude-review: ${head_sha} -->"
-  claude_marked=$(gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
-    | jq -rs --arg marker "$marker" \
-        '[.[] | flatten | .[] | select(.body | contains($marker))] | length')
-  if [ "${claude_marked:-0}" -gt 0 ]; then
+  if _claude_marker_present "$pr" "$owner_repo" "$head_sha"; then
     echo "PASS: reviewed: Claude review covers head commit"
     return 0
   fi
 
-  # Latest Copilot review timestamp via paginated reviews (jq slurp fixes per-page jq bug).
-  latest_review=$(gh api --paginate "repos/${owner_repo}/pulls/${pr}/reviews" \
-    | jq -rs --argjson logins "$(printf '%s\n' "${COPILOT_LOGINS[@]}" | jq -R . | jq -s .)" \
-        '[.[] | flatten | .[] | select(.user.login as $l | $logins | index($l))] | sort_by(.submitted_at) | last | .submitted_at // empty')
+  latest_review=$(_latest_copilot_review_at "$pr" "$owner_repo")
 
   # macOS vs Linux date parsing with TZ=UTC normalization (mirrors check_copilot_currency).
   local head_epoch review_epoch=0 now_epoch
@@ -212,6 +249,8 @@ check_review_happened() {
     return 2
   fi
   echo "FAIL: reviewed: head commit has no Copilot or Claude review"
+  echo "  note: a Copilot comment saying it could not review (quota limit, nothing to"
+  echo "        analyze) does NOT count as a review — that is this gate working."
   echo "  remedy: review the PR yourself, then attest the head commit with:"
   echo "    bash scripts/workflow/mark-claude-review.sh $pr \"<one-line findings>\""
   return 1
