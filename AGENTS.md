@@ -88,6 +88,7 @@ Each git worktree gets isolated Supabase ports automatically. The Husky `post-ch
 - **Create**: `git worktree add /path -b branch origin/main` — the hook handles the rest.
 - **Cleanup**: `scripts/worktree_cleanup.py` (stops Supabase, removes volumes, deallocates slot). Plain `git worktree remove` or `rm -rf` leaks slot entries and Docker volumes — `scripts/worktree_orphan_sweep.py` reconciles them; pass `--apply` to reclaim. A SessionStart hook runs the sweep in dry-run mode every 6h and prints a one-line nudge if orphans are found.
 - **Ports**: main worktree uses defaults (3000 / 54321 / 54322). Slot N: `3000+N*10`, `54321+N*100`, `54322+N*100`.
+- **Supabase `project_id`**: derived from the branch name the **first** time a worktree is set up, then **pinned** — later checkouts reuse the id already in `supabase/config.toml`. It names the Docker containers and labels the volumes, so letting it follow a `git checkout -b` would rename the stack out from under itself (`supabase stop` matches nothing, the old containers keep the ports bound, cleanup misses them). `config.toml` is the authoritative record of the running stack's id. (PP-4936.)
 - **Config**: edit `supabase/config.toml.template`, not the generated file (which is chmod 444).
 
 ### Starting the local stack (self-service)

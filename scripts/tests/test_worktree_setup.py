@@ -17,12 +17,15 @@ from worktree_setup import (
     PortConfig,
     allocate_slot,
     branch_to_project_id,
+    generate_config_toml,
     generate_launch_json,
     load_manifest,
     merge_env_local,
     parse_env_file,
     prune_manifest,
+    read_pinned_project_id,
     resolve_brainstorm_server_path,
+    resolve_project_id,
 )
 
 # Testing philosophy for worktree setup
@@ -585,6 +588,101 @@ class TestBranchToProjectId:
         result = branch_to_project_id(branch)
         assert len(result) == 40
         assert re.match(r"^pinpoint-a{22}-[0-9a-f]{8}$", result), result
+
+
+class TestPinnedProjectId:
+    """Test project_id pinning — the id must survive a branch rename (PP-4936)."""
+
+    def _write_config(self, worktree: Path, body: str) -> Path:
+        config = worktree / "supabase" / "config.toml"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text(body)
+        return config
+
+    def test_reads_generated_project_id(self, tmp_path: Path) -> None:
+        self._write_config(
+            tmp_path,
+            "# ⚠️ AUTO-GENERATED — DO NOT EDIT ⚠️\n"
+            'project_id = "pinpoint-worktree-old-branch"\n'
+            "[api]\nport = 54421\n",
+        )
+
+        assert read_pinned_project_id(tmp_path) == "pinpoint-worktree-old-branch"
+
+    def test_missing_config_is_not_pinned(self, tmp_path: Path) -> None:
+        # Fresh worktree: config.toml is gitignored, so it doesn't exist yet.
+        assert read_pinned_project_id(tmp_path) is None
+
+    def test_config_without_project_id_is_not_pinned(self, tmp_path: Path) -> None:
+        self._write_config(tmp_path, "[api]\nport = 54421\n")
+
+        assert read_pinned_project_id(tmp_path) is None
+
+    def test_commented_project_id_is_ignored(self, tmp_path: Path) -> None:
+        self._write_config(
+            tmp_path,
+            '# project_id = "pinpoint-commented-out"\nproject_id = "pinpoint-real"\n',
+        )
+
+        assert read_pinned_project_id(tmp_path) == "pinpoint-real"
+
+    def test_bare_template_id_is_not_pinnable(self, tmp_path: Path) -> None:
+        # config.toml.template ships `project_id = "pinpoint"`. Pinning that
+        # would give every worktree the same container names.
+        self._write_config(tmp_path, 'project_id = "pinpoint"\n')
+
+        assert read_pinned_project_id(tmp_path) is None
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "not-pinpoint-prefixed",  # invisible to worktree_orphan_sweep.py
+            "pinpoint-Has-Uppercase",  # not a legal Docker/Supabase id
+            "pinpoint-has_underscore",
+            "pinpoint-" + "a" * 40,  # over MAX_PROJECT_ID_LEN
+        ],
+    )
+    def test_malformed_ids_fall_back_to_derivation(
+        self, tmp_path: Path, value: str
+    ) -> None:
+        self._write_config(tmp_path, f'project_id = "{value}"\n')
+
+        assert read_pinned_project_id(tmp_path) is None
+        assert resolve_project_id(tmp_path, "feat/new") == "pinpoint-feat-new"
+
+    def test_resolve_derives_from_branch_when_unpinned(self, tmp_path: Path) -> None:
+        assert resolve_project_id(tmp_path, "feat/thing") == "pinpoint-feat-thing"
+
+    def test_resolve_keeps_pinned_id_after_branch_rename(self, tmp_path: Path) -> None:
+        # The PP-4936 reproduction: worktree set up on one branch, then
+        # `git checkout -b` inside it. The stack is already running under the
+        # original id, so the id must not follow the branch.
+        self._write_config(tmp_path, 'project_id = "pinpoint-worktree-pbm-token"\n')
+
+        assert (
+            resolve_project_id(tmp_path, "feat/pbm-token-env-var")
+            == "pinpoint-worktree-pbm-token"
+        )
+
+    def test_generated_config_round_trips_its_own_id(self, tmp_path: Path) -> None:
+        # End-to-end: generate a config for branch A, then resolve for branch B
+        # and confirm A's id survives — i.e. regeneration is idempotent on the
+        # project_id even as the branch changes.
+        template = tmp_path / "supabase" / "config.toml.template"
+        template.parent.mkdir(parents=True)
+        template.write_text('project_id = "pinpoint"\n[api]\nport = 54321\n')
+
+        first = PortConfig(
+            slot=3,
+            project_id=resolve_project_id(tmp_path, "worktree-agent-abc"),
+            name="worktree-agent-abc",
+        )
+        (tmp_path / "supabase" / "config.toml").write_text(
+            generate_config_toml(tmp_path, first)
+        )
+
+        assert first.project_id == "pinpoint-worktree-agent-abc"
+        assert resolve_project_id(tmp_path, "feat/renamed") == first.project_id
 
 
 if __name__ == "__main__":
