@@ -421,7 +421,7 @@ When something happens in response to user action, where should they see feedbac
 | Long-running background work (uploads)            | Toast with progress indicator                                                                       |
 | Short in-place work (counter increment)           | Immediate UI update, no notification                                                                |
 
-**Why server-side redirect instead of `toast.success() + router.push()`?** The project's progressive-enhancement rule (CORE-ARCH-002) requires forms to work without JavaScript. `<form action={serverAction}>` + server-side `redirect(...)` works with JS off; a `toast.success()` + `router.push()` pattern only fires after hydration. If a success toast is genuinely needed on the destination page, persist a one-time success state (e.g., via a search param or short-lived cookie read in the destination route) and render it there.
+**Why server-side redirect instead of `toast.success() + router.push()`?** The redirect is part of the action's own result, so the confirmation and the navigation cannot disagree. `toast.success()` + `router.push()` is two independent client steps: the toast can fire while the push fails, leaving the user told the thing succeeded on a page that never moved — the false confirmation CORE-ARCH-012 forbids. Redirecting also unmounts the form as part of the transition, sidestepping React 19's post-action form reset entirely (see `docs/patterns/server-action-forms.md`). If a success toast is genuinely needed on the destination page, persist a one-time success state (e.g., via a search param or short-lived cookie read in the destination route) and render it there.
 
 **Rule of thumb:** If the user initiated it and waited → feedback. If it was instant or invisible → no feedback.
 
@@ -539,7 +539,7 @@ Do not reorder the buttons to try to "fix" the mobile stack — the reversal is 
 
 - Never build a custom `Modal` or `Drawer` component — Dialog / AlertDialog / Sheet cover every case.
 - Never put a `<form>` inside a `DropdownMenuItem` — Radix closes the dropdown before the form submits. Use `onSelect={() => serverAction()}` instead.
-- Never wrap a Server Action in an inline async function: `action={async () => await serverAction()}` breaks progressive enhancement. Pass the Server Action directly: `action={serverAction}`.
+- Never wrap a Server Action in an inline async function: `action={async () => await serverAction()}` breaks Next.js form handling (CORE-ARCH-005). Pass the Server Action directly: `action={serverAction}`.
 - For destructive confirmations, use `AlertDialog` — it has semantics (`role="alertdialog"`) that screen readers announce more urgently.
 - When opening any modal, set `inert` on the page-root container (CORE-A11Y-006). Radix uses `aria-hidden` + pointer-events on the background; `inert` is the platform primitive that also removes the background from tab order.
 - Native `<dialog>.showModal()` (Baseline Widely available; Baseline since Mar 2023 per §19) is **not** the default for product UI — shadcn `<Dialog>` / `<AlertDialog>` / `<Sheet>` are. Reach for `<dialog>` only for one-off, self-contained, single-purpose surfaces that don't earn a place in the shadcn variant system (e.g., a debug-only inspector, a tightly-scoped help blurb). See `pinpoint-ui` skill § "Native HTML primitives alongside shadcn/Radix".

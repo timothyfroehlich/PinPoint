@@ -29,7 +29,7 @@
 - [Severity Naming](./patterns/severity-naming.md)
   - Player-Centric Language
 - [Server Action Forms](./patterns/server-action-forms.md)
-  - Forms That Work Without JavaScript
+  - `useActionState` and the Radix Select form-reset footgun
 - [Machine Status Derivation](./patterns/machine-status-derivation.md)
   - Deriving Machine Status from Issues
 - [Testing Patterns](./patterns/testing-patterns.md)

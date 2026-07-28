@@ -40,9 +40,9 @@ These files contain migration context from previous codebase iterations. When re
 - Use Server Actions for mutations
 - Request-level caching with React 19 `cache()`
 
-**Progressive Enhancement:**
+**Forms:**
 
-- Forms work without JavaScript
+- Mutations submit through Server Actions, not hand-rolled `fetch`
 - Selective client components for interactivity
 
 **Type Safety:**
