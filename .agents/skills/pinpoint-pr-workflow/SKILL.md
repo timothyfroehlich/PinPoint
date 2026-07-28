@@ -54,7 +54,7 @@ PinPoint scopes: `issues`, `machines`, `auth`, `ui`, `db`, `e2e`, `agents`, `wor
 
 If branch has no upstream: `git push -u origin <branch-name>`. Else: `git push`.
 
-Verify upstream tracks the branch itself, NOT main: `git branch -vv` should show `[origin/<your-branch>]`.
+Verify upstream tracks the branch itself, NOT main: `git branch -vv` should show `[origin/<your-branch>]`. After pushing, `git status` must show "up to date with origin" — if it doesn't, the push didn't land cleanly (e.g. a fetch is needed, or the remote moved); resolve before continuing.
 
 ---
 
