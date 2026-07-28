@@ -90,7 +90,7 @@ test.describe("Technician Role Permissions", () => {
     // Navigate to a machine owned by admin (Addams Family initials are TAF in seed)
     await page.goto("/m/TAF");
 
-    // The Edit tab only renders for viewers holding `machines.edit`
+    // The Manage tab only renders for viewers holding `machines.edit`
     const editTab = page.getByTestId("machine-tab-edit");
     await expect(editTab).toBeVisible();
 

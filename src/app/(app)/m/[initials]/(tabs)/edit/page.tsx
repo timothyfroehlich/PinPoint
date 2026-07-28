@@ -21,7 +21,10 @@ import { PinballmapSyncNow } from "./pinballmap-sync-now";
 import { MachineOwnerTransfer } from "./machine-owner-transfer";
 
 /**
- * Machine Edit tab (/m/[initials]/edit) — PP-o355.19.
+ * Machine Manage tab (/m/[initials]/edit) — PP-o355.19.
+ *
+ * URL slug stays `edit`; the visible tab label is "Manage" (see
+ * MachineTabStrip for why).
  *
  * Replaces the Edit Machine modal. The driver was never size alone: **a route
  * lets sections have different save models.** Details fields belong to one
@@ -31,7 +34,7 @@ import { MachineOwnerTransfer } from "./machine-owner-transfer";
  *
  * Lives INSIDE the `(tabs)` group, so the machine header, tab strip, and
  * translite come from the shared layout and this file renders only the panel.
- * The Edit tab itself is hidden from viewers who lack `machines.edit`, so the
+ * The Manage tab itself is hidden from viewers who lack `machines.edit`, so the
  * redirect below is the deep-link guard, not the primary gate.
  *
  * Removing the Dialog wrapper also removes PP-o355.13's repro path — a Radix
@@ -69,7 +72,7 @@ export default async function MachineEditPage({
   };
 
   // Send anyone who may not edit back to the machine's Info tab. They never see
-  // the Edit tab, so this only fires on a deep link or a stale bookmark. A bare
+  // the Manage tab, so this only fires on a deep link or a stale bookmark. A bare
   // 404 would be a lie — the machine exists, the viewer just cannot edit it.
   if (
     !user ||

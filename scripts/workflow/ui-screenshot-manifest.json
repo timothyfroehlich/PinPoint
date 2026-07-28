@@ -37,7 +37,7 @@
     "seedNeeds": "default seed"
   },
   "machine-edit": {
-    "label": "Machine Edit (Addams Family)",
+    "label": "Machine Manage (Addams Family)",
     "route": "/m/TAF/edit",
     "authRole": "admin",
     "seedNeeds": "seeded machine TAF (addamsFamily) from src/test/data/machines.json. Shot as admin on purpose: the page hides sections by permission (Pinball Map link/sync, Danger zone), and admin is the only role that renders all of them in one frame."

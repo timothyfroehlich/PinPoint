@@ -42,7 +42,7 @@ export default async function MachineDetailLayout({
     status: deriveMachineStatus(machine.issues),
   };
 
-  // The Edit tab is only rendered for viewers who hold `machines.edit`; the
+  // The Manage tab is only rendered for viewers who hold `machines.edit`; the
   // Edit route re-checks the same permission so a deep link is still guarded.
   const currentUserProfile = user
     ? await db.query.userProfiles.findFirst({
