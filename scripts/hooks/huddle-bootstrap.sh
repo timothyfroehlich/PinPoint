@@ -147,7 +147,7 @@ notes = {
     'today_bead': {'id': sys.argv[1], 'date': sys.argv[2]},
     'monthly_bead': {'id': sys.argv[3], 'month': sys.argv[4]},
     'settings': {
-        'n_dailies_to_inject': 5,
+        'n_dailies_to_inject': 2,
         'day_boundary_tz': 'local',
         'stale_name_cutoff_days': 14
     },
@@ -237,7 +237,7 @@ notes = {
     'today_bead': {'id': sys.argv[1], 'date': sys.argv[2]},
     'monthly_bead': {'id': sys.argv[3], 'month': sys.argv[4]},
     'settings': {
-        'n_dailies_to_inject': 5,
+        'n_dailies_to_inject': 2,
         'day_boundary_tz': 'local',
         'stale_name_cutoff_days': 14
     },

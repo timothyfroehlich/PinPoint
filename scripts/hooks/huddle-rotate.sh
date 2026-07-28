@@ -178,11 +178,11 @@ except Exception:
 import sys, json
 try:
     n = json.loads(sys.stdin.read())
-    default = {'n_dailies_to_inject': 5, 'day_boundary_tz': 'local', 'stale_name_cutoff_days': 14}
+    default = {'n_dailies_to_inject': 2, 'day_boundary_tz': 'local', 'stale_name_cutoff_days': 14}
     print(json.dumps(n.get('settings', default)))
 except Exception:
-    print('{\"n_dailies_to_inject\":5,\"day_boundary_tz\":\"local\",\"stale_name_cutoff_days\":14}')
-" 2>/dev/null || echo '{"n_dailies_to_inject":5,"day_boundary_tz":"local","stale_name_cutoff_days":14}')
+    print('{\"n_dailies_to_inject\":2,\"day_boundary_tz\":\"local\",\"stale_name_cutoff_days\":14}')
+" 2>/dev/null || echo '{"n_dailies_to_inject":2,"day_boundary_tz":"local","stale_name_cutoff_days":14}')
 
   current_month=$(date +%Y-%m)
   local month_rolled=0
@@ -314,3 +314,7 @@ huddle_reconcile_today || true
 # session-names prune backups. Never fatal; a failure here must not fail rotation.
 find "$STATE_DIR" -maxdepth 1 -name 'last-seen-*' -type f -mtime +14 -delete 2>/dev/null || true
 find "$STATE_DIR" -maxdepth 1 -name 'session-names.json.pre-prune-*' -type f -delete 2>/dev/null || true
+# Quiet-session nudge clocks (PP-llkj): one per session id, so they accumulate
+# faster than poll cursors. A session outliving a day is already unusual; two
+# days is a safe floor for "that conversation is over".
+find "$STATE_DIR" -maxdepth 1 -name 'nudged-*' -type f -mtime +2 -delete 2>/dev/null || true
