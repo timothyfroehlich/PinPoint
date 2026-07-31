@@ -30,7 +30,7 @@ export function PinballmapSyncNow(): React.JSX.Element {
         {isPending ? "Syncing…" : "Sync now"}
       </button>
       {state && !state.ok && (
-        <span className="ml-2 text-destructive" role="alert">
+        <span className="ml-2 text-destructive-text" role="alert">
           {state.message}
         </span>
       )}

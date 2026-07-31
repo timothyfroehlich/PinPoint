@@ -206,7 +206,7 @@ export function MachineOwnerTransfer({
             type="button"
             variant="outline"
             size="sm"
-            className="shrink-0 border-destructive/50 text-destructive hover:bg-destructive/10"
+            className="shrink-0 border-destructive/50 text-destructive-text hover:bg-destructive/10"
             onClick={() => setIsOpen(true)}
             data-testid="open-owner-transfer"
           >
@@ -226,7 +226,7 @@ export function MachineOwnerTransfer({
           <input type="hidden" name="name" value={machineName} />
 
           {state && !state.ok && state.code !== "ASSIGNEE_NOT_MEMBER" && (
-            <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-destructive">
+            <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-destructive-text">
               <p className="text-sm font-medium" role="alert">
                 {state.message}
               </p>
