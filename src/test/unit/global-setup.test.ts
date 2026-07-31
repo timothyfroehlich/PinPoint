@@ -36,6 +36,28 @@ const CHROMIUM_CONFIG = {
   projects: [{ use: { browserName: "chromium" } }],
 } as unknown as FullConfig;
 
+// The render probe launches each needed+installed engine. Mock the engines so
+// unit tests never spawn a real browser: `launch` is controlled per-test, and
+// `executablePath` feeds the (mocked) existsSync binary check above.
+const launchMock = vi.fn();
+vi.mock("@playwright/test", () => {
+  const engine = {
+    launch: (): unknown => launchMock(),
+    executablePath: (): string => "/fake/browser",
+  };
+  return { chromium: engine, firefox: engine, webkit: engine };
+});
+
+/** A browser whose page reports `width` for the probe's text measurement. */
+const browserRendering = (width: number): unknown => ({
+  newPage: () =>
+    Promise.resolve({
+      setContent: () => Promise.resolve(undefined),
+      evaluate: () => Promise.resolve(width),
+    }),
+  close: () => Promise.resolve(undefined),
+});
+
 // Mock postgres client for the pre-flight DB connectivity check
 const endMock = vi.fn();
 const sqlTagMock = Object.assign(
@@ -65,6 +87,7 @@ describe("e2e/global-setup", () => {
     execSyncMock.mockReset();
     spawnSyncMock.mockReset().mockReturnValue({ status: 0, error: null });
     existsSyncMock.mockReset().mockReturnValue(true);
+    launchMock.mockReset().mockResolvedValue(browserRendering(42));
     fetchMock.mockReset().mockResolvedValue({ ok: true });
     sqlTagMock.mockReset().mockResolvedValue([{ "?column?": 1 }]);
     endMock.mockReset();
@@ -245,6 +268,83 @@ describe("e2e/global-setup", () => {
     await expect(setup(CHROMIUM_CONFIG)).rejects.toThrow(
       "pnpm exec playwright install"
     );
+  });
+
+  // Regression guard for PP-8b6j: a stale fontconfig cache left Chromium
+  // launching fine but shaping zero glyphs, so it aborted the moment a spec
+  // typed. Every symptom surfaced far downstream (auth-setup landing on
+  // /login), so the probe has to name the real cause here.
+  it("throws with the font remedy when an engine renders no glyphs", async () => {
+    launchMock.mockResolvedValue(browserRendering(0));
+    const setup = await loadSetup();
+
+    await expect(setup(CHROMIUM_CONFIG)).rejects.toThrow(
+      "rm -f ~/.cache/fontconfig/*.cache-*"
+    );
+  });
+
+  it("names the missing system library when an engine can't launch", async () => {
+    launchMock.mockRejectedValue(
+      new Error(
+        "browserType.launch: Target page, context or browser has been closed\n" +
+          "MiniBrowser: error while loading shared libraries: libicudata.so.74: " +
+          "cannot open shared object file: No such file or directory"
+      )
+    );
+    const setup = await loadSetup();
+
+    // The font remedy would be actively misleading here, so it must not appear.
+    const message = String(
+      await setup(CHROMIUM_CONFIG).catch((e: unknown) => e)
+    );
+    expect(message).toContain("libicudata.so.74");
+    expect(message).not.toContain("fc-cache");
+  });
+
+  // A launch failure we can't classify must stay neutral rather than guess.
+  // Naming fonts here would send the reader to wipe a cache that is fine while
+  // the real cause — load, a sandbox denial — goes unread.
+  it("does not blame fonts for an unrecognized launch failure", async () => {
+    launchMock.mockRejectedValue(
+      new Error("browserType.launch: Timeout 30000ms exceeded.")
+    );
+    const setup = await loadSetup();
+
+    const message = String(
+      await setup(CHROMIUM_CONFIG).catch((e: unknown) => e)
+    );
+    expect(message).toContain("Timeout 30000ms exceeded");
+    expect(message).not.toContain("fc-cache");
+    expect(message).not.toContain("font stack");
+  });
+
+  it("proceeds when the engine renders text", async () => {
+    execSyncMock.mockReturnValue(undefined);
+    const setup = await loadSetup();
+
+    await expect(setup(CHROMIUM_CONFIG)).resolves.toBeUndefined();
+    expect(launchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not launch a browser when the config declares no projects", async () => {
+    execSyncMock.mockReturnValue(undefined);
+    const setup = await loadSetup();
+
+    await setup(EMPTY_CONFIG);
+
+    expect(launchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not probe an engine whose binary is absent", async () => {
+    // Missing binaries are checkBrowserBinaries' story — probing them anyway
+    // would report "no glyphs" for what is really an uninstalled browser.
+    existsSyncMock.mockReturnValue(false);
+    const setup = await loadSetup();
+
+    await expect(setup(CHROMIUM_CONFIG)).rejects.toThrow(
+      "Missing Playwright browser binaries"
+    );
+    expect(launchMock).not.toHaveBeenCalled();
   });
 
   it("checks Docker before Supabase health (ordering)", async () => {
