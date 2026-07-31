@@ -15,6 +15,10 @@
 - **investigator** - Deep read-only analysis and diagnostics
 - **Explore** - Fast codebase exploration and search
 
+### Code review
+
+`REVIEW.md` at the repo root is the canonical review rubric, shared with Copilot and Antigravity. Read it before launching the code-review skill.
+
 ### Sandbox & Playwright
 
 - The macOS sandbox blocks Chromium's Mach port IPC, causing `MachPortRendezvousServer: Permission denied` crashes.
