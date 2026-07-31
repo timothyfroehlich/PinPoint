@@ -61,6 +61,7 @@ Load relevant skills for every task. If your tool doesn't support skills, read t
 | Workflow   | `pinpoint-pr-workflow`         | Full PR lifecycle: commit, push, CI, merge                                                                                               |
 | Workflow   | `pinpoint-orchestrator`        | Parallel subagent work in worktrees: dispatch, monitor, follow-up                                                                        |
 | Workflow   | `pinpoint-huddle`              | Inter-session coordination via daily/monthly beads (the huddle hooks)                                                                    |
+| Workflow   | `pinpoint-memory-review`       | Weekly curated pass over recorded context: prune, promote, dedupe across both machines                                                   |
 | Workflow   | `pinpoint-superpowers-bridge`  | Running the superpowers lifecycle in PinPoint: bead field pointers + overrides for the conflicting finish/worktree/review/subagent steps |
 | Deployment | `pinpoint-db-connections`      | Supabase/Postgres pooler & connection-string reference                                                                                   |
 | Deployment | `pinpoint-migration-conflicts` | Resolving drizzle/meta conflicts on merge                                                                                                |
