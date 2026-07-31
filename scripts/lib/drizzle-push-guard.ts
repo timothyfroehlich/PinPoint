@@ -4,7 +4,7 @@
 // delta directly, producing NO migration file. The next `db:generate` then
 // writes a migration against a snapshot that no longer matches reality, and the
 // `prevId` chain in `drizzle/meta` silently forks. Recovery means hand-repairing
-// binary-ish snapshot files (see the pinpoint-migration-conflicts skill), which
+// binary-ish snapshot files (see the pinpoint-deployment skill), which
 // is exactly the state that folder is never supposed to enter.
 //
 // The guard lives here — and is invoked from `drizzle.config.ts`, which

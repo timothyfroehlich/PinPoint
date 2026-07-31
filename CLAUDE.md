@@ -19,11 +19,9 @@
 
 `REVIEW.md` at the repo root is the canonical review rubric, shared with Copilot and Antigravity. Read it before launching the code-review skill.
 
-### Sandbox & Playwright
+### Sandbox network isolation
 
-- The macOS sandbox blocks Chromium's Mach port IPC, causing `MachPortRendezvousServer: Permission denied` crashes.
-- Playwright commands are excluded from sandboxing via `excludedCommands` in `.claude/settings.local.json`. If you see Mach port errors, verify the command prefix matches an entry there (env var prefixes like `SKIP_SUPABASE_RESET=true` need separate entries).
-- `gh` CLI TLS errors are fixed by `enableWeakerNetworkIsolation: true` in the same file.
+- `gh` CLI TLS errors are fixed by `enableWeakerNetworkIsolation: true` in `.claude/settings.local.json`.
 
 ### Working Style
 
@@ -73,4 +71,4 @@ See `pinpoint-orchestrator` skill for the full workflow and known-bug details.
 
 ### Session Completion (Claude Code specifics)
 
-The "Landing the Plane" checklist in AGENTS.md applies to the lead agent and solo sessions.
+The "Landing the plane" checklist (`pinpoint-pr-workflow` skill, Phases 4–5) applies to the lead agent and solo sessions.
