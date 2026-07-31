@@ -75,8 +75,13 @@ done
 # %x1f (unit separator) between fields, %x1e (record separator) between commits:
 # commit subjects routinely contain every other punctuation character, and a
 # tab/pipe delimiter would split mid-title.
+#
+# %cd, not %ad: `--since` filters on the committer date, and the rendered
+# "newest <date>" is the block's staleness signal. Author dates survive rebases
+# and cherry-picks unchanged, so a freshly-landed commit can carry a
+# weeks-old %ad — which would make a current digest report itself as stale.
 LOG_RAW=$(git log "$TRUNK" --no-merges --since="$SINCE" \
-  --pretty=format:'%h%x1f%ad%x1f%s%x1e' --date=short 2>/dev/null) || LOG_RAW=""
+  --pretty=format:'%h%x1f%cd%x1f%s%x1e' --date=short 2>/dev/null) || LOG_RAW=""
 
 BRANCH_RAW=""
 if (( SHOW_BRANCHES )); then

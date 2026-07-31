@@ -255,6 +255,13 @@ if [[ "$SOURCE" == "compact" ]]; then
     printf 'direction, or you picked up something new since your last huddle post,\n'
     printf 'say so in one line — peers only see what you write down.\n'
     printf '    bd comments add %s "Your update. —%s"\n\n' "$_TODAY_ID_COMPACT" "$NAME"
+    # Same caveat as the startup path: with rotation pending there is no daily
+    # for today yet, so the id above is a literal placeholder rather than a
+    # command you can paste.
+    if [[ -n "$ROTATION_PENDING" ]]; then
+      printf 'NOTE: rotation is pending, so the bead id above is a placeholder. Dispatch the\n'
+      printf 'rotation subagent first — it reports the new id — then substitute it.\n\n'
+    fi
   else
     # shellcheck disable=SC2016  # backticks are literal Markdown
     printf 'This session (`%s`) is not registered in the huddle. Register with:\n' "$SESSION_ID"
