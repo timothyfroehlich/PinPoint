@@ -650,6 +650,19 @@ class TestPinnedProjectId:
         assert read_pinned_project_id(tmp_path) is None
         assert resolve_project_id(tmp_path, "feat/new") == "pinpoint-feat-new"
 
+    def test_hashed_max_length_id_is_pinnable(self, tmp_path: Path) -> None:
+        # Long branches (every `worktree-agent-*`/`feat/…-PP-…` name) hash to
+        # exactly MAX_PROJECT_ID_LEN. An off-by-one in the length gate would
+        # silently refuse to pin the most common case.
+        long_branch = "feat/pin-worktree-supabase-project-id-PP-4936"
+        derived = branch_to_project_id(long_branch)
+        assert len(derived) == 40
+
+        self._write_config(tmp_path, f'project_id = "{derived}"\n')
+
+        assert read_pinned_project_id(tmp_path) == derived
+        assert resolve_project_id(tmp_path, "some/other-branch") == derived
+
     def test_trailing_newline_in_id_is_rejected(self, tmp_path: Path) -> None:
         # A `$`-anchored check would accept this and write a corrupt id back.
         self._write_config(tmp_path, 'project_id = "pinpoint-broken\n"\n')
