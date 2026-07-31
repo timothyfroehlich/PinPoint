@@ -56,7 +56,7 @@ The counter-case, from PP-22e4: **creation-type prohibitions cannot be path-scop
 
 Delete the redundant copies and keep the best-written one at the correct tier. **Merge before deleting** when the copies each carry detail the others lack — the failure mode here is not duplication, it is deleting the copy that happened to hold the useful part.
 
-⚠️ **Search with `rg --hidden`.** Default `rg` skips dotfile directories, so `.agents/` and `.claude/` are invisible and a dedupe sweep will report false-clean. This exact blind spot let a live `CORE-ARCH-002` citation survive a hand-check that reported clean.
+⚠️ **Search with `rg --hidden`.** Default `rg` skips dotfile directories, so `.agents/` and `.claude/` are invisible and a dedupe sweep will report false-clean. This exact blind spot let a live citation of a rule being retired (PP-nw80) survive a hand-check that reported clean.
 
 ## Worked examples
 
