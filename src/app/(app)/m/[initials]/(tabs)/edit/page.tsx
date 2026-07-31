@@ -1,7 +1,7 @@
 import type React from "react";
 import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, MapPin } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
@@ -10,7 +10,6 @@ import {
   checkPermission,
   type OwnershipContext,
 } from "~/lib/permissions/index";
-import { PinballmapListingControl } from "~/components/machines/PinballmapListingControl";
 import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
 import { getPinballMapState } from "~/lib/pinballmap/state";
 import { formatDateTime } from "~/lib/dates";
@@ -132,10 +131,13 @@ export default async function MachineEditPage({
   const locationUrl = pinballmapLocationUrl();
 
   return (
-    // The panel is narrower than the tab strip above it: these are form fields,
-    // and a full-width text input on desktop is a worse target than a measured
-    // column. `max-w-3xl` is what PageContainer size="narrow" used to give it.
-    <div className="max-w-3xl space-y-6">
+    // Capped at 4xl rather than filling the tab strip's width: these are form
+    // fields, and a full-width text input on a wide monitor is a worse target
+    // than a measured column. `@container` is what lets the fields inside pair
+    // up two-up at `@xl` — they respond to THIS panel's width, not the
+    // viewport's (CORE-RESP-001..004), so the pairing behaves the same whether
+    // or not a future layout puts something beside it.
+    <div className="@container max-w-4xl space-y-5">
       {/* Details — these fields save together. */}
       <section className="space-y-4" aria-labelledby="section-details">
         <h2 id="section-details" className="text-base font-semibold">
@@ -188,14 +190,31 @@ export default async function MachineEditPage({
           )}
         </div>
 
-        <PinballmapListingControl
-          machineId={machine.id}
-          hasCatalogLink={machine.pinballmapMachineId !== null}
-          listed={machine.pinballmapListed}
-          lmxId={machine.pinballmapLmxId}
-          canLink={canLink}
-          pinballmapUrl={locationUrl}
-        />
+        {/* Placeholder, not the real control. PP-o355.21 replaces the #1683
+            listing control wholesale — its states are DERIVED from the last
+            sync snapshot rather than discovered by pressing "Connect", and
+            "Connect"/"Verify" are retired outright. Shipping the old control on
+            this new tab would teach an idiom we're about to take away, and its
+            "Not listed" badge is wrong for machines that are in fact on the
+            map. So the box holds its place and says nothing it would have to
+            walk back. "Sync now" above is real and still works. */}
+        <section
+          aria-label="Pinball Map listing"
+          className="space-y-2 rounded-md border border-outline bg-surface p-3"
+        >
+          <div className="flex items-center gap-2">
+            <MapPin
+              aria-hidden="true"
+              className="size-4 text-muted-foreground"
+            />
+            <h3 className="text-sm font-medium text-foreground">
+              Pinball Map listing
+            </h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Listing controls are coming soon.
+          </p>
+        </section>
       </section>
 
       {/* Danger zone — applies immediately. Machine deletion joins this

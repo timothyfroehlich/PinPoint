@@ -202,4 +202,24 @@ describe("MachineDetailsForm", () => {
       .soft(screen.getByRole("combobox"))
       .toHaveTextContent("Off the Floor");
   });
+
+  // Name and Availability sit side by side at `@xl` (see the layout comment in
+  // machine-details-form.tsx). CSS grid placement does NOT reorder the DOM, so
+  // pairing them changed the keyboard path to Name → Availability → Model. That
+  // was accepted deliberately for the vertical space, but it is exactly the
+  // kind of decision that gets silently undone by a later layout tweak — so
+  // pin the order itself rather than the Tailwind classes that produce it.
+  it("keeps keyboard order Name → Availability → PinballMap fields", () => {
+    render(<MachineDetailsForm {...baseProps} />);
+
+    const name = screen.getByLabelText(/Machine Name/);
+    const availability = screen.getByRole("combobox");
+    const pinballMapFields = screen.getByTestId("pbm-link-field");
+
+    const follows = (a: Element, b: Element): boolean =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    expect.soft(follows(name, availability)).toBe(true);
+    expect.soft(follows(availability, pinballMapFields)).toBe(true);
+  });
 });

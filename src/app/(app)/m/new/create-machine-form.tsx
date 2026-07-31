@@ -356,17 +356,19 @@ export function CreateMachineForm({
         </div>
 
         {/* PinballMap listing — a brand-new machine always starts unlisted.
-            Connecting it to a PinballMap entry (the state-aware control) happens
-            from the machine's Edit dialog once it exists and has an id to act on
-            (PP-o355.12 read side). */}
+            Listing happens after creation, from the machine's Manage tab, once
+            it exists and has an id to act on. Deliberately vague about the
+            control: the Edit dialog is gone (PP-o355.19) and the listing
+            control itself is being rebuilt (PP-o355.21), so naming a button
+            here would only go stale again. */}
         <div className="flex items-start gap-2">
           <MapPin
             aria-hidden="true"
             className="mt-0.5 size-4 text-muted-foreground"
           />
           <p className="text-sm text-muted-foreground">
-            Connect this machine to its PinballMap listing after creating it —
-            open its Edit dialog and use &ldquo;Connect to PinballMap&rdquo;.
+            Not yet on Pinball Map — you can list this machine from its Manage
+            tab after creating it.
           </p>
         </div>
 

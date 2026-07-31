@@ -134,33 +134,70 @@ export function MachineDetailsForm({
       // Any native input event marks the section dirty. Radix Select changes
       // do not bubble `input`, so Availability flags dirtiness explicitly.
       onInput={() => setIsDirty(true)}
-      className="space-y-6"
+      className="space-y-4"
       data-testid="machine-details-form"
     >
       <input type="hidden" name="id" value={machineId} />
 
       {state && !state.ok && (
-        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive">
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive-text">
           <p className="text-sm font-medium" role="alert">
             {state.message}
           </p>
         </div>
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="edit-name" className="text-foreground">
-          Machine Name <span aria-hidden="true">*</span>
-        </Label>
-        <Input
-          id="edit-name"
-          name="name"
-          type="text"
-          required
-          defaultValue={name}
-          placeholder="e.g., Medieval Madness"
-          enterKeyHint="next"
-          className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
-        />
+      {/* Name and Availability share a row once the container is wide enough.
+          This pairing is deliberate but NOT semantic — unlike Model/Edition
+          (which pair inside PinballMapLinkField, where Edition is meaningless
+          without a Model), these two fields have nothing to do with each other
+          and are paired purely because both are short. The tradeoff was taken
+          knowingly: multi-column forms cost some scanning speed when the
+          columns aren't related, and it makes tab order Name → Availability →
+          Model, but it buys enough vertical space that the whole tab —
+          including Danger zone — fits above the fold at 1440x900. Tab order is
+          pinned by a test in machine-details-form.test.tsx; if you unpair
+          these, that test is the thing that will tell you. */}
+      <div className="grid gap-4 @xl:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-name" className="text-foreground">
+            Machine Name <span aria-hidden="true">*</span>
+          </Label>
+          <Input
+            id="edit-name"
+            name="name"
+            type="text"
+            required
+            defaultValue={name}
+            placeholder="e.g., Medieval Madness"
+            enterKeyHint="next"
+            className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-presence" className="text-foreground">
+            Availability
+          </Label>
+          <Select
+            name="presenceStatus"
+            defaultValue={presenceStatus}
+            onValueChange={() => setIsDirty(true)}
+          >
+            <SelectTrigger
+              id="edit-presence"
+              className="border-outline bg-surface text-foreground"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {VALID_MACHINE_PRESENCE_STATUSES.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {getMachinePresenceLabel(status)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {canLink && (
@@ -172,7 +209,7 @@ export function MachineDetailsForm({
         />
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {/* No htmlFor: RichTextEditor is a contenteditable widget with no
             focusable `id`. Its accessible name comes from `ariaLabel`. */}
         <Label className="text-foreground">Description</Label>
@@ -186,38 +223,13 @@ export function MachineDetailsForm({
           placeholder="Add a description for this machine..."
           ariaLabel="Machine description"
           compact={false}
-          className="min-h-[120px]"
+          className="min-h-[96px]"
         />
         <input
           type="hidden"
           name="description"
           value={descriptionDoc ? JSON.stringify(descriptionDoc) : ""}
         />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="edit-presence" className="text-foreground">
-          Availability
-        </Label>
-        <Select
-          name="presenceStatus"
-          defaultValue={presenceStatus}
-          onValueChange={() => setIsDirty(true)}
-        >
-          <SelectTrigger
-            id="edit-presence"
-            className="border-outline bg-surface text-foreground"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {VALID_MACHINE_PRESENCE_STATUSES.map((status) => (
-              <SelectItem key={status} value={status}>
-                {getMachinePresenceLabel(status)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="flex items-center justify-end gap-3">

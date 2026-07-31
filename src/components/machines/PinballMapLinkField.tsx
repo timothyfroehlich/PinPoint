@@ -207,7 +207,7 @@ export function PinballMapLinkField({
       : "Search for a model…";
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 @xl:grid @xl:grid-cols-2 @xl:gap-4 @xl:space-y-0">
       <input type="hidden" name="pbmLinkPresent" value="1" />
       {excluded && <input type="hidden" name="pinballmapExcluded" value="on" />}
       {/* When the edition step is shown, the <select> below carries
@@ -221,137 +221,149 @@ export function PinballMapLinkField({
         />
       )}
 
-      <Label
-        htmlFor={triggerId}
-        className="flex items-baseline gap-2 text-foreground"
-      >
-        Model
-        <span className="text-xs font-normal text-muted-foreground">
-          source: Pinball Map
-        </span>
-      </Label>
-
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            id={triggerId}
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            disabled={disabled}
-            data-testid="pinballmap-link-select"
-            className="w-full justify-between border-outline bg-surface text-foreground font-normal"
-          >
-            <span
-              className={
-                family || excluded ? "text-foreground" : "text-muted-foreground"
-              }
-            >
-              {family
-                ? `${family.name}${familyMeta ? ` · ${familyMeta}` : ""}`
-                : excluded
-                  ? "Not on Pinball Map"
-                  : placeholderLabel}
-            </span>
-            <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-(--radix-popover-trigger-width) p-0"
-          align="start"
+      {/* Model's label + trigger are wrapped so the root grid can lay Model and
+          Edition side by side once the container is wide enough. Unlike the
+          Name/Availability pairing on the form above, this one is semantic:
+          Edition is meaningless without a Model, its control only appears once
+          a Model with multiple editions is picked, and the second column is
+          otherwise a placeholder reading "Pick a model first". Keeping them on
+          one row is what makes that dependency legible. */}
+      <div className="space-y-1.5">
+        <Label
+          htmlFor={triggerId}
+          className="flex items-baseline gap-2 text-foreground"
         >
-          {/* shouldFilter={false}: results are already filtered server-side. */}
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="e.g. Medieval Madness"
-              value={query}
-              onValueChange={setQuery}
-            />
-            <CommandList>
-              {loading ? (
-                <div
-                  role="status"
-                  className="px-3 py-4 text-xs text-muted-foreground"
-                >
-                  Searching…
-                </div>
-              ) : query.trim().length === 0 ? (
-                <div className="px-3 py-4 text-xs text-muted-foreground">
-                  Type a title to search Pinball Map.
-                </div>
-              ) : results.length > 0 ? (
-                <CommandGroup>
-                  {results.map((r) => {
-                    const meta = formatMeta(r.manufacturer, r.year);
-                    const key =
-                      r.machineGroupId !== null
-                        ? `g${r.machineGroupId}`
-                        : `m${r.pinballmapMachineId}`;
-                    return (
-                      <CommandItem
-                        key={key}
-                        value={key}
-                        onSelect={() => handlePickFamily(r)}
-                      >
-                        <div className="flex flex-col">
-                          <span>
-                            {r.name}
-                            {r.editionCount > 1 && (
-                              <span className="ml-1.5 text-[10px] text-muted-foreground">
-                                {r.editionCount} editions
+          Model
+          <span className="text-xs font-normal text-muted-foreground">
+            source: Pinball Map
+          </span>
+        </Label>
+
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              id={triggerId}
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              disabled={disabled}
+              data-testid="pinballmap-link-select"
+              className="w-full justify-between border-outline bg-surface text-foreground font-normal"
+            >
+              <span
+                className={
+                  family || excluded
+                    ? "text-foreground"
+                    : "text-muted-foreground"
+                }
+              >
+                {family
+                  ? `${family.name}${familyMeta ? ` · ${familyMeta}` : ""}`
+                  : excluded
+                    ? "Not on Pinball Map"
+                    : placeholderLabel}
+              </span>
+              <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-(--radix-popover-trigger-width) p-0"
+            align="start"
+          >
+            {/* shouldFilter={false}: results are already filtered server-side. */}
+            <Command shouldFilter={false}>
+              <CommandInput
+                placeholder="e.g. Medieval Madness"
+                value={query}
+                onValueChange={setQuery}
+              />
+              <CommandList>
+                {loading ? (
+                  <div
+                    role="status"
+                    className="px-3 py-4 text-xs text-muted-foreground"
+                  >
+                    Searching…
+                  </div>
+                ) : query.trim().length === 0 ? (
+                  <div className="px-3 py-4 text-xs text-muted-foreground">
+                    Type a title to search Pinball Map.
+                  </div>
+                ) : results.length > 0 ? (
+                  <CommandGroup>
+                    {results.map((r) => {
+                      const meta = formatMeta(r.manufacturer, r.year);
+                      const key =
+                        r.machineGroupId !== null
+                          ? `g${r.machineGroupId}`
+                          : `m${r.pinballmapMachineId}`;
+                      return (
+                        <CommandItem
+                          key={key}
+                          value={key}
+                          onSelect={() => handlePickFamily(r)}
+                        >
+                          <div className="flex flex-col">
+                            <span>
+                              {r.name}
+                              {r.editionCount > 1 && (
+                                <span className="ml-1.5 text-[10px] text-muted-foreground">
+                                  {r.editionCount} editions
+                                </span>
+                              )}
+                            </span>
+                            {meta.length > 0 && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {meta}
                               </span>
                             )}
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                ) : (
+                  // Searched with no match → surface the "Not on PinballMap"
+                  // fallback here (not before someone has looked), so the choice
+                  // only appears once the catalog has actually come up empty.
+                  <>
+                    <p className="px-3 pt-3 pb-1 text-xs text-muted-foreground">
+                      No Pinball Map match for “{query.trim()}”.
+                    </p>
+                    <CommandGroup>
+                      <CommandItem
+                        value="__not_on_pinballmap__"
+                        onSelect={handlePickExcluded}
+                        data-testid="pinballmap-not-on-map"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium text-foreground">
+                            Not on Pinball Map
                           </span>
-                          {meta.length > 0 && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {meta}
-                            </span>
-                          )}
+                          <span className="text-[10px] text-muted-foreground">
+                            Pinball Map only maps standard pinball machines —
+                            pick this for novelty or non-pinball games it
+                            won&apos;t list.
+                          </span>
                         </div>
                       </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              ) : (
-                // Searched with no match → surface the "Not on PinballMap"
-                // fallback here (not before someone has looked), so the choice
-                // only appears once the catalog has actually come up empty.
-                <>
-                  <p className="px-3 pt-3 pb-1 text-xs text-muted-foreground">
-                    No Pinball Map match for “{query.trim()}”.
-                  </p>
-                  <CommandGroup>
-                    <CommandItem
-                      value="__not_on_pinballmap__"
-                      onSelect={handlePickExcluded}
-                      data-testid="pinballmap-not-on-map"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-medium text-foreground">
-                          Not on Pinball Map
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          Pinball Map only maps standard pinball machines — pick
-                          this for novelty or non-pinball games it won&apos;t
-                          list.
-                        </span>
-                      </div>
-                    </CommandItem>
-                  </CommandGroup>
-                </>
-              )}
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+                    </CommandGroup>
+                  </>
+                )}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
 
-      {/* Edition / Reason — one always-present slot so the field never reflows.
+        {/* Edition / Reason — one always-present slot so the field never reflows.
           It's the required edition picker for an ambiguous multi-edition family;
           when the machine is marked Not on PinballMap it becomes the reason
           input instead; otherwise it's a disabled slot with contextual text.
           The select carries pinballmapMachineId natively when shown; otherwise
           the hidden input above does. */}
+      </div>
+
       <div className="space-y-1.5">
         {/* Associate the label only with a control that actually renders: the
             reason input when excluded, the edition select when one is needed.
@@ -367,7 +379,7 @@ export function PinballMapLinkField({
         >
           {excluded ? "Reason (optional)" : "Edition"}
           {needsEdition && !excluded && (
-            <span className="text-destructive"> *</span>
+            <span className="text-destructive-text"> *</span>
           )}
         </Label>
         {excluded ? (
@@ -379,6 +391,10 @@ export function PinballMapLinkField({
             placeholder="e.g. novelty game, not real pinball"
             maxLength={200}
             disabled={disabled}
+            // Same surface treatment as every other input on this page. Without
+            // it the shared Input base (`bg-input/30 border-input`) renders
+            // dimmer than its neighbours and reads as disabled.
+            className="border-outline bg-surface text-foreground placeholder:text-muted-foreground"
             aria-label="Reason this machine is not on Pinball Map"
           />
         ) : needsEdition ? (
