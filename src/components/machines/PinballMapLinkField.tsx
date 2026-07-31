@@ -48,7 +48,7 @@ import {
  * The server re-derives manufacturer/year/OPDB/IPDB from the catalog on save,
  * never trusting the client.
  *
- * ## Submission (native form, progressive enhancement)
+ * ## Submission (native form)
  * - `pbmLinkPresent=1` — marks that this form manages the link, so the action
  *   treats the submitted state as authoritative (and never wipes the link from
  *   other edit surfaces that omit the marker).

@@ -143,7 +143,7 @@ export function ProfileEditor({
         </div>
       </div>
 
-      {/* Text fields — progressive-enhancement form */}
+      {/* Text fields — native form submit */}
       <form
         action={profileAction}
         className="space-y-4 rounded-xl border border-outline-variant bg-card p-4"

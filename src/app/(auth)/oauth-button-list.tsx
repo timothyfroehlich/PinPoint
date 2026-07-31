@@ -5,11 +5,12 @@ import { getAvailableProviders } from "~/lib/auth/providers";
 import { signInWithProviderAction } from "~/app/(auth)/oauth-actions";
 
 /**
- * Renders one progressive-enhancement <form action> per available provider.
+ * Renders one `<form action>` per available provider.
  *
  * Server Component — iterates the provider registry at render time and reads
- * the `DISCORD_CLIENT_ID` env var (server-only). The wrapping `<form>` is how
- * we keep this JS-free: no onClick handler, progressive enhancement works.
+ * the `DISCORD_CLIENT_ID` env var (server-only). Submitting through the
+ * wrapping `<form>` rather than an onClick handler is what keeps this a
+ * Server Component: no client bundle, no hydration.
  *
  * When no providers are configured, renders `null` (no stray separator).
  */

@@ -41,7 +41,7 @@ import {
  *   reassign dialog — render the identical list without a redundant popover.
  * - `MachineCombobox` wraps that list in a Popover with a trigger button, for
  *   inline form use (the report form). An optional hidden `<input>` (via `name`)
- *   keeps it compatible with native/progressive-enhancement form submission.
+ *   keeps it compatible with native form submission.
  *
  * Filtering matches on both the machine name and its initials, so "GZ" and
  * "God" both find Godzilla.

@@ -10,8 +10,9 @@ import { cn } from "~/lib/utils";
  * Uses zxcvbn (Dropbox's password strength library) to evaluate password strength.
  * Shows visual feedback and suggestions for improvement.
  *
- * Progressive enhancement: This is a client component for interactivity,
- * but the form still works without JavaScript (validation happens server-side).
+ * Advisory only — this client component never gates submission. Password
+ * rules are enforced server-side, so the meter cannot pass something the
+ * action would reject, or block something it would accept.
  */
 export function PasswordStrength({
   password,
