@@ -57,16 +57,33 @@ usage: apply_remote.sh --manifest <path> [--host <ssh-host>] [--dry-run|--stage-
 EOF
 }
 
+# `shift 2` with a single argument left returns nonzero, which under `set -e`
+# kills the script before any usage message can print - so the value is checked
+# explicitly rather than relying on the later required-argument check.
+require_value() {
+  if [[ $2 -lt 2 ]]; then
+    echo "$1 requires a value" >&2
+    usage
+    exit 2
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --manifest) MANIFEST="${2:-}"; shift 2 ;;
-    --host) HOST="${2:-}"; shift 2 ;;
+    --manifest) require_value "$1" $#; MANIFEST="$2"; shift 2 ;;
+    --host) require_value "$1" $#; HOST="$2"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     --stage-only) STAGE_ONLY=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage; exit 2 ;;
   esac
 done
+
+if [[ "${DRY_RUN}" -eq 1 && "${STAGE_ONLY}" -eq 1 ]]; then
+  echo "--dry-run and --stage-only are mutually exclusive" >&2
+  usage
+  exit 2
+fi
 
 # Validate everything BEFORE touching the remote, so a typo never spins up work
 # on the other machine.
@@ -137,10 +154,47 @@ EOF
   exit 0
 fi
 
+# Clear any previous run's result BEFORE dispatching. REMOTE_RESULT is a fixed
+# path, so a run that exits 0 without writing one would otherwise return the
+# last run's document - and the lead would report last week's ids as applied
+# this week, believing the machines synced when they did not.
+echo "==> clearing any stale result on ${HOST}" >&2
+# shellcheck disable=SC2029  # intended: a fixed /tmp path, expanded here on purpose
+ssh "${HOST}" "rm -f ${REMOTE_RESULT}"
+
 echo "==> dispatching headless claude on ${HOST}" >&2
+# The remote agent may have applied part of the manifest before failing, so its
+# exit status must not abort us before we retrieve the record of what changed.
+apply_status=0
 # shellcheck disable=SC2029  # intended: paths resolve here, $HOME in REMOTE_CLAUDE resolves there
-ssh "${HOST}" "cd ${REMOTE_REPO} && ${REMOTE_CLAUDE} -p $(printf '%q' "${PROMPT}")" >&2
+ssh "${HOST}" "cd ${REMOTE_REPO} && ${REMOTE_CLAUDE} -p $(printf '%q' "${PROMPT}")" >&2 \
+  || apply_status=$?
+
+if [[ "${apply_status}" -ne 0 ]]; then
+  echo "==> remote agent exited ${apply_status}; retrieving result anyway" >&2
+fi
 
 echo "==> retrieving result" >&2
+result=""
 # shellcheck disable=SC2029  # intended: a fixed /tmp path, expanded here on purpose
-ssh "${HOST}" "cat ${REMOTE_RESULT}"
+result="$(ssh "${HOST}" "cat ${REMOTE_RESULT}" 2>/dev/null)" || result=""
+
+if [[ -z "${result}" ]]; then
+  echo "no result document at ${HOST}:${REMOTE_RESULT} - the remote agent wrote nothing." >&2
+  echo "The remote store may still have been modified; check its snapshot." >&2
+  exit 1
+fi
+
+if ! printf '%s' "${result}" | python3 -c '
+import json, sys
+doc = json.load(sys.stdin)
+missing = [k for k in ("schema_version", "machine", "applied", "disputed", "failed") if k not in doc]
+if missing:
+    sys.exit("result document is missing keys: " + ", ".join(missing))
+' >&2; then
+  echo "refusing to report an unrecognised result document" >&2
+  exit 1
+fi
+
+printf '%s\n' "${result}"
+exit "${apply_status}"

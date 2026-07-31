@@ -38,8 +38,13 @@ def machine(tmp_path: Path) -> dict[str, Path]:
 
     projects = claude / "projects"
     home_slug = str(home).replace("/", "-")
+    # Claude derives a store's directory name from the project's ABSOLUTE path,
+    # so the in-scope slug has to be computed from the fixture's real repo path -
+    # a hardcoded name would never match --repo and every test would see
+    # "other-project".
+    repo_slug = str(repo).replace("/", "-")
 
-    project_store = projects / "-home-someone-Code-PinPoint" / "memory"
+    project_store = projects / repo_slug / "memory"
     _memory_file(
         project_store,
         "keeper",
@@ -61,9 +66,19 @@ def machine(tmp_path: Path) -> dict[str, Path]:
     )
 
     _memory_file(
-        projects / "-home-someone-Code-PinPoint--claude-worktrees-agent-abc" / "memory",
+        projects / f"{repo_slug}--claude-worktrees-agent-abc" / "memory",
         "orphan",
         description="written in a worktree",
+        mtype="project",
+    )
+
+    # A different repo's store. Must never be mistaken for in-scope: the review
+    # would otherwise verify, dedupe and propose deleting another project's
+    # memories.
+    _memory_file(
+        projects / "-home-someone-Code-SomeOtherRepo" / "memory",
+        "foreign",
+        description="belongs to a different project entirely",
         mtype="project",
     )
 
@@ -109,7 +124,72 @@ def _store(doc: dict, scope: str) -> dict:
 
 def test_classifies_project_home_and_worktree_scopes(machine):
     doc = _run(machine)
-    assert {s["scope"] for s in doc["memory_stores"]} == {"project", "home", "worktree"}
+    assert {s["scope"] for s in doc["memory_stores"]} == {
+        "project",
+        "home",
+        "worktree",
+        "other-project",
+    }
+
+
+def test_only_the_repo_passed_in_is_scoped_project(machine):
+    """--repo has to actually scope the corpus. Without this, every unrelated
+    repo's memory store under ~/.claude/projects is indistinguishable from the
+    one under review, and a pass could propose deleting another project's
+    memories."""
+    doc = _run(machine)
+    in_scope = [s for s in doc["memory_stores"] if s["scope"] == "project"]
+    assert len(in_scope) == 1
+    assert in_scope[0]["slug"] == str(machine["repo"]).replace("/", "-")
+
+    foreign = [s for s in doc["memory_stores"] if s["scope"] == "other-project"]
+    assert [s["slug"] for s in foreign] == ["-home-someone-Code-SomeOtherRepo"]
+
+
+def test_a_worktree_path_still_scopes_to_the_main_checkout(machine):
+    """The review is usually run from a worktree. Passing that path as --repo
+    must still put the MAIN checkout's memories in scope - otherwise the corpus
+    that matters is silently labelled other-project and dropped."""
+    worktree = machine["repo"] / ".claude" / "worktrees" / "some-branch"
+    worktree.mkdir(parents=True)
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--repo",
+            str(worktree),
+            "--home",
+            str(machine["home"]),
+            "--claude-dir",
+            str(machine["claude"]),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    doc = json.loads(proc.stdout)
+    in_scope = [s for s in doc["memory_stores"] if s["scope"] == "project"]
+    assert [s["slug"] for s in in_scope] == [str(machine["repo"]).replace("/", "-")]
+
+
+def test_worktree_scope_is_repo_relative(machine):
+    """A worktree slug belonging to a different repo is that repo's problem, not
+    ours - it must not land in this review's worktree bucket."""
+    other_wt = (
+        machine["claude"]
+        / "projects"
+        / "-home-someone-Code-SomeOtherRepo--claude-worktrees-agent-zzz"
+        / "memory"
+    )
+    _memory_file(
+        other_wt, "far", description="another repo's worktree", mtype="project"
+    )
+    doc = _run(machine)
+    worktrees = [s for s in doc["memory_stores"] if s["scope"] == "worktree"]
+    assert all(
+        s["slug"].startswith(str(machine["repo"]).replace("/", "-")) for s in worktrees
+    )
+    assert len(worktrees) == 1
 
 
 def test_skips_slug_dirs_without_a_memory_subdir(machine):
@@ -149,7 +229,11 @@ def test_collects_context_files_and_skills(machine):
     doc = _run(machine)
     kinds = {c["kind"]: c for c in doc["context_files"]}
     assert kinds["project-claude-md"]["exists"] is True
-    assert kinds["project-claude-md"]["lines"] == 3
+    # "# project\nline two\n" is TWO lines. A trailing newline terminates the
+    # last line, it does not start a new one - and AGENTS.md's <=10-line CI gate
+    # is the stated consumer of this number, so an off-by-one reads a compliant
+    # 10-line stub as a violation.
+    assert kinds["project-claude-md"]["lines"] == 2
     assert kinds["global-claude-md"]["exists"] is True
     assert kinds["review-md"]["exists"] is False
     assert doc["skills"] == [
@@ -160,6 +244,25 @@ def test_collects_context_files_and_skills(machine):
             "bytes": doc["skills"][0]["bytes"],
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        ("", 0),
+        ("one\n", 1),
+        ("one", 1),
+        ("one\ntwo\n", 2),
+        ("one\ntwo", 2),
+        ("one\n\nthree\n", 3),
+    ],
+)
+def test_line_count_matches_wc_l_semantics(machine, content, expected):
+    """Line counts feed a CI gate expressed in `wc -l` terms, so they have to
+    agree with it rather than counting the terminating newline as a line."""
+    (machine["repo"] / "CLAUDE.md").write_text(content, encoding="utf-8")
+    kinds = {c["kind"]: c for c in _run(machine)["context_files"]}
+    assert kinds["project-claude-md"]["lines"] == expected
 
 
 def test_imports_only_dependency_free_stdlib():

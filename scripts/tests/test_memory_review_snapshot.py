@@ -108,6 +108,25 @@ def test_snapshots_worktree_scoped_stores_too(machine):
     assert any("worktrees" in s["slug"] for s in receipt["stores"])
 
 
+def test_pruning_ignores_directories_that_are_not_snapshots(machine):
+    """The design expects humans to restore by hand from this root, so anything
+    they leave here must be out of the deletion pool. Name-ordering makes it
+    worse than it sounds: digits sort before letters, so a stray `restored/`
+    survives while a real oldest snapshot is destroyed in its place."""
+    (machine["dest"]).mkdir(parents=True, exist_ok=True)
+    keeper = machine["dest"] / "restored"
+    keeper.mkdir()
+    (keeper / "important.md").write_text("hand-restored", encoding="utf-8")
+
+    for stamp in ("20260701-000000", "20260702-000000"):
+        _run(machine, "--stamp", stamp)
+    receipt = _run(machine, "--stamp", "20260703-000000", "--keep", "1")
+
+    assert keeper.is_dir(), "a non-snapshot directory must never be pruned"
+    assert (keeper / "important.md").exists()
+    assert receipt["pruned"] == ["20260701-000000", "20260702-000000"]
+
+
 def test_imports_only_dependency_free_stdlib():
     tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
     imported: set[str] = set()
@@ -117,6 +136,15 @@ def test_imports_only_dependency_free_stdlib():
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
             imported.add(node.module.split(".")[0])
 
-    allowed = {"__future__", "argparse", "datetime", "json", "shutil", "sys", "pathlib"}
+    allowed = {
+        "__future__",
+        "argparse",
+        "datetime",
+        "json",
+        "re",
+        "shutil",
+        "sys",
+        "pathlib",
+    }
     assert imported <= allowed, f"unexpected imports: {sorted(imported - allowed)}"
     assert "subprocess" not in imported

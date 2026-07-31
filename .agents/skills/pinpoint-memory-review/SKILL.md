@@ -35,7 +35,9 @@ bd memories
 
 ⚠️ If Bazzite is unreachable, try `bazzite-lan` before concluding anything is wrong — and note that **`tailscale ping` succeeding proves nothing**, since disco pings ride outside WireGuard. A 1.96.4 magicsock bug once made the tailnet look perfectly healthy while dropping every byte of data.
 
-Each inventory reports `memory_stores[]` with a `scope` of `project`, `home`, or `worktree`; `context_files[]`; `rules` (whose `exists` is `false` until PP-22e4 PR 8 lands); and `skills[]`.
+Each inventory reports `memory_stores[]` with a `scope`, plus `context_files[]`, `rules` (whose `exists` is `false` until PP-22e4 PR 8 lands), and `skills[]`.
+
+**The corpus is `project` + `home` + `worktree` only.** `~/.claude/projects` holds a store for every repo Tim has ever opened, and those come back as **`other-project`** — read them for context if you like, but never verify, dedupe, or propose changes to them. They belong to a different project. Passing a worktree path as `--repo` is fine; the collector resolves it back to the main checkout, which is where the memories that matter live.
 
 **Read the index drift for free.** Compare each store's `index.pointers` against its `entries[].file`:
 

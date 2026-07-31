@@ -24,6 +24,11 @@ import sys
 from pathlib import Path
 
 WORKTREE_MARKER = "--claude-worktrees-"
+# PinPoint's worktrees live at <main-checkout>/.claude/worktrees/<name>. Claude
+# encodes that whole path into the store slug, so a caller who passes a worktree
+# path as --repo would scope the review to the worktree's own store and push the
+# main checkout's memories - the ones that matter - into "other-project".
+WORKTREE_PATH_SEGMENT = "/.claude/worktrees/"
 LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 INDEX_POINTER_RE = re.compile(r"\(([^)]+\.md)\)")
 FRONTMATTER_KEY_RE = re.compile(r"^\s*([A-Za-z_]+):\s*(.*)$")
@@ -42,7 +47,11 @@ def _read(path: Path) -> str:
 
 
 def _line_count(text: str) -> int:
-    return text.count("\n") + 1
+    """Match `wc -l` semantics: a trailing newline terminates the last line, it
+    does not start another one. This number feeds PP-22e4's <=10-line AGENTS.md
+    CI gate, so counting the terminator would read a compliant stub as a
+    violation."""
+    return len(text.splitlines())
 
 
 def _parse_frontmatter(text: str) -> dict[str, str]:
@@ -109,15 +118,37 @@ def _encode_path(path: Path) -> str:
     return str(path).replace("/", "-")
 
 
-def _classify(slug: str, home: Path) -> str:
-    if WORKTREE_MARKER in slug:
-        return "worktree"
+def main_checkout(repo: Path) -> Path:
+    """Resolve a worktree path back to the main checkout it belongs to.
+
+    Done by string rather than by asking git, because this module must stay
+    subprocess-free to survive being piped to a remote interpreter. A path that
+    is not inside a worktree is returned unchanged.
+    """
+    text = str(repo)
+    head, sep, _ = text.partition(WORKTREE_PATH_SEGMENT)
+    return Path(head) if sep else repo
+
+
+def _classify(slug: str, home: Path, repo: Path) -> str:
+    """Scope a store relative to the repo under review.
+
+    `other-project` matters: `~/.claude/projects` holds a store per repo the user
+    has ever opened, and without this every unrelated project's memories would
+    enter the corpus indistinguishable from the ones being reviewed - which a
+    pass could then propose deleting.
+    """
+    repo_slug = _encode_path(main_checkout(repo))
     if slug == _encode_path(home):
         return "home"
-    return "project"
+    if slug.startswith(f"{repo_slug}{WORKTREE_MARKER}"):
+        return "worktree"
+    if slug == repo_slug:
+        return "project"
+    return "other-project"
 
 
-def collect_memory_stores(claude_dir: Path, home: Path) -> list[dict]:
+def collect_memory_stores(claude_dir: Path, home: Path, repo: Path) -> list[dict]:
     projects = claude_dir / "projects"
     if not projects.is_dir():
         return []
@@ -132,7 +163,7 @@ def collect_memory_stores(claude_dir: Path, home: Path) -> list[dict]:
         stores.append(
             {
                 "slug": slug_dir.name,
-                "scope": _classify(slug_dir.name, home),
+                "scope": _classify(slug_dir.name, home, repo),
                 "path": str(memory),
                 "index": _index_info(memory / "MEMORY.md"),
                 "entry_count": len(entries),
@@ -196,7 +227,7 @@ def build_document(repo: Path, home: Path, claude_dir: Path) -> dict:
         "machine": socket.gethostname(),
         "home": str(home),
         "repo": str(repo),
-        "memory_stores": collect_memory_stores(claude_dir, home),
+        "memory_stores": collect_memory_stores(claude_dir, home, repo),
         "context_files": collect_context_files(repo, home),
         "rules": collect_rules(repo),
         "skills": collect_skills(repo),

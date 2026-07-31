@@ -17,11 +17,17 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
 
 DEFAULT_KEEP = 10
+STAMP_FORMAT = "%Y%m%d-%H%M%S"
+# Only directories matching the stamp shape are ours to delete. Humans are
+# expected to restore by hand out of this root, so anything else they leave here
+# must be outside the deletion pool.
+SNAPSHOT_NAME_RE = re.compile(r"^\d{8}-\d{6}$")
 
 
 def find_stores(claude_dir: Path) -> list[Path]:
@@ -55,10 +61,19 @@ def prune(dest_root: Path, keep: int, current: Path) -> list[str]:
 
     `current` is excluded unconditionally - pruning must never delete the
     snapshot this run just took, no matter what `keep` is set to.
+
+    Only stamp-shaped directories are candidates. Without that filter a stray
+    `restored/` left here by hand is recursively deletable, and because digits
+    sort before letters it would survive while a genuine oldest snapshot was
+    destroyed in its place - a silently wrong retention window.
     """
     if keep <= 0:
         return []
-    existing = sorted(p for p in dest_root.iterdir() if p.is_dir() and p != current)
+    existing = sorted(
+        p
+        for p in dest_root.iterdir()
+        if p.is_dir() and p != current and SNAPSHOT_NAME_RE.match(p.name)
+    )
     doomed = existing[: max(0, len(existing) - (keep - 1))]
     for path in doomed:
         shutil.rmtree(path)
@@ -95,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
         else home / ".pinpoint" / "memory-snapshots"
     )
     stamp = args.stamp or datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y%m%d-%H%M%S"
+        STAMP_FORMAT
     )
 
     snapshot_dir = dest_root / stamp
