@@ -22,24 +22,12 @@ If all five say "E2E is the right layer", write it. Otherwise, the cheapest laye
 ## Quick Start
 
 - **Run Smoke Tests**: `pnpm run smoke` (Fast, critical paths)
-- **Run Full Suite**: `pnpm run e2e:full` (Comprehensive — CI only, don't run locally unless asked)
+- **Run Full Suite**: `pnpm run e2e:full` / `e2e:all` (Comprehensive — CI's job by default; on a resource-constrained system, especially with several agent sessions running, don't run it locally)
 - **Debug Mode**: `pnpm exec playwright test e2e/path/to/test.spec.ts --debug`
 
 ## Which Tests to Run (Decision Tree)
 
-1. **Changed pure logic/utils?** → `pnpm run check` (unit tests, ~12s)
-2. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (~15-30s)
-3. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
-4. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs
-5. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
-6. **NEVER** run `e2e:full` locally unless explicitly asked — that's what CI is for
-
-**Key rules for agents:**
-
-- Always use `--project=chromium` for targeted runs (skip Mobile Chrome unless testing responsive)
-- Use `--headed` for debugging visual issues
-- `pnpm run check` catches 90% of issues — E2E is for integration verification, not iteration
-- If a test is flaky locally, report it — don't retry in a loop
+See the `pinpoint-testing` skill § "Which Tests to Run (Decision Tree)" — canonical, don't duplicate here.
 
 ## The Golden Rule: Worker Isolation
 
@@ -61,6 +49,11 @@ PinPoint E2E tests run in parallel against a **shared database**.
 - **Best Practices**: See [references/e2e-best-practices.md](references/e2e-best-practices.md) for structure and anti-patterns.
 - **Isolation Patterns**: See [references/isolation-patterns.md](references/isolation-patterns.md) for how to use `test-isolation.ts` and `supabase-admin.ts`.
 - **Helpers**: See [references/common-helpers.md](references/common-helpers.md) for `actions.ts`, `page-helpers.ts`, and `mailpit.ts`.
+
+## Sandbox & Playwright (macOS only — does not apply on the Bazzite Linux host)
+
+- The macOS sandbox blocks Chromium's Mach port IPC, causing `MachPortRendezvousServer: Permission denied` crashes.
+- Playwright commands are excluded from sandboxing via `excludedCommands` in `.claude/settings.local.json`. If you see Mach port errors, verify the command prefix matches an entry there (env var prefixes like `SKIP_SUPABASE_RESET=true` need separate entries).
 
 ## Debugging Checklist
 

@@ -26,7 +26,7 @@ import {
 
 const repoRoot = process.cwd();
 
-// Shapes taken from the real endpoints (AGENTS.md §7 / pinpoint-db-connections).
+// Shapes taken from the real endpoints (AGENTS.md §7 / pinpoint-deployment).
 const PROD_POOLER_URL = `postgres://postgres.${PRODUCTION_PROJECT_REF}:pw@aws-0-us-east-2.pooler.supabase.com:6543/postgres`;
 const PROD_DIRECT_URL = `postgres://postgres:pw@db.${PRODUCTION_PROJECT_REF}.supabase.co:5432/postgres`;
 const PROD_API_URL = `https://${PRODUCTION_PROJECT_REF}.supabase.co`;
