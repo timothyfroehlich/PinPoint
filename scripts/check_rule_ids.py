@@ -83,6 +83,17 @@ CATALOG = "docs/NON_NEGOTIABLES.md"
 # Files and globs whose CORE-* citations must resolve. Missing paths are fine:
 # .claude/rules/ does not exist yet -- the context-system rebuild (PP-22e4)
 # lands it in a later PR, and this gate is written to already cover it.
+#
+# .agents/skills/ is here because it is a first-class citation surface, not a
+# doc archive: AGENTS.md section 3 instructs every agent to load the relevant
+# skill for every task, so a skill citing a retired ID misinstructs agents at
+# least as loudly as AGENTS.md would. PP-nw80 found exactly that -- the
+# progressive-enhancement rule survived in pinpoint-design-bible after being
+# deleted from the catalog, with `pnpm run check` green, because this list
+# stopped at .agents/rules/. Note that a bare `rg CORE-ARCH-002 .` will not
+# catch it either: ripgrep skips dotfile directories by default, so .agents/
+# and .claude/ are invisible to the obvious hand-check. This gate is the
+# backstop for that blind spot.
 CITING_SOURCES: tuple[str, ...] = (
     "CLAUDE.md",
     "AGENTS.md",
@@ -90,6 +101,7 @@ CITING_SOURCES: tuple[str, ...] = (
     ".claude/rules/*.md",
     ".claude/rules/**/*.md",
     ".agents/rules/*.md",
+    ".agents/skills/**/*.md",
     ".github/copilot-instructions.md",
     ".github/instructions/*.md",
     ".claude/hooks/*.cjs",

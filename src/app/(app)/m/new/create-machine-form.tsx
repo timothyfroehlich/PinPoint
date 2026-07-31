@@ -222,11 +222,9 @@ export function CreateMachineForm({
        * still reading the error. The text fields were already made controlled
        * for exactly this reason; dispatching `useActionState` directly closes
        * the same hole for the Selects, because no form submission ever
-       * completes and React never fires the reset. Sanctioned exception to
-       * CORE-ARCH-002 — this form already depends on JS end to end (the
-       * success path is a `window.location.assign` redirect), so there is no
-       * no-JS story to preserve. Success still resets explicitly via
-       * `resetForm()`.
+       * completes and React never fires the reset. This form depends on JS end
+       * to end regardless (the success path is a `window.location.assign`
+       * redirect). Success still resets explicitly via `resetForm()`.
        */}
       <form
         ref={formRef}

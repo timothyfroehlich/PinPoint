@@ -1,6 +1,6 @@
 ---
 name: pinpoint-ui
-description: shadcn/ui patterns, progressive enhancement, Server Components, Client Components, form handling, Tailwind CSS v4, accessibility. Use when building UI, forms, components, or when user mentions UI/styling/components/forms.
+description: shadcn/ui patterns, Server Action forms, Server Components, Client Components, form handling, Tailwind CSS v4, accessibility. Use when building UI, forms, components, or when user mentions UI/styling/components/forms.
 ---
 
 # PinPoint UI Guide
@@ -13,7 +13,7 @@ Use this skill when:
 - Creating forms
 - Working with shadcn/ui components
 - Styling with Tailwind CSS v4
-- Implementing progressive enhancement
+- Implementing Server Action forms
 - Deciding between Server and Client Components
 - User mentions: "UI", "component", "form", "styling", "Tailwind", "shadcn", "button", "input"
 
@@ -22,7 +22,7 @@ Use this skill when:
 ### Critical UI Rules
 
 1. **Server Components first**: Default to Server Components, use "use client" only for interactivity
-2. **Progressive enhancement**: Forms must work without JavaScript
+2. **Honest failure** (CORE-ARCH-012): a control that cannot perform its action must not report that it did — never a success confirmation for input that could not have been collected. There is no no-JS requirement.
 3. **shadcn/ui only**: No MUI components
 4. **Direct Server Action references**: No inline wrappers in forms
 5. **Dropdown Server Actions**: Use `onSelect`, not forms
@@ -216,7 +216,7 @@ export function IssueFilter() {
 }
 ```
 
-### Forms with Progressive Enhancement
+### Forms with a direct Server Action reference
 
 ```typescript
 // Direct Server Action reference
@@ -706,7 +706,7 @@ shadcn `<Alert>` already carries `role="alert"`. Sonner toasts fire in `role="st
 
 Essential motion (e.g., a sheet sliding into view — the slide is what tells the user what just happened) can opt out by omitting the `motion-reduce:` variant; document the choice in a one-line comment.
 
-## Progressive Enhancement
+## CSS-First Interaction
 
 ### CSS-Only Patterns
 
@@ -725,21 +725,33 @@ Essential motion (e.g., a sheet sliding into view — the slide is what tells th
 </p>
 ```
 
-### Fallback for No JS
+### Mutations go through a Server Action
 
 ```typescript
-// Form works without JavaScript
-<form action={createIssue} method="POST">
+// Mutation submitted through a Server Action
+<form action={createIssue}>
   <input name="title" required />
   <button type="submit">Submit</button>
 </form>
 
-// BAD: Requires JavaScript
-<form onSubmit={(e) => {
+// Also fine: a form containing a Radix Select dispatches the same Server
+// Action directly. Carrying `action={...}` would let React 19's post-action
+// reset replay the Select's mount-time value. `onSubmit` is not the problem —
+// leaving the Server Action path is.
+<form onSubmit={(e) => { e.preventDefault(); dispatchForm(); }}>
+
+// BAD: hand-rolled fetch to an API route — bypasses the Server Action path
+<form onSubmit={async (e) => {
   e.preventDefault();
-  // Client-side only logic
+  await fetch("/api/issues", { method: "POST", body: payload });
 }}>
 ```
+
+There is no no-JS requirement — that rule was retired (PP-nw80). This is about
+keeping one mutation path (CORE-ARCH-005/007), not about surviving without
+JavaScript. The Radix Select carve-out — why it exists, both shapes it bit, and
+why controlling the Select does not help — is in
+`docs/patterns/server-action-forms.md`.
 
 ## Layout Patterns
 
@@ -929,7 +941,7 @@ export function Card({ children, className }: CardProps) {
 Before committing UI code:
 
 - [ ] Server Components by default (only "use client" when needed)
-- [ ] Forms work without JavaScript
+- [ ] No control reports success for an action it could not perform (CORE-ARCH-012)
 - [ ] Direct Server Action references (no inline wrappers)
 - [ ] Dropdowns use `onSelect` for Server Actions
 - [ ] CSS variables, no hardcoded colors

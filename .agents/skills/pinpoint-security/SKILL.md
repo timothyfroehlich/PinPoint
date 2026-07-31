@@ -279,7 +279,7 @@ export function IssueEditor({ accessLevel, ownershipContext }: IssueEditorProps)
         title={deniedReason}
       />
       {!permissionState.allowed && deniedReason && (
-        <span className="text-xs text-destructive">{deniedReason}</span>
+        <span className="text-xs text-destructive-text">{deniedReason}</span>
       )}
     </div>
   );

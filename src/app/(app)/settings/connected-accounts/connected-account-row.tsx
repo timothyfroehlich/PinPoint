@@ -121,20 +121,26 @@ export function ConnectedAccountRow({
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  {/* Form-action submit preserves progressive enhancement
-                      (NON_NEGOTIABLE #5) — unlink works without JS via the
-                      noscript fallback below; this in-dialog form is the
-                      with-JS path. */}
+                  {/* Submits through the action prop rather than an onClick
+                      handler (CORE-ARCH-005). This in-dialog form is the
+                      normal path; the <noscript> form below covers the case
+                      where the dialog never opens. */}
                   <form action={unlinkAction}>
                     <UnlinkSubmitButton displayName={displayName} />
                   </form>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            {/* No-JS fallback: AlertDialog needs Radix's client JS to open,
-                so without JS the in-dialog form above is unreachable. The
+            {/* No-JS fallback. AlertDialog needs Radix's client JS to open,
+                so without JS the in-dialog form above is unreachable; the
                 browser hides <noscript> content when scripts run, so this
-                form only surfaces when JS is disabled. */}
+                form only surfaces when JS is disabled.
+
+                Kept, not required. No surface owes a no-JS path any more
+                (PP-nw80) — this is the one place that ever engineered one,
+                it costs nothing, and unlinking an identity provider is worth
+                a belt-and-braces escape hatch. Delete it freely if it ever
+                gets in the way. */}
             {canUnlink && (
               <noscript>
                 <form action={unlinkAction}>

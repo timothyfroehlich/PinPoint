@@ -258,7 +258,7 @@ export async function updateUserRole(
  * Result of {@link inviteUser}. On success it carries the new invited-user id
  * plus the submitted name so the client can build a display row without a
  * round-trip. Errors are returned (not thrown) so the form can surface them via
- * `useActionState` — the progressive-enhancement pattern (CORE-ARCH-002/007).
+ * `useActionState` (CORE-ARCH-007).
  */
 export type InviteUserResult = Result<
   { userId: string; firstName: string; lastName: string },

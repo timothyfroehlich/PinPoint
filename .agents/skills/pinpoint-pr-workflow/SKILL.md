@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, Copilot + human review handling (via MCP), UI screenshots, readiness labeling, human-only gate-enforced merge handoff. Use when committing changes, opening PRs, watching CI, addressing review comments, posting screenshots, or handing a PR to Tim to merge.
+description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, Copilot + human review handling (via MCP), UI screenshots, readiness labeling, human-only gate-enforced merge handoff, and post-merge deploy-watch/cleanup/handoff. Use when committing changes, opening PRs, watching CI, addressing review comments, posting screenshots, handing a PR to Tim to merge, or landing the plane after Tim merges (watching the deploy, cleanup, handoff).
 ---
 
 # PinPoint PR Workflow
@@ -13,6 +13,7 @@ End-to-end pipeline from "I have changes" to "merged in main". Replaces the depr
 - Local commits, no PR yet → **Phase 2: PR**
 - PR open, CI not yet green-and-clean → **Phase 3: Review**
 - `ready-for-review` label applied → **Phase 4: Merge** (human-only handoff — see below)
+- Tim has merged the PR → **Phase 5: after the merge** (deploy-watch, cleanup, handoff)
 
 ---
 
@@ -31,7 +32,7 @@ Default to `pnpm run check` (~12s; covers type, lint, format, unit tests, yamlli
 
 ### 1.3 E2E selection
 
-Use this matrix based on `git diff --name-only --staged`. **Never run `e2e:full` / `e2e:all` locally — the full suite is CI's job.** Locally, run only targeted specs (`pnpm exec playwright test <spec> --project=chromium`) while writing them or iterating on a feature they touch.
+Use this matrix based on `git diff --name-only --staged`. The full suite (`e2e:full` / `e2e:all`) is CI's job by default — roughly 8–10 minutes of three parallel Chromium workers plus a Supabase stack and a Next server. **On a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally** — push and let CI do it; on a machine with real headroom it's a reasonable thing to run when you actually want the signal. Locally, run only targeted specs (`pnpm exec playwright test <spec> --project=chromium`) while writing them or iterating on a feature they touch.
 
 | Changed file patterns                                                                                | Recommended local check                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
@@ -53,7 +54,7 @@ PinPoint scopes: `issues`, `machines`, `auth`, `ui`, `db`, `e2e`, `agents`, `wor
 
 If branch has no upstream: `git push -u origin <branch-name>`. Else: `git push`.
 
-Verify upstream tracks the branch itself, NOT main: `git branch -vv` should show `[origin/<your-branch>]`.
+Verify upstream tracks the branch itself, NOT main: `git branch -vv` should show `[origin/<your-branch>]`. After pushing, `git status` must show "up to date with origin" — if it doesn't, the push didn't land cleanly (e.g. a fetch is needed, or the remote moved); resolve before continuing.
 
 ---
 
@@ -180,7 +181,7 @@ If head is newer than the latest Copilot review:
 
 - Elapsed < 600s → wait, Copilot may still be reviewing.
 - Elapsed >= 600s (or `request_copilot_review` yields nothing after another 60s) → **run a Claude fallback review instead of proceeding unreviewed.** Copilot silently skips `review_requested` events often enough that "no review" cannot be a merge path (per PR #1342 / #1326). The fallback:
-  1. Run `/code-review` against the PR diff (model-invocable local review — **not** `ultra`, which is user-triggered, billed, and the agent cannot launch).
+  1. Review the PR diff yourself — a deliberate manual pass over `git diff origin/main...HEAD` against `REVIEW.md`, the canonical rubric. (`/code-review` is a harness built-in that only Tim can trigger; `ultra` is user-triggered and billed. An agent can launch neither.)
   2. Address serious findings the same way you handle Copilot threads: fix → push → re-review. A fix changes the head SHA and re-arms the `reviewed` gate. Consciously decline the rest.
   3. `bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings summary>"` — posts the SHA-pinned sticky marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
 
@@ -242,7 +243,7 @@ If CI is still running, hand him the automerge form instead — it waits rather 
 ! scripts/workflow/merge-pr.sh <PR> --human --automerge
 ```
 
-Never say "merged" or "I merged it" — only Tim runs the merge. Say "ready for you to merge" and give him the command. (A `!`-prefixed command in Claude Code is a human-typed shell passthrough — it does not generate a PreToolUse event, so it is the only channel this hook cannot see. That is by design: it is the human channel.)
+Never say "ready to push when you are" — you push. Never say a PR is "merged" or that you merged it — only Tim runs the merge; say "ready for Tim to merge" and give him the command. (A `!`-prefixed command in Claude Code is a human-typed shell passthrough — it does not generate a PreToolUse event, so it is the only channel this hook cannot see. That is by design: it is the human channel.)
 
 ### 4.2 What `merge-pr.sh --human` does (reference — Tim runs this, not you)
 
@@ -289,7 +290,7 @@ On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --match-
 - Copilot has silently-skipped a merge-from-main commit and the diff was reviewed manually
 - The `threads` / `currency` / `reviewed` gates are known to fail and that's being explicitly accepted
 
-Prefer the Claude fallback (Phase 3.4 — run `/code-review` + `mark-claude-review.sh`) over asking Tim to `--force` a `reviewed`-gate failure: the fallback makes the guarantee true rather than skipping it, and you can do it before handoff.
+Prefer the Claude fallback (Phase 3.4 — manual diff review + `mark-claude-review.sh`) over asking Tim to `--force` a `reviewed`-gate failure: the fallback makes the guarantee true rather than skipping it, and you can do it before handoff.
 
 **`--bypass-merge-requirements`** — for CI/branch-protection issues:
 
@@ -331,6 +332,24 @@ gh api "repos/{owner}/{repo}/compare/main...$pr_branch" --jq '.behind_by'
 ```
 
 If `behind_by > 0`, comment `@dependabot rebase` on the PR and wait for the rebased CI to pass before handing Tim the `--human` command. Do not use `gh pr view --json baseRefOid` for this — `baseRefOid` is the base branch's current SHA at query time, so it always equals `origin/main` and cannot detect a stale PR head.
+
+---
+
+## Phase 5: after the merge
+
+Work isn't done at "git push" — it's done when the change is **merged, deployed clean, and cleaned up**.
+
+### 5.1 Watch the deployment — only if the PR could break it
+
+After Tim merges, consider watching the deployment — only if the PR could break it. A merge that breaks prod isn't done, so when the change actually reaches the deployed app, it's worth watching the production deploy land and confirming no build, migration, or runtime errors. That means: anything under `src/`, a migration, a dependency or `next.config.ts` change, an env-registry change, or anything on the `vercel-build` path. **Skip it otherwise** — docs, skills, beads, GitHub workflows, and dev-only scripts can't affect the deploy, and watching a run that was never at risk just burns time. This is a judgement call, not a mandate; if you're not present when Tim merges, it's his to do or to ask you to pick back up.
+
+### 5.2 Cleanup — non-destructive now, destructive on confirmation
+
+Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
+
+### 5.3 Hand off
+
+Hand off for the next session, and post to the huddle daily bead if other sessions need to know what landed.
 
 ---
 
