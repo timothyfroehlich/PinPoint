@@ -47,26 +47,6 @@
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
 
-| Category   | Skill                          | When to use                                                                                                                              |
-| :--------- | :----------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
-| UI         | `pinpoint-ui`                  | Components, shadcn/ui, forms, responsive design                                                                                          |
-| UI         | `pinpoint-design-bible`        | Design system, page archetypes, spacing, surfaces                                                                                        |
-| TypeScript | `pinpoint-typescript`          | Type errors, generics, Drizzle types                                                                                                     |
-| Testing    | `pinpoint-testing`             | Writing tests, PGlite, test-layer decisions                                                                                              |
-| Testing    | `pinpoint-e2e`                 | E2E tests, worker isolation, Playwright stability                                                                                        |
-| Security   | `pinpoint-security`            | Auth, CSP, Zod, Supabase SSR                                                                                                             |
-| Patterns   | `pinpoint-patterns`            | Server Actions, data fetching, architecture                                                                                              |
-| Workflow   | `pinpoint-prototype-mode`      | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt                                                                  |
-| Workflow   | `pinpoint-briefing`            | Session-start health review                                                                                                              |
-| Workflow   | `pinpoint-pr-workflow`         | Full PR lifecycle: commit, push, CI, merge                                                                                               |
-| Workflow   | `pinpoint-orchestrator`        | Parallel subagent work in worktrees: dispatch, monitor, follow-up                                                                        |
-| Workflow   | `pinpoint-huddle`              | Inter-session coordination via daily/monthly beads (the huddle hooks)                                                                    |
-| Workflow   | `pinpoint-superpowers-bridge`  | Running the superpowers lifecycle in PinPoint: bead field pointers + overrides for the conflicting finish/worktree/review/subagent steps |
-| Deployment | `pinpoint-db-connections`      | Supabase/Postgres pooler & connection-string reference                                                                                   |
-| Deployment | `pinpoint-migration-conflicts` | Resolving drizzle/meta conflicts on merge                                                                                                |
-| Deployment | `pinpoint-preview-deployments` | On-demand TTL'd Supabase preview branches, `/preview` command                                                                            |
-| Deployment | `pinpoint-audit-override`      | Per-PR `/audit-override` escape hatch for unrelated audit failures                                                                       |
-
 ## 4. Environment
 
 ### Host prerequisites
@@ -112,8 +92,8 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `pnpm run check`                      | Fast: types, lint, format, unit, yamllint, actionlint, ruff, shellcheck (~12s)                                                                                                                                                   |
 | `pnpm run preflight`                  | Full: check + build + integration. **For non-trivial changes** (migrations, auth, server actions, middleware, DB schema) — not every commit. Host-wide cap of 2 concurrent runs (via `sem`); use `preflight:unlocked` to bypass. |
 | `pnpm run smoke`                      | Smoke E2E (~60s)                                                                                                                                                                                                                 |
-| `pnpm run e2e:full`                   | Full E2E suite — **CI only; don't run locally.**                                                                                                                                                                                 |
-| `pnpm run e2e:all`                    | Full + smoke + roots, separate Playwright invocations (~10–15 min) — **CI only; don't run locally.**                                                                                                                             |
+| `pnpm run e2e:full`                   | Full E2E suite — CI's job by default; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally.**                                                               |
+| `pnpm run e2e:all`                    | Full + smoke + roots, separate Playwright invocations (~10–15 min) — CI's job by default; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally.**           |
 | `pnpm run db:migrate`                 | Apply schema changes locally                                                                                                                                                                                                     |
 | `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups` (data-only dev seed, **not** a DR artifact)                                                                                                                                          |
 | `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                                                                                                                                                                       |
@@ -141,7 +121,7 @@ When the user explicitly asks for "prototype mode" / "rapid iteration" / "just e
 6. DB schema / migrations → `pnpm run preflight`
 7. Final pre-review → push and let **CI** run the full suite; don't sweep locally.
 
-**Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state. **Never** run `e2e:full` / `e2e:all` locally — the full suite is CI's job. Always use `--project=chromium` for targeted runs; `--headed` to debug visually. Report flaky tests; don't retry in a loop.
+**Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state. The full suite (`e2e:full` / `e2e:all`) is CI's job by default — roughly 8–10 minutes of three parallel Chromium workers plus a Supabase stack and a Next server; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally** — on a machine with real headroom it's a reasonable thing to run when you actually want the signal. Always use `--project=chromium` for targeted runs; `--headed` to debug visually. Report flaky tests; don't retry in a loop.
 
 ### Reproducing CI failures locally
 
@@ -160,7 +140,7 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 
 ### Migration conflicts
 
-Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the prevId chain. Full regenerate-don't-edit protocol: `pinpoint-migration-conflicts` skill.
+Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the prevId chain. Full regenerate-don't-edit protocol: `pinpoint-deployment` skill.
 
 ### Review comments
 
@@ -207,7 +187,7 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 - **`pinpoint-prod`** (Live, Pro plan): **real user data — strict safety.** Daily backups, 7-day retention, no PITR — so the recovery floor is the previous nightly snapshot. That posture is asserted weekly by `pnpm run chores:backups` (chores checklist item 9); it verifies backups exist and are retained, not that they restore.
 - **Local**: `db:reset` OK. **Prod: NEVER `db:reset`. Only `db:migrate`.**
 - **Prod-mutating Supabase surfaces are gated in `.claude/settings.json`** (CORE-SEC-010): prod is the only project in the org, and MCP calls bypass both the Bash hook stack and the script-level `assertLocalDatabase` / `assertNotDrizzlePush` guards. So: every write-capable MCP tool (`execute_sql`, `apply_migration`, `deploy_edge_function`, `pause_project`, `restore_project`, `create_project`, the branch mutators) is on `permissions.ask`; the destructive CLI verbs `supabase db reset` / `db remote commit` / `migration repair` / `branches delete` are on `ask`, and `supabase db push` / `projects delete` on `deny`. Read-only MCP tools stay unprompted. These are prefix matchers over the command string — a speed bump against accidents, not a security boundary — and they don't reach child processes, so `pnpm run db:reset` and the E2E global-setup are unaffected. Add new write surfaces to the lists as the connector or CLI grows.
-- **Connection**: app + scripts use `POSTGRES_URL` — the Supavisor **transaction** pooler (`…pooler.supabase.com:6543`, IPv4), with `prepare:false` set on every porsager client that connects there (`src/server/db/index.ts`, `scripts/lib/pg-client.mjs`) — the transaction pooler does not support prepared statements, and a resolved incident (PP-d8l8) traced silent prod commit loss to this exact setting missing on the runtime client. **Never reintroduce `prepare:true` on a `:6543` client.** Full pooler/endpoint reference, connection string format, and the incident writeup: `pinpoint-db-connections` skill.
+- **Connection**: app + scripts use `POSTGRES_URL` — the Supavisor **transaction** pooler (`…pooler.supabase.com:6543`, IPv4), with `prepare:false` set on every porsager client that connects there (`src/server/db/index.ts`, `scripts/lib/pg-client.mjs`) — the transaction pooler does not support prepared statements, and a resolved incident (PP-d8l8) traced silent prod commit loss to this exact setting missing on the runtime client. **Never reintroduce `prepare:true` on a `:6543` client.** Full pooler/endpoint reference, connection string format, and the incident writeup: `pinpoint-deployment` skill.
 
 ### Vercel
 
@@ -216,29 +196,14 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 ### Preview deployments (on-demand, TTL'd Supabase branches)
 
-Native Supabase auto-branching is **disabled** — no PR gets a preview by default. Previews are created on demand via the `/preview` PR-comment command and torn down on a TTL by an hourly reaper. Full control-surface reference and implementation pointers: `pinpoint-preview-deployments` skill.
+Native Supabase auto-branching is **disabled** — no PR gets a preview by default. Previews are created on demand via the `/preview` PR-comment command and torn down on a TTL by an hourly reaper. Full control-surface reference and implementation pointers: `pinpoint-deployment` skill.
 
 ### Audit-gate override (per-PR `/audit-override`)
 
-When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **unrelated** to a PR's changes, `/audit-override <reason>` is the escape hatch so it doesn't force an admin-merge — commit-bound, dropped on every new push. Full protocol: `pinpoint-audit-override` skill.
+When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **unrelated** to a PR's changes, `/audit-override <reason>` is the escape hatch so it doesn't force an admin-merge — commit-bound, dropped on every new push. Full protocol: `pinpoint-deployment` skill.
 
 ## 8. Documentation
 
 Actionable, "what" and "how" only. Skills carry the deep dives.
 
 **Canonical specs are authoritative** — particularly `pinpoint-design-bible` (§5 page archetypes, §17 modal archetypes). When implementation changes UI behavior covered there, **edit the spec in place**. Don't append divergence notes or "TODO: spec out of date" disclaimers. If you find one, fold it into canonical text and delete it. Dated artifacts in `docs/superpowers/specs/` are records — leave them alone.
-
-## 9. Landing the plane
-
-Work isn't done at "git push" — it's done when the change is **merged, deployed clean, and cleaned up**. The full pipeline (commit → PR → CI → merge) lives in the `pinpoint-pr-workflow` skill; the load-bearing rules are repeated here in case that skill isn't loaded.
-
-1. **Before you push:** `pnpm run check` is the floor (types, lint, format, unit). Run `pnpm run preflight` for non-trivial changes — migrations, security/auth, server actions, middleware, DB schema. Don't run the full E2E suite locally; CI owns it.
-2. **Push and open the PR ready-for-review** (draft only while iterating — see "Working style"). Sync with main by **merge, never rebase**; `git status` must show "up to date with origin". "Ready" is not just "pushed": wait for Copilot to review the current head commit and resolve/decline its threads before you call the PR ready or done — `merge-pr.sh` re-enforces this (`currency` + `threads` gates) at merge time. See `pinpoint-pr-workflow` Phase 3. **UI-touching PRs additionally need screenshots posted** (see step 4) before they can be called ready.
-3. **Lean on CI for the full E2E suite** — don't run `e2e:full` locally; CI owns it once the PR is up. Do run **selected specs locally** while writing them or iterating on a feature they touch (`pnpm exec playwright test <spec> --project=chromium`).
-4. **UI-touching PRs: post screenshots before handoff.** `node scripts/workflow/pr-screenshots.mjs <PR>` shoots the manifest pages at desktop+mobile viewports and posts a sticky PR comment so Tim can eyeball them before merging. The commit-time `ui-screenshot-reminder.cjs` hook nudges when a commit touches a UI glob — don't ignore it.
-5. **Merging is human-only, via ANY path — including `merge-pr.sh`.** An agent never runs `merge-pr.sh` itself, even to enforce the gates; that hook is blocked (PP-wi85). The agent's terminal state on a PR is: ready-for-review, CI green, reviews resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human` — add `--automerge` when CI is still running, so it waits and merges rather than making him come back (attest the review first; it waits out CI, not an unreviewed head). (Bead close timing follows beads' defaults; there's no fixed at-merge rule.)
-6. **After Tim merges, consider watching the deployment — only if the PR could break it.** A merge that breaks prod isn't done, so when the change actually reaches the deployed app, it's worth watching the production deploy land and confirming no build, migration, or runtime errors. That means: anything under `src/`, a migration, a dependency or `next.config.ts` change, an env-registry change, or anything on the `vercel-build` path. **Skip it otherwise** — docs, skills, beads, GitHub workflows, and dev-only scripts can't affect the deploy, and watching a run that was never at risk just burns time. This is a judgement call, not a mandate; if you're not present when Tim merges, it's his to do or to ask you to pick back up.
-7. **Cleanup — non-destructive now, destructive on confirmation.** Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
-8. **Hand off** for the next session, and post to the huddle daily bead if other sessions need to know what landed.
-
-Never say "ready to push when you are" — you push. Never say a PR is "merged" or that you merged it — only Tim runs the merge; say "ready for Tim to merge" and give him the command.

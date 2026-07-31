@@ -8,7 +8,7 @@
 // (which reads git's local knowledge of origin/main — it does not fetch).
 //
 // PP-wi85: UI-touching PRs must have desktop+mobile screenshots posted before
-// handoff to Tim (see AGENTS.md §9, pinpoint-pr-workflow skill Phase 2/3).
+// handoff to Tim (see pinpoint-pr-workflow skill Phase 2/3).
 
 const { execFileSync } = require("node:child_process");
 
