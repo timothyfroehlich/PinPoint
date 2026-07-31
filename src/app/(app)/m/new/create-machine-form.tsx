@@ -355,20 +355,25 @@ export function CreateMachineForm({
           </Select>
         </div>
 
-        {/* PinballMap listing — a brand-new machine always starts unlisted.
-            This copy names no destination on purpose. The Edit dialog is gone
-            (PP-o355.19) and the Manage tab's listing control is a placeholder
-            until PP-o355.21 rebuilds it, so sending the reader to a specific
-            screen would be sending them somewhere they can't act. Point it at
-            the listing control once .21 ships. */}
+        {/* PinballMap listing — a brand-new machine always starts unlisted, and
+            nothing will list it on its own. The hourly cron only refreshes the
+            location snapshot and heals drifted lmx ids; it deliberately does
+            NOT flip `pinballmapListed` ("that stays a human decision" —
+            src/lib/pinballmap/sync.ts), and the PBM write verbs don't exist
+            yet. So this copy says listing isn't automatic rather than implying
+            something downstream handles it — the failure mode being a machine
+            left silently unlisted forever because nobody thought they had to
+            act. It names no destination either: the Edit dialog is gone
+            (PP-o355.19) and the Manage tab's control is a placeholder until
+            PP-o355.21. Point it at that control once .21 ships. */}
         <div className="flex items-start gap-2">
           <MapPin
             aria-hidden="true"
             className="mt-0.5 size-4 text-muted-foreground"
           />
           <p className="text-sm text-muted-foreground">
-            Not yet on Pinball Map. Listing is handled by the hourly sync for
-            now — machine-level listing controls are coming soon.
+            Not yet on Pinball Map. Listing it there isn&rsquo;t automatic yet —
+            machine-level listing controls are coming soon.
           </p>
         </div>
 

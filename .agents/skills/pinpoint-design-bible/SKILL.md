@@ -591,12 +591,19 @@ The timeline composer (PP-0x98) establishes the basic pattern; generalizing it a
 red-600) is the FILL — white on it is 5.3:1, which is correct. But that same
 red used as TEXT on our dark background is only **3.96:1**, under AA's 4.5:1
 for normal text. So destructive _text_ uses `text-destructive-text` (#ef4444,
-red-500 — 5.09:1): outline buttons, error copy, required-field markers,
-`FormMessage`. Reach for `text-destructive` and you will ship an AA failure.
+red-500 — 5.09:1): outline buttons, error copy, required-field markers, form
+validation messages. Reach for `text-destructive` and you will ship an AA
+failure.
 
 The original token comment ("red-600 passes ~5.3:1") described only the
 white-on-red case and made the untested inverse look checked — which is how
-79 usages accumulated before anyone measured. PP-mjms sweeps the remainder.
+79 usages accumulated before anyone measured.
+
+**This rule is ahead of the codebase.** Only the machine Manage tab has been
+converted; `src/components/ui/form.tsx` (`FormMessage`), `ui/alert.tsx`'s
+destructive variant, and the auth screens still carry the failing token.
+**PP-mjms** sweeps them. Write new code to the rule above — don't take a
+neighbouring file as the example.
 
 ## 19. Browser Support Policy
 

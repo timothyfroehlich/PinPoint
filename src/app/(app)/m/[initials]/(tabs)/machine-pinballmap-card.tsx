@@ -34,7 +34,16 @@ import type { PbmMachineStatus } from "~/lib/pinballmap/status";
 const DESYNC_COPY: Partial<Record<PbmMachineStatus["reason"], string>> = {
   listed_locally_absent_on_pbm: "Listed here, but not showing on Pinball Map.",
   on_pbm_not_listed_locally: "On Pinball Map, but not marked listed here.",
-  lmx_drifted: "This machine's Pinball Map entry moved; our link is stale.",
+  // `lmx_drifted` is deliberately absent. `reconcileAfterSync` heals every
+  // drifted machine on each hourly cron, and its heal condition is the very
+  // same `derivePbmMachineStatus` predicate that raises this reason — so the
+  // state is only ever visible in the window between PBM moving a row id and
+  // the next cron, and it repairs itself. Showing it would report a
+  // self-healing transient to someone who can do nothing about it.
+  //
+  // The two that remain are NOT self-healing: sync deliberately never flips
+  // `pinballmapListed` ("that stays a human decision"), so those mismatches
+  // persist until a person acts, and this alert is the only signal they exist.
 };
 
 export interface MachinePinballmapCardProps {

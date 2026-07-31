@@ -249,7 +249,7 @@ export function CreateIssueForm() {
   return (
     <form action={formAction}>
       <input name="title" required />
-      {state.message && <p className="text-destructive">{state.message}</p>}
+      {state.message && <p className="text-destructive-text">{state.message}</p>}
       <button type="submit">Create Issue</button>
     </form>
   );
@@ -720,7 +720,7 @@ Essential motion (e.g., a sheet sliding into view — the slide is what tells th
 
 // Peer patterns for form validation
 <Input className="peer" />
-<p className="peer-invalid:visible invisible text-destructive">
+<p className="peer-invalid:visible invisible text-destructive-text">
   Invalid input
 </p>
 ```
@@ -916,7 +916,7 @@ export function Card({ children, className }: CardProps) {
 <div style={{ marginTop: '10px', color: '#ff0000' }}>
 
 // GOOD: Tailwind utilities with semantic tokens
-<div className="mt-2.5 text-destructive">
+<div className="mt-2.5 text-destructive-text">
 ```
 
 ## Troubleshooting

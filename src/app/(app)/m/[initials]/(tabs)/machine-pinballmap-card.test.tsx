@@ -49,7 +49,13 @@ describe("MachinePinballmapCard", () => {
     );
   });
 
-  it("shows the 'link moved' desync copy", () => {
+  // `lmx_drifted` self-heals: `reconcileAfterSync` repairs every drifted
+  // machine on each hourly cron, using the same predicate that raises the
+  // reason. Surfacing it would report a transient nobody can act on, so it is
+  // deliberately absent from DESYNC_COPY. This test is the guard — if someone
+  // adds the key back, they should be doing it because PP-o355.21 gave the
+  // state a real action, not because the blank looked like an oversight.
+  it("shows no alert for lmx_drifted, which the hourly sync heals itself", () => {
     render(
       <MachinePinballmapCard
         locationUrl={LOCATION_URL}
@@ -57,9 +63,9 @@ describe("MachinePinballmapCard", () => {
         desyncReason="lmx_drifted"
       />
     );
-    expect(screen.getByTestId("machine-pinballmap-desync")).toHaveTextContent(
-      /pinball map entry moved/i
-    );
+    expect(
+      screen.queryByTestId("machine-pinballmap-desync")
+    ).not.toBeInTheDocument();
   });
 
   // The desync alerts are informational only while PP-o355.21 is outstanding:
@@ -70,7 +76,6 @@ describe("MachinePinballmapCard", () => {
   it.each([
     "listed_locally_absent_on_pbm",
     "on_pbm_not_listed_locally",
-    "lmx_drifted",
   ] as const)("names no removed control in the %s copy", (reason) => {
     render(
       <MachinePinballmapCard
