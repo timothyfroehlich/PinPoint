@@ -1,6 +1,6 @@
 ---
 name: pinpoint-security
-description: Security patterns, CSP nonces, input validation, auth checks, Supabase SSR patterns. Use when implementing authentication, forms, security features, or when user mentions security/validation/auth.
+description: Security patterns, CSP nonces, input validation, auth checks, Supabase SSR patterns. Also site-URL construction and open-redirect prevention — `getSiteUrl` / `requireSiteUrl` / `resolveRequestUrl` / `isInternalUrl` / `getSafeRedirect` from `~/lib/url`, and why hand-rolled `process.env` URL building is banned. Use when implementing authentication, forms, redirects, absolute URLs in emails or webhooks, or security features, or when user mentions security/validation/auth/redirect/site URL.
 ---
 
 # PinPoint Security Guide
@@ -151,7 +151,40 @@ Redirect target URLs are normalized using `resolveRedirectPath` in the callback 
 
 ---
 
-## 4. Code Examples
+## 4. Site URL Construction & Safe Redirects
+
+**Goal**: one consistent site-URL resolution across dev, preview, and prod — and no open redirects.
+
+Never read `process.env` and stitch a URL together by hand. Use the helpers in `~/lib/url`:
+
+| Helper                       | Use for                                                                                                        |
+| :--------------------------- | :------------------------------------------------------------------------------------------------------------- |
+| `getSiteUrl()`               | The general case. Prefers `NEXT_PUBLIC_SITE_URL`, falls back to `localhost` in development.                    |
+| `requireSiteUrl(action)`     | When a missing site URL should be a hard failure rather than a silent `localhost` fallback (emails, webhooks). |
+| `resolveRequestUrl(headers)` | Deriving the origin from an incoming request's headers.                                                        |
+| `isInternalUrl(url)`         | Type guard: is this a same-site path we're allowed to send a user to?                                          |
+| `getSafeRedirect(...)`       | Normalizing a user-supplied `?redirect=` target down to an internal path. Open-redirect prevention.            |
+
+```typescript
+import { getSiteUrl } from "~/lib/url";
+
+// Good
+const url = `${getSiteUrl()}/some-path`;
+
+// Bad — re-derives the rule, drifts from every other call site
+const port = process.env.PORT || 3000;
+const url = `http://localhost:${port}/some-path`;
+```
+
+Why it's centralized: the fallback rules differ per environment, and a hand-rolled copy silently emails users a `localhost` link from production.
+
+**Watch for this**: `src/lib/blob/client.ts` (~line 58) still builds its mock upload URL from `process.env["NEXT_PUBLIC_SITE_URL"] ?? \`http://localhost:${port}\`` instead of calling `getSiteUrl()`. It's the one remaining violation against seven correct call sites — don't copy it, and fold it in if you're already touching that file.
+
+Redirect targets in the OAuth callback route go through `resolveRedirectPath`, which enforces internal-path-or-`getSiteUrl()` (see §3 Dynamic Redirects). Anywhere else that accepts a redirect target from the user, use `getSafeRedirect`.
+
+---
+
+## 5. Code Examples
 
 ### Server Action with Auth & Permission Gates
 
@@ -324,7 +357,8 @@ Before deploying or merging security-sensitive changes, verify:
 - [ ] **Email Privacy**: User email addresses are never displayed outside of admin views or settings (CORE-SEC-007).
 - [ ] **Input Validation**: All form inputs are validated using Zod (CORE-SEC-002).
 - [ ] **Sanitization**: Any new sanitize-html call uses `NON_TEXT_TAGS` from `~/lib/sanitize-html-config`; prefer the existing `renderMarkdownToHtml` / tiptap renderer over rolling a new allowlist.
-- [ ] **Hostnames**: No hardcoded hostnames/ports used; local dev runs strictly on `localhost` (CORE-SEC-008).
+- [ ] **Hostnames**: No hardcoded hostnames/ports used; local dev runs strictly on `localhost` (CORE-SEC-008). Absolute URLs come from `~/lib/url` (`getSiteUrl` / `requireSiteUrl`), never hand-built from `process.env`.
+- [ ] **Redirects**: Any user-supplied redirect target is normalized through `getSafeRedirect` / `isInternalUrl` before use.
 - [ ] **CSP Config**: Dynamic CSP nonce generated via root `middleware.ts` (CORE-SEC-004); no `'unsafe-inline'` for script-src; new external hosts added to the production branch by default.
 - [ ] **Middleware response**: `updateSession`'s response is returned as-is (CORE-SSR-005) — no rewrap, no header copy.
 - [ ] **Identities Safeguard**: Manual unlinking verifies multiple identities remain via `canUnlinkIdentity`.

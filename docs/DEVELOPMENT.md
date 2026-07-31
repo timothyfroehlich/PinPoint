@@ -20,7 +20,7 @@ If you’re trying to understand how to implement something, read:
 
 - `AGENTS.md`
 - `docs/NON_NEGOTIABLES.md`
-- `docs/PATTERNS.md`
+- `.agents/skills/<name>/SKILL.md` — the code patterns live in the skills now (`pinpoint-ui`, `pinpoint-typescript`, `pinpoint-security`, `pinpoint-testing`, `pinpoint-e2e`, `pinpoint-design-bible`, `pinpoint-deployment`)
 
 ## Quickstart for Development
 

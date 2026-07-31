@@ -149,7 +149,7 @@ The line you're walking is "synthesizing state inside a third party's domain." R
 
 Read these files for comprehensive testing guidance:
 
-- [E2E_BEST_PRACTICES.md](../../../docs/E2E_BEST_PRACTICES.md) — E2E-specific patterns with Playwright
+- `pinpoint-e2e` skill (and its `references/e2e-best-practices.md`) — E2E-specific patterns with Playwright, worker isolation, environment defaults
 - [NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) — Testing-related non-negotiables
 - [e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md) — 2026-05 E2E suite audit (per-spec verdicts and bug-class framework history)
 
@@ -302,7 +302,9 @@ beforeEach(async () => {
 });
 ```
 
-## E2E Patterns from E2E_BEST_PRACTICES.md
+## E2E Patterns
+
+The full E2E guide is the `pinpoint-e2e` skill. What follows is the layer-selection-adjacent subset.
 
 ### Selector Strategy
 
@@ -395,7 +397,7 @@ Before committing tests:
 - [ ] Test files in correct location (unit vs integration vs E2E)
 - [ ] Integration tests use worker-scoped PGlite (`getTestDb()` and `setupTestDb()`)
 - [ ] No per-test PGlite instances (violates CORE-TEST-001)
-- [ ] E2E tests use roles/labels for selectors (see [Selector Strategy](../../../docs/E2E_BEST_PRACTICES.md#selector-strategy) in E2E_BEST_PRACTICES.md)
+- [ ] E2E tests use roles/labels for selectors (see **Selector Strategy** above)
 - [ ] No arbitrary `waitForTimeout()` in E2E tests (violates [Forbidden Patterns](../../../docs/NON_NEGOTIABLES.md#forbidden-patterns) in NON_NEGOTIABLES.md)
 - [ ] Tests are independent (no shared state)
 - [ ] Testing behavior, not implementation
@@ -403,7 +405,7 @@ Before committing tests:
 
 ## Additional Resources
 
-- E2E best practices: [E2E_BEST_PRACTICES.md](../../../docs/E2E_BEST_PRACTICES.md)
+- E2E best practices: `pinpoint-e2e` skill (`.agents/skills/pinpoint-e2e/`)
 - 2026-05 E2E suite audit: [e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md)
 - Non-negotiables: [NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) (CORE-TEST-\* rules)
 - Playwright docs: Use the `context7` MCP server for current Playwright patterns and API references (resolve-library-id → get-library-docs)

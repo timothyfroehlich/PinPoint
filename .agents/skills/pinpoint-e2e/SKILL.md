@@ -1,6 +1,6 @@
 ---
 name: pinpoint-e2e
-description: E2E testing guide for PinPoint (Playwright, Isolation, Mailpit, Supabase). Use when writing, debugging, or fixing E2E tests to ensure worker isolation and stability.
+description: E2E testing guide for PinPoint (Playwright, Isolation, Mailpit, Supabase), including the local/preview environment defaults — dev autologin (`DEV_AUTOLOGIN_ENABLED`) and its three opt-outs (`x-skip-autologin` header, `skip_autologin` cookie, `?autologin=off`), the global-setup preflight→migrate→fast-reset→full-reset chain and the `SKIP_SUPABASE_RESET` bypass, and the `/api/test-data/cleanup` endpoint (`issueIds` / `machineIds` / `issueTitlePrefix`). Use when writing, debugging, or fixing E2E tests to ensure worker isolation and stability, when a test is unexpectedly authenticated or needs to run as a guest, or when E2E seed/cleanup state looks wrong.
 ---
 
 # PinPoint E2E Testing Skill
