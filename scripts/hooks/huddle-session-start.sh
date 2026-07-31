@@ -30,9 +30,13 @@
 #     "agent_type":       "<name>"  (optional, when launched with --agent)
 #   }
 #
-# We suppress the announcement on `source=compact` because the agent already
-# saw it pre-compaction — re-emitting it is noise. All other source values
-# (startup, resume, clear) get the announcement.
+# On `source=compact` we emit a condensed block instead of the full one: the
+# agent saw the verbose registration/etiquette text pre-compaction, but the
+# compaction summary is not guaranteed to carry its huddle name, today's bead
+# id, or any sense of what the project has been working on — and a compacted
+# session is exactly the one most likely to post nothing for the rest of its
+# life. So compact gets: identity one-liner, posting reminder, work digest.
+# (PP-llkj. Before that, compact got nothing at all.)
 
 set -euo pipefail
 
@@ -47,6 +51,20 @@ source "$LIB_SCRIPT"
 STATE_DIR=$(huddle_state_dir) || exit 0
 NAMES_JSON="$STATE_DIR/session-names.json"
 mkdir -p "$STATE_DIR"
+
+# --- Work digest (PP-llkj) ---
+# "What has this project been doing lately", derived from git alone — see
+# huddle-digest.sh. Printed on every announced session start, including after
+# compaction. Fail-open: any error prints nothing and the block is skipped.
+emit_work_digest() {
+  local digest_script digest_out
+  digest_script="$(dirname "$0")/huddle-digest.sh"
+  [[ -f "$digest_script" ]] || return 0
+  digest_out=$(bash "$digest_script" --days 7 2>/dev/null) || return 0
+  [[ -n "$digest_out" ]] || return 0
+  printf '\n## What we have been working on (last 7 days)\n\n'
+  printf '%s\n' "$digest_out"
+}
 
 # --- Per-machine Dolt sync (throttled, fail-open) ---
 # Pull peer machines' huddle updates (and push ours) before reading root notes,
@@ -216,15 +234,41 @@ if [[ -z "$SESSION_ID" ]]; then
   exit 0
 fi
 
-# Suppress announcement on compact — agent already saw it pre-compaction.
-if [[ "$SOURCE" == "compact" ]]; then
-  exit 0
-fi
-
 # Look up registered name
 NAME=""
 if [[ -f "$NAMES_JSON" ]]; then
   NAME=$(jq -r --arg sid "$SESSION_ID" '.[$sid] // ""' "$NAMES_JSON" 2>/dev/null || echo "")
+fi
+
+# Compact restart: condensed identity + posting reminder, then fall through to
+# the digest. The full registration/etiquette text is deliberately skipped —
+# what a compacted session actually lost is its own name, the bead id, and the
+# project's recent shape.
+if [[ "$SOURCE" == "compact" ]]; then
+  _TODAY_ID_COMPACT=$(huddle_today_bead_id 2>/dev/null) || _TODAY_ID_COMPACT="<today-bead-id>"
+  [[ -n "$_TODAY_ID_COMPACT" ]] || _TODAY_ID_COMPACT="<today-bead-id>"
+  printf '## Huddle identity (post-compaction)\n\n'
+  if [[ -n "$NAME" ]]; then
+    # shellcheck disable=SC2016  # backticks are literal Markdown
+    printf 'You are **%s**. Today'\''s coordination bead is `%s`.\n\n' "$NAME" "$_TODAY_ID_COMPACT"
+    printf 'Compaction is a good moment to post: if your scope grew, you changed\n'
+    printf 'direction, or you picked up something new since your last huddle post,\n'
+    printf 'say so in one line — peers only see what you write down.\n'
+    printf '    bd comments add %s "Your update. —%s"\n\n' "$_TODAY_ID_COMPACT" "$NAME"
+    # Same caveat as the startup path: with rotation pending there is no daily
+    # for today yet, so the id above is a literal placeholder rather than a
+    # command you can paste.
+    if [[ -n "$ROTATION_PENDING" ]]; then
+      printf 'NOTE: rotation is pending, so the bead id above is a placeholder. Dispatch the\n'
+      printf 'rotation subagent first — it reports the new id — then substitute it.\n\n'
+    fi
+  else
+    # shellcheck disable=SC2016  # backticks are literal Markdown
+    printf 'This session (`%s`) is not registered in the huddle. Register with:\n' "$SESSION_ID"
+    printf '    bash scripts/hooks/huddle-whoami.sh register <Harness>-<Topic> %s\n\n' "$SESSION_ID"
+  fi
+  emit_work_digest
+  exit 0
 fi
 
 if [[ -n "$NAME" ]]; then
@@ -250,8 +294,15 @@ if [[ -n "$NAME" ]]; then
   printf 'investigation (not a quick question or one-line fix) — post a ONE-LINE kickoff to\n'
   printf 'today'\''s bead, once, so parallel sessions know and anyone with context can chime in:\n'
   printf '    bd comments add %s "Starting: <what> in <area/branch>. Ping me if you have context. —%s"\n\n' "$_TODAY_ID_REG" "$NAME"
-  printf 'Also post when you: file a bead for a non-obvious finding ("Filed PP-xxx: <finding>"),\n'
-  printf 'or touch an area others may conflict on ("Working on <file/area> in <branch>; flag if conflict").\n'
+  printf 'THE KICKOFF IS NOT THE LAST POST. Keep the channel current — peers only know what\n'
+  printf 'you write down, and the most common failure is a session that announces a plan and\n'
+  printf 'then silently works on something else for hours. Post again when:\n'
+  printf '  - **scope gets ADDED to what you'\''re already doing** — Tim tacks a second ask onto\n'
+  printf '    this session, review feedback grows the change, or a "quick fix" turns into a\n'
+  printf '    refactor. Say what got added, not just that something did.\n'
+  printf '  - you CHANGE DIRECTION or abandon the approach you announced\n'
+  printf '  - you start touching a NEW file/area others may conflict on\n'
+  printf '  - you file a bead for a non-obvious finding ("Filed PP-xxx: <finding>")\n'
   printf '  (Merges and PR opens are auto-posted — no manual action needed for those.)\n'
   printf '    bd comments add %s "Your update. —%s"\n\n' "$_TODAY_ID_REG" "$NAME"
   printf 'If a peer'\''s kickoff scrolls by and you have specific relevant context — a conflict,\n'
@@ -289,9 +340,15 @@ else
   printf 'Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`\n'
 fi
 
+# --- Work digest (PP-llkj) ---
+# Printed before the daily summaries on purpose. The dailies are written in a
+# "Merged / In-flight / Discoveries / Blockers" shape, and read cold they land as
+# a list of everything that recently broke. The digest answers "what kind of work
+# is this project doing right now" first; the dailies then add day-scale detail.
+emit_work_digest
+
 # --- Summary injection (§5.1 step 5) ---
 # Inject monthly summary description + N most-recent daily bead descriptions.
-# Suppressed on compact (already returned early above via SOURCE check).
 # Fails open: any bd error exits silently without noise.
 ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || { exit 0; }
 NOTES_STR=$(printf '%s' "$ROOT_JSON" | jq -r '.[0].notes // ""' 2>/dev/null) || { exit 0; }
@@ -299,20 +356,24 @@ if [[ -z "$NOTES_STR" ]]; then
   exit 0
 fi
 
+# Default 2, not the original 5 (PP-llkj): the work digest above now carries the
+# week-scale picture in a denser and more useful form, so five days of
+# blocker-shaped daily summaries is duplicated budget. Two keeps yesterday and
+# the day before — the window where a peer's discovery is still actionable.
 N_DAILIES=$(printf '%s' "$NOTES_STR" | python3 -c "
 import sys, json
 try:
     n = json.loads(sys.stdin.read())
-    print(n.get('settings', {}).get('n_dailies_to_inject', 5))
+    print(n.get('settings', {}).get('n_dailies_to_inject', 2))
 except Exception:
-    print(5)
-" 2>/dev/null || echo "5")
+    print(2)
+" 2>/dev/null || echo "2")
 # Sanitize: a non-numeric value ('null', '', 'abc') from the JSON would later
 # trip `[[ "$DAILY_COUNT" -ge "$N_DAILIES" ]]` with "integer expression expected"
-# on stderr. Default to 5; clamp to [1, 20] so a bad setting can't blow up the
+# on stderr. Default to 2; clamp to [1, 20] so a bad setting can't blow up the
 # session-start output budget.
 if ! [[ "$N_DAILIES" =~ ^[0-9]+$ ]]; then
-  N_DAILIES=5
+  N_DAILIES=2
 fi
 if (( N_DAILIES < 1 )); then N_DAILIES=1; fi
 if (( N_DAILIES > 20 )); then N_DAILIES=20; fi

@@ -341,6 +341,107 @@ NEW_COMMENTS=$(
 
 COUNT=$(printf '%s' "$NEW_COMMENTS" | jq 'length' 2>/dev/null) || exit 0
 
+# --- Quiet-session nudge (PP-llkj) ---
+# The huddle's failure mode isn't sessions posting too little at the start —
+# it's sessions that post a kickoff and then go silent while the work changes
+# shape underneath them. Scope gets added mid-session, direction changes, a
+# "quick fix" grows a migration, and peers keep reading a stale plan.
+#
+# So: if a *registered* session has no post on today's bead, or its newest post
+# has aged past the window, print one short reminder. Rate-limited per session
+# (not per worktree — two sessions in one worktree are two conversations), and
+# emitted at most once per window even if the session stays quiet.
+#
+# Runs before the new-comment early-exit on purpose: a session with nothing new
+# to read is exactly the one most likely to have been heads-down and quiet.
+# Set HUDDLE_NUDGE_SECONDS=0 to disable.
+huddle_maybe_nudge() {
+  local nudge_seconds nudge_file now_ts last_nudge my_last my_last_age
+
+  nudge_seconds="${HUDDLE_NUDGE_SECONDS:-2700}"  # 45 min
+  [[ "$nudge_seconds" =~ ^[0-9]+$ ]] || return 0
+  (( nudge_seconds > 0 )) || return 0
+  # Unregistered sessions can't be credited for their own posts (no sign-off to
+  # match) and are already being nagged to register by session-start.
+  [[ -n "$AGENT_NAME" && -n "$SESSION_ID" ]] || return 0
+
+  nudge_file="$STATE_DIR/nudged-$(printf '%s' "$SESSION_ID" | tr -cd '[:alnum:]-')"
+  now_ts=$(date +%s)
+
+  # First slow-path poll of this session: start the clock, don't nag. A session
+  # that just opened hasn't had a chance to post yet.
+  if [[ ! -f "$nudge_file" ]]; then
+    printf '%s\n' "$now_ts" > "$nudge_file" 2>/dev/null || true
+    return 0
+  fi
+
+  last_nudge=0
+  # NOTE: `read` exits 1 at EOF-without-newline while still assigning, so a
+  # `|| last_nudge=0` fallback here would clobber a perfectly good value. Let it
+  # fail and validate the variable instead.
+  read -r last_nudge < "$nudge_file" 2>/dev/null || :
+  [[ "$last_nudge" =~ ^[0-9]+$ ]] || last_nudge=0
+  (( now_ts - last_nudge >= nudge_seconds )) || return 0
+
+  # Committed to evaluating a nudge — reset the clock either way, so a session
+  # that is posting regularly is re-checked once per window, not every turn.
+  printf '%s\n' "$now_ts" > "$nudge_file" 2>/dev/null || true
+
+  # Newest post signed by this session, if any. Same suffix match as the
+  # self-filter above, so a session that signs correctly is credited.
+  # shellcheck disable=SC2016  # $name is a jq variable, NOT a shell var
+  my_last=$(
+    printf '%s' "$COMMENTS_JSON" | jq -r --arg name "$AGENT_NAME" '
+      [ .[]
+        | select((.text | endswith("—Claude-" + $name))
+                 or (.text | endswith("—" + $name)))
+        | .created_at
+      ] | sort | last // ""' 2>/dev/null
+  ) || my_last=""
+
+  if [[ -n "$my_last" ]]; then
+    my_last_age=$(
+      printf '%s' "$my_last" | python3 -c "
+import sys, datetime
+raw = sys.stdin.read().strip().replace('Z', '+00:00')
+try:
+    t = datetime.datetime.fromisoformat(raw)
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=datetime.timezone.utc)
+    print(int((datetime.datetime.now(datetime.timezone.utc) - t).total_seconds()))
+except Exception:
+    print(-1)
+" 2>/dev/null
+    ) || my_last_age=-1
+    [[ "$my_last_age" =~ ^-?[0-9]+$ ]] || my_last_age=-1
+    # Posted inside this window? The channel is current — say nothing. Only
+    # sessions that have actually gone quiet get nudged.
+    if (( my_last_age >= 0 && my_last_age < nudge_seconds )); then
+      return 0
+    fi
+  fi
+
+  printf '## Huddle: say what you are working on\n\n'
+  if [[ -z "$my_last" ]]; then
+    # shellcheck disable=SC2016  # backticks are literal Markdown
+    printf '**%s** has not posted to today'\''s bead (`%s`) yet this session.\n\n' "$AGENT_NAME" "$TODAY_BEAD_ID"
+    printf 'If this session is doing real work, post the one-line kickoff now — what you\n'
+    printf 'are doing and where — so parallel sessions can flag conflicts and offer context.\n\n'
+  else
+    printf '**%s**, your last huddle post was %s. Since then, has the work changed shape?\n\n' "$AGENT_NAME" "$my_last"
+    printf 'Post an update if ANY of these happened — especially the first, which is the\n'
+    printf 'one that most often goes unsaid:\n'
+    printf '  - **scope was ADDED to what you were already doing** (a follow-on ask, review\n'
+    printf '    feedback that grew the change, a fix that turned into a refactor)\n'
+    printf '  - you changed direction or dropped the approach you announced\n'
+    printf '  - you started touching a new file/area others could conflict on\n\n'
+  fi
+  printf '    bd comments add %s "<one line>. —%s"\n\n' "$TODAY_BEAD_ID" "$AGENT_NAME"
+  printf 'If nothing has changed, ignore this — do not post a bare status ping.\n\n'
+}
+
+huddle_maybe_nudge
+
 if [[ "$COUNT" -eq 0 ]]; then
   exit 0
 fi

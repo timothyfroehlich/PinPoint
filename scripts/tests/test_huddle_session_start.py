@@ -329,16 +329,114 @@ def test_no_rotation_emits_identity_block_for_registered_session(
     assert "## Huddle recent activity" in out
 
 
-# --- Early-exit paths must keep short-circuiting -----------------------------
+# --- PP-llkj: the compact path informs instead of staying silent -------------
+#
+# Compaction used to emit nothing past the rotation notice, on the theory that
+# the agent had already seen its identity. But the compaction summary carries no
+# guarantee of retaining the agent's huddle name or today's bead id, and a
+# compacted session is the one most likely to go quiet for the rest of its life.
+# It now gets a condensed identity + posting reminder (never the full
+# registration/etiquette wall) and the work digest.
 
 
-def test_compact_suppresses_identity_but_keeps_rotation_notice(repo: Path) -> None:
-    # The agent already saw its identity pre-compaction; rotation is still news.
+def test_compact_emits_condensed_identity_not_the_full_block(repo: Path) -> None:
+    register(repo, "Claude-HuddleFix")
+    rc, out, err = run_hook(repo, source="compact")
+    assert rc == 0, err
+    assert "## Huddle identity (post-compaction)" in out
+    assert "You are **Claude-HuddleFix**" in out
+    assert TODAY_DAILY_ID in out
+    # The verbose startup-only text stays suppressed.
+    assert "Registered as: **Claude-HuddleFix**" not in out
+    assert "self-filter active" not in out
+    assert "## Huddle recent activity" not in out
+
+
+def test_compact_prompts_an_unregistered_session_to_register(repo: Path) -> None:
+    rc, out, err = run_hook(repo, source="compact")
+    assert rc == 0, err
+    assert "not registered in the huddle" in out
+    assert SESSION_ID in out
+    assert REGISTRATION_MARKER not in out
+
+
+def test_compact_still_emits_the_rotation_notice(repo: Path) -> None:
     set_rotation_pending(repo)
     rc, out, err = run_hook(repo, source="compact")
     assert rc == 0, err
     assert ROTATION_MARKER in out
-    assert IDENTITY_MARKER not in out
+
+
+# --- PP-llkj: work digest ----------------------------------------------------
+
+
+def _seed_commit(repo: Path, subject: str) -> None:
+    """One commit on `main`, so huddle-digest.sh has something to report."""
+    subprocess.run(["git", "checkout", "-q", "-b", "main"], cwd=repo, check=False)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=t@example.com",
+            "-c",
+            "user.name=T",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            subject,
+        ],
+        cwd=repo,
+        check=True,
+    )
+
+
+def test_startup_injects_the_work_digest_before_the_dailies(repo: Path) -> None:
+    register(repo, "Claude-HuddleFix")
+    _seed_commit(repo, "feat(settings): shareable settings sets (#1730)")
+    rc, out, err = run_hook(repo)
+    assert rc == 0, err
+    assert "## What we have been working on (last 7 days)" in out
+    assert "shareable settings sets (#1730)" in out
+    # Framing order matters: "what are we building" lands before the daily
+    # summaries, which read as a list of what recently broke.
+    assert out.index("What we have been working on") < out.index(
+        "## Huddle recent activity"
+    )
+
+
+def test_compact_injects_the_work_digest(repo: Path) -> None:
+    register(repo, "Claude-HuddleFix")
+    _seed_commit(repo, "feat(settings): shareable settings sets (#1730)")
+    rc, out, err = run_hook(repo, source="compact")
+    assert rc == 0, err
+    assert "## What we have been working on (last 7 days)" in out
+    assert "shareable settings sets (#1730)" in out
+
+
+def test_digest_absence_does_not_break_session_start(repo: Path) -> None:
+    """No commits (fresh clone, shallow checkout) — the section just vanishes."""
+    register(repo, "Claude-HuddleFix")
+    rc, out, err = run_hook(repo)
+    assert rc == 0, err
+    assert "What we have been working on" not in out
+    assert "Registered as: **Claude-HuddleFix**" in out
+
+
+# --- PP-llkj: scope-growth prompting ----------------------------------------
+
+
+def test_identity_block_prompts_on_added_scope(repo: Path) -> None:
+    """The kickoff is not the last post — added scope must be announced too."""
+    register(repo, "Claude-HuddleFix")
+    rc, out, err = run_hook(repo)
+    assert rc == 0, err
+    assert "THE KICKOFF IS NOT THE LAST POST" in out
+    assert "scope gets ADDED" in out
+    assert "CHANGE DIRECTION" in out
+
+
+# --- Early-exit paths must keep short-circuiting -----------------------------
 
 
 def test_subagent_transcript_emits_nothing(repo: Path) -> None:
