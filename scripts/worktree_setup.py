@@ -278,8 +278,9 @@ _PINNED_PROJECT_ID_RE = re.compile(r'^project_id\s*=\s*"([^"]+)"', re.MULTILINE)
 # "pinpoint-" prefix, so honoring a hand-written id outside that shape would
 # make the worktree's containers invisible to the sweep. This also rejects the
 # template's bare `project_id = "pinpoint"`, so a config.toml copied straight
-# from the template still gets a real per-worktree id.
-_PINNABLE_PROJECT_ID_RE = re.compile(r"^pinpoint-[a-z0-9-]*$")
+# from the template still gets a real per-worktree id. Matched with fullmatch:
+# `$` would accept a trailing newline, which would corrupt the id we write back.
+_PINNABLE_PROJECT_ID_RE = re.compile(r"pinpoint-[a-z0-9-]*")
 
 
 def read_pinned_project_id(worktree_path: Path) -> str | None:
@@ -291,11 +292,12 @@ def read_pinned_project_id(worktree_path: Path) -> str | None:
 
     Returns None when the file is absent (fresh worktree — nothing to preserve),
     unreadable, has no project_id, or carries an id that doesn't match the shape
-    this script generates.
+    this script generates. Never raises: this runs from the post-checkout hook,
+    where an exception would skip the rest of the worktree's config generation.
     """
     try:
         content = (worktree_path / "supabase" / "config.toml").read_text()
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return None
 
     match = _PINNED_PROJECT_ID_RE.search(content)
@@ -305,7 +307,7 @@ def read_pinned_project_id(worktree_path: Path) -> str | None:
     candidate = match.group(1)
     if len(candidate) > MAX_PROJECT_ID_LEN:
         return None
-    if not _PINNABLE_PROJECT_ID_RE.match(candidate):
+    if not _PINNABLE_PROJECT_ID_RE.fullmatch(candidate):
         return None
     return candidate
 

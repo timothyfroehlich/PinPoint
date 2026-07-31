@@ -650,6 +650,25 @@ class TestPinnedProjectId:
         assert read_pinned_project_id(tmp_path) is None
         assert resolve_project_id(tmp_path, "feat/new") == "pinpoint-feat-new"
 
+    def test_trailing_newline_in_id_is_rejected(self, tmp_path: Path) -> None:
+        # A `$`-anchored check would accept this and write a corrupt id back.
+        self._write_config(tmp_path, 'project_id = "pinpoint-broken\n"\n')
+
+        assert read_pinned_project_id(tmp_path) is None
+
+    def test_unreadable_config_does_not_raise(self, tmp_path: Path) -> None:
+        # This runs from the post-checkout hook — an exception here would skip
+        # the rest of the worktree's config generation. A directory where
+        # config.toml should be (OSError) and undecodable bytes
+        # (UnicodeDecodeError) both have to come back as "not pinned".
+        (tmp_path / "supabase" / "config.toml").mkdir(parents=True)
+        assert read_pinned_project_id(tmp_path) is None
+
+        binary = tmp_path / "binary"
+        (binary / "supabase").mkdir(parents=True)
+        (binary / "supabase" / "config.toml").write_bytes(b"\xff\xfe\x00project_id")
+        assert read_pinned_project_id(binary) is None
+
     def test_resolve_derives_from_branch_when_unpinned(self, tmp_path: Path) -> None:
         assert resolve_project_id(tmp_path, "feat/thing") == "pinpoint-feat-thing"
 
