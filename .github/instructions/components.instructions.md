@@ -9,9 +9,10 @@ applyTo: "src/components/**/*.tsx,src/app/**/*.tsx"
 - Flag `"use client"` on a component with no interactivity — no event handlers, no browser APIs, no `useState`/`useEffect`. Push `"use client"` down to the smallest interactive leaf.
 - Flag a client component that receives a whole ORM row / domain object (a full issue, machine, or `user_profiles` row) as a prop. Pass only the fields it renders — the RSC payload ships to the browser in page source.
 
-## Progressive enhancement (CORE-ARCH-002)
+## Honest failure (CORE-ARCH-012)
 
-- Forms mutate via `<form action={serverAction}>`, not `onSubmit` + `fetch`. The core submit must work with JS disabled. Flag inline `onClick` handlers that perform a mutation a form action should own.
+- Flag a control that reports success for an action it could not have performed — a success toast or confirmation rendered for a submission whose input could not have been collected, or a save control that submits unchanged state and confirms it as a change.
+- Mutations still route through Server Actions (CORE-ARCH-005, CORE-ARCH-007). But there is **no** no-JS requirement: a control that visibly does nothing when JavaScript is unavailable is acceptable. Do not flag an `onClick`-dispatched mutation on no-JS grounds alone.
 
 ## Two-layer responsive (CORE-RESP-001..004)
 

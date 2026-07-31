@@ -28,8 +28,8 @@
   - Database to Application Type Conversion
 - [Severity Naming](./patterns/severity-naming.md)
   - Player-Centric Language
-- [Progressive Enhancement](./patterns/progressive-enhancement.md)
-  - Forms That Work Without JavaScript
+- [Server Action Forms](./patterns/server-action-forms.md)
+  - `useActionState` and the Radix Select form-reset footgun
 - [Machine Status Derivation](./patterns/machine-status-derivation.md)
   - Deriving Machine Status from Issues
 - [Testing Patterns](./patterns/testing-patterns.md)

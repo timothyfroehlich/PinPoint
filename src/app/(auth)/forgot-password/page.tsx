@@ -9,7 +9,6 @@ import { ForgotPasswordForm } from "./forgot-password-form";
  * Forgot Password Page
  *
  * Request a password reset email.
- * Progressive enhancement - works without JavaScript.
  */
 export default async function ForgotPasswordPage(): Promise<React.JSX.Element> {
   // Check if already logged in

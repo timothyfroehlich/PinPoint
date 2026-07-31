@@ -59,7 +59,7 @@ export function DiscordConfigForm({
 
   // Save action — useActionState wraps the server action so we get pending
   // state and the structured result back. Form-level submission goes through
-  // the action prop, preserving progressive enhancement.
+  // the action prop rather than an onSubmit handler (CORE-ARCH-005).
   const [saveState, saveFormAction, isPending] = useActionState<
     SaveDiscordConfigResult | undefined,
     FormData

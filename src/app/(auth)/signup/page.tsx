@@ -14,7 +14,6 @@ import { eq } from "drizzle-orm";
  * Signup Page
  *
  * User registration with email, password, and name.
- * Progressive enhancement - works without JavaScript.
  * Password strength indicator (client-side enhancement).
  */
 export default async function SignupPage({

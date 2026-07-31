@@ -10,8 +10,9 @@ set -euo pipefail
 # a fresh review. This is the Claude fallback for when Copilot silently skips.
 #
 # The helper only *attests* — the caller is responsible for having actually run the
-# review first (`/code-review`, the model-invocable local review). Same honesty model
-# as `merge-pr.sh --force`.
+# review first — a manual pass over the diff against REVIEW.md, since `/code-review`
+# is a user-triggered harness built-in an agent cannot launch. Same honesty model as
+# `merge-pr.sh --force`.
 #
 # Usage:
 #   bash scripts/workflow/mark-claude-review.sh <PR> ["one-line findings summary"]

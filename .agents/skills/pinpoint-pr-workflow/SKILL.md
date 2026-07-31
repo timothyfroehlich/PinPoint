@@ -181,7 +181,7 @@ If head is newer than the latest Copilot review:
 
 - Elapsed < 600s → wait, Copilot may still be reviewing.
 - Elapsed >= 600s (or `request_copilot_review` yields nothing after another 60s) → **run a Claude fallback review instead of proceeding unreviewed.** Copilot silently skips `review_requested` events often enough that "no review" cannot be a merge path (per PR #1342 / #1326). The fallback:
-  1. Run `/code-review` against the PR diff (model-invocable local review — **not** `ultra`, which is user-triggered, billed, and the agent cannot launch).
+  1. Review the PR diff yourself — a deliberate manual pass over `git diff origin/main...HEAD` against `REVIEW.md`, the canonical rubric. (`/code-review` is a harness built-in that only Tim can trigger; `ultra` is user-triggered and billed. An agent can launch neither.)
   2. Address serious findings the same way you handle Copilot threads: fix → push → re-review. A fix changes the head SHA and re-arms the `reviewed` gate. Consciously decline the rest.
   3. `bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings summary>"` — posts the SHA-pinned sticky marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
 
@@ -290,7 +290,7 @@ On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --match-
 - Copilot has silently-skipped a merge-from-main commit and the diff was reviewed manually
 - The `threads` / `currency` / `reviewed` gates are known to fail and that's being explicitly accepted
 
-Prefer the Claude fallback (Phase 3.4 — run `/code-review` + `mark-claude-review.sh`) over asking Tim to `--force` a `reviewed`-gate failure: the fallback makes the guarantee true rather than skipping it, and you can do it before handoff.
+Prefer the Claude fallback (Phase 3.4 — manual diff review + `mark-claude-review.sh`) over asking Tim to `--force` a `reviewed`-gate failure: the fallback makes the guarantee true rather than skipping it, and you can do it before handoff.
 
 **`--bypass-merge-requirements`** — for CI/branch-protection issues:
 
