@@ -69,6 +69,10 @@ CONFIG_HEADER = """\
 # Managed by: scripts/worktree_setup.py (via post-checkout hook)
 # To modify: edit supabase/config.toml.template, then switch branches to regenerate
 #
+# project_id is pinned on first setup and preserved across branch switches —
+# it names the Supabase containers/volumes, so changing it would orphan a
+# running stack (PP-4936).
+#
 """
 
 ENV_HEADER = """\
@@ -257,6 +261,76 @@ def branch_to_project_id(branch_name: str) -> str:
     digest = hashlib.sha256(branch_name.encode("utf-8")).hexdigest()[:HASH_SUFFIX_LEN]
     readable = full[:MAX_READABLE_LEN].rstrip("-")
     return f"{readable}-{digest}"
+
+
+# A worktree's project id is pinned on first setup and reused from then on,
+# rather than re-derived from the branch on every checkout. Supabase names its
+# containers and labels its volumes after the project id, so re-deriving it
+# after `git checkout -b` inside a live worktree renames the stack out from
+# under itself: `supabase stop` targets an id that matches nothing, the old
+# containers keep the slot's ports bound (so `supabase start` fails with
+# "address already in use"), and every cleanup path that looks resources up by
+# the new id leaves the old ones behind. (PP-4936.)
+_PINNED_PROJECT_ID_RE = re.compile(r'^project_id\s*=\s*"([^"]+)"', re.MULTILINE)
+
+# A pinned id is only honored when it has the shape branch_to_project_id emits.
+# worktree_orphan_sweep.py identifies PinPoint-owned Supabase resources by the
+# "pinpoint-" prefix, so honoring a hand-written id outside that shape would
+# make the worktree's containers invisible to the sweep. This also rejects the
+# template's bare `project_id = "pinpoint"`, so a config.toml copied straight
+# from the template still gets a real per-worktree id. Matched with fullmatch:
+# `$` would accept a trailing newline, which would corrupt the id we write back.
+_PINNABLE_PROJECT_ID_RE = re.compile(r"pinpoint-[a-z0-9-]*")
+
+
+def read_pinned_project_id(worktree_path: Path) -> str | None:
+    """Return the project_id already recorded in this worktree's config.toml.
+
+    The generated `supabase/config.toml` is the file the Supabase CLI itself
+    reads, so it is the authoritative record of the id the worktree's stack was
+    started under — the same assumption worktree_orphan_sweep.py makes.
+
+    Returns None when the file is absent (fresh worktree — nothing to preserve),
+    unreadable, has no project_id, or carries an id that doesn't match the shape
+    this script generates. Never raises: this runs from the post-checkout hook,
+    where an exception would skip the rest of the worktree's config generation.
+    """
+    try:
+        content = (worktree_path / "supabase" / "config.toml").read_text()
+    except (OSError, UnicodeDecodeError):
+        return None
+
+    match = _PINNED_PROJECT_ID_RE.search(content)
+    if match is None:
+        return None
+
+    candidate = match.group(1)
+    if len(candidate) > MAX_PROJECT_ID_LEN:
+        return None
+    if not _PINNABLE_PROJECT_ID_RE.fullmatch(candidate):
+        return None
+    return candidate
+
+
+def resolve_project_id(worktree_path: Path, branch: str) -> str:
+    """Pick the Supabase project id for a worktree — a pinned id always wins.
+
+    Falls back to deriving one from the branch name for a fresh worktree (or a
+    config.toml we can't read an id out of). Logs when the two disagree, since
+    that means the branch was renamed after the worktree was set up.
+    """
+    derived = branch_to_project_id(branch)
+    pinned = read_pinned_project_id(worktree_path)
+    if pinned is None:
+        return derived
+    if pinned != derived:
+        print(
+            f"worktree_setup: keeping pinned Supabase project_id '{pinned}' "
+            f"(branch '{branch}' would derive '{derived}') — renaming it would "
+            "orphan this worktree's running stack",
+            file=sys.stderr,
+        )
+    return pinned
 
 
 def generate_config_toml(worktree_path: Path, port_config: PortConfig) -> str:
@@ -684,7 +758,7 @@ def main() -> None:
 
     branch = get_branch()
     configure_branch_tracking(branch, worktree_path)
-    project_id = branch_to_project_id(branch)
+    project_id = resolve_project_id(worktree_path, branch)
     worktree_key = str(worktree_path)
 
     # Check if we already have a slot (branch switch) or need a new one (fresh worktree)
@@ -736,6 +810,7 @@ def main() -> None:
     # Print summary to stderr (post-checkout output goes to terminal)
     print(
         f"worktree_setup: slot={slot} "
+        f"project_id={port_config.project_id} "
         f"nextjs={port_config.nextjs_port} "
         f"api={port_config.api_port} "
         f"db={port_config.db_port}",
