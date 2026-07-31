@@ -13,7 +13,7 @@ Work bead {beads_id}. First run `bd show {beads_id}` && `bd update {beads_id} --
 
 ### Quality Gates
 
-Run `pnpm run check` before returning. Then self-review: run `/code-review` on your own diff (model-invocable **local** review — **not** `ultra`, which is user-triggered/billed and you cannot launch) and address serious findings. After your final push, if Copilot hasn't reviewed your head commit within ~10 min, run `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` so the `reviewed` merge gate passes.
+Run `pnpm run check` before returning. Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Don't reach for `/code-review` or `ultra`: both are user-triggered harness surfaces (`ultra` is also billed) and an agent cannot launch either. After your final push, if Copilot hasn't reviewed your head commit within ~10 min, run `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` so the `reviewed` merge gate passes.
 
 ### Environment Setup
 
