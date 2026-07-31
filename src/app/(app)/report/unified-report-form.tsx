@@ -362,11 +362,10 @@ export function UnifiedReportForm({
            * value straight back into the draft, so a failed submit silently
            * undid the reporter's Severity/Priority/Status/Frequency choices.
            * Dispatching `useActionState` directly means no form submission ever
-           * completes, so React never fires the reset. Sanctioned exception to
-           * CORE-ARCH-002 — this form already depends on JS end to end
-           * (Turnstile token, draft persistence, `window.location.assign`
-           * redirect), so there is no no-JS story to preserve. Success still
-           * resets explicitly via `resetSingleForm()`.
+           * completes, so React never fires the reset. This form depends on JS
+           * end to end regardless (Turnstile token, draft persistence,
+           * `window.location.assign` redirect). Success still resets
+           * explicitly via `resetSingleForm()`.
            */}
           <form
             onSubmit={(e) => {

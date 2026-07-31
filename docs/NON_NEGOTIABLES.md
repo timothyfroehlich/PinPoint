@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-07-17
-**Version**: 2.4 (form-token/status corrections; SMTP, quick-report-grid, and confirm-delete sanctioned exceptions — audit PP-9vh3/PP-h9lb)
+**Last Updated**: 2026-07-27
+**Version**: 2.5 (progressive-enhancement non-negotiable retired; CORE-ARCH-012 honest-failure added — PP-nw80)
 
 > **Sync contract**: `AGENTS.md`'s rule index is a one-line summary of these rules. Every index entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
 
@@ -25,7 +25,7 @@
 8. Never use `any`, non-null `!`, or unsafe `as` (CORE-TS-007)
 9. Default to Server Components, minimal Client Components (CORE-ARCH-001)
 10. Map data to minimal shapes before passing to Client Components (CORE-SEC-006)
-11. Forms work without JavaScript (CORE-ARCH-002)
+11. A control that cannot act must not report that it did (CORE-ARCH-012)
 12. Drizzle migrations only — no `drizzle-kit push` (CORE-ARCH-009)
 13. Use `localhost`, never `127.0.0.1`, for local URLs (CORE-SEC-008)
 14. Pick the cheapest test layer that catches the bug class (CORE-TEST-005)
@@ -320,20 +320,6 @@
 - **Do:** Default to Server Components, use "use client" only for interactivity
 - **Don't:** Make entire pages Client Components unnecessarily
 
-**CORE-ARCH-002:** Progressive enhancement
-
-- **Severity:** Required
-- **Why:** Forms work without JavaScript
-- **Do:** Use Server Actions with `<form action={serverAction}>`
-- **Don't:** Require client-side JavaScript for core functionality
-- **Status:** This rule is under active reconsideration (PP-nw80). The exception list below is now large enough that it describes the actual pattern rather than a set of one-off waivers — read it as a record of where native submission lost, not as a budget to spend.
-- **Sanctioned exceptions:**
-  - The member+ bulk quick-report grid (`src/app/(app)/report/(tabbed)/quick/quick-report-grid.tsx`, PP-sn34) submits each row through an `onClick`-triggered Server Action instead of a single `<form action>`, because per-row async submit with independent partial-failure handling across many rows cannot be expressed as one native form. The grid is a technician-oriented power tool layered on top of `/report`, not the only way to file an issue. (This carve-out previously rested on `/report` being "the fully progressive-enhancement path"; that is no longer accurate — see the Radix-Select exception below — and it was already only half-true, since an unauthenticated no-JS reporter never gets a Turnstile token.) A new no-`<form>` submission path that is the _sole_ way to perform an action is still a violation.
-  - **Every form containing a Radix Select** builds its `FormData` by hand and calls the `useActionState` dispatch directly inside `startTransition`, rather than carrying `action={...}` on the `<form>`. `@radix-ui/react-select` >=2.3.3 attaches a form-`reset` listener that replays `onValueChange` with the Select's mount-time value, and React 19 auto-resets a `<form action={...}>` once the action settles — **on failure as well as success**, since React only sees that the action returned. Dispatching directly means no form submission ever completes, so React never fires the reset. Affected files:
-    - The four inline issue-detail metadata forms (`src/app/(app)/m/[initials]/i/[issueNumber]/update-issue-{status,priority,severity,frequency}-form.tsx`, PP-0fvr). These auto-submitted from `onValueChange`, so the reset replay looked like a real user selection and fired a **second write carrying the stale value** — silently reverting every change about a second after it was made.
-    - `src/app/(app)/m/[initials]/update-machine-form.tsx`, `src/app/(app)/m/new/create-machine-form.tsx`, `src/app/(app)/report/unified-report-form.tsx`, and `src/app/(app)/settings/delete-account-section.tsx` (PP-1ajq). These submit from a real button, so there is no bad write — instead a **failed** save silently wiped the user's unsaved edits while the form was still on screen (uncontrolled inputs snapped back to `defaultValue`; Selects snapped back to their mount value; controlled Selects had the stale value written back through `onValueChange`). Worst case was delete-account, where a reverted machine-reassignment left the confirmation text intact and the destructive button enabled.
-    - Note that making a Select **controlled does not help** — Radix's replay calls `onValueChange`, so the stale value is written straight into your state. Removing the native submission path is the remedy. Regression guards live in `src/test/unit/components/{issues,machines,settings,report}/*revert*.test.tsx` and deliberately mock neither `react` nor the Select wrappers; mocking `useActionState` is precisely why this bug class stayed invisible to a green suite for five days.
-
 **CORE-ARCH-004:** Issues always per-machine
 
 - **Severity:** Critical
@@ -393,6 +379,13 @@
 - **Why:** The "Doodle Bug" (PP-2053). A user reported an issue, got a confirmation email with a working link, but the issue was never persisted and no alert fired. Root cause: the confirmation email was sent from a Resend HTTP call executed _inside_ the issue-creation transaction, before COMMIT. When the request was killed mid-flight the transaction rolled back, but the email had already gone out — a silent write-loss. A transaction can roll back at any point; anything irreversible done before COMMIT can outlive a write that never lands.
 - **Do:** Keep transaction callbacks to transactional DB work only. Fetch external inputs (e.g. the Discord Vault token via `getDiscordConfig()`) _before_ opening the transaction. Deliver external effects _after_ commit — use `after()` in a Server Action plus the two-phase `planNotification` (in-transaction writes) / `dispatchNotification` (post-commit fan-out) split. A runtime tripwire enforces this: `db.transaction` sets an in-transaction `AsyncLocalStorage` flag (`~/server/db/transaction-context`), and the email / Discord / blob / Vault-RPC client wrappers throw `SideEffectInTransactionError` if invoked while it is set — failing loudly in dev, test, and CI. A static ESLint backstop (`no-restricted-syntax`, options in `eslint-rules/no-side-effects-in-transaction.mjs`) catches the same violation at lint/CI time, before runtime: it flags calls to `sendEmail` / `sendDm` / `dispatchNotification` / `uploadToBlob` / `deleteFromBlob` / `getDiscordConfig` / `fetch` / `*.emails.send` inside a `db.transaction(...)` callback.
 - **Don't:** Call `sendEmail`, `sendDm`, `uploadToBlob`/`deleteFromBlob`, `getDiscordConfig`, `fetch`, or any other HTTP/IO from inside a `db.transaction(...)` callback. Don't "optimize" by moving a pre-fetch into the transaction. Don't catch and swallow `SideEffectInTransactionError` — fix the call site to run post-commit.
+
+**CORE-ARCH-012:** A control that cannot act must not report that it did
+
+- **Severity:** Required
+- **Why:** PinPoint does not support JavaScript-disabled browsers, and a visibly broken control is an acceptable outcome when JavaScript fails to load — the user can see something is wrong and retry. What is not acceptable is a control that reports success for an action it could not perform: the user walks away believing the change was saved. Visible breakage is recoverable; false confirmation is not. Replaces the progressive-enhancement non-negotiable retired on 2026-07-27 (see the Rule IDs appendix), after an audit found that only ~7 of ~28 submission surfaces worked without JavaScript and that the public `/report` entry point — the rule's flagship surface — was unconditionally broken. Audit and reasoning: `docs/superpowers/specs/2026-07-27-core-arch-002-scope-design.md` (PP-nw80).
+- **Do:** When a control cannot perform its action — a dependency is unavailable, JavaScript is not running, a precondition is unmet — let it visibly do nothing, or surface a real error. Rely on server-side validation to reject submissions that could not have carried valid input.
+- **Don't:** Render a success message, toast, or confirmation for a submission whose input could not have been collected. Don't wire a save control that submits unchanged state and confirms it as a change.
 
 ---
 
@@ -658,7 +651,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..008: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001..010: Architecture (003 retired)
+- CORE‑ARCH‑001, 004..012: Architecture (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor

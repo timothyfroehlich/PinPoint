@@ -62,8 +62,8 @@ export function DeleteAccountSection({
   // field back to ""), while the controlled confirmation text survived and
   // kept the destructive button enabled. Dispatching directly means no form
   // submission ever completes, so React never fires the reset. Same remedy as
-  // PP-0fvr; sanctioned exception to CORE-ARCH-002 — the form lives inside a
-  // Radix AlertDialog, so there is no no-JS story to preserve.
+  // PP-0fvr. The form lives inside a Radix AlertDialog, so it depends on JS
+  // end to end regardless.
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     // Ignore submits bubbled up from a descendant form. React propagates events
     // through the React tree, not the DOM tree, so a portalled `<form>` in any

@@ -189,9 +189,8 @@ export function EditMachineDialog({
   // >=2.3.3 replayed each Select's mount-time value through its own form-
   // `reset` listener. Dispatching `useActionState` directly means no form
   // submission ever completes, so React never fires that reset. Same remedy as
-  // the inline issue metadata forms (PP-0fvr); sanctioned exception to
-  // CORE-ARCH-002 (the form lives inside a Radix Dialog, so it has no no-JS
-  // story to preserve).
+  // the inline issue metadata forms (PP-0fvr). The form lives inside a Radix
+  // Dialog, so it depends on JS end to end regardless.
   const dispatchForm = (): void => {
     if (!formRef.current) return;
     const fd = new FormData(formRef.current);

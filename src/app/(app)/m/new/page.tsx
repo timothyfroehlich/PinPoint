@@ -17,7 +17,7 @@ import { getUnifiedUsers } from "~/lib/users/queries";
  * Create Machine Page (Protected Route)
  *
  * Form to create a new pinball machine.
- * Uses Server Actions with progressive enhancement (works without JS).
+ * Mutates through a Server Action.
  */
 export default async function NewMachinePage(): Promise<React.JSX.Element> {
   // Auth guard - check if user is authenticated (CORE-SSR-002)
