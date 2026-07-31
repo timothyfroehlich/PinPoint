@@ -71,19 +71,26 @@ pnpm run preflight:unlocked        # Full pre-commit check (unlocked, bypasses c
 
 ### Which Tests to Run (Decision Tree)
 
-1. **Changed pure logic/utils?** → `pnpm run check` (unit tests, ~12s)
-2. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (~15-30s)
-3. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
-4. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs
-5. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
-6. **NEVER** run `e2e:full` locally unless explicitly asked — that's what CI is for
+1. **Docs, hooks, config, or other non-source changes?** → `pnpm run check` is enough (~12s)
+2. **Changed pure logic/utils?** → `pnpm run check` (unit tests, ~12s)
+3. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (~15-30s)
+4. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
+5. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs
+6. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
+7. **Final pre-review** → push and let CI run the full suite; don't sweep locally.
 
 **Key rules for agents:**
 
+- **Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state.
+- The full suite (`e2e:full` / `e2e:all`) is CI's job by default — it's roughly 8–10 minutes of three parallel Chromium workers plus a Supabase stack and a Next server. **On a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally** — push and let CI do it. On a machine with real headroom it's a reasonable thing to run when you actually want the signal.
 - Always use `--project=chromium` for targeted runs (skip Mobile Chrome unless testing responsive)
 - Use `--headed` for debugging visual issues
 - `pnpm run check` catches 90% of issues — E2E is for integration verification, not iteration
 - If a test is flaky locally, report it — don't retry in a loop
+
+### Reproducing CI failures locally
+
+Always try local first — seconds vs minutes, full devtools. If a single-test run fails with missing fixtures, run the whole file (E2E specs share state across describe blocks via `beforeAll`).
 
 ### Critical Rules
 

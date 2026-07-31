@@ -62,9 +62,31 @@ Read the full notice, derive a name from your first prompt, and register:
 - DO NOT use bead IDs, PR numbers, or generic labels like `Worker1`
 - If the name's taken, the helper suggests variations; pick one and retry
 
-### Recent activity summary (follows identity)
+### Work digest (follows identity)
 
-After the identity block, session-start injects this month's coordination summary and the descriptions of the N most-recent daily beads (default N=5). This is the context that replaced the old PP-cvh comment dump — ~300 tokens vs ~5,000.
+    ## What we have been working on (last 7 days)
+
+    **Merged to `main` — 42 commits in the last 7 days** (newest 2026-07-28, via `origin/main`)
+
+    _New capability (8)_ — mcp (2), agents, collections, db, hooks, pinballmap, settings
+    - shareable settings sets — owner/community kinds, visibility, tournament tag (#1730)
+    ...
+    _Housekeeping_ — 9 dependency bumps, 4 chore
+
+    **In flight — 9 branches touched in the last 7 days**
+    - `feat/machine-edit-page` — label the machine record tab "Manage", not "Edit" _2026-07-27_
+
+The shape of recent work: what merged to `main` grouped by work type (with a scope histogram naming which parts of the app moved), and which branches are currently alive. `huddle-digest.sh` builds it from the local git object store — **no LLM, no network, no `bd`** — so it costs a few milliseconds and can't go stale in the way a hand-written summary does.
+
+Read it as orientation, not as instructions: it tells you what kind of work this project is doing right now, which is the thing the daily summaries below it don't convey. Because it reads `origin/main` as-is and never fetches, it labels the newest commit date it actually saw — if that date looks old, your remote refs are stale, not the project.
+
+### Recent activity summary (follows the digest)
+
+Then this month's coordination summary and the descriptions of the N most-recent daily beads (default N=2, `settings.n_dailies_to_inject`). Dailies are written in a "Merged / In-flight / Discoveries / Blockers" shape; they're the day-scale detail layer — recent discoveries and live blockers — under the week-scale digest. N dropped from 5 to 2 when the digest landed (PP-llkj): five days of blocker-shaped summaries was duplicated budget and read as a list of everything that recently broke.
+
+### After compaction
+
+Compaction emits a condensed block rather than nothing: your registered name, today's bead id, a reminder to post if your scope grew, and the work digest. The full registration/etiquette text is skipped — you saw it at startup. Compaction is a deliberate prompt point because a compacted session is the one most likely to have quietly changed shape.
 
 ## Bootstrap
 
@@ -179,6 +201,24 @@ Comments signed by your own session (matching `—<YourName>` or `—Claude-<You
 
 **Peer-response etiquette:** when a peer's kickoff or update scrolls by, reply only if you have _specific relevant context_ — a conflict with what they're touching, a gotcha you hit there, a related in-flight branch or bead. Don't ack-spam ("sounds good", "noted") — silence is the correct response when you have nothing concrete to add.
 
+### Quiet-session nudge
+
+The same hook watches whether _you_ have said anything. If your session is registered and has no post on today's bead — or your newest post has aged past 45 minutes — it prints one reminder:
+
+    ## Huddle: say what you are working on
+
+    **Claude-Foo**, your last huddle post was 2026-07-28T12:04:11Z. Since then, has the work changed shape?
+    ...
+      - **scope was ADDED to what you were already doing**
+      - you changed direction or dropped the approach you announced
+      - you started touching a new file/area others could conflict on
+
+It fires at most once per window per session, never on a session's first poll, and never when you've posted inside the window. `HUDDLE_NUDGE_SECONDS=0` disables it; the clock lives in `<state-dir>/nudged-<session_id>`.
+
+**Why it exists:** the kickoff is not the failure point — the silence after it is. A session announces a plan, then Tim adds a second ask, or review feedback grows the change, or a one-line fix turns into a refactor, and peers spend hours coordinating against a plan that stopped being true. Added scope is the single most under-reported thing in the huddle, which is why the nudge names it first.
+
+If nothing actually changed, ignore the nudge. A bare "still working on it" is noise.
+
 ### Throttle override
 
 Edit `.claude/settings.json` and update `HUDDLE_THROTTLE_SECONDS=180` on the PostToolUse hook command line. Setting it to `0` polls on every tool call — useful for debugging only. To stop PostToolUse polling entirely, remove the entire PostToolUse entry from `.claude/settings.json` (UserPromptSubmit polling continues regardless).
@@ -193,6 +233,8 @@ Edit `.claude/settings.json` and update `HUDDLE_THROTTLE_SECONDS=180` on the Pos
 **What still requires a manual post** (the judgment calls automation can't make):
 
 - **A session kickoff** — once per session, after you understand the goal, for substantive work or investigations (not trivial Q&A or one-line fixes): "Starting: <what> in <area/branch>. Ping me if you have context." This lets parallel sessions learn about your work early — before something ships — so anyone with a relevant gotcha, conflict, or in-flight branch can chime in.
+- **Scope that got ADDED to what you're already doing** — Tim tacks a second ask onto the session, review feedback grows the change, a "quick fix" turns out to need a migration. Say what got added, not just that something did: "PP-xxx grew to also cover <thing> — now touching <area>." **This is the most commonly skipped post and the one peers most need**, because the kickoff they read is now describing work you're no longer only doing.
+- **A change of direction** — you dropped the approach you announced. Peers may have decisions pending on it.
 - A bead you filed for a non-obvious finding: "Filed PP-xxx: <finding>."
 - A coordination need — file/area conflict risk: "Working on <file/area> in <branch>; flag if conflict."
 
@@ -219,8 +261,9 @@ Sign with `—<YourFullRegisteredName>` (em-dash + your registered name). The se
 | ---------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `scripts/hooks/huddle-bootstrap.sh`      | manual (one-time)                                        | Init root epic + daily + monthly + config.json                                                                                                                                                                                                                                                                                                                  |
 | `scripts/hooks/huddle-rotate.sh`         | rotation subagent                                        | Phase A: atomic create-and-pointer-update; outputs OLD/NEW bead IDs                                                                                                                                                                                                                                                                                             |
-| `scripts/hooks/huddle-poll.sh`           | UserPromptSubmit + PostToolUse (throttled)               | Inject new today_bead comments since last_seen                                                                                                                                                                                                                                                                                                                  |
-| `scripts/hooks/huddle-session-start.sh`  | SessionStart                                             | Bootstrap notice, rotation notice, identity, summary injection                                                                                                                                                                                                                                                                                                  |
+| `scripts/hooks/huddle-poll.sh`           | UserPromptSubmit + PostToolUse (throttled)               | Inject new today_bead comments since last_seen; quiet-session nudge                                                                                                                                                                                                                                                                                             |
+| `scripts/hooks/huddle-session-start.sh`  | SessionStart                                             | Bootstrap notice, rotation notice, identity (condensed on compact), work digest, summary injection                                                                                                                                                                                                                                                              |
+| `scripts/hooks/huddle-digest.sh`         | session-start (also runnable by hand)                    | "Last 7 days" work digest from git alone — merged-to-main by work type + in-flight branches. `--days N`, `--max-items N`, `--no-branches`                                                                                                                                                                                                                       |
 | `scripts/hooks/huddle-pr-announce.sh`    | PostToolUse (`Bash`\|`mcp__github__create_pull_request`) | Auto-post PR-open notice; dedup + fail-open                                                                                                                                                                                                                                                                                                                     |
 | `scripts/hooks/huddle-whoami.sh`         | manual                                                   | Register/lookup/list/discover session→name mappings                                                                                                                                                                                                                                                                                                             |
 | `scripts/hooks/huddle-rotation-check.sh` | sourced by both hooks                                    | Date-compare: returns 0 if today_bead.date < today                                                                                                                                                                                                                                                                                                              |
@@ -234,6 +277,7 @@ All under `<main-worktree>/.agents/huddle/` (shared across all linked worktrees 
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `config.json`           | `{"root_bead_id": "PP-xxx"}` — **rebuildable cache** (rewritten from a title query on miss/stale); written by bootstrap or auto-adopted on a fresh machine (see Multi-machine)        |
 | `session-names.json`    | `{session_id: name}` map (canonical for self-filter). **Intentionally machine-local** — a session lives on one machine, and a peer machine's posts must NOT be self-filtered on yours |
+| `nudged-<session_id>`   | Per-session quiet-nudge clock (epoch seconds). Swept during rotation at >2d                                                                                                           |
 | `last-seen-<path-hash>` | Per-checkout poll cursor (newest injected `created_at`). Stale cursors (>14d) are swept during rotation                                                                               |
 | `last-pull`             | **Embedded mode only.** Per-machine Dolt-sync throttle marker (epoch seconds). Unused in server mode (`huddle_sync` no-ops)                                                           |
 | `pull.lock`             | **Embedded mode only.** Non-blocking flock/lockf target so exactly one session syncs when many fire at once                                                                           |
