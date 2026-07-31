@@ -185,7 +185,9 @@ If head is newer than the latest Copilot review:
   2. Address serious findings the same way you handle Copilot threads: fix → push → re-review. A fix changes the head SHA and re-arms the `reviewed` gate. Consciously decline the rest.
   3. `bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings summary>"` — posts the SHA-pinned sticky marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
 
-`merge-pr.sh` enforces this at merge time via the `reviewed` gate (PASSes on a Copilot review OR a SHA-matched Claude marker; WAITs inside the 600s window; FAILs after it with no review of either kind). Unlike the older `currency` gate — which WARN-proceeds on a stale/absent Copilot review — `reviewed` blocks the merge, so the Claude fallback is the way past it, not a bypass. Don't tell Tim a PR is "ready" or "done" while head is still unreviewed — making a review happen is part of finishing the PR, not an optional extra.
+`merge-pr.sh` enforces this at merge time via the `reviewed` gate (PASSes on a Copilot review OR a SHA-matched Claude marker; WAITs inside the 600s window; FAILs after it with no review of either kind). Unlike the `currency` gate — which never hard-fails, only WARN-proceeds once its timer runs out — `reviewed` blocks the merge, so the Claude fallback is the way past it, not a bypass. Both gates honour the marker. Don't tell Tim a PR is "ready" or "done" while head is still unreviewed — making a review happen is part of finishing the PR, not an optional extra.
+
+**A Copilot comment saying it _couldn't_ review is not a review** (PP-jw0s). When Copilot is quota-limited or finds nothing to analyze, it still posts a review object with a real timestamp — and both gates used to count it, going green on a review that read nothing. They now match those bodies and treat them as absent, so a quota-limited PR takes the honest path: WAIT, then FAIL with the `mark-claude-review.sh` remedy printed. If you see that FAIL during a quota outage, the gate is working — run the fallback above, don't `--force`.
 
 ### 3.5 Post UI screenshots (UI-touching PRs only)
 
@@ -235,18 +237,25 @@ Once 3.1–3.6 are satisfied (CI green, threads resolved, head commit reviewed, 
 ! scripts/workflow/merge-pr.sh <PR> --human
 ```
 
+If CI is still running, hand him the automerge form instead — it waits rather than making him come back. Attest the review first (Phase 3.4); automerge waits out CI, not an unreviewed head:
+
+```
+! scripts/workflow/merge-pr.sh <PR> --human --automerge
+```
+
 Never say "ready to push when you are" — you push. Never say a PR is "merged" or that you merged it — only Tim runs the merge; say "ready for Tim to merge" and give him the command. (A `!`-prefixed command in Claude Code is a human-typed shell passthrough — it does not generate a PreToolUse event, so it is the only channel this hook cannot see. That is by design: it is the human channel.)
 
 ### 4.2 What `merge-pr.sh --human` does (reference — Tim runs this, not you)
 
 ```
-scripts/workflow/merge-pr.sh <PR> --human [--dry-run] [--force] [--bypass-merge-requirements]
+scripts/workflow/merge-pr.sh <PR> --human [-a|--automerge] [--dry-run] [--force] [--bypass-merge-requirements]
 ```
 
 `--human` is required to actually merge; omitting it makes the script refuse with a `REFUSE:` message (defense-in-depth for harnesses without the Claude Code hook — Codex/Gemini/Antigravity). `--dry-run` doesn't require `--human` in the script itself, but that exemption only matters outside Claude Code — inside Claude Code the hook blocks the Bash call before the script even runs, dry-run or not.
 
 Other flags (stackable, order-independent):
 
+- `-a` / `--automerge` — poll the gates instead of evaluating once, and merge the moment they all pass. Fire it while CI is still running; that's the point. It does **not** wait out an unreviewed head — `reviewed` hard-fails 600s after a head push with no Copilot review and no Claude marker, and a hard failure ends the run — so post the marker first when Copilot is quota-limited or has skipped. Ends in exactly one of three states, each named on exit: `MERGED`, `RED` (a gate hard-failed — no merge, `ready-for-review` dropped), or `TIMED OUT` (still waiting when the budget expired — PR untouched, label intact, exit code 2). A WAIT keeps it polling; only a hard failure stops it. `AUTOMERGE_TIMEOUT` (default 3600s) and `AUTOMERGE_POLL_INTERVAL` (default 30s) tune it. Mutually exclusive with `--dry-run`. Prints the gate block on the first poll and again whenever the picture changes, so a long wait stays readable.
 - `--force` — bypass `currency` + `threads` + `reviewed` (review-state) gates. Requires manual permission approval.
 - `--bypass-merge-requirements` — bypass `ci` gate AND pass `--admin` to `gh pr merge`,
   overriding GitHub branch-protection rules. Requires manual permission approval.
