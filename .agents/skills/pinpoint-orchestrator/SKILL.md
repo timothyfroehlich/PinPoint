@@ -133,7 +133,7 @@ Work bead <ID>. First run `bd show <ID>` && `bd update <ID> --claim` — the bea
 
 ## Quality Gates
 
-Run `pnpm run check` before returning. Then self-review: run `/code-review` on your own diff (the model-invocable local review — **not** `ultra`, which is user-triggered/billed and you cannot launch) and address serious findings. After your final push, if Copilot hasn't reviewed your head commit within ~10 min, run `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` so the `reviewed` merge gate passes.
+Run `pnpm run check` before returning. Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Don't reach for `/code-review` or `ultra`: both are user-triggered harness surfaces (`ultra` is also billed) and an agent cannot launch either. After your final push, if Copilot hasn't reviewed your head commit within ~10 min, run `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` so the `reviewed` merge gate passes.
 
 ## Return Format
 
@@ -205,7 +205,7 @@ Or fallback: `gh pr edit <PR> --add-label ready-for-review`.
 
 The subagent self-reviews its own diff (Phase 3 template), but that can be skipped or Copilot can silently miss the head commit — so the lead re-checks at the handoff boundary. Before applying `ready-for-review` or handing a PR to Tim for `merge-pr.sh --human`, confirm the head commit is covered by **either** a Copilot review **or** a SHA-pinned Claude marker (`<!-- pinpoint-claude-review: <head_sha> -->`). If neither covers head:
 
-1. Run `/code-review` on the PR diff — the model-invocable **local** review. (`ultra` is the cloud multi-agent review; it is user-triggered and billed, so the agent cannot launch it.)
+1. Review the PR diff yourself — a deliberate manual pass over `git diff origin/main...HEAD` against `REVIEW.md` (the canonical rubric) and the bead's acceptance criteria. `/code-review` is a harness built-in that only Tim can trigger, and `ultra` is the cloud multi-agent review — user-triggered and billed. An agent can launch neither, so the manual pass is the backstop.
 2. Address serious findings (fix → have the subagent push → re-review; a fix re-arms the gate). Decline the rest.
 3. `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` to post the marker.
 

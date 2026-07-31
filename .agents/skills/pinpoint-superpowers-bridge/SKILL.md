@@ -62,7 +62,7 @@ Everything above happens **in a worktree** — the root checkout is read-only (A
 
 ### `requesting-code-review` / `receiving-code-review`
 
-- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** review gate is **CI Gate + `/code-review`** (see `pinpoint-pr-workflow`), not a plugin subagent.
+- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** review gate is **CI Gate + the head-commit review requirement** in `pinpoint-pr-workflow` (Copilot, or your own manual pass over the diff plus `mark-claude-review.sh`), not a plugin subagent.
 - **Reply to review comments via MCP** (`add_reply_to_pull_request_comment` + resolve the thread with `pull_request_review_write method:"resolve_thread"`), **signed with your agent name** (`—Claude` / `—Gemini` / `—Codex` / `—Antigravity`, per AGENTS.md §5 "Review comments"). Declined comments still get a one-sentence reply — no silent ignores. Do not use the plugin's own reply flow.
 
 ### `finishing-a-development-branch` — the biggest override
@@ -79,17 +79,17 @@ Superpowers presents a 4-option menu led by "1. Merge back to `<base>` locally".
 
 ## 4. Quick reference
 
-| Superpowers step         | PinPoint override                                                                 |
-| :----------------------- | :-------------------------------------------------------------------------------- |
-| Spec written             | + create bead with `--spec-id` + `--acceptance` (§2)                              |
-| Plan written             | record path + branch in `--design` (§1)                                           |
-| Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`, from main worktree               |
-| SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                              |
-| Code review              | CI Gate + `/code-review`; replies via MCP, signed with your agent name            |
-| Finish: "merge locally"  | ❌ prohibited → PR + human-only `merge-pr.sh --human` handoff + landing-the-plane |
-| Finish: tests            | tiered `pnpm run check`/`preflight`/`smoke`, not `npm test`                       |
-| Finish: worktree cleanup | `WorktreeRemove` hook / `worktree_cleanup.py`, on confirmation                    |
-| Close bead               | only after merge                                                                  |
+| Superpowers step         | PinPoint override                                                                                 |
+| :----------------------- | :------------------------------------------------------------------------------------------------ |
+| Spec written             | + create bead with `--spec-id` + `--acceptance` (§2)                                              |
+| Plan written             | record path + branch in `--design` (§1)                                                           |
+| Worktree create          | `EnterWorktree` / `Agent(isolation:"worktree")`, from main worktree                               |
+| SDD dispatch             | clear the scale gate (count + cost, Tim's yes) first                                              |
+| Code review              | CI Gate + `pinpoint-pr-workflow` head-commit review; replies via MCP, signed with your agent name |
+| Finish: "merge locally"  | ❌ prohibited → PR + human-only `merge-pr.sh --human` handoff + landing-the-plane                 |
+| Finish: tests            | tiered `pnpm run check`/`preflight`/`smoke`, not `npm test`                                       |
+| Finish: worktree cleanup | `WorktreeRemove` hook / `worktree_cleanup.py`, on confirmation                                    |
+| Close bead               | only after merge                                                                                  |
 
 ## Red flags — stop if you catch yourself
 
