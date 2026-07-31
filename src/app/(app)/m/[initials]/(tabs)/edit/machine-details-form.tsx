@@ -103,8 +103,9 @@ export function MachineDetailsForm({
   // through its own form-`reset` listener. On a failed save that is silent
   // data loss under an error banner. Dispatching `useActionState` directly
   // means no form submission ever completes, so React never fires that reset.
-  // Same remedy as `EditMachineDialog` (PP-1ajq) and the inline issue metadata
-  // forms (PP-0fvr).
+  // Same remedy as the inline issue metadata forms (PP-0fvr) and the other
+  // PP-1ajq forms (create-machine, unified-report, delete-account). It was
+  // first applied to the Edit Machine modal that this page replaces.
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     // Suppress native submission; the dispatch below drives the action.
     // Native constraint validation (`required` on name) has already run by the

@@ -356,19 +356,19 @@ export function CreateMachineForm({
         </div>
 
         {/* PinballMap listing — a brand-new machine always starts unlisted.
-            Listing happens after creation, from the machine's Manage tab, once
-            it exists and has an id to act on. Deliberately vague about the
-            control: the Edit dialog is gone (PP-o355.19) and the listing
-            control itself is being rebuilt (PP-o355.21), so naming a button
-            here would only go stale again. */}
+            This copy names no destination on purpose. The Edit dialog is gone
+            (PP-o355.19) and the Manage tab's listing control is a placeholder
+            until PP-o355.21 rebuilds it, so sending the reader to a specific
+            screen would be sending them somewhere they can't act. Point it at
+            the listing control once .21 ships. */}
         <div className="flex items-start gap-2">
           <MapPin
             aria-hidden="true"
             className="mt-0.5 size-4 text-muted-foreground"
           />
           <p className="text-sm text-muted-foreground">
-            Not yet on Pinball Map — you can list this machine from its Manage
-            tab after creating it.
+            Not yet on Pinball Map. Listing is handled by the hourly sync for
+            now — machine-level listing controls are coming soon.
           </p>
         </div>
 

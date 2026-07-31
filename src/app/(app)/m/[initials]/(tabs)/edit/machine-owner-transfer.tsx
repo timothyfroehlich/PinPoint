@@ -142,7 +142,7 @@ export function MachineOwnerTransfer({
   // DOM without re-rendering React, so a second attempt would submit an empty
   // machine id. Dispatching `useActionState` directly means no form submission
   // ever completes, so React never fires that reset. Same remedy as
-  // `MachineDetailsForm` and `EditMachineDialog` (PP-1ajq).
+  // `MachineDetailsForm` above (PP-1ajq).
   const dispatchForm = (mutate?: (fd: FormData) => void): void => {
     if (!formRef.current) return;
     const fd = new FormData(formRef.current);

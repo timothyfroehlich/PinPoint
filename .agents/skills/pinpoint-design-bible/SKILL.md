@@ -391,13 +391,13 @@ Prefer `<Skeleton>` rectangles shaped like the content that will appear. Skeleto
 
 Three tiers based on scope. Pick the narrowest one that fits.
 
-| Scope                           | Pattern                                                                |
-| :------------------------------ | :--------------------------------------------------------------------- |
-| Form-level (submission failed)  | `<Alert variant="destructive"><AlertDescription>` at top of form       |
-| Field-level (one field invalid) | `<FormMessage>` (react-hook-form) or inline `text-sm text-destructive` |
-| Inline list edit (cell update)  | `toast.error("Failed to update X")`                                    |
-| Entire route crashed            | `error.tsx` boundary (already implemented)                             |
-| Route not found                 | `not-found.tsx` boundary (already implemented)                         |
+| Scope                           | Pattern                                                                     |
+| :------------------------------ | :-------------------------------------------------------------------------- |
+| Form-level (submission failed)  | `<Alert variant="destructive"><AlertDescription>` at top of form            |
+| Field-level (one field invalid) | `<FormMessage>` (react-hook-form) or inline `text-sm text-destructive-text` |
+| Inline list edit (cell update)  | `toast.error("Failed to update X")`                                         |
+| Entire route crashed            | `error.tsx` boundary (already implemented)                                  |
+| Route not found                 | `not-found.tsx` boundary (already implemented)                              |
 
 **Rules:**
 
@@ -563,7 +563,7 @@ The timeline composer (PP-0x98) establishes the basic pattern; generalizing it a
 | `text-on-surface`           | `text-foreground`           |
 | `text-on-surface-variant`   | `text-muted-foreground`     |
 | `bg-error-container`        | `bg-destructive/10`         |
-| `text-on-error-container`   | `text-destructive`          |
+| `text-on-error-container`   | `text-destructive-text`     |
 
 **Rules:**
 
@@ -579,13 +579,24 @@ The timeline composer (PP-0x98) establishes the basic pattern; generalizing it a
 | Body text                   | `text-foreground`       |
 | Secondary / helper text     | `text-muted-foreground` |
 | Primary accent (links/CTAs) | `text-primary`          |
-| Error text                  | `text-destructive`      |
+| Error text                  | `text-destructive-text` |
 | Primary CTA background      | `bg-primary`            |
 | Subtle background           | `bg-muted`              |
 | Destructive CTA background  | `bg-destructive`        |
 | Destructive container bg    | `bg-destructive/10`     |
 | Card background             | `bg-card`               |
 | Dimmed/closed item          | `bg-surface-variant/30` |
+
+**Two reds, and they are not interchangeable.** `bg-destructive` (#dc2626,
+red-600) is the FILL — white on it is 5.3:1, which is correct. But that same
+red used as TEXT on our dark background is only **3.96:1**, under AA's 4.5:1
+for normal text. So destructive _text_ uses `text-destructive-text` (#ef4444,
+red-500 — 5.09:1): outline buttons, error copy, required-field markers,
+`FormMessage`. Reach for `text-destructive` and you will ship an AA failure.
+
+The original token comment ("red-600 passes ~5.3:1") described only the
+white-on-red case and made the untested inverse look checked — which is how
+79 usages accumulated before anyone measured. PP-mjms sweeps the remainder.
 
 ## 19. Browser Support Policy
 
@@ -703,7 +714,7 @@ Append `<span aria-hidden="true">*</span>` to the `<Label>` of every required fi
 - **Visual:** `:user-invalid` styling on the shared `<Input>` primitive — fires only after the user has interacted (CORE-FORM-003).
 - **AT:** `aria-invalid="true"` synced on blur when `checkValidity()` fails (CORE-FORM-004). Implement once in the shared primitive, not per form.
 - **Form-level errors:** `<Alert variant="destructive">` at the top of the form (per §13 Error State).
-- **Field-level errors:** `<FormMessage>` (react-hook-form) under the field, or inline `<p className="text-sm text-destructive">`.
+- **Field-level errors:** `<FormMessage>` (react-hook-form) under the field, or inline `<p className="text-sm text-destructive-text">`.
 
 ### Submit-button enabled state
 
