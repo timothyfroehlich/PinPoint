@@ -53,6 +53,9 @@ EXIT_MAIN_WORKTREE = 2
 EXIT_STALE_TARGET = 3
 #: Cleanup ran but Docker could not be enumerated, so the Supabase volumes were
 #: neither counted nor removed. `worktree_orphan_sweep.py` is the backstop.
+#: NOTE: `worktree_orphan_sweep.py` spells its equivalent `EXIT_DOCKER_UNKNOWN = 1`
+#: — the same name with a different value, deliberately. In that script 1 is free;
+#: here it already means "failed", and callers distinguish these codes per script.
 EXIT_DOCKER_UNKNOWN = 4
 
 
