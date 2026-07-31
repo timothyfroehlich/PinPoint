@@ -188,7 +188,7 @@ Every authenticated page should compose `<MainLayout>` → `<PageContainer>` →
 
 Consuming an existing domain enum is covered above — pull labels, icons and styles out of `STATUS_CONFIG` / `SEVERITY_CONFIG` / `PRIORITY_CONFIG` / `FREQUENCY_CONFIG`. This section is about **authoring** a new one.
 
-A config-driven enum is a centralized configuration object for a domain enum that needs UI metadata (labels, styles, icons, descriptions). One module owns the values, the type, the metadata, and the accessors, so the DB schema, the Zod schema, and every component all read the same source. `src/lib/issues/status.ts` is the reference implementation: `IssueStatus` (11 values, 3 groups — new: 2, in_progress: 4, closed: 5), `IssueSeverity` (4), `IssuePriority` (3), `IssueFrequency` (3), each with labels, descriptions, Tailwind styles and Lucide icons.
+A config-driven enum is a centralized configuration object for a domain enum that needs UI metadata (labels, styles, icons, descriptions). One module owns the values, the type, the metadata, and the accessors, so the DB schema, the Zod schema, and every component all read the same source. `src/lib/issues/status.ts` is the reference implementation: `IssueStatus` (grouped into new / in_progress / closed), `IssueSeverity`, `IssuePriority` and `IssueFrequency`, each with labels, descriptions, Tailwind styles and Lucide icons.
 
 **Authoring template** — seven pieces, in this order, in one file under `src/lib/<domain>/`:
 
@@ -799,7 +799,7 @@ const dispatchForm = (): void => {
 };
 ```
 
-`startTransition` is not optional — outside a transition React 19 silently skips the Server Action. The reference implementation is `src/app/(app)/report/unified-report-form.tsx` (the `<form onSubmit={...}>` around line 356), which also guards `e.target !== e.currentTarget` so a submit bubbling up from a portalled descendant form doesn't get cancelled here (React propagates events through the React tree, not the DOM tree).
+`startTransition` is not optional — outside a transition React 19 silently skips the Server Action. The reference implementation is the `<form onSubmit={...}>` in `src/app/(app)/report/unified-report-form.tsx`, which also guards `e.target !== e.currentTarget` so a submit bubbling up from a portalled descendant form doesn't get cancelled here (React propagates events through the React tree, not the DOM tree).
 
 How it surfaced in each shape:
 
@@ -835,7 +835,7 @@ Applies to CREATE forms only. Edit forms typically navigate or close on success,
 
 The **return-redirect** requirement is the load-bearing piece. When a Server Action calls `redirect()` server-side, Next.js throws a redirect error that propagates **before** `useActionState` returns success to the client, so the cleanup `useEffect` never fires. Returning `redirectTo` shifts the redirect to the client and lets cleanup run first.
 
-**Ordering inside the effect matters (PP-1ajq): `formRef.current.reset()` must run _before_ the explicit `setState` clears.** `reset()` synchronously fires the form-`reset` event, and Radix answers it by replaying each Select's mount-time value through `onValueChange`. Everything in the effect is one React batch, so whichever update is queued last wins — reset first and the stale replay is superseded by your clears; clear first and the replay overwrites them. See the commented `resetSingleForm` in `src/app/(app)/report/unified-report-form.tsx` (~line 205) for the worked case.
+**Ordering inside the effect matters (PP-1ajq): `formRef.current.reset()` must run _before_ the explicit `setState` clears.** `reset()` synchronously fires the form-`reset` event, and Radix answers it by replaying each Select's mount-time value through `onValueChange`. Everything in the effect is one React batch, so whichever update is queued last wins — reset first and the stale replay is superseded by your clears; clear first and the replay overwrites them. See the commented `resetSingleForm` in `src/app/(app)/report/unified-report-form.tsx` for the worked case.
 
 **Why both passes are needed:**
 
@@ -865,17 +865,17 @@ Native reset clears the form's DOM state; explicit `setState` clears React's vie
 
 ### Server Actions
 
-- Exported server actions are **suffixed `Action`** — `createMachineAction`, `markAsReadAction`. 135/135 exports across `src/app/**/actions.ts` follow this; match it.
+- Exported server actions are **suffixed `Action`** — `createMachineAction`, `markAsReadAction`. This is the house style for new code, not a universal invariant: a minority of existing actions under `src/app/**/actions.ts` predate it and don't carry the suffix (`inviteUser`, `updateUserRole`, `saveDiscordConfig`, `updateMachineDescription` among them — `inviteUser` is wired straight into `useActionState` in `InviteUserDialog.tsx`). Name new actions with the suffix; **don't** rename existing ones to match, and don't assume an unsuffixed export isn't a Server Action.
 - Every action checks authorization through `checkPermission()` from `~/lib/permissions/helpers` (CORE-ARCH-008). Never hand-roll a role comparison. `pinpoint-security` has the full auth/permission gate walkthrough.
 - Actions return `Result<T, C>` from `~/lib/result.ts` (`ok(...)` / `err(...)`), not thrown exceptions, so `useActionState` can render the failure.
-- Report failures through `serverActionError()` from `~/lib/observability/report-error` (27 call sites) rather than a bare `console.error` — that's what routes the error to Sentry with action context.
+- Report failures through `serverActionError()` from `~/lib/observability/report-error` rather than a bare `console.error` — that's what routes the error to Sentry with action context.
 - Zod schemas live in a separate `schemas.ts` next to the action (a Next.js requirement — `"use server"` files may only export async functions).
 
 ### Data access
 
 Data access lives in **colocated** `_data.ts` / `queries.ts` files next to the route that uses it, wrapped in `cache()` from React so a layout and its page don't double-hit the DB in one render pass. There is **no** `src/server/data-access/` directory — don't create one.
 
-Revalidate with `revalidatePath` (50 files use it). `revalidateTag` has **zero** usages in `src/`; if you think you need it, you're introducing a second caching convention.
+Revalidate with `revalidatePath` — that's the convention throughout. `revalidateTag` has **zero** usages in `src/`; if you think you need it, you're introducing a second caching convention.
 
 ### Machine status is derived, never stored
 
@@ -885,7 +885,7 @@ There is no `status` column on the `machines` table — a machine's operational 
 
 `docs/LOGGING.md` is canonical — read it for the structured-logging conventions (`log.info` / `log.warn` / `log.error` from `~/lib/logger`, context fields, never log PII).
 
-One UI-specific fact that lives here: **`~/lib/logger` imports `mkdirSync` from `"fs"`, so it cannot be imported into a Client Component.** `console.*` is therefore correct and expected inside `"use client"` files — six of them do it today. Don't "fix" a console call in a client component by swapping in `~/lib/logger`; that breaks the build.
+One UI-specific fact that lives here: **`~/lib/logger` imports `mkdirSync` from `"fs"`, so it cannot be imported into a Client Component.** `console.*` is therefore correct and expected inside `"use client"` files. Don't "fix" a console call in a client component by swapping in `~/lib/logger`; that breaks the build.
 
 ## Layout Patterns
 

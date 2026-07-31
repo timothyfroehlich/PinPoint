@@ -178,7 +178,7 @@ const url = `http://localhost:${port}/some-path`;
 
 Why it's centralized: the fallback rules differ per environment, and a hand-rolled copy silently emails users a `localhost` link from production.
 
-**Watch for this**: `src/lib/blob/client.ts` (~line 58) still builds its mock upload URL from `process.env["NEXT_PUBLIC_SITE_URL"] ?? \`http://localhost:${port}\`` instead of calling `getSiteUrl()`. It's the one remaining violation against seven correct call sites — don't copy it, and fold it in if you're already touching that file.
+**Watch for this**: the local-mock branch of `src/lib/blob/client.ts` still builds its upload URL from `process.env["NEXT_PUBLIC_SITE_URL"] ?? \`http://localhost:${port}\`` instead of calling `getSiteUrl()` — the one place in the codebase that still hand-rolls this. Don't copy it, and fold it in if you're already touching that file.
 
 Redirect targets in the OAuth callback route go through `resolveRedirectPath`, which enforces internal-path-or-`getSiteUrl()` (see §3 Dynamic Redirects). Anywhere else that accepts a redirect target from the user, use `getSafeRedirect`.
 
