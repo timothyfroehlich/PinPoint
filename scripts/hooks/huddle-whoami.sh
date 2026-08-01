@@ -114,7 +114,7 @@ discover_session_id() {
 #
 # A subagent CANNOT learn its own session_id, so it must never register:
 #   - $CLAUDE_CODE_SESSION_ID is seeded with the PARENT's id;
-#   - discover_session_id below returns the newest TOP-LEVEL transcript, which
+#   - discover_session_id above returns the newest TOP-LEVEL transcript, which
 #     excludes subagents/ by construction — so also the parent's;
 #   - the scratchpad path handed to a subagent embeds the parent's UUID.
 # Every available route yields the parent's id (PP-788v). Telling agents to
