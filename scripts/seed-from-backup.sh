@@ -18,9 +18,9 @@ BACKUP_FILE=$1
 if [ -z "$BACKUP_FILE" ]; then
     echo -e "${BLUE}🔍 No backup file specified. Looking for the latest one in $BACKUP_DIR...${NC}"
 
-    # "Missing directory", "unlistable directory" and "directory with no dumps"
-    # are three different problems. Report them separately — collapsing a failed
-    # lookup into "no backups found" is the exact bug being fixed here.
+    # Missing directory, non-directory, unlistable directory and directory-with-
+    # no-dumps are four different problems. Report them separately — collapsing a
+    # failed lookup into "no backups found" is the exact bug being fixed here.
     if [ ! -d "$BACKUP_DIR" ]; then
         if [ -e "$BACKUP_DIR" ]; then
             # Not "missing" — something is there, it just isn't a directory, and

@@ -12,10 +12,15 @@ name. Because those names sort lexicographically in timestamp order, that needs
 no `stat()` and no `find(1)` extension, so GNU and BSD userlands agree without
 branching on OS.
 
-`test_selects_newest_by_filename_not_mtime` is the load-bearing one: it fails on
-Linux if anyone reinstates an mtime-ordered lookup (`find -printf '%T@'`, `ls
--t`, `stat`), which is the only class of change that could reintroduce the
-macOS-only break. The rest pin the three now-distinct failure reports.
+Two tests carry the weight:
+
+- `test_selects_newest_by_filename_not_mtime` fails on Linux if anyone reinstates
+  an mtime-ordered lookup (`find -printf '%T@'`, `ls -t`, `stat`), which is the
+  only class of change that could reintroduce the macOS-only break.
+- `test_ignores_names_without_a_timestamp` pins the precondition that makes
+  name-ordering valid at all: the glob must match only the timestamped shape.
+
+The rest pin the four now-distinct failure reports.
 
 Every test answers "n" at the confirmation prompt, so the script aborts before
 it can reach a database, and runs with cwd set to a scratch dir so the
