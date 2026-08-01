@@ -18,18 +18,51 @@ BACKUP_FILE=$1
 if [ -z "$BACKUP_FILE" ]; then
     echo -e "${BLUE}🔍 No backup file specified. Looking for the latest one in $BACKUP_DIR...${NC}"
 
-    # Use find for robust file resolution, handling spaces and special characters
-    BACKUP_FILE=$(
-        find "$BACKUP_DIR" -maxdepth 1 -type f -name 'pinpoint_prod_*.sql' -printf '%T@ %p\n' 2>/dev/null \
-            | sort -nr \
-            | head -n 1 \
-            | cut -d' ' -f2-
-    )
-
-    if [ -z "$BACKUP_FILE" ]; then
-        echo -e "${RED}❌ No backup files found in $BACKUP_DIR${NC}"
+    # "Missing directory", "unlistable directory" and "directory with no dumps"
+    # are three different problems. Report them separately — collapsing a failed
+    # lookup into "no backups found" is the exact bug being fixed here.
+    if [ ! -d "$BACKUP_DIR" ]; then
+        echo -e "${RED}❌ Backup directory does not exist: $BACKUP_DIR${NC}"
+        echo -e "${YELLOW}   Run 'pnpm run db:backup' to create one.${NC}"
         exit 1
     fi
+
+    # An unreadable/unsearchable directory yields the same empty glob as an empty
+    # one, so check before matching rather than misreporting the result after.
+    if [ ! -r "$BACKUP_DIR" ] || [ ! -x "$BACKUP_DIR" ]; then
+        echo -e "${RED}❌ Backup lookup failed: cannot list $BACKUP_DIR (permission denied).${NC}"
+        echo -e "${YELLOW}   This is not the same as having no backups — fix the directory permissions.${NC}"
+        exit 1
+    fi
+
+    # Backups are named pinpoint_prod_<YYYYmmdd_HHMMSS>.sql, so lexicographic
+    # order IS chronological order — the newest is simply the greatest name.
+    # A plain glob needs no stat() and no find(1) extension, so it behaves
+    # identically under GNU and BSD userlands. (This used to be
+    # `find -printf '%T@ %p\n' 2>/dev/null`; -printf is GNU findutils only, so
+    # on macOS find errored, the redirect ate the message, and the script
+    # claimed the directory was empty — PP-euhg.)
+    shopt -s nullglob
+    backup_candidates=("$BACKUP_DIR"/pinpoint_prod_*.sql)
+    shopt -u nullglob
+
+    if [ ${#backup_candidates[@]} -eq 0 ]; then
+        echo -e "${RED}❌ No backup files found in $BACKUP_DIR${NC}"
+        echo -e "${YELLOW}   Expected files named pinpoint_prod_<YYYYmmdd_HHMMSS>.sql.${NC}"
+        echo -e "${YELLOW}   Run 'pnpm run db:backup' to create one.${NC}"
+        exit 1
+    fi
+
+    # Pick the greatest name. An explicit loop (rather than ${arr[-1]}) keeps
+    # this working on macOS's stock bash 3.2, which has no negative indexing.
+    BACKUP_FILE=${backup_candidates[0]}
+    for candidate in "${backup_candidates[@]}"; do
+        if [[ $candidate > $BACKUP_FILE ]]; then
+            BACKUP_FILE=$candidate
+        fi
+    done
+
+    echo -e "${GREEN}✓ Found ${#backup_candidates[@]} backup(s); using the newest${NC}"
 fi
 
 if [ ! -f "$BACKUP_FILE" ]; then
