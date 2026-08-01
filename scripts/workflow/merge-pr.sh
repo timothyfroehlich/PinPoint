@@ -14,20 +14,26 @@
 #   -a, --automerge               Poll the gates instead of evaluating them once, and merge
 #                                 as soon as they all pass. Fire it while CI is still
 #                                 running — that is what it is for. It does NOT wait out
-#                                 an unreviewed head: `reviewed` hard-fails 600s after a
-#                                 head push with no Copilot review and no Claude marker,
-#                                 and a hard failure ends the run. So attest the review
-#                                 first (mark-claude-review.sh) if Copilot is quota-limited
-#                                 or has already skipped. Terminates on exactly three
-#                                 outcomes, each reported on exit:
+#                                 an unreviewed head. `reviewed` only WAITs while a review
+#                                 REQUEST is outstanding, and only for 600s from that
+#                                 request; if nobody requested a review since the last
+#                                 push, it hard-fails on the FIRST poll and the run ends.
+#                                 So request the review before firing this
+#                                 (`gh pr edit <PR> --add-reviewer "@copilot"`), or attest
+#                                 head with mark-claude-review.sh if Copilot is
+#                                 quota-limited or has already skipped. Terminates on
+#                                 exactly three outcomes, each reported on exit:
 #                                   MERGED      — gates went green, PR squash-merged
 #                                   RED         — a gate hard-failed; no merge, label removed
 #                                   TIMED OUT   — still waiting when the budget ran out
-#                                 A WAIT (CI running, review pending) keeps polling; only a
-#                                 hard failure stops it. Tune with AUTOMERGE_TIMEOUT (default
-#                                 3600s) and AUTOMERGE_POLL_INTERVAL (default 30s).
+#                                 A WAIT (CI running, requested review not yet answered)
+#                                 keeps polling; only a hard failure stops it. Tune with
+#                                 AUTOMERGE_TIMEOUT (default 3600s) and
+#                                 AUTOMERGE_POLL_INTERVAL (default 30s).
 #   --dry-run                     Print would-do summary, take no action. Does not require --human.
-#   --force                       Bypass currency + threads + reviewed gates.
+#   --force                       Bypass currency + threads + reviewed gates. This is the
+#                                 ONLY way to merge a head no reviewer has seen, and it
+#                                 requires manual permission approval each time.
 #   --bypass-merge-requirements   Bypass ci gate AND pass --admin to gh pr merge
 #                                 (overrides GitHub branch-protection rules).
 #                                 Combine with --force to bypass currency + threads + reviewed + ci together.

@@ -1,7 +1,7 @@
-"""Regression tests for scripts/workflow/pr-watch.py false CI alarms.
+"""Regression tests for scripts/workflow/pr-watch.py.
 
-Three bugs are covered — all of the same family: the watcher reporting a
-failure for something that was not one.
+Three false-alarm bugs are covered — all of the same family: the watcher
+reporting a failure for something that was not one.
 
 1. A `cancelled` run was classified as a failure — cancellation is routine
    (a newer commit cancels the in-flight run via concurrency groups, and the
@@ -19,13 +19,23 @@ failure for something that was not one.
    a healthy run whose jobs were all still pending. "We could not find out" is
    not a verdict. (PP-qkl8)
 
+Review-request state (PP-lzaw): Copilot review is fully request-only on this
+repo as of 2026-08-01 — nothing asks on your behalf, so every PR opens with no
+request at all — and `--check-ready` has to say WHICH review state a PR is in.
+"Nobody asked", "asked and waiting" and "you pushed past the request" need three
+different actions and only the middle one resolves by waiting; flattening them
+into one "not reviewed yet" turns a forgotten request into a silent overnight
+stall.
+
 Everything is mocked at the `gh` CLI seam (`pr_watch.gh`) — these tests never
 reach GitHub (CORE-TEST-006).
 """
 
 import importlib.util
 import json
+import re
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -76,10 +86,40 @@ def _run(run_id: int, status: str, conclusion: str, name: str = "CI", sha=HEAD_S
     }
 
 
-def make_gh(*, rollup=(), runs=(), merge_state="CLEAN", threads=(), labels=()):
+def _ago(seconds: float) -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - seconds))
+
+
+def copilot_review(commit_id=HEAD_SHA, body="Copilot reviewed 3 of 3 files."):
+    return {
+        "user": {"login": "copilot-pull-request-reviewer[bot]"},
+        "commit_id": commit_id,
+        "submitted_at": _ago(0),
+        "body": body,
+    }
+
+
+def make_gh(
+    *,
+    rollup=(),
+    runs=(),
+    merge_state="CLEAN",
+    threads=(),
+    labels=(),
+    head_age=60,
+    request_ages=(0,),
+    reviews=(),
+    issue_comments=(),
+    request_pending=False,
+):
     """Build a fake `gh` that answers every call pr-watch makes.
 
     Records each invocation on `.calls` so tests can assert what was queried.
+
+    The review-state args mirror `copilot_review_state`'s inputs. Defaults put the
+    PR in `awaiting` — a request 0s old against a 60s-old head, with no review yet
+    — which is a passing readiness state, so tests that don't care about the
+    review gate stay unaffected by it.
     """
 
     def fake_gh(*args: str) -> str:
@@ -97,6 +137,34 @@ def make_gh(*, rollup=(), runs=(), merge_state="CLEAN", threads=(), labels=()):
                 )
             if fields == "headRefName,headRefOid":
                 return json.dumps({"headRefName": BRANCH, "headRefOid": HEAD_SHA})
+            if fields == "headRefOid,reviewRequests":
+                return json.dumps(
+                    {
+                        "headRefOid": HEAD_SHA,
+                        "reviewRequests": [{"__typename": "User", "login": "Copilot"}]
+                        if request_pending
+                        else [],
+                    }
+                )
+        if args[0] == "api" and args[1].endswith(f"/commits/{HEAD_SHA}"):
+            return _ago(head_age)
+        if args[:2] == ("api", "--paginate"):
+            path = args[2]
+            if "/timeline" in path:
+                return json.dumps(
+                    [
+                        {
+                            "event": "review_requested",
+                            "created_at": _ago(age),
+                            "requested_reviewer": {"login": "Copilot"},
+                        }
+                        for age in request_ages
+                    ]
+                )
+            if "/comments" in path:
+                return json.dumps(list(issue_comments))
+            if "/reviews" in path:
+                return json.dumps(list(reviews))
         if args[:2] == ("api", "graphql"):
             return json.dumps(
                 {
@@ -721,3 +789,246 @@ def test_run_audit_reports_cancelled_gate_as_superseded(monkeypatch, capsys):
     monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=[_gate("CANCELLED")]))
     assert pr_watch.run_audit(PR) is False
     assert "cancelled (superseded)" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# copilot_review_state — the six states, keyed to the REQUEST (PP-lzaw)
+# ---------------------------------------------------------------------------
+#
+# Copilot review is request-only on this repo. The states that matter are the
+# ones a bare "not reviewed yet" would flatten: "nobody asked", "asked and
+# waiting", and "you pushed past the request" need three different actions, and
+# only the middle one resolves by waiting. Kept in lockstep with the bash
+# implementation in _pr-gates.sh (see scripts/tests/test_pr_gates.py).
+
+FRESH = 60
+STALE = 1200
+ANCIENT = 4000
+
+_MARKER = f"<!-- pinpoint-claude-review: {HEAD_SHA} -->\nreviewed by hand"
+REQUEST_CMD = f'gh pr edit {PR} --add-reviewer "@copilot"'
+
+
+GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
+
+
+@pytest.mark.unit
+def test_non_review_pattern_is_identical_to_the_bash_gate():
+    """pr-watch and _pr-gates.sh must eat exactly the same non-review bodies.
+
+    A wording added to one and not the other makes the readiness report and the
+    merge gate disagree about whether a PR has been reviewed — worse than either
+    answer alone, because whichever one you happen to read looks authoritative.
+    """
+    gates = GATES_PATH.read_text()
+    match = re.search(r"^readonly COPILOT_NON_REVIEW_BODY_RE='(.+)'$", gates, re.M)
+    assert match, "COPILOT_NON_REVIEW_BODY_RE not found in _pr-gates.sh"
+    assert match.group(1) == pr_watch.COPILOT_NON_REVIEW_BODY_RE.pattern
+
+
+@pytest.mark.unit
+def test_wait_threshold_is_identical_to_the_bash_gate():
+    gates = GATES_PATH.read_text()
+    match = re.search(r"^readonly COPILOT_REVIEW_WAIT_THRESHOLD=(\d+)$", gates, re.M)
+    assert match, "COPILOT_REVIEW_WAIT_THRESHOLD not found in _pr-gates.sh"
+    assert int(match.group(1)) == pr_watch.COPILOT_REVIEW_WAIT_THRESHOLD
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "state",
+    ["marker", "covered", "awaiting", "overdue", "pushed_after", "never_requested"],
+)
+def test_state_vocabulary_is_shared_with_the_bash_gate(state):
+    """Both implementations name the same six states, so reports are comparable."""
+    assert f"RS_STATE={state}" in GATES_PATH.read_text()
+
+
+@pytest.mark.unit
+def test_review_state_never_requested(monkeypatch):
+    monkeypatch.setattr(pr_watch, "gh", make_gh(head_age=FRESH, request_ages=()))
+    state, detail = pr_watch.copilot_review_state(PR)
+    assert state == "never_requested"
+    assert REQUEST_CMD in detail
+
+
+@pytest.mark.unit
+def test_review_state_pushed_after_request(monkeypatch):
+    """Head newer than the newest request — nothing re-requests automatically."""
+    monkeypatch.setattr(pr_watch, "gh", make_gh(head_age=FRESH, request_ages=(STALE,)))
+    state, detail = pr_watch.copilot_review_state(PR)
+    assert state == "pushed_after"
+    assert "NEWER than the last request" in detail
+    assert REQUEST_CMD in detail
+
+
+@pytest.mark.unit
+def test_review_state_pushed_after_flags_a_lagging_timeline(monkeypatch):
+    """A pending Copilot reviewer alongside `pushed_after` means "re-run".
+
+    GitHub's issue timeline lags a freshly-created review_requested event by up
+    to a minute; `reviewRequests` updates immediately. Still `pushed_after`, not
+    `awaiting`: Copilot reviews the head as of the REQUEST, so a genuinely stale
+    pending request produces a review of the wrong tree.
+    """
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(head_age=FRESH, request_ages=(STALE,), request_pending=True),
+    )
+    state, detail = pr_watch.copilot_review_state(PR)
+    assert state == "pushed_after"
+    assert "pending reviewer right now" in detail
+
+
+@pytest.mark.unit
+def test_review_state_awaiting_survives_an_ancient_head(monkeypatch):
+    """The timer runs from the request, so an old head with a fresh ask still waits."""
+    monkeypatch.setattr(
+        pr_watch, "gh", make_gh(head_age=ANCIENT, request_ages=(FRESH,))
+    )
+    assert pr_watch.copilot_review_state(PR)[0] == "awaiting"
+
+
+@pytest.mark.unit
+def test_review_state_overdue(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch, "gh", make_gh(head_age=ANCIENT, request_ages=(STALE,))
+    )
+    state, detail = pr_watch.copilot_review_state(PR)
+    assert state == "overdue"
+    assert "mark-claude-review.sh" in detail
+
+
+@pytest.mark.unit
+def test_review_state_covered_is_judged_by_commit_id(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(head_age=STALE, request_ages=(STALE,), reviews=[copilot_review()]),
+    )
+    assert pr_watch.copilot_review_state(PR)[0] == "covered"
+
+
+@pytest.mark.unit
+def test_review_state_ignores_a_newer_review_of_an_earlier_commit(monkeypatch):
+    """The PR #1784 false PASS: submitted_at is newer than head, commit_id is not.
+
+    Comparing timestamps read this as "covers head"; comparing SHAs does not.
+    """
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            head_age=STALE,
+            request_ages=(FRESH,),
+            reviews=[copilot_review(commit_id=OLD_SHA)],
+        ),
+    )
+    assert pr_watch.copilot_review_state(PR)[0] == "awaiting"
+
+
+@pytest.mark.unit
+def test_review_state_ignores_a_non_review_at_head(monkeypatch):
+    """A quota-limited "I could not review this" carries head's SHA but read nothing."""
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            head_age=STALE,
+            request_ages=(FRESH,),
+            reviews=[
+                copilot_review(
+                    body=(
+                        "Copilot was unable to review this pull request because "
+                        "the user who requested the review has reached their "
+                        "quota limit."
+                    )
+                )
+            ],
+        ),
+    )
+    assert pr_watch.copilot_review_state(PR)[0] == "awaiting"
+
+
+@pytest.mark.unit
+def test_review_state_counts_a_partial_review(monkeypatch):
+    """A real review that merely mentions files it could not analyse still counts."""
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            head_age=STALE,
+            request_ages=(STALE,),
+            reviews=[
+                copilot_review(
+                    body=(
+                        "Copilot reviewed 3 out of 5 changed files. It was unable "
+                        "to review 2 generated files."
+                    )
+                )
+            ],
+        ),
+    )
+    assert pr_watch.copilot_review_state(PR)[0] == "covered"
+
+
+@pytest.mark.unit
+def test_review_state_marker_without_a_request_says_it_is_standing_in(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(head_age=FRESH, request_ages=(), issue_comments=[{"body": _MARKER}]),
+    )
+    state, detail = pr_watch.copilot_review_state(PR)
+    assert state == "marker"
+    assert "standing in" in detail
+
+
+@pytest.mark.unit
+def test_review_state_ignores_a_marker_for_another_sha(monkeypatch):
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(
+            head_age=FRESH,
+            request_ages=(FRESH,),
+            issue_comments=[{"body": f"<!-- pinpoint-claude-review: {OLD_SHA} -->"}],
+        ),
+    )
+    assert pr_watch.copilot_review_state(PR)[0] == "awaiting"
+
+
+# ---------------------------------------------------------------------------
+# run_audit — the review state is reported distinctly, and gates readiness
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "state,kwargs",
+    [
+        ("never_requested", {"head_age": FRESH, "request_ages": ()}),
+        ("pushed_after", {"head_age": FRESH, "request_ages": (STALE,)}),
+        ("overdue", {"head_age": ANCIENT, "request_ages": (STALE,)}),
+    ],
+)
+def test_run_audit_is_not_ready_without_a_live_review_path(
+    monkeypatch, capsys, state, kwargs
+):
+    """A forgotten request must be UNMISTAKABLE, not a silent overnight stall."""
+    monkeypatch.setattr(pr_watch, "gh", make_gh(rollup=[_gate("SUCCESS")], **kwargs))
+    assert pr_watch.run_audit(PR) is False
+    assert f"✗ copilot-review: {state}:" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+def test_run_audit_passes_while_a_request_is_outstanding(monkeypatch, capsys):
+    """`awaiting` is not a failure — the ask is live and the answer is coming."""
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(rollup=[_gate("SUCCESS")], head_age=ANCIENT, request_ages=(FRESH,)),
+    )
+    assert pr_watch.run_audit(PR) is True
+    assert "✓ copilot-review: awaiting:" in capsys.readouterr().out

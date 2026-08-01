@@ -30,9 +30,13 @@ if [ -z "$PRS" ]; then
     exit 0
 fi
 
-# Header
-printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "PR" "Title" "CI" "Copilot" "Merge" "Draft" "Branch"
-printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "------" "----------------------------------------" "------------" "----------" "----------" "--------" "-------------------"
+# Header. The Copilot column reports the REVIEW state, not just a thread count:
+# a bare "0" read identically for "reviewed, everything resolved" and "no review
+# was ever requested", which under request-only Copilot (PP-lzaw) is the
+# difference between ready-to-merge and nobody-is-coming. Unresolved threads
+# still take precedence — they are the actionable state.
+printf "%-6s %-40s %-12s %-12s %-10s %-8s %s\n" "PR" "Title" "CI" "Copilot" "Merge" "Draft" "Branch"
+printf "%-6s %-40s %-12s %-12s %-10s %-8s %s\n" "------" "----------------------------------------" "------------" "------------" "----------" "--------" "-------------------"
 
 for pr in $PRS; do
     if ! [[ "$pr" =~ ^[0-9]+$ ]]; then
@@ -100,6 +104,26 @@ for pr in $PRS; do
     done
     [ "$copilot_ok" = "false" ] && copilot_count="?"
 
+    # Copilot column: unresolved threads win (they need action now); otherwise
+    # report which review state the PR is in.
+    if [ "$copilot_count" = "?" ]; then
+        copilot_str="?"
+    elif [ "$copilot_count" -gt 0 ]; then
+        copilot_str="${copilot_count} unres"
+    elif _compute_review_state "$pr" 2>/dev/null; then
+        case "$RS_STATE" in
+            marker)          copilot_str="marker" ;;
+            covered)         copilot_str="reviewed" ;;
+            awaiting)        copilot_str="awaiting" ;;
+            overdue)         copilot_str="OVERDUE" ;;
+            pushed_after)    copilot_str="RE-REQUEST" ;;
+            never_requested) copilot_str="NOT ASKED" ;;
+            *)               copilot_str="?" ;;
+        esac
+    else
+        copilot_str="?"
+    fi
+
     # Merge status
     case "$merge_state" in
         CONFLICTING) merge_str="CONFLICT" ;;
@@ -117,5 +141,5 @@ for pr in $PRS; do
         draft_str="draft"
     fi
 
-    printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "#${pr}" "$title" "$ci_status" "$copilot_count" "$merge_str" "$draft_str" "$branch"
+    printf "%-6s %-40s %-12s %-12s %-10s %-8s %s\n" "#${pr}" "$title" "$ci_status" "$copilot_str" "$merge_str" "$draft_str" "$branch"
 done
