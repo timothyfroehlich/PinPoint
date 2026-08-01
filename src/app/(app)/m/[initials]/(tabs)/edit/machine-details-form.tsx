@@ -76,6 +76,10 @@ export function MachineDetailsForm({
   >(updateMachineAction, undefined);
 
   const [isDirty, setIsDirty] = useState(false);
+  // `useActionState` exposes no reset, so Cancel dismisses the last result
+  // instead. Cleared on every submit so a fresh outcome always shows.
+  const [resultDismissed, setResultDismissed] = useState(false);
+  const shownState = resultDismissed ? undefined : state;
   // The RichTextEditor is uncontrolled after mount (content is an initial
   // prop), so its doc is mirrored here to serialize into the hidden field.
   const [descriptionDoc, setDescriptionDoc] = useState<ProseMirrorDoc | null>(
@@ -115,6 +119,7 @@ export function MachineDetailsForm({
     const fd = new FormData(formRef.current);
     // useActionState dispatch must run inside a transition — outside one,
     // React 19 silently skips the server action.
+    setResultDismissed(false);
     startTransition(() => {
       formAction(fd);
     });
@@ -124,6 +129,11 @@ export function MachineDetailsForm({
     setDescriptionDoc(description);
     setResetKey((k) => k + 1);
     setIsDirty(false);
+    // Cancel discards the edits, so any banner or "Saved" note describing them
+    // has to go with them — otherwise a failed save leaves its error on screen
+    // over reverted fields, and a prior success reads as "Saved" about values
+    // that were just thrown away (PP-o355.19 review).
+    setResultDismissed(true);
   };
 
   return (
@@ -140,10 +150,10 @@ export function MachineDetailsForm({
     >
       <input type="hidden" name="id" value={machineId} />
 
-      {state && !state.ok && (
+      {shownState && !shownState.ok && (
         <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive-text">
           <p className="text-sm font-medium" role="alert">
-            {state.message}
+            {shownState.message}
           </p>
         </div>
       )}
@@ -207,6 +217,11 @@ export function MachineDetailsForm({
           defaultName={pinballmapTitleName}
           defaultExcluded={pinballmapExcluded}
           defaultExcludedReason={pinballmapExcludedReason}
+          // The picker's controls are cmdk items and a Radix Select, so none of
+          // them bubble `input` — without this the section would still claim
+          // "No unsaved changes" after a model change, and Cancel would discard
+          // it silently (PP-o355.19 review).
+          onDirty={() => setIsDirty(true)}
         />
       )}
 
@@ -244,7 +259,7 @@ export function MachineDetailsForm({
         >
           {isDirty
             ? "Unsaved changes"
-            : state?.ok
+            : shownState?.ok
               ? "Saved"
               : "No unsaved changes"}
         </span>

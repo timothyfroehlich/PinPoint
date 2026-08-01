@@ -585,7 +585,9 @@ export async function updateMachineAction(
 
   const rawData = {
     id: formData.get("id"),
-    name: formData.get("name"),
+    // A missing field reads as `null`, which the optional schema would reject —
+    // normalize so "field absent" means "leave the name alone".
+    name: formData.get("name") ?? undefined,
     ownerId:
       typeof formData.get("ownerId") === "string" &&
       (formData.get("ownerId") as string).length > 0
@@ -638,6 +640,11 @@ export async function updateMachineAction(
         name: true,
         initials: true,
         presenceStatus: true,
+        // Needed to decide whether an edit re-targets the PBM link — see the
+        // `pinballmapListed` carry-over at the `resolvePbmLinkColumns` call.
+        pinballmapMachineId: true,
+        pinballmapListed: true,
+        pinballmapLmxId: true,
       },
     });
 
@@ -675,7 +682,28 @@ export async function updateMachineAction(
           "You do not have permission to link this machine to Pinball Map."
         );
       }
-      const pbm = await resolvePbmLinkColumns(validation.data);
+      // `pinballmapListed` is NOT a form field — it is flipped only by
+      // `linkPinballmapEntryAction` / the verify action, which talk to PBM. The
+      // edit form therefore submits nothing for it, and without this carry-over
+      // `resolvePbmLinkColumns` would default it to `false` — silently unlisting
+      // a listed machine on every unrelated "Save details" (PP-o355.19 review).
+      // Carry the stored value only while the link target is unchanged;
+      // re-targeting the link makes the old listing meaningless, and the
+      // resolver already forces `false` on the unlinked/excluded branches.
+      const submittedPbmId = validation.data.pinballmapMachineId ?? null;
+      const linkUnchanged =
+        submittedPbmId === currentMachine.pinballmapMachineId;
+      const pbm = await resolvePbmLinkColumns({
+        ...validation.data,
+        ...(linkUnchanged && currentMachine.pinballmapListed
+          ? {
+              pinballmapListed: true,
+              ...(currentMachine.pinballmapLmxId === null
+                ? {}
+                : { pinballmapLmxId: currentMachine.pinballmapLmxId }),
+            }
+          : {}),
+      });
       if (!pbm.ok) return err("VALIDATION", pbm.message);
       pbmColumns = pbm.columns;
     }
@@ -736,7 +764,7 @@ export async function updateMachineAction(
         const [updatedMachine] = await tx
           .update(machines)
           .set({
-            name,
+            ...(name !== undefined && { name }),
             ...(presenceStatus !== undefined && { presenceStatus }),
             ownerId: machineOwnerId ?? null,
             invitedOwnerId: machineInvitedOwnerId ?? null,
@@ -781,7 +809,7 @@ export async function updateMachineAction(
             presenceStatus: currentMachine.presenceStatus,
           },
           {
-            name,
+            name: name ?? currentMachine.name,
             ownerChanged: true,
             owner: toMachineOwnerRef(machineOwnerId, machineInvitedOwnerId),
             presenceStatus,
@@ -924,7 +952,7 @@ export async function updateMachineAction(
       const [updatedMachine] = await tx
         .update(machines)
         .set({
-          name,
+          ...(name !== undefined && { name }),
           ...(presenceStatus !== undefined && { presenceStatus }),
           ...(shouldUpdateOwner && {
             ownerId: finalOwnerId,
@@ -987,7 +1015,7 @@ export async function updateMachineAction(
           presenceStatus: currentMachine.presenceStatus,
         },
         {
-          name,
+          name: name ?? currentMachine.name,
           ownerChanged: shouldUpdateOwner,
           owner: toMachineOwnerRef(finalOwnerId, finalInvitedOwnerId),
           presenceStatus,

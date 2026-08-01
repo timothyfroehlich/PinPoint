@@ -41,8 +41,10 @@ import { Alert, AlertDescription } from "~/components/ui/alert";
 export interface MachineOwnerTransferProps {
   machineId: string;
   /**
-   * Current machine name — resubmitted unchanged so the shared update action
-   * can satisfy its required `name` field without altering it.
+   * Current machine name — for the confirmation copy only. It is deliberately
+   * NOT submitted: resubmitting a page-load snapshot reverted a rename made
+   * concurrently by someone else (PP-o355.19 review). `name` is optional on
+   * `updateMachineSchema`, so omitting it leaves the stored name alone.
    */
   machineName: string;
   ownerId: string | null;
@@ -69,9 +71,11 @@ export interface MachineOwnerTransferProps {
  * out of any portal-vs-dismiss interaction. The confirm below IS an
  * AlertDialog, which is safe: plain text and two buttons, no portalled picker.
  *
- * This form carries `id`, `name` and `ownerId` only. `updateMachineAction`
- * leaves presence, description and PinballMap link columns untouched when their
- * fields are absent, so a transfer cannot clobber unsaved edits in Details.
+ * This form carries `id` and `ownerId` only — notably NOT `name`, so a transfer
+ * cannot revert a rename that landed after this page was rendered.
+ * `updateMachineAction` leaves name, presence, description and PinballMap link
+ * columns untouched when their fields are absent, so a transfer cannot clobber
+ * unsaved edits in Details either.
  */
 export function MachineOwnerTransfer({
   machineId,
@@ -223,7 +227,6 @@ export function MachineOwnerTransfer({
           className="mt-4 space-y-3"
         >
           <input type="hidden" name="id" value={machineId} />
-          <input type="hidden" name="name" value={machineName} />
 
           {state && !state.ok && state.code !== "ASSIGNEE_NOT_MEMBER" && (
             <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-destructive-text">

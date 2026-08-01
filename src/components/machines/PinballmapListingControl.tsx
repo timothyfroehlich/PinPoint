@@ -36,9 +36,17 @@ import { Button } from "~/components/ui/button";
  * machine, Unlist) need the operator token and land in the follow-up PR; until
  * then the deep link to pinballmap.com is the fallback (CORE-PBM-001 link-back).
  *
- * Rendered as its own `<form>` region — NOT nested in the Details form
- * (nested forms are invalid HTML), so it lives in the Pinball Map section of
- * the machine edit page, beside that form rather than inside it.
+ * Designed as its own `<form>` region — NOT nested in the Details form (nested
+ * forms are invalid HTML) — so it can sit in the Pinball Map section of the
+ * machine edit page beside that form rather than inside it.
+ *
+ * NOT CURRENTLY RENDERED. PP-o355.19 replaced the machine edit modal (its only
+ * former call site) with the Manage tab, which shows a "Listing controls are
+ * coming soon" placeholder in that section instead. This component and its test
+ * are kept as the intended implementation for PP-o355.21, which wires the
+ * listing controls up for real. Until then the only writers of
+ * `pinballmapListed` are `linkPinballmapEntryAction` and
+ * `verifyPinballmapLinkAction`, and neither is reachable from the UI.
  */
 export interface PinballmapListingControlProps {
   machineId: string;

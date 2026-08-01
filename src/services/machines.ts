@@ -39,6 +39,11 @@ export interface MachinePbmColumns {
   pinballmapExcluded: boolean;
   pinballmapExcludedReason: string | null;
   pinballmapListed: boolean;
+  // The PBM-side listing id. Two CHECK constraints tie it to the columns above
+  // (`machines_pinballmap_lmx_requires_link` / `..._requires_listed`), so it has
+  // to move as part of this set — leaving a stale lmx behind when a machine is
+  // unlinked or unlisted makes the UPDATE throw.
+  pinballmapLmxId: number | null;
   manufacturer: string | null;
   year: number | null;
   opdbId: string | null;

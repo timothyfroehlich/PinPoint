@@ -70,14 +70,17 @@ describe("MachineOwnerTransfer", () => {
     expect(submit).toBeEnabled();
   });
 
-  it("carries the current name so the shared update action's required field is satisfied", async () => {
+  it("does not submit a name, so a transfer cannot revert a concurrent rename", async () => {
+    // This form used to carry a hidden `name` holding a page-load snapshot,
+    // purely to satisfy what was then a required schema field. Because the
+    // action writes `name` unconditionally, a transfer would silently revert a
+    // rename someone else had made in between (PP-o355.19 review). `name` is
+    // now optional on update, so the right move is to omit it entirely.
     const user = userEvent.setup();
     render(<MachineOwnerTransfer {...baseProps} />);
     await user.click(screen.getByTestId("open-owner-transfer"));
 
-    const nameField =
-      document.querySelector<HTMLInputElement>('input[name="name"]');
-    expect(nameField?.value).toBe("Godzilla (Premium)");
+    expect(document.querySelector('input[name="name"]')).toBeNull();
   });
 
   it("does not submit a description field, so a transfer cannot clear it", async () => {

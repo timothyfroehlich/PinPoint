@@ -36,8 +36,17 @@ vi.mock("~/components/editor/RichTextEditorDynamic", () => ({
   ),
 }));
 
+// Stubbed, but the stub exposes `onDirty` so the wiring is testable: the real
+// picker's controls (cmdk items, a Radix Select) never bubble `input`, so the
+// callback is the ONLY way the form learns a PBM change happened.
 vi.mock("~/components/machines/PinballMapLinkField", () => ({
-  PinballMapLinkField: () => <div data-testid="pbm-link-field" />,
+  PinballMapLinkField: ({ onDirty }: { onDirty?: () => void }) => (
+    <div data-testid="pbm-link-field">
+      <button type="button" onClick={() => onDirty?.()}>
+        stub-pbm-change
+      </button>
+    </div>
+  ),
 }));
 
 const baseProps = {
@@ -209,6 +218,45 @@ describe("MachineDetailsForm", () => {
   // was accepted deliberately for the vertical space, but it is exactly the
   // kind of decision that gets silently undone by a later layout tweak — so
   // pin the order itself rather than the Tailwind classes that produce it.
+  it("marks the section dirty when the PinballMap picker changes", async () => {
+    // The picker used to leave the note reading "No unsaved changes" over a
+    // real pending edit, so Cancel discarded it with no signal
+    // (PP-o355.19 review).
+    const user = userEvent.setup();
+    render(<MachineDetailsForm {...baseProps} />);
+
+    expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+      "No unsaved changes"
+    );
+
+    await user.click(screen.getByRole("button", { name: "stub-pbm-change" }));
+
+    expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+      "Unsaved changes"
+    );
+  });
+
+  it("clears a failed-save banner when the user cancels", async () => {
+    // Cancel reverts the edits the banner is describing, so leaving it on
+    // screen reports a failure about values that are no longer there.
+    vi.mocked(updateMachineAction).mockResolvedValue(
+      err("SERVER", "Something went wrong saving these details.")
+    );
+    const user = userEvent.setup();
+    render(<MachineDetailsForm {...baseProps} />);
+
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+    await user.click(screen.getByRole("button", { name: "Save details" }));
+    await screen.findByRole("alert");
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+      "No unsaved changes"
+    );
+  });
+
   it("keeps keyboard order Name → Availability → PinballMap fields", () => {
     render(<MachineDetailsForm {...baseProps} />);
 

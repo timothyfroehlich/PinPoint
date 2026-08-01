@@ -69,6 +69,15 @@ interface PinballMapLinkFieldProps {
   defaultExcluded?: boolean;
   defaultExcludedReason?: string | null;
   disabled?: boolean;
+  /**
+   * Called when the USER changes the selection. The picker's state lives in
+   * React (cmdk items, a Radix Select, a controlled hidden input), none of
+   * which fire a bubbling `input` event — so a parent tracking dirtiness via
+   * `onInput` sees nothing and reports "No unsaved changes" over real pending
+   * edits (PP-o355.19 review). Deliberately NOT called by the edit-preselect
+   * effect, which is initialization rather than an edit.
+   */
+  onDirty?: (() => void) | undefined;
 }
 
 function formatMeta(manufacturer: string | null, year: number | null): string {
@@ -83,6 +92,7 @@ export function PinballMapLinkField({
   defaultExcluded = false,
   defaultExcludedReason = null,
   disabled = false,
+  onDirty,
 }: PinballMapLinkFieldProps): React.JSX.Element {
   const reasonId = useId();
   const triggerId = useId();
@@ -151,6 +161,7 @@ export function PinballMapLinkField({
     setExcluded(false); // mutual exclusion
     setOpen(false);
     setQuery("");
+    onDirty?.();
 
     if (pick.pinballmapMachineId !== null) {
       // Single-edition family (standalone or a one-edition group): resolved.
@@ -186,6 +197,7 @@ export function PinballMapLinkField({
     setSelectedEditionId(null);
     setOpen(false);
     setQuery("");
+    onDirty?.();
   };
 
   // The edition step is shown only for an ambiguous (multi-edition) family.
@@ -421,7 +433,10 @@ export function PinballMapLinkField({
               {...(selectedEditionId !== null
                 ? { value: String(selectedEditionId) }
                 : {})}
-              onValueChange={(v) => setSelectedEditionId(Number(v))}
+              onValueChange={(v) => {
+                setSelectedEditionId(Number(v));
+                onDirty?.();
+              }}
             >
               <SelectTrigger
                 id={editionId}
