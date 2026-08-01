@@ -34,6 +34,6 @@ Icon trigger with a badge dot when unread changelog entries exist. Its items are
 
 ### Testing Responsive Behavior
 
-- **Overflow assertions:** `assertNoHorizontalOverflow(page)` lives in `e2e/support/actions.ts`; §4 records what it actually asserts and why it isn't a `scrollWidth` comparison. Every new page must be added to `e2e/smoke/responsive-overflow.spec.ts`.
+- **Overflow assertions:** `assertNoHorizontalOverflow(page)` lives in `e2e/support/actions.ts`; §4 records what it actually asserts, and why the `scrollWidth` half of it can never fail under the app shell. Every new page must be added to `e2e/smoke/responsive-overflow.spec.ts`.
 - **Container query testing:** Playwright can force a container width: `await page.evaluate(() => { document.querySelector('[data-testid="content-wrapper"]')!.style.width = '576px'; })` — triggers `@xl:` breakpoints independently of viewport.
 - **Chrome DevTools:** Container query overlays available in Elements panel → "container" badge on `@container` elements.
