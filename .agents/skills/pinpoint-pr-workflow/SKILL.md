@@ -203,6 +203,13 @@ gh pr edit <PR> --add-reviewer "@copilot"   # same command re-requests
 
 Live casework from the night this changed: on PRs #1779 and #1780 the agent pushed a fix ~3 minutes after Copilot's review landed, invalidating it. Under request-only that pattern yields no valid review at all.
 
+**A review that appears right after you open the PR is not your review.** Opening a PR can still fire an automatic request (observed on #1784, 2026-08-01: a `review_requested` event at PR-open that nobody typed, while a subsequent push fired none). That review reads your **first** commit — by definition the start of iteration, not the end — so it says nothing about the tree you actually want reviewed. Don't let it stand in for the request. The general rule holds regardless of how that setting lands: **a review submitted before your last push does not cover head.** Check the review's `commit_id` against `git rev-parse HEAD` rather than trusting that a review exists:
+
+```bash
+gh api repos/timothyfroehlich/PinPoint/pulls/<PR>/reviews \
+  --jq '.[] | select(.user.login=="copilot-pull-request-reviewer[bot]") | {state, commit_id, submitted_at}'
+```
+
 #### If the request produces nothing (the Claude fallback)
 
 Requesting is not optional and the fallback is not a substitute for it. `mark-claude-review.sh` is for the case where you **did** request and Copilot still didn't deliver — it silently skipped the `review_requested` event (PR #1342 / #1326), or it's quota-limited. It is **not** a way to skip asking.
