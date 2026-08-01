@@ -4,7 +4,7 @@ The date-formatting vocabulary and the lucide-react icon sizing rules.
 
 ## 15. Date Formatting Vocabulary
 
-> **Status — implemented.** Three canonical helpers live in [`src/lib/dates.ts`](../../../src/lib/dates.ts). Use them; never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
+> **Status — implemented.** Three canonical helpers live in [`src/lib/dates.ts`](../../../../src/lib/dates.ts). Use them; never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
 
 | Helper                 | Output                         | When to use                                                  |
 | :--------------------- | :----------------------------- | :----------------------------------------------------------- |
