@@ -122,3 +122,9 @@ const email = await mailpit.waitForEmail(adminEmail, {
   subjectContains: uniqueIssueTitle,
 });
 ```
+
+## Environment Defaults (Local / Preview)
+
+- **Autologin.** `DEV_AUTOLOGIN_ENABLED` defaults to `true` for dev and preview: when no valid session exists, the middleware auto-signs in as `DEV_AUTOLOGIN_EMAIL` / `DEV_AUTOLOGIN_PASSWORD` (the seeded admin by default). Opt out per request three ways — header `x-skip-autologin: true`, cookie `skip_autologin=true`, or query `?autologin=off`. Use one of these for any guest or public-route scenario, or the test will silently run as an admin. (`src/lib/supabase/middleware.ts`.)
+- **Database setup.** Playwright's `global-setup` runs the chain: pre-flight checks (Supabase health, Postgres connectivity) → apply pending migrations → fast reset (truncate + seed). If the fast reset fails — a fresh checkout, say — it falls back to a full `supabase db reset` + migrate + seed. Set `SKIP_SUPABASE_RESET=true` to bypass the whole thing for iterative UI-only runs. (`e2e/global-setup.ts`.)
+- **Cleanup API.** `/api/test-data/cleanup` accepts `issueIds`, `machineIds`, and `issueTitlePrefix`. The `cleanupTestEntities` helper forwards `issueTitlePrefix`, which is what keeps public-reporting tests (whose entities aren't created through a known ID) from accumulating. (`src/app/api/test-data/cleanup/route.ts`.)

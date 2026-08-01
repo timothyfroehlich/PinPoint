@@ -12,9 +12,12 @@ if [ -z "$WORKTREE_PATH" ] || [ "$WORKTREE_PATH" = "null" ]; then
   exit 0
 fi
 
+# A missing path is NOT automatically a no-op (PP-omz3): the slot manifest entry
+# and the git worktree registration can outlive the directory, and a wrong or
+# mangled path also lands here. worktree_cleanup.py adjudicates — it exits 0 only
+# when the path is absent from both sources of truth — so don't short-circuit it.
 if [ ! -d "$WORKTREE_PATH" ]; then
-  echo "Warning: Worktree path '$WORKTREE_PATH' does not exist; skipping." >&2
-  exit 0
+  echo "Warning: Worktree path '$WORKTREE_PATH' does not exist; checking for leaks." >&2
 fi
 
 # Find cleanup script in the main worktree
@@ -41,6 +44,12 @@ if command -v bd >/dev/null 2>&1; then
   fi
 fi
 
+# The hook itself always exits 0 — a failing WorktreeRemove hook would wedge
+# Claude Code's own teardown — but the cleanup script's exit code is the only
+# signal that something leaked, so report it instead of flattening it to
+# "failed". Codes: 1 failed, 2 refused (main worktree), 3 stale target with
+# residue, 4 Supabase volume state unknown.
 if [ -f "$CLEANUP" ]; then
-  python3 "$CLEANUP" "$WORKTREE_PATH" >&2 || echo "Warning: cleanup failed" >&2
+  python3 "$CLEANUP" "$WORKTREE_PATH" >&2 \
+    || echo "Warning: worktree_cleanup.py exited $? — cleanup INCOMPLETE for '$WORKTREE_PATH'" >&2
 fi

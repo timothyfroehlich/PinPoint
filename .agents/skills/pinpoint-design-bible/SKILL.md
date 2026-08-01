@@ -1,6 +1,6 @@
 ---
 name: pinpoint-design-bible
-description: Design system rules, page archetypes, spacing rhythm, surface hierarchy, responsive strategy. Use when building any new UI, page, or component to ensure visual consistency.
+description: Design system rules, page archetypes, spacing rhythm, surface hierarchy, responsive strategy, and the player-centric issue severity vocabulary (cosmetic / minor / major / unplayable — never low/medium/high or critical). Use when building any new UI, page, or component to ensure visual consistency, or when naming, labelling, or writing copy for issue severity levels.
 ---
 
 # PinPoint Design Bible
@@ -421,7 +421,7 @@ When something happens in response to user action, where should they see feedbac
 | Long-running background work (uploads)            | Toast with progress indicator                                                                       |
 | Short in-place work (counter increment)           | Immediate UI update, no notification                                                                |
 
-**Why server-side redirect instead of `toast.success() + router.push()`?** The redirect is part of the action's own result, so the confirmation and the navigation cannot disagree. `toast.success()` + `router.push()` is two independent client steps: the toast can fire while the push fails, leaving the user told the thing succeeded on a page that never moved — the false confirmation CORE-ARCH-012 forbids. Redirecting also unmounts the form as part of the transition, sidestepping React 19's post-action form reset entirely (see `docs/patterns/server-action-forms.md`). If a success toast is genuinely needed on the destination page, persist a one-time success state (e.g., via a search param or short-lived cookie read in the destination route) and render it there.
+**Why server-side redirect instead of `toast.success() + router.push()`?** The redirect is part of the action's own result, so the confirmation and the navigation cannot disagree. `toast.success()` + `router.push()` is two independent client steps: the toast can fire while the push fails, leaving the user told the thing succeeded on a page that never moved — the false confirmation CORE-ARCH-012 forbids. Redirecting also unmounts the form as part of the transition, sidestepping React 19's post-action form reset entirely (see `pinpoint-ui` → **Server Action Forms** for the Radix Select carve-out and the CREATE-form reset rules). If a success toast is genuinely needed on the destination page, persist a one-time success state (e.g., via a search param or short-lived cookie read in the destination route) and render it there.
 
 **Rule of thumb:** If the user initiated it and waited → feedback. If it was instant or invisible → no feedback.
 
@@ -818,3 +818,22 @@ When you build a mockup or prototype of a change for review, **show enough of th
 - **Label what's changing vs. unchanged.** Make it obvious which parts are the actual proposal and which are existing context shown for placement (a caption, a highlight, or a short "everything outside the highlighted area is current UI, shown for context" note). This keeps the surrounding context from reading as new design decisions up for debate.
 
 This is a presentation rule for design _exploration_, not a constraint on the product UI itself.
+
+## 24. Severity Vocabulary (player-centric language)
+
+Issue severity has exactly four levels, and they are named for what a **player** experiences at the machine — not for how hard the repair is.
+
+| Level        | Means                                                                               |
+| :----------- | :---------------------------------------------------------------------------------- |
+| `cosmetic`   | Visual only, play is unaffected — dirty glass, a minor bulb out                     |
+| `minor`      | Small issue that doesn't change gameplay — sound slightly distorted                 |
+| `major`      | Plays, but a significant feature is broken — a shot not registering, a weak flipper |
+| `unplayable` | The machine cannot be played — ball stuck, flippers dead, no power                  |
+
+**Rules:**
+
+- Use player-centric language in every label, description, and piece of copy. The user filing an issue is a player standing at a machine, not a technician triaging a queue.
+- These four, in this order. **Never** substitute technical or generic scales — no low/medium/high, no `critical`, no `P1`/`P2`, no `blocker`.
+- The enum is defined once in `src/lib/issues/status.ts` (`SEVERITY_CONFIG`) and enforced by the schema enum; labels, colors, and icons come from there (§1). Don't restate the values in a component.
+
+Machine status derives from these — `unplayable` on an open issue makes the machine unplayable, `major` makes it need service. That derivation lives in `src/lib/machines/status.ts`; see `pinpoint-ui` → **Server & Data Conventions**.

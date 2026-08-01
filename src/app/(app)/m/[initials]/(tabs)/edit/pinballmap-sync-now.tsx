@@ -11,7 +11,7 @@ import { syncPinballMapNowAction } from "~/app/(app)/m/pinballmap-actions";
  * `syncPinballMapNowAction` is already form-action shaped, so this stays a
  * plain `<form action={...}>` — it carries no Radix Select and no controlled
  * hidden inputs, so React 19's post-action reset has nothing to wipe (see
- * `docs/patterns/server-action-forms.md`). It reports its own outcome rather
+ * the `pinpoint-ui` skill → Server Action Forms). It reports its own outcome rather
  * than claiming success it can't verify (CORE-ARCH-012): the action
  * self-throttles at the `syncLocationSnapshot` seam and surfaces `THROTTLED`
  * rather than hammering PinballMap (CORE-PBM-001).

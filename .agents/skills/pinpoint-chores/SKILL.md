@@ -94,6 +94,12 @@ Then work the checklist. For each item, note findings as a comment on the bead (
    - On **WARN**: note it as a comment on the chores bead; a single skipped day isn't an incident, a pattern across weeks is.
    - Requires the Supabase CLI to be logged in (`supabase login`) — auth comes from its stored token, not an env var. `pnpm run db:backup` is unrelated: that's a data-only `public`-schema dev-seeding dump with no schema and no `auth.users`, not a DR artifact.
 
+10. **Memory & context review** (PP-uoqg)
+    - Load the `pinpoint-memory-review` skill and run a pass. It reviews every store of recorded context across both machines — beads memories, Claude auto-memories on the Mac and Bazzite, and the canonical context files — then proposes prunes, promotions, and dedupes and hands Tim a short veto list.
+    - **This is also the sync mechanism.** Claude auto-memory is per-machine and syncs nowhere, so skipping this item is what lets the two machines drift apart. It is the reason Bazzite once knew a tmux fix for twelve days while the Mac rediscovered it from scratch.
+    - The most context-heavy item on the list — **delegate the verification fan-out to subagents** per that skill and keep only the synthesis inline.
+    - The veto list is presented **in-session**, one line per item. Tim drills into whichever ones he wants; don't hand him a document.
+
 ## Finish: re-arm the nag
 
 When chores are done, **re-defer the bead one week out** so it goes dormant and the nag clears everywhere:
