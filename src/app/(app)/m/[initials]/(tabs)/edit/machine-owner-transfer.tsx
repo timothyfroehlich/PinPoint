@@ -212,7 +212,18 @@ export function MachineOwnerTransfer({
             variant="outline"
             size="sm"
             className="shrink-0 border-destructive/50 text-destructive-text hover:bg-destructive/10"
-            onClick={() => setIsOpen(true)}
+            onClick={() => {
+              // Re-sync before opening. `selectedOwnerId` is seeded once at
+              // mount and survives close/reopen, but the owner it was seeded
+              // from does not: a transfer made elsewhere re-renders this server
+              // component with a new owner while the client state stays put.
+              // The stale value would enable Transfer with nothing picked and
+              // misjudge `needsTransferConfirm`. (`OwnerSelect` itself is fine
+              // — it lives behind `isOpen` and remounts with a fresh
+              // `defaultValue`, so the submitted `ownerId` was always correct.)
+              setSelectedOwnerId(currentOwnerId);
+              setIsOpen(true);
+            }}
             data-testid="open-owner-transfer"
           >
             Change owner…

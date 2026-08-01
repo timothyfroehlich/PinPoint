@@ -11,12 +11,25 @@ vi.mock("~/app/(app)/m/actions", () => ({
 
 // OwnerSelect is a Popover + cmdk picker; swap it for a plain select that
 // honours the same `onValueChange` contract.
+//
+// The mock must also match the real component's SUBMISSION shape: OwnerSelect
+// renders `<input type="hidden" name="ownerId">` seeded from `defaultValue`.
+// An earlier mock carried neither, so `new FormData(form)` in these tests held
+// only `id` — nothing here guarded that the owner reaches the action at all,
+// and a wrong `defaultValue` would have gone unnoticed (PP-o355.19 review).
 vi.mock("~/components/machines/OwnerSelect", () => ({
-  OwnerSelect: ({ onValueChange }: { onValueChange: (id: string) => void }) => (
+  OwnerSelect: ({
+    defaultValue,
+    onValueChange,
+  }: {
+    defaultValue?: string | null;
+    onValueChange: (id: string) => void;
+  }) => (
     <select
+      name="ownerId"
       aria-label="Owner"
       onChange={(e) => onValueChange(e.target.value)}
-      defaultValue=""
+      defaultValue={defaultValue ?? ""}
     >
       <option value="">Unassigned</option>
       <option value="owner-1">Current Owner</option>
@@ -89,6 +102,43 @@ describe("MachineOwnerTransfer", () => {
     await user.click(screen.getByTestId("open-owner-transfer"));
 
     expect(document.querySelector('input[name="description"]')).toBeNull();
+  });
+
+  it("submits the picked owner as `ownerId` alongside the machine id", async () => {
+    const user = userEvent.setup();
+    render(<MachineOwnerTransfer {...baseProps} />);
+    await user.click(screen.getByTestId("open-owner-transfer"));
+    await user.selectOptions(screen.getByLabelText("Owner"), "owner-2");
+    await user.click(
+      screen.getByRole("button", { name: "Transfer ownership" })
+    );
+
+    // useActionState calls the action as (prevState, formData).
+    const fd = vi.mocked(updateMachineAction).mock.calls[0]?.[1];
+    expect(fd?.get("ownerId")).toBe("owner-2");
+    expect(fd?.get("id")).toBe(baseProps.machineId);
+  });
+
+  it("re-syncs against the current owner when a concurrent transfer lands", async () => {
+    // Another editor moves the machine while this page is open. The server
+    // re-renders with the new owner; this client component keeps its state.
+    // Reopening the disclosure must judge against the NEW owner, otherwise
+    // Transfer is enabled with nothing picked (PP-o355.19 review).
+    const user = userEvent.setup();
+    const { rerender } = render(<MachineOwnerTransfer {...baseProps} />);
+
+    rerender(
+      <MachineOwnerTransfer
+        {...baseProps}
+        ownerId="owner-2"
+        ownerName="New Owner"
+      />
+    );
+    await user.click(screen.getByTestId("open-owner-transfer"));
+
+    expect(
+      screen.getByRole("button", { name: "Transfer ownership" })
+    ).toBeDisabled();
   });
 
   it("announces a failed transfer as a live-region alert", async () => {
