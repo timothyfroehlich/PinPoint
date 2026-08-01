@@ -19,11 +19,13 @@ reporting a failure for something that was not one.
    a healthy run whose jobs were all still pending. "We could not find out" is
    not a verdict. (PP-qkl8)
 
-Review-request state (PP-lzaw): Copilot review is request-only on this repo, so
-`--check-ready` has to say WHICH review state a PR is in. "Nobody asked",
-"asked and waiting" and "you pushed past the request" need three different
-actions and only the middle one resolves by waiting; flattening them into one
-"not reviewed yet" turns a forgotten request into a silent overnight stall.
+Review-request state (PP-lzaw): Copilot review is fully request-only on this
+repo as of 2026-08-01 — nothing asks on your behalf, so every PR opens with no
+request at all — and `--check-ready` has to say WHICH review state a PR is in.
+"Nobody asked", "asked and waiting" and "you pushed past the request" need three
+different actions and only the middle one resolves by waiting; flattening them
+into one "not reviewed yet" turns a forgotten request into a silent overnight
+stall.
 
 Everything is mocked at the `gh` CLI seam (`pr_watch.gh`) — these tests never
 reach GitHub (CORE-TEST-006).
