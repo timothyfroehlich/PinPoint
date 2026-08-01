@@ -24,6 +24,7 @@ reach GitHub (CORE-TEST-006).
 
 import importlib.util
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -542,6 +543,41 @@ ANCIENT = 4000
 
 _MARKER = f"<!-- pinpoint-claude-review: {HEAD_SHA} -->\nreviewed by hand"
 REQUEST_CMD = f'gh pr edit {PR} --add-reviewer "@copilot"'
+
+
+GATES_PATH = Path(__file__).parent.parent / "workflow" / "_pr-gates.sh"
+
+
+@pytest.mark.unit
+def test_non_review_pattern_is_identical_to_the_bash_gate():
+    """pr-watch and _pr-gates.sh must eat exactly the same non-review bodies.
+
+    A wording added to one and not the other makes the readiness report and the
+    merge gate disagree about whether a PR has been reviewed — worse than either
+    answer alone, because whichever one you happen to read looks authoritative.
+    """
+    gates = GATES_PATH.read_text()
+    match = re.search(r"^readonly COPILOT_NON_REVIEW_BODY_RE='(.+)'$", gates, re.M)
+    assert match, "COPILOT_NON_REVIEW_BODY_RE not found in _pr-gates.sh"
+    assert match.group(1) == pr_watch.COPILOT_NON_REVIEW_BODY_RE.pattern
+
+
+@pytest.mark.unit
+def test_wait_threshold_is_identical_to_the_bash_gate():
+    gates = GATES_PATH.read_text()
+    match = re.search(r"^readonly COPILOT_REVIEW_WAIT_THRESHOLD=(\d+)$", gates, re.M)
+    assert match, "COPILOT_REVIEW_WAIT_THRESHOLD not found in _pr-gates.sh"
+    assert int(match.group(1)) == pr_watch.COPILOT_REVIEW_WAIT_THRESHOLD
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "state",
+    ["marker", "covered", "awaiting", "overdue", "pushed_after", "never_requested"],
+)
+def test_state_vocabulary_is_shared_with_the_bash_gate(state):
+    """Both implementations name the same six states, so reports are comparable."""
+    assert f"RS_STATE={state}" in GATES_PATH.read_text()
 
 
 @pytest.mark.unit

@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -68,14 +69,17 @@ CI_GATE_NAME = "CI Gate"
 
 # Copilot posts a review OBJECT even when it reviewed nothing (quota exhausted,
 # no analyzable files). Those must be treated as absent — see the long rationale
-# in _pr-gates.sh (PP-jw0s).
-# Matched on WHOLE-PR phrasings only. "t able to review any files" covers both
-# "wasn't able to..." and "not able to..." without eating a real review that
-# merely mentions files it could not analyse.
-COPILOT_NON_REVIEW_MARKERS = (
-    "reached their quota limit",
-    "unable to review this pull request",
-    "t able to review any files",
+# in _pr-gates.sh (PP-jw0s). This pattern is a CHARACTER-FOR-CHARACTER copy of
+# COPILOT_NON_REVIEW_BODY_RE there; two hand-written variants would silently
+# diverge on the next wording added, and a body the bash eats but the Python
+# keeps (or vice versa) is exactly the kind of disagreement that makes the
+# gates untrustworthy. Change one, change both.
+COPILOT_NON_REVIEW_BODY_RE = re.compile(
+    "reached their quota limit"
+    "|unable to review this pull request"
+    "|not able to review any files"
+    "|wasn.t able to review any files",
+    re.IGNORECASE,
 )
 CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
@@ -241,8 +245,7 @@ def _gh_api_list(path: str) -> list[dict]:
 
 
 def _is_substantive(review: dict) -> bool:
-    body = (review.get("body") or "").lower()
-    return not any(m in body for m in COPILOT_NON_REVIEW_MARKERS)
+    return not COPILOT_NON_REVIEW_BODY_RE.search(review.get("body") or "")
 
 
 def _iso_to_epoch(value: str) -> float:
