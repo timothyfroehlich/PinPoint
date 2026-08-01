@@ -356,3 +356,25 @@ echo "MERGED: PR #$PR"
   _MSG="Merged PR #$PR$_BEAD_PART: $PR_TITLE$_FILES_PART. Sync main if you have active branches. —$_SIGN"
   bd comments add "$_TODAY" "$_MSG" >/dev/null 2>&1 || true
 ) || true
+
+# --- Reap the merged PR's worktree (fail-open) ---
+# Same contract as the huddle notice above: the merge already happened, so no
+# post-step may propagate an error.
+#
+# worktree_reap.py re-derives the verdict itself rather than trusting "this PR
+# just merged" — it reaps only when the worktree's HEAD *is* the merged SHA and
+# the tree is clean, so a dirty worktree, or one that kept committing after the
+# merge, survives as REVIEW. It also refuses any worktree containing the
+# invoking process's cwd, which is what makes running this from inside the
+# merged branch's own worktree safe.
+(
+  set +e
+  set +u
+  set +o pipefail
+  _REAP_SCRIPT="$(dirname "$0")/../worktree_reap.py"
+  [[ -f "$_REAP_SCRIPT" ]] || exit 0
+  _HEAD_REF=$(gh pr view "$PR" --json headRefName --jq .headRefName 2>/dev/null)
+  [[ -n "$_HEAD_REF" ]] || exit 0
+  _REPO_DIR=$(cd "$(dirname "$0")/../.." && pwd)
+  python3 "$_REAP_SCRIPT" --apply --quiet --branch "$_HEAD_REF" --repo-dir "$_REPO_DIR"
+) || true
