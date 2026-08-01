@@ -12,14 +12,14 @@ import { pinpointTransactionPlugin } from "./eslint-rules/no-side-effects-in-tra
 
 // ===== Slim mode (PP-4zcj) =====
 // This config is AUTHORITATIVE and complete. CI always runs it whole
-// (`pnpm run lint`, ci.yml "ESLint" job) with PINPOINT_LINT_SLIM unset, so what
-// CI evaluates is byte-identical to what it evaluated before this flag existed.
+// (`pnpm run lint`, ci.yml "ESLint" job) with PINPOINT_LINT_SLIM unset, so the
+// ruleset CI evaluates is unchanged from before this flag existed.
 //
-// When the flag IS set, `pnpm run lint:slim` drops every rule that needs type
+// When the flag IS set, `pnpm run lint:_slim` drops every rule that needs type
 // information — because building the TypeScript Program is the entire cost of a
-// lint run (~18s / ~2.9 GB). Those rules are covered locally by `oxlint`'s
-// tsgolint engine instead (~1.4s / ~1.3 GB), and the two together are
-// `pnpm run lint:local`, which is what `pnpm run check` runs.
+// lint run (14.86s / 3152 MB). Those rules are covered locally by `oxlint`'s
+// tsgolint engine instead (0.94s / 932 MB), and the two run in parallel as
+// `pnpm run lint:local` (3.76s), which is what `pnpm run check` runs.
 //
 // The mirror is a SPEED optimization, never a coverage bet: this branch only
 // ever REMOVES rules, and anything it or oxlint misses is still caught by the

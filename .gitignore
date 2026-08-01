@@ -175,6 +175,7 @@ supabase/migrations/
 # Superpowers plugin ephemeral files
 .superpowers/
 
-# oxlint tsgolint scratch emit dir (never written; see tsconfig.app.json) — PP-4zcj
+# oxlint: tsgolint's scratch emit dir (only .tsbuildinfo lands here, never JS —
+# see tsconfig.app.json) and the backup @oxlint/migrate writes beside the config
 .oxlint-tsbuild/
 .oxlintrc.json.bak

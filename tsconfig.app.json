@@ -16,14 +16,19 @@
     "composite": true, // Referenceable leaf project (PP-4k76)
     "strictNullChecks": true, // Explicit for emphasis (part of "strict")
     "forceConsistentCasingInFileNames": true, // Cross-platform safety
-    // Inert for every real gate, required by one. Because `noEmit` cannot be set
-    // here (TS6310, see above), the *default* output dir is each input's own
+    // Required by oxlint's tsgolint engine. Because `noEmit` cannot be set here
+    // (TS6310, see above), the *default* output dir is each input's own
     // directory — so a `.mjs` input like scripts/lib/db-target.mjs resolves to
-    // "write over yourself" (TS5055). Nothing hits that today: typecheck passes
-    // --noEmit, `next build` forces its own noEmit, and drizzle-kit reads the
-    // root config. oxlint's tsgolint engine builds the program directly and does
-    // trip it, so point emit at a scratch dir that is never written to.
-    // Gitignored. (PP-4zcj.)
+    // "write over yourself" (TS5055). `tsc` and `next build` never hit that
+    // (they pass/force --noEmit), but tsgolint builds the program directly and
+    // does, so emit is pointed at a scratch dir instead. Only `.tsbuildinfo`
+    // ever lands there, never JS; it is gitignored.
+    //
+    // NOT a no-op, despite only ever being read: setting `outDir` makes this
+    // composite project require that EVERY file in the program be listed in
+    // `include` (TS6307) — which is why the JSON globs below had to be added.
+    // Add a new import of a non-.ts file type and you may need to widen
+    // `include` again. (PP-4zcj.)
     "outDir": "./.oxlint-tsbuild/app"
   },
   "include": [

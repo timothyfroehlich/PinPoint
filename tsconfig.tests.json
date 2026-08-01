@@ -18,10 +18,11 @@
     "composite": true,
     "strict": true,
     "types": ["vitest/globals", "@testing-library/jest-dom"],
-    // See the matching note in tsconfig.app.json. Here the emit-over-input file
-    // is eslint-rules/no-side-effects-in-transaction.mjs, pulled in by
-    // src/test/eslint/*.test.ts. Inert for every real gate; needed only by
-    // oxlint's tsgolint engine. Gitignored. (PP-4zcj.)
+    // See the matching note in tsconfig.app.json — including the warning that
+    // this is not a no-op. Here the emit-over-input file is
+    // eslint-rules/no-side-effects-in-transaction.mjs, pulled in by
+    // src/test/eslint/*.test.ts. Needed only by oxlint's tsgolint engine.
+    // Gitignored. (PP-4zcj.)
     "outDir": "./.oxlint-tsbuild/tests"
   },
   "references": [{ "path": "./tsconfig.app.json" }],
