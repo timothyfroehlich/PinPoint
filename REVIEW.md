@@ -49,15 +49,15 @@ Copilot and Antigravity both read agent skills. Consult the relevant one for the
 
 ## How a review gets triggered
 
-**Reviews are requested, never automatic.** Since 2026-08-01 Copilot code review is configured request-only on this repo: it does not fire on a push, on the `ready-for-review` label, or on green CI. Antigravity likewise reviews when Tim asks.
+**One review fires automatically, at PR-open; every later one must be asked for.** Since 2026-08-01 Copilot code review is configured request-only on this repo apart from that: creating a PR fires a single request against open-time head, and nothing else does — not an intermediate push, not the `ready-for-review` label, not green CI. Antigravity likewise reviews when Tim asks.
 
-This did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit** — a Copilot review, or a Claude author's SHA-pinned self-review marker — with every thread resolved. What changed is only _when_ the review is spent: an author who is still churning through CI failures and fixups used to have each intermediate push reviewed and superseded minutes later, at real quota cost. Now the author finishes iterating first, then asks once:
+This did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit** — a Copilot review, or a Claude author's SHA-pinned self-review marker — with every thread resolved. What changed is only _when_ the review is spent: an author still churning through CI failures and fixups used to have each intermediate push reviewed and superseded minutes later, at real quota cost. Now authors are expected to finish before opening, so the automatic review lands on finished work. If they push past it, they ask again — once:
 
 ```bash
 gh pr edit <PR> --add-reviewer "@copilot"
 ```
 
-If the author pushes after requesting, the review no longer covers head and nothing re-requests automatically — that's deliberate, so a 3-commit fixup doesn't spend 3 reviews. Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
+Nothing re-requests automatically, deliberately, so a 3-commit fixup doesn't spend 3 reviews. **If you're reviewing, assume the commit you were handed is the one the author intends to be final** — and note that a review counts only while its `commit_id` is still head. Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 
 ## Review mechanics
 

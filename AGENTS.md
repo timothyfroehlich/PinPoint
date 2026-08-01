@@ -145,15 +145,15 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 ### Review requests
 
-**Copilot is request-only (since 2026-08-01).** It does not review on push, on the `ready-for-review` label, or on green CI — nothing requests it for you. The merge bar is unchanged: a PR still needs a review covering its **head commit** (Copilot, or a SHA-pinned Claude marker) with threads resolved. Only the timing changed, so that an agent churning through CI failures and fixups doesn't spend a review on each intermediate push.
+**Copilot review is request-only as of 2026-08-01 — with one exception: you get a single automatic review at PR-open, against open-time head.** Nothing else asks: not an intermediate push, not the `ready-for-review` label, not green CI. The merge bar is unchanged — a PR still needs a review covering its **head commit** (Copilot, or a SHA-pinned Claude marker) with threads resolved. Only the timing changed, so an agent churning through CI failures and fixups doesn't spend a review on each intermediate push.
 
-Finish iterating — implementation, CI fixes, self-review fixes, merge-from-main — **then** ask once:
+So **finish your churn before opening the PR** where you can; the free open-time review then covers head and you spend nothing extra. If you do push after opening, that review is stale and nothing re-requests — finish all of it, then ask once:
 
 ```bash
 gh pr edit <PR> --add-reviewer "@copilot"
 ```
 
-A push after requesting invalidates that review, and nothing re-requests automatically (deliberate — a 3-commit fixup would otherwise burn 3 reviews). Batch the remaining fixes, then re-request once with the same command. `mark-claude-review.sh` is the fallback for a request Copilot didn't answer, not a way to skip asking. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+Judge a review by comparing its `commit_id` to head, never by which event produced it: the automatic one counts when it covers head, and any review is worthless once you push past it. `mark-claude-review.sh` is the fallback for a request Copilot didn't answer, not a way to skip asking. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Review comments
 
