@@ -10,9 +10,15 @@ Usage: ./scripts/workflow/pr-watch.py [--check-ready | --force] [--verbose] <PR_
                  Gate absent or in-progress is NOT a blocking condition —
                  the watch loop handles those by waiting.
   --check-ready  Run the full readiness check (mergeable + CI Gate present
-                 + Copilot resolved + ready label) and exit. CI Gate
-                 absent IS a fail here — this mode answers "is this PR
-                 ready for human review right now?".
+                 + a review covering head + Copilot threads resolved +
+                 ready label) and exit. CI Gate absent IS a fail here —
+                 this mode answers "is this PR ready for human review
+                 right now?". The `copilot-review` line names one of six
+                 states rather than a bare yes/no: Copilot review is
+                 request-only on this repo, so "nobody asked yet",
+                 "asked, still waiting" and "you pushed past the request"
+                 need three different actions and only the middle one
+                 resolves by waiting (PP-lzaw).
   --force        Skip the pre-check entirely and watch unconditionally.
   --verbose      Emit per-job progressive updates ("X passed", "CI Gate
                  in_progress — continuing to wait", "Watching PR #N — N
@@ -52,6 +58,32 @@ COPILOT_LOGINS = (
 )
 READY_LABEL = "ready-for-review"
 CI_GATE_NAME = "CI Gate"
+
+# --- Review-request state (PP-lzaw) -----------------------------------------
+# Kept deliberately in sync with scripts/workflow/_pr-gates.sh, which is the
+# canonical implementation. Duplicated rather than shelled out to because this
+# script is the read-only reporter and _pr-gates.sh is sourced by merge-pr.sh,
+# which agents may not invoke at all. scripts/tests/test_pr_watch.py pins the
+# two vocabularies together.
+
+# Copilot posts a review OBJECT even when it reviewed nothing (quota exhausted,
+# no analyzable files). Those must be treated as absent — see the long rationale
+# in _pr-gates.sh (PP-jw0s).
+# Matched on WHOLE-PR phrasings only. "t able to review any files" covers both
+# "wasn't able to..." and "not able to..." without eating a real review that
+# merely mentions files it could not analyse.
+COPILOT_NON_REVIEW_MARKERS = (
+    "reached their quota limit",
+    "unable to review this pull request",
+    "t able to review any files",
+)
+CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
+
+# Seconds to wait for Copilot to answer a REQUEST before the wait stops being
+# legitimate. Measured from the request, not the head push.
+COPILOT_REVIEW_WAIT_THRESHOLD = 600
+
+REQUEST_REVIEW_HINT = 'gh pr edit {pr} --add-reviewer "@copilot"'
 
 REVIEW_POLL_INTERVAL = 60  # seconds — GitHub rate limit friendly
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
@@ -183,6 +215,126 @@ def get_review_threads(pr: int) -> list[dict]:
         if not rt["pageInfo"]["hasNextPage"]:
             return threads
         cursor = rt["pageInfo"]["endCursor"]
+
+
+def _gh_api_list(path: str) -> list[dict]:
+    """GET a paginated GitHub list endpoint, returning every item.
+
+    `gh api --paginate` emits ONE JSON document per page, so json.loads on the
+    whole stream fails from page 2 onward. Decode documents until the buffer is
+    exhausted and flatten.
+    """
+    raw = gh("api", "--paginate", f"{path}?per_page=100")
+    decoder = json.JSONDecoder()
+    items: list[dict] = []
+    idx = 0
+    while idx < len(raw):
+        while idx < len(raw) and raw[idx].isspace():
+            idx += 1
+        if idx >= len(raw):
+            break
+        doc, end = decoder.raw_decode(raw, idx)
+        if isinstance(doc, list):
+            items.extend(doc)
+        idx = end
+    return items
+
+
+def _is_substantive(review: dict) -> bool:
+    body = (review.get("body") or "").lower()
+    return not any(m in body for m in COPILOT_NON_REVIEW_MARKERS)
+
+
+def _iso_to_epoch(value: str) -> float:
+    return (
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+        .replace(tzinfo=timezone.utc)
+        .timestamp()
+    )
+
+
+def copilot_review_state(pr: int) -> tuple[str, str]:
+    """Return (state, human-readable detail) for the PR's review situation.
+
+    Mirrors `_compute_review_state` in scripts/workflow/_pr-gates.sh — same six
+    states, same ordering, same clock. States: marker, covered, awaiting,
+    overdue, pushed_after, never_requested.
+
+    The distinction that matters: a request NEWER than the head push means a
+    wait is legitimate; a head newer than the newest request means nobody is
+    coming, because nothing re-requests automatically. Collapsing those into one
+    "not reviewed yet" is what turns a forgotten request into an overnight stall.
+    """
+    repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
+    head_sha = gh("pr", "view", str(pr), "--json", "headRefOid", "--jq", ".headRefOid")
+    head_date = gh(
+        "api", f"{repo}/commits/{head_sha}", "--jq", ".commit.committer.date"
+    )
+    head_epoch = _iso_to_epoch(head_date)
+
+    # The review REQUEST clock lives on the issue timeline; the reviews endpoint
+    # cannot tell "nobody asked" from "asked, still waiting". A request names the
+    # reviewer as plain "Copilot" — not the bot login its reviews are authored
+    # under — so match a case-insensitive "copilot" prefix.
+    requests = [
+        ev.get("created_at", "")
+        for ev in _gh_api_list(f"{repo}/issues/{pr}/timeline")
+        if ev.get("event") == "review_requested"
+        and ((ev.get("requested_reviewer") or {}).get("login") or "")
+        .lower()
+        .startswith("copilot")
+    ]
+    latest_request = max(requests) if requests else ""
+    request_epoch = _iso_to_epoch(latest_request) if latest_request else 0.0
+    request_covers_head = bool(latest_request) and request_epoch >= head_epoch
+
+    marker = f"{CLAUDE_MARKER_PREFIX} {head_sha} -->"
+    if any(
+        marker in (c.get("body") or "")
+        for c in _gh_api_list(f"{repo}/issues/{pr}/comments")
+    ):
+        detail = f"Claude review marker pins head {head_sha[:7]}"
+        if not request_covers_head:
+            detail += " (standing in — no Copilot review was requested for this head)"
+        return "marker", detail
+
+    # Coverage is judged by commit_id, not by timestamp: a review submitted after
+    # a later push can still have read an earlier tree.
+    if any(
+        r.get("commit_id") == head_sha
+        and (r.get("user") or {}).get("login") in COPILOT_LOGINS
+        and _is_substantive(r)
+        for r in _gh_api_list(f"{repo}/pulls/{pr}/reviews")
+    ):
+        return "covered", f"Copilot review carries head SHA {head_sha[:7]}"
+
+    hint = REQUEST_REVIEW_HINT.format(pr=pr)
+    if not latest_request:
+        return (
+            "never_requested",
+            f"no Copilot review has ever been requested — run: {hint}",
+        )
+
+    if not request_covers_head:
+        behind = int(head_epoch - request_epoch)
+        return (
+            "pushed_after",
+            f"head is {behind}s NEWER than the last request ({latest_request}) — "
+            f"you pushed after requesting; nothing re-requests automatically. "
+            f"When you stop iterating, run: {hint}",
+        )
+
+    waited = int(time.time() - request_epoch)
+    if waited < COPILOT_REVIEW_WAIT_THRESHOLD:
+        return (
+            "awaiting",
+            f"review requested {waited}s ago, Copilot has not answered yet",
+        )
+    return (
+        "overdue",
+        f"review requested {waited}s ago and still unanswered — re-request ({hint}) "
+        f"or attest head with scripts/workflow/mark-claude-review.sh",
+    )
 
 
 def _unresolved_copilot(threads: list[dict]) -> int:
@@ -356,9 +508,22 @@ def run_audit(pr: int) -> bool:
         "applied" if READY_LABEL in labels else "not applied (orchestrator applies)"
     )
 
+    # A review covering head is part of an agent's terminal state on a PR, and
+    # under request-only Copilot it does not happen unless someone asks. Report
+    # WHICH state the PR is in — "nobody asked", "asked and waiting", and "you
+    # pushed past the request" need three different actions, and only the middle
+    # one resolves by waiting. `awaiting` is not a failure: the request is
+    # outstanding and the answer is on its way.
+    try:
+        review_state, review_detail = copilot_review_state(pr)
+    except (RuntimeError, ValueError, KeyError) as exc:
+        review_state, review_detail = "unknown", f"could not determine ({exc})"
+    review_ok = review_state in ("marker", "covered", "awaiting")
+
     checks = [
         (not bad_merge, "mergeable", merge_detail),
         (ci_check[0], "ci-gate", ci_check[1]),
+        (review_ok, "copilot-review", f"{review_state}: {review_detail}"),
         (
             unresolved == 0,
             "copilot-resolved",
