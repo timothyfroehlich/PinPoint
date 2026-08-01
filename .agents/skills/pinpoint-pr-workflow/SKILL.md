@@ -185,7 +185,7 @@ gh pr edit <PR> --add-reviewer "@copilot"
 `@copilot` is a `gh`-native special value for `--add-reviewer` (documented by GitHub; verified on `gh` 2.97). It resolves to `copilot-pull-request-reviewer[bot]` — the exact login `_pr-gates.sh` and `pr-watch.py` match. Use this form and only this form:
 
 - Don't hand-roll `POST /repos/{owner}/{repo}/pulls/{n}/requested_reviewers` — one command beats a remembered payload.
-- Don't reach for an MCP `request_copilot_review` tool. The GitHub MCP plugin is **not** installed in this environment; older notes in `docs/superpowers/` that reference it are records of a setup that no longer exists.
+- Don't reach for an MCP `request_copilot_review` tool. It isn't reliably there — the `github` plugin is absent from the installed-plugin set, and a session's tool catalog may expose no GitHub MCP tools at all. The `docs/superpowers/` notes that reference the tool are records of a 2026-05 setup, not a current guarantee. `gh` is always present.
 - Don't request at `gh pr create` time. Opening the PR is the start of iteration, not the end of it.
 
 #### Sequencing — this is the whole point of the change
