@@ -25,6 +25,16 @@ The corpus was written when teaching a model to write TypeScript was a real
 need. It no longer is. What remains valuable is the record of choices this
 project made that a competent agent could not derive from the code.
 
+**Risk posture** (Tim, 2026-08-01, recorded because it governs how hard to cut
+and would otherwise be invisible to a later reader):
+
+> We'll do the best we can. We've been having fewer and fewer drastic issues
+> lately, so I'm getting less worried about over-trimming work
+
+Bias toward cutting when a line is borderline. Under-cutting is the failure mode
+this sweep exists to correct — the first seven PRs left the corpus roughly flat
+by moving text instead of removing it.
+
 ## The test
 
 Applied line by line, in order:
@@ -99,7 +109,7 @@ The single exception is skill `description` frontmatter — see below.
 - `.github/instructions/**` (6 files), `.agents/rules/antigravity.md`
 - Agent-facing `docs/*.md`: `ESLINT_RULES` (328), `TYPESCRIPT_STRICTEST_PATTERNS`
   (318), `SECURITY` (312), `LOGGING` (233), `DEVELOPMENT` (210),
-  `CI_WORKFLOW_SETUP` (34), `pbm-listing-redesign-refresher` (227)
+  `CI_WORKFLOW_SETUP` (34)
 
 **Keepers, not swept**
 
@@ -113,6 +123,9 @@ The single exception is skill `description` frontmatter — see below.
 - `docs/plans/`, `docs/superpowers/`, `docs/testing/*-audit-*.md` — dated frozen
   records
 - `docs/runbooks/` — operational procedures for production incidents
+- `docs/pbm-listing-redesign-refresher.md` — a live working handoff document for
+  the in-flight PBM epic, updated 2026-08-01 by #1762. Revisit once that epic
+  lands; another agent is on it now.
 
 Total in scope ≈ 7,400 lines. Expected removal: 3,500–4,500.
 
@@ -121,9 +134,19 @@ Total in scope ≈ 7,400 lines. Expected removal: 3,500–4,500.
 Eight PRs, hard-serialized in the existing PP-22e4 manner: no PR N+1 worktree
 until PR N's merge commit is on `origin/main`. Ordered lowest-risk first.
 
-1. **Orphans.** `ESLINT_RULES.md` (328), `pbm-listing-redesign-refresher.md`
-   (227), `CI_WORKFLOW_SETUP.md` (34). All three have **zero** inbound links.
-   100%-deletion diff; reviewable by link-check alone. ~589 lines.
+1. **Orphans.** `ESLINT_RULES.md` (328) and `CI_WORKFLOW_SETUP.md` (34). Zero
+   inbound links, and dormant — last substantive touches 2026-06-06 (#1505) and
+   2026-01-07 (#704). 100%-deletion diff. ~362 lines.
+
+   `pbm-listing-redesign-refresher.md` (227) was in this group and was
+   **removed from it**. It has zero inbound links but was updated 2026-08-01 by
+   #1762 and is the working handoff document for the in-flight PBM epic.
+   **Zero inbound links does not mean unused** — a handoff or refresher doc is
+   opened by path from a bead, never linked to. Every deletion candidate gets a
+   `git log -3 -- <file>` recency check as well as a link check. Recency caused
+   by this sweep's own PRs does not count as use: `TYPESCRIPT_STRICTEST_PATTERNS.md`
+   looks recent only because PP-22e4 edited it twice.
+
 2. **TypeScript.** `pinpoint-typescript` (334) + `TYPESCRIPT_STRICTEST_PATTERNS.md`
    (318). One decision moves verbatim to the catalog: _`InferSelectModel` yields
    camelCase types directly, so PinPoint has no db→app converter layer and none
