@@ -8,7 +8,11 @@
 //      takes an injectable `exists` predicate so it needs no real files.
 //   2. The repo's own .claude/settings.json — asserted healthy in both
 //      directions, so `pnpm run check` goes red on a dead registration.
-//   3. Fail-open contract — a few subprocess cases spawn `node` on the hook
+//   3. Behaviour probes — `evaluateGuardBehavior()` calls each guard's exported
+//      pure classifier with a known-bad and a known-good command. Registration
+//      is a weak proxy for a working guard: the merge guard was fully wired and
+//      present on disk while allowing `eval "gh pr merge 123"` (PP-6t3c).
+//   4. Fail-open contract — a few subprocess cases spawn `node` on the hook
 //      with VERIFY_GUARD_SETTINGS pointed at a temp fixture, asserting the
 //      warn-only guarantee (always exit 0, one-line skip note, no stack trace).
 
@@ -25,12 +29,28 @@ const hookPath = path.resolve(
   process.cwd(),
   ".claude/hooks/verify-guard-stack.cjs"
 );
-const { evaluateGuardStack, extractScriptPaths } = require(hookPath) as {
+interface BehaviorProbe {
+  hook: string;
+  export: string;
+  mustBlock: string[];
+  mustAllow: string[];
+}
+
+const {
+  evaluateGuardStack,
+  evaluateGuardBehavior,
+  extractScriptPaths,
+  BEHAVIOR_PROBES,
+} = require(hookPath) as {
   evaluateGuardStack: (
     settings: unknown,
     options?: { exists?: (relPath: string) => boolean }
   ) => string[];
+  evaluateGuardBehavior: (options?: {
+    load?: (basename: string) => unknown;
+  }) => string[];
   extractScriptPaths: (command: string) => string[];
+  BEHAVIOR_PROBES: BehaviorProbe[];
 };
 
 // ---------------------------------------------------------------------------
@@ -363,6 +383,85 @@ describe("the repo's own .claude/settings.json", () => {
       )
     );
     expect(evaluateGuardStack(settings)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Behaviour probes (PP-6t3c): the canary used to answer only "is the guard
+// registered?". A registered, on-disk, silently-permissive guard reads as
+// healthy under that question — which is exactly what the merge guard was.
+// ---------------------------------------------------------------------------
+describe("evaluateGuardBehavior — the real guards", () => {
+  it("reports no problems: every guard still blocks its known-bad commands", () => {
+    expect(evaluateGuardBehavior()).toEqual([]);
+  });
+
+  it("covers the merge guard's wrapper bypasses", () => {
+    const mergeProbe = BEHAVIOR_PROBES.find(
+      (p) => p.hook === "block-direct-merge.cjs"
+    );
+    expect(mergeProbe).toBeDefined();
+    expect(mergeProbe?.mustBlock).toContain('eval "gh pr merge 123 --squash"');
+  });
+});
+
+describe("evaluateGuardBehavior — degradation is reported, never thrown", () => {
+  it("reports a guard that stopped blocking", () => {
+    const problems = evaluateGuardBehavior({
+      load: () => ({
+        classifyMerge: () => ({ block: false }),
+        classifyCommand: () => ({ block: false }),
+        isHeavyCommand: () => false,
+      }),
+    });
+    expect(problems.join("\n")).toContain("block-direct-merge.cjs allows");
+    expect(problems.join("\n")).toContain(
+      'eval \\"gh pr merge 123 --squash\\"'
+    );
+  });
+
+  it("reports a guard that started blocking everything", () => {
+    const problems = evaluateGuardBehavior({
+      load: () => ({
+        classifyMerge: () => ({ block: true }),
+        classifyCommand: () => ({ block: true }),
+        isHeavyCommand: () => true,
+      }),
+    });
+    expect(problems.join("\n")).toContain("blocks");
+    expect(problems).toHaveLength(BEHAVIOR_PROBES.length);
+  });
+
+  it("reports a guard that lost its exported classifier", () => {
+    const problems = evaluateGuardBehavior({ load: () => ({}) });
+    expect(problems.join("\n")).toContain("no longer exports");
+  });
+
+  it("reports — does not throw — when a guard cannot be loaded at all", () => {
+    const problems = evaluateGuardBehavior({
+      load: () => {
+        throw Object.assign(new Error("boom"), { code: "MODULE_NOT_FOUND" });
+      },
+    });
+    expect(problems).toHaveLength(BEHAVIOR_PROBES.length);
+    expect(problems.join("\n")).toContain("could not be loaded");
+  });
+
+  it("reports — does not throw — when a classifier itself throws", () => {
+    const problems = evaluateGuardBehavior({
+      load: () => ({
+        classifyMerge: () => {
+          throw new Error("boom");
+        },
+        classifyCommand: () => {
+          throw new Error("boom");
+        },
+        isHeavyCommand: () => {
+          throw new Error("boom");
+        },
+      }),
+    });
+    expect(problems).toHaveLength(BEHAVIOR_PROBES.length);
   });
 });
 
