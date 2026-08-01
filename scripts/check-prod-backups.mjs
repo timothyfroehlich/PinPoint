@@ -174,22 +174,26 @@ function fetchBackups() {
   } catch (error) {
     if (error.code === "ENOENT") {
       throw new Error(
-        "The `supabase` CLI is not on PATH. Install it, then re-run."
+        "The `supabase` CLI is not on PATH. Install it, then re-run.",
+        { cause: error }
       );
     }
     if (error.code === "ETIMEDOUT") {
       throw new Error(
-        `\`supabase backups list\` timed out after ${CLI_TIMEOUT_MS / 1000}s.`
+        `\`supabase backups list\` timed out after ${CLI_TIMEOUT_MS / 1000}s.`,
+        { cause: error }
       );
     }
     const stderr = String(error.stderr ?? "");
     if (/access token|not logged in|unauthor/i.test(stderr)) {
       throw new Error(
-        `Supabase CLI is not authenticated — run \`supabase login\`.\n${stderr.trim()}`
+        `Supabase CLI is not authenticated — run \`supabase login\`.\n${stderr.trim()}`,
+        { cause: error }
       );
     }
     throw new Error(
-      `\`supabase backups list\` failed.\n${stderr.trim() || error.message}`
+      `\`supabase backups list\` failed.\n${stderr.trim() || error.message}`,
+      { cause: error }
     );
   }
 
