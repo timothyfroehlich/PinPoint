@@ -546,6 +546,40 @@ describe("updateMachineAction listing carry-over (PGlite)", () => {
     expect(row?.pinballmapLmxId).toBeNull();
   });
 
+  it("unlists and drops the lmx when a listed machine is marked not-on-PBM", async () => {
+    // The riskiest transition for the two lmx CHECK constraints: the machine
+    // leaves BOTH the linked and the listed state while carrying an lmx.
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedCatalog(42);
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    const fd = new FormData();
+    fd.set("id", machine.id);
+    fd.set("name", "Godzilla");
+    fd.set("pbmLinkPresent", "1");
+    fd.set("pinballmapExcluded", "on");
+    fd.set("pinballmapExcludedReason", "Home use only");
+
+    const res = await updateMachineAction(undefined, fd);
+    expectOk(res);
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapExcluded).toBe(true);
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapMachineId).toBeNull();
+    expect(row?.pinballmapLmxId).toBeNull();
+  });
+
   it("unlists when the save clears the link entirely", async () => {
     const db = await getTestDb();
     const { updateMachineAction } = await import("~/app/(app)/m/actions");
