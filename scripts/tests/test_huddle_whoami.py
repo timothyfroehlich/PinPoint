@@ -214,6 +214,33 @@ def test_missing_session_id_still_shows_usage(repo: Path) -> None:
     assert rc == 1
     assert "Usage: huddle-whoami.sh register [--force] NAME SESSION_ID" in err
     assert names(repo) == {}
+    # The discover hint puts the command on its own line rather than running it
+    # together with prose, which is what the stray double space was papering over.
+    assert "To get the discovered session_id, run:" in err
+    assert "\n  bash scripts/hooks/huddle-whoami.sh discover\n" in err
+    assert "discover  to get" not in err
+
+
+def test_unknown_subcommand_usage_states_each_signature(repo: Path) -> None:
+    """A collapsed trailing `[SESSION_ID]` misdescribes every subcommand.
+
+    SESSION_ID is REQUIRED for whoami and register, and accepted by neither
+    list nor discover — so the fallback usage spells each one out.
+    """
+    rc, _, err = run(repo, "bogus-subcommand")
+    assert rc == 1
+    assert "Usage: huddle-whoami.sh <subcommand>" in err
+    assert "whoami SESSION_ID" in err
+    assert "register [--force] NAME SESSION_ID" in err
+    # list/discover take no session_id, so neither line may suggest one.
+    list_line = next(ln for ln in err.splitlines() if ln.strip().startswith("list"))
+    discover_line = next(
+        ln for ln in err.splitlines() if ln.strip().startswith("discover")
+    )
+    assert "SESSION_ID" not in list_line
+    assert "SESSION_ID" not in discover_line
+    # The old single-optional-argument form must not come back.
+    assert "] [SESSION_ID]" not in err
 
 
 def test_whoami_and_list_are_unaffected(repo: Path) -> None:

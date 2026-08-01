@@ -209,7 +209,8 @@ case "$cmd" in
     if [[ -z "$sid" ]]; then
       printf 'Usage: huddle-whoami.sh register [--force] NAME SESSION_ID\n' >&2
       printf 'SESSION_ID is required — the heuristic is unreliable when multiple sessions are active.\n' >&2
-      printf 'Use: bash scripts/hooks/huddle-whoami.sh discover  to get the discovered session_id.\n' >&2
+      printf 'To get the discovered session_id, run:\n' >&2
+      printf '  bash scripts/hooks/huddle-whoami.sh discover\n' >&2
       exit 1
     fi
     # Reject duplicate names: if any OTHER session_id already owns this name,
@@ -278,7 +279,15 @@ case "$cmd" in
     ;;
 
   *)
-    echo "Usage: huddle-whoami.sh [whoami|register [--force] NAME|list|discover] [SESSION_ID]" >&2
+    # Spell each subcommand out rather than factoring SESSION_ID into a single
+    # trailing `[SESSION_ID]`: it is REQUIRED for whoami and register and
+    # accepted by neither list nor discover, so the collapsed form misleads on
+    # exactly the mistyped-subcommand path that prints this.
+    printf 'Usage: huddle-whoami.sh <subcommand>\n' >&2
+    printf '  whoami SESSION_ID                     Print the name registered for SESSION_ID\n' >&2
+    printf '  register [--force] NAME SESSION_ID    Register SESSION_ID as NAME\n' >&2
+    printf '  list                                  Print every session_id → name pair\n' >&2
+    printf '  discover                              Print the best-guess session_id of this shell\n' >&2
     exit 1
     ;;
 esac
