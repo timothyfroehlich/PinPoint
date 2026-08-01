@@ -14,6 +14,11 @@ interface InfoRailProps {
   descriptionSlot?: React.ReactNode;
   /** Edit-machine control (dialog trigger or denied tooltip), shown in the owner card footer. */
   editSlot?: React.ReactNode;
+  /**
+   * PinballMap card (PP-o355.3). Rendered as-is when provided; when omitted, the
+   * PinballMap slot renders nothing.
+   */
+  pinballmapSlot?: React.ReactNode;
 }
 
 const CARD = "rounded-xl border border-outline-variant bg-card p-4";
@@ -29,9 +34,9 @@ const COMING_SOON = "text-sm text-muted-foreground";
  * rail and folds inline on mobile (the caller controls placement + gap; this
  * returns the cards as a fragment).
  *
- * Frame-first: Tags and PinballMap are reserved placeholder slots (Collections
- * and PP-o355.3 respectively fill them later). Only the Machine card shows live
- * data.
+ * Tags is still a reserved placeholder (Collections fills it later). PinballMap
+ * renders the `pinballmapSlot` card when the caller provides one (PP-o355.3),
+ * and nothing when it doesn't.
  */
 export function InfoRail({
   owner,
@@ -39,6 +44,7 @@ export function InfoRail({
   addedAt,
   descriptionSlot,
   editSlot,
+  pinballmapSlot,
 }: InfoRailProps): React.JSX.Element {
   return (
     <>
@@ -103,17 +109,10 @@ export function InfoRail({
         <p className={COMING_SOON}>Coming soon!</p>
       </div>
 
-      {/* PinballMap — reserved slot; the status card + public link arrive with
-          PP-o355.3. */}
-      <div
-        className={PLACEHOLDER_CARD}
-        data-testid="machine-pinballmap-placeholder"
-      >
-        <p className={`mb-2 flex items-center gap-2 ${LABEL}`}>
-          <span className="text-secondary">◆</span> PinballMap
-        </p>
-        <p className={COMING_SOON}>Coming soon!</p>
-      </div>
+      {/* PinballMap — the PP-o355.3 card fills this slot only when the machine is
+          listed on PinballMap; otherwise the caller passes nothing and no card
+          renders here. */}
+      {pinballmapSlot}
     </>
   );
 }

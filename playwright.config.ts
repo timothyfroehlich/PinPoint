@@ -113,11 +113,9 @@ export default defineConfig({
     reuseExistingServer: !process.env["CI"],
     timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
     stdout: (webServerStdout === "inherit" ? "pipe" : webServerStdout) as
-      | "pipe"
-      | "ignore",
+      "pipe" | "ignore",
     stderr: (webServerStderr === "inherit" ? "pipe" : webServerStderr) as
-      | "pipe"
-      | "ignore",
+      "pipe" | "ignore",
     ignoreHTTPSErrors: true,
     env: {
       PORT: String(port),

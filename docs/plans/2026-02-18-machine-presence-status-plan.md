@@ -106,11 +106,7 @@ Create `src/lib/machines/presence.ts`:
 
 ```typescript
 export type MachinePresenceStatus =
-  | "on_the_floor"
-  | "off_the_floor"
-  | "on_loan"
-  | "pending_arrival"
-  | "removed";
+  "on_the_floor" | "off_the_floor" | "on_loan" | "pending_arrival" | "removed";
 
 export const VALID_MACHINE_PRESENCE_STATUSES: MachinePresenceStatus[] = [
   "on_the_floor",

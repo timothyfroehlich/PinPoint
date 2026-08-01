@@ -10,7 +10,6 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { EmptyState } from "~/components/ui/empty-state";
-import type { LucideIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { formatDateTime } from "~/lib/dates";
 import { RelativeTime } from "~/components/issues/RelativeTime";
@@ -174,23 +173,24 @@ export function IssueList({
       scope="col"
       aria-sort={getSortAriaSort(column)}
       className={cn(
-        "px-4 py-3 text-sm font-semibold text-muted-foreground group cursor-pointer hover:text-foreground transition-colors duration-150 sticky top-0 bg-muted/30 z-10",
+        "px-4 py-3 text-sm font-semibold text-muted-foreground sticky top-0 bg-muted/30 z-10",
         align === "right" && "text-right",
         align === "center" && "text-center",
         className
       )}
-      onClick={() => handleSort(column)}
     >
-      <div
+      <button
+        type="button"
+        onClick={() => handleSort(column)}
         className={cn(
-          "flex items-center",
+          "group flex w-full items-center cursor-pointer hover:text-foreground transition-colors duration-150",
           align === "right" && "justify-end",
           align === "center" && "justify-center"
         )}
       >
         {label}
         {renderSortIcon(column)}
-      </div>
+      </button>
     </th>
   );
 
@@ -364,22 +364,9 @@ export function IssueList({
             </thead>
             <tbody className="divide-y divide-border">
               {stableIssues.map((issue) => {
-                const sc = STATUS_CONFIG as Record<
-                  string,
-                  { label: string; icon: LucideIcon; iconColor: string }
-                >;
-                const sv = SEVERITY_CONFIG as Record<
-                  string,
-                  { label: string; icon: LucideIcon; iconColor: string }
-                >;
-                const pr = PRIORITY_CONFIG as Record<
-                  string,
-                  { label: string; icon: LucideIcon; iconColor: string }
-                >;
-
-                const statusConfig = sc[issue.status]!;
-                const severityConfig = sv[issue.severity]!;
-                const priorityConfig = pr[issue.priority]!;
+                const statusConfig = STATUS_CONFIG[issue.status];
+                const severityConfig = SEVERITY_CONFIG[issue.severity];
+                const priorityConfig = PRIORITY_CONFIG[issue.priority];
 
                 return (
                   <tr

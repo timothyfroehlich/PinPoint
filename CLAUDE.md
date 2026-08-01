@@ -15,12 +15,15 @@
 - **investigator** - Deep read-only analysis and diagnostics
 - **Explore** - Fast codebase exploration and search
 
-### Sandbox & Playwright
+### Code review
 
-- The macOS sandbox blocks Chromium's Mach port IPC, causing `MachPortRendezvousServer: Permission denied` crashes.
-- Playwright commands are excluded from sandboxing via `excludedCommands` in `.claude/settings.local.json`. If you see Mach port errors, verify the command prefix matches an entry there (env var prefixes like `SKIP_SUPABASE_RESET=true` need separate entries).
-- `gh` CLI TLS errors are fixed by `enableWeakerNetworkIsolation: true` in the same file.
-- Use `pnpm run dev:status` to check if Next.js/Supabase/Postgres are running — don't hand-roll curl health checks.
+`REVIEW.md` at the repo root is the canonical review rubric, shared with Copilot and Antigravity. Read it before launching the code-review skill.
+
+**Copilot reviews only when you explicitly ask, since 2026-08-01 — nothing requests one for you.** Not opening the PR, not a push, not the `ready-for-review` label, not green CI. A review covering the head commit is still required to merge; only the trigger changed, so you pick the moment and spend one review on finished work. Finish your churn first, then ask once with `gh pr edit <PR> --add-reviewer "@copilot"`. Judge a review by its `commit_id` vs head, not by which event produced it — push past a review and you need to ask again. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+
+### Sandbox network isolation
+
+- `gh` CLI TLS errors are fixed by `enableWeakerNetworkIsolation: true` in `.claude/settings.local.json`.
 
 ### Working Style
 
@@ -51,7 +54,7 @@ See `pinpoint-orchestrator` skill Phase 2 for the full technical record.
 
 - **Dispatch**: `isolation: "worktree"` works out of the box — Claude Code creates the worktree, the `post-checkout` hook configures it (slot allocation, ports, `.env.local`, `.claude/launch.json`).
 - **Cleanup**: Claude Code's `WorktreeRemove` hook automatically runs `scripts/worktree_cleanup.py` (stops Supabase, removes Docker volumes, deallocates slot). Manual `git worktree remove /path` or `rm -rf` skips the hook — slot manifest entry and Docker volumes leak. `scripts/worktree_orphan_sweep.py` reconciles the slot manifest, active worktrees, and Supabase Docker resources; the SessionStart hook runs it in dry-run mode every 6h and surfaces a one-line nudge when orphans accumulate.
-- **Branch creation**: `Agent(isolation:"worktree")` handles branch creation automatically. AGENTS.md §4 "Branch Management" rules still apply if you create a branch manually inside an existing worktree.
+- **Branch creation**: `Agent(isolation:"worktree")` handles branch creation automatically. AGENTS.md §5 "Branches" rules still apply if you create a branch manually inside an existing worktree.
 
 ### Parallel Subagent Workflow
 
@@ -70,12 +73,4 @@ See `pinpoint-orchestrator` skill for the full workflow and known-bug details.
 
 ### Session Completion (Claude Code specifics)
 
-The "Landing the Plane" checklist in AGENTS.md applies to the lead agent and solo sessions.
-
-### Antigravity
-
-Antigravity is Google's CLI agent harness (currently Gemini) with full local environment access. Beads tagged `agy-ready` are cleared for autonomous execution; `agy-ui` additionally marks beads whose acceptance requires browser verification.
-
-- **Triage gates and tagging workflow:** `pinpoint-agy-triage` skill.
-- **Handing a bead to Antigravity:** `pinpoint-agy-dispatch` skill (run in Claude Code; emits a copy-paste prompt for the Antigravity 2.0 agent manager).
-- **Executing a bead inside Antigravity:** `pinpoint-agy-execute` skill.
+The "Landing the plane" checklist (`pinpoint-pr-workflow` skill, Phases 4–5) applies to the lead agent and solo sessions.

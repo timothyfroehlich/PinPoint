@@ -23,6 +23,7 @@ import { type MachineTimelineEventData } from "~/lib/timeline/machine-event-type
 import { type TimelineEventSourceType } from "~/lib/timeline/machine-events";
 import { type TimelineTag } from "~/lib/timeline/machine-tags";
 import { type SettingsSection } from "~/lib/machines/settings-types";
+import type { LocationSnapshot } from "~/lib/pinballmap/types";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -173,6 +174,18 @@ export const machines = pgTable(
     pinballmapMachineId: integer("pinballmap_machine_id"),
     pinballmapExcluded: boolean("pinballmap_excluded").notNull().default(false),
     pinballmapExcludedReason: text("pinballmap_excluded_reason"),
+    // Whether we consider this machine listed on PinballMap's public map (bead C
+    // / PP-o355.3). A local, manually-maintained boolean — the source of truth
+    // for "show the View-on-PinballMap link". Decoupled from presence/availability
+    // by design (no hard link). Listing presupposes a catalog link, enforced by
+    // the CHECK below. Reconciling this against PBM's actual snapshot is a later
+    // feature (inbound sync); pushing the change to PBM is bead E (outbound).
+    pinballmapListed: boolean("pinballmap_listed").notNull().default(false),
+    // Durable captured PBM listing handle (the location_machine_xref id). We
+    // STORE AND HEAL this rather than re-resolving it per push (PP-o355.16 /
+    // .12). Nullable: only set once a machine is actually listed on PBM. An lmx
+    // implies both a catalog link and pinballmap_listed (CHECKs below).
+    pinballmapLmxId: integer("pinballmap_lmx_id"),
     manufacturer: text("manufacturer"),
     year: integer("year"),
     opdbId: text("opdb_id"),
@@ -189,6 +202,28 @@ export const machines = pgTable(
       "machines_pinballmap_link_exclusive",
       sql`NOT (pinballmap_machine_id IS NOT NULL AND pinballmap_excluded)`
     ),
+    // Can't be listed on PinballMap without a catalog link — you can only appear
+    // on the public map as a recognized title.
+    pinballmapListedRequiresLinkCheck: check(
+      "machines_pinballmap_listed_requires_link",
+      sql`NOT (pinballmap_listed AND pinballmap_machine_id IS NULL)`
+    ),
+    // An lmx handle presupposes a catalog link.
+    pinballmapLmxRequiresLinkCheck: check(
+      "machines_pinballmap_lmx_requires_link",
+      sql`NOT (pinballmap_lmx_id IS NOT NULL AND pinballmap_machine_id IS NULL)`
+    ),
+    // An lmx handle presupposes we consider the machine listed.
+    pinballmapLmxRequiresListedCheck: check(
+      "machines_pinballmap_lmx_requires_listed",
+      sql`NOT (pinballmap_lmx_id IS NOT NULL AND NOT pinballmap_listed)`
+    ),
+    // One PBM lister per catalog title at our location — duplicate cabinets of
+    // the same title share one PBM lmx (PbmApiAudit finding #1). Partial: only
+    // listed rows participate.
+    pinballmapListedUnique: uniqueIndex("machines_pinballmap_listed_unique")
+      .on(t.pinballmapMachineId)
+      .where(sql`pinballmap_listed`),
     ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
     invitedOwnerIdIdx: index("idx_machines_invited_owner_id").on(
       t.invitedOwnerId
@@ -556,7 +591,20 @@ export const machineSettingsSets = pgTable(
       .$type<SettingsSection[]>()
       .notNull()
       .default([]),
+    // The machine owner's canonical set. Exactly one per machine (partial
+    // unique index below). Always an owner set + public.
     isPreferred: boolean("is_preferred").notNull().default(false),
+    // Kind (drives who may EDIT — see ~/lib/machines/settings-permissions):
+    // true = owner set (created by the machine owner; only owner + admin edit,
+    // protected from techs). false = community set (co-edited by technicians+
+    // and the machine owner). Captured at creation; stored not derived, so it
+    // survives machine-ownership transfer.
+    isOwnerSet: boolean("is_owner_set").notNull().default(false),
+    // Visibility (drives who may SEE): false = private draft (creator only),
+    // true = public. New sets are born private drafts.
+    isPublic: boolean("is_public").notNull().default(false),
+    // The orthogonal "Tournament" tag. Tagging requires edit rights on the set.
+    isTournament: boolean("is_tournament").notNull().default(false),
     createdBy: uuid("created_by").references(() => userProfiles.id, {
       onDelete: "set null",
     }),
@@ -583,6 +631,93 @@ export const machineSettingsSets = pgTable(
     // with ON DELETE SET NULL, so a profile delete scans this table on each FK.
     createdByIdx: index("idx_machine_settings_sets_created_by").on(t.createdBy),
     updatedByIdx: index("idx_machine_settings_sets_updated_by").on(t.updatedBy),
+  })
+).enableRLS();
+
+/**
+ * Collections + Collection Machines
+ *
+ * User-created collections of arbitrary machines (PP-wqit.1, Wave 0a). A
+ * collection is private to its owner unless a `view_token` is minted (Wave 0b,
+ * PP-wqit.2): possession of the token grants anonymous read access. Edit
+ * sharing is account-based (PP-wqit.7), not a token — there is no edit_token.
+ */
+export const collections = pgTable(
+  "collections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    description: jsonb("description").$type<ProseMirrorDoc>(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    // View-share capability (Wave 0b). Nullable = sharing off; a random
+    // base64url token = "anyone with the link can view". The token IS the
+    // capability and lives in the URL path; rotating it revokes old links.
+    // The collection id is NOT a capability (a uuid handle only resolves for
+    // owner/admin), so the id stays a non-secret internal identifier.
+    viewToken: text("view_token").unique(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // No Drizzle $onUpdate — every UPDATE sets this explicitly in the action.
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    ownerIdx: index("idx_collections_owner_id").on(t.ownerId),
+  })
+).enableRLS();
+
+export const collectionMachines = pgTable(
+  "collection_machines",
+  {
+    collectionId: uuid("collection_id")
+      .notNull()
+      .references(() => collections.id, { onDelete: "cascade" }),
+    machineId: uuid("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    addedBy: uuid("added_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.collectionId, t.machineId] }),
+    machineIdx: index("idx_collection_machines_machine").on(t.machineId),
+  })
+).enableRLS();
+
+/**
+ * Account-based edit sharing (PP-wqit.7). A row grants `user_id` the given
+ * `role` on `collection_id`. MVP uses only 'editor' (may add owner-granted
+ * 'viewer' later without a migration). Distinct from view_token (anonymous
+ * read) and from a future saved_collections bookmark (self-added view-only).
+ */
+export const collectionCollaborators = pgTable(
+  "collection_collaborators",
+  {
+    collectionId: uuid("collection_id")
+      .notNull()
+      .references(() => collections.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("editor"),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    addedBy: uuid("added_by").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.collectionId, t.userId] }),
+    userIdx: index("idx_collection_collaborators_user").on(t.userId),
   })
 ).enableRLS();
 
@@ -810,6 +945,7 @@ export const userProfilesRelations = relations(
     notifications: many(notifications),
     watchedIssues: many(issueWatchers),
     watchedMachines: many(machineWatchers),
+    ownedCollections: many(collections),
   })
 );
 
@@ -827,6 +963,7 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
   }),
   watchers: many(machineWatchers),
   settingsSets: many(machineSettingsSets),
+  collectionMemberships: many(collectionMachines),
 }));
 
 export const machineSettingsSetsRelations = relations(
@@ -839,6 +976,43 @@ export const machineSettingsSetsRelations = relations(
     updatedByUser: one(userProfiles, {
       fields: [machineSettingsSets.updatedBy],
       references: [userProfiles.id],
+    }),
+  })
+);
+
+export const collectionsRelations = relations(collections, ({ one, many }) => ({
+  owner: one(userProfiles, {
+    fields: [collections.ownerId],
+    references: [userProfiles.id],
+  }),
+  members: many(collectionMachines),
+  collaborators: many(collectionCollaborators),
+}));
+
+export const collectionCollaboratorsRelations = relations(
+  collectionCollaborators,
+  ({ one }) => ({
+    collection: one(collections, {
+      fields: [collectionCollaborators.collectionId],
+      references: [collections.id],
+    }),
+    user: one(userProfiles, {
+      fields: [collectionCollaborators.userId],
+      references: [userProfiles.id],
+    }),
+  })
+);
+
+export const collectionMachinesRelations = relations(
+  collectionMachines,
+  ({ one }) => ({
+    collection: one(collections, {
+      fields: [collectionMachines.collectionId],
+      references: [collections.id],
+    }),
+    machine: one(machines, {
+      fields: [collectionMachines.machineId],
+      references: [machines.id],
     }),
   })
 );
@@ -993,6 +1167,66 @@ export const discordIntegrationConfig = pgTable(
     ),
   })
 );
+
+/**
+ * PinballMap integration state (singleton).
+ *
+ * Exactly one row (id = 'singleton'), enforced by a CHECK constraint. Holds the
+ * whole last-fetched location snapshot (`snapshotJson`) plus sync health, so every
+ * downstream surface reads the stored snapshot rather than hitting PBM per request
+ * (PBM's "one call per hour" conduct, CORE-PBM-001). Outbound creds (email + vault
+ * token id) are written by the connect flow (PP-o355.12). Shared foundation for
+ * PP-o355.11 (cron sync) and PP-o355.12 (list/unlist) — PP-o355.16.
+ *
+ * The mandatory blanket API token (X-Api-Token) that PBM requires on ALL v1
+ * endpoints — reads included — once REQUIRE_API_TOKEN flips on (July 30 2026 gate,
+ * CORE-PBM-001) is deliberately NOT stored here: it is a platform capability
+ * issued to PinPoint-the-application, so it reads from the `PINBALLMAP_API_TOKEN`
+ * env var (PP-o355.23 dropped the Vault pointer column and its read RPC). The
+ * per-operator write creds below stay in Vault because they are per-user identity
+ * arriving at runtime — a DISTINCT layer: the api_token gates access, the operator
+ * creds identify who is writing. `outboundTokenVaultId` and `updatedBy` reference
+ * other schemas (`vault.secrets.id`, `auth.users.id`) — no FK (Drizzle cannot
+ * express cross-schema references).
+ */
+export const pinballmapState = pgTable(
+  "pinballmap_state",
+  {
+    id: text("id").primaryKey().default("singleton"),
+    enabled: boolean("enabled").notNull().default(false),
+    locationId: integer("location_id").notNull().default(26454),
+    snapshotJson: jsonb("snapshot_json").$type<LocationSnapshot>(),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    // Timestamp of the last sync ATTEMPT (success OR failure), stamped at the
+    // START of the attempt. Distinct from `lastSyncedAt` ("last SUCCESSFUL
+    // sync"): the manual-refresh throttle (PP-hbi0) rate-limits against the last
+    // attempt so a failed fetch (429/500) can't reset the clock and let repeat
+    // clicks re-hit PBM — inverting CORE-PBM-001's backoff. The cron path does
+    // not enforce the interval but still records its attempt here.
+    lastSyncAttemptAt: timestamp("last_sync_attempt_at", {
+      withTimezone: true,
+    }),
+    lastSyncStatus: text("last_sync_status", {
+      enum: ["unknown", "ok", "error"],
+    })
+      .notNull()
+      .default("unknown"),
+    lastSyncError: text("last_sync_error"),
+    outboundEmail: text("outbound_email"),
+    outboundTokenVaultId: uuid("outbound_token_vault_id"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedBy: uuid("updated_by"),
+  },
+  (_t) => ({
+    singletonCheck: check("pinballmap_state_singleton", sql`id = 'singleton'`),
+    syncStatusCheck: check(
+      "pinballmap_state_sync_status_check",
+      sql`last_sync_status IN ('unknown', 'ok', 'error')`
+    ),
+  })
+).enableRLS();
 
 /**
  * Type exports

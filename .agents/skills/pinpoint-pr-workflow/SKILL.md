@@ -1,6 +1,6 @@
 ---
 name: pinpoint-pr-workflow
-description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, Copilot + human review handling (via MCP), readiness labeling, gate-enforced merge. Use when committing changes, opening PRs, watching CI, addressing review comments, or merging.
+description: Full PR lifecycle for PinPoint — commit, push, CI monitoring, getting the head commit covered by a Copilot review (request-only since 2026-08-01: nothing auto-reviews, so you ask once when you have stopped iterating), review handling, UI screenshots, readiness labeling, human-only gate-enforced merge handoff, and post-merge deploy-watch/cleanup/handoff. Use when committing changes, opening PRs, watching CI, requesting or chasing a Copilot review, addressing review comments, posting screenshots, handing a PR to Tim to merge, or landing the plane after Tim merges (watching the deploy, cleanup, handoff).
 ---
 
 # PinPoint PR Workflow
@@ -12,7 +12,8 @@ End-to-end pipeline from "I have changes" to "merged in main". Replaces the depr
 - Uncommitted changes in tree → **Phase 1: Commit**
 - Local commits, no PR yet → **Phase 2: PR**
 - PR open, CI not yet green-and-clean → **Phase 3: Review**
-- `ready-for-review` label applied → **Phase 4: Merge**
+- `ready-for-review` label applied → **Phase 4: Merge** (human-only handoff — see below)
+- Tim has merged the PR → **Phase 5: after the merge** (deploy-watch, cleanup, handoff)
 
 ---
 
@@ -23,7 +24,7 @@ End-to-end pipeline from "I have changes" to "merged in main". Replaces the depr
 - Verify NOT on main: `git rev-parse --abbrev-ref HEAD` ≠ `main`.
 - Verify branch follows naming convention: `feature/*`, `fix/*`, `chore/*`, `docs/*`, `test/*`, `refactor/*`.
 - Verify based on current main: `git merge-base HEAD origin/main` is recent.
-- Verify NO `git rebase origin/main` ever — commandment 18 (use `git merge origin/main` instead).
+- Verify NO `git rebase origin/main` ever — AGENTS.md §5 "Branches" (use `git merge origin/main` instead).
 
 ### 1.2 Pre-commit validation
 
@@ -31,7 +32,7 @@ Default to `pnpm run check` (~12s; covers type, lint, format, unit tests, yamlli
 
 ### 1.3 E2E selection
 
-Use this matrix based on `git diff --name-only --staged`. **Never run `e2e:full` / `e2e:all` locally — the full suite is CI's job.** Locally, run only targeted specs (`pnpm exec playwright test <spec> --project=chromium`) while writing them or iterating on a feature they touch.
+Use this matrix based on `git diff --name-only --staged`. The full suite (`e2e:full` / `e2e:all`) is CI's job by default — roughly 8–10 minutes of three parallel Chromium workers plus a Supabase stack and a Next server. **On a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally** — push and let CI do it; on a machine with real headroom it's a reasonable thing to run when you actually want the signal. Locally, run only targeted specs (`pnpm exec playwright test <spec> --project=chromium`) while writing them or iterating on a feature they touch.
 
 | Changed file patterns                                                                                | Recommended local check                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
@@ -53,7 +54,7 @@ PinPoint scopes: `issues`, `machines`, `auth`, `ui`, `db`, `e2e`, `agents`, `wor
 
 If branch has no upstream: `git push -u origin <branch-name>`. Else: `git push`.
 
-Verify upstream tracks the branch itself, NOT main: `git branch -vv` should show `[origin/<your-branch>]`.
+Verify upstream tracks the branch itself, NOT main: `git branch -vv` should show `[origin/<your-branch>]`. After pushing, `git status` must show "up to date with origin" — if it doesn't, the push didn't land cleanly (e.g. a fetch is needed, or the remote moved); resolve before continuing.
 
 ---
 
@@ -106,6 +107,8 @@ timeout_ms: 3600000
 ```
 
 Exit 0 = all passed, or stopped for a new Copilot review. Exit 1 = failure — read `tmp/gh-monitor/failure-<RUN_ID>.md`.
+
+If you judge the failure to be a GitHub Actions **infra** flake (network timeout, runner loss, download 5xx, Supabase container-start) rather than a real code/test failure, log it before rerunning: `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`).
 
 ### 3.2 Check for review comments
 
@@ -165,28 +168,95 @@ Sign replies with your agent name (`—Claude-Plunger`, `—Claude-Spinner`, etc
 
 Copilot review threads count here too — a PR is not ready while Copilot has open threads. Resolve or decline each one (per 3.3) before moving on.
 
-### 3.4 Verify Copilot reviewed the latest commit
+### 3.4 Request the Copilot review — explicitly, once, when you have stopped iterating
 
-A PR isn't "ready for review" — and you must not declare it done — until Copilot has actually reviewed the **current head commit**. This catches the silent-skip case where `update_pull_request_branch` or merge-from-main commits don't trigger Copilot's `review_requested` event (per PR #1342 case).
+**The merge bar has not moved: a PR still cannot merge without a review covering the HEAD commit** — a Copilot review or a SHA-pinned Claude marker — with all its threads resolved. Review is mandatory, not on-demand, not discretionary, and the Claude marker is not a shortcut around it.
 
-Compare:
+**What changed on 2026-08-01 is only _who decides when_ the review is spent.** Previously Copilot reviewed every intermediate push — so an agent churning through CI failures, review fixes and merge-from-main commits piled up reviews that were superseded within minutes, at real quota cost. Auto-review is now **off** in both places it used to fire: not on a push, and not on PR-open.
 
-- `pull_request_read(method: "get_reviews")` → latest `submitted_at` for a `copilot-pull-request-reviewer` / `copilot-pull-request-reviewer[bot]` review
-- `get_commit(sha: <head_sha>)` → `commit.committer.date`
+**Nothing requests a review on your behalf. Ever.** Not creating the PR, not a push, not the `ready-for-review` label, not green CI.
 
-If head is newer than the latest Copilot review:
+Worth knowing if you read PR history from before 2026-08-01, or a doc that predates this line: PRs #1782–#1784 each show one `review_requested` firing ~1s after creation, and PR #1784 documented that as a permanent exception. It wasn't. The repo-level Copilot toggle was already off; an **account-level** preference at `github.com/settings/copilot` was overriding it, and Tim turned that off the same morning. There are now **zero** automatic reviews. Any doc still promising a free one at PR-open is stale — fix it.
 
-- Elapsed < 600s → wait, Copilot may still be reviewing.
-- Elapsed >= 600s (or `request_copilot_review` yields nothing after another 60s) → **run a Claude fallback review instead of proceeding unreviewed.** Copilot silently skips `review_requested` events often enough that "no review" cannot be a merge path (per PR #1342 / #1326). The fallback:
-  1. Run `/code-review` against the PR diff (model-invocable local review — **not** `ultra`, which is user-triggered, billed, and the agent cannot launch).
-  2. Address serious findings the same way you handle Copilot threads: fix → push → re-review. A fix changes the head SHA and re-arms the `reviewed` gate. Consciously decline the rest.
-  3. `bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings summary>"` — posts the SHA-pinned sticky marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
+So the model is simply: **you decide when you're ready for a review, and you know you need one to merge.**
 
-`merge-pr.sh` enforces this at merge time via the `reviewed` gate (PASSes on a Copilot review OR a SHA-matched Claude marker; WAITs inside the 600s window; FAILs after it with no review of either kind). Unlike the older `currency` gate — which WARN-proceeds on a stale/absent Copilot review — `reviewed` blocks the merge, so the Claude fallback is the way past it, not a bypass. Don't tell Tim a PR is "ready" or "done" while head is still unreviewed — making a review happen is part of finishing the PR, not an optional extra.
+- **Finish your churn first, then ask.** Implementation, self-review pass, CI green, merge-from-main — get all of it done, then spend one review on work that's actually finished. Opening the PR early costs you nothing now; it's requesting early that wastes the review.
+- **Requesting is a step in finishing the PR**, not an optional extra. If you never ask, head stays unreviewed and the `reviewed` gate blocks the merge until a human notices. Easy to forget; Tim accepted that risk deliberately in exchange for not burning quota on work that isn't ready.
 
-### 3.5 Apply `ready-for-review` label
+#### The one canonical way to ask
 
-Once CI green + zero unresolved review threads (including Copilot) + Copilot reviewed head commit + no merge conflict:
+```bash
+gh pr edit <PR> --add-reviewer "@copilot"
+```
+
+`@copilot` is a `gh`-native special value for `--add-reviewer` (documented by GitHub; verified on `gh` 2.97). It resolves to `copilot-pull-request-reviewer[bot]` — the exact login `_pr-gates.sh` and `pr-watch.py` match. Use this form and only this form:
+
+- Don't hand-roll `POST /repos/{owner}/{repo}/pulls/{n}/requested_reviewers` — one command beats a remembered payload.
+- Don't reach for an MCP `request_copilot_review` tool. It isn't reliably there — the `github` plugin is absent from the installed-plugin set, and a session's tool catalog may expose no GitHub MCP tools at all. The `docs/superpowers/` notes that reference the tool are records of a 2026-05 setup, not a current guarantee. `gh` is always present.
+- Don't pass `--reviewer` to `gh pr create` either. Open the PR, watch CI, settle the diff — _then_ request. Requesting at creation time is the same premature spend, just spelled differently.
+
+#### Sequencing — this is the whole point of the change
+
+1. Open the PR whenever you like and watch CI. No review is running, so an early PR costs nothing.
+2. Finish **all** the work: the implementation, the self-review pass over `git diff origin/main...HEAD` against `REVIEW.md`, the CI fixes, the merge-from-main.
+3. Stop iterating, then request — **once**:
+
+   ```bash
+   gh pr edit <PR> --add-reviewer "@copilot"
+   ```
+
+4. Wait for the review, handle its threads per 3.2/3.3, then go to 3.5/3.6.
+
+**Copilot reviews the head as of the _request_, not as of when it runs.** Measured on #1787: a request made at `a4a26aad` produced a review stamped `commit_id: a4a26aad`, submitted two minutes _after_ `7d672c4` had already been pushed. So an early request doesn't just waste a review — it buys one that **can never cover head**, and you're left unable to merge until you ask again. This is the mechanical reason step 2 comes before step 3: all pushes done, CI Gate green, _then_ request.
+
+**Every push past a review leaves it stale, and nothing asks again on your behalf.** That's by design — a 3-commit fixup that fired a fresh request on each push would spend three reviews, which is exactly the quota burn this change exists to eliminate. If you do have to push after being reviewed, batch the rest of the fixes, then run the same command again — once.
+
+Live casework from the night this changed: on PRs #1779 and #1780 the agent pushed a fix ~3 minutes after Copilot's review landed, invalidating it. Under the old model the next push silently bought a replacement; now that pattern leaves the PR with no valid review at all unless you ask.
+
+**Judge a review by its `commit_id`, never by which event produced it or by the fact that one exists.** A review is worthless to the gate the moment you push past it, and "there's a Copilot review on this PR" says nothing about whether it read your current tree. The single rule: **a review whose `commit_id` isn't head does not count.** Check it:
+
+```bash
+gh api repos/timothyfroehlich/PinPoint/pulls/<PR>/reviews \
+  --jq '.[] | select(.user.login=="copilot-pull-request-reviewer[bot]") | {state, commit_id, submitted_at}'
+```
+
+#### If the request produces nothing (the Claude fallback)
+
+Requesting is not optional and the fallback is not a substitute for it. `mark-claude-review.sh` is for the case where you **did** request and Copilot still didn't deliver — it silently skipped the `review_requested` event (PR #1342 / #1326), or it's quota-limited. It is **not** a way to skip asking.
+
+Once you have requested and Copilot has not produced a review of head:
+
+1. Review the PR diff yourself — a deliberate manual pass over `git diff origin/main...HEAD` against `REVIEW.md`, the canonical rubric. (`/code-review` is a harness built-in that only Tim can trigger; `ultra` is user-triggered and billed. An agent can launch neither.)
+2. Address serious findings the same way you handle Copilot threads: fix → push → request again. A fix changes the head SHA and re-arms the `reviewed` gate. Consciously decline the rest.
+3. `bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings summary>"` — posts the SHA-pinned sticky marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
+
+The marker attests that **you actually read the diff**. Posting it without having done the pass is a false attestation, not a shortcut.
+
+**A Copilot comment saying it _couldn't_ review is not a review** (PP-jw0s). When Copilot is quota-limited or finds nothing to analyze, it still posts a review object with a real timestamp — and both gates used to count it, going green on a review that read nothing. They now match those bodies and treat them as absent, so a quota-limited PR takes the honest path: WAIT, then FAIL with the `mark-claude-review.sh` remedy printed. If you see that FAIL during a quota outage, the gate is working — run the fallback above, don't `--force`.
+
+#### What the gates check today (and what's changing)
+
+`merge-pr.sh` enforces the review at merge time via the `reviewed` gate (PASSes on a Copilot review OR a SHA-matched Claude marker; WAITs inside a 600s window; FAILs after it with no review of either kind). The companion `currency` gate never hard-fails — it only WARN-proceeds once its timer runs out. Both honour the marker.
+
+**Caveat while PP-lzaw is open:** both timers are still keyed to the **head push**, which only made sense when Copilot arrived unprompted. Until PP-lzaw re-keys them to the review _request_, a PR where nobody requested a review will sit through a 600s `currency` wait for something that is never coming and then land on a `reviewed` FAIL. Don't read that FAIL as "post the marker" — read it as "you forgot to request." Request, wait for the review, and let the gate pass honestly. Don't tell Tim a PR is "ready" or "done" while head is still unreviewed.
+
+### 3.5 Post UI screenshots (UI-touching PRs only)
+
+If the diff touches `src/app/**`, `src/components/**`, any `.css`, or design tokens, screenshots must be posted before the PR can be called ready — Tim reviews UI by eye, not by reading a diff. The commit-time `ui-screenshot-reminder.cjs` PostToolUse hook nudges on the first `git commit` that touches a UI glob; don't ignore it.
+
+```
+node scripts/workflow/pr-screenshots.mjs <PR>
+```
+
+Shoots the manifest in `scripts/workflow/ui-screenshot-manifest.json` (issues list, issue detail, report form, dashboard, a machine detail, collections — pass `--pages=a,b,c` to shoot a subset) at desktop (1440×900) and mobile (390×844) viewports, pushes the PNGs to the orphan `pr-screenshots` branch, and posts/updates one sticky PR comment (marker `<!-- pr-screenshots -->`) with a desktop|mobile table per page. Re-run after any UI-affecting push — it updates the same sticky comment in place, tagged with the new head SHA.
+
+Two `--pages` gotchas: it only accepts the **equals** form (`--pages=machine-edit`); the space-separated form fails with `Unrecognized argument`. And a filtered run rebuilds the sticky comment from just the pages it shot, silently dropping the others — so always finish with an unfiltered run before handing the PR off.
+
+Requires the local dev server (`pnpm run dev`) and Supabase (`supabase start`) running. First run (or a stale/missing login session) regenerates `e2e/.auth/*.json` via the `auth-setup` Playwright project, which resets + reseeds the local dev DB — same as running E2E tests locally, not a new risk.
+
+### 3.6 Apply `ready-for-review` label
+
+Once CI green + a Copilot review whose `commit_id` matches head (you requested it per 3.4; or the fallback marker) + zero unresolved review threads (including Copilot) + no merge conflict + screenshots posted (if UI-touching, per 3.5):
 
 1. Read current labels via `pull_request_read(method: "get")` and extract `.labels[]`.
 2. Build new labels array: existing labels + `"ready-for-review"`.
@@ -204,23 +274,43 @@ labels: [<existing>, "ready-for-review"]
 
 NOTE: PR labels are added via the issues endpoint. `labels` parameter is full-replacement, so read current labels first to avoid clobbering.
 
-The label is a hint to Tim that the PR is ready. `merge-pr.sh` re-checks all gates at merge time regardless.
+The label is a hint to Tim that the PR is ready for **him** to merge — it does not authorize an agent to merge. `merge-pr.sh --human` re-checks all gates when Tim runs it.
+
+**The label does not request the Copilot review.** Tim considered wiring the request to `ready-for-review` (or to CI green) and rejected it: requesting stays an explicit, deliberate act (3.4). Applying the label on a PR whose head is past its last review — or that was never reviewed at all — just moves the failure to merge time.
 
 ---
 
-## Phase 4: Merge
+## Phase 4: Merge — human-only (PP-wi85)
 
-Direct `gh pr merge` and MCP `merge_pull_request` are blocked by hook. Use `merge-pr.sh`.
+**Merging is human-only, via ANY path.** Direct `gh pr merge`, MCP `merge_pull_request`, AND `scripts/workflow/merge-pr.sh` itself are ALL blocked for an agent by the `block-direct-merge.cjs` PreToolUse hook — including `merge-pr.sh --dry-run`. There is no agent-usable bypass; the old `.claude-merge-bypass` sentinel was removed entirely. If you want to sanity-check gate-relevant PR state without running the script, read it via MCP (`pull_request_read`) instead — you cannot invoke `merge-pr.sh` at all, not even to preview.
 
-### 4.1 Invoke
+### 4.1 Agent's terminal state: handoff, not merge
+
+Once 3.1–3.6 are satisfied (CI green, a review whose `commit_id` matches head per 3.4, threads resolved, no conflict, screenshots posted if UI-touching), your job on this PR is done. Tell Tim it's ready and hand him the exact command to run himself:
 
 ```
-bash scripts/workflow/merge-pr.sh <PR>
+! scripts/workflow/merge-pr.sh <PR> --human
 ```
 
-Flags (stackable, order-independent):
+If CI is still running, hand him the automerge form instead — it waits rather than making him come back. Get the head reviewed first (Phase 3.4); automerge waits out CI, not an unreviewed head — and a review you never requested never arrives, so it would just burn the timeout:
 
-- `--dry-run` — preview only, no action.
+```
+! scripts/workflow/merge-pr.sh <PR> --human --automerge
+```
+
+Never say "ready to push when you are" — you push. Never say a PR is "merged" or that you merged it — only Tim runs the merge; say "ready for Tim to merge" and give him the command. (A `!`-prefixed command in Claude Code is a human-typed shell passthrough — it does not generate a PreToolUse event, so it is the only channel this hook cannot see. That is by design: it is the human channel.)
+
+### 4.2 What `merge-pr.sh --human` does (reference — Tim runs this, not you)
+
+```
+scripts/workflow/merge-pr.sh <PR> --human [-a|--automerge] [--dry-run] [--force] [--bypass-merge-requirements]
+```
+
+`--human` is required to actually merge; omitting it makes the script refuse with a `REFUSE:` message (defense-in-depth for harnesses without the Claude Code hook — Codex/Gemini/Antigravity). `--dry-run` doesn't require `--human` in the script itself, but that exemption only matters outside Claude Code — inside Claude Code the hook blocks the Bash call before the script even runs, dry-run or not.
+
+Other flags (stackable, order-independent):
+
+- `-a` / `--automerge` — poll the gates instead of evaluating once, and merge the moment they all pass. Fire it while CI is still running; that's the point. It does **not** wait out an unreviewed head — `reviewed` hard-fails 600s after a head push with no Copilot review and no Claude marker, and a hard failure ends the run — so make sure head is reviewed first: request per 3.4, or post the marker when Copilot is quota-limited or has skipped a request you did make. Ends in exactly one of three states, each named on exit: `MERGED`, `RED` (a gate hard-failed — no merge, `ready-for-review` dropped), or `TIMED OUT` (still waiting when the budget expired — PR untouched, label intact, exit code 2). A WAIT keeps it polling; only a hard failure stops it. `AUTOMERGE_TIMEOUT` (default 3600s) and `AUTOMERGE_POLL_INTERVAL` (default 30s) tune it. Mutually exclusive with `--dry-run`. Prints the gate block on the first poll and again whenever the picture changes, so a long wait stays readable.
 - `--force` — bypass `currency` + `threads` + `reviewed` (review-state) gates. Requires manual permission approval.
 - `--bypass-merge-requirements` — bypass `ci` gate AND pass `--admin` to `gh pr merge`,
   overriding GitHub branch-protection rules. Requires manual permission approval.
@@ -228,9 +318,9 @@ Flags (stackable, order-independent):
 Combine `--force --bypass-merge-requirements` to bypass `currency` + `threads` + `reviewed` + `ci` together.
 The `no_conflict` gate is NEVER bypassable — GitHub rejects conflicting merges regardless of `--admin`.
 
-`merge-pr.sh` evaluates **5 gates**: `ci`, `currency`, `threads`, `reviewed`, `no_conflict`. The `reviewed` gate is the hard backstop that no head commit merges unreviewed — prefer running the Claude fallback (Phase 3.4) to satisfy it over `--force`-bypassing it.
+`merge-pr.sh` evaluates **5 gates**: `ci`, `currency`, `threads`, `reviewed`, `no_conflict`. The `reviewed` gate is the hard backstop that no head commit merges unreviewed — prefer running the Claude fallback (Phase 3.4) to satisfy it before handoff, rather than telling Tim to `--force` past it.
 
-### 4.2 Interpret output
+### 4.3 Interpret output (for reading over Tim's shoulder / diagnosing a FAIL he reports)
 
 Script emits structured status tokens:
 
@@ -243,45 +333,41 @@ Script emits structured status tokens:
 | `WARN: <gate>: <state>`  | Permitted to proceed with notice                       | Continue, but be informed             |
 | `SKIP: <gate>: <reason>` | Gate doesn't apply                                     | Continue                              |
 
-On any FAIL: script removes `ready-for-review` label if present (the label's contract is "click-merge-without-thinking"; if a gate fails at merge time, that contract is broken). Exit 1.
+On any FAIL: script removes `ready-for-review` label if present (the label's contract is "click-merge-without-thinking"; if a gate fails at merge time, that contract is broken). Exit 1. If Tim reports a FAIL, fix the underlying issue and push — then re-hand him the same `--human` command.
 
 On all PASS: script captures head SHA, calls `gh pr merge <PR> --squash --match-head-commit=<sha>`. TOCTOU-safe — if a new commit lands between gate check and merge, GitHub rejects the merge (`--match-head-commit` mismatch). Branch deletion is handled by the repo's auto-delete-branches setting, not by the merge command — passing `--delete-branch` from a worktree fails local cleanup because main is held by the root checkout.
 
-### 4.3 Escape hatches
+### 4.4 Escape hatches (Tim decides; you can inform, not invoke)
 
 **`--force`** — for Copilot/review-state issues (bypasses `currency` + `threads` + `reviewed`):
 
-- API failure on the `threads`, `currency`, or `reviewed` gate where you've manually verified the underlying state is fine
-- Copilot has silently-skipped a merge-from-main commit AND you've reviewed the diff manually
-- You're aware the `threads` / `currency` / `reviewed` gates would fail and you're explicitly accepting
+- API failure on the `threads`, `currency`, or `reviewed` gate where the underlying state has been manually verified fine
+- Copilot has silently-skipped a merge-from-main commit and the diff was reviewed manually
+- The `threads` / `currency` / `reviewed` gates are known to fail and that's being explicitly accepted
 
-Prefer the Claude fallback (Phase 3.4 — run `/code-review` + `mark-claude-review.sh`) over `--force` for a `reviewed`-gate failure: the fallback makes the guarantee true rather than skipping it.
+Prefer the Claude fallback (Phase 3.4 — manual diff review + `mark-claude-review.sh`) over asking Tim to `--force` a `reviewed`-gate failure: the fallback makes the guarantee true rather than skipping it, and you can do it before handoff.
+
+**A `reviewed` FAIL because you never requested a review — or pushed past the one you got and never asked again — is neither a `--force` case nor a marker case.** It's an unfinished PR. Request it (3.4), wait, then hand off.
 
 **`--bypass-merge-requirements`** — for CI/branch-protection issues:
 
 - A required check is failing for known-irrelevant reasons (infrastructure flake, unrelated job)
-  AND you've manually verified the change is safe
+  AND the change has been manually verified safe. Log the flake first:
+  `bash scripts/workflow/log-gha-flake.sh <pr> <run-id> <class> "<symptom>"` (see `docs/runbooks/gha-flake-log.md`).
 - An emergency hotfix where waiting for CI is not acceptable
 - Combine with `--force` when both review-state and CI gates need to be skipped
 
-Do NOT bypass when:
+Do NOT suggest bypassing when:
 
 - Merge conflict exists (`no_conflict` gate is never bypassable; conflicts can't be ignored)
-- You haven't manually verified the underlying state. Both flags require manual permission approval
+- The underlying state hasn't been manually verified. Both flags require manual permission approval
   in the chat — treat the approval prompt as a "are you sure?" checkpoint.
 
-### 4.4 Bypass the hook (emergency only)
+### 4.5 If `merge-pr.sh` itself is broken
 
-If you absolutely need to bypass the hook (e.g., merge-pr.sh itself is broken and you have a hotfix to ship):
+There is no hook bypass — that channel was removed entirely (PP-wi85). If a hotfix genuinely can't wait for the script to be fixed, that's Tim's call, made in his own shell (`gh pr merge <PR> --squash` run by him directly, or a fixed `--human` run). Document why in the merge commit or a follow-up comment. An agent should not look for a workaround here — flag the breakage and let Tim decide.
 
-```bash
-touch .claude-merge-bypass
-gh pr merge <PR> --squash
-```
-
-The sentinel is single-use — deleted on the next merge attempt. Document in commit message WHY you bypassed.
-
-### 4.5 Dependabot PRs: rebase before merging back-to-back
+### 4.6 Dependabot PRs: rebase before merging back-to-back
 
 When two or more Dependabot PRs that both touch `pnpm-lock.yaml` (or any lockfile) are open simultaneously, merging them in succession without rebasing the second-and-later PRs can silently break the lockfile.
 
@@ -289,7 +375,7 @@ When two or more Dependabot PRs that both touch `pnpm-lock.yaml` (or any lockfil
 
 **Why `rebase-strategy: auto` in `.github/dependabot.yml` doesn't save you:** "auto" means Dependabot rebases when _the dependency version_ is out of date, not when _the lockfile region_ has shifted under it. Two independent Dependabot PRs against the same main can both stay "current" by Dependabot's definition while their lockfile diffs collide on merge.
 
-**Rule:** when merging the first of two or more Dependabot PRs that both touch a lockfile, comment `@dependabot rebase` on each remaining Dependabot PR before merging it. Dependabot regenerates the lockfile against post-first-merge main and the duplicate is deduped automatically. Wait for the rebased CI to pass before invoking `merge-pr.sh` on the second PR.
+**Rule:** when merging the first of two or more Dependabot PRs that both touch a lockfile, comment `@dependabot rebase` on each remaining Dependabot PR before merging it. Dependabot regenerates the lockfile against post-first-merge main and the duplicate is deduped automatically. Wait for the rebased CI to pass before handing Tim the `--human` command for the second PR.
 
 **Casework:** 2026-05-19 — PRs #1379 and #1381 each added `brace-expansion@5.0.6:` to `packages:` independently. Both merged within ~1 minute. Main's `Setup Dependencies` broke until a manual dedup of `pnpm-lock.yaml` was bundled into PR #1383 alongside that PR's primary E2E locator fix.
 
@@ -302,7 +388,25 @@ pr_branch=$(gh pr view <second_pr> --json headRefName --jq .headRefName)
 gh api "repos/{owner}/{repo}/compare/main...$pr_branch" --jq '.behind_by'
 ```
 
-If `behind_by > 0`, comment `@dependabot rebase` on the PR and wait for the rebased CI to pass before invoking `merge-pr.sh`. Do not use `gh pr view --json baseRefOid` for this — `baseRefOid` is the base branch's current SHA at query time, so it always equals `origin/main` and cannot detect a stale PR head.
+If `behind_by > 0`, comment `@dependabot rebase` on the PR and wait for the rebased CI to pass before handing Tim the `--human` command. Do not use `gh pr view --json baseRefOid` for this — `baseRefOid` is the base branch's current SHA at query time, so it always equals `origin/main` and cannot detect a stale PR head.
+
+---
+
+## Phase 5: after the merge
+
+Work isn't done at "git push" — it's done when the change is **merged, deployed clean, and cleaned up**.
+
+### 5.1 Watch the deployment — only if the PR could break it
+
+After Tim merges, consider watching the deployment — only if the PR could break it. A merge that breaks prod isn't done, so when the change actually reaches the deployed app, it's worth watching the production deploy land and confirming no build, migration, or runtime errors. That means: anything under `src/`, a migration, a dependency or `next.config.ts` change, an env-registry change, or anything on the `vercel-build` path. **Skip it otherwise** — docs, skills, beads, GitHub workflows, and dev-only scripts can't affect the deploy, and watching a run that was never at risk just burns time. This is a judgement call, not a mandate; if you're not present when Tim merges, it's his to do or to ask you to pick back up.
+
+### 5.2 Cleanup — non-destructive now, destructive on confirmation
+
+Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
+
+### 5.3 Hand off
+
+Hand off for the next session, and post to the huddle daily bead if other sessions need to know what landed.
 
 ---
 

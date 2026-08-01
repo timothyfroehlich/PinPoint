@@ -7,7 +7,12 @@
 
 import { test, expect } from "@playwright/test";
 import { MailpitClient } from "../support/mailpit.js";
-import { ensureLoggedIn, updateIssueField } from "../support/actions.js";
+import {
+  ensureLoggedIn,
+  updateIssueField,
+  selectMachine,
+  machineSelectValue,
+} from "../support/actions.js";
 import {
   fillReportForm,
   submitFormAndWaitForRedirect,
@@ -73,16 +78,10 @@ test.describe("Notifications", () => {
     const publicPage = await publicContext.newPage();
 
     await publicPage.goto("/report");
-    // Wait for machine list to populate (check select exists)
-    await expect(publicPage.getByTestId("machine-select")).toBeVisible();
-    await publicPage
-      .getByTestId("machine-select")
-      .selectOption({ value: machine.id });
+    await selectMachine(publicPage, machine.id);
 
     // Verify selection stuck (mobile chrome stability)
-    await expect(publicPage.getByTestId("machine-select")).toHaveValue(
-      machine.id
-    );
+    await expect(machineSelectValue(publicPage)).toHaveValue(machine.id);
 
     const issueTitle = getTestIssueTitle("Public Report");
     await fillReportForm(publicPage, {
@@ -304,13 +303,11 @@ test.describe("Notifications", () => {
 
     // Use a seeded machine for convenience, or create one.
     // Since we are watching globally, any machine works.
-    await publicPage
-      .getByTestId("machine-select")
-      .selectOption({ value: seededMachines.medievalMadness.id });
+    await selectMachine(publicPage, seededMachines.medievalMadness.id);
 
     const issueTitle = getTestIssueTitle("Global Watcher Test");
     // Verify machine selection stuck
-    await expect(publicPage.getByTestId("machine-select")).toHaveValue(
+    await expect(machineSelectValue(publicPage)).toHaveValue(
       seededMachines.medievalMadness.id
     );
 
@@ -369,12 +366,8 @@ test.describe("Notifications", () => {
     const publicPage = await publicContext.newPage();
     await publicPage.goto("/report");
     // Select machine and verify state (Mobile Chrome hardening)
-    await publicPage
-      .getByTestId("machine-select")
-      .selectOption({ value: machine.id });
-    await expect(publicPage.getByTestId("machine-select")).toHaveValue(
-      machine.id
-    );
+    await selectMachine(publicPage, machine.id);
+    await expect(machineSelectValue(publicPage)).toHaveValue(machine.id);
     const issueTitle = getTestIssueTitle("Interaction Test");
     await fillReportForm(publicPage, {
       title: issueTitle,
@@ -435,16 +428,12 @@ test.describe("Notifications", () => {
     });
 
     await memberPage.goto("/report");
-    await memberPage
-      .getByTestId("machine-select")
-      .selectOption({ value: machine.id });
+    await selectMachine(memberPage, machine.id);
 
     const issueTitle = getTestIssueTitle("Email Test Issue");
     await fillReportForm(memberPage, { title: issueTitle });
 
-    await expect(memberPage.getByTestId("machine-select")).toHaveValue(
-      machine.id
-    );
+    await expect(machineSelectValue(memberPage)).toHaveValue(machine.id);
     await expect(memberPage.getByLabel("Issue Title *")).toHaveValue(
       issueTitle
     );

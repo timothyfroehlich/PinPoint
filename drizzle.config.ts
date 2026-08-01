@@ -1,6 +1,14 @@
 import { loadEnvConfig } from "@next/env";
 import { defineConfig } from "drizzle-kit";
 
+import { isCloudDatabaseUrl } from "./scripts/lib/db-target.mjs";
+import { assertNotDrizzlePush } from "./scripts/lib/drizzle-push-guard";
+
+// Safety: `drizzle-kit push` is banned (CORE-ARCH-009). This runs FIRST — before
+// env loading and before any credential is resolved — so a refusal can never
+// surface a connection string. Rationale: scripts/lib/drizzle-push-guard.ts.
+assertNotDrizzlePush();
+
 // Load Next.js environment variables (respects .env.local priority)
 loadEnvConfig(process.cwd());
 
@@ -43,11 +51,10 @@ if (!directUrl) {
   );
 }
 
-// Safety: prevent drizzle-kit from accidentally running against production
-const isProductionUrl = /supabase\.com|neon\.tech|rds\.amazonaws\.com/.test(
-  directUrl
-);
-if (isProductionUrl && !process.env.DRIZZLE_FORCE_PRODUCTION) {
+// Safety: prevent drizzle-kit from accidentally running against production.
+// The host match lives in scripts/lib/db-target.mjs so drizzle-kit and
+// scripts/mark-migration-applied.ts share one copy of it.
+if (isCloudDatabaseUrl(directUrl) && !process.env.DRIZZLE_FORCE_PRODUCTION) {
   throw new Error(
     `SAFETY: drizzle-kit would run against a production database!\n` +
       `   URL: ${directUrl.replace(/:[^:@]+@/, ":***@")}\n` +
@@ -79,7 +86,10 @@ export default defineConfig({
     "timeline_events",
     "timeline_event_people",
     "pinballmap_catalog",
+    "pinballmap_state",
     "machine_settings_sets",
+    "collections",
+    "collection_machines",
   ],
   schemaFilter: ["public"],
   verbose: true,

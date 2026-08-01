@@ -7,8 +7,14 @@
 
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
+import {
+  createMachine,
+  updateMachinePresence,
+  type MachinePbmColumns,
+} from "~/services/machines";
 import {
   machines,
   machineWatchers,
@@ -16,8 +22,7 @@ import {
   invitedUsers,
 } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
-import { validatePbmLinkSelection } from "~/lib/pinballmap/linking";
-import { getCatalogEntry } from "~/lib/pinballmap/catalog";
+import { resolvePbmLinkColumns } from "~/lib/pinballmap/link-columns";
 import { type Result, ok, err } from "~/lib/result";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
@@ -40,12 +45,15 @@ import {
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import {
-  emitMachineCreated,
   emitMachineUpdated,
   toMachineOwnerRef,
 } from "~/lib/timeline/machine-lifecycle-helpers";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
 import { type MachineTimelineEventKind } from "~/lib/timeline/machine-event-types";
+import {
+  VALID_MACHINE_PRESENCE_STATUSES,
+  type MachinePresenceStatus,
+} from "~/lib/machines/presence";
 
 /**
  * Maps a prose-field column name to its marker lifecycle event kind.
@@ -143,105 +151,6 @@ export type DeleteMachineResult = Result<
   "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
 
-/** Machine columns derived from a create/edit form's PinballMap link selection. */
-interface PbmLinkColumns {
-  pinballmapMachineId: number | null;
-  pinballmapExcluded: boolean;
-  pinballmapExcludedReason: string | null;
-  manufacturer: string | null;
-  year: number | null;
-  opdbId: string | null;
-  ipdbId: number | null;
-}
-
-type ResolvePbmLinkResult =
-  | { ok: true; columns: PbmLinkColumns }
-  | { ok: false; message: string };
-
-/**
- * Resolve the machine's PinballMap columns from the submitted link selection.
- *
- * Enforces the mutual-exclusion + (flag-gated) requirement via
- * {@link validatePbmLinkSelection}, and — crucially — derives model metadata
- * (manufacturer/year/OPDB/IPDB) from the catalog mirror rather than trusting the
- * client. Returns the full column set so both the create and edit inserts/updates
- * can spread it; the submitted state is authoritative (clearing the picker
- * unlinks, which is how re-link/unlink works).
- */
-async function resolvePbmLinkColumns(input: {
-  pinballmapMachineId?: number | undefined;
-  pinballmapExcluded?: boolean | undefined;
-  pinballmapExcludedReason?: string | undefined;
-}): Promise<ResolvePbmLinkResult> {
-  const pinballmapMachineId = input.pinballmapMachineId ?? null;
-  const pinballmapExcluded = input.pinballmapExcluded ?? false;
-
-  const validationError = validatePbmLinkSelection({
-    pinballmapMachineId,
-    pinballmapExcluded,
-  });
-  if (validationError === "both_link_and_excluded") {
-    return {
-      ok: false,
-      message:
-        "A machine can't be both linked to PinballMap and marked as not on it.",
-    };
-  }
-  if (validationError === "link_required") {
-    return {
-      ok: false,
-      message:
-        "Select a PinballMap title or mark the machine as not on PinballMap.",
-    };
-  }
-
-  const empty: PbmLinkColumns = {
-    pinballmapMachineId: null,
-    pinballmapExcluded: false,
-    pinballmapExcludedReason: null,
-    manufacturer: null,
-    year: null,
-    opdbId: null,
-    ipdbId: null,
-  };
-
-  if (pinballmapExcluded) {
-    return {
-      ok: true,
-      columns: {
-        ...empty,
-        pinballmapExcluded: true,
-        pinballmapExcludedReason: input.pinballmapExcludedReason ?? null,
-      },
-    };
-  }
-
-  if (pinballmapMachineId !== null) {
-    const entry = await getCatalogEntry(pinballmapMachineId);
-    if (!entry) {
-      return {
-        ok: false,
-        message:
-          "That PinballMap title is no longer in the catalog — search again.",
-      };
-    }
-    return {
-      ok: true,
-      columns: {
-        ...empty,
-        pinballmapMachineId,
-        manufacturer: entry.manufacturer,
-        year: entry.year,
-        opdbId: entry.opdbId,
-        ipdbId: entry.ipdbId,
-      },
-    };
-  }
-
-  // Neither linked nor excluded (requirement off): all PBM columns stay empty.
-  return { ok: true, columns: empty };
-}
-
 /** True when the submitted form expresses any PinballMap link intent. */
 function wantsPbmLinkChange(input: {
   pinballmapMachineId?: number | undefined;
@@ -264,6 +173,7 @@ function readPbmLinkFormFields(formData: FormData): {
   pinballmapMachineId: string | undefined;
   pinballmapExcluded: boolean | undefined;
   pinballmapExcludedReason: string | undefined;
+  pinballmapListed: boolean | undefined;
 } {
   const idRaw = formData.get("pinballmapMachineId");
   const reasonRaw = formData.get("pinballmapExcludedReason");
@@ -276,6 +186,8 @@ function readPbmLinkFormFields(formData: FormData): {
       typeof reasonRaw === "string" && reasonRaw.trim().length > 0
         ? reasonRaw
         : undefined,
+    pinballmapListed:
+      formData.get("pinballmapListed") === "on" ? true : undefined,
   };
 }
 
@@ -336,6 +248,11 @@ export async function createMachineAction(
       (formData.get("ownerId") as string).length > 0
         ? (formData.get("ownerId") as string)
         : undefined,
+    presenceStatus:
+      typeof formData.get("presenceStatus") === "string" &&
+      (formData.get("presenceStatus") as string).length > 0
+        ? (formData.get("presenceStatus") as string)
+        : undefined,
     forcePromoteUserId:
       typeof formData.get("forcePromoteUserId") === "string" &&
       (formData.get("forcePromoteUserId") as string).length > 0
@@ -344,6 +261,14 @@ export async function createMachineAction(
     ...readPbmLinkFormFields(formData),
   };
 
+  // Description carried by the create form's rich text editor, same
+  // hidden-field + JSON pattern as the edit form (bead C parity pass).
+  const descriptionResult = parseDescriptionFormField(formData);
+  if (!descriptionResult.ok) {
+    return err("VALIDATION", descriptionResult.message);
+  }
+  const descriptionColumn = descriptionResult.value;
+
   // Validate input (CORE-SEC-002)
   const validation = createMachineSchema.safeParse(rawData);
   if (!validation.success) {
@@ -351,7 +276,8 @@ export async function createMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { name, initials, ownerId, forcePromoteUserId } = validation.data;
+  const { name, initials, ownerId, presenceStatus, forcePromoteUserId } =
+    validation.data;
 
   // Resolve PinballMap link columns (mutual-exclusion + catalog-derived metadata).
   // Creators are tech/admin (machines.create), who always hold the link
@@ -362,7 +288,7 @@ export async function createMachineAction(
   ) {
     return err(
       "UNAUTHORIZED",
-      "You do not have permission to link machines to PinballMap."
+      "You do not have permission to link machines to Pinball Map."
     );
   }
   const pbm = await resolvePbmLinkColumns(validation.data);
@@ -400,105 +326,27 @@ export async function createMachineAction(
       return err("VALIDATION", "Selected user is not a guest.");
     }
 
-    // Atomic: promote + insert machine + add watcher
+    // Atomic promote + create, delegated to the service (transaction + owner
+    // watcher + lifecycle + notification planning). `promoteGuest.type` selects
+    // the owner column and gates the "added" notification — only an active
+    // promotion notified in the original.
     try {
-      const [machine] = await db.transaction(async (tx) => {
-        // Promote guest to member
-        if (targetActive) {
-          await tx
-            .update(userProfiles)
-            .set({ role: "member" })
-            .where(eq(userProfiles.id, forcePromoteUserId));
-        } else {
-          await tx
-            .update(invitedUsers)
-            .set({ role: "member" })
-            .where(eq(invitedUsers.id, forcePromoteUserId));
-        }
-
-        // Determine owner columns
-        const machineOwnerId = targetActive ? forcePromoteUserId : undefined;
-        const machineInvitedOwnerId = targetInvited
-          ? forcePromoteUserId
-          : undefined;
-
-        // Insert machine
-        const [newMachine] = await tx
-          .insert(machines)
-          .values({
-            name,
-            initials,
-            ownerId: machineOwnerId,
-            invitedOwnerId: machineInvitedOwnerId,
-            ...pbmColumns,
-          })
-          .returning();
-
-        if (!newMachine) {
-          throw new Error("Machine creation failed");
-        }
-
-        // Add owner as watcher
-        if (machineOwnerId) {
-          await tx
-            .insert(machineWatchers)
-            .values({
-              machineId: newMachine.id,
-              userId: machineOwnerId,
-              watchMode: "subscribe",
-            })
-            .onConflictDoUpdate({
-              target: [machineWatchers.machineId, machineWatchers.userId],
-              set: { watchMode: "subscribe" },
-            });
-        }
-
-        // Lifecycle: emit machine_added (and owner_set with a to_owner
-        // person-reference if owned — real OR invited). Atomic with the
-        // machine insert — if these fail, the machine rolls back.
-        await emitMachineCreated(
-          tx,
-          {
-            id: newMachine.id,
-            owner: toMachineOwnerRef(
-              newMachine.ownerId,
-              newMachine.invitedOwnerId
-            ),
-          },
-          user.id
-        );
-
-        return [newMachine];
+      const { machine, deliveryPlan } = await createMachine({
+        name,
+        initials,
+        actorUserId: user.id,
+        ownerId: targetActive ? forcePromoteUserId : null,
+        invitedOwnerId: targetInvited ? forcePromoteUserId : null,
+        presenceStatus,
+        description: descriptionColumn,
+        pbmColumns,
+        promoteGuest: {
+          userId: forcePromoteUserId,
+          type: targetActive ? "active" : "invited",
+        },
       });
 
-      // Post-commit side effect — best-effort: do not fail the action on notification errors
-      if (targetActive) {
-        try {
-          const channels = await getChannels();
-          await dispatchNotification(
-            await planNotification(
-              {
-                type: "machine_ownership_changed",
-                resourceId: machine.id,
-                resourceType: "machine",
-                actorId: user.id,
-                includeActor: false,
-                machineName: machine.name,
-                newStatus: "added",
-                additionalRecipientIds: [forcePromoteUserId],
-              },
-              undefined,
-              channels
-            )
-          );
-        } catch (sideEffectError: unknown) {
-          reportError(sideEffectError, {
-            action: "createMachineNotify",
-            bestEffort: true,
-            machineId: machine.id,
-          });
-        }
-      }
+      after(() => dispatchNotification(deliveryPlan));
 
       revalidatePath("/m");
       return ok({
@@ -573,55 +421,20 @@ export async function createMachineAction(
   }
   // If no ownerId provided, leave both undefined — DB stores NULL (no defaulting to caller)
 
-  // Insert machine + watcher + lifecycle events atomically.
+  // Insert machine + watcher + lifecycle events atomically (delegated to the
+  // service). No owner promotion here, so the returned plan carries no
+  // deliveries — creating a machine with an existing member as owner does not
+  // notify them, matching the original.
   try {
-    const [machine] = await db.transaction(async (tx) => {
-      const [newMachine] = await tx
-        .insert(machines)
-        .values({
-          name,
-          initials,
-          ownerId: finalOwnerId,
-          invitedOwnerId: finalInvitedOwnerId,
-          ...pbmColumns,
-        })
-        .returning();
-
-      if (!newMachine) {
-        throw new Error("Machine creation failed");
-      }
-
-      // Auto-add owner to machine_watchers (full subscribe mode)
-      if (finalOwnerId) {
-        await tx
-          .insert(machineWatchers)
-          .values({
-            machineId: newMachine.id,
-            userId: finalOwnerId,
-            watchMode: "subscribe",
-          })
-          .onConflictDoUpdate({
-            target: [machineWatchers.machineId, machineWatchers.userId],
-            set: { watchMode: "subscribe" },
-          });
-      }
-
-      // Lifecycle: emit machine_added (and owner_set with a to_owner
-      // person-reference if owned — real OR invited). Atomic with the machine
-      // insert — if these fail, the machine rolls back.
-      await emitMachineCreated(
-        tx,
-        {
-          id: newMachine.id,
-          owner: toMachineOwnerRef(
-            newMachine.ownerId,
-            newMachine.invitedOwnerId
-          ),
-        },
-        user.id
-      );
-
-      return [newMachine];
+    const { machine } = await createMachine({
+      name,
+      initials,
+      actorUserId: user.id,
+      ownerId: finalOwnerId,
+      invitedOwnerId: finalInvitedOwnerId,
+      presenceStatus,
+      description: descriptionColumn,
+      pbmColumns,
     });
 
     revalidatePath("/m");
@@ -772,7 +585,9 @@ export async function updateMachineAction(
 
   const rawData = {
     id: formData.get("id"),
-    name: formData.get("name"),
+    // A missing field reads as `null`, which the optional schema would reject —
+    // normalize so "field absent" means "leave the name alone".
+    name: formData.get("name") ?? undefined,
     ownerId:
       typeof formData.get("ownerId") === "string" &&
       (formData.get("ownerId") as string).length > 0
@@ -825,6 +640,11 @@ export async function updateMachineAction(
         name: true,
         initials: true,
         presenceStatus: true,
+        // Needed to decide whether an edit re-targets the PBM link — see the
+        // `pinballmapListed` carry-over at the `resolvePbmLinkColumns` call.
+        pinballmapMachineId: true,
+        pinballmapListed: true,
+        pinballmapLmxId: true,
       },
     });
 
@@ -849,7 +669,7 @@ export async function updateMachineAction(
     // submitted state is authoritative (clearing it unlinks), so it requires the
     // link permission and derives metadata from the catalog mirror. When the
     // marker is absent, link columns are left untouched.
-    let pbmColumns: PbmLinkColumns | null = null;
+    let pbmColumns: MachinePbmColumns | null = null;
     if (pbmFormPresent) {
       if (
         !checkPermission("machines.pinballmap.link", accessLevel, {
@@ -859,10 +679,31 @@ export async function updateMachineAction(
       ) {
         return err(
           "UNAUTHORIZED",
-          "You do not have permission to link this machine to PinballMap."
+          "You do not have permission to link this machine to Pinball Map."
         );
       }
-      const pbm = await resolvePbmLinkColumns(validation.data);
+      // `pinballmapListed` is NOT a form field — it is flipped only by
+      // `linkPinballmapEntryAction` / the verify action, which talk to PBM. The
+      // edit form therefore submits nothing for it, and without this carry-over
+      // `resolvePbmLinkColumns` would default it to `false` — silently unlisting
+      // a listed machine on every unrelated "Save details" (PP-o355.19 review).
+      // Carry the stored value only while the link target is unchanged;
+      // re-targeting the link makes the old listing meaningless, and the
+      // resolver already forces `false` on the unlinked/excluded branches.
+      const submittedPbmId = validation.data.pinballmapMachineId ?? null;
+      const linkUnchanged =
+        submittedPbmId === currentMachine.pinballmapMachineId;
+      const pbm = await resolvePbmLinkColumns({
+        ...validation.data,
+        ...(linkUnchanged && currentMachine.pinballmapListed
+          ? {
+              pinballmapListed: true,
+              ...(currentMachine.pinballmapLmxId === null
+                ? {}
+                : { pinballmapLmxId: currentMachine.pinballmapLmxId }),
+            }
+          : {}),
+      });
       if (!pbm.ok) return err("VALIDATION", pbm.message);
       pbmColumns = pbm.columns;
     }
@@ -923,7 +764,7 @@ export async function updateMachineAction(
         const [updatedMachine] = await tx
           .update(machines)
           .set({
-            name,
+            ...(name !== undefined && { name }),
             ...(presenceStatus !== undefined && { presenceStatus }),
             ownerId: machineOwnerId ?? null,
             invitedOwnerId: machineInvitedOwnerId ?? null,
@@ -968,7 +809,7 @@ export async function updateMachineAction(
             presenceStatus: currentMachine.presenceStatus,
           },
           {
-            name,
+            name: name ?? currentMachine.name,
             ownerChanged: true,
             owner: toMachineOwnerRef(machineOwnerId, machineInvitedOwnerId),
             presenceStatus,
@@ -1111,7 +952,7 @@ export async function updateMachineAction(
       const [updatedMachine] = await tx
         .update(machines)
         .set({
-          name,
+          ...(name !== undefined && { name }),
           ...(presenceStatus !== undefined && { presenceStatus }),
           ...(shouldUpdateOwner && {
             ownerId: finalOwnerId,
@@ -1174,7 +1015,7 @@ export async function updateMachineAction(
           presenceStatus: currentMachine.presenceStatus,
         },
         {
-          name,
+          name: name ?? currentMachine.name,
           ownerChanged: shouldUpdateOwner,
           owner: toMachineOwnerRef(finalOwnerId, finalInvitedOwnerId),
           presenceStatus,
@@ -1464,6 +1305,116 @@ async function updateMachineTextField(
       "SERVER",
       "Failed to update field. Please try again.",
       { action: "updateMachineTextField", field }
+    );
+  }
+}
+
+// --- Machine Presence (availability) Update Action ---
+
+const presenceSchema = z.enum(VALID_MACHINE_PRESENCE_STATUSES);
+
+/**
+ * Update Machine Presence (availability) — the one manual machine control on
+ * the Service tab (design §4). Status stays read-only/derived; presence is a
+ * 5-state select. Editable by machine owner, technicians, and admins
+ * (`machines.edit`).
+ *
+ * Emits a `presence_changed` lifecycle event (via {@link emitMachineUpdated})
+ * atomically with the row update, so the change surfaces in the Activity feed.
+ * The emit only fires when the value actually changes.
+ */
+export async function updateMachinePresenceAction(
+  machineId: string,
+  presenceStatus: MachinePresenceStatus
+): Promise<UpdateMachineFieldResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return err("UNAUTHORIZED", "Unauthorized. Please log in.");
+  }
+
+  if (!z.string().uuid().safeParse(machineId).success) {
+    return err("VALIDATION", "Invalid machine ID");
+  }
+
+  const parsedPresence = presenceSchema.safeParse(presenceStatus);
+  if (!parsedPresence.success) {
+    return err("VALIDATION", "Invalid availability value.");
+  }
+
+  try {
+    const [profile, machine] = await Promise.all([
+      db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+        columns: { role: true },
+      }),
+      db.query.machines.findFirst({
+        where: eq(machines.id, machineId),
+        columns: {
+          id: true,
+          initials: true,
+          name: true,
+          ownerId: true,
+          invitedOwnerId: true,
+          presenceStatus: true,
+        },
+      }),
+    ]);
+
+    if (!profile) {
+      return err("UNAUTHORIZED", "User profile not found.");
+    }
+    if (!machine) {
+      return err("NOT_FOUND", "Machine not found.");
+    }
+
+    const accessLevel = getAccessLevel(profile.role);
+    if (
+      !checkPermission("machines.edit", accessLevel, {
+        userId: user.id,
+        machineOwnerId: machine.ownerId,
+      })
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "Only the machine owner, technicians, or admins can change availability."
+      );
+    }
+
+    // Delegate the mutation to the service, which owns the transaction + the
+    // `presence_changed` lifecycle emit and the unchanged-value no-op guard
+    // (skips the write entirely — no bumped `updatedAt`, no timeline row).
+    const { changed } = await updateMachinePresence({
+      machineId: machine.id,
+      presenceStatus: parsedPresence.data,
+      actorUserId: user.id,
+      current: {
+        name: machine.name,
+        ownerId: machine.ownerId,
+        invitedOwnerId: machine.invitedOwnerId,
+        presenceStatus: machine.presenceStatus,
+      },
+    });
+
+    if (changed) {
+      // Presence shows on both the Info and Service tabs (and the header), and a
+      // change emits a timeline row — revalidate the whole machine subtree.
+      revalidatePath(`/m/${machine.initials}`, "layout");
+    }
+
+    return ok({ machineId: machine.id });
+  } catch (error: unknown) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+    return serverActionError(
+      error,
+      "SERVER",
+      "Failed to update availability. Please try again.",
+      { action: "updateMachinePresenceAction" }
     );
   }
 }

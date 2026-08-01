@@ -4,7 +4,7 @@
 #
 # Harness-agnostic. Fires at session start from any agent harness that supports
 # SessionStart-equivalent hooks (Claude Code via .claude/settings.json,
-# Antigravity via .agents/hooks/agy-beads-bootstrap.cjs, etc.). Reads stdin JSON
+# Antigravity via .agents/hooks/antigravity-bootstrap.cjs, etc.). Reads stdin JSON
 # for `session_id`, looks up the session's registered name in
 # <main-worktree>/.agents/huddle/session-names.json (see huddle-lib.sh for the
 # state-dir resolver), and emits a brief identity block on stdout which the
@@ -18,7 +18,7 @@
 # hook; this one is just identity announcement.
 #
 # Stdin payload schema (Claude Code shape; other harnesses adapt to this via
-# their bootstrap shim — see .agents/hooks/agy-beads-bootstrap.cjs for the
+# their bootstrap shim — see .agents/hooks/antigravity-bootstrap.cjs for the
 # Antigravity adapter):
 #   {
 #     "session_id":       "<UUID>",
@@ -30,9 +30,13 @@
 #     "agent_type":       "<name>"  (optional, when launched with --agent)
 #   }
 #
-# We suppress the announcement on `source=compact` because the agent already
-# saw it pre-compaction — re-emitting it is noise. All other source values
-# (startup, resume, clear) get the announcement.
+# On `source=compact` we emit a condensed block instead of the full one: the
+# agent saw the verbose registration/etiquette text pre-compaction, but the
+# compaction summary is not guaranteed to carry its huddle name, today's bead
+# id, or any sense of what the project has been working on — and a compacted
+# session is exactly the one most likely to post nothing for the rest of its
+# life. So compact gets: identity one-liner, posting reminder, work digest.
+# (PP-llkj. Before that, compact got nothing at all.)
 
 set -euo pipefail
 
@@ -47,6 +51,20 @@ source "$LIB_SCRIPT"
 STATE_DIR=$(huddle_state_dir) || exit 0
 NAMES_JSON="$STATE_DIR/session-names.json"
 mkdir -p "$STATE_DIR"
+
+# --- Work digest (PP-llkj) ---
+# "What has this project been doing lately", derived from git alone — see
+# huddle-digest.sh. Printed on every announced session start, including after
+# compaction. Fail-open: any error prints nothing and the block is skipped.
+emit_work_digest() {
+  local digest_script digest_out
+  digest_script="$(dirname "$0")/huddle-digest.sh"
+  [[ -f "$digest_script" ]] || return 0
+  digest_out=$(bash "$digest_script" --days 7 2>/dev/null) || return 0
+  [[ -n "$digest_out" ]] || return 0
+  printf '\n## What we have been working on (last 7 days)\n\n'
+  printf '%s\n' "$digest_out"
+}
 
 # --- Per-machine Dolt sync (throttled, fail-open) ---
 # Pull peer machines' huddle updates (and push ours) before reading root notes,
@@ -132,11 +150,23 @@ case "$TRANSCRIPT_PATH" in
 esac
 
 # --- Rotation check ---
+# Emits the "rotation needed" notice and then FALLS THROUGH: rotation and
+# identity/registration are independent concerns, and a session that starts on a
+# new day before rotation has run still needs its session_id and its
+# registration prompt.
+#
+# PP-2m3l: this block used to `exit 0` right after the notice, so the identity /
+# registration block below was unreachable on the first sessions of every day.
+# Those sessions never registered, which broke the huddle self-filter (they saw
+# their own posts injected back as if from a peer) and degraded post attribution.
+# SessionStart fires once per session, so there was no second chance to re-prompt.
+ROTATION_PENDING=""
 ROTATION_CHECK_SCRIPT="$(dirname "$0")/huddle-rotation-check.sh"
 if [[ -f "$ROTATION_CHECK_SCRIPT" ]]; then
   # shellcheck source=huddle-rotation-check.sh disable=SC1091
   source "$ROTATION_CHECK_SCRIPT"
   if huddle_rotation_needed; then
+    ROTATION_PENDING=1
     STORED_DATE=""
     NOTES_STR_ROT=$(bd show "$ROOT_ID" --json 2>/dev/null | jq -r '.[0].notes // ""' 2>/dev/null || echo "")
     if [[ -n "$NOTES_STR_ROT" ]]; then
@@ -158,8 +188,7 @@ except Exception:
     printf 'previous day, create today'\''s bead, update pointers, and post\n'
     printf '"continued in" markers on closed beads. Safe even if a peer already\n'
     printf 'rotated (the subagent no-ops under a file lock).\n\n'
-    printf 'Dispatch template: .agents/skills/pinpoint-huddle/SKILL.md.\n'
-    exit 0
+    printf 'Dispatch template: .agents/skills/pinpoint-huddle/SKILL.md.\n\n'
   fi
 fi
 
@@ -168,21 +197,58 @@ fi
 # midnight race left two open dailies for today (two machines rotated before
 # either pushed), collapse them to the canonical here. No-op in the common case
 # (two cheap local reads); silent + fail-open.
-huddle_reconcile_today || true
+#
+# Skipped while rotation is pending — preserving the pre-PP-2m3l behaviour, where
+# this only ever ran on the up-to-date path. The function keys off root notes'
+# `today_bead.date`, which is still YESTERDAY's date until rotation runs, so
+# calling it now would reconcile (and close dupes of) a stale day.
+#
+# Note this net never collapses stale-day duplicates at all: it only ever targets
+# the date root notes point at, and rotation moves that pointer to today. That
+# gap is pre-existing (this call was unreachable on the rotation-pending path
+# before PP-2m3l too) and out of scope here — do NOT read the skip as "the next
+# session start will catch it".
+if [[ -z "$ROTATION_PENDING" ]]; then
+  huddle_reconcile_today || true
+fi
 
 SESSION_ID=""
 SOURCE=""
 if [[ -n "$INPUT" ]]; then
-  # python3 failure is handled by the read's `|| { … }` fallback; ignore masked return.
-  # shellcheck disable=SC2312
-  read -r SESSION_ID SOURCE <<<"$(
-    printf '%s' "$INPUT" | python3 -c "
-import sys, json
+  # The two fields are joined on STX (\x02) and split with IFS=STX — the same
+  # separator convention huddle-pr-announce.sh uses, and for the same reason.
+  # It must be a NON-whitespace byte: bash treats space/tab/newline as "IFS
+  # whitespace" even when IFS names only one of them, which means leading
+  # separators are skipped and runs collapse. That is exactly how PP-txet bit —
+  # the fields were space-joined and read with the default IFS, so
+  # `{"session_id": "", "source": "startup"}` produced " startup" and parsed as
+  # SESSION_ID=startup, SOURCE="". The empty-session_id guard below never fired,
+  # the hook announced `startup` as the session id, and the compact check
+  # further down compared against an emptied SOURCE. A tab separator would NOT
+  # have fixed this; STX splits into a genuine empty leading field.
+  #
+  # str() + strip() on the python side keep a non-string or whitespace-only
+  # field from reading as a truthy session_id.
+  #
+  # The IFS prefix assignment does not persist — `read` is a regular builtin —
+  # so the daily-injection loop further down still gets the default IFS.
+  _SEP=$(printf '\002')
+  # A python3 or JSON failure is absorbed by the parse itself: sid/src stay empty,
+  # the here-string is a bare separator, and the `[[ -z "$SESSION_ID" ]]` guard
+  # below exits. The `|| { … }` is belt-and-braces for `read` itself failing — it
+  # rarely fires, since a here-string always supplies a trailing newline.
+  # shellcheck disable=SC2312  # the masked $(...) return is handled as described
+  IFS="$_SEP" read -r SESSION_ID SOURCE <<<"$(
+    printf '%s' "$INPUT" | SEP="$_SEP" python3 -c "
+import os, sys, json
+sid = src = ''
 try:
     p = json.load(sys.stdin)
-    print((p.get('session_id') or '') + ' ' + (p.get('source') or ''))
+    sid = str(p.get('session_id') or '').strip()
+    src = str(p.get('source') or '').strip()
 except Exception:
-    print(' ')
+    pass
+print(sid + os.environ['SEP'] + src)
 " 2>/dev/null
   )" || { SESSION_ID=""; SOURCE=""; }
 fi
@@ -192,15 +258,41 @@ if [[ -z "$SESSION_ID" ]]; then
   exit 0
 fi
 
-# Suppress announcement on compact — agent already saw it pre-compaction.
-if [[ "$SOURCE" == "compact" ]]; then
-  exit 0
-fi
-
 # Look up registered name
 NAME=""
 if [[ -f "$NAMES_JSON" ]]; then
   NAME=$(jq -r --arg sid "$SESSION_ID" '.[$sid] // ""' "$NAMES_JSON" 2>/dev/null || echo "")
+fi
+
+# Compact restart: condensed identity + posting reminder, then fall through to
+# the digest. The full registration/etiquette text is deliberately skipped —
+# what a compacted session actually lost is its own name, the bead id, and the
+# project's recent shape.
+if [[ "$SOURCE" == "compact" ]]; then
+  _TODAY_ID_COMPACT=$(huddle_today_bead_id 2>/dev/null) || _TODAY_ID_COMPACT="<today-bead-id>"
+  [[ -n "$_TODAY_ID_COMPACT" ]] || _TODAY_ID_COMPACT="<today-bead-id>"
+  printf '## Huddle identity (post-compaction)\n\n'
+  if [[ -n "$NAME" ]]; then
+    # shellcheck disable=SC2016  # backticks are literal Markdown
+    printf 'You are **%s**. Today'\''s coordination bead is `%s`.\n\n' "$NAME" "$_TODAY_ID_COMPACT"
+    printf 'Compaction is a good moment to post: if your scope grew, you changed\n'
+    printf 'direction, or you picked up something new since your last huddle post,\n'
+    printf 'say so in one line — peers only see what you write down.\n'
+    printf '    bd comments add %s "Your update. —%s"\n\n' "$_TODAY_ID_COMPACT" "$NAME"
+    # Same caveat as the startup path: with rotation pending there is no daily
+    # for today yet, so the id above is a literal placeholder rather than a
+    # command you can paste.
+    if [[ -n "$ROTATION_PENDING" ]]; then
+      printf 'NOTE: rotation is pending, so the bead id above is a placeholder. Dispatch the\n'
+      printf 'rotation subagent first — it reports the new id — then substitute it.\n\n'
+    fi
+  else
+    # shellcheck disable=SC2016  # backticks are literal Markdown
+    printf 'This session (`%s`) is not registered in the huddle. Register with:\n' "$SESSION_ID"
+    printf '    bash scripts/hooks/huddle-whoami.sh register <Harness>-<Topic> %s\n\n' "$SESSION_ID"
+  fi
+  emit_work_digest
+  exit 0
 fi
 
 if [[ -n "$NAME" ]]; then
@@ -213,12 +305,28 @@ if [[ -n "$NAME" ]]; then
   # Resolve today_bead_id for the copy-paste command (fail-open: fall back to placeholder)
   _TODAY_ID_REG=$(huddle_today_bead_id 2>/dev/null) || _TODAY_ID_REG="<today-bead-id>"
   [[ -n "$_TODAY_ID_REG" ]] || _TODAY_ID_REG="<today-bead-id>"
+  # With rotation pending, today's daily does not exist yet, so the resolver
+  # always misses and every command below renders the literal placeholder. Say so
+  # — otherwise the first session of each day pastes `<today-bead-id>` into bash
+  # and gets a redirect error instead of a clear failure.
+  if [[ -n "$ROTATION_PENDING" ]]; then
+    printf 'NOTE: rotation is still pending, so today'\''s bead does not exist yet and the id\n'
+    printf 'in the commands below is a literal placeholder. Dispatch the rotation subagent\n'
+    printf 'first — it reports the new bead id — then substitute it before posting.\n\n'
+  fi
   printf 'Once you understand what this session is tackling — and it'\''s real work or an\n'
   printf 'investigation (not a quick question or one-line fix) — post a ONE-LINE kickoff to\n'
   printf 'today'\''s bead, once, so parallel sessions know and anyone with context can chime in:\n'
   printf '    bd comments add %s "Starting: <what> in <area/branch>. Ping me if you have context. —%s"\n\n' "$_TODAY_ID_REG" "$NAME"
-  printf 'Also post when you: file a bead for a non-obvious finding ("Filed PP-xxx: <finding>"),\n'
-  printf 'or touch an area others may conflict on ("Working on <file/area> in <branch>; flag if conflict").\n'
+  printf 'THE KICKOFF IS NOT THE LAST POST. Keep the channel current — peers only know what\n'
+  printf 'you write down, and the most common failure is a session that announces a plan and\n'
+  printf 'then silently works on something else for hours. Post again when:\n'
+  printf '  - **scope gets ADDED to what you'\''re already doing** — Tim tacks a second ask onto\n'
+  printf '    this session, review feedback grows the change, or a "quick fix" turns into a\n'
+  printf '    refactor. Say what got added, not just that something did.\n'
+  printf '  - you CHANGE DIRECTION or abandon the approach you announced\n'
+  printf '  - you start touching a NEW file/area others may conflict on\n'
+  printf '  - you file a bead for a non-obvious finding ("Filed PP-xxx: <finding>")\n'
   printf '  (Merges and PR opens are auto-posted — no manual action needed for those.)\n'
   printf '    bd comments add %s "Your update. —%s"\n\n' "$_TODAY_ID_REG" "$NAME"
   printf 'If a peer'\''s kickoff scrolls by and you have specific relevant context — a conflict,\n'
@@ -256,9 +364,15 @@ else
   printf 'Full reference: `.agents/skills/pinpoint-huddle/SKILL.md`\n'
 fi
 
+# --- Work digest (PP-llkj) ---
+# Printed before the daily summaries on purpose. The dailies are written in a
+# "Merged / In-flight / Discoveries / Blockers" shape, and read cold they land as
+# a list of everything that recently broke. The digest answers "what kind of work
+# is this project doing right now" first; the dailies then add day-scale detail.
+emit_work_digest
+
 # --- Summary injection (§5.1 step 5) ---
 # Inject monthly summary description + N most-recent daily bead descriptions.
-# Suppressed on compact (already returned early above via SOURCE check).
 # Fails open: any bd error exits silently without noise.
 ROOT_JSON=$(bd show "$ROOT_ID" --json 2>/dev/null) || { exit 0; }
 NOTES_STR=$(printf '%s' "$ROOT_JSON" | jq -r '.[0].notes // ""' 2>/dev/null) || { exit 0; }
@@ -266,20 +380,24 @@ if [[ -z "$NOTES_STR" ]]; then
   exit 0
 fi
 
+# Default 2, not the original 5 (PP-llkj): the work digest above now carries the
+# week-scale picture in a denser and more useful form, so five days of
+# blocker-shaped daily summaries is duplicated budget. Two keeps yesterday and
+# the day before — the window where a peer's discovery is still actionable.
 N_DAILIES=$(printf '%s' "$NOTES_STR" | python3 -c "
 import sys, json
 try:
     n = json.loads(sys.stdin.read())
-    print(n.get('settings', {}).get('n_dailies_to_inject', 5))
+    print(n.get('settings', {}).get('n_dailies_to_inject', 2))
 except Exception:
-    print(5)
-" 2>/dev/null || echo "5")
+    print(2)
+" 2>/dev/null || echo "2")
 # Sanitize: a non-numeric value ('null', '', 'abc') from the JSON would later
 # trip `[[ "$DAILY_COUNT" -ge "$N_DAILIES" ]]` with "integer expression expected"
-# on stderr. Default to 5; clamp to [1, 20] so a bad setting can't blow up the
+# on stderr. Default to 2; clamp to [1, 20] so a bad setting can't blow up the
 # session-start output budget.
 if ! [[ "$N_DAILIES" =~ ^[0-9]+$ ]]; then
-  N_DAILIES=5
+  N_DAILIES=2
 fi
 if (( N_DAILIES < 1 )); then N_DAILIES=1; fi
 if (( N_DAILIES > 20 )); then N_DAILIES=20; fi

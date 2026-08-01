@@ -45,8 +45,11 @@ test.describe("Machine Details - Extended", () => {
       password: TEST_USERS.admin.password,
     });
 
-    // Navigate to admin-owned machine
-    await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
+    // Navigate to the admin-owned machine's Service tab — Owner's Requirements
+    // relocated off the Info tab into the Service-tab Machine box (PP-5sgt.3).
+    await page.goto(
+      `/m/${seededMachines.medievalMadness.initials}/maintenance`
+    );
 
     // Click the Edit pencil to enter edit mode. RichTextDisplay can render
     // links (mentions/urls) and nesting <a> inside <button> is invalid HTML,

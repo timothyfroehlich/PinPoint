@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Shield,
   Gamepad2,
+  Library,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import {
@@ -114,6 +115,20 @@ export function UserMenu({
             >
               <Gamepad2 className="mr-2 size-4" />
               <span>My Machines</span>
+            </a>
+          </DropdownMenuItem>
+        )}
+
+        {/* My Collections — the user's personal collections list (PP-wqit.1). */}
+        {userId && (
+          <DropdownMenuItem asChild>
+            <a
+              href="/c/collections"
+              className="flex items-center cursor-pointer"
+              data-testid="user-menu-my-collections"
+            >
+              <Library className="mr-2 size-4" />
+              <span>My Collections</span>
             </a>
           </DropdownMenuItem>
         )}

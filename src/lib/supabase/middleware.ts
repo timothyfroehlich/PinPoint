@@ -100,11 +100,24 @@ export async function updateSession(
   // Protected routes logic
   const path = request.nextUrl.pathname;
 
+  // Shared collection views (Wave 0b) live at /c/<handle> — a uuid or view
+  // token — and must open for anonymous visitors (a valid view token grants
+  // read access; the in-page resolver 404s a missing/invalid handle, so opening
+  // the route publicly reveals nothing). Exclude the owner-only siblings, which
+  // stay auth-gated: /c/collections (the "My Collections" list) and /c/owner/*.
+  const isPublicCollectionView =
+    path.startsWith("/c/") &&
+    path !== "/c/collections" &&
+    !path.startsWith("/c/collections/") &&
+    path !== "/c/owner" &&
+    !path.startsWith("/c/owner/");
+
   const isPublic =
     path === "/" ||
     path === "/m" ||
     path.startsWith("/m/") ||
     path.startsWith("/issues") ||
+    isPublicCollectionView ||
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
     path.startsWith("/forgot-password") ||
@@ -117,13 +130,19 @@ export async function updateSession(
     path.startsWith("/whats-new") ||
     path.startsWith("/privacy") ||
     path.startsWith("/terms") ||
+    // API routes authenticate themselves (e.g. the MCP server's bearer gate) and
+    // must return 401/403 to their callers rather than a /login redirect.
     path.startsWith("/api");
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    // Preserve original destination
-    url.searchParams.set("next", path);
+    // Preserve the original destination, including its query string. Routes like
+    // /oauth/consent?authorization_id=… carry a required query param that must
+    // survive the login round-trip. `searchParams.set` percent-encodes the value
+    // so an inner "?"/"&" can't leak into the login URL as sibling params — do
+    // NOT hand-build this as `?next=${path}${search}` (that would mis-encode).
+    url.searchParams.set("next", `${path}${request.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
 

@@ -1,11 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useTransition } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { type z } from "zod";
 import type { OwnerSelectUser } from "~/components/machines/OwnerSelect";
 
 import {
@@ -16,22 +13,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "~/components/ui/form";
-import { Switch } from "~/components/ui/switch";
-import { inviteUser } from "~/app/(app)/admin/users/actions";
-import { inviteUserSchema } from "~/app/(app)/admin/users/schema";
-
-type InviteUserFormValues = z.infer<typeof inviteUserSchema>;
+  inviteUser,
+  type InviteUserResult,
+} from "~/app/(app)/admin/users/actions";
 
 interface InviteUserDialogProps {
   open: boolean;
@@ -44,64 +33,6 @@ export function InviteUserDialog({
   onOpenChange,
   onSuccess,
 }: InviteUserDialogProps): React.JSX.Element {
-  const [isPending, startTransition] = useTransition();
-
-  const form = useForm<InviteUserFormValues>({
-    resolver: zodResolver(inviteUserSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      role: "member",
-      sendInvite: true,
-    },
-  });
-
-  function onSubmit(values: InviteUserFormValues): void {
-    startTransition(async () => {
-      try {
-        // Create FormData to match server action signature
-        const formData = new FormData();
-        formData.append("firstName", values.firstName);
-        formData.append("lastName", values.lastName);
-        formData.append("email", values.email);
-        formData.append("role", values.role);
-        formData.append("sendInvite", String(values.sendInvite));
-
-        const result = await inviteUser(formData);
-        if (result.ok) {
-          toast.success("User invited successfully");
-          form.reset();
-          // Build minimal user object for the callback (CORE-SEC-006)
-          // Invited users are always created with member role (role field removed from UI)
-          const newUser: OwnerSelectUser = {
-            id: result.userId,
-            name: `${values.firstName} ${values.lastName}`,
-            lastName: values.lastName,
-            status: "invited",
-            machineCount: 0,
-            role: "member",
-          };
-          // Call onSuccess with both the ID and minimal OwnerSelectUser, then close dialog
-          // Note: router.refresh() removed - parent manages users state directly
-          onSuccess?.(result.userId, newUser);
-          onOpenChange(false);
-        }
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to invite user"
-        );
-      }
-    });
-  }
-
-  // Reset form when dialog closes
-  React.useEffect(() => {
-    if (!open) {
-      form.reset();
-    }
-  }, [open, form]);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -112,91 +43,158 @@ export function InviteUserDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="space-y-4"
-            noValidate
-          >
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="firstName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="lastName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input type="email" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="sendInvite"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <div className="space-y-0.5">
-                    <FormLabel>Send Invitation Email</FormLabel>
-                    <FormDescription>
-                      User will receive an email to join.
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={!!field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
-            <DialogFooter className="pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" loading={isPending}>
-                {isPending ? "Inviting..." : "Invite User"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        {/*
+         * The form (and its `useActionState`) lives in a child that mounts with
+         * the dialog content, so every open starts from a clean state instead of
+         * showing the previous attempt's error.
+         */}
+        <InviteUserForm
+          onOpenChange={onOpenChange}
+          {...(onSuccess ? { onSuccess } : {})}
+        />
       </DialogContent>
     </Dialog>
+  );
+}
+
+function InviteUserForm({
+  onOpenChange,
+  onSuccess,
+}: {
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: (userId: string, user: OwnerSelectUser) => void;
+}): React.JSX.Element {
+  const [state, formAction, isPending] = useActionState<
+    InviteUserResult | undefined,
+    FormData
+  >(inviteUser, undefined);
+
+  // Run success side effects once per resolved state (mirrors the create-machine
+  // form's handled-state guard so we don't re-fire on unrelated re-renders).
+  const handledStateRef = useRef<typeof state>(undefined);
+  useEffect(() => {
+    if (!state || state === handledStateRef.current || !state.ok) {
+      return;
+    }
+    handledStateRef.current = state;
+
+    toast.success("User invited successfully");
+
+    // Build a minimal display row for the caller (CORE-SEC-006). Invited users
+    // are always created with the member role.
+    const newUser: OwnerSelectUser = {
+      id: state.value.userId,
+      name: `${state.value.firstName} ${state.value.lastName}`,
+      lastName: state.value.lastName,
+      status: "invited",
+      machineCount: 0,
+      role: "member",
+    };
+    onSuccess?.(state.value.userId, newUser);
+    onOpenChange(false);
+  }, [state, onSuccess, onOpenChange]);
+
+  return (
+    <form action={formAction} className="space-y-4">
+      {state && !state.ok && (
+        <Alert variant="destructive">
+          <AlertDescription>{state.message}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Invited users are always created as members; role isn't user-editable. */}
+      <input type="hidden" name="role" value="member" />
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="invite-firstName">
+            First Name{" "}
+            <span aria-hidden="true" className="text-destructive">
+              *
+            </span>
+          </Label>
+          <Input
+            id="invite-firstName"
+            name="firstName"
+            type="text"
+            autoComplete="given-name"
+            required
+            enterKeyHint="next"
+            maxLength={50}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="invite-lastName">
+            Last Name{" "}
+            <span aria-hidden="true" className="text-destructive">
+              *
+            </span>
+          </Label>
+          <Input
+            id="invite-lastName"
+            name="lastName"
+            type="text"
+            autoComplete="family-name"
+            required
+            enterKeyHint="next"
+            maxLength={50}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="invite-email">
+          Email{" "}
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
+        </Label>
+        <Input
+          id="invite-email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          enterKeyHint="send"
+          maxLength={254}
+        />
+      </div>
+
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+        <div className="space-y-0.5">
+          <Label htmlFor="invite-sendInvite">Send Invitation Email</Label>
+          <p
+            id="invite-sendInvite-desc"
+            className="text-sm text-muted-foreground"
+          >
+            User will receive an email to join.
+          </p>
+        </div>
+        {/* Native checkbox (value "true") so the form submits without JS and the
+            server reads `sendInvite === "true"`. */}
+        <input
+          id="invite-sendInvite"
+          name="sendInvite"
+          type="checkbox"
+          value="true"
+          defaultChecked
+          aria-describedby="invite-sendInvite-desc"
+          className="size-4 accent-primary"
+        />
+      </div>
+
+      <DialogFooter className="pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onOpenChange(false)}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" loading={isPending}>
+          {isPending ? "Inviting..." : "Invite User"}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }

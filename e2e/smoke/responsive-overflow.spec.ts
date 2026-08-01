@@ -23,14 +23,43 @@ import { getProfileIdByEmail } from "../support/supabase-admin.js";
 const machineInitials = seededMachines.addamsFamily.initials;
 const issueNum = seededIssue("TAF").num;
 
+// TAF is admin-owned (with an invited-owner override on top) — this file's
+// `ensureLoggedIn` calls default to the `member` role, which lacks
+// `machines.edit` on it. Routing the /edit entry at TAF would only ever
+// render the page's own permission-denied redirect back to /m/TAF, not the
+// edit page's content. Eight Ball Deluxe is member-owned (see the ownerMap
+// in supabase/seed-users.mjs), so this entry actually renders what it
+// claims to overflow-check.
+const ownedMachineInitials = seededMachines.eightBallDeluxe.initials;
+
+// Filter-heavy query for surfaces that render <IssueFilters>. Overflow bugs
+// live in the loaded, many-chips state — not the empty default — so exercise a
+// route variant where a wide set of active-filter chips is rendered. This is
+// what surfaces content bleeding off the viewport (see PP collections chip
+// overflow: chips previously overlaid the search input and spilled off-screen
+// on narrow viewports once several filters were active).
+// Deliberately heavy: partial selections from each status group (so they render
+// as individual chips rather than collapsing to a single group chip) plus every
+// severity, priority, and frequency value. This produces ~19 chips — enough that
+// a non-wrapping chip row would overrun a 375px viewport, which is exactly the
+// regression this guards against.
+const filterHeavyQuery =
+  `?status=new,in_progress,need_parts,need_help,fixed,wont_fix,wai,no_repro` +
+  `&severity=cosmetic,minor,major,unplayable` +
+  `&priority=low,medium,high` +
+  `&frequency=intermittent,frequent,constant` +
+  `&machine=${machineInitials}`;
+
 const authenticatedRoutes = [
   "/dashboard",
   "/issues",
+  `/issues${filterHeavyQuery}`,
   "/m",
   `/m/${machineInitials}`,
   `/m/${machineInitials}/settings`,
   `/m/${machineInitials}/maintenance`,
   `/m/${machineInitials}/timeline`,
+  `/m/${ownedMachineInitials}/edit`,
   `/m/${machineInitials}/i/${issueNum}`,
   "/settings",
 ];
@@ -69,6 +98,16 @@ test.describe("Responsive: no horizontal overflow", () => {
           await assertNoA11yViolations(page);
         });
       }
+
+      // Loaded state: the collection Issues tab with a wide set of active
+      // filters renders the full chip row — the surface where the chip overflow
+      // was originally reported.
+      test(`/c/owner/[member]/issues (filters active)`, async ({ page }) => {
+        await page.goto(`${collectionBase}/issues${filterHeavyQuery}`);
+        await page.waitForLoadState("load");
+        await assertNoHorizontalOverflow(page);
+        await assertNoA11yViolations(page);
+      });
     });
   });
 

@@ -9,10 +9,6 @@ import {
 } from "./MachineAttributionLine";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import { RelativeTime } from "~/components/issues/RelativeTime";
-import {
-  useTimelineRowDensity,
-  type TimelineRowDensity,
-} from "~/hooks/use-timeline-row-density";
 import { formatIssueId } from "~/lib/issues/utils";
 import { STATUS_CONFIG } from "~/lib/issues/status";
 import { MACHINE_EVENT_ICONS } from "~/lib/timeline/machine-event-icons";
@@ -63,18 +59,24 @@ interface Props {
  *
  * Line 1 layout: `[ID verb] [badges] [— Actor] [time]`. The em-dash and
  * actor name are visually part of the left cluster — time alone is
- * right-pinned via `margin-left: auto`. The {@link useTimelineRowDensity}
- * hook observes the row body width and drops the actor when space runs
- * out (two tiers: `full` with actor, `no-actor` without).
+ * right-pinned via `margin-left: auto`. The row body is a container-query
+ * context (`@container`); the actor clause and the secondary (frequency)
+ * badge are shown/hidden purely in CSS against the body's own width, so
+ * the layout adapts without any JS measurement:
+ *
+ *   - `@[560px]` and wider — actor clause shown (`full` tier).
+ *   - `@[420px]`–`560px` — actor hidden, both badges shown (`no-actor`).
+ *   - below `@[420px]` — actor hidden AND the Frequency badge dropped,
+ *     keeping only Severity (`compact`). Mirrors the PP-dnk8 "mobile
+ *     badge-wrap caps to Status+Severity" rule.
  *
  * Line 2: `<AFM-03 Title>` issue anchor. Wraps to multiple lines if the
  * title is long.
  *
- * Client component because the ResizeObserver-driven density logic needs
- * to measure the actual DOM. SSR-safe: initial render uses `"no-actor"`
- * (actor hidden) so the first paint matches the tightest layout; JS
- * expands to `"full"` when room is available. This avoids hydration
- * mismatch and the "actor flashes in then disappears" flicker.
+ * Container queries replace the former ResizeObserver density hook: the
+ * actor and frequency badge are always in the DOM (no hydration mismatch,
+ * no "actor flashes in then disappears" flicker) and CSS alone toggles
+ * their visibility at the two width thresholds.
  */
 export function MachineTimelineIssueRow({
   row,
@@ -96,8 +98,6 @@ export function MachineTimelineIssueRow({
     : null;
   const title = "title" in row.eventData ? row.eventData.title : undefined;
 
-  const { density, containerRef } = useTimelineRowDensity();
-
   // Right-pinned timestamp slot: relative time for "today" rows, the absolute
   // date for month-rollup rows. One slot, one position — never both.
   // `<RelativeTime>` ticks every 60s so the label stays accurate while the
@@ -116,14 +116,15 @@ export function MachineTimelineIssueRow({
       <div className="flex size-10 shrink-0 items-center justify-center">
         <Icon aria-hidden="true" className={cn("size-5", colorClass)} />
       </div>
-      <div className="min-w-0 flex-1" ref={containerRef}>
+      {/* `@container`: the row body is the container-query context. The actor
+          clause and frequency badge below query this element's own width via
+          `@[560px]:` / `@[420px]:` utilities — the CSS successor to the old
+          ResizeObserver density hook, matching its 560/420px thresholds. */}
+      <div className="@container min-w-0 flex-1">
         {machineLabel ? (
           <MachineAttributionLine machine={machineLabel} />
         ) : null}
-        <div
-          className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden text-sm"
-          data-density={density}
-        >
+        <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden text-sm">
           {/* Line 1 reading order: ID (link) · verb · by Actor · badges
               · ‹spacer› · time. ID is the only link in this line — the
               title link lives on line 2.
@@ -152,8 +153,10 @@ export function MachineTimelineIssueRow({
             <span className="min-w-0 flex-1 truncate text-muted-foreground">
               {verbClause}
             </span>
-            {actor && density === "full" ? (
-              <span className="shrink-0 text-muted-foreground">
+            {actor ? (
+              // Shown only once the row body reaches the `full` tier (≥560px);
+              // hidden on narrower rows so the verb + badges + timestamp fit.
+              <span className="hidden shrink-0 text-muted-foreground @[560px]:inline">
                 by{" "}
                 <span className="font-medium text-foreground/90">
                   {actor.name}
@@ -162,7 +165,7 @@ export function MachineTimelineIssueRow({
               </span>
             ) : null}
           </span>
-          <IssueRowBadges eventData={row.eventData} density={density} />
+          <IssueRowBadges eventData={row.eventData} />
           {rightMeta ? (
             <span className="ml-auto shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
               {rightMeta}
@@ -254,12 +257,10 @@ function formatStatusLabel(value: string): string {
 
 interface IssueRowBadgesProps {
   eventData: IssueEventData;
-  density: TimelineRowDensity;
 }
 
 function IssueRowBadges({
   eventData,
-  density,
 }: IssueRowBadgesProps): React.JSX.Element | null {
   if (eventData.kind === "issue_opened") {
     const badges: React.JSX.Element[] = [];
@@ -273,16 +274,18 @@ function IssueRowBadges({
         />
       );
     }
-    // Frequency is the secondary badge — dropped on the narrow (compact) tier
-    // so Severity + ID + timestamp fit a ~360px row without overlapping.
-    // Mirrors PP-dnk8's "mobile badge-wrap caps to Status+Severity".
-    if (eventData.frequency && density !== "compact") {
+    // Frequency is the secondary badge — hidden below the `compact` threshold
+    // (@[420px]) so Severity + ID + timestamp fit a ~360px row without
+    // overlapping. Mirrors PP-dnk8's "mobile badge-wrap caps to
+    // Status+Severity". Always in the DOM; CSS alone toggles it.
+    if (eventData.frequency) {
       badges.push(
         <IssueBadge
           key="frequency"
           type="frequency"
           value={eventData.frequency}
           variant="strip"
+          className="hidden @[420px]:flex"
         />
       );
     }

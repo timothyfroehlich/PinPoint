@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { createRef, type ReactElement, type RefObject } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { type ReactElement } from "react";
+import { describe, expect, it, vi } from "vitest";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
 import type { MachineIssueEventData } from "~/lib/timeline/machine-event-types";
@@ -19,24 +19,12 @@ function renderRow(ui: ReactElement): ReturnType<typeof render> {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
 }
 
-// The density hook starts as `"compact"` and only widens after a
-// ResizeObserver sees the row body pass a threshold. jsdom has no real layout,
-// so observe never fires — we mock the hook and drive `density` per-test via
-// this hoisted holder (default `"full"` so actor + both-badge assertions
-// exercise the widest branch). Tests that care about narrow behaviour set
-// `densityMock.value` before rendering and reset it afterwards.
-const densityMock = vi.hoisted<{
-  value: "full" | "no-actor" | "compact";
-}>(() => ({ value: "full" }));
-vi.mock("~/hooks/use-timeline-row-density", () => ({
-  useTimelineRowDensity: (): {
-    density: "full" | "no-actor" | "compact";
-    containerRef: RefObject<HTMLDivElement | null>;
-  } => ({
-    density: densityMock.value,
-    containerRef: createRef<HTMLDivElement | null>(),
-  }),
-}));
+// Density is now pure CSS: the row body is an `@container` and the actor
+// clause / frequency badge are shown or hidden via `@[560px]:` / `@[420px]:`
+// utilities against the body's own width. jsdom has no layout engine and does
+// not evaluate container queries, so every responsive element is always in the
+// DOM here — the visibility toggle is asserted via the utility classes below
+// rather than presence/absence (the old ResizeObserver density hook is gone).
 
 // RelativeTime uses setInterval + useEffect; in jsdom it renders the ISO
 // fallback on first paint and then ticks. Stub it to a stable placeholder so
@@ -89,6 +77,24 @@ describe("MachineTimelineIssueRow", () => {
       // No suffix on a real user.
       expect(screen.queryByText(/\(invited\)/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/\(guest\)/i)).not.toBeInTheDocument();
+    });
+
+    it("gates the actor clause behind the `full` container-query threshold", () => {
+      const row = makeRow(
+        {
+          kind: "issue_opened",
+          issueId: ISSUE_ID,
+          issueNumber: 3,
+          title: "Broken flipper",
+        },
+        { people: { reporter: { displayName: "Alice", isInvited: false } } }
+      );
+      renderRow(<MachineTimelineIssueRow row={row} machineInitials="AFM" />);
+      // Actor clause is always rendered; CSS hides it below ~560px and shows it
+      // at/above the `full` tier. The name's wrapping span is the gated clause.
+      const actorClause = screen.getByText("Alice").parentElement;
+      expect(actorClause?.className).toContain("hidden");
+      expect(actorClause?.className).toContain("@[560px]:inline");
     });
 
     it("appends '(invited)' for an invited reporter people-row", () => {
@@ -317,10 +323,6 @@ describe("MachineTimelineIssueRow", () => {
   });
 
   describe("badges", () => {
-    afterEach(() => {
-      densityMock.value = "full";
-    });
-
     it("issue_opened with severity renders a severity badge", () => {
       const row = makeRow({
         kind: "issue_opened",
@@ -347,8 +349,7 @@ describe("MachineTimelineIssueRow", () => {
       expect(screen.getByText(/frequent/i)).toBeInTheDocument();
     });
 
-    it("drops the frequency badge on the compact (narrow) tier, keeping severity", () => {
-      densityMock.value = "compact";
+    it("CSS-hides the frequency badge below the compact threshold while severity stays visible", () => {
       const row = makeRow({
         kind: "issue_opened",
         issueId: ISSUE_ID,
@@ -358,25 +359,22 @@ describe("MachineTimelineIssueRow", () => {
         frequency: "frequent",
       });
       renderRow(<MachineTimelineIssueRow row={row} machineInitials="AFM" />);
-      // Severity stays; frequency is shed so ID + severity + timestamp fit a
-      // narrow phone row without overlapping (PP-dnk8 mobile badge cap).
-      expect(screen.getByText(/major/i)).toBeInTheDocument();
-      expect(screen.queryByText(/frequent/i)).not.toBeInTheDocument();
-    });
-
-    it("keeps both badges on the no-actor (mid) tier", () => {
-      densityMock.value = "no-actor";
-      const row = makeRow({
-        kind: "issue_opened",
-        issueId: ISSUE_ID,
-        issueNumber: 3,
-        title: "Broken flipper",
-        severity: "major",
-        frequency: "frequent",
-      });
-      renderRow(<MachineTimelineIssueRow row={row} machineInitials="AFM" />);
-      expect(screen.getByText(/major/i)).toBeInTheDocument();
-      expect(screen.getByText(/frequent/i)).toBeInTheDocument();
+      // Both badges are always in the DOM now — visibility is container-query
+      // CSS, not conditional rendering. The frequency badge carries the
+      // `@[420px]` show-gate (hidden below ~420px so ID + severity + timestamp
+      // fit a narrow phone row, PP-dnk8 mobile badge cap); severity has no gate.
+      // Split on whitespace for exact-token matching — the base Badge class
+      // includes `overflow-hidden`, so a substring check would false-positive.
+      const frequencyClasses = screen
+        .getByTestId("issue-frequency-badge")
+        .className.split(/\s+/);
+      expect(frequencyClasses).toContain("hidden");
+      expect(frequencyClasses).toContain("@[420px]:flex");
+      const severityClasses = screen
+        .getByTestId("issue-severity-badge")
+        .className.split(/\s+/);
+      expect(severityClasses).not.toContain("hidden");
+      expect(severityClasses).not.toContain("@[420px]:flex");
     });
 
     it("issue_closed with closedAsStatus renders a status badge", () => {

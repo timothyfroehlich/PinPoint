@@ -15,7 +15,7 @@
 1. **Drizzle migrations only** (CORE-ARCH-009): `db:generate` + `db:migrate`. Never `drizzle-kit push`. Supabase migration config is disabled.
 2. **Worker-scoped PGlite** (CORE-TEST-001): no per-test DB instances (causes lockups).
 3. **Server Components default** (CORE-ARCH-001): `"use client"` only for interaction leaves.
-4. **Progressive enhancement** (CORE-ARCH-002): `<form action={serverAction}>`. No inline handlers.
+4. **Honest failure** (CORE-ARCH-012): a control that cannot perform its action must not report that it did. Let it visibly do nothing or surface a real error — never a success toast for input that could not have been collected. There is no no-JS requirement; mutations still route through Server Actions (CORE-ARCH-005, CORE-ARCH-007). **A form containing a Radix Select must dispatch `useActionState` directly rather than carry `action={...}`** — React 19's post-action reset replays the Select's mount-time value, on failure as well as success (PP-0fvr, PP-1ajq; `pinpoint-ui` skill → **Server Action Forms**).
 5. **Supabase SSR** (CORE-SSR-001, CORE-SSR-002): `createClient()` → `auth.getUser()` immediately. No logic between.
 6. **Type safety** (CORE-TS-007): ts-strictest. No `any`, no `!`, no unsafe `as`.
 7. **Path aliases** (CORE-TS-008): always `~/` (e.g. `~/lib/utils`).
@@ -23,15 +23,15 @@
 9. **Test at the cheapest layer** (CORE-TEST-005): E2E for multi-step journeys; integration (PGlite + direct action) for server-action wiring, permissions, query correctness; RTL unit for form-state and UI logic. Smoke E2E is for "renders without 500" only. Bug-class table: `pinpoint-testing` skill.
 10. **Email privacy** (CORE-SEC-007): user emails only in admin views and the user's own settings page. Everywhere else: names, "Anonymous", or roles.
 11. **Permissions go through the matrix** (CORE-ARCH-008): all checks via `checkPermission()` from `~/lib/permissions/helpers`. The help page auto-generates from the matrix — keep enforcement and matrix in sync.
-12. **Two-layer responsive** (CORE-RESP-001..004): viewport breakpoints (`md:`, `lg:`) for page structure; container queries (`@lg:`, `@xl:`) for component internals. No `useMediaQuery` / `window.innerWidth` — use CSS. Sanctioned exceptions (behavior swaps CSS can't express): `use-table-responsive-columns` (PP-rs9), `use-is-mobile` (PP-43q3 row-edit sheet).
+12. **Two-layer responsive** (CORE-RESP-001..004): viewport breakpoints (`md:`, `lg:`) for page structure; container queries (`@lg:`, `@xl:`) for component internals. No `useMediaQuery` / `window.innerWidth` — use CSS. Sanctioned exceptions (behavior swaps CSS can't express): `use-table-responsive-columns` (PP-rs9), `use-is-mobile` (PP-43q3 — row-edit sheet + confirm-delete).
 13. **Test what we own** (CORE-TEST-006): mock third-party SDKs at their boundary; don't synthesize their internal state. Any production third-party hostname reachable from an E2E run is a class-J violation — delete the spec and add an SDK-boundary mock.
 14. **`localhost`, never `127.0.0.1`** (CORE-SEC-008): cookie host isolation breaks Supabase SSR auth across the two. Use `localhost` in config, `.env*`, Playwright `baseURL`, and any local URL.
 15. **Baseline Widely available is the UI floor** (CORE-UI-005, CORE-UI-006): reach for `<dialog>`, container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, etc. directly — no polyfills, no feature detection. Look up modern patterns via the `modern-web-guidance` plugin (`npx -y modern-web-guidance@latest search "<query>"` then `retrieve "<id>"`); each guide tags its Baseline status. Newly-available features (Popover API, View Transitions, anchor positioning, scroll-driven animations) require a per-feature opt-in documented in `pinpoint-design-bible` §19.
 16. **Form correctness** (CORE-FORM-001..006): right `type` (`email`/`tel`/`url`/`password`), correct `autocomplete` token (`current-password` / `new-password` / `off` on confirm), `:user-invalid` styling on the shared Input, `aria-invalid` synced on blur, visible required-field indicators, `enterkeyhint` on sequential mobile fields.
 17. **Accessibility floor** (CORE-A11Y-001..006): skip-to-main link, `motion-reduce:` paired with animations, `<th scope="col">` + `aria-sort` + accessible name on data tables, real `<button>` (never `<div role="button">`), `title` is not a tooltip, `inert` on background regions when a modal opens.
 18. **No side effects inside DB transactions** (CORE-ARCH-011): external/non-transactional effects (HTTP, email, Discord, blob, Vault RPC) never run inside `db.transaction` — fetch inputs before it, deliver effects after commit (`after()` + `planNotification`/`dispatchNotification`). A runtime tripwire throws `SideEffectInTransactionError` if violated. (The Doodle Bug, PP-2053.)
-19. **Respect PinballMap API conduct** (CORE-PBM-001): all PBM access goes through the `~/lib/pinballmap` client seam using the documented JSON API — one sync call/hour, store+reuse tokens (Vault), descriptive User-Agent, 429 backoff, attribution + link-back when rendering PBM data. Never crawl pinballmap.com or reach it from tests. Re-read `docs/external/pinballmap-*` before changing integration code.
-20. **Env vars: central registry + no secret coupling** (CORE-SEC-009): every production-required env var is declared in the `next.config.ts` build registry (`assertVercelDeploymentEnv`) so a missing value fails the Vercel build, not silently degrades. No secret reused as another's fallback; no secret prefixed `NEXT_PUBLIC_`. Catalog + scope matrix: `docs/ENV_VARS.md`.
+19. **Respect PinballMap API conduct** (CORE-PBM-001): all PBM access goes through the `~/lib/pinballmap` client seam using the documented JSON API — cron does one automated sync call/hour, manual refreshes are throttled at the `syncLocationSnapshot` seam to ≤20/hour (one per 3 min, against last attempt — PP-hbi0), store+reuse tokens (`api_token` from the `PINBALLMAP_API_TOKEN` env var, per-operator write creds in Vault), descriptive User-Agent, 429 backoff, attribution + link-back when rendering PBM data. Never crawl pinballmap.com or reach it from tests. Re-read `docs/external/pinballmap-*` before changing integration code.
+20. **Env vars: central registry + no secret coupling** (CORE-SEC-009): every production-required env var is declared in the `next.config.ts` build registry (`assertVercelDeploymentEnv`) so a missing value fails the Vercel build, not silently degrades. "Production-required" means **PinPoint is broken without it** — the registry is a deploy gate, so an optional surface's config goes in `docs/ENV_VARS.md` §4.2 instead, and a var you do register must be set in Vercel _before_ the PR merges. No secret reused as another's fallback; no secret prefixed `NEXT_PUBLIC_`. Catalog + scope matrix: `docs/ENV_VARS.md`.
 
 ### 2.2 Process rules
 
@@ -39,36 +39,13 @@
 2. **Run `pnpm run check` before committing** (~12s — the default floor). Reserve `pnpm run preflight` (the slower check + build + integration) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
-5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md` and `.agents/rules/AGY.md`. (PP-46z, PP-bg45.)
-6. **Never `--no-verify`**, never `gh pr merge`, never wildcard tool permissions — without explicit user approval each time.
+5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
+6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **Merging is human-only, via ANY path** — never `gh pr merge`, never MCP `merge_pull_request`, and never `scripts/workflow/merge-pr.sh` (even though it enforces the merge gates, running it is still an agent merge). An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (see §5 "Review requests"), reviews resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
 
 ## 3. Agent Skills
 
 Load relevant skills for every task. If your tool doesn't support skills, read the file directly. All skills live at `.agents/skills/<name>/SKILL.md`.
-
-| Category    | Skill                          | When to use                                                                                                                              |
-| :---------- | :----------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
-| UI          | `pinpoint-ui`                  | Components, shadcn/ui, forms, responsive design                                                                                          |
-| UI          | `pinpoint-design-bible`        | Design system, page archetypes, spacing, surfaces                                                                                        |
-| TypeScript  | `pinpoint-typescript`          | Type errors, generics, Drizzle types                                                                                                     |
-| Testing     | `pinpoint-testing`             | Writing tests, PGlite, test-layer decisions                                                                                              |
-| Testing     | `pinpoint-e2e`                 | E2E tests, worker isolation, Playwright stability                                                                                        |
-| Security    | `pinpoint-security`            | Auth, CSP, Zod, Supabase SSR                                                                                                             |
-| Patterns    | `pinpoint-patterns`            | Server Actions, data fetching, architecture                                                                                              |
-| Workflow    | `pinpoint-prototype-mode`      | Opt-in rapid UI/UX prototyping: relax rigor on presentation, track debt                                                                  |
-| Workflow    | `pinpoint-briefing`            | Session-start health review                                                                                                              |
-| Workflow    | `pinpoint-pr-workflow`         | Full PR lifecycle: commit, push, CI, merge                                                                                               |
-| Workflow    | `pinpoint-orchestrator`        | Parallel subagent work in worktrees: dispatch, monitor, follow-up                                                                        |
-| Workflow    | `pinpoint-huddle`              | Inter-session coordination via daily/monthly beads (the huddle hooks)                                                                    |
-| Workflow    | `pinpoint-superpowers-bridge`  | Running the superpowers lifecycle in PinPoint: bead field pointers + overrides for the conflicting finish/worktree/review/subagent steps |
-| Deployment  | `pinpoint-db-connections`      | Supabase/Postgres pooler & connection-string reference                                                                                   |
-| Deployment  | `pinpoint-migration-conflicts` | Resolving drizzle/meta conflicts on merge                                                                                                |
-| Deployment  | `pinpoint-preview-deployments` | On-demand TTL'd Supabase preview branches, `/preview` command                                                                            |
-| Deployment  | `pinpoint-audit-override`      | Per-PR `/audit-override` escape hatch for unrelated audit failures                                                                       |
-| Antigravity | `pinpoint-agy-triage`          | Grooming: evaluate whether a bead is agy-ready/agy-ui                                                                                    |
-| Antigravity | `pinpoint-agy-dispatch`        | Emit an Antigravity copy-paste prompt for a chosen bead                                                                                  |
-| Antigravity | `pinpoint-agy-execute`         | Runbook for Antigravity to execute an agy-ready bead end-to-end                                                                          |
 
 ## 4. Environment
 
@@ -91,6 +68,7 @@ Each git worktree gets isolated Supabase ports automatically. The Husky `post-ch
 - **Create**: `git worktree add /path -b branch origin/main` — the hook handles the rest.
 - **Cleanup**: `scripts/worktree_cleanup.py` (stops Supabase, removes volumes, deallocates slot). Plain `git worktree remove` or `rm -rf` leaks slot entries and Docker volumes — `scripts/worktree_orphan_sweep.py` reconciles them; pass `--apply` to reclaim. A SessionStart hook runs the sweep in dry-run mode every 6h and prints a one-line nudge if orphans are found.
 - **Ports**: main worktree uses defaults (3000 / 54321 / 54322). Slot N: `3000+N*10`, `54321+N*100`, `54322+N*100`.
+- **Supabase `project_id`**: derived from the branch name the **first** time a worktree is set up, then **pinned** — later checkouts reuse the id already in `supabase/config.toml`. It names the Docker containers and labels the volumes, so letting it follow a `git checkout -b` would rename the stack out from under itself (`supabase stop` matches nothing, the old containers keep the ports bound, cleanup misses them). `config.toml` is the authoritative record of the running stack's id. (PP-4936.)
 - **Config**: edit `supabase/config.toml.template`, not the generated file (which is chmod 444).
 
 ### Starting the local stack (self-service)
@@ -115,13 +93,15 @@ Only stop services you started in this session, by specific PID or via worktree-
 | `pnpm run check`                      | Fast: types, lint, format, unit, yamllint, actionlint, ruff, shellcheck (~12s)                                                                                                                                                   |
 | `pnpm run preflight`                  | Full: check + build + integration. **For non-trivial changes** (migrations, auth, server actions, middleware, DB schema) — not every commit. Host-wide cap of 2 concurrent runs (via `sem`); use `preflight:unlocked` to bypass. |
 | `pnpm run smoke`                      | Smoke E2E (~60s)                                                                                                                                                                                                                 |
-| `pnpm run e2e:full`                   | Full E2E suite — **CI only; don't run locally.**                                                                                                                                                                                 |
-| `pnpm run e2e:all`                    | Full + smoke + roots, separate Playwright invocations (~10–15 min) — **CI only; don't run locally.**                                                                                                                             |
+| `pnpm run e2e:full`                   | Full E2E suite — CI's job by default; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally.**                                                               |
+| `pnpm run e2e:all`                    | Full + smoke + roots, separate Playwright invocations (~10–15 min) — CI's job by default; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally.**           |
 | `pnpm run db:migrate`                 | Apply schema changes locally                                                                                                                                                                                                     |
-| `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups`                                                                                                                                                                                      |
+| `pnpm run db:backup`                  | Manual prod dump → `~/.pinpoint/db-backups` (data-only dev seed, **not** a DR artifact)                                                                                                                                          |
 | `pnpm run db:seed:from-prod`          | Reset local + seed from latest prod backup                                                                                                                                                                                       |
+| `pnpm run chores:backups`             | Verify prod Supabase daily physical backups exist + retention is intact (weekly chore; hits prod, not part of `check`)                                                                                                           |
 | `ruff check && ruff format`           | Python lint/format (no venv needed)                                                                                                                                                                                              |
 | `./scripts/workflow/pr-watch.py <PR>` | Watch CI for a PR (Monitor-compatible). Never hand-roll a polling loop.                                                                                                                                                          |
+| `pnpm run dev:status`                 | Check whether Next.js / Supabase / Postgres are up — one command, worktree-port aware. Use it instead of ad-hoc `curl` health checks against localhost.                                                                          |
 | `FORCE_MEM_PRECHECK=skip <command>`   | Bypass the memory-pressure gate for one run (e.g. when you know pressure is transient or acceptable).                                                                                                                            |
 
 ### Type-check engine (TS 7 GA dual-install)
@@ -142,7 +122,7 @@ When the user explicitly asks for "prototype mode" / "rapid iteration" / "just e
 6. DB schema / migrations → `pnpm run preflight`
 7. Final pre-review → push and let **CI** run the full suite; don't sweep locally.
 
-**Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state. **Never** run `e2e:full` / `e2e:all` locally — the full suite is CI's job. Always use `--project=chromium` for targeted runs; `--headed` to debug visually. Report flaky tests; don't retry in a loop.
+**Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state. The full suite (`e2e:full` / `e2e:all`) is CI's job by default — roughly 8–10 minutes of three parallel Chromium workers plus a Supabase stack and a Next server; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally** — on a machine with real headroom it's a reasonable thing to run when you actually want the signal. Always use `--project=chromium` for targeted runs; `--headed` to debug visually. Report flaky tests; don't retry in a loop.
 
 ### Reproducing CI failures locally
 
@@ -161,11 +141,23 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 
 ### Migration conflicts
 
-Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the prevId chain. Full regenerate-don't-edit protocol: `pinpoint-migration-conflicts` skill.
+Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the prevId chain. Full regenerate-don't-edit protocol: `pinpoint-deployment` skill.
+
+### Review requests
+
+**Copilot reviews only when you explicitly ask, as of 2026-08-01. Nothing requests one on your behalf — ever.** Not opening the PR, not a push, not the `ready-for-review` label, not green CI. The merge bar is unchanged — a PR still needs a review covering its **head commit** (Copilot, or a SHA-pinned Claude marker) with threads resolved. Only the trigger changed: you decide when you're ready, and you know you need the review to merge.
+
+That's what makes the spend efficient, so **finish your churn first** — CI fixes, review fixes, merge-from-main — and then ask, once, on work you're actually done with:
+
+```bash
+gh pr edit <PR> --add-reviewer "@copilot"
+```
+
+Judge a review by comparing its `commit_id` to head, never by which event produced it — any review is worthless once you push past it, so a post-review push means asking again. `mark-claude-review.sh` is the fallback for a request Copilot didn't answer, not a way to skip asking. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Review comments
 
-If a PR accumulates review comments (from Tim or another agent): fix the code, OR decline with a one-sentence reply (`add_reply_to_pull_request_comment`) and resolve the thread (`pull_request_review_write(method: "resolve_thread")`). Sign replies with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). Declined comments must get a reply — no silent ignores.
+The canonical review rubric is `REVIEW.md` at the repo root. If a PR accumulates review comments (from Tim or another agent): fix the code, OR decline with a one-sentence reply (`add_reply_to_pull_request_comment`) and resolve the thread (`pull_request_review_write(method: "resolve_thread")`). Sign replies with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). Declined comments must get a reply — no silent ignores.
 
 ### Parallel subagent work
 
@@ -205,39 +197,26 @@ How Tim wants agents to behave. (§1 has the one-line version; this is the detai
 
 ### Supabase
 
-- **`pinpoint-prod`** (Live, Pro plan): **real user data — strict safety.** Daily backups, 7-day retention.
+- **`pinpoint-prod`** (Live, Pro plan): **real user data — strict safety.** Daily backups, 7-day retention, no PITR — so the recovery floor is the previous nightly snapshot. That posture is asserted weekly by `pnpm run chores:backups` (chores checklist item 9); it verifies backups exist and are retained, not that they restore.
 - **Local**: `db:reset` OK. **Prod: NEVER `db:reset`. Only `db:migrate`.**
-- **Connection**: app + scripts use `POSTGRES_URL` — the Supavisor **transaction** pooler (`…pooler.supabase.com:6543`, IPv4), with `prepare:false` set on every porsager client that connects there (`src/server/db/index.ts`, `scripts/lib/pg-client.mjs`) — the transaction pooler does not support prepared statements, and a resolved incident (PP-d8l8) traced silent prod commit loss to this exact setting missing on the runtime client. **Never reintroduce `prepare:true` on a `:6543` client.** Full pooler/endpoint reference, connection string format, and the incident writeup: `pinpoint-db-connections` skill.
+- **Prod-mutating Supabase surfaces are gated in `.claude/settings.json`** (CORE-SEC-010): prod is the only project in the org, and MCP calls bypass both the Bash hook stack and the script-level `assertLocalDatabase` / `assertNotDrizzlePush` guards. So: every write-capable MCP tool (`execute_sql`, `apply_migration`, `deploy_edge_function`, `pause_project`, `restore_project`, `create_project`, the branch mutators) is on `permissions.ask`; the destructive CLI verbs `supabase db reset` / `db remote commit` / `migration repair` / `branches delete` are on `ask`, and `supabase db push` / `projects delete` on `deny`. Read-only MCP tools stay unprompted. These are prefix matchers over the command string — a speed bump against accidents, not a security boundary — and they don't reach child processes, so `pnpm run db:reset` and the E2E global-setup are unaffected. Add new write surfaces to the lists as the connector or CLI grows.
+- **Connection**: app + scripts use `POSTGRES_URL` — the Supavisor **transaction** pooler (`…pooler.supabase.com:6543`, IPv4), with `prepare:false` set on every porsager client that connects there (`src/server/db/index.ts`, `scripts/lib/pg-client.mjs`) — the transaction pooler does not support prepared statements, and a resolved incident (PP-d8l8) traced silent prod commit loss to this exact setting missing on the runtime client. **Never reintroduce `prepare:true` on a `:6543` client.** Full pooler/endpoint reference, connection string format, and the incident writeup: `pinpoint-deployment` skill.
 
 ### Vercel
 
 - Vercel runs `pnpm run migrate:production` on build (production only).
-- Stuck migration fix: `POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`.
+- Stuck migration fix: `MARK_MIGRATION_FORCE_PRODUCTION=1 POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <n>`. The token is required — the script refuses a remote target without it, and prompts once more when run in a TTY. It writes to `drizzle.__drizzle_migrations` without running the migration, so a wrong number makes prod's schema diverge from history permanently.
 
 ### Preview deployments (on-demand, TTL'd Supabase branches)
 
-Native Supabase auto-branching is **disabled** — no PR gets a preview by default. Previews are created on demand via the `/preview` PR-comment command and torn down on a TTL by an hourly reaper. Full control-surface reference and implementation pointers: `pinpoint-preview-deployments` skill.
+Native Supabase auto-branching is **disabled** — no PR gets a preview by default. Previews are created on demand via the `/preview` PR-comment command and torn down on a TTL by an hourly reaper. Full control-surface reference and implementation pointers: `pinpoint-deployment` skill.
 
 ### Audit-gate override (per-PR `/audit-override`)
 
-When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **unrelated** to a PR's changes, `/audit-override <reason>` is the escape hatch so it doesn't force an admin-merge — commit-bound, dropped on every new push. Full protocol: `pinpoint-audit-override` skill.
+When `pnpm audit --audit-level=high` goes RED on a freshly-published advisory **unrelated** to a PR's changes, `/audit-override <reason>` is the escape hatch so it doesn't force an admin-merge — commit-bound, dropped on every new push. Full protocol: `pinpoint-deployment` skill.
 
 ## 8. Documentation
 
 Actionable, "what" and "how" only. Skills carry the deep dives.
 
 **Canonical specs are authoritative** — particularly `pinpoint-design-bible` (§5 page archetypes, §17 modal archetypes). When implementation changes UI behavior covered there, **edit the spec in place**. Don't append divergence notes or "TODO: spec out of date" disclaimers. If you find one, fold it into canonical text and delete it. Dated artifacts in `docs/superpowers/specs/` are records — leave them alone.
-
-## 9. Landing the plane
-
-Work isn't done at "git push" — it's done when the change is **merged, deployed clean, and cleaned up**. The full pipeline (commit → PR → CI → merge) lives in the `pinpoint-pr-workflow` skill; the load-bearing rules are repeated here in case that skill isn't loaded.
-
-1. **Before you push:** `pnpm run check` is the floor (types, lint, format, unit). Run `pnpm run preflight` for non-trivial changes — migrations, security/auth, server actions, middleware, DB schema. Don't run the full E2E suite locally; CI owns it.
-2. **Push and open the PR ready-for-review** (draft only while iterating — see "Working style"). Sync with main by **merge, never rebase**; `git status` must show "up to date with origin". "Ready" is not just "pushed": wait for Copilot to review the current head commit and resolve/decline its threads before you call the PR ready or done — `merge-pr.sh` re-enforces this (`currency` + `threads` gates) at merge time. See `pinpoint-pr-workflow` Phase 3.
-3. **Lean on CI for the full E2E suite** — don't run `e2e:full` locally; CI owns it once the PR is up. Do run **selected specs locally** while writing them or iterating on a feature they touch (`pnpm exec playwright test <spec> --project=chromium`).
-4. **Merge via `scripts/workflow/merge-pr.sh <PR>`** — never `gh pr merge` or MCP merge directly. (Bead close timing follows beads' defaults; there's no fixed at-merge rule.)
-5. **After merge, watch the deployment.** Don't walk away at merge — watch the production deploy land and confirm no build, migration, or runtime errors. A merge that breaks prod isn't done.
-6. **Cleanup — non-destructive now, destructive on confirmation.** Close the bead, file genuine follow-up beads, and hand off freely. For destructive cleanup (removing worktrees, deleting branches/volumes), wait for explicit confirmation.
-7. **Hand off** for the next session, and post to the huddle daily bead if other sessions need to know what landed.
-
-Never say "ready to push when you are" — you push.

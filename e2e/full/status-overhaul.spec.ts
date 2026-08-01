@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
   updateIssueField,
   visibleIssueFieldControl,
+  selectMachine,
 } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
@@ -32,7 +33,7 @@ test.describe("Status Overhaul E2E", () => {
     // confirms the server component saw the auth cookie correctly.
     await expect(page.getByTestId("issue-priority-select")).toBeVisible();
 
-    await page.getByTestId("machine-select").selectOption(machine.id);
+    await selectMachine(page, machine.id);
     await fillReportForm(page, {
       title: "E2E Status Overhaul Test",
       severity: "unplayable",

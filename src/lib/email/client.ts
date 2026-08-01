@@ -9,6 +9,7 @@ import {
   EMAIL_FROM,
 } from "./transport";
 import { log } from "~/lib/logger";
+import { maskEmail } from "~/lib/logging/mask";
 import { reportError } from "~/lib/observability/report-error";
 import { assertNotInTransaction } from "~/server/db/transaction-context";
 
@@ -75,11 +76,11 @@ export async function sendEmail({
   // transaction (the Doodle Bug, PP-2053).
   assertNotInTransaction("sendEmail");
 
-  log.info({ to, subject }, "[Email] Attempting to send email");
+  log.info({ to: maskEmail(to), subject }, "[Email] Attempting to send email");
 
   if (!transport) {
     log.warn(
-      { to, subject },
+      { to: maskEmail(to), subject },
       "[Email] No transport configured. Email not sent."
     );
     return { success: false, error: "No transport configured" };
@@ -94,7 +95,7 @@ export async function sendEmail({
     idempotencyKey,
   });
   if (result.success) {
-    log.info({ to, subject }, "[Email] Email sent successfully");
+    log.info({ to: maskEmail(to), subject }, "[Email] Email sent successfully");
   } else {
     reportError(result.error, { action: "sendEmail" });
   }

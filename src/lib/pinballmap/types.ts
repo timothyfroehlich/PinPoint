@@ -22,8 +22,10 @@ export interface PbmCondition {
 
 /**
  * A location_machine_xref — "this machine at this location". The `id` (lmx id)
- * is ephemeral: removing and re-adding a machine mints a new one, so it is
- * resolved from the latest snapshot at action time and never cached.
+ * is the durable listing handle: we capture it when a machine is listed and
+ * STORE it on `machines.pinballmap_lmx_id`, healing it from the latest snapshot
+ * when PBM re-mints one (removing + re-adding a machine changes the id). We do
+ * not re-resolve it per push — see the store-and-heal model (PP-o355.16 / .12).
  *
  * Note: PBM's location payload carries only `machineId` here, not the machine
  * name — names come from the catalog mirror (bead B).
@@ -97,11 +99,7 @@ export interface PbmCredentials {
  * - `transient` — network error or 5xx; safe to retry later
  */
 export type PbmWriteFailureReason =
-  | "rate_limited"
-  | "unauthorized"
-  | "not_found"
-  | "rejected"
-  | "transient";
+  "rate_limited" | "unauthorized" | "not_found" | "rejected" | "transient";
 
 /** Shared failure shape; `message` carries PBM's own text when it supplied one. */
 export interface PbmWriteFailure {
@@ -122,15 +120,11 @@ export type PbmAddMachineResult = { ok: true; lmxId: number } | PbmWriteFailure;
  * differs. `null` means PBM returned no IC state for the lmx.
  */
 export type PbmToggleResult =
-  | { ok: true; icEnabled: boolean | null }
-  | PbmWriteFailure;
+  { ok: true; icEnabled: boolean | null } | PbmWriteFailure;
 
 /** Result of exchanging a login+password for an API token (bead F). */
 export type PbmAuthFailureReason =
-  | "invalid_credentials"
-  | "account_disabled"
-  | "rate_limited"
-  | "transient";
+  "invalid_credentials" | "account_disabled" | "rate_limited" | "transient";
 
 export interface PbmAuthFailure {
   ok: false;
@@ -139,8 +133,7 @@ export interface PbmAuthFailure {
 }
 
 export type PbmAuthResult =
-  | { ok: true; token: string; username: string }
-  | PbmAuthFailure;
+  { ok: true; token: string; username: string } | PbmAuthFailure;
 
 /**
  * The single seam wrapping all PBM HTTP. Live and mock implementations both

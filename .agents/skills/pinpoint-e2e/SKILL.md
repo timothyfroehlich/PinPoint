@@ -1,6 +1,6 @@
 ---
 name: pinpoint-e2e
-description: E2E testing guide for PinPoint (Playwright, Isolation, Mailpit, Supabase). Use when writing, debugging, or fixing E2E tests to ensure worker isolation and stability.
+description: E2E testing guide for PinPoint (Playwright, Isolation, Mailpit, Supabase), including the local/preview environment defaults — dev autologin (`DEV_AUTOLOGIN_ENABLED`) and its three opt-outs (`x-skip-autologin` header, `skip_autologin` cookie, `?autologin=off`), the global-setup preflight→migrate→fast-reset→full-reset chain and the `SKIP_SUPABASE_RESET` bypass, and the `/api/test-data/cleanup` endpoint (`issueIds` / `machineIds` / `issueTitlePrefix`). Use when writing, debugging, or fixing E2E tests to ensure worker isolation and stability, when a test is unexpectedly authenticated or needs to run as a guest, or when E2E seed/cleanup state looks wrong.
 ---
 
 # PinPoint E2E Testing Skill
@@ -13,7 +13,7 @@ Run this checklist BEFORE typing `test("...", async ({ page })`. The 2026-05 aud
 
 1. **What bug class does this catch?** See `pinpoint-testing` skill § "Bug Classes & Cheapest Catching Layer". Class A/B/C/E/G/H/I should not be E2E — integration or RTL unit is the right home.
 2. **Does an integration or unit test already cover this feature?** Run `rg -l "your-keyword" src/test/ src/` first (substitute the actual feature keyword). The audit found that agents create new specs because they can't see the existing tests — most of the time you should be extending an existing file, not creating a new one. See `pinpoint-testing` skill § "Where Existing Coverage Lives".
-3. **Class-J self-check (AGENTS.md §2.1 "Test What We Own")**: Does this spec hit any URL outside `localhost`, `127.0.0.1`, or our owned local stack (Mailpit, PGlite, local Supabase)? If yes → STOP. Mock the SDK at the boundary in `src/lib/<service>/client.test.ts`. Live Discord, real OAuth provider redirects, vendor email-template parsing are violations.
+3. **Class-J self-check (CORE-TEST-006, "Test What We Own")**: Does this spec hit any URL outside `localhost`, `127.0.0.1`, or our owned local stack (Mailpit, PGlite, local Supabase)? If yes → STOP. Mock the SDK at the boundary in `src/lib/<service>/client.test.ts`. Live Discord, real OAuth provider redirects, vendor email-template parsing are violations.
 4. **Would the assertion be the same if I called the Server Action directly with PGlite seeded data?** If yes → integration test, not E2E. The browser overhead buys nothing.
 5. **Is this a genuine multi-step user journey** that spans two or more page renders (e.g. login → mutate → verify across pages)? If no → almost certainly not E2E.
 
@@ -22,24 +22,12 @@ If all five say "E2E is the right layer", write it. Otherwise, the cheapest laye
 ## Quick Start
 
 - **Run Smoke Tests**: `pnpm run smoke` (Fast, critical paths)
-- **Run Full Suite**: `pnpm run e2e:full` (Comprehensive — CI only, don't run locally unless asked)
+- **Run Full Suite**: `pnpm run e2e:full` / `e2e:all` (Comprehensive — CI's job by default; on a resource-constrained system, especially with several agent sessions running, don't run it locally)
 - **Debug Mode**: `pnpm exec playwright test e2e/path/to/test.spec.ts --debug`
 
 ## Which Tests to Run (Decision Tree)
 
-1. **Changed pure logic/utils?** → `pnpm run check` (unit tests, ~12s)
-2. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (~15-30s)
-3. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
-4. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs
-5. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
-6. **NEVER** run `e2e:full` locally unless explicitly asked — that's what CI is for
-
-**Key rules for agents:**
-
-- Always use `--project=chromium` for targeted runs (skip Mobile Chrome unless testing responsive)
-- Use `--headed` for debugging visual issues
-- `pnpm run check` catches 90% of issues — E2E is for integration verification, not iteration
-- If a test is flaky locally, report it — don't retry in a loop
+See the `pinpoint-testing` skill § "Which Tests to Run (Decision Tree)" — canonical, don't duplicate here.
 
 ## The Golden Rule: Worker Isolation
 
@@ -61,6 +49,11 @@ PinPoint E2E tests run in parallel against a **shared database**.
 - **Best Practices**: See [references/e2e-best-practices.md](references/e2e-best-practices.md) for structure and anti-patterns.
 - **Isolation Patterns**: See [references/isolation-patterns.md](references/isolation-patterns.md) for how to use `test-isolation.ts` and `supabase-admin.ts`.
 - **Helpers**: See [references/common-helpers.md](references/common-helpers.md) for `actions.ts`, `page-helpers.ts`, and `mailpit.ts`.
+
+## Sandbox & Playwright (macOS only — does not apply on the Bazzite Linux host)
+
+- The macOS sandbox blocks Chromium's Mach port IPC, causing `MachPortRendezvousServer: Permission denied` crashes.
+- Playwright commands are excluded from sandboxing via `excludedCommands` in `.claude/settings.local.json`. If you see Mach port errors, verify the command prefix matches an entry there (env var prefixes like `SKIP_SUPABASE_RESET=true` need separate entries).
 
 ## Debugging Checklist
 

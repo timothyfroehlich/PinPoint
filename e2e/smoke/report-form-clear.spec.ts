@@ -13,7 +13,7 @@ import {
   fillReportForm,
   submitFormAndWaitForRedirect,
 } from "../support/page-helpers.js";
-import { assertNoA11yViolations } from "../support/actions.js";
+import { assertNoA11yViolations, selectMachine } from "../support/actions.js";
 
 const TITLE_PREFIX = "E2E Form Clear";
 
@@ -37,9 +37,7 @@ test.describe("Report Form Clears After Submission", () => {
 
     await assertNoA11yViolations(page);
 
-    const select = page.getByTestId("machine-select");
-    await expect(select).toBeVisible();
-    await select.selectOption({ index: 1 });
+    await selectMachine(page);
     await expect(page).toHaveURL(/machine=/);
 
     const issueTitle = `${TITLE_PREFIX} ${Date.now()}`;
@@ -68,15 +66,15 @@ test.describe("Report Form Clears After Submission", () => {
     const titleInput = page.getByLabel("Issue Title *");
     await expect(titleInput).toHaveValue("");
 
-    // 5. Assert localStorage draft was cleared
+    // 5. Assert the unified draft (report_draft) was cleared
     const draft = await page.evaluate(() =>
-      window.localStorage.getItem("report_form_state")
+      window.localStorage.getItem("report_draft")
     );
-    // Draft should either be null or contain empty/default values
+    // Draft should either be null or carry no leftover entry-#1 content.
     if (draft !== null) {
       const parsed = JSON.parse(draft);
-      expect(parsed.title).toBeFalsy();
-      expect(parsed.description).toBeNull();
+      expect(parsed.entries?.[0]?.title ?? "").toBeFalsy();
+      expect(parsed.entries?.[0]?.description ?? null).toBeNull();
     }
   });
 });

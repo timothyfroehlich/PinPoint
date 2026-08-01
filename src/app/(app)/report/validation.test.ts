@@ -12,7 +12,9 @@ describe("Public Issue Form Validation", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toContain("machineId");
+      // PP-idrb §7: the raw field name must NOT leak into the user-facing
+      // message (previously it was prefixed "machineId: …").
+      expect(result.error).not.toContain("machineId");
       // Zod's default error for undefined/missing field when it expects a uuid string
       expect(result.error).toContain(
         "Invalid input: expected string, received undefined"
@@ -30,8 +32,8 @@ describe("Public Issue Form Validation", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toContain("severity");
-      expect(result.error).toContain("Select a severity");
+      // Plain schema message, no "severity: " field prefix (PP-idrb §7).
+      expect(result.error).toBe("Select a severity");
     }
   });
 
@@ -46,8 +48,8 @@ describe("Public Issue Form Validation", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toContain("title");
-      expect(result.error).toContain("Title is required");
+      // Plain schema message, no "title: " field prefix (PP-idrb §7).
+      expect(result.error).toBe("Title is required");
     }
   });
 
@@ -128,7 +130,8 @@ describe("Public Issue Form Validation", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toContain("assignedTo");
+      // The field path must not leak into the message (PP-idrb §7).
+      expect(result.error).not.toContain("assignedTo");
     }
   });
 });

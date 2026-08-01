@@ -48,7 +48,7 @@ jobs:
       deps: ${{ steps.deps-filter.outputs.deps }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -56,7 +56,7 @@ jobs:
         with:
           persist-credentials: false
       - id: filter
-        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d  # ratchet:dorny/paths-filter@v4.0.1
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706  # ratchet:dorny/paths-filter@v4.0.2
         with:
           predicate-quantifier: "every"
           filters: |
@@ -75,7 +75,7 @@ jobs:
       # Separate filter for dependency changes using default "some" quantifier
       # so deps=true when ANY changed file is a dependency file (not ALL).
       - id: deps-filter
-        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d  # ratchet:dorny/paths-filter@v4.0.1
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706  # ratchet:dorny/paths-filter@v4.0.2
         with:
           filters: |
             deps:
@@ -99,7 +99,7 @@ jobs:
     if: needs.changes.outputs.code == 'true'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -114,7 +114,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -134,7 +134,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -149,7 +149,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -177,7 +177,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -192,7 +192,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -217,7 +217,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -232,7 +232,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -257,7 +257,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -312,7 +312,7 @@ jobs:
             ! -name '*.lock.yml' -print0 | xargs -0 zizmor --min-severity low --format plain
 
       - name: Ratchet Check (pinned actions)
-        uses: sethvargo/ratchet@15bde13e63a9fe94f9abe1c2de94b7efe95da311  # ratchet:sethvargo/ratchet@main
+        uses: sethvargo/ratchet@43c2f868adf316878296666232da1c8d2733f159  # ratchet:sethvargo/ratchet@main
         with:
           files: |
             .github/workflows/ci.yml
@@ -325,7 +325,7 @@ jobs:
     needs: [setup, typecheck, lint, format, linters, test-unit, test-integration]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -340,7 +340,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -370,7 +370,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -385,7 +385,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -415,7 +415,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -430,7 +430,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -466,7 +466,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -481,7 +481,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -498,11 +498,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Setup Supabase
         uses: ./.github/actions/setup-supabase
@@ -529,7 +528,7 @@ jobs:
     needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -544,7 +543,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -561,11 +560,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Setup Supabase
         uses: ./.github/actions/setup-supabase
@@ -586,7 +584,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -601,7 +599,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -618,11 +616,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -669,7 +666,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -684,7 +681,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -701,11 +698,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -752,7 +748,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -767,7 +763,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -784,11 +780,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -836,7 +831,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -851,7 +846,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -868,11 +863,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf  # ratchet:supabase/setup-cli@v2.1.1
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520  # ratchet:supabase/setup-cli@v3.0.0
         with:
           # Pinned Supabase CLI — bump deliberately (was: latest). PP-d5zn.
           version: 2.109.1
-          github-token: ${{ github.token }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # ratchet:actions/cache@v6.1.0
@@ -975,7 +969,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -996,7 +990,7 @@ jobs:
     needs: setup
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
@@ -1011,7 +1005,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # ratchet:actions/setup-node@v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # ratchet:actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: "pnpm"
@@ -1102,7 +1096,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411  # ratchet:step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920  # ratchet:step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 

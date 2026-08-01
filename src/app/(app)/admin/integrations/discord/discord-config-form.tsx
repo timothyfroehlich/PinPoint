@@ -59,7 +59,7 @@ export function DiscordConfigForm({
 
   // Save action — useActionState wraps the server action so we get pending
   // state and the structured result back. Form-level submission goes through
-  // the action prop, preserving progressive enhancement.
+  // the action prop rather than an onSubmit handler (CORE-ARCH-005).
   const [saveState, saveFormAction, isPending] = useActionState<
     SaveDiscordConfigResult | undefined,
     FormData
@@ -222,7 +222,7 @@ export function DiscordConfigForm({
           >
             {validatingToken ? (
               <>
-                <Loader2 className="mr-1.5 size-3 animate-spin" />
+                <Loader2 className="mr-1.5 size-3 animate-spin motion-reduce:animate-none" />
                 Validating...
               </>
             ) : (
@@ -275,7 +275,7 @@ export function DiscordConfigForm({
             >
               {validatingServer ? (
                 <>
-                  <Loader2 className="mr-1.5 size-3 animate-spin" />
+                  <Loader2 className="mr-1.5 size-3 animate-spin motion-reduce:animate-none" />
                   Validating...
                 </>
               ) : (
@@ -432,8 +432,11 @@ function ValidationStatus({
   if (status.kind === "validating") {
     return (
       <p className="text-xs text-muted-foreground flex items-center gap-1">
-        <Loader2 className="size-3 animate-spin" aria-hidden /> Checking with
-        Discord…
+        <Loader2
+          className="size-3 animate-spin motion-reduce:animate-none"
+          aria-hidden
+        />{" "}
+        Checking with Discord…
       </p>
     );
   }
@@ -491,7 +494,7 @@ function SaveResetFooter({
       >
         {isPending ? (
           <>
-            <Loader2 className="mr-2 size-4 animate-spin" />
+            <Loader2 className="mr-2 size-4 animate-spin motion-reduce:animate-none" />
             Saving...
           </>
         ) : showSaved ? (

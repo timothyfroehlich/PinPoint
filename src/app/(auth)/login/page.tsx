@@ -10,7 +10,6 @@ import { LoginForm } from "./login-form";
  * Login Page
  *
  * Email/password authentication with "Remember Me" option.
- * Progressive enhancement - works without JavaScript.
  */
 export default async function LoginPage({
   searchParams,

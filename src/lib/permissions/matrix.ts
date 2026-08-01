@@ -44,7 +44,7 @@
  * - 'owner' when the relationship is "owns/maintains this resource" (machine owner, etc.)
  * - 'own_or_owner' when EITHER of those grants permission (keeps the help page
  *   showing a single rule instead of two matrix entries that would need to be
- *   ORed at call sites — see AGENTS.md §2.1 "Matrix-Only Permissions").
+ *   ORed at call sites — see CORE-ARCH-008, "Matrix-Only Permissions").
  *
  * All three require ownership context to resolve. See checkPermission() in helpers.ts,
  * which resolves 'own' via userId === reporterId, 'owner' via userId === machineOwnerId,
@@ -62,11 +62,7 @@ export type PermissionValue = boolean | "own" | "owner" | "own_or_owner";
  * helpers.ts to convert a UserRole (or null) into an AccessLevel.
  */
 export type AccessLevel =
-  | "unauthenticated"
-  | "guest"
-  | "member"
-  | "technician"
-  | "admin";
+  "unauthenticated" | "guest" | "member" | "technician" | "admin";
 
 export const ACCESS_LEVELS = [
   "unauthenticated",
@@ -188,6 +184,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         id: "issues.report.assignee",
         label: "Set assignee when reporting",
         description: "Assign someone when creating an issue",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: true,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "issues.report.quick",
+        label: "Quick report issues",
+        description:
+          "Create many issues at once from the quick report grid (/report/quick)",
         access: {
           unauthenticated: false,
           guest: false,
@@ -384,13 +393,39 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
       },
       {
         id: "machines.pinballmap.link",
-        label: "Link machines to PinballMap",
+        label: "Link machines to Pinball Map",
         description:
-          "Set or change a machine's PinballMap catalog link, or mark it as not on PinballMap",
+          "Set or change a machine's Pinball Map catalog link, or mark it as not on Pinball Map",
         access: {
           unauthenticated: false,
           guest: false,
           member: "owner",
+          technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "machines.pinballmap.push",
+        label: "Push listing changes to PinballMap",
+        description:
+          "List or unlist a machine on PinballMap.com using the shared operator account",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
+          technician: false,
+          admin: true,
+        },
+      },
+      {
+        id: "machines.pinballmap.sync",
+        label: "Trigger a Pinball Map sync",
+        description:
+          "Manually refresh the stored Pinball Map location snapshot ('Sync now'). The hourly cron does this automatically; this grants the on-demand action.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: false,
           technician: true,
           admin: true,
         },
@@ -530,6 +565,38 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           guest: false,
           member: false,
           technician: false,
+          admin: true,
+        },
+      },
+    ],
+  },
+  {
+    id: "collections",
+    label: "Collections",
+    permissions: [
+      {
+        id: "collections.view",
+        label: "View collections",
+        description:
+          "View a collection's Overview, Issues, and Timeline. Private collections are additionally restricted to their owner (and admins); link-based sharing is handled outside the role matrix.",
+        access: {
+          unauthenticated: true,
+          guest: true,
+          member: true,
+          technician: true,
+          admin: true,
+        },
+      },
+      {
+        id: "collections.create",
+        label: "Create collections",
+        description:
+          "Create a personal collection and add machines to it. Managing a collection (rename, delete, edit membership) is restricted to its owner.",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: true,
+          technician: true,
           admin: true,
         },
       },

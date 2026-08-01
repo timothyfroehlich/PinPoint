@@ -103,8 +103,7 @@ export interface ChannelContext {
  * without catching exceptions.
  */
 export type DeliveryResult =
-  | { ok: true }
-  | { ok: false; reason: "transient" | "permanent" | "skipped" };
+  { ok: true } | { ok: false; reason: "transient" | "permanent" | "skipped" };
 
 /**
  * The channel contract. Channels are plain objects (decision #1) —

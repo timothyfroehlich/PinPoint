@@ -1,5 +1,4 @@
 import type React from "react";
-import type { Viewport } from "next";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getMachineForLayout } from "~/app/(app)/m/[initials]/_data";
@@ -10,25 +9,9 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { SettingsTab } from "~/components/machines/settings/SettingsTab";
 
-/**
- * Soft-keyboard resilience (PP-a0pl, scoped to this settings-heavy page).
- *
- * The default `interactive-widget=resizes-visual` lets the on-screen keyboard
- * cover content: it shrinks only the *visual* viewport, so the layout doesn't
- * move and a focused editor / the RowEditSheet inputs / the Save-Cancel row can
- * end up hidden behind the keyboard. `resizes-content` shrinks the *layout*
- * viewport instead, so content reflows above the keyboard.
- *
- * Cross-browser: honored by Chromium (Chrome/Edge/Android); iOS Safari ignores
- * `interactive-widget` and keeps its own default focus-scroll — so this is a
- * strict improvement on Chromium and a harmless no-op on iOS. App-wide rollout,
- * the §19 Baseline write-up, and real-device iOS verification ride with PP-a0pl.
- */
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  interactiveWidget: "resizes-content",
-};
+// The soft-keyboard `interactive-widget=resizes-content` viewport now ships
+// app-wide from the root layout (src/app/layout.tsx, PP-a0pl) — the per-page
+// export that used to live here has been folded into it.
 
 /**
  * Machine Settings Tab (/m/[initials]/settings) — PP-43q3.
@@ -60,18 +43,28 @@ export default async function MachineSettingsTab({
       })
     : null;
 
-  const canEdit = checkPermission(
-    "machines.settings.manage",
-    getAccessLevel(profile?.role),
-    { userId: user?.id, machineOwnerId: machine.owner?.id ?? null }
-  );
+  const access = getAccessLevel(profile?.role);
+  const machineOwnerId = machine.owner?.id ?? null;
 
-  const sets = await getMachineSettingsSets(db, machine.id);
+  // Machine-wide gate for the "Add set" button (creating rides on the existing
+  // matrix entry); per-set edit rights are computed per row in the query.
+  const canCreate = checkPermission("machines.settings.manage", access, {
+    userId: user?.id,
+    machineOwnerId,
+  });
+
+  const sets = await getMachineSettingsSets(db, machine.id, {
+    viewerId: user?.id ?? null,
+    access,
+    machineOwnerId,
+  });
 
   return (
     <div className="space-y-6">
       <SettingsTab
-        canEdit={canEdit}
+        canCreate={canCreate}
+        viewerId={user?.id ?? null}
+        machineOwnerId={machineOwnerId}
         machineId={machine.id}
         initialSets={sets}
         settingsRequests={machine.settingsRequests ?? null}

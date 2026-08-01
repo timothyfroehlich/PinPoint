@@ -1,13 +1,7 @@
 "use client";
 
 import type React from "react";
-import {
-  useState,
-  useActionState,
-  useRef,
-  useEffect,
-  startTransition,
-} from "react";
+import { useState, useActionState, useEffect, startTransition } from "react";
 import {
   updateIssuePriorityAction,
   type UpdateIssuePriorityResult,
@@ -42,8 +36,9 @@ interface UpdateIssuePriorityFormProps {
 const priorityOptions: IssuePriority[] = ["low", "medium", "high"];
 
 /**
- * Form component for updating issue priority with progressive enhancement.
+ * Form component for updating issue priority.
  * Uses useActionState for form submission with client-side validation.
+ * Dispatches the action directly rather than via `<form action={...}>` — see PP-0fvr.
  */
 export function UpdateIssuePriorityForm({
   issueId,
@@ -52,12 +47,8 @@ export function UpdateIssuePriorityForm({
   ownershipContext,
   compact = false,
 }: UpdateIssuePriorityFormProps): React.JSX.Element {
-  const formRef = useRef<HTMLFormElement>(null);
   const [selectedPriority, setSelectedPriority] =
     useState<IssuePriority>(currentPriority);
-  const [pendingPriority, setPendingPriority] = useState<IssuePriority | null>(
-    null
-  );
   const [state, formAction, isPending] = useActionState<
     UpdateIssuePriorityResult | undefined,
     FormData
@@ -83,20 +74,24 @@ export function UpdateIssuePriorityForm({
         ownershipContext
       );
 
-  // Auto-submit form when pending priority changes
-  useEffect(() => {
-    if (pendingPriority !== null && formRef.current) {
-      const form = formRef.current;
-      startTransition(() => {
-        form.requestSubmit();
-      });
-      setPendingPriority(null);
-    }
-  }, [pendingPriority]);
-
+  // Dispatch the action directly instead of routing through a native
+  // `<form>` submission. `@radix-ui/react-select` >=2.3.3 attaches a
+  // `reset` listener to the form it participates in and replays the
+  // Select's *initial* value through `onValueChange` when that event fires;
+  // React 19 auto-resets a `<form action={...}>` once the action settles,
+  // so a native submit here would emit a second, spurious `onValueChange`
+  // carrying the stale value shortly after every real selection (PP-0fvr).
+  // Building `FormData` by hand and calling the `useActionState` dispatch
+  // ourselves means no `<form>` is ever submitted, so neither React's
+  // auto-reset nor Radix's reset listener ever fires.
   const handleValueChange = (newPriority: IssuePriority): void => {
     setSelectedPriority(newPriority);
-    setPendingPriority(newPriority);
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("priority", newPriority);
+    startTransition(() => {
+      formAction(formData);
+    });
   };
 
   if (
@@ -148,14 +143,20 @@ export function UpdateIssuePriorityForm({
   );
 
   return (
+    // No `action` prop, no hidden inputs: submits are dispatched manually
+    // from `handleValueChange` above via `formAction(formData)`, never via
+    // native form submission (see comment there for why). Kept as a
+    // `<form>` element (rather than a `<div>`) purely so existing
+    // `form[data-form="update-priority"]` selectors keep matching; it is
+    // not natively submittable, so don't add an `action` or a submit
+    // control back onto it.
     <form
-      ref={formRef}
-      action={formAction}
+      onSubmit={(event) => {
+        event.preventDefault();
+      }}
       className="space-y-2"
       data-form="update-priority"
     >
-      <input type="hidden" name="issueId" value={issueId} />
-      <input type="hidden" name="priority" value={selectedPriority} />
       <div
         className={cn(
           "relative",

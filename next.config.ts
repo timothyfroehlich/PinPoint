@@ -26,8 +26,16 @@ const REQUIRED_ALL_DEPLOYMENTS: readonly RequiredEnvGroup[] = [
   ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
 ];
 
-// Required in Production only. Preview resolves the canonical site URL from
-// VERCEL_URL (see src/lib/url.ts getSiteUrl), so it is not required there.
+// Required in Production only.
+// - NEXT_PUBLIC_SITE_URL: Preview resolves the canonical site URL from
+//   VERCEL_URL (see src/lib/url.ts getSiteUrl), so it is not required there.
+//
+// This registry gates vars PinPoint itself cannot run correctly without. A var
+// that only configures an optional surface does NOT belong here, even when that
+// surface is production-only — see docs/ENV_VARS.md §4.2. MCP_BEARER_TOKEN /
+// MCP_ADMIN_USER_ID were briefly listed here and are the cautionary case: the
+// MCP server needs them, PinPoint does not, and gating the build on them turned
+// an unconfigured optional feature into a failed production deploy (PP-ogzs).
 const REQUIRED_PRODUCTION_ONLY: readonly RequiredEnvGroup[] = [
   ["NEXT_PUBLIC_SITE_URL"],
 ];
@@ -56,9 +64,22 @@ function assertVercelDeploymentEnv(): void {
 
 assertVercelDeploymentEnv();
 
+// Comma-separated hostnames/IPs allowed to reach the dev server's HMR/dev
+// resources when a browser hits it from a non-localhost origin (e.g. reaching a
+// Bazzite-hosted dev server from another tailnet machine). Dev-server-only —
+// `next build`/Vercel ignore `allowedDevOrigins`. Set per-machine in the
+// gitignored `.env.development.local`; empty/unset in normal local dev.
+const devAllowedOrigins = process.env["DEV_ALLOWED_ORIGINS"]
+  ?.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const nextConfig: NextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
   reactStrictMode: true,
+  ...(devAllowedOrigins?.length
+    ? { allowedDevOrigins: devAllowedOrigins }
+    : {}),
   experimental: {
     serverActions: {
       // Image uploads are sent through Server Actions as multipart FormData.
@@ -93,6 +114,17 @@ const nextConfig: NextConfig = {
         hostname: "localhost",
       },
     ],
+  },
+  async redirects() {
+    return [
+      // Shortlink for the quick report grid (PP-sn34). Temporary (307) so the
+      // canonical target can move without browsers hard-caching the redirect.
+      {
+        source: "/rq",
+        destination: "/report/quick",
+        permanent: false,
+      },
+    ];
   },
   async headers() {
     return [

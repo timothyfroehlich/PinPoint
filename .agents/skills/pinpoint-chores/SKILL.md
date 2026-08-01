@@ -1,6 +1,6 @@
 ---
 name: pinpoint-chores
-description: Runbook for the weekly PinPoint "chores" session — the human-in-the-loop maintenance pass (Supabase CLI pin, TS-7 rollout, Dependabot, changelog, Sentry/Supabase advisors, cloud-routine beads). Use when Tim says "let's do chores", when the SessionStart chores-nag fires ("🧹 Weekly chores are N days overdue"), or when you want the chores checklist. After finishing, re-arm the nag with `bd defer`.
+description: Runbook for the weekly PinPoint "chores" session — the human-in-the-loop maintenance pass (Supabase CLI pin, TS-7 rollout, Dependabot, changelog, Sentry/Supabase advisors, PinballMap vendored-docs drift, GHA infra-flake triage, cloud-routine beads). Use when Tim says "let's do chores", when the SessionStart chores-nag fires ("🧹 Weekly chores are N days overdue"), or when you want the chores checklist. After finishing, re-arm the nag with `bd defer`.
 ---
 
 # pinpoint-chores
@@ -32,13 +32,32 @@ Find the bead first (by label, so you have its ID for comments + the reset):
 
     bd update <chores-bead> --status in_progress
 
+**Delegate the context-heavy items to subagents.** The checklist keeps growing, and several items burn a lot of context (the GHA infra-flake triage, the Sentry / Supabase advisor sweeps, the Weekly-Review bead review). As lead, farm those out to subagents and keep just the synthesis — don't run everything inline. Give each subagent the item's runbook pointer and have it report back findings + proposed beads; you decide and file. Cheap, quick items (version-pin checks, the vendored-docs diff) can stay inline.
+
 Then work the checklist. For each item, note findings as a comment on the bead (`bd comments add <chores-bead> "..."`) and file follow-up beads for anything actionable — don't fix everything inline; chores is triage + quick wins.
 
 ### Checklist
 
-1. **Stale Supabase CLI pin check** (PP-nlv6)
-   - Compare the pinned Supabase CLI version against the latest release. The pin lives in CI setup / config; a version-drift nudge belongs here, not in per-session briefing.
-   - If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
+1. **Stale version-pin checks** (Supabase CLI — PP-nlv6; pnpm corepack pin — PP-w0eq)
+   - **Supabase CLI pin.** Compare the pinned Supabase CLI version against the latest release. A version-drift nudge belongs here, not in per-session briefing. If stale, file/refresh a bead to bump it (or bump it if trivial and verified).
+     - The pin is **9 sites across 4 files** — `ci.yml` (×6), plus `preview-control.yaml`, `preview-sync.yaml`, `preview-reaper.yaml` (×1 each). A bump is a multi-site edit: change **all nine or none**. A partial bump leaves jobs on mismatched CLI versions, which surfaces as a job-specific CI failure that reads like a flake rather than a bad edit.
+     - List every pin, then compare against the newest release:
+
+       ```bash
+       rg -n -A6 'uses: supabase/setup-cli' .github/workflows/*.y*ml | rg 'version:'
+       gh api /repos/supabase/cli/releases/latest --jq .tag_name
+       ```
+
+       (`-A6` matters — one call site has an extra `if:` line before `with:`, so a smaller window silently misses it and you'd bump 8 of 9.)
+   - **pnpm corepack pin.** The pnpm binary is pinned in the `packageManager` field of `package.json` (corepack). **Dependabot cannot bump this field** — it's an open, unimplemented feature request ([dependabot-core#4830](https://github.com/dependabot/dependabot-core/issues/4830)); Dependabot's pnpm support only updates deps _inside_ the lockfile, never the corepack pin. So this is the only watcher it has, and it silently rots without it (that's how we ended up 9 months behind on 10.2.0 until npm's audit-endpoint retirement forced the jump — PP-w0eq).
+     - **Apply a 30-day cooldown** (supply-chain soak — same rationale as the Dependabot npm cooldown): bump only to the newest stable pnpm ≥30 days old, never the just-released `latest`.
+     - Find the newest eligible version:
+
+       ```bash
+       npm view pnpm time --json | python3 -c "import json,sys,datetime as d; t=json.load(sys.stdin); c=d.datetime.now(d.UTC)-d.timedelta(days=30); r=[(v,ts) for v,ts in t.items() if '-' not in v and v.split('.')[0].isdigit()]; r.sort(key=lambda x:list(map(int,x[0].split('.')))); print(next(v for v,ts in reversed(r) if d.datetime.fromisoformat(ts.replace('Z','+00:00'))<=c))"
+       ```
+
+     - If it's newer than the current pin (mind major bumps — read the pnpm release notes/migration guide first), bump via `corepack use pnpm@<version>`, then verify no lockfile churn (`pnpm install --frozen-lockfile` → only `package.json` should change), `pnpm audit --audit-level=high` still resolves, and `pnpm run check` is green. PR it through the normal workflow; file a bead if a major bump needs real migration work.
 
 2. **TypeScript-7 rollout status**
    - Read `docs/plans/2026-06-27-typescript-7-upgrade-plan.md` for the current phase.
@@ -48,15 +67,38 @@ Then work the checklist. For each item, note findings as a comment on the bead (
 3. **Dependabot updates**
    - Review open Dependabot PRs (`gh pr list --author "app/dependabot"`). Merge the safe ones via the normal PR workflow; file a bead for any that need real work.
 
-4. **Release-notes / changelog routine output**
-   - Review what the changelog/release-notes routine produced since last chores. Correct or supplement as needed.
+4. **Changelog PR from the Weekly Review routine**
+   - The consolidated Weekly Review cloud routine opens a changelog PR (`docs/changelog-<date>`) when user-facing PRs merged that week. Review and merge it via the normal PR workflow (or correct/supplement first).
 
-5. **Sentry + Supabase advisor checks**
-   - Run the Sentry error scan and the Supabase advisor checks that previously lived in the session-start briefing. Triage new issues into beads.
+5. **Sentry + Supabase advisor checks** (moved here from the session-start briefing)
+   - **Sentry — new production errors.** Requires the Sentry MCP OAuth handshake; if the query tools aren't registered, run `mcp__plugin_sentry_sentry__authenticate`, complete the browser login, then `/reload-plugins` (tool registration is a one-time handshake — completing OAuth alone won't expose the query tools). Then `mcp__plugin_sentry_sentry__find_organizations` → `mcp__plugin_sentry_sentry__search_issues` with `query: "is:unresolved firstSeen:>-7d"`. Flag high-event-count issues and new regressions; triage into beads.
+   - **Supabase advisors — prod** (`project_id` = `udhesuizjsgxfeotqybn`, PinPoint-Prod). Load the deferred tool first (`ToolSearch` query `select:mcp__plugin_supabase_supabase__get_advisors`), then call `mcp__plugin_supabase_supabase__get_advisors` twice: `type: "security"` (RLS gaps, exposed tables/functions, auth misconfig) and `type: "performance"` (unindexed FKs, RLS initplan re-evaluation, unused indexes). ERROR-level security lints are immediate-attention. **Known-intentional:** tables with RLS **enabled but zero policies** are the deliberate Drizzle-superuser-only pattern (migration 0034), not a regression — don't file them. If the MCP isn't connected, note the one-line skip and move on. File beads for genuine findings.
 
-6. **Review beads filed by the cloud routines**
-   - The scheduled cloud routines write findings straight into beads (security findings, flaky-test reports, etc.). Review everything filed since the last chores session and act on / prioritize / decline each.
-   - Handy: `bd list --json` filtered by recent `created_at`, or the labels the routines use.
+6. **Review beads filed by the Weekly Review routine**
+   - The consolidated Weekly Review cloud routine files beads for its security findings (`security` label) and its flaky-test report (`flaky-test` label). Review everything filed since the last chores session and act on / prioritize / decline each.
+   - Handy: `bd list --label security` and `bd list --label flaky-test`, or `bd list --json` filtered by recent `created_at`.
+
+7. **PinballMap vendored-docs drift check** (CORE-PBM-001)
+   - Fetch the live `https://pinballmap.com/llms.txt` and `https://pinballmap.com/robots.txt`, and diff each against the vendored copy in `docs/external/` (`pinballmap-llms.txt`, `pinballmap-robots.txt`). These must stay **byte-identical** to what PBM serves.
+   - If either changed: refresh the vendored file verbatim from source, then re-review the conduct / rate-limit / attribution implications against `src/lib/pinballmap/`. File a bead if the change affects API conduct (not just a trivial wording tweak).
+   - This weekly check is our **standing** drift guard — there is no automated drift GHA (the once-planned PP-o355.9 was closed in favor of this).
+
+8. **GHA infra-flake triage**
+   - Run the weekly triage procedure in `docs/runbooks/gha-flake-log.md`: read the recent weekly `gha-flake-week` sighting beads (current ISO week + prior 2) plus the permanent `gha-flake-log` ledger, pull new sightings past the ledger cursor, cluster by signature, rule out non-issues, spin genuine recurring infra issues into child beads, catch regressions against `fixed` rows, close aged-out weekly beads, then rewrite the ledger and advance the cursor.
+   - This is context-heavy — a good candidate to delegate to a subagent (see "Running the chores").
+
+9. **Prod backup validation**
+   - Run `pnpm run chores:backups`. It calls `supabase backups list` against PinPoint-Prod and asserts the daily physical backups are still happening: newest COMPLETED backup < 48h old, at least 7 retained, `walg_enabled` true. It warns on a 24–48h-old newest backup, any non-`COMPLETED` entry, and a >36h gap inside the window; it reports `pitr_enabled` so a posture change is visible.
+   - **What this proves and doesn't.** It attests that backups **exist** and are being **retained**. It does **not** prove they restore — a real restore drill means restoring a physical backup into a throwaway project, which isn't a weekly-cadence activity. Don't let a green run read as "DR is verified."
+   - On **FAIL**: check the Supabase dashboard and `status.supabase.com` before assuming the script is wrong, then file a **P1** bead. This is the only signal we have that the DR posture in `AGENTS.md` §7 is still true.
+   - On **WARN**: note it as a comment on the chores bead; a single skipped day isn't an incident, a pattern across weeks is.
+   - Requires the Supabase CLI to be logged in (`supabase login`) — auth comes from its stored token, not an env var. `pnpm run db:backup` is unrelated: that's a data-only `public`-schema dev-seeding dump with no schema and no `auth.users`, not a DR artifact.
+
+10. **Memory & context review** (PP-uoqg)
+    - Load the `pinpoint-memory-review` skill and run a pass. It reviews every store of recorded context across both machines — beads memories, Claude auto-memories on the Mac and Bazzite, and the canonical context files — then proposes prunes, promotions, and dedupes and hands Tim a short veto list.
+    - **This is also the sync mechanism.** Claude auto-memory is per-machine and syncs nowhere, so skipping this item is what lets the two machines drift apart. It is the reason Bazzite once knew a tmux fix for twelve days while the Mac rediscovered it from scratch.
+    - The most context-heavy item on the list — **delegate the verification fan-out to subagents** per that skill and keep only the synthesis inline.
+    - The veto list is presented **in-session**, one line per item. Tim drills into whichever ones he wants; don't hand him a document.
 
 ## Finish: re-arm the nag
 

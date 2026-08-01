@@ -135,7 +135,7 @@ export function SignupForm({
           id="email"
           name="email"
           type="email"
-          autoComplete="email"
+          autoComplete="username"
           required
           enterKeyHint="next"
           className="bg-surface-variant"

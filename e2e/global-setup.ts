@@ -1,7 +1,14 @@
 import { execSync, spawnSync } from "child_process";
 import { existsSync } from "fs";
 
-import { chromium, firefox, webkit, type FullConfig } from "@playwright/test";
+import {
+  chromium,
+  firefox,
+  webkit,
+  type Browser,
+  type BrowserType,
+  type FullConfig,
+} from "@playwright/test";
 import postgres from "postgres";
 
 function redactUrl(url: string): string {
@@ -16,37 +23,44 @@ function redactUrl(url: string): string {
 
 type BrowserName = "chromium" | "firefox" | "webkit";
 
-const BROWSER_ENGINES: Record<BrowserName, { executablePath(): string }> = {
+const BROWSER_ENGINES: Record<BrowserName, BrowserType> = {
   chromium,
   firefox,
   webkit,
 };
 
 /**
- * Verify Playwright browser binaries are installed for every project the
- * active config will run. Failing fast here turns a cryptic mid-run
- * `browserType.launch: Executable doesn't exist` into an actionable error.
- *
- * Only checks browsers the active config actually needs — CI installs
- * chromium only, so blanket-checking firefox/webkit would break CI.
+ * The engines the active config needs. Only browsers the config actually
+ * asks for — CI installs chromium only, so blanket-checking firefox/webkit
+ * would break CI. A config with no projects needs nothing, which is also the
+ * seam the unit tests use to disable browser checks entirely.
  */
-function checkBrowserBinaries(config: FullConfig): void {
+function neededBrowsers(config: FullConfig): Set<BrowserName> {
   const needed = new Set<BrowserName>();
   for (const project of config.projects) {
     const name = project.use.browserName ?? "chromium";
     if (name in BROWSER_ENGINES) needed.add(name);
   }
+  return needed;
+}
 
-  const missing: BrowserName[] = [];
-  for (const browser of needed) {
-    try {
-      if (!existsSync(BROWSER_ENGINES[browser].executablePath())) {
-        missing.push(browser);
-      }
-    } catch {
-      missing.push(browser);
-    }
+function isInstalled(browser: BrowserName): boolean {
+  try {
+    return existsSync(BROWSER_ENGINES[browser].executablePath());
+  } catch {
+    return false;
   }
+}
+
+/**
+ * Verify Playwright browser binaries are installed for every project the
+ * active config will run. Failing fast here turns a cryptic mid-run
+ * `browserType.launch: Executable doesn't exist` into an actionable error.
+ */
+function checkBrowserBinaries(config: FullConfig): void {
+  const needed = neededBrowsers(config);
+
+  const missing = [...needed].filter((browser) => !isInstalled(browser));
 
   if (missing.length > 0) {
     const names = missing.join(" ");
@@ -55,6 +69,147 @@ function checkBrowserBinaries(config: FullConfig): void {
         `  Install with: pnpm exec playwright install --with-deps ${names}`
     );
   }
+}
+
+/** One engine that launched but failed its render check, and what to do. */
+interface BrowserProbeFailure {
+  browser: BrowserName;
+  detail: string;
+  remedy: string;
+}
+
+const TEXT_PROBE_HTML =
+  '<!doctype html><meta charset="utf-8"><span id="probe">PinPoint</span>';
+
+/**
+ * The engine came up but shaped nothing — the case this guard was written for.
+ * Only ever reached by the measured-0px path, never by a launch failure.
+ */
+const FONT_REMEDY =
+  `launched but rendered no glyphs — the host font stack is broken\n` +
+  `      Try: rm -f ~/.cache/fontconfig/*.cache-* && fc-cache -f\n` +
+  `      ostree hosts pin /usr/share/fonts to mtime 0, so fontconfig never\n` +
+  `      invalidates a stale cache entry on its own. See PP-8b6j.`;
+
+/**
+ * Remedy for an engine that threw on the way up. Only failure shapes we can
+ * positively identify get a specific fix; everything else stays deliberately
+ * neutral. A confidently wrong remedy is worse than none — it sends the reader
+ * off to "repair" a healthy part of their machine while the real cause sits
+ * unread in the message above. Launch timeouts on a loaded host and sandboxed
+ * Chromium startup crashes both land in the neutral branch.
+ */
+function launchRemedy(browser: BrowserName, message: string): string {
+  // Reachable despite the isInstalled() filter: that check resolves the default
+  // executable, while a project pinning `channel` launches a different binary.
+  if (message.includes("Executable doesn't exist")) {
+    return (
+      `${browser} is not installed\n` +
+      `      Install with: pnpm exec playwright install --with-deps ${browser}`
+    );
+  }
+  const missingLib = /error while loading shared libraries: ([^\s:]+)/.exec(
+    message
+  );
+  if (missingLib) {
+    return (
+      `missing system library ${missingLib[1]}\n` +
+      `      Try: pnpm exec playwright install-deps ${browser}\n` +
+      `      Fedora/ostree hosts have no install-deps support — install the\n` +
+      `      matching system package, or leave this engine to CI.`
+    );
+  }
+  return (
+    `failed to launch — see the error above for the cause\n` +
+    `      The engine never got far enough to render, so this is not a font problem.`
+  );
+}
+
+async function probeBrowser(
+  browser: BrowserName
+): Promise<BrowserProbeFailure | null> {
+  let instance: Browser | undefined;
+  try {
+    instance = await BROWSER_ENGINES[browser].launch();
+    const page = await instance.newPage();
+    await page.setContent(TEXT_PROBE_HTML);
+    // Zero width means fontconfig handed the engine no usable font. Chromium
+    // usually aborts outright before reaching here; Firefox/WebKit degrade to
+    // an unrendered run instead, so measure rather than trusting a clean launch.
+    const width = await page.evaluate(
+      () => document.getElementById("probe")?.getBoundingClientRect().width ?? 0
+    );
+    if (width > 0) return null;
+    return {
+      browser,
+      detail: "text measured 0px wide",
+      remedy: FONT_REMEDY,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      browser,
+      detail: message.split("\n")[0] ?? message,
+      remedy: launchRemedy(browser, message),
+    };
+  } finally {
+    if (instance) await instance.close().catch(() => undefined);
+  }
+}
+
+/**
+ * An engine that is *installed* but cannot render text is worse than one
+ * that's missing: every spec fails later with an unrelated-looking assertion
+ * instead of an error naming the real cause. The instance this exists for
+ * (PP-8b6j): a stale `~/.cache/fontconfig` entry made fontconfig report zero
+ * fonts, so Skia CHECK-failed in SkFontMgr_FontConfigInterface and Chromium's
+ * renderer died the instant a spec typed into a field. It presented as
+ * `fill()` silently no-opping — auth-setup just kept landing on /login — and
+ * cost several days across sessions. It does not self-heal: ostree pins
+ * /usr/share/fonts to mtime 0 and fontconfig keys cache validity on directory
+ * mtime, so a bad entry is never invalidated. The same zero-font state is why
+ * headless screenshots wouldn't rasterize text (PP-rsy3).
+ *
+ * So launch each engine once and confirm it can shape a run of text. Chromium
+ * is fatal — auth-setup runs there, so nothing downstream can pass without it.
+ * Other engines only warn, so one broken engine doesn't block the rest.
+ *
+ * Probes `needed ∩ installed`. Needed (not every installed engine) so CI's
+ * chromium-only runs don't demand firefox/webkit, and so a config with no
+ * projects probes nothing — the seam the unit tests rely on. Installed (not
+ * merely needed) so a missing binary stays `checkBrowserBinaries`' story and
+ * is never reported here as a font fault.
+ *
+ * Scope note: device-based projects carry their engine on
+ * `defaultBrowserType`, which Playwright leaves out of `use.browserName`, so
+ * `needed` resolves to chromium for our configs. That is the engine that
+ * matters here. WebKit's own breakage on this host is a separate, loud
+ * launch failure (PP-5f22), not a silent one.
+ */
+async function checkBrowsersRenderText(config: FullConfig): Promise<void> {
+  const targets = [...neededBrowsers(config)].filter(isInstalled);
+  const probes = await Promise.all(
+    targets.map((browser) => probeBrowser(browser))
+  );
+  const failures = probes.filter(
+    (probe): probe is BrowserProbeFailure => probe !== null
+  );
+  if (failures.length === 0) return;
+
+  const describe = (failure: BrowserProbeFailure): string =>
+    `  ✗ ${failure.browser}: ${failure.detail}\n      ${failure.remedy}`;
+
+  if (failures.some((failure) => failure.browser === "chromium")) {
+    throw new Error(
+      "Browser engine cannot render text — every spec would fail downstream:\n" +
+        failures.map(describe).join("\n")
+    );
+  }
+
+  console.warn(
+    "⚠️  Unusable browser engine(s) on this host — their projects will fail:"
+  );
+  for (const failure of failures) console.warn(describe(failure));
 }
 
 /**
@@ -152,6 +307,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   // need to be there for tests to launch.
   console.log("🔍 Checking Playwright browser binaries...");
   checkBrowserBinaries(config);
+  await checkBrowsersRenderText(config);
 
   console.log("🔍 Checking Docker daemon...");
   checkDocker();

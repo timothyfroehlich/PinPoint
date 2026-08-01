@@ -423,6 +423,32 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.pinballmap.link", "admin")).toBe(true);
     });
 
+    it("should restrict pushing listing changes to PinballMap to admins", () => {
+      // Writes go through the shared operator token, so unlike read-only
+      // linking (owner/tech/admin) this is admin-only in v1 (PP-o355.12).
+      expect(getPermission("machines.pinballmap.push", "unauthenticated")).toBe(
+        false
+      );
+      expect(getPermission("machines.pinballmap.push", "guest")).toBe(false);
+      expect(getPermission("machines.pinballmap.push", "member")).toBe(false);
+      expect(getPermission("machines.pinballmap.push", "technician")).toBe(
+        false
+      );
+      expect(getPermission("machines.pinballmap.push", "admin")).toBe(true);
+    });
+
+    it("should restrict PinballMap sync to technicians and admins", () => {
+      expect(getPermission("machines.pinballmap.sync", "unauthenticated")).toBe(
+        false
+      );
+      expect(getPermission("machines.pinballmap.sync", "guest")).toBe(false);
+      expect(getPermission("machines.pinballmap.sync", "member")).toBe(false);
+      expect(getPermission("machines.pinballmap.sync", "technician")).toBe(
+        true
+      );
+      expect(getPermission("machines.pinballmap.sync", "admin")).toBe(true);
+    });
+
     it("should require authentication to watch machines", () => {
       expect(getPermission("machines.watch", "unauthenticated")).toBe(false);
       expect(getPermission("machines.watch", "guest")).toBe(true);
@@ -583,5 +609,21 @@ describe("admin.integrations.manage permission", () => {
     expect(
       checkPermission("admin.integrations.manage", "unauthenticated")
     ).toBe(false);
+  });
+});
+
+describe("issues.report.quick", () => {
+  it("is granted to member, technician, and admin", () => {
+    expect(checkPermission("issues.report.quick", "member")).toBe(true);
+    expect(checkPermission("issues.report.quick", "technician")).toBe(true);
+    expect(checkPermission("issues.report.quick", "admin")).toBe(true);
+    expect(checkPermission("issues.report.quick", "guest")).toBe(false);
+    expect(checkPermission("issues.report.quick", "unauthenticated")).toBe(
+      false
+    );
+  });
+
+  it("is registered in PERMISSIONS_BY_ID", () => {
+    expect(PERMISSIONS_BY_ID["issues.report.quick"]).toBeDefined();
   });
 });

@@ -1,0 +1,2 @@
+ALTER TABLE "machines" ADD COLUMN "pinballmap_listed" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "machines" ADD CONSTRAINT "machines_pinballmap_listed_requires_link" CHECK (NOT (pinballmap_listed AND pinballmap_machine_id IS NULL));

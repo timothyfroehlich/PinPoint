@@ -11,6 +11,7 @@ import {
   resetPasswordSchema,
 } from "./schemas";
 import { log } from "~/lib/logger";
+import { maskEmail } from "~/lib/logging/mask";
 import {
   serverActionError,
   reportError,
@@ -132,7 +133,7 @@ export async function loginAction(
     if (!accountLimit.success) {
       log.warn(
         {
-          email: email.substring(0, 3) + "***",
+          email: maskEmail(email),
           action: "login",
           resetIn: formatResetTime(accountLimit.reset),
         },
@@ -516,7 +517,7 @@ export async function forgotPasswordAction(
     if (!emailLimit.success) {
       log.warn(
         {
-          email: email.substring(0, 3) + "***",
+          email: maskEmail(email),
           action: "forgot-password",
           resetIn: formatResetTime(emailLimit.reset),
         },
@@ -660,10 +661,7 @@ export async function resetPasswordAction(
         if (resetCodes.has(mapped.code)) {
           return err(
             mapped.code as
-              | "WEAK_PASSWORD"
-              | "SAME_PASSWORD"
-              | "SERVER"
-              | "VALIDATION",
+              "WEAK_PASSWORD" | "SAME_PASSWORD" | "SERVER" | "VALIDATION",
             mapped.message
           );
         }

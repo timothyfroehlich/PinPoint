@@ -62,8 +62,9 @@ export async function updateNotificationPreferencesAction(
 
   // Absent fields are preserved (not coerced to false). The SwitchWithFormSupport
   // hidden input always submits "on" or "off" from the resolved switch state, so
-  // a JS-enabled save sends every rendered field. Anything missing — direct API
-  // call, future per-toggle save, no-JS submit — leaves that column untouched.
+  // a normal save sends every rendered field. Anything missing — direct API
+  // call, a future per-toggle save, a partial submit — leaves that column
+  // untouched.
   const rawData: Partial<Record<PrefField, boolean>> = {};
   for (const name of PREF_FIELDS) {
     const value = formData.get(name);

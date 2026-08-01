@@ -1,14 +1,9 @@
----
-trigger: always_on
-# For Antigravity
----
-
 # PinPoint Non‑Negotiables
 
-**Last Updated**: 2026-06-18
-**Version**: 2.3 (PinballMap API conduct added — CORE-PBM-001)
+**Last Updated**: 2026-07-27
+**Version**: 2.5 (progressive-enhancement non-negotiable retired; CORE-ARCH-012 honest-failure added — PP-nw80)
 
-> **Sync contract**: `AGENTS.md` §2.1 is a one-line index of these rules. Every §2.1 entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
+> **Sync contract**: `AGENTS.md`'s rule index is a one-line summary of these rules. Every index entry cites the canonical `CORE-*` ID(s) here. When a rule changes, update both.
 
 ## Overview
 
@@ -30,7 +25,7 @@ trigger: always_on
 8. Never use `any`, non-null `!`, or unsafe `as` (CORE-TS-007)
 9. Default to Server Components, minimal Client Components (CORE-ARCH-001)
 10. Map data to minimal shapes before passing to Client Components (CORE-SEC-006)
-11. Forms work without JavaScript (CORE-ARCH-002)
+11. A control that cannot act must not report that it did (CORE-ARCH-012)
 12. Drizzle migrations only — no `drizzle-kit push` (CORE-ARCH-009)
 13. Use `localhost`, never `127.0.0.1`, for local URLs (CORE-SEC-008)
 14. Pick the cheapest test layer that catches the bug class (CORE-TEST-005)
@@ -218,15 +213,29 @@ trigger: always_on
 - **Severity:** Critical
 - **Why:** Browser cookies set on `localhost` are not sent to `127.0.0.1`. Mixing the two across Supabase site URL, Next.js dev server, and Playwright `baseURL` breaks SSR auth — Server Actions see anonymous users after a successful login.
 - **Do:** Use `localhost` in `supabase/config.toml`, `.env*`, Playwright `baseURL`, health-check scripts, and any local HTTP endpoint.
-- **Don't:** Use `127.0.0.1:NNNN` for any local URL agents or the dev stack will read. CSP rules and validation checks that intentionally cover both forms are the only exception.
+- **Don't:** Use `127.0.0.1:NNNN` for any local URL agents or the dev stack will read.
+- **Exceptions:** CSP rules and validation checks that intentionally cover both forms; and server-to-server connections where no browser or cookie is involved — e.g. the local Mailpit SMTP client in `src/lib/email/transport.ts` defaults `host` to `127.0.0.1`, and the cookie-isolation rationale above simply does not apply to a Node SMTP socket.
 
 **CORE-SEC-009:** Production-required env vars go in the central build registry; no secret coupling
 
 - **Severity:** High
 - **Why:** A required env var that only logs or degrades when missing ships a broken feature to production undetected (the unsubscribe-link / CAN-SPAM incident, PP-7xt). Reusing one secret as another's fallback means rotating it silently breaks the borrower (the `UNSUBSCRIBE_SIGNING_SECRET` ↔ `SUPABASE_SERVICE_ROLE_KEY` coupling).
 - **Do:** Declare every production-required env var in the registry in `next.config.ts` (`assertVercelDeploymentEnv`) so a missing value **fails the Vercel build**. Give each secret its own value. Catalog every new var in `docs/ENV_VARS.md` with its scope and sensitivity.
+- **Scope — "production-required" means PinPoint is broken without it,** not merely "it's a secret", "it's production-only", or "a feature degrades". The registry is a deploy gate: everything in it can take production deploys down. A var that only configures an **optional surface** — one whose absence leaves the rest of the app correct, and whose sole consumer notices immediately — belongs in `docs/ENV_VARS.md` §4.2 instead. Test: _if this were unset in prod right now, would users be silently harmed?_ Unsubscribe links → yes, registry. The MCP admin server → no, it just 401s → §4.2. Adding an optional feature's var to the registry hard-failed a production deploy (PP-ogzs).
+- **Order matters:** a var added to the registry must exist in the Vercel scope **before** the PR merges — the gate fires on the first deploy after merge, not in CI.
 - **Don't:** Rely on runtime logs/graceful degradation for a var that must exist in prod; reuse one secret as a fallback for a different purpose; prefix a secret `NEXT_PUBLIC_` (it inlines into the client bundle). Same-value alias _names_ (e.g. `SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_SECRET_KEY`) are fine.
 - **Reference:** `docs/ENV_VARS.md` — full catalog, scope matrix, and "adding a new env var" checklist.
+
+**CORE-SEC-010:** Prod-mutating Supabase surfaces stay behind a permission prompt
+
+- **Severity:** Critical
+- **Why:** `pinpoint-prod` (`udhesuizjsgxfeotqybn`) is the **only** project in the Supabase org, so any remote-targeting Supabase call lands on live member data — there is no staging project to hit by mistake. PITR is off; the recovery floor is the previous nightly backup, i.e. up to ~24h of data loss. MCP tool calls do not go through Bash at all, so neither the `PreToolUse` hook stack nor the script-level guards (`assertNotDrizzlePush()`, `scripts/assert-local-db.mjs`) can see them, and the destructive Supabase CLI verbs beyond `db push` had no rule of any kind.
+- **Do:** Keep two lists in `.claude/settings.json` current:
+  - **MCP** — every write-capable tool on `permissions.ask` as a bare tool name (`mcp__claude_ai_Supabase__execute_sql`, `…__apply_migration`, `…__deploy_edge_function`, `…__pause_project`, `…__restore_project`, `…__create_project`, and the branch mutators). MCP rules take no argument pattern: no `Bash(...)` wrapper, no `:*` suffix. Add newly-exposed write tools when the connector's surface grows.
+  - **CLI** — `ask` on `supabase db reset`, `supabase db remote commit`, `supabase migration repair`, `supabase branches delete`; `deny` on `supabase db push` and `supabase projects delete`. `deny` is reserved for verbs with **no** legitimate use here (prod is the only project, and a deleted project is not recoverable from a nightly backup). `db reset` stays on `ask` rather than `deny` because the local form is routine and a prefix rule cannot reliably distinguish it from `--linked` — the prompt shows the full command, so the human sees `--linked` before approving.
+- **Don't:** Put a write surface on `allow`, or leave a newly-exposed one unlisted (unlisted defaults to unprompted). Don't gate the read-only MCP tools (`list_*`, `get_*`, `search_docs`, `generate_typescript_types`) — prompting on those trains the reflex to click through. Don't add a `PreToolUse` hook to chase wrapper evasion; this repo tried twice (PRs #1736, #1738) and concluded effect-rules belong at the lowest layer.
+- **Scope — these rules are a speed bump, not a security boundary.** Bash permission rules are prefix matchers over the command string, so a wrapper shape (`sh -c "…"`, `eval`, env indirection) walks straight past them, exactly as it does past the hook stack. `ask` is a prompt, not a block. They stop accidents, not intent. They also do not reach child processes: `e2e/global-setup.ts` shells out to `supabase db reset --yes` against the **local** stack from inside the Playwright global-setup process, which is not an agent Bash call and is therefore unaffected — as is `pnpm run db:reset`, which is `supabase stop && supabase start` + drop + migrate + seed and never calls `supabase db reset`.
+- **Enforced by:** `permissions.deny` / `permissions.ask` in `.claude/settings.json`; the `verify-guard-stack.cjs` SessionStart canary warns if either list is emptied or dropped.
 
 ---
 
@@ -289,7 +298,7 @@ trigger: always_on
 **CORE-TEST-005:** Interaction Coverage at the Cheapest Catching Layer
 
 - **Severity:** Required
-- **Why:** Tests that verify element existence without exercising the handler miss broken wiring (PR #894 pattern). But E2E is not always the cheapest layer that catches that bug class — see AGENTS.md §2.1 "Interaction Coverage at the Cheapest Layer" and the 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`).
+- **Why:** Tests that verify element existence without exercising the handler miss broken wiring (PR #894 pattern). But E2E is not always the cheapest layer that catches that bug class — see the 2026-05 audit (`docs/testing/e2e-audit-2026-05.md`).
 - **Do:** Every clickable user-facing element must be exercised by at least one test that actually invokes its handler. Pick the layer by bug class: multi-step journeys → E2E; Server Action wiring / permissions / DB queries → integration (PGlite + direct action call); pure form-state / UI logic → RTL unit.
 - **Don't:** Only assert `toBeVisible()` without testing the interaction. Also don't reflexively write E2E for every clickable — integration or RTL is usually faster and more thorough for class-B / E / I bugs.
 
@@ -310,13 +319,6 @@ trigger: always_on
 - **Why:** Better performance, SEO, reduced bundle size
 - **Do:** Default to Server Components, use "use client" only for interactivity
 - **Don't:** Make entire pages Client Components unnecessarily
-
-**CORE-ARCH-002:** Progressive enhancement
-
-- **Severity:** Required
-- **Why:** Forms work without JavaScript
-- **Do:** Use Server Actions with `<form action={serverAction}>`
-- **Don't:** Require client-side JavaScript for core functionality
 
 **CORE-ARCH-004:** Issues always per-machine
 
@@ -362,6 +364,7 @@ trigger: always_on
 - **Why:** Production has real user data. `push` bypasses migration history, can drop columns silently, and corrupts the schema's relationship to `drizzle/meta` snapshots. Supabase migrations are disabled (`db.migrations.enabled = false`) — Drizzle is the single source of truth.
 - **Do:** Use `pnpm run db:generate` to author migrations, then `pnpm run db:migrate` to apply. Treat `drizzle/meta` snapshots as authoritative; never edit them by hand (see also `AGENTS.md` §5 Migration conflicts).
 - **Don't:** Run `drizzle-kit push` against any database (local, preview, prod). Don't use Supabase CLI migrations. Don't hand-edit `drizzle/meta/*.json`.
+- **Enforced by:** `drizzle.config.ts` calls `assertNotDrizzlePush()` (`scripts/lib/drizzle-push-guard.ts`) before any credential is resolved, so drizzle-kit refuses `push` no matter how it was invoked. `package.json`'s `db:_push` tripwire is a second, independent line of defense.
 
 **CORE-ARCH-010:** Rule of Three before abstracting
 
@@ -377,6 +380,13 @@ trigger: always_on
 - **Do:** Keep transaction callbacks to transactional DB work only. Fetch external inputs (e.g. the Discord Vault token via `getDiscordConfig()`) _before_ opening the transaction. Deliver external effects _after_ commit — use `after()` in a Server Action plus the two-phase `planNotification` (in-transaction writes) / `dispatchNotification` (post-commit fan-out) split. A runtime tripwire enforces this: `db.transaction` sets an in-transaction `AsyncLocalStorage` flag (`~/server/db/transaction-context`), and the email / Discord / blob / Vault-RPC client wrappers throw `SideEffectInTransactionError` if invoked while it is set — failing loudly in dev, test, and CI. A static ESLint backstop (`no-restricted-syntax`, options in `eslint-rules/no-side-effects-in-transaction.mjs`) catches the same violation at lint/CI time, before runtime: it flags calls to `sendEmail` / `sendDm` / `dispatchNotification` / `uploadToBlob` / `deleteFromBlob` / `getDiscordConfig` / `fetch` / `*.emails.send` inside a `db.transaction(...)` callback.
 - **Don't:** Call `sendEmail`, `sendDm`, `uploadToBlob`/`deleteFromBlob`, `getDiscordConfig`, `fetch`, or any other HTTP/IO from inside a `db.transaction(...)` callback. Don't "optimize" by moving a pre-fetch into the transaction. Don't catch and swallow `SideEffectInTransactionError` — fix the call site to run post-commit.
 
+**CORE-ARCH-012:** A control that cannot act must not report that it did
+
+- **Severity:** Required
+- **Why:** PinPoint does not support JavaScript-disabled browsers, and a visibly broken control is an acceptable outcome when JavaScript fails to load — the user can see something is wrong and retry. What is not acceptable is a control that reports success for an action it could not perform: the user walks away believing the change was saved. Visible breakage is recoverable; false confirmation is not. Replaces the progressive-enhancement non-negotiable retired on 2026-07-27 (see the Rule IDs appendix), after an audit found that only ~7 of ~28 submission surfaces worked without JavaScript and that the public `/report` entry point — the rule's flagship surface — was unconditionally broken. Audit and reasoning: `docs/superpowers/specs/2026-07-27-core-arch-002-scope-design.md` (PP-nw80).
+- **Do:** When a control cannot perform its action — a dependency is unavailable, JavaScript is not running, a precondition is unmet — let it visibly do nothing, or surface a real error. Rely on server-side validation to reject submissions that could not have carried valid input.
+- **Don't:** Render a success message, toast, or confirmation for a submission whose input could not have been collected. Don't wire a save control that submits unchanged state and confirms it as a change.
+
 ---
 
 ## Integrations
@@ -385,8 +395,9 @@ trigger: always_on
 
 - **Severity:** High
 - **Why:** PinballMap is a third-party community service we both read from and write to publicly. Their `llms.txt` sets explicit conduct (use bulk endpoints, don't poll in loops, store-and-reuse tokens, real-but-generous rate limits) and their `robots.txt` blocks AI crawlers from the website — the documented JSON API is the only sanctioned channel. Their FAQ requires attribution + a link back when displaying their data. Ignoring this risks rate-limit bans and violates their terms.
-- **Do:** Route all PBM access through the `PinballMapClient` seam (`~/lib/pinballmap`). Use the documented JSON API per the vendored `docs/external/pinballmap-llms.txt`; one location call per hour for sync; store and reuse tokens in Supabase Vault; send a descriptive User-Agent with a contact URL; back off on 429; render attribution + a link back to pinballmap.com wherever PBM data appears. Re-read the vendored `docs/external/pinballmap-*` files (kept current by the drift GHA) before changing integration code.
-- **Don't:** Crawl or scrape pinballmap.com HTML; poll the API in loops to detect changes; call `auth_details` per request; use undocumented/web-only routes; or reach pinballmap.com from any test (that is also CORE-TEST-006 — mock at the client seam).
+- **Mandatory API token (from July 30 2026):** PBM is closing its previously-open API behind a required `api_token` (blog 2026-07-16). Once their `REQUIRE_API_TOKEN` gate flips on, **ALL v1 endpoints — reads included — require the token**. This is a **two-layer** auth model: the `api_token` (sent as the `X-Api-Token` header, tied to an approved account, global limit **120/min**) is the blanket access gate for reads _and_ writes; writes **also** still carry the per-operator identity (`user_email` + `user_token`) as query params. The `api_token` is a **platform capability, not tenant data** — PBM issues it to an approved account against a use-plan, i.e. to PinPoint-the-application — so it is a deploy-time constant read from the `PINBALLMAP_API_TOKEN` env var (`~/lib/pinballmap/api-token.ts`) and injected onto every request by `createLiveClient`. It is deliberately **not** in the `next.config.ts` build registry: without it PBM sync degrades and nothing else breaks (CORE-SEC-009; docs/ENV_VARS.md §4.2). The per-operator write creds stay in Supabase Vault (`pinballmap_state.outbound_token_vault_id`) because they are per-user identity arriving at runtime through a connect flow. (PP-uusr; moved out of Vault by PP-o355.23 / migration 0059.)
+- **Do:** Route all PBM access through the `PinballMapClient` seam (`~/lib/pinballmap`). Use the documented JSON API per the vendored `docs/external/pinballmap-llms.txt`. Sync cadence: the automated cron does one location call per hour; human-initiated "Sync now"/verify refreshes are throttled at the `syncLocationSnapshot` seam to at most one per `PBM_MANUAL_SYNC_MIN_INTERVAL_MS` (3 min → ≤20/hour), enforced against the last ATTEMPT so a failed fetch can't fail-open the guard (PP-hbi0). Store and reuse the `api_token` (env var) + operator tokens (Supabase Vault) and send `X-Api-Token` on every request; send a descriptive User-Agent with a contact URL; back off on 429; render attribution + a link back to pinballmap.com wherever PBM data appears. Re-read the vendored `docs/external/pinballmap-*` files (kept current by the drift GHA) before changing integration code.
+- **Don't:** Crawl or scrape pinballmap.com HTML; poll the API in loops to detect changes; call `auth_details` per request; ship a live request without the `X-Api-Token` header once provisioned; use undocumented/web-only routes; or reach pinballmap.com from any test (that is also CORE-TEST-006 — mock at the client seam).
 
 ---
 
@@ -437,7 +448,7 @@ trigger: always_on
 - **Why:** JS viewport checks create hydration mismatches, add resize listeners, and duplicate CSS's job
 - **Do:** Use Tailwind breakpoint classes or container queries
 - **Don't:** `window.innerWidth`, `window.matchMedia`, `useMediaQuery` hooks
-- **Sanctioned exceptions** (behavior swaps CSS can't express, not styling): `use-table-responsive-columns` (PP-rs9), `use-is-mobile` (PP-43q3 — swaps inline cell editing for a bottom-sheet editor on mobile)
+- **Sanctioned exceptions** (behavior swaps CSS can't express, not styling): `use-table-responsive-columns` (PP-rs9); `use-is-mobile` (PP-43q3) — two consumers: it swaps inline cell editing for a bottom-sheet editor, and swaps the arm/confirm-tap delete affordance for a modal confirm in `ConfirmingDeleteButton`
 
 **CORE-RESP-003:** sm: is padding only
 
@@ -449,9 +460,9 @@ trigger: always_on
 **CORE-RESP-004:** Overflow testing required
 
 - **Severity:** High
-- **Why:** Horizontal overflow is invisible to Playwright visibility assertions but breaks the user experience
-- **Do:** Add route to `e2e/smoke/responsive-overflow.spec.ts` when creating a new page
-- **Don't:** Ship a new page without overflow coverage at both mobile and desktop viewports
+- **Why:** Horizontal overflow is invisible to Playwright visibility assertions but breaks the user experience. It is also invisible to a naive `document.scrollWidth` check, because the app shell clips overflow at `<body>` (`overflow-x: hidden` in `globals.css`) — so `assertNoHorizontalOverflow` walks the DOM for content a non-scrollable ancestor clips off-screen instead. Overflow bugs live in the **loaded, filled state** (long names, many chips/badges, active filters), not the empty default a page lands on — an empty-state visit passes while the real state is broken.
+- **Do:** Add every new top-level route to `e2e/smoke/responsive-overflow.spec.ts`, and exercise it in its **loaded state** — pre-apply filters/params so lists, chip rows, and badges actually render (see the `filterHeavyQuery` variants). Both mobile (375px) and desktop viewports run via the project matrix.
+- **Don't:** Ship a new page without overflow coverage, or cover it only in its empty state. Don't "fix" an overflow by adding `overflow-x: hidden` to hide the symptom — that clips content off-screen where the user can't reach it.
 
 ---
 
@@ -532,12 +543,13 @@ trigger: always_on
 - **Why:** `type="email"` triggers the email keyboard on mobile and enables free native format validation; `type="tel"` triggers the numeric keypad; `type="url"` adds URL hints. `type="text"` is the wrong default for typed identity inputs — it loses the keyboard hint and the validation.
 - **Do:** `type="email"` for any email field (login, signup, anonymous-reporter contact, password reset). `type="tel"` for phone. `type="url"` for URLs. `type="password"` for any secret. `type="number"` only when the value is a number you'll do math on — for postal codes, IDs, and similar, use `type="text" inputMode="numeric"`.
 - **Don't:** Ship `<input type="text">` for an email field. Don't suppress the type to bypass a mobile keyboard quirk — fix the quirk.
+- **Exception:** A combined email-or-username sign-in field uses `type="text" inputMode="email"` (see `src/app/(auth)/login/login-form.tsx`) — it accepts either an email address or a bare username, so native `type="email"` validation (which would reject a username) is deliberately traded away while `inputMode` keeps the email keyboard hint.
 
 **CORE-FORM-002:** Autocomplete tokens on every credential/identity input
 
 - **Severity:** Critical
 - **Why:** Password managers and browser autofill key on the `autocomplete` attribute. Wrong or missing tokens mean credentials don't autofill, generated passwords aren't offered, and the confirm-password field gets autofilled with the user's existing password — silently breaking the flow.
-- **Do:** Sign-in form: `autocomplete="username"` on email + `id="current-password"` on the password field with `autocomplete="current-password"`. Sign-up form: `autocomplete="username"` on email, `autocomplete="new-password"` on the new password field, `autocomplete="off"` on the confirm-password field. Anonymous-reporter forms get `autocomplete="given-name"`, `autocomplete="family-name"`, `autocomplete="email"`. Domain-specific pickers that should NOT be autofilled (e.g., machine selector) set `autocomplete="off"` explicitly.
+- **Do:** Sign-in form: `autocomplete="username"` on the email/username field (it is the account login identifier) + `id="current-password"` on the password field with `autocomplete="current-password"`. Sign-up form: `autocomplete="username"` on the email field (the email is the account login identifier), `autocomplete="new-password"` on the new password field, `autocomplete="off"` on the confirm-password field. Anonymous-reporter forms get `autocomplete="given-name"`, `autocomplete="family-name"`, `autocomplete="email"`. Domain-specific pickers that should NOT be autofilled (e.g., machine selector) set `autocomplete="off"` explicitly.
 - **Don't:** Put `autocomplete="new-password"` on the confirm field. Don't share an `id` between login and signup password fields. Don't omit the attribute on anonymous-reporter forms.
 - **Reference:** modern-web-guidance `autofill-sign-in-form`, `autofill-sign-up-form`, `autofill-address-form`.
 
@@ -545,19 +557,19 @@ trigger: always_on
 
 - **Severity:** Required
 - **Why:** `:user-invalid` (Baseline Widely available) flips a CSS pseudo-class on form controls only **after** the user has interacted with them — no premature red rings on page load, no JS state mirroring, no event listeners. The shared `<Input>` already has `aria-invalid:` styling; pair it with `:user-invalid:` and the browser does the rest.
-- **Do:** `src/components/ui/input.tsx` (and `textarea.tsx`, `select.tsx`) must carry the equivalent of `[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40` so every input automatically picks up post-interaction invalid styling. Add to the primitive once — don't copy this per form.
+- **Do:** `src/components/ui/input.tsx` and `textarea.tsx` carry the equivalent of `[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40` so every input automatically picks up post-interaction invalid styling. Add to the primitive once — don't copy this per form. (`select.tsx` is a Radix trigger, not a native form control, so the `:user-invalid` pseudo-class does not apply to it — it uses `aria-invalid:` styling only.)
 - **Don't:** Hand-roll `useState` + `onBlur` to mirror invalid state. Don't paint inputs red on initial render.
 - **Reference:** modern-web-guidance `validate-input-after-interaction`.
-- **Status:** Not yet implemented; tracked under PP-kqbk.2.
+- **Status:** Implemented in `input.tsx` and `textarea.tsx` (PP-kqbk.2). `select.tsx` is out of scope — see the Do note.
 
 **CORE-FORM-004:** `aria-invalid` synced for screen readers
 
 - **Severity:** Required
 - **Why:** `:user-invalid` is a CSS pseudo-class — visual only. Screen readers need `aria-invalid="true"` to announce "invalid" alongside the field label. Without it, AT users get only the form-level alert after a server round-trip.
-- **Do:** Add the `onBlur` listener to `src/components/ui/input.tsx` (and `textarea.tsx`, `select.tsx`) **once** so every form picks it up automatically — same primitive that hosts CORE-FORM-003 styling. The listener sets `aria-invalid="true"` on inputs that fail `checkValidity()` after first interaction, and `aria-invalid="false"` when the value becomes valid again. Do not copy the listener per form.
+- **Do:** Add the `onBlur` listener to `src/components/ui/input.tsx` and `textarea.tsx` **once** so every form picks it up automatically — same primitive that hosts CORE-FORM-003 styling. The listener sets `aria-invalid="true"` on inputs that fail `checkValidity()` after first interaction, and `aria-invalid="false"` when the value becomes valid again, and skips the sync when the caller already controls `aria-invalid` (react-hook-form / Radix `FormControl`). Do not copy the listener per form.
 - **Don't:** Set `aria-invalid="true"` on initial render. Don't rely solely on the form-level `<Alert>` to communicate per-field errors.
 - **Reference:** modern-web-guidance `accessible-error-announcement`, `required-field-feedback`.
-- **Status:** Not yet implemented; tracked under PP-kqbk.2 (bundled with CORE-FORM-003).
+- **Status:** Implemented in `input.tsx` and `textarea.tsx` (PP-kqbk.2, bundled with CORE-FORM-003). `select.tsx` (a Radix trigger) has no native `checkValidity()`; a caller-controlled `aria-invalid` is the mechanism there.
 
 **CORE-FORM-005:** Required fields are visually marked before interaction
 
@@ -639,7 +651,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..008: Security
 - CORE‑PERF‑001..003: Performance (incl. image priority + preconnect)
 - CORE‑TEST‑001..006: Testing
-- CORE‑ARCH‑001..010: Architecture (003 retired)
+- CORE‑ARCH‑001, 004..012: Architecture (002, 003 retired)
 - CORE‑RESP‑001..004: Responsive framework
 - CORE‑UI‑001..006: UI & styling + Browser support / MWG catalog (005, 006)
 - CORE‑A11Y‑001..006: Accessibility floor

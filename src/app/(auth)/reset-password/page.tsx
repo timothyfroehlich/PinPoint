@@ -11,7 +11,6 @@ import { ResetPasswordForm } from "./reset-password-form";
  *
  * Set a new password after clicking the reset link from email.
  * User must be authenticated via the reset link token.
- * Progressive enhancement - works without JavaScript.
  */
 export default async function ResetPasswordPage({
   searchParams,

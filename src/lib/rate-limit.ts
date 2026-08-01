@@ -19,6 +19,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
 import { log } from "~/lib/logger";
+import { maskEmail } from "~/lib/logging/mask";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 
 /**
@@ -445,7 +446,7 @@ export async function checkLoginAccountLimit(
     log.error(
       {
         err: error instanceof Error ? error.message : "Unknown",
-        email: email.substring(0, 3) + "***",
+        email: maskEmail(email),
       },
       "Login account rate limit check failed"
     );
@@ -551,7 +552,7 @@ export async function checkForgotPasswordLimit(
     log.error(
       {
         err: error instanceof Error ? error.message : "Unknown",
-        email: email.substring(0, 3) + "***",
+        email: maskEmail(email),
       },
       "Forgot password rate limit check failed"
     );

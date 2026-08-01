@@ -21,18 +21,18 @@ There is no numeric target for test counts. Total-test-count is a vanity metric.
 
 > _What class of bug does this test catch, and is the chosen layer the cheapest one that catches that class?_
 
-| Class | What it catches                                                | Cheapest catching layer                                                                                                                                                                                                        |
-| ----- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **A** | Auth redirect / route protection                               | Integration (middleware) or thin E2E set                                                                                                                                                                                       |
-| **B** | Server Action wiring (form → action → DB → response)           | **Integration** (PGlite + direct action call)                                                                                                                                                                                  |
-| **C** | Form-state lifecycle (reset / optimistic / rollback)           | **RTL unit**                                                                                                                                                                                                                   |
-| **D** | Layout / overflow / hydration regression                       | **Smoke E2E** ([responsive-overflow.spec.ts](../../../e2e/smoke/responsive-overflow.spec.ts) is canonical)                                                                                                                     |
-| **E** | Permission enforcement (role X can / cannot mutate)            | **Integration**                                                                                                                                                                                                                |
-| **F** | Multi-step user journey (login → mutate → verify across pages) | **E2E** (the only class E2E genuinely owns)                                                                                                                                                                                    |
-| **G** | Pure logic (validators, formatters, dates)                     | Unit                                                                                                                                                                                                                           |
-| **H** | Pure UI state (open / close, focus, keyboard nav)              | RTL unit                                                                                                                                                                                                                       |
-| **I** | DB query correctness (filters, joins, ordering)                | Integration (PGlite)                                                                                                                                                                                                           |
-| **J** | Third-party integration                                        | **Boundary-mocked** unit/integration. NEVER live external services in E2E except our owned local stack (Mailpit, PGlite, local Supabase including local Storage). See [AGENTS.md](../../../AGENTS.md) §2.1 "Test What We Own". |
+| Class | What it catches                                                | Cheapest catching layer                                                                                                                                                                                                                                                          |
+| ----- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A** | Auth redirect / route protection                               | Integration (middleware) or thin E2E set                                                                                                                                                                                                                                         |
+| **B** | Server Action wiring (form → action → DB → response)           | **Integration** (PGlite + direct action call)                                                                                                                                                                                                                                    |
+| **C** | Form-state lifecycle (reset / optimistic / rollback)           | **RTL unit**                                                                                                                                                                                                                                                                     |
+| **D** | Layout / overflow / hydration regression                       | **Smoke E2E** ([responsive-overflow.spec.ts](../../../e2e/smoke/responsive-overflow.spec.ts) is canonical)                                                                                                                                                                       |
+| **E** | Permission enforcement (role X can / cannot mutate)            | **Integration**                                                                                                                                                                                                                                                                  |
+| **F** | Multi-step user journey (login → mutate → verify across pages) | **E2E** (the only class E2E genuinely owns)                                                                                                                                                                                                                                      |
+| **G** | Pure logic (validators, formatters, dates)                     | Unit                                                                                                                                                                                                                                                                             |
+| **H** | Pure UI state (open / close, focus, keyboard nav)              | RTL unit                                                                                                                                                                                                                                                                         |
+| **I** | DB query correctness (filters, joins, ordering)                | Integration (PGlite)                                                                                                                                                                                                                                                             |
+| **J** | Third-party integration                                        | **Boundary-mocked** unit/integration. NEVER live external services in E2E except our owned local stack (Mailpit, PGlite, local Supabase including local Storage). See CORE-TEST-006, "Test What We Own", in [docs/NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing). |
 
 E2E earns its slot when the test is genuinely class F. Most other classes have a cheaper home. The 2026-05 audit ([e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md)) found that 36 of 48 specs were partially or fully misallocated — write the cheapest layer that catches the bug class, not the most thorough one (CORE-TEST-005).
 
@@ -71,19 +71,26 @@ pnpm run preflight:unlocked        # Full pre-commit check (unlocked, bypasses c
 
 ### Which Tests to Run (Decision Tree)
 
-1. **Changed pure logic/utils?** → `pnpm run check` (unit tests, ~12s)
-2. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (~15-30s)
-3. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
-4. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs
-5. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
-6. **NEVER** run `e2e:full` locally unless explicitly asked — that's what CI is for
+1. **Docs, hooks, config, or other non-source changes?** → `pnpm run check` is enough (~12s)
+2. **Changed pure logic/utils?** → `pnpm run check` (unit tests, ~12s)
+3. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (~15-30s)
+4. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
+5. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs
+6. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
+7. **Final pre-review** → push and let CI run the full suite; don't sweep locally.
 
 **Key rules for agents:**
 
+- **Never** invoke `pnpm exec playwright test` with no spec path — it runs every spec in one Playwright process and cross-contaminates seed state.
+- The full suite (`e2e:full` / `e2e:all`) is CI's job by default — it's roughly 8–10 minutes of three parallel Chromium workers plus a Supabase stack and a Next server. **On a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally** — push and let CI do it. On a machine with real headroom it's a reasonable thing to run when you actually want the signal.
 - Always use `--project=chromium` for targeted runs (skip Mobile Chrome unless testing responsive)
 - Use `--headed` for debugging visual issues
 - `pnpm run check` catches 90% of issues — E2E is for integration verification, not iteration
 - If a test is flaky locally, report it — don't retry in a loop
+
+### Reproducing CI failures locally
+
+Always try local first — seconds vs minutes, full devtools. If a single-test run fails with missing fixtures, run the whole file (E2E specs share state across describe blocks via `beforeAll`).
 
 ### Critical Rules
 
@@ -96,7 +103,7 @@ pnpm run preflight:unlocked        # Full pre-commit check (unlocked, bypasses c
 
 ## Test What We Own
 
-> See [AGENTS.md](../../../AGENTS.md) §2.1 and [docs/NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) (CORE-TEST-006) for the binding form.
+> See [docs/NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) (CORE-TEST-006) for the binding form.
 
 Tests must verify PinPoint's code at the boundary of services we don't control, not simulate the service's internals. If your test setup is building scaffolding that synthesizes a third party's internal state — raw DB writes into `auth.identities`, captcha-bypass mocks, OAuth handshake fakes, regex extraction from a vendor's email template — step back. You're testing their code, not yours. Cover PinPoint's contribution with unit tests; cover "the page renders without 500" with a smoke test; reserve integration/E2E for when the test exercises the contracted public API of a real running service.
 
@@ -142,7 +149,7 @@ The line you're walking is "synthesizing state inside a third party's domain." R
 
 Read these files for comprehensive testing guidance:
 
-- [E2E_BEST_PRACTICES.md](../../../docs/E2E_BEST_PRACTICES.md) — E2E-specific patterns with Playwright
+- `pinpoint-e2e` skill (and its `references/e2e-best-practices.md`) — E2E-specific patterns with Playwright, worker isolation, environment defaults
 - [NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) — Testing-related non-negotiables
 - [e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md) — 2026-05 E2E suite audit (per-spec verdicts and bug-class framework history)
 
@@ -295,7 +302,9 @@ beforeEach(async () => {
 });
 ```
 
-## E2E Patterns from E2E_BEST_PRACTICES.md
+## E2E Patterns
+
+The full E2E guide is the `pinpoint-e2e` skill. What follows is the layer-selection-adjacent subset.
 
 ### Selector Strategy
 
@@ -359,13 +368,22 @@ await expect(page.getByText("Data loaded")).toBeVisible();
 **Over-Mocking**:
 
 ```typescript
-// ❌ Bad: Mocking everything (for DB logic)
-vi.mock("~/server/db");
+// ❌ Bad: canned return values — this tests the mock, not the query
+vi.mock("~/server/db", () => ({
+  db: { query: { issues: { findFirst: vi.fn() } } },
+}));
 vi.mock("drizzle-orm");
 
-// ✅ Good: Use PGlite integration test instead
-// Integration tests with PGlite test real DB logic
+// ✅ Good: forward the db singleton to worker-scoped PGlite — the real query runs
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  return { db: await getTestDb() };
+});
 ```
+
+The ❌ case is mocking `~/server/db` with **canned return values**, or mocking `drizzle-orm` at all — the assertions then only prove the mock returned what you told it to.
+
+The ✅ case is the **house pattern**, used broadly across `src/test/integration/`. It's how you integration-test a service function that imports the `db` singleton directly instead of accepting it as a parameter: the mock forwards to `getTestDb()`, so the real SQL executes against real Postgres. `src/test/integration/transaction-tripwire.test.ts` is a representative example. This composes with CORE-TEST-001 rather than violating it — `getTestDb()` hands back the **worker-scoped** instance, so no per-test database is created.
 
 **Testing Server Components Directly**:
 
@@ -388,7 +406,7 @@ Before committing tests:
 - [ ] Test files in correct location (unit vs integration vs E2E)
 - [ ] Integration tests use worker-scoped PGlite (`getTestDb()` and `setupTestDb()`)
 - [ ] No per-test PGlite instances (violates CORE-TEST-001)
-- [ ] E2E tests use roles/labels for selectors (see [Selector Strategy](../../../docs/E2E_BEST_PRACTICES.md#selector-strategy) in E2E_BEST_PRACTICES.md)
+- [ ] E2E tests use roles/labels for selectors (see **Selector Strategy** above)
 - [ ] No arbitrary `waitForTimeout()` in E2E tests (violates [Forbidden Patterns](../../../docs/NON_NEGOTIABLES.md#forbidden-patterns) in NON_NEGOTIABLES.md)
 - [ ] Tests are independent (no shared state)
 - [ ] Testing behavior, not implementation
@@ -396,7 +414,7 @@ Before committing tests:
 
 ## Additional Resources
 
-- E2E best practices: [E2E_BEST_PRACTICES.md](../../../docs/E2E_BEST_PRACTICES.md)
+- E2E best practices: `pinpoint-e2e` skill (`.agents/skills/pinpoint-e2e/`)
 - 2026-05 E2E suite audit: [e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md)
 - Non-negotiables: [NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) (CORE-TEST-\* rules)
 - Playwright docs: Use the `context7` MCP server for current Playwright patterns and API references (resolve-library-id → get-library-docs)

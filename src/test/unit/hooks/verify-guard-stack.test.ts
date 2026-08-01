@@ -1,11 +1,19 @@
 // Unit tests for .claude/hooks/verify-guard-stack.cjs — the SessionStart
 // guard-stack integrity canary.
 //
-// Two layers:
-//   1. Fast path — the pure `evaluateGuardStack(settings)` evaluator is
-//      exercised directly with in-memory fixture objects (no fs / exit / IO).
-//   2. Fail-open contract — a couple of subprocess cases spawn `node` on the
-//      hook with VERIFY_GUARD_SETTINGS pointed at a temp fixture, asserting the
+// Three layers:
+//   1. Fast path — `evaluateGuardStack(settings)` is exercised directly with
+//      in-memory fixture objects. Both directions: expected-hook-not-registered
+//      (forward) and registered-script-not-on-disk (reverse). The reverse check
+//      takes an injectable `exists` predicate so it needs no real files.
+//   2. The repo's own .claude/settings.json — asserted healthy in both
+//      directions, so `pnpm run check` goes red on a dead registration.
+//   3. Behaviour probes — `evaluateGuardBehavior()` calls each guard's exported
+//      pure classifier with a known-bad and a known-good command. Registration
+//      is a weak proxy for a working guard: the merge guard was fully wired and
+//      present on disk while allowing `eval "gh pr merge 123"` (PP-6t3c).
+//   4. Fail-open contract — a few subprocess cases spawn `node` on the hook
+//      with VERIFY_GUARD_SETTINGS pointed at a temp fixture, asserting the
 //      warn-only guarantee (always exit 0, one-line skip note, no stack trace).
 
 import { spawnSync } from "node:child_process";
@@ -21,21 +29,40 @@ const hookPath = path.resolve(
   process.cwd(),
   ".claude/hooks/verify-guard-stack.cjs"
 );
-const { evaluateGuardStack } = require(hookPath) as {
-  evaluateGuardStack: (settings: unknown) => string[];
+interface BehaviorProbe {
+  hook: string;
+  export: string;
+  mustBlock: string[];
+  mustAllow: string[];
+}
+
+const {
+  evaluateGuardStack,
+  evaluateGuardBehavior,
+  extractScriptPaths,
+  BEHAVIOR_PROBES,
+} = require(hookPath) as {
+  evaluateGuardStack: (
+    settings: unknown,
+    options?: { exists?: (relPath: string) => boolean }
+  ) => string[];
+  evaluateGuardBehavior: (options?: {
+    load?: (basename: string) => unknown;
+  }) => string[];
+  extractScriptPaths: (command: string) => string[];
+  BEHAVIOR_PROBES: BehaviorProbe[];
 };
 
 // ---------------------------------------------------------------------------
 // Fixture builders
 // ---------------------------------------------------------------------------
 const ALL_EXPECTED_HOOKS = [
-  "block-dangerous-commands.cjs",
   "normalize-workspace-paths.cjs",
   "inject-beads-actor.cjs",
-  "block-bad-shell-patterns.cjs",
   "block-heavy-under-pressure.cjs",
   "block-direct-merge.cjs",
   "block-main-worktree-branch-switch.cjs",
+  "block-worktree-dispatch-from-linked.cjs",
 ];
 
 /** Build a settings object wiring the given hook basenames under PreToolUse. */
@@ -67,7 +94,7 @@ function settingsWithHooks(
 // Fast path: pure evaluateGuardStack
 // ---------------------------------------------------------------------------
 describe("evaluateGuardStack — healthy", () => {
-  it("reports no problems when all 7 hooks + non-empty permissions present", () => {
+  it("reports no problems when all 6 hooks + non-empty permissions present", () => {
     const settings = settingsWithHooks(ALL_EXPECTED_HOOKS);
     expect(evaluateGuardStack(settings)).toEqual([]);
   });
@@ -80,14 +107,14 @@ describe("evaluateGuardStack — healthy", () => {
         PreToolUse: [
           {
             matcher: "Bash",
-            hooks: ALL_EXPECTED_HOOKS.slice(0, 4).map((b) => ({
+            hooks: ALL_EXPECTED_HOOKS.slice(0, 3).map((b) => ({
               type: "command",
               command: `node .claude/hooks/${b}`,
             })),
           },
           {
             matcher: "Bash|mcp__github__merge_pull_request",
-            hooks: ALL_EXPECTED_HOOKS.slice(4).map((b) => ({
+            hooks: ALL_EXPECTED_HOOKS.slice(3).map((b) => ({
               type: "command",
               command: `node .claude/hooks/${b}`,
             })),
@@ -113,12 +140,12 @@ describe("evaluateGuardStack — missing hooks", () => {
   it("lists multiple missing hooks in one problem string", () => {
     const remaining = ALL_EXPECTED_HOOKS.filter(
       (b) =>
-        b !== "block-dangerous-commands.cjs" &&
+        b !== "normalize-workspace-paths.cjs" &&
         b !== "block-main-worktree-branch-switch.cjs"
     );
     const problems = evaluateGuardStack(settingsWithHooks(remaining));
     expect(problems).toEqual([
-      "missing PreToolUse hooks: block-dangerous-commands.cjs, block-main-worktree-branch-switch.cjs",
+      "missing PreToolUse hooks: normalize-workspace-paths.cjs, block-main-worktree-branch-switch.cjs",
     ]);
   });
 
@@ -191,6 +218,250 @@ describe("evaluateGuardStack — combinations", () => {
       "permissions.deny empty/absent",
       "permissions.ask empty/absent",
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reverse direction: a registration whose script no longer exists on disk
+// ---------------------------------------------------------------------------
+
+/** Build settings wiring arbitrary command strings under a given hook event. */
+function settingsWithCommands(
+  event: "PostToolUse" | "SessionStart" | "UserPromptSubmit",
+  commands: string[]
+): unknown {
+  return {
+    permissions: { deny: ["Bash(x)"], ask: ["Bash(y)"] },
+    hooks: {
+      PreToolUse: [
+        {
+          matcher: "Bash",
+          hooks: ALL_EXPECTED_HOOKS.map((b) => ({
+            type: "command",
+            command: `node .claude/hooks/${b}`,
+          })),
+        },
+      ],
+      [event]: [
+        { hooks: commands.map((command) => ({ type: "command", command })) },
+      ],
+    },
+  };
+}
+
+describe("extractScriptPaths", () => {
+  it("pulls the script path out of the command shapes settings.json uses", () => {
+    expect(
+      extractScriptPaths("node .claude/hooks/block-direct-merge.cjs")
+    ).toEqual([".claude/hooks/block-direct-merge.cjs"]);
+    expect(
+      extractScriptPaths(
+        'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/huddle-poll.sh'
+      )
+    ).toEqual(["scripts/hooks/huddle-poll.sh"]);
+    expect(
+      extractScriptPaths(
+        'HUDDLE_THROTTLE_SECONDS=180 bash "$CLAUDE_PROJECT_DIR"/scripts/hooks/huddle-poll.sh'
+      )
+    ).toEqual(["scripts/hooks/huddle-poll.sh"]);
+  });
+
+  it("skips commands that are not repo-relative script paths", () => {
+    // Inline programs, bare binaries on $PATH, flags, absolute paths, and
+    // unresolved shell expansion all yield nothing rather than a false alarm.
+    for (const command of [
+      `node -e "console.log(1)"`,
+      `bash -c 'echo hi'`,
+      "bd sync --quiet",
+      "echo 'scripts/hooks/nope'",
+      "bash /usr/local/bin/something.sh",
+      "bash ~/dotfiles/thing.sh",
+      'bash "$SOME_OTHER_DIR"/thing.sh',
+      "bash ../outside-the-repo.sh",
+    ]) {
+      expect(extractScriptPaths(command)).toEqual([]);
+    }
+  });
+});
+
+describe("evaluateGuardStack — registered-but-missing-from-disk", () => {
+  it("reports a PreToolUse registration whose script was deleted", () => {
+    // Every expected hook is wired, so the FORWARD check is clean — this is
+    // exactly the blind spot: the registration exists, the file does not.
+    const settings = settingsWithHooks([
+      ...ALL_EXPECTED_HOOKS,
+      "block-drizzle-push.cjs",
+    ]);
+    const problems = evaluateGuardStack(settings, {
+      exists: (relPath) => relPath !== ".claude/hooks/block-drizzle-push.cjs",
+    });
+    expect(problems).toEqual([
+      "registered hooks missing from disk: .claude/hooks/block-drizzle-push.cjs",
+    ]);
+  });
+
+  it("checks registrations under non-PreToolUse events too", () => {
+    const settings = settingsWithCommands("SessionStart", [
+      'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/deleted-session-hook.sh',
+    ]);
+    const problems = evaluateGuardStack(settings, {
+      exists: (relPath) => !relPath.includes("deleted-session-hook"),
+    });
+    expect(problems).toEqual([
+      "registered hooks missing from disk: scripts/hooks/deleted-session-hook.sh",
+    ]);
+  });
+
+  it("lists each dead registration once, in wiring order", () => {
+    const settings = settingsWithCommands("PostToolUse", [
+      "node .claude/hooks/gone-a.cjs",
+      'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/gone-b.sh',
+      "node .claude/hooks/gone-a.cjs",
+    ]);
+    const problems = evaluateGuardStack(settings, {
+      exists: (relPath) => !relPath.includes("gone-"),
+    });
+    expect(problems).toEqual([
+      "registered hooks missing from disk: .claude/hooks/gone-a.cjs, scripts/hooks/gone-b.sh",
+    ]);
+  });
+
+  it("stays silent when every registration resolves to a real file", () => {
+    // No `exists` override — this hits the real filesystem against the real
+    // repo, and every basename below is a file that exists.
+    const settings = settingsWithCommands("SessionStart", [
+      'bash "${CLAUDE_PROJECT_DIR:-.}"/scripts/hooks/huddle-session-start.sh',
+      "node .claude/hooks/verify-guard-stack.cjs",
+    ]);
+    expect(evaluateGuardStack(settings)).toEqual([]);
+  });
+
+  it("does not flag non-path commands (inline shell, $PATH binaries)", () => {
+    const settings = settingsWithCommands("PostToolUse", [
+      `node -e "process.exit(0)"`,
+      "bd sync --quiet",
+      `bash -c 'echo scripts/hooks/not-a-real-file.sh'`,
+    ]);
+    // Only the real PreToolUse guard files "exist"; anything pulled out of the
+    // three commands above would be reported.
+    expect(
+      evaluateGuardStack(settings, {
+        exists: (relPath) => relPath.startsWith(".claude/hooks/"),
+      })
+    ).toEqual([]);
+  });
+
+  it("reports both directions at once", () => {
+    const remaining = ALL_EXPECTED_HOOKS.filter(
+      (b) => b !== "block-direct-merge.cjs"
+    );
+    const settings = settingsWithHooks([
+      ...remaining,
+      "block-drizzle-push.cjs",
+    ]);
+    const problems = evaluateGuardStack(settings, {
+      exists: (relPath) => relPath !== ".claude/hooks/block-drizzle-push.cjs",
+    });
+    expect(problems).toEqual([
+      "missing PreToolUse hooks: block-direct-merge.cjs",
+      "registered hooks missing from disk: .claude/hooks/block-drizzle-push.cjs",
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The real .claude/settings.json — this is the assertion that makes CI red
+// when a hook file is deleted without dropping its registration (or vice
+// versa). Both canary directions, checked against the repo as it actually is.
+// ---------------------------------------------------------------------------
+describe("the repo's own .claude/settings.json", () => {
+  it("has a healthy guard stack in both directions", () => {
+    const settings: unknown = JSON.parse(
+      fs.readFileSync(
+        path.resolve(process.cwd(), ".claude/settings.json"),
+        "utf8"
+      )
+    );
+    expect(evaluateGuardStack(settings)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Behaviour probes (PP-6t3c): the canary used to answer only "is the guard
+// registered?". A registered, on-disk, silently-permissive guard reads as
+// healthy under that question — which is exactly what the merge guard was.
+// ---------------------------------------------------------------------------
+describe("evaluateGuardBehavior — the real guards", () => {
+  it("reports no problems: every guard still blocks its known-bad commands", () => {
+    expect(evaluateGuardBehavior()).toEqual([]);
+  });
+
+  it("covers the merge guard's wrapper bypasses", () => {
+    const mergeProbe = BEHAVIOR_PROBES.find(
+      (p) => p.hook === "block-direct-merge.cjs"
+    );
+    expect(mergeProbe).toBeDefined();
+    expect(mergeProbe?.mustBlock).toContain('eval "gh pr merge 123 --squash"');
+  });
+});
+
+describe("evaluateGuardBehavior — degradation is reported, never thrown", () => {
+  it("reports a guard that stopped blocking", () => {
+    const problems = evaluateGuardBehavior({
+      load: () => ({
+        classifyMerge: () => ({ block: false }),
+        classifyCommand: () => ({ block: false }),
+        isHeavyCommand: () => false,
+      }),
+    });
+    expect(problems.join("\n")).toContain("block-direct-merge.cjs allows");
+    expect(problems.join("\n")).toContain(
+      'eval \\"gh pr merge 123 --squash\\"'
+    );
+  });
+
+  it("reports a guard that started blocking everything", () => {
+    const problems = evaluateGuardBehavior({
+      load: () => ({
+        classifyMerge: () => ({ block: true }),
+        classifyCommand: () => ({ block: true }),
+        isHeavyCommand: () => true,
+      }),
+    });
+    expect(problems.join("\n")).toContain("blocks");
+    expect(problems).toHaveLength(BEHAVIOR_PROBES.length);
+  });
+
+  it("reports a guard that lost its exported classifier", () => {
+    const problems = evaluateGuardBehavior({ load: () => ({}) });
+    expect(problems.join("\n")).toContain("no longer exports");
+  });
+
+  it("reports — does not throw — when a guard cannot be loaded at all", () => {
+    const problems = evaluateGuardBehavior({
+      load: () => {
+        throw Object.assign(new Error("boom"), { code: "MODULE_NOT_FOUND" });
+      },
+    });
+    expect(problems).toHaveLength(BEHAVIOR_PROBES.length);
+    expect(problems.join("\n")).toContain("could not be loaded");
+  });
+
+  it("reports — does not throw — when a classifier itself throws", () => {
+    const problems = evaluateGuardBehavior({
+      load: () => ({
+        classifyMerge: () => {
+          throw new Error("boom");
+        },
+        classifyCommand: () => {
+          throw new Error("boom");
+        },
+        isHeavyCommand: () => {
+          throw new Error("boom");
+        },
+      }),
+    });
+    expect(problems).toHaveLength(BEHAVIOR_PROBES.length);
   });
 });
 
@@ -302,5 +573,25 @@ describe("verify-guard-stack.cjs subprocess — fail-open contract", () => {
     expect(stderr).toContain("GUARD STACK DEGRADED");
     expect(stderr).toContain("block-direct-merge.cjs");
     expect(stderr).toContain("permissions.deny empty/absent");
+  });
+
+  it("dead registration → exit 0 (warn-only) naming the missing script", () => {
+    // Forward check clean, file gone: the failure mode this canary used to miss.
+    const file = writeTmp(
+      "settings.json",
+      JSON.stringify(
+        settingsWithHooks([...ALL_EXPECTED_HOOKS, "deleted-guard-fixture.cjs"]),
+        null,
+        2
+      )
+    );
+    const { status, stdout, stderr } = runHook(file);
+    expect(status).toBe(0); // never blocks
+    expect(stdout).toBe("");
+    expect(stderr).toContain("GUARD STACK DEGRADED");
+    expect(stderr).toContain(
+      "registered hooks missing from disk: .claude/hooks/deleted-guard-fixture.cjs"
+    );
+    expect(stderr).not.toContain("missing PreToolUse hooks");
   });
 });

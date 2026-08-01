@@ -11,11 +11,14 @@ interface MachineTabStripProps {
     openCount: number;
     status: MachineStatus;
   };
+  /** Viewer holds `machines.edit` — see the Manage tab note below. */
+  canEdit: boolean;
 }
 
 export function MachineTabStrip({
   initials,
   maintenance,
+  canEdit,
 }: MachineTabStripProps): React.JSX.Element {
   return (
     <RouteTabStrip
@@ -34,6 +37,16 @@ export function MachineTabStrip({
           badge: { count: maintenance.openCount, status: maintenance.status },
         },
         { slug: "timeline", label: "Timeline" },
+        // URL slug stays `edit`; the visible label is "Manage". The tab holds
+        // the machine's RECORD — name, model, availability, PBM listing,
+        // ownership, deletion — while the Settings tab holds the machine's
+        // DIP switches, software settings, and Jones plugs. Calling this one
+        // "Edit" invited "do I change availability in Edit or Settings?".
+        //
+        // Permission-gated, and therefore LAST: appending it keeps every other
+        // tab at the same index for every role, so the strip doesn't reflow
+        // depending on who is looking at it.
+        ...(canEdit ? [{ slug: "edit", label: "Manage" }] : []),
       ]}
     />
   );

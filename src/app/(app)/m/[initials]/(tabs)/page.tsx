@@ -1,31 +1,25 @@
 import type React from "react";
 import { notFound } from "next/navigation";
-import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
-import { getUnifiedUsers } from "~/lib/users/queries";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
+import { userProfiles } from "~/server/db/schema";
 import { deriveMachineStatus } from "~/lib/machines/status";
-import { resolveRequestUrl } from "~/lib/url";
-import { buildMachineReportUrl } from "~/lib/machines/report-url";
-import { generateQrPngDataUrl } from "~/lib/machines/qr";
-import { EditButtonWithTooltip } from "../edit-button-tooltip";
-import { EditMachineDialog } from "../update-machine-form";
-import { QrCodeDialog } from "../qr-code-dialog";
-import { MachineTextFields } from "../machine-text-fields";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { docIsEmpty } from "~/lib/tiptap/types";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
 import {
   getAccessLevel,
   checkPermission,
-  getPermissionDeniedReason,
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
+import { pinballmapLocationUrl } from "~/lib/pinballmap/public-url";
+import { getPinballMapState } from "~/lib/pinballmap/state";
+import { derivePbmMachineStatus } from "~/lib/pinballmap/sync";
 import { InfoHero } from "./info-hero";
 import { InfoRail } from "./info-rail";
+import { MachinePinballmapCard } from "./machine-pinballmap-card";
 
 /**
  * Machine Info Tab (default route for /m/[initials]/) — the QR-scanning
@@ -33,14 +27,12 @@ import { InfoRail } from "./info-rail";
  *
  * Reading order (both breakpoints): Hero (status + presence + Report button +
  * known-issues peek) → reference cluster (Details card: machine description +
- * owner, then Tags / PinballMap placeholders) → recent-activity peek →
- * maintainer tools. Desktop is a main column + 320px rail; mobile folds the
- * rail inline after the hero.
+ * owner, then Tags / PinballMap placeholders) → recent-activity peek. Desktop
+ * is a main column + 320px rail; mobile folds the rail inline after the hero.
  *
- * NOTE (PP-5sgt.3): the maintainer tools at the bottom — QR code and owner
- * requirements/notes — are kept here temporarily. The Service-tab rework
- * relocates both to the Service tab (the maintainer's workbench); remove this
- * block then. (Edit already moved into the Details card.)
+ * Maintainer/owner-private tools (QR code, Owner's Requirements) live on the
+ * Service tab (the maintainer's workbench, PP-5sgt.3) — not here. The player
+ * landing carries only player-facing content; Edit lives in the Details card.
  */
 export default async function MachineInfoTab({
   params,
@@ -75,34 +67,15 @@ export default async function MachineInfoTab({
     machineOwnerId: machine.ownerId ?? undefined,
   };
 
-  const canEdit = checkPermission(
-    "machines.edit",
-    accessLevel,
-    ownershipContext
-  );
-  const editDeniedReason = getPermissionDeniedReason(
-    "machines.edit",
-    accessLevel,
-    ownershipContext
-  );
-  const canEditAnyMachine =
-    accessLevel === "admin" || accessLevel === "technician";
-  const isOwner =
-    !!user &&
-    (user.id === machine.ownerId || user.id === machine.invitedOwnerId);
-
-  const canViewOwnerRequirements = checkPermission(
-    "machines.view.ownerRequirements",
-    accessLevel
-  );
   const canCompose = checkPermission(
     "machines.timeline.comment.add",
     accessLevel
   );
 
-  // PinballMap linking (bead B / PP-o355.2): the edit dialog exposes the picker
-  // only to users who may link, and needs the linked title's display name (the
-  // machine row stores only the PBM id + metadata, not the catalog name).
+  // PinballMap linking (bead B / PP-o355.2) gates the maintainer-facing desync
+  // signal below. The catalog picker itself moved to the edit page
+  // (PP-o355.19), so this landing no longer resolves the linked title's display
+  // name or the unified-user list — both were dialog-only reads.
   const canLink = checkPermission(
     "machines.pinballmap.link",
     accessLevel,
@@ -110,51 +83,17 @@ export default async function MachineInfoTab({
   );
   const machineStatus = deriveMachineStatus(openIssues);
 
-  const headersList = await headers();
-  const dynamicSiteUrl = resolveRequestUrl(headersList);
-  const reportUrl = buildMachineReportUrl({
-    siteUrl: dynamicSiteUrl,
-    machineInitials: machine.initials,
-    source: "qr",
-  });
-
-  // These three are independent of one another — resolve them concurrently
-  // rather than serially so the QR-scan landing doesn't stack a PinballMap
-  // lookup, the unified-user list, and the QR PNG encode back-to-back on the
-  // render path.
-  const pinballmapTitlePromise: Promise<string | null> =
+  // The stored PBM snapshot drives the desync signal, which is a maintainer-
+  // facing alert (it points at a mismatch to resolve). Only read it when the
+  // viewer may act on it (`canLink`) AND the machine is linked — so the public
+  // QR-scan landing never pays for (or shows) it. Location-wide singleton.
+  const pbmState =
     canLink && machine.pinballmapMachineId !== null
-      ? db.query.pinballmapCatalog
-          .findFirst({
-            where: eq(
-              pinballmapCatalog.pinballmapMachineId,
-              machine.pinballmapMachineId
-            ),
-            columns: { name: true },
-          })
-          .then((linkedTitle) => linkedTitle?.name ?? null)
-      : Promise.resolve(null);
-  const allUsersPromise: Promise<Awaited<ReturnType<typeof getUnifiedUsers>>> =
-    canEdit ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]);
+      ? await getPinballMapState()
+      : null;
 
-  const [pinballmapTitleName, allUsersRaw, qrDataUrl] = await Promise.all([
-    pinballmapTitlePromise,
-    allUsersPromise,
-    generateQrPngDataUrl(reportUrl),
-  ]);
-  const allUsers = allUsersRaw.map((u) => ({
-    id: u.id,
-    name: u.name,
-    lastName: u.lastName,
-    machineCount: u.machineCount,
-    status: u.status,
-    role: u.role,
-  }));
-
-  const showOwnerFields = canViewOwnerRequirements;
-
-  // Description renders read-only inside the Details card; editing happens in
-  // the Edit Machine dialog (not inline). Gate on docIsEmpty rather than just
+  // Description renders read-only inside the Details card; editing happens on
+  // the Edit Machine page (not inline). Gate on docIsEmpty rather than just
   // `!== null`: a legacy or semantically-empty ProseMirror doc renders nothing
   // in RichTextDisplay, but a truthy slot still paints an empty prose block and
   // a stray divider above the owner row. docIsEmpty covers null, undefined, and
@@ -163,35 +102,26 @@ export default async function MachineInfoTab({
     <RichTextDisplay content={machine.description} />
   ) : null;
 
-  // Edit-machine control lives in the owner card. PP-o355.2 PinballMap fields
-  // are wired through the dialog for users who may link.
-  const editControl =
-    canEdit && user ? (
-      <EditMachineDialog
-        machine={{
-          id: machine.id,
-          name: machine.name,
-          initials: machine.initials,
-          presenceStatus: machine.presenceStatus,
-          ownerId: machine.ownerId,
-          invitedOwnerId: machine.invitedOwnerId,
-          owner: machine.owner ? { name: machine.owner.name } : null,
-          invitedOwner: machine.invitedOwner
-            ? { name: machine.invitedOwner.name }
-            : null,
-          pinballmapMachineId: machine.pinballmapMachineId,
-          pinballmapExcluded: machine.pinballmapExcluded,
-          pinballmapExcludedReason: machine.pinballmapExcludedReason,
-          pinballmapTitleName,
-          description: machine.description,
-        }}
-        allUsers={allUsers}
-        canEditAnyMachine={canEditAnyMachine}
-        isOwner={isOwner}
-        canLink={canLink}
+  // PinballMap card (PP-o355.3 + desync PP-o355.11): everyone sees the plain
+  // "View on PinballMap" card for listed machines. The desync alert is
+  // maintainer-only (`canLink`) — for those users the card also appears on a
+  // desynced-but-not-listed machine (e.g. on PBM but not marked listed here),
+  // so the mismatch surfaces where it can be acted on. `pbmState` is null for
+  // non-maintainers, so `desynced` is false for them regardless.
+  const pbmStatus = derivePbmMachineStatus({
+    pinballmapMachineId: machine.pinballmapMachineId,
+    pinballmapListed: machine.pinballmapListed,
+    pinballmapLmxId: machine.pinballmapLmxId,
+    snapshot: pbmState?.snapshotJson ?? null,
+  });
+  const showDesync = canLink && pbmStatus.desynced;
+  const pinballmapCard =
+    machine.pinballmapListed || showDesync ? (
+      <MachinePinballmapCard
+        locationUrl={pinballmapLocationUrl()}
+        desynced={showDesync}
+        desyncReason={pbmStatus.reason}
       />
-    ) : user && editDeniedReason !== null ? (
-      <EditButtonWithTooltip reason={editDeniedReason} />
     ) : null;
 
   const rail = (
@@ -200,16 +130,16 @@ export default async function MachineInfoTab({
       invitedOwner={machine.invitedOwner}
       addedAt={machine.createdAt}
       descriptionSlot={descriptionSlot}
-      editSlot={editControl}
+      pinballmapSlot={pinballmapCard}
     />
   );
 
   // Single grid in DOM reading order: Hero → reference rail (Details card:
-  // description + owner, then Tags / PinballMap) → recent activity → maintainer
-  // tools. On mobile it's one flex column (the rail folds inline after the
-  // hero). On desktop the rail is pinned to the 320px right column, spanning the
-  // main column's rows; everything else auto-flows down column 1. Rendered once
-  // so test ids stay unique.
+  // description + owner, then Tags / PinballMap) → recent activity. On mobile
+  // it's one flex column (the rail folds inline after the hero). On desktop the
+  // rail is pinned to the 320px right column, spanning the main column's rows;
+  // everything else auto-flows down column 1. Rendered once so test ids stay
+  // unique.
   return (
     <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-6">
       <InfoHero
@@ -231,36 +161,6 @@ export default async function MachineInfoTab({
         machineName={machine.name}
         canCompose={canCompose}
       />
-
-      {/* Maintainer tools. QR is shown to everyone (matching pre-redesign
-          behavior); owner requirements/notes are permission-gated. Edit moved
-          into the owner card. NOTE (PP-5sgt.3): owner requirements/notes
-          relocate to the Service tab; QR relocates there too. Remove this block
-          then. */}
-      <div className="space-y-4 border-t border-outline-variant pt-6">
-        {showOwnerFields && (
-          <MachineTextFields
-            machineId={machine.id}
-            // showDescription={false} → the description is never rendered here,
-            // so don't ship the ProseMirror doc across the RSC→client boundary
-            // (CORE-SEC-006 minimal client payload); it already crosses once via
-            // the Edit dialog where it's actually needed.
-            description={null}
-            ownerRequirements={machine.ownerRequirements}
-            canEditGeneral={canEdit}
-            canViewOwnerRequirements={canViewOwnerRequirements}
-            showDescription={false}
-          />
-        )}
-        <div className="flex flex-wrap gap-3">
-          <QrCodeDialog
-            machineName={machine.name}
-            machineInitials={machine.initials}
-            qrDataUrl={qrDataUrl}
-            reportUrl={reportUrl}
-          />
-        </div>
-      </div>
     </div>
   );
 }

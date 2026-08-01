@@ -31,8 +31,7 @@ export function EditorToolbar({
 
   const setLink = (): void => {
     const previousUrl = editor.getAttributes("link")["href"] as
-      | string
-      | undefined;
+      string | undefined;
     const url = window.prompt("URL", previousUrl);
 
     // cancelled

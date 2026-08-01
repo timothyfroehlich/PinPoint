@@ -536,16 +536,16 @@ pnpm run e2e
 
 ## Tech Stack Decisions
 
-| Date       | Decision                                  | Rationale                                                |
+| Date | Decision | Rationale |
 | ---------- | ----------------------------------------- | -------------------------------------------------------- | --- |
-| 2025-11-10 | Next.js 16                                | Use latest stable release                                |
-| 2025-11-10 | No real-time subscriptions                | MVP doesn't need it                                      |
-| 2025-11-10 | Service layer allowed where helpful       | Use when coordinating workflows, avoid needless wrappers |
-| 2025-11-10 | Issues always per-machine                 | Aligns with reality, simplifies schema                   |
-| 2025-11-10 | Severity: cosmetic/minor/major/unplayable | Clear, player-centric language                           |
-| 2025-11-10 | Role: guest/member/admin                  | Simple, extensible permission model                      |
-| 2025-11-10 | Two Supabase projects                     | Preview/prod separation                                  |
-| 2025-11-20 | Drizzle migrations                        | Schema version control, production safety                |     |
+| 2025-11-10 | Next.js 16 | Use latest stable release |
+| 2025-11-10 | No real-time subscriptions | MVP doesn't need it |
+| 2025-11-10 | Service layer allowed where helpful | Use when coordinating workflows, avoid needless wrappers |
+| 2025-11-10 | Issues always per-machine | Aligns with reality, simplifies schema |
+| 2025-11-10 | Severity: cosmetic/minor/major/unplayable | Clear, player-centric language |
+| 2025-11-10 | Role: guest/member/admin | Simple, extensible permission model |
+| 2025-11-10 | Two Supabase projects | Preview/prod separation |
+| 2025-11-20 | Drizzle migrations | Schema version control, production safety | |
 
 ---
 

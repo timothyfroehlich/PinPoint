@@ -83,36 +83,82 @@ Sensitivity: 🔴 secret · 🟢 public config.
 > `NEXT_PUBLIC_SUPABASE_*` are public (anon/publishable) keys — safe to expose —
 > but still **required** for the app to boot, so they're in the registry.
 
+> **What belongs here.** Membership is decided by "PinPoint cannot run correctly
+> without this", not by "this is a secret" or "this only matters in production".
+> A var that configures an **optional surface** belongs in §4.2 even when that
+> surface is production-only — gating the build on it converts an unconfigured
+> feature into a failed deploy. See the MCP vars in §4.2 for the worked example.
+
 ### 4.2 Production-relevant but not build-gated (degrade or feature-gate)
 
 These intentionally **degrade gracefully** rather than fail the build. Listed so
 the degradation is a known, documented choice — not an oversight.
 
-| Var (aliases)                                             | Sens. | Prod                | Owner module                              | Behavior when absent                                             |
-| --------------------------------------------------------- | ----- | ------------------- | ----------------------------------------- | ---------------------------------------------------------------- |
-| `POSTGRES_URL_NON_POOLING`                                | 🔴    | ✅(migrations)      | `drizzle.config.ts`                       | throws at migrate time if `POSTGRES_URL` is pooled               |
-| `UPSTASH_REDIS_REST_URL` (`KV_REST_API_URL`)              | 🔴    | ⭕                  | `src/lib/rate-limit.ts`                   | rate limiting disabled; prod logs; non-prod degrades silently    |
-| `UPSTASH_REDIS_REST_TOKEN` (`KV_REST_API_TOKEN`)          | 🔴    | ⭕                  | `src/lib/rate-limit.ts`                   | as above                                                         |
-| `CRON_SECRET`                                             | 🔴    | ⭕                  | `src/app/api/cron/cleanup-blobs/route.ts` | cron endpoint logs error (unprotected)                           |
-| `BLOB_READ_WRITE_TOKEN`                                   | 🔴    | ✅(Vercel-injected) | `src/lib/blob/client.ts`                  | non-prod uses mock storage                                       |
-| `RESEND_API_KEY`                                          | 🔴    | ⚪                  | `src/lib/email/client.ts`                 | falls back to SMTP; auth emails go via Supabase SMTP regardless  |
-| `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | 🔴/🟢 | ⚪                  | `src/lib/security/turnstile.ts`           | CAPTCHA skipped (widget hidden, server verify passes); prod logs |
-| `DISCORD_CLIENT_ID` + `DISCORD_CLIENT_SECRET`             | 🔴    | ⚪                  | `src/lib/auth/providers.ts`               | Discord OAuth hidden end-to-end                                  |
-| `NEXT_PUBLIC_SENTRY_DSN`                                  | 🟢    | ⭕                  | `src/components/SentryInitializer.tsx`    | Sentry not initialized                                           |
+| Var (aliases)                                             | Sens. | Prod                | Owner module                              | Behavior when absent                                                                                                                                                                                                           |
+| --------------------------------------------------------- | ----- | ------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POSTGRES_URL_NON_POOLING`                                | 🔴    | ✅(migrations)      | `drizzle.config.ts`                       | throws at migrate time if `POSTGRES_URL` is pooled                                                                                                                                                                             |
+| `UPSTASH_REDIS_REST_URL` (`KV_REST_API_URL`)              | 🔴    | ⭕                  | `src/lib/rate-limit.ts`                   | rate limiting disabled; prod logs; non-prod degrades silently                                                                                                                                                                  |
+| `UPSTASH_REDIS_REST_TOKEN` (`KV_REST_API_TOKEN`)          | 🔴    | ⭕                  | `src/lib/rate-limit.ts`                   | as above                                                                                                                                                                                                                       |
+| `CRON_SECRET`                                             | 🔴    | ⭕                  | `src/app/api/cron/cleanup-blobs/route.ts` | cron endpoint logs error (unprotected)                                                                                                                                                                                         |
+| `BLOB_READ_WRITE_TOKEN`                                   | 🔴    | ✅(Vercel-injected) | `src/lib/blob/client.ts`                  | non-prod uses mock storage                                                                                                                                                                                                     |
+| `RESEND_API_KEY`                                          | 🔴    | ⚪                  | `src/lib/email/client.ts`                 | falls back to SMTP; auth emails go via Supabase SMTP regardless                                                                                                                                                                |
+| `TURNSTILE_SECRET_KEY` + `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | 🔴/🟢 | ⚪                  | `src/lib/security/turnstile.ts`           | CAPTCHA skipped (widget hidden, server verify passes); prod logs                                                                                                                                                               |
+| `DISCORD_CLIENT_ID` + `DISCORD_CLIENT_SECRET`             | 🔴    | ⚪                  | `src/lib/auth/providers.ts`               | Discord OAuth hidden end-to-end                                                                                                                                                                                                |
+| `PINBALLMAP_API_TOKEN`                                    | 🔴    | ⭕                  | `src/lib/pinballmap/api-token.ts`         | read from env at runtime; absent → PBM `X-Api-Token` omitted, live reads/writes fail once PBM's REQUIRE_API_TOKEN gate flips (July 30 2026). Production-only — never set locally or in CI. Never `NEXT_PUBLIC_`, never reused. |
+| `NEXT_PUBLIC_SENTRY_DSN`                                  | 🟢    | ⭕                  | `src/components/SentryInitializer.tsx`    | Sentry not initialized                                                                                                                                                                                                         |
+| `MCP_BEARER_TOKEN`                                        | 🔴    | ⚪                  | `src/lib/mcp/verify-token.ts`             | MCP auth fails closed — `/api/mcp/mcp` 401s, warns `reason: "not_configured"`. Rest of PinPoint unaffected.                                                                                                                    |
+| `MCP_ADMIN_USER_ID`                                       | 🔴    | ⚪                  | `src/lib/mcp/verify-token.ts`             | as above                                                                                                                                                                                                                       |
+
+> **PinballMap api_token (PP-o355.23).** A **platform capability, not tenant
+> data** — PBM issues it to an approved account against a use-plan, i.e. to
+> PinPoint-the-application, and every tenant inherits it without ever touching
+> it. That makes it a deploy-time constant, so it lives in this env var rather
+> than Supabase Vault (migration 0059 dropped the Vault pointer column on
+> `pinballmap_state` and the service-role read RPC that decrypted it, both added
+> by migration 0057). Deliberately **not** symmetric with the
+> per-operator write creds (`outbound_email` / `outbound_token_vault_id`), which
+> correctly stay in Vault: those are per-user identity arriving at runtime through
+> a connect flow. Set it in Vercel production only —
+> `vercel env add PINBALLMAP_API_TOKEN production --no-sensitive` (non-sensitive
+> so the value stays readable back — Vercel's default sensitive type is
+> write-only). The token alone cannot authorize a write: PBM writes additionally
+> require the per-operator `user_email` + `user_token`, so the blast radius of a
+> leak is quota abuse against our shared 120/min limit and traffic attributed to
+> us, not data modification. **Deliberately not
+> build-gated:** without it PBM sync degrades and every other surface works, so it
+> fails the §4.1 "is PinPoint broken without this?" test. Setting it does not turn
+> PBM on — `pinballmap_state.enabled` gates that separately (PP-o355.10).
+>
+> **MCP remote admin (PP-u4ab).** `MCP_BEARER_TOKEN` is the shared secret a
+> client presents as `Authorization: Bearer …` to `/api/mcp/mcp`; generate it
+> with `openssl rand -hex 32` (minimum 32 chars — shorter values are rejected).
+> `MCP_ADMIN_USER_ID` is the Supabase user UUID every MCP tool call acts as; it
+> must resolve to an `admin` access level, re-checked on every request. Neither
+> is `NEXT_PUBLIC_`; neither is reused as another var's fallback. Rotate by
+> changing `MCP_BEARER_TOKEN`.
+>
+> **Deliberately not build-gated.** These are required for **MCP** to work, not
+> for **PinPoint** to work. Both are unset → the MCP endpoint 401s and every
+> other surface is untouched, which is the correct degraded state for an
+> optional single-user admin tool. They were briefly added to the §4.1 registry
+> and the first production deploy after that change hard-failed at `next build`
+> with the vars simply not yet set — an optional feature taking prod deploys
+> down with it. Don't put them back (PP-ogzs).
 
 ### 4.3 Local / CI / test-only config
 
-| Var (aliases)                                                                   | Sens.         | Scope    | Owner module                               | Notes                                       |
-| ------------------------------------------------------------------------------- | ------------- | -------- | ------------------------------------------ | ------------------------------------------- |
-| `PORT`                                                                          | 🟢            | Dev      | `src/lib/url.ts`, `src/lib/blob/client.ts` | default `3000`                              |
-| `EMAIL_TRANSPORT`                                                               | 🟢            | Dev/CI   | `src/lib/email/client.ts`                  | `smtp` → Mailpit; unset → Resend            |
-| `MAILPIT_PORT` / `MAILPIT_SMTP_PORT` (`INBUCKET_PORT` / `INBUCKET_SMTP_PORT`)   | 🟢            | Dev/CI   | `src/lib/email/client.ts`                  | per-worktree test mail ports                |
-| `DEV_AUTOLOGIN_ENABLED` / `_EMAIL` / `_PASSWORD`                                | 🔴(dev creds) | Dev      | `src/lib/supabase/middleware.ts`           | 🚫 must be absent/`false` in prod           |
-| `PINBALLMAP_MODE`                                                               | 🟢            | All      | `src/lib/pinballmap/config.ts`             | `live` in prod, `mock` elsewhere by default |
-| `MOCK_BLOB_STORAGE`                                                             | 🟢            | Dev/test | `src/lib/blob/client.ts`                   | feature flag                                |
-| `DRIZZLE_FORCE_PRODUCTION`                                                      | 🟢            | Ops      | `drizzle.config.ts`                        | explicit opt-in guard for prod DDL          |
-| `LOG_LEVEL` / `PINPOINT_LOG_DIR`                                                | 🟢            | All      | `src/lib/logger.ts`                        | defaults: `info` / `<cwd>/logs`             |
-| `SKIP_SUPABASE_RESET`, `E2E_DOCKER_READY_ATTEMPTS`, `E2E_DOCKER_READY_DELAY_MS` | 🟢            | CI/test  | `e2e/global-setup.ts`                      | E2E harness tuning                          |
+| Var (aliases)                                                                   | Sens.         | Scope    | Owner module                               | Notes                                                                          |
+| ------------------------------------------------------------------------------- | ------------- | -------- | ------------------------------------------ | ------------------------------------------------------------------------------ |
+| `PORT`                                                                          | 🟢            | Dev      | `src/lib/url.ts`, `src/lib/blob/client.ts` | default `3000`                                                                 |
+| `EMAIL_TRANSPORT`                                                               | 🟢            | Dev/CI   | `src/lib/email/client.ts`                  | `smtp` → Mailpit; unset → Resend                                               |
+| `MAILPIT_PORT` / `MAILPIT_SMTP_PORT` (`INBUCKET_PORT` / `INBUCKET_SMTP_PORT`)   | 🟢            | Dev/CI   | `src/lib/email/client.ts`                  | per-worktree test mail ports                                                   |
+| `DEV_AUTOLOGIN_ENABLED` / `_EMAIL` / `_PASSWORD`                                | 🔴(dev creds) | Dev      | `src/lib/supabase/middleware.ts`           | 🚫 must be absent/`false` in prod                                              |
+| `DEV_ALLOWED_ORIGINS`                                                           | 🟢            | Dev      | `next.config.ts`                           | comma-sep origins for cross-machine `next dev`; ignored by `next build`/Vercel |
+| `PINBALLMAP_MODE`                                                               | 🟢            | All      | `src/lib/pinballmap/config.ts`             | default keys off `VERCEL_ENV`: `live` only on a production deployment          |
+| `MOCK_BLOB_STORAGE`                                                             | 🟢            | Dev/test | `src/lib/blob/client.ts`                   | feature flag                                                                   |
+| `DRIZZLE_FORCE_PRODUCTION`                                                      | 🟢            | Ops      | `drizzle.config.ts`                        | explicit opt-in guard for prod DDL                                             |
+| `LOG_LEVEL` / `PINPOINT_LOG_DIR`                                                | 🟢            | All      | `src/lib/logger.ts`                        | defaults: `info` / `<cwd>/logs`                                                |
+| `SKIP_SUPABASE_RESET`, `E2E_DOCKER_READY_ATTEMPTS`, `E2E_DOCKER_READY_DELAY_MS` | 🟢            | CI/test  | `e2e/global-setup.ts`                      | E2E harness tuning                                                             |
 
 ### 4.4 Platform-set (do not manage manually)
 
@@ -149,10 +195,19 @@ remaining fallbacks are benign same-value aliases.
 1. **Pick the scope(s)** using §3. Default to deny — only the scopes that need it.
 2. **Sensitivity:** secret → never `NEXT_PUBLIC_`; public config → `NEXT_PUBLIC_` only if the browser truly needs it (it ends up in page source).
 3. **No coupling:** give it its own value; never borrow another secret as a fallback (alias _names_ for the same value are fine).
-4. **If production-required:** add it to the registry in `next.config.ts`
-   (`REQUIRED_ALL_DEPLOYMENTS` or `REQUIRED_PRODUCTION_ONLY`), so a missing value
-   fails the build instead of degrading silently.
-5. **Document it here** (the right §4 table) and add it to `.env.example` (and
+4. **Set it in Vercel** for each chosen scope (Project Settings → Environment
+   Variables). Do this **before** step 5 — the registry assertion fires on the
+   first deploy after merge, never in CI, so registering a var whose value isn't
+   set yet fails that deploy.
+5. **Is it production-_required_?** This means **PinPoint is broken without it**
+   — not "it's a secret", not "it's production-only", not "a feature degrades".
+   The registry is a deploy gate; everything in it can fail a production deploy.
+   Ask: _if this were unset in prod right now, would users be silently harmed?_
+   - **Yes** → add it to `next.config.ts` (`REQUIRED_ALL_DEPLOYMENTS` or
+     `REQUIRED_PRODUCTION_ONLY`) so a missing value fails the build instead of
+     degrading silently. Example: `UNSUBSCRIBE_SIGNING_SECRET` (CAN-SPAM).
+   - **No** → leave it out and document the degradation in §4.2. Example: the
+     MCP vars — unset means `/api/mcp/mcp` 401s and nothing else changes, so
+     gating the build on them only ever costs you a deploy (PP-ogzs).
+6. **Document it here** (the right §4 table) and add it to `.env.example` (and
    `.env.ci` if the CI build reads it).
-6. **Set it in Vercel** for each chosen scope (Project Settings → Environment
-   Variables).

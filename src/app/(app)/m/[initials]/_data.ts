@@ -85,3 +85,29 @@ export const getMachineForLayout = cache(async (initials: string) => {
 export type MachineForLayout = NonNullable<
   Awaited<ReturnType<typeof getMachineForLayout>>["machine"]
 >;
+
+/**
+ * All issues (every status) for a machine, newest first — the "All" view of
+ * the Service tab's Open Issues card (`?view=all`). Selects the same columns
+ * the `IssueCard` needs so the card renders identically to the open-only view.
+ * Loaded lazily (only when the ⋯ menu switches to All) so the default open
+ * view stays cheap. `cache()`-wrapped for request-level dedupe.
+ */
+export const getMachineAllIssues = cache(async (initials: string) => {
+  return db.query.issues.findMany({
+    where: eq(issues.machineInitials, initials),
+    columns: {
+      id: true,
+      issueNumber: true,
+      title: true,
+      status: true,
+      severity: true,
+      priority: true,
+      frequency: true,
+      machineInitials: true,
+      createdAt: true,
+      reporterName: true,
+    },
+    orderBy: (issues, { desc }) => [desc(issues.createdAt)],
+  });
+});

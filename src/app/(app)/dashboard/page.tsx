@@ -22,7 +22,6 @@ import {
   exists,
 } from "drizzle-orm";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
-import type { Issue } from "~/lib/types";
 import { formatDate } from "~/lib/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { IssueCard } from "~/components/issues/IssueCard";
@@ -77,6 +76,7 @@ const getDashboardData = cache(async (userId?: string) => {
           machineInitials: true,
           issueNumber: true,
           createdAt: true,
+          reporterName: true,
         },
       })
     : Promise.resolve([]);
@@ -464,7 +464,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                 {assignedIssues.map((issue) => (
                   <IssueCard
                     key={issue.id}
-                    issue={issue as unknown as Issue}
+                    issue={issue}
                     machine={{ name: issue.machine.name }}
                     variant="compact"
                     dataTestId="assigned-issue-card"
@@ -494,7 +494,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               {recentIssues.map((issue) => (
                 <IssueCard
                   key={issue.id}
-                  issue={issue as unknown as Issue}
+                  issue={issue}
                   machine={{ name: issue.machine.name }}
                   showReporter={true}
                   dataTestId="recent-issue-card"

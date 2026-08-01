@@ -37,6 +37,17 @@ interface IssueCardProps {
   badgeLayout?: "normal" | "strip";
   className?: string;
   showReporter?: boolean;
+  /**
+   * Render the machine name sub-line. Off on a machine's own page, where the
+   * name is redundant on every row (design §4, PP-dnk8).
+   */
+  showMachineName?: boolean;
+  /**
+   * Cap the badge strip on narrow rows so it never wraps to a second line:
+   * Priority + Frequency collapse below the `@md/card-header` tier, leaving
+   * Status + Severity (design §4, PP-dnk8). Strip layout only.
+   */
+  capNarrowBadges?: boolean;
   dataTestId?: string;
 }
 
@@ -47,6 +58,8 @@ export function IssueCard({
   badgeLayout = "normal",
   className,
   showReporter = false,
+  showMachineName = true,
+  capNarrowBadges = false,
   dataTestId,
 }: IssueCardProps): React.JSX.Element {
   const isClosed = (CLOSED_STATUSES as readonly string[]).includes(
@@ -89,9 +102,11 @@ export function IssueCard({
                 {issue.title}
               </CardTitle>
               <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-                <span className="font-medium underline decoration-primary/30 underline-offset-2">
-                  {machine.name}
-                </span>
+                {showMachineName && (
+                  <span className="font-medium underline decoration-primary/30 underline-offset-2">
+                    {machine.name}
+                  </span>
+                )}
                 {showReporter && (
                   <span>
                     Reported by {reporter.name} • {formatDate(issue.createdAt)}
@@ -101,7 +116,11 @@ export function IssueCard({
               </div>
             </div>
             <div className="shrink-0">
-              <IssueBadgeGrid issue={issue} variant={badgeLayout} />
+              <IssueBadgeGrid
+                issue={issue}
+                variant={badgeLayout}
+                capNarrow={capNarrowBadges}
+              />
             </div>
           </div>
         </CardHeader>

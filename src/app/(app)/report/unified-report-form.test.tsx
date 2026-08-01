@@ -1,22 +1,36 @@
 /**
- * RTL tests for draft-persistence behavior in UnifiedReportForm (PP-2053.6).
+ * RTL tests for UnifiedReportForm now that persistence lives in the shared
+ * ReportDraftProvider (PP-idrb). The form is rendered inside the provider and
+ * these tests verify the form ↔ store wiring end-to-end:
  *
- * Tests verify:
- *  - name/email/image metadata survive a simulated reload (localStorage → state restore)
- *  - draft is preserved on a failed submission (state.success is falsy)
- *  - draft is cleared on a genuine success (state.success is truthy)
+ *  - reporter identity + image metadata seeded into the draft surface on the form
+ *  - a slim/legacy image row that fails hardening never shows in the gallery
+ *  - the draft is preserved on a failed submit, cleared on a genuine success
+ *  - restored images survive submit-time validation (the PP-2053.6 silent-drop guard)
  *
  * Strategy: the form uses useActionState internally. We mock the React module so
- * we can inject controlled [state, action, isPending] tuples, exactly like the
- * existing update-issue-forms-rollback tests.
+ * we can inject controlled [state, action, isPending] tuples between renders.
  */
 
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { randomUUID } from "node:crypto";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { UnifiedReportForm } from "./unified-report-form";
 import type { ActionState } from "./unified-report-form";
+import { ReportDraftProvider } from "./report-draft-store";
+import {
+  serializeDraft,
+  defaultEntry,
+  emptySingle,
+  DRAFT_VERSION,
+  REPORT_DRAFT_KEY,
+  type ReportDraft,
+  type SharedEntry,
+  type SingleOnlyState,
+} from "./report-draft-schema";
+import type { MachineOption } from "~/components/machines/MachineCombobox";
 // Import the REAL schema (NOT mocked) so the round-trip test proves a restored
 // draft's images survive submit-time validation. This is the regression guard
 // for the silent-image-drop bug (PP-2053.6 review): restored images must carry
@@ -113,6 +127,12 @@ const MACHINES = [
   },
 ];
 
+const MACHINE_OPTIONS: MachineOption[] = MACHINES.map((m) => ({
+  value: m.id,
+  name: m.name,
+  initials: m.initials,
+}));
+
 const DEFAULT_PROPS = {
   machinesList: MACHINES,
   defaultMachineId: undefined,
@@ -122,6 +142,30 @@ const DEFAULT_PROPS = {
   initialIssues: [],
   initialMachineInitials: "",
 };
+
+/** Render the form inside the shared provider (required — the form reads it). */
+function wrapped(
+  props: typeof DEFAULT_PROPS = DEFAULT_PROPS
+): React.JSX.Element {
+  return (
+    <ReportDraftProvider machines={MACHINE_OPTIONS} assignees={[]}>
+      <UnifiedReportForm {...props} />
+    </ReportDraftProvider>
+  );
+}
+
+/** Pre-seed the unified draft in localStorage so the provider hydrates it. */
+function seedDraft(over: {
+  entry?: Partial<SharedEntry>;
+  single?: Partial<SingleOnlyState>;
+}): void {
+  const draft: ReportDraft = {
+    version: DRAFT_VERSION,
+    entries: [{ ...defaultEntry(randomUUID()), ...over.entry }],
+    single: { ...emptySingle(), ...over.single },
+  };
+  localStorage.setItem(REPORT_DRAFT_KEY, serializeDraft(draft));
+}
 
 function idleState(
   overrides: Partial<ActionState> = {}
@@ -145,7 +189,7 @@ const VALID_IMAGE = {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("UnifiedReportForm draft persistence (PP-2053.6)", () => {
+describe("UnifiedReportForm ↔ shared draft store (PP-idrb)", () => {
   beforeEach(() => {
     localStorage.clear();
     // Default: idle, no success/error
@@ -157,22 +201,18 @@ describe("UnifiedReportForm draft persistence (PP-2053.6)", () => {
     vi.clearAllMocks();
   });
 
-  describe("name/email/image metadata survive a simulated reload", () => {
-    it("restores firstName, lastName, and email from localStorage", () => {
-      // Pre-seed localStorage as if the form was previously filled in
-      localStorage.setItem(
-        "report_form_state",
-        JSON.stringify({
-          machineId: MACHINES[0]?.id ?? "",
-          title: "Left flipper dead",
+  describe("seeded draft surfaces on the form", () => {
+    it("shows firstName, lastName, and email hydrated from the draft", () => {
+      seedDraft({
+        entry: { machineId: MACHINES[0]?.id ?? "", title: "Left flipper dead" },
+        single: {
           firstName: "Ada",
           lastName: "Lovelace",
           email: "ada@example.com",
-          uploadedImages: [],
-        })
-      );
+        },
+      });
 
-      render(<UnifiedReportForm {...DEFAULT_PROPS} />);
+      render(wrapped());
 
       expect(screen.getByLabelText("First Name")).toHaveValue("Ada");
       expect(screen.getByLabelText("Last Name")).toHaveValue("Lovelace");
@@ -181,120 +221,95 @@ describe("UnifiedReportForm draft persistence (PP-2053.6)", () => {
       );
     });
 
-    it("restores full image metadata and renders the gallery stub", () => {
-      localStorage.setItem(
-        "report_form_state",
-        JSON.stringify({ uploadedImages: [VALID_IMAGE] })
-      );
+    it("renders the gallery for a fully-valid restored image", () => {
+      seedDraft({ single: { uploadedImages: [VALID_IMAGE] } });
 
-      render(<UnifiedReportForm {...DEFAULT_PROPS} />);
+      render(wrapped());
 
       const gallery = screen.getByTestId("image-gallery");
       expect(gallery).toHaveAttribute("data-image-count", "1");
     });
 
-    it("drops legacy slim-only image rows that lack required metadata", () => {
+    it("drops slim-only image rows that lack required metadata", () => {
       // A draft written before the metadata fix carries only blobUrl/blobPathname.
-      // Restoring it as-is would let the submit action silently reject the images
-      // (schema requires originalFilename/fileSizeBytes/mimeType). The restore
-      // effect filters such rows so the gallery never shows photos that won't
-      // actually be saved.
-      localStorage.setItem(
-        "report_form_state",
-        JSON.stringify({
+      // The provider's hardening filters such rows so the gallery never shows
+      // photos the submit action would silently reject.
+      seedDraft({
+        single: {
           uploadedImages: [
             {
               blobUrl: VALID_IMAGE.blobUrl,
               blobPathname: VALID_IMAGE.blobPathname,
             },
-          ],
-        })
-      );
+          ] as unknown as SingleOnlyState["uploadedImages"],
+        },
+      });
 
-      render(<UnifiedReportForm {...DEFAULT_PROPS} />);
+      render(wrapped());
 
       expect(screen.queryByTestId("image-gallery")).not.toBeInTheDocument();
     });
 
-    it("does not restore uploadedImages when the array is empty", () => {
-      localStorage.setItem(
-        "report_form_state",
-        JSON.stringify({ uploadedImages: [] })
-      );
+    it("renders no gallery when the image array is empty", () => {
+      seedDraft({ single: { uploadedImages: [] } });
 
-      render(<UnifiedReportForm {...DEFAULT_PROPS} />);
+      render(wrapped());
 
-      // Gallery should not be rendered when there are no images
       expect(screen.queryByTestId("image-gallery")).not.toBeInTheDocument();
     });
   });
 
   describe("draft preserved on error, cleared on success", () => {
-    it("preserves the draft in localStorage after a failed submission", async () => {
+    it("keeps the draft in localStorage after a failed submission", async () => {
       const user = userEvent.setup();
 
-      // Render with an idle state first so the form is interactive
       mockUseActionState.mockReturnValue(idleState({ error: undefined }));
-      const { rerender } = render(<UnifiedReportForm {...DEFAULT_PROPS} />);
+      const { rerender } = render(wrapped());
 
-      // Type into the firstName field
       await user.type(screen.getByLabelText("First Name"), "Alan");
 
       // Simulate a failed action: state has an error but NOT success
       mockUseActionState.mockReturnValue(
         idleState({ error: "Server error: 504" })
       );
-      rerender(<UnifiedReportForm {...DEFAULT_PROPS} />);
+      rerender(wrapped());
 
-      // The draft should still be in localStorage (not cleared)
-      const saved = localStorage.getItem("report_form_state");
-      expect(saved).not.toBeNull();
+      expect(localStorage.getItem(REPORT_DRAFT_KEY)).not.toBeNull();
     });
 
-    it("clears localStorage on successful submission", async () => {
+    it("clears the draft in localStorage on successful submission", async () => {
       const user = userEvent.setup();
 
-      // Start idle
       mockUseActionState.mockReturnValue(idleState());
-      const { rerender } = render(<UnifiedReportForm {...DEFAULT_PROPS} />);
+      const { rerender } = render(wrapped());
 
-      // Type some data so localStorage has content
       await user.type(screen.getByLabelText("First Name"), "Grace");
+      expect(localStorage.getItem(REPORT_DRAFT_KEY)).not.toBeNull();
 
-      // Confirm localStorage has the draft
-      expect(localStorage.getItem("report_form_state")).not.toBeNull();
-
-      // Simulate success
+      // Simulate success — the form calls clearAll(), which wipes the draft.
       mockUseActionState.mockReturnValue(idleState({ success: true }));
+      rerender(wrapped());
 
-      rerender(<UnifiedReportForm {...DEFAULT_PROPS} />);
-
-      expect(localStorage.getItem("report_form_state")).toBeNull();
+      expect(localStorage.getItem(REPORT_DRAFT_KEY)).toBeNull();
     });
 
-    it("clears firstName/lastName/email state on success", () => {
-      // Pre-seed a draft with contact info
-      localStorage.setItem(
-        "report_form_state",
-        JSON.stringify({
+    it("clears firstName/lastName/email on success", () => {
+      seedDraft({
+        single: {
           firstName: "Grace",
           lastName: "Hopper",
           email: "grace@example.com",
-        })
-      );
+        },
+      });
 
       mockUseActionState.mockReturnValue(idleState());
-      const { rerender } = render(<UnifiedReportForm {...DEFAULT_PROPS} />);
+      const { rerender } = render(wrapped());
 
-      // Fields are restored from localStorage
       expect(screen.getByLabelText("First Name")).toHaveValue("Grace");
 
-      // Simulate success
       mockUseActionState.mockReturnValue(idleState({ success: true }));
+      rerender(wrapped());
 
-      rerender(<UnifiedReportForm {...DEFAULT_PROPS} />);
-
-      // Inputs should be cleared
       expect(screen.getByLabelText("First Name")).toHaveValue("");
       expect(screen.getByLabelText("Last Name")).toHaveValue("");
       expect(screen.getByLabelText("Email Address")).toHaveValue("");
@@ -317,15 +332,10 @@ describe("UnifiedReportForm draft persistence (PP-2053.6)", () => {
     }
 
     it("re-serializes restored images so imagesMetadataArraySchema accepts them", () => {
-      // Seed a draft with full metadata, render, and read the hidden input the
-      // submit action would receive.
-      localStorage.setItem(
-        "report_form_state",
-        JSON.stringify({ uploadedImages: [VALID_IMAGE] })
-      );
+      seedDraft({ single: { uploadedImages: [VALID_IMAGE] } });
 
       mockUseActionState.mockReturnValue(idleState());
-      render(<UnifiedReportForm {...DEFAULT_PROPS} />);
+      render(wrapped());
 
       const serialized = readSerializedImagesMetadata();
 

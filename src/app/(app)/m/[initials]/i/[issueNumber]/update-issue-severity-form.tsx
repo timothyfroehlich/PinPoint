@@ -1,13 +1,7 @@
 "use client";
 
 import type React from "react";
-import {
-  useState,
-  useActionState,
-  useRef,
-  useEffect,
-  startTransition,
-} from "react";
+import { useState, useActionState, useEffect, startTransition } from "react";
 import {
   updateIssueSeverityAction,
   type UpdateIssueSeverityResult,
@@ -53,12 +47,8 @@ export function UpdateIssueSeverityForm({
   ownershipContext,
   compact = false,
 }: UpdateIssueSeverityFormProps): React.JSX.Element {
-  const formRef = useRef<HTMLFormElement>(null);
   const [selectedSeverity, setSelectedSeverity] =
     useState<IssueSeverity>(currentSeverity);
-  const [pendingSeverity, setPendingSeverity] = useState<IssueSeverity | null>(
-    null
-  );
   const [state, formAction, isPending] = useActionState<
     UpdateIssueSeverityResult | undefined,
     FormData
@@ -84,20 +74,24 @@ export function UpdateIssueSeverityForm({
         ownershipContext
       );
 
-  // Auto-submit form when pending severity changes
-  useEffect(() => {
-    if (pendingSeverity !== null && formRef.current) {
-      const form = formRef.current;
-      startTransition(() => {
-        form.requestSubmit();
-      });
-      setPendingSeverity(null);
-    }
-  }, [pendingSeverity]);
-
+  // Dispatch the action directly instead of routing through a native
+  // `<form>` submission. `@radix-ui/react-select` >=2.3.3 attaches a
+  // `reset` listener to the form it participates in and replays the
+  // Select's *initial* value through `onValueChange` when that event fires;
+  // React 19 auto-resets a `<form action={...}>` once the action settles,
+  // so a native submit here would emit a second, spurious `onValueChange`
+  // carrying the stale value shortly after every real selection (PP-0fvr).
+  // Building `FormData` by hand and calling the `useActionState` dispatch
+  // ourselves means no `<form>` is ever submitted, so neither React's
+  // auto-reset nor Radix's reset listener ever fires.
   const handleValueChange = (newSeverity: IssueSeverity): void => {
     setSelectedSeverity(newSeverity);
-    setPendingSeverity(newSeverity);
+    const formData = new FormData();
+    formData.append("issueId", issueId);
+    formData.append("severity", newSeverity);
+    startTransition(() => {
+      formAction(formData);
+    });
   };
 
   if (
@@ -149,14 +143,20 @@ export function UpdateIssueSeverityForm({
   );
 
   return (
+    // No `action` prop, no hidden inputs: submits are dispatched manually
+    // from `handleValueChange` above via `formAction(formData)`, never via
+    // native form submission (see comment there for why). Kept as a
+    // `<form>` element (rather than a `<div>`) purely so existing
+    // `form[data-form="update-severity"]` selectors keep matching; it is
+    // not natively submittable, so don't add an `action` or a submit
+    // control back onto it.
     <form
-      ref={formRef}
-      action={formAction}
+      onSubmit={(event) => {
+        event.preventDefault();
+      }}
       className="space-y-2"
       data-form="update-severity"
     >
-      <input type="hidden" name="issueId" value={issueId} />
-      <input type="hidden" name="severity" value={selectedSeverity} />
       <div
         className={cn(
           "relative",

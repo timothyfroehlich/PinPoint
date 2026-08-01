@@ -18,14 +18,16 @@
  * What this test verifies:
  *   - Seed localStorage with a clearly-stale UUID before navigation.
  *   - Load /report with no URL machine param.
- *   - Assert the machine select is empty (placeholder shown), not "first machine".
+ *   - Assert the machine picker is empty (placeholder shown), not "first machine".
  *   - Assert the title (from the same draft) DID restore — proving the draft
  *     wasn't wholesale discarded; only the bad machine was dropped.
- *   - Submit without re-selecting and confirm the form refuses (required attr).
+ *   - Confirm the form refuses submission with no machine (Submit is disabled —
+ *     the combobox submits a hidden input the browser can't `required`-validate,
+ *     so the button is gated on a selection instead).
  */
 
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn } from "../support/actions.js";
+import { ensureLoggedIn, machineSelectValue } from "../support/actions.js";
 import { TEST_USERS } from "../support/constants.js";
 
 const STALE_UUID = "ffffffff-ffff-4fff-8fff-ffffffffffff";
@@ -69,17 +71,20 @@ test.describe("UnifiedReportForm — stale localStorage machineId (PP-lql)", () 
     const machineSelect = page.getByTestId("machine-select");
     await expect(machineSelect).toBeVisible();
 
-    // The dropdown is empty (placeholder) — NOT the first real machine.
-    await expect(machineSelect).toHaveValue("");
+    // The picker is empty (placeholder shown) — NOT the first real machine.
+    await expect(machineSelect).toContainText("Select a machine");
+    await expect(machineSelectValue(page)).toHaveValue("");
 
     // Other draft fields restored normally — only the invalid machine was dropped.
     await expect(page.getByLabel("Issue Title *")).toHaveValue(
       "PP-lql stale draft restoration"
     );
 
-    // Required attribute blocks submission until the user picks a machine.
-    await page.getByRole("button", { name: "Submit Issue Report" }).click();
-    await expect(page).toHaveURL(/\/report(\?.*)?$/, { timeout: 5000 });
-    await expect(machineSelect).toHaveValue("");
+    // With no machine selected, submission is blocked: the Submit button is
+    // disabled until the user picks a machine (replaces native `required`).
+    await expect(
+      page.getByRole("button", { name: "Submit Issue Report" })
+    ).toBeDisabled();
+    await expect(machineSelectValue(page)).toHaveValue("");
   });
 });

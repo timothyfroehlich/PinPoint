@@ -55,13 +55,10 @@ test.describe("Machine with Inline Invite (Smoke)", () => {
     await page.getByRole("textbox", { name: "Email" }).fill(userEmail);
 
     // Ensure "Send invitation email" is unchecked for smoke test to avoid Mailpit dep if it's slow
-    // (Though it's usually fine, we can toggle it to test the switch too)
-    const inviteSwitch = page.getByRole("switch", {
+    const inviteCheckbox = page.getByRole("checkbox", {
       name: /Send invitation email/i,
     });
-    if ((await inviteSwitch.getAttribute("aria-checked")) === "true") {
-      await inviteSwitch.click();
-    }
+    await inviteCheckbox.uncheck();
 
     await page
       .getByRole("button", { name: /Invite User/i, includeHidden: false })

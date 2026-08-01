@@ -6,7 +6,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions.js";
+import { loginAs, selectMachine } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { TEST_USERS } from "../support/constants.js";
 import { fillReportForm } from "../support/page-helpers.js";
@@ -27,7 +27,7 @@ test.describe("Public Issue Reporting - Extended", () => {
     const email = `newuser-${timestamp}@example.com`;
 
     await page.goto("/report");
-    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await selectMachine(page);
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
 
@@ -53,7 +53,7 @@ test.describe("Public Issue Reporting - Extended", () => {
     page,
   }) => {
     await page.goto("/report");
-    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await selectMachine(page);
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
 
@@ -88,7 +88,7 @@ test.describe("Public Issue Reporting - Extended", () => {
     const email = `reporter-${timestamp}@example.com`;
 
     await page.goto("/report");
-    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await selectMachine(page);
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
 
@@ -128,7 +128,7 @@ test.describe("Public Issue Reporting - Extended", () => {
 
     // 1. Submit anonymous issue
     await page.goto("/report");
-    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await selectMachine(page);
     await expect(page).toHaveURL(/machine=/);
 
     await fillReportForm(page, {

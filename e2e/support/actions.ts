@@ -275,6 +275,38 @@ export async function selectOption(
   await expect(option).toBeHidden({ timeout: 5000 });
 }
 
+/**
+ * Selects a machine from the report-form MachineCombobox (Popover + cmdk).
+ *
+ * The old machine picker was a native `<select>` driven by Playwright's
+ * `.selectOption()`; the combobox needs an open-then-click sequence. Pass a
+ * machine id to pick a specific machine, or omit `machineId` to pick the first
+ * one in the list (the equivalent of the old `.selectOption({ index: 1 })`,
+ * which just needed *a* machine selected).
+ */
+export async function selectMachine(
+  page: Page,
+  machineId?: string
+): Promise<void> {
+  const trigger = page.getByTestId("machine-select");
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+
+  const option = machineId
+    ? page.getByTestId(`machine-option-${machineId}`)
+    : page.locator('[data-testid^="machine-option-"]').first();
+  await expect(option).toBeVisible({ timeout: 5000 });
+  await option.click();
+
+  // Selecting closes the popover, so the option unmounts.
+  await expect(option).toBeHidden({ timeout: 5000 });
+}
+
+/** The hidden input carrying the report form's selected machine id. */
+export function machineSelectValue(page: Page): Locator {
+  return page.getByTestId("machine-select-input");
+}
+
 type IssueFieldName = "status" | "severity" | "priority" | "frequency";
 
 export function visibleIssueFieldControl(page: Page, field: IssueFieldName) {
@@ -323,15 +355,118 @@ export async function updateIssueField(
  * the overflow amount and viewport width.
  */
 export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
-  const result = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
+  const result = await page.evaluate(() => {
+    const doc = document.documentElement;
+    const viewportWidth = doc.clientWidth;
+
+    // How far past a viewport edge an element must extend before we treat it as
+    // a layout break rather than acceptable graceful clipping. Components that
+    // deliberately clip a few px of trailing content (e.g. a right-pinned
+    // timestamp in a density-managed row that already truncates its main text)
+    // are working as designed; a chip row or card spilling tens/hundreds of px
+    // off-screen is not. 32px ≈ more than a stray sub-pixel or a clipped
+    // character — a whole word/control has been pushed out of view.
+    const OVERFLOW_LIMIT = 32;
+
+    const overflowsViewport = (rect: DOMRect): boolean =>
+      rect.left < -OVERFLOW_LIMIT ||
+      rect.right > viewportWidth + OVERFLOW_LIMIT;
+
+    // Classify how an ancestor constrains horizontal overflow:
+    //   "scroll" — user can scroll to reveal it (not a visual break)
+    //   "clip"   — content is clipped and unreachable (a real break)
+    //   "visible" — no constraint
+    const clipKindX = (el: Element): "scroll" | "clip" | "visible" => {
+      const ox = getComputedStyle(el).overflowX;
+      if (ox === "auto" || ox === "scroll") return "scroll";
+      if (ox === "hidden" || ox === "clip") return "clip";
+      return "visible";
+    };
+
+    // Nearest ancestor that constrains this element horizontally. Why this
+    // matters: PinPoint's app shell sets `overflow-x: hidden` on <html>/<body>
+    // (globals.css) plus an `overflow-hidden` content wrapper (layout.tsx), so
+    // any horizontal overrun is silently CLIPPED rather than widening the
+    // document. That defeats a plain `document.scrollWidth <= clientWidth`
+    // check — it can never fail. Here we instead detect content that a
+    // NON-scrollable ancestor clips off-screen (hidden from the user), while
+    // treating real scroll containers (carousels, tab strips) as fine.
+    const nearestClipperX = (el: Element): "scroll" | "clip" | "none" => {
+      let node = el.parentElement;
+      while (node) {
+        const k = clipKindX(node);
+        if (k !== "visible") return k;
+        node = node.parentElement;
+      }
+      return "none";
+    };
+
+    const describe = (el: Element, rect: DOMRect): string => {
+      const tag = el.tagName.toLowerCase();
+      const id = el.id ? `#${el.id}` : "";
+      const testid = el.getAttribute("data-testid");
+      const tid = testid ? `[data-testid="${testid}"]` : "";
+      const cls =
+        typeof el.className === "string" && el.className.trim()
+          ? "." + el.className.trim().split(/\s+/).slice(0, 3).join(".")
+          : "";
+      const side =
+        rect.left < 0
+          ? `left edge (left=${Math.round(rect.left)}px)`
+          : `right edge (right=${Math.round(rect.right)}px > ${viewportWidth}px)`;
+      return `${tag}${id}${tid}${cls} — clipped past the ${side}`;
+    };
+
+    const offenders: string[] = [];
+    for (const el of Array.from(document.body.querySelectorAll("*"))) {
+      if (
+        typeof el.checkVisibility === "function" &&
+        !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+      ) {
+        continue;
+      }
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) continue;
+      if (!overflowsViewport(rect)) continue;
+
+      // Report only the boundary element — the one whose parent stays within
+      // the viewport — so we surface the source of the overrun instead of every
+      // descendant dragged off-screen with it.
+      const parent = el.parentElement;
+      if (parent && overflowsViewport(parent.getBoundingClientRect())) continue;
+
+      // Reachable by scrolling => not a visual break.
+      if (nearestClipperX(el) === "scroll") continue;
+
+      offenders.push(describe(el, rect));
+      if (offenders.length >= 10) break;
+    }
+
+    return {
+      scrollWidth: doc.scrollWidth,
+      clientWidth: viewportWidth,
+      offenders,
+    };
+  });
+
+  // Kept as a cheap belt-and-suspenders for any surface rendered outside the
+  // overflow-hidden app shell. Note: under the shell this can never fail (the
+  // shell clips the document), which is exactly why the element walk below
+  // exists.
   expect(
     result.scrollWidth,
     `Horizontal overflow detected: content is ${result.scrollWidth}px wide ` +
       `but viewport is only ${result.clientWidth}px (${result.scrollWidth - result.clientWidth}px overflow)`
   ).toBeLessThanOrEqual(result.clientWidth);
+
+  expect(
+    result.offenders,
+    `Visible element(s) are clipped off-screen by a non-scrollable ancestor — ` +
+      `content the user cannot see or reach. This is the mobile-overflow class ` +
+      `that document.scrollWidth misses because the app shell clips overflow at ` +
+      `<body>. Offenders (boundary element of each overrun):\n` +
+      result.offenders.map((o) => `  • ${o}`).join("\n")
+  ).toEqual([]);
 }
 
 /**

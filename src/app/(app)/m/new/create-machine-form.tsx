@@ -8,6 +8,13 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import {
   createMachineAction,
   type CreateMachineResult,
   type AssigneeNotMemberMeta,
@@ -18,6 +25,13 @@ import {
   type OwnerSelectUser,
 } from "~/components/machines/OwnerSelect";
 import { PinballMapLinkField } from "~/components/machines/PinballMapLinkField";
+import { RichTextEditor } from "~/components/editor/RichTextEditorDynamic";
+import type { ProseMirrorDoc } from "~/lib/tiptap/types";
+import {
+  VALID_MACHINE_PRESENCE_STATUSES,
+  getMachinePresenceLabel,
+} from "~/lib/machines/presence";
+import { MapPin } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +66,9 @@ export function CreateMachineForm({
   const [ownerIdValue, setOwnerIdValue] = useState("");
   // Bumped on reset to remount OwnerSelect (which holds its own internal state).
   const [ownerSelectKey, setOwnerSelectKey] = useState(0);
+  const [descriptionDoc, setDescriptionDoc] = useState<ProseMirrorDoc | null>(
+    null
+  );
 
   // Promote dialog state — populated when server returns ASSIGNEE_NOT_MEMBER
   const [promoteAssignee, setPromoteAssignee] = useState<
@@ -75,6 +92,7 @@ export function CreateMachineForm({
     setInitialsValue("");
     setOwnerIdValue("");
     setOwnerSelectKey((k) => k + 1);
+    setDescriptionDoc(null);
   };
 
   // Open the promote dialog when server returns ASSIGNEE_NOT_MEMBER (once per state)
@@ -146,7 +164,7 @@ export function CreateMachineForm({
 
       {/*
        * Promote-and-assign confirmation dialog.
-       * Duplicated from update-machine-form.tsx — pending extraction at 3rd consumer.
+       * Duplicated from machine-owner-transfer.tsx — pending extraction at 3rd consumer.
        *
        * Radix portals the DialogContent outside the form tree, so the confirm
        * button cannot use type="submit" to target the outer form. We build
@@ -193,12 +211,41 @@ export function CreateMachineForm({
         </DialogContent>
       </Dialog>
 
+      {/*
+       * No `action={formAction}` on purpose (PP-1ajq). React 19 auto-resets a
+       * `<form action={...}>` once the action settles — on failure as well as
+       * success — and this form stays on screen after a failed create.
+       * @radix-ui/react-select >=2.3.3 replays each Select's mount-time value
+       * through `onValueChange` on that reset, so a failed create silently
+       * threw the Availability choice back to "On the Floor" (and the
+       * PinballMap edition picker back to its mount state) while the user was
+       * still reading the error. The text fields were already made controlled
+       * for exactly this reason; dispatching `useActionState` directly closes
+       * the same hole for the Selects, because no form submission ever
+       * completes and React never fires the reset. This form depends on JS end
+       * to end regardless (the success path is a `window.location.assign`
+       * redirect). Success still resets explicitly via `resetForm()`.
+       */}
       <form
-        action={formAction}
         ref={formRef}
         onSubmit={(e) => {
+          // Ignore submits that bubbled up from a DESCENDANT form. React
+          // propagates events through the React tree, not the DOM tree, so the
+          // portalled `<form>` inside OwnerSelect's InviteUserDialog reaches
+          // this handler even though it is not a DOM descendant. Without this
+          // guard our `preventDefault()` cancelled the invite's own submission
+          // and the invited user never appeared (caught by
+          // e2e/full/machine-with-invite.spec.ts).
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
           // Snapshot the full submitted FormData for confirmPromote's re-dispatch.
-          submittedDataRef.current = new FormData(e.currentTarget);
+          const fd = new FormData(e.currentTarget);
+          submittedDataRef.current = fd;
+          // useActionState dispatch must be called inside a transition — calling it
+          // outside a transition silently skips the server action (React 19 requirement).
+          startTransition(() => {
+            formAction(fd);
+          });
         }}
         id="create-machine-form"
         className="space-y-4"
@@ -223,19 +270,15 @@ export function CreateMachineForm({
           />
         </div>
 
-        {/* Model — links the machine to its PinballMap catalog model/edition.
-            Sits right after the name: capturing the model is fundamental, not an
-            afterthought (bead B / PP-o355.2). */}
-        <PinballMapLinkField />
-
         {/* Machine Initials */}
         <div className="space-y-1.5">
           <Label htmlFor="initials" className="text-foreground">
-            Initials *
+            Initials{" "}
+            <span className="font-normal text-muted-foreground">
+              (cannot be changed later)
+            </span>{" "}
+            *
           </Label>
-          <p className="text-xs text-muted-foreground">
-            2–6 characters, permanent.
-          </p>
           <Input
             id="initials"
             name="initials"
@@ -264,6 +307,73 @@ export function CreateMachineForm({
             showHelpText={false}
           />
         )}
+
+        {/* Model — links the machine to its PinballMap catalog model/edition
+            (bead B / PP-o355.2). */}
+        <PinballMapLinkField />
+
+        {/* Description */}
+        <div className="space-y-1.5">
+          <Label className="text-foreground">Description</Label>
+          <RichTextEditor
+            content={null}
+            onChange={setDescriptionDoc}
+            mentionsEnabled={false}
+            placeholder="Add a description for this machine..."
+            ariaLabel="Machine description"
+            compact={false}
+            className="min-h-[120px]"
+          />
+          <input
+            type="hidden"
+            name="description"
+            value={descriptionDoc ? JSON.stringify(descriptionDoc) : ""}
+          />
+        </div>
+
+        {/* Availability */}
+        <div className="space-y-1.5">
+          <Label htmlFor="presence-status" className="text-foreground">
+            Availability
+          </Label>
+          <Select name="presenceStatus" defaultValue="on_the_floor">
+            <SelectTrigger
+              id="presence-status"
+              className="border-outline bg-surface text-foreground"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {VALID_MACHINE_PRESENCE_STATUSES.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {getMachinePresenceLabel(status)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* PinballMap listing — a brand-new machine always starts unlisted, and
+            nothing will list it on its own. The hourly cron only refreshes the
+            location snapshot and heals drifted lmx ids; it deliberately does
+            NOT flip `pinballmapListed` ("that stays a human decision" —
+            src/lib/pinballmap/sync.ts), and the PBM write verbs don't exist
+            yet. So this copy says listing isn't automatic rather than implying
+            something downstream handles it — the failure mode being a machine
+            left silently unlisted forever because nobody thought they had to
+            act. It names no destination either: the Edit dialog is gone
+            (PP-o355.19) and the Manage tab's control is a placeholder until
+            PP-o355.21. Point it at that control once .21 ships. */}
+        <div className="flex items-start gap-2">
+          <MapPin
+            aria-hidden="true"
+            className="mt-0.5 size-4 text-muted-foreground"
+          />
+          <p className="text-sm text-muted-foreground">
+            Not yet on Pinball Map. Listing it there isn&rsquo;t automatic yet —
+            machine-level listing controls are coming soon.
+          </p>
+        </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-2">

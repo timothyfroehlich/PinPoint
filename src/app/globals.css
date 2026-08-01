@@ -27,6 +27,17 @@
   --color-accent-foreground: #f8fafc;
   --color-destructive: #dc2626; /* red-600 — white on red-500 failed AA (~3.8:1); red-600 passes (~5.3:1) */
   --color-destructive-foreground: #ffffff;
+  /* Red used as TEXT on a dark surface — the inverse of the pair above, and a
+     genuinely different constraint. The 5.3:1 noted above is white-on-red for
+     FILLED controls; nobody had checked red-on-background, and #dc2626 there is
+     only 3.96:1 against #0f0f11 — under AA's 4.5:1 for normal text. red-500 is
+     5.09:1 and reads as more alarming than the lighter reds, which start
+     washing toward pink on a dark surface.
+     Use `text-destructive-text` for destructive TEXT (outline buttons, error
+     copy, required-field markers); keep `bg-destructive` + `text-destructive-foreground`
+     for filled controls. Caught by the axe pass in responsive-overflow.spec.ts
+     on the machine Manage tab (PP-o355.19). */
+  --color-destructive-text: #ef4444; /* red-500 — 5.09:1 on --color-background */
 
   /* Status Specific */
   --color-status-new: #4ade80;
@@ -175,6 +186,34 @@
   font-style: italic;
   pointer-events: none;
   height: 0;
+}
+
+/* Quick report collapsed row (PP-sn34): a single grid that reflows via a
+   container query on the row card (CORE-RESP: component-internal reflow uses
+   container queries, not viewport breakpoints). Priority doesn't fit at a
+   narrow width, so the narrow layout drops it (still editable in the
+   expanded row) and gives Machine/Severity a fixed 60/40 split; at
+   container widths ≥640px there's room for it alongside Severity. "actions"
+   is a wrapper around discard+submit so they can share one grid cell.
+   Narrow → 3 lines (machine·severity / problem / more·actions); wide → 2
+   lines (machine·severity·priority·more / problem·actions). */
+.quick-collapsed {
+  display: grid;
+  gap: 0.625rem;
+  align-items: end;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-areas:
+    "machine machine machine severity severity"
+    "problem problem problem problem problem"
+    "more more actions actions actions";
+}
+@container (min-width: 640px) {
+  .quick-collapsed {
+    grid-template-columns: minmax(0, 1fr) 170px 150px auto;
+    grid-template-areas:
+      "machine severity priority more"
+      "problem problem actions actions";
+  }
 }
 
 @layer base {

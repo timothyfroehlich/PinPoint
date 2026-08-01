@@ -17,6 +17,7 @@
  * Loaded by Node's --env-file flag in the package.json script invocation.
  */
 
+import { assertNotPinPointProduction } from "../scripts/lib/db-target.mjs";
 import { createScriptClient } from "../scripts/lib/pg-client.mjs";
 
 const POSTGRES_URL = process.env.POSTGRES_URL;
@@ -25,6 +26,12 @@ if (!POSTGRES_URL) {
   console.error("❌ Missing POSTGRES_URL");
   process.exit(1);
 }
+
+// Remote-capable (a fresh non-prod environment may legitimately bootstrap its
+// bot token this way), so no loopback-only guard — but never production: this
+// would write a DEV bot token into the prod Vault whenever prod's
+// bot_token_vault_id happens to be NULL.
+assertNotPinPointProduction(POSTGRES_URL, "POSTGRES_URL");
 
 const envBotToken = process.env.DISCORD_BOT_TOKEN?.trim();
 const envGuildId = process.env.DISCORD_GUILD_ID?.trim();
@@ -113,11 +120,13 @@ try {
       }
     } catch (updateError) {
       try {
-        // vault.delete_secret is the inverse of vault.create_secret used
-        // above (pg_vault extension). Best-effort cleanup so we don't leave
-        // an encrypted secret with no DB reference; failure here is logged
-        // but not re-thrown — the original UPDATE error is what matters.
-        await sql`SELECT vault.delete_secret(${vaultId}::uuid)`;
+        // supabase_vault (0.3.1) exposes only create_secret and
+        // update_secret — there is no delete_secret — so deletion is a plain
+        // row DELETE against vault.secrets, scoped to the id we just created.
+        // Best-effort cleanup so we don't leave an encrypted secret with no
+        // DB reference; failure here is logged but not re-thrown — the
+        // original UPDATE error is what matters.
+        await sql`DELETE FROM vault.secrets WHERE id = ${vaultId}::uuid`;
       } catch (cleanupError) {
         console.error(
           "⚠️  Failed to clean up orphaned vault secret",

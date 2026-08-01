@@ -58,9 +58,18 @@ export async function ensureUserProfile(user: User): Promise<void> {
       }
     }
 
+    const email = user.email;
+    if (!email) {
+      // Email is a NOT NULL column and the primary identity anchor; a Supabase
+      // user without one can't have a valid profile recreated.
+      throw new Error(
+        `Cannot recreate user profile for ${user.id}: Supabase user has no email`
+      );
+    }
+
     await db.insert(userProfiles).values({
       id: user.id,
-      email: user.email!, // Email is required by schema
+      email,
       firstName,
       lastName,
       avatarUrl,

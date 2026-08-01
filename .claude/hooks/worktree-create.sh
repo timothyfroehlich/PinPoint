@@ -151,7 +151,7 @@ do_worktree_add() {
   local last_stderr=""
 
   for attempt in $(seq 1 "$max_retries"); do
-    last_stderr=$(git -C "$BASE_PATH" worktree add "$WORKTREE_PATH" -b "$BRANCH" 2>&1) && {
+    last_stderr=$(git -C "$BASE_PATH" worktree add "$WORKTREE_PATH" -b "$BRANCH" "$BASE_REF" 2>&1) && {
       echo "$WORKTREE_PATH"
       return 0
     }
@@ -178,8 +178,30 @@ do_worktree_add() {
   return 1
 }
 
+# --- Resolve the base ref: freshly-fetched origin/main, not the (often stale) root HEAD ---
+# The root checkout ($BASE_PATH) stays on `main` but is never fast-forwarded, so its HEAD
+# routinely trails origin/main by many commits (PP-2cpf, observed 12 behind). Branching a new
+# worktree off that stale HEAD silently poisons anything that reads local files — e.g. the
+# session briefing's `pnpm audit` flagging CVEs that were already patched upstream. Both bridge
+# sessions and Agent(isolation:worktree) dispatch come through here, so fixing it at this
+# chokepoint freshens every path.
+#
+# Best-effort: fetch origin/main and branch off the fetched SHA; fall back to HEAD when the
+# fetch fails (offline) so worktree creation never hard-depends on the network. The fetch runs
+# OUTSIDE the flock below so network latency never extends the cross-session lock hold.
+# GIT_HTTP_LOW_SPEED_* bounds a stalled fetch (<1KB/s for 15s aborts) so a flaky network
+# degrades to the HEAD fallback instead of hanging every worktree creation.
+BASE_REF="HEAD"
+if GIT_HTTP_LOW_SPEED_LIMIT=1000 GIT_HTTP_LOW_SPEED_TIME=15 \
+     git -C "$BASE_PATH" fetch --quiet origin main 2>/dev/null; then
+  FETCHED_SHA=$(git -C "$BASE_PATH" rev-parse --verify --quiet FETCH_HEAD 2>/dev/null || true)
+  if [ -n "$FETCHED_SHA" ]; then
+    BASE_REF="$FETCHED_SHA"
+  fi
+fi
+
 export -f do_worktree_add is_lock_contention ms_to_sleep_args
-export BASE_PATH BRANCH WORKTREE_PATH
+export BASE_PATH BRANCH WORKTREE_PATH BASE_REF
 
 # --- Acquire exclusive lock and run worktree add ---
 case "$LOCK_TOOL" in

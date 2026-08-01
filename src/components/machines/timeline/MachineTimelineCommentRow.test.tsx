@@ -140,7 +140,7 @@ describe("MachineTimelineCommentRow", () => {
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
   });
 
-  it("does NOT display the author's email anywhere (rule 10)", () => {
+  it("does NOT display the author's email anywhere (CORE-SEC-007)", () => {
     render(
       <MachineTimelineCommentRow
         row={baseRow}

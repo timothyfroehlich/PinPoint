@@ -2,13 +2,14 @@
 
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { discordIntegrationConfig, userProfiles } from "~/server/db/schema";
+import { discordIntegrationConfig } from "~/server/db/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { saveDiscordConfigSchema, validateServerIdSchema } from "./schema";
 import { log } from "~/lib/logger";
 import { reportError } from "~/lib/observability/report-error";
-import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { checkPermission } from "~/lib/permissions/helpers";
+import { getUserAccessLevel } from "~/lib/permissions/access";
 import { getDiscordTokenForAdmin } from "~/lib/discord/config";
 
 async function verifyIntegrationsAdmin(): Promise<{ userId: string }> {
@@ -18,11 +19,7 @@ async function verifyIntegrationsAdmin(): Promise<{ userId: string }> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-  const accessLevel = getAccessLevel(profile?.role);
+  const accessLevel = await getUserAccessLevel(user.id);
   if (!checkPermission("admin.integrations.manage", accessLevel)) {
     throw new Error(
       "Forbidden: You do not have permission to manage integrations"
@@ -389,7 +386,7 @@ export async function saveDiscordConfig(
         if (!createdId) {
           // Residual we cannot compensate: if create_secret succeeded
           // server-side but this result read rejected/returned no id, we
-          // have no id to delete_secret — the orphan (if any) is
+          // have no id to delete — the orphan (if any) is
           // unrecoverable here. Throwing still routes through the catch for
           // the Sentry signal + structured error; orphanGuard.vaultId stays
           // null because there's nothing actionable to clean up.
@@ -472,12 +469,16 @@ export async function saveDiscordConfig(
     //     Hence orphanGuard.vaultId is only ever set on the create path.
     if (orphanGuard.vaultId) {
       try {
-        // vault.delete_secret is the inverse of vault.create_secret used
-        // above (pg_vault extension). Best-effort — a failure here just
-        // leaves a stray encrypted secret in vault.secrets; the singleton
-        // row already isn't pointing at it.
+        // supabase_vault (0.3.1, the version running locally and in prod)
+        // exposes exactly two public functions — create_secret and
+        // update_secret. There is NO delete_secret at any version we run, so
+        // deletion is a plain row DELETE against vault.secrets, the same form
+        // migration 0059 uses. Scoped to the single id we just created: the
+        // singleton's own (referenced) secret must never be touched.
+        // Best-effort — a failure here just leaves a stray encrypted secret
+        // in vault.secrets; the singleton row already isn't pointing at it.
         await db.execute(
-          sql`SELECT vault.delete_secret(${orphanGuard.vaultId}::uuid)`
+          sql`DELETE FROM vault.secrets WHERE id = ${orphanGuard.vaultId}::uuid`
         );
       } catch (cleanupErr) {
         log.error(

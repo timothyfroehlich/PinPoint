@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type React from "react";
 import { cookies } from "next/headers";
 import "./globals.css";
@@ -18,6 +18,29 @@ export const metadata: Metadata = {
     icon: "/favicon.png",
     apple: "/apple-touch-icon.png",
   },
+};
+
+/**
+ * Soft-keyboard resilience, app-wide (PP-a0pl).
+ *
+ * The browser default `interactive-widget=resizes-visual` lets the on-screen
+ * keyboard cover content: it shrinks only the *visual* viewport, so the layout
+ * doesn't move and a focused input / the editors / the Save-Cancel row can end
+ * up hidden behind the keyboard. `resizes-content` shrinks the *layout*
+ * viewport instead, so content reflows above the keyboard — and, as a bonus,
+ * turns keyboard-open into a plain viewport-height reduction that Playwright can
+ * drive deterministically (see e2e/full/soft-keyboard-reflow.spec.ts).
+ *
+ * Cross-browser reality: honored by Chromium (Chrome/Edge/Android). iOS Safari
+ * *ignores* `interactive-widget` entirely and keeps its own native focus-scroll
+ * — so this is a strict improvement on Chromium and a harmless no-op on iOS,
+ * where the belt-and-suspenders `scrollIntoView`-on-focus in the settings
+ * editors does the reaching. Baseline write-up: design-bible §19.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content",
 };
 
 /**

@@ -3,18 +3,56 @@
 # Re-evaluates all 5 PR gates at merge time (TOCTOU safety vs label-time gates),
 # squash-merges with --match-head-commit if all pass, removes ready-for-review label on failure.
 #
-# Usage: merge-pr.sh <PR> [--dry-run] [--force] [--bypass-merge-requirements]
-#   --dry-run                     Print would-do summary, take no action.
-#   --force                       Bypass currency + threads + reviewed gates.
+# Usage: merge-pr.sh <PR> --human [-a|--automerge] [--dry-run] [--force] [--bypass-merge-requirements]
+#   --human                       REQUIRED to actually merge. Merging is human-authorized
+#                                 only (PP-wi85) — this script refuses to execute a merge
+#                                 without it. Not required for --dry-run: a human or CI
+#                                 process previewing gate status without merging is fine.
+#                                 This is NOT an agent-preview allowance — inside Claude
+#                                 Code, block-direct-merge.cjs blocks an agent from
+#                                 invoking this script at all, --dry-run included.
+#   -a, --automerge               Poll the gates instead of evaluating them once, and merge
+#                                 as soon as they all pass. Fire it while CI is still
+#                                 running — that is what it is for. It does NOT wait out
+#                                 an unreviewed head. `reviewed` only WAITs while a review
+#                                 REQUEST is outstanding, and only for 600s from that
+#                                 request; if nobody requested a review since the last
+#                                 push, it hard-fails on the FIRST poll and the run ends.
+#                                 So request the review before firing this
+#                                 (`gh pr edit <PR> --add-reviewer "@copilot"`), or attest
+#                                 head with mark-claude-review.sh if Copilot is
+#                                 quota-limited or has already skipped. Terminates on
+#                                 exactly three outcomes, each reported on exit:
+#                                   MERGED      — gates went green, PR squash-merged
+#                                   RED         — a gate hard-failed; no merge, label removed
+#                                   TIMED OUT   — still waiting when the budget ran out
+#                                 A WAIT (CI running, requested review not yet answered)
+#                                 keeps polling; only a hard failure stops it. Tune with
+#                                 AUTOMERGE_TIMEOUT (default 3600s) and
+#                                 AUTOMERGE_POLL_INTERVAL (default 30s).
+#   --dry-run                     Print would-do summary, take no action. Does not require --human.
+#   --force                       Bypass currency + threads + reviewed gates. This is the
+#                                 ONLY way to merge a head no reviewer has seen, and it
+#                                 requires manual permission approval each time.
 #   --bypass-merge-requirements   Bypass ci gate AND pass --admin to gh pr merge
 #                                 (overrides GitHub branch-protection rules).
 #                                 Combine with --force to bypass currency + threads + reviewed + ci together.
+#
+# Canonical human-run command: scripts/workflow/merge-pr.sh <PR> --human
+# Fire-and-forget variant:     scripts/workflow/merge-pr.sh <PR> --human --automerge
 #
 # no_conflict gate is NEVER bypassable — GitHub rejects conflicting merges regardless of --admin.
 # Authorship gate has no bypass; this script operates only on PRs you authored OR PRs authored
 # by trusted Dependabot bot identities (app/dependabot, dependabot[bot], dependabot).
 # Both --force and --bypass-merge-requirements require manual permission approval
 # (settings.json permissions.ask).
+#
+# Defense-in-depth note (PP-wi85): the --human flag is a same-tool guard against
+# non-interactive/scripted invocation — it does not (and cannot) verify a human is
+# actually typing the command. It stops accidental/scripted calls; the real
+# enforcement boundary is that Claude Code's block-direct-merge.cjs PreToolUse hook
+# refuses to let an agent invoke this script at all (any flags), in ANY harness that
+# wires the hook. Cross-tool (Codex/Gemini/Antigravity) coverage is best-effort only.
 
 set -euo pipefail
 
@@ -22,18 +60,49 @@ PR=""
 DRY_RUN=false
 FORCE=false
 BYPASS_REQS=false
+HUMAN=false
+AUTOMERGE=false
+
+# Automerge polling budget. Defaults sized for this repo: the full E2E suite runs
+# ~10-15 min, and the review window is another 10, so an hour covers a normal PR
+# with room for a CI re-run.
+AUTOMERGE_TIMEOUT=${AUTOMERGE_TIMEOUT:-3600}
+AUTOMERGE_POLL_INTERVAL=${AUTOMERGE_POLL_INTERVAL:-30}
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run)                   DRY_RUN=true ;;
     --force)                     FORCE=true ;;
     --bypass-merge-requirements) BYPASS_REQS=true ;;
+    --human)                     HUMAN=true ;;
+    -a|--automerge)              AUTOMERGE=true ;;
     *) if [ -z "$PR" ]; then PR="$arg"; else echo "Error: unexpected argument $arg" >&2; exit 1; fi ;;
   esac
 done
 
 if [ -z "$PR" ] || ! [[ "$PR" =~ ^[0-9]+$ ]]; then
-  echo "Usage: $0 <PR> [--dry-run] [--force] [--bypass-merge-requirements]" >&2
+  echo "Usage: $0 <PR> --human [-a|--automerge] [--dry-run] [--force] [--bypass-merge-requirements]" >&2
+  exit 1
+fi
+
+# --automerge exists to merge unattended; previewing it would just be the one-shot
+# path with extra steps, and silently ignoring one of the two flags is worse than
+# refusing.
+if [ "$AUTOMERGE" = "true" ] && [ "$DRY_RUN" = "true" ]; then
+  echo "Error: --automerge and --dry-run are mutually exclusive." >&2
+  echo "       Use --dry-run alone to preview gate status without merging." >&2
+  exit 1
+fi
+
+# Merges are human-authorized only (PP-wi85). --dry-run is exempt — it takes no
+# action, so a human or CI process previewing gate status without merging is
+# fine. This is NOT an agent-preview allowance: inside Claude Code, the
+# block-direct-merge.cjs PreToolUse hook blocks an agent from invoking this
+# script at all, --dry-run included — an agent should read PR state via MCP
+# (pull_request_read) instead of ever reaching this line.
+if [ "$DRY_RUN" != "true" ] && [ "$HUMAN" != "true" ]; then
+  echo "REFUSE: merges are human-authorized only. Canonical command: scripts/workflow/merge-pr.sh $PR --human" >&2
+  echo "        (forgot --human? add it to merge. --dry-run previews gate status without merging.)" >&2
   exit 1
 fi
 
@@ -70,7 +139,14 @@ echo "Head SHA: $PR_HEAD_SHA"
 
 # --- Run all 5 gates, collect statuses ---
 # Per-gate bypass kind: "none" (never bypassable), "force" (--force), "admin" (--bypass-merge-requirements).
+#
+# run_all_gates accumulates into globals rather than printing, so the automerge loop can
+# decide whether a given poll is worth showing. GATE_BLOCKED is the union in gate order —
+# what the one-shot path reports, byte-identical to before automerge existed.
+GATE_REPORT=""
 GATE_FAILURES=()
+GATE_WAITS=()
+GATE_BLOCKED=()
 
 run_gate() {
   local name=$1 fn=$2 bypass_kind=$3
@@ -78,57 +154,157 @@ run_gate() {
   output=$("$fn" "$PR") || rc=$?
   # Fail-closed visibility: if a gate exits non-zero without emitting a status
   # token (e.g. gh/jq/API failure under pipefail), surface a synthetic FAIL so
-  # the structured-output contract isn't broken by a blank line.
+  # the structured-output contract isn't broken by a blank line. Such a gate is
+  # never treated as a transient WAIT — a broken gate must not be polled through.
   if [ -z "$output" ] && [ "$rc" -ne 0 ]; then
-    echo "FAIL: $name: gate exited rc=$rc with no output (likely gh/jq/API failure — see stderr)"
+    GATE_REPORT+="FAIL: $name: gate exited rc=$rc with no output (likely gh/jq/API failure — see stderr)"$'\n'
+    rc=1
   else
-    echo "$output"
+    GATE_REPORT+="$output"$'\n'
   fi
-  if [ "$rc" -ne 0 ]; then
-    local bypassed=false
-    case "$bypass_kind" in
-      force)
-        if [ "$FORCE" = "true" ]; then
-          echo "  (--force: $name gate non-pass, bypassed)"
-          bypassed=true
-        fi
-        ;;
-      admin)
-        if [ "$BYPASS_REQS" = "true" ]; then
-          echo "  (--bypass-merge-requirements: $name gate non-pass, bypassed)"
-          bypassed=true
-        fi
-        ;;
-      none) : ;;
-    esac
-    if [ "$bypassed" = "false" ]; then
-      GATE_FAILURES+=("$name")
-    fi
+
+  if [ "$rc" -eq 0 ]; then
+    return 0
   fi
+
+  local bypassed=false
+  case "$bypass_kind" in
+    force)
+      if [ "$FORCE" = "true" ]; then
+        GATE_REPORT+="  (--force: $name gate non-pass, bypassed)"$'\n'
+        bypassed=true
+      fi
+      ;;
+    admin)
+      if [ "$BYPASS_REQS" = "true" ]; then
+        GATE_REPORT+="  (--bypass-merge-requirements: $name gate non-pass, bypassed)"$'\n'
+        bypassed=true
+      fi
+      ;;
+    none) : ;;
+  esac
+  if [ "$bypassed" = "true" ]; then
+    return 0
+  fi
+
+  # rc=2 means a transient WAIT (CI still running, review pending, GitHub still
+  # computing mergeability); anything else is a hard failure. Both block a one-shot
+  # run exactly as before — the distinction only tells automerge whether to keep
+  # waiting or to stop.
+  if [ "$rc" -eq 2 ]; then
+    GATE_WAITS+=("$name")
+  else
+    GATE_FAILURES+=("$name")
+  fi
+  GATE_BLOCKED+=("$name")
 }
 
-run_gate ci          check_ci                  admin
-run_gate currency    check_copilot_currency    force
-run_gate threads     check_unresolved_threads  force
-run_gate reviewed    check_review_happened     force
-run_gate no_conflict check_no_merge_conflict   none
+run_all_gates() {
+  GATE_REPORT=""
+  GATE_FAILURES=()
+  GATE_WAITS=()
+  GATE_BLOCKED=()
+  # Head SHA as of the start of THIS evaluation. Each gate re-reads head itself, so
+  # this is what "the commit the gates approved" means — and it is what
+  # --match-head-commit must pin. Merging a head read *after* the loop would hand
+  # GitHub a commit that inherited another commit's CI, review and thread state.
+  POLL_HEAD_SHA=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)
+  run_gate ci          check_ci                  admin
+  run_gate currency    check_copilot_currency    force
+  run_gate threads     check_unresolved_threads  force
+  run_gate reviewed    check_review_happened     force
+  run_gate no_conflict check_no_merge_conflict   none
+}
 
-# --- Decide ---
-if [ ${#GATE_FAILURES[@]} -gt 0 ]; then
-  echo "RESULT: ${#GATE_FAILURES[@]} gate(s) failed: ${GATE_FAILURES[*]}"
-  if [ "$DRY_RUN" = "true" ]; then
-    echo "DRY RUN: would remove ready-for-review label if present"
-    exit 1
-  fi
-  # Remove label if present
-  if [[ ",$PR_LABELS," == *",ready-for-review,"* ]]; then
+drop_ready_label() {
+  # Re-read rather than trusting the startup snapshot: --automerge can run for an
+  # hour, and the label is often added by an agent minutes after Tim fires the
+  # command. A stale snapshot would silently skip the removal and break the
+  # documented RED contract.
+  local labels
+  labels=$(gh pr view "$PR" --json labels --jq '.labels | map(.name) | join(",")' 2>/dev/null || echo "$PR_LABELS")
+  if [[ ",$labels," == *",ready-for-review,"* ]]; then
     echo "Removing ready-for-review label..."
     gh pr edit "$PR" --remove-label ready-for-review 2>/dev/null || true
   fi
-  exit 1
-fi
+}
 
-echo "RESULT: all gates passed"
+# Signature of the current blocking picture, used to suppress identical repeat output.
+# Built with explicit emptiness checks: `${arr[*]}` on an empty array trips `set -u`
+# under bash 3.2, which is what macOS still ships as /bin/bash.
+gate_signature() {
+  local sig=""
+  if [ ${#GATE_FAILURES[@]} -gt 0 ]; then sig="F=${GATE_FAILURES[*]}"; fi
+  if [ ${#GATE_WAITS[@]} -gt 0 ]; then sig="$sig W=${GATE_WAITS[*]}"; fi
+  printf '%s' "$sig"
+}
+
+# --- Decide ---
+if [ "$AUTOMERGE" = "true" ]; then
+  automerge_started=$(date -u +%s)
+  automerge_deadline=$((automerge_started + AUTOMERGE_TIMEOUT))
+  poll=0
+  last_signature="__unset__"
+
+  echo "AUTOMERGE: polling every ${AUTOMERGE_POLL_INTERVAL}s, giving up after ${AUTOMERGE_TIMEOUT}s"
+
+  while true; do
+    poll=$((poll + 1))
+    run_all_gates
+
+    # Print the gate block on the first poll and whenever the picture changes. A
+    # 40-minute CI wait would otherwise scroll the same five lines 80 times.
+    current_signature=$(gate_signature)
+    if [ "$current_signature" != "$last_signature" ]; then
+      printf '%s' "$GATE_REPORT"
+      last_signature="$current_signature"
+    fi
+
+    if [ ${#GATE_FAILURES[@]} -gt 0 ]; then
+      echo "RESULT: ${#GATE_FAILURES[@]} gate(s) failed: ${GATE_FAILURES[*]}"
+      drop_ready_label
+      echo "AUTOMERGE: RED after ${poll} poll(s), $(( $(date -u +%s) - automerge_started ))s — not merged."
+      exit 1
+    fi
+
+    if [ ${#GATE_WAITS[@]} -eq 0 ]; then
+      echo "RESULT: all gates passed"
+      echo "AUTOMERGE: green after ${poll} poll(s), $(( $(date -u +%s) - automerge_started ))s — merging."
+      break
+    fi
+
+    now=$(date -u +%s)
+    if [ "$now" -ge "$automerge_deadline" ]; then
+      echo "RESULT: still waiting on: ${GATE_WAITS[*]}"
+      echo "AUTOMERGE: TIMED OUT after $((now - automerge_started))s — not merged, nothing failed."
+      echo "  The PR is untouched and the label is intact. Re-run once the pending gate(s) settle,"
+      echo "  or raise the budget: AUTOMERGE_TIMEOUT=7200 $0 $PR --human --automerge"
+      exit 2
+    fi
+    sleep "$AUTOMERGE_POLL_INTERVAL"
+  done
+
+  # Merge the head the FINAL poll evaluated, not whatever is current now. Re-reading
+  # here would defeat --match-head-commit: a push landing during the wait would be
+  # merged carrying the previous commit's CI, review and thread state. Pinning the
+  # polled SHA means such a push makes GitHub reject the merge instead — fail closed.
+  PR_HEAD_SHA="$POLL_HEAD_SHA"
+else
+  run_all_gates
+  printf '%s' "$GATE_REPORT"
+
+  if [ ${#GATE_BLOCKED[@]} -gt 0 ]; then
+    echo "RESULT: ${#GATE_BLOCKED[@]} gate(s) failed: ${GATE_BLOCKED[*]}"
+    if [ "$DRY_RUN" = "true" ]; then
+      echo "DRY RUN: would remove ready-for-review label if present"
+      exit 1
+    fi
+    drop_ready_label
+    exit 1
+  fi
+
+  echo "RESULT: all gates passed"
+fi
 
 # Build merge args. --admin invokes admin-merge mode on GitHub, which overrides
 # branch-protection rules (failed required checks, missing reviews, etc.).
@@ -145,9 +321,11 @@ if [ "$DRY_RUN" = "true" ]; then
 fi
 
 # --- Execute merge ---
-# The block-direct-merge PreToolUse hook fires on top-level Claude Bash invocations only.
-# This `gh pr merge` runs as a subprocess of the script, so the hook does not see it —
-# no sentinel needed. (A leftover sentinel would silently bypass the next user-level merge.)
+# Reaching this line already required passing the --human gate above. The
+# block-direct-merge PreToolUse hook (Claude Code) additionally refuses to let
+# an agent invoke this script at all — see the header comment. This `gh pr
+# merge` runs as a subprocess of the script either way, so the hook does not
+# see it directly; --human is the guard for that layer.
 gh pr merge "$PR" "${MERGE_ARGS[@]}"
 echo "MERGED: PR #$PR"
 
