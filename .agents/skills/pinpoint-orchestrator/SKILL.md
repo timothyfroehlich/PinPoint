@@ -234,7 +234,7 @@ Then wait for the review and handle its threads. Don't post a marker to paper ov
 **A request was made and Copilot didn't deliver** (silent skip, or quota-limited) → run the fallback:
 
 1. Review the PR diff yourself — a deliberate manual pass over `git diff origin/main...HEAD` against `REVIEW.md` (the canonical rubric) and the bead's acceptance criteria. `/code-review` is a harness built-in that only Tim can trigger, and `ultra` is the cloud multi-agent review — user-triggered and billed. An agent can launch neither, so the manual pass is the backstop.
-2. Address serious findings (fix → have the subagent push → re-review; a fix re-arms the gate). Decline the rest.
+2. Address serious findings (fix → have the subagent push → review the new head yourself; a fix re-arms the gate). Decline the rest.
 3. `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` to post the marker.
 
 **A review's `commit_id` already matches head** → nothing to do. That review is legitimately terminal; requesting another just spends quota to learn the same thing.

@@ -207,7 +207,9 @@ gh pr edit <PR> --add-reviewer "@copilot"
 
 4. Wait for the review, handle its threads per 3.2/3.3, then go to 3.5/3.6.
 
-**Every push past a review leaves it stale, and nothing re-requests automatically.** That's by design — a 3-commit fixup that re-requested on each push would spend three reviews, which is exactly the quota burn this change exists to eliminate. If you do have to push after being reviewed, batch the rest of the fixes, then run the same command again — once.
+**Copilot reviews the head as of the _request_, not as of when it runs.** Measured on #1787: a request made at `a4a26aad` produced a review stamped `commit_id: a4a26aad`, submitted two minutes _after_ `7d672c4` had already been pushed. So an early request doesn't just waste a review — it buys one that **can never cover head**, and you're left unable to merge until you ask again. This is the mechanical reason step 2 comes before step 3: all pushes done, CI Gate green, _then_ request.
+
+**Every push past a review leaves it stale, and nothing asks again on your behalf.** That's by design — a 3-commit fixup that fired a fresh request on each push would spend three reviews, which is exactly the quota burn this change exists to eliminate. If you do have to push after being reviewed, batch the rest of the fixes, then run the same command again — once.
 
 Live casework from the night this changed: on PRs #1779 and #1780 the agent pushed a fix ~3 minutes after Copilot's review landed, invalidating it. Under the old model the next push silently bought a replacement; now that pattern leaves the PR with no valid review at all unless you ask.
 
@@ -225,7 +227,7 @@ Requesting is not optional and the fallback is not a substitute for it. `mark-cl
 Once you have requested and Copilot has not produced a review of head:
 
 1. Review the PR diff yourself — a deliberate manual pass over `git diff origin/main...HEAD` against `REVIEW.md`, the canonical rubric. (`/code-review` is a harness built-in that only Tim can trigger; `ultra` is user-triggered and billed. An agent can launch neither.)
-2. Address serious findings the same way you handle Copilot threads: fix → push → re-request. A fix changes the head SHA and re-arms the `reviewed` gate. Consciously decline the rest.
+2. Address serious findings the same way you handle Copilot threads: fix → push → request again. A fix changes the head SHA and re-arms the `reviewed` gate. Consciously decline the rest.
 3. `bash scripts/workflow/mark-claude-review.sh <PR> "<one-line findings summary>"` — posts the SHA-pinned sticky marker `<!-- pinpoint-claude-review: <head_sha> -->` that the `reviewed` gate detects.
 
 The marker attests that **you actually read the diff**. Posting it without having done the pass is a false attestation, not a shortcut.

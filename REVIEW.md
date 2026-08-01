@@ -57,7 +57,7 @@ This did **not** loosen the merge bar. A PR still cannot merge without a review 
 gh pr edit <PR> --add-reviewer "@copilot"
 ```
 
-Nothing re-requests automatically either, deliberately, so a 3-commit fixup doesn't spend 3 reviews — a push past a review obliges the author to ask again. **If you're reviewing, assume the commit you were handed is the one the author intends to be final** — they chose to spend a review on it — and note that a review counts only while its `commit_id` is still head. Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
+Nothing asks again automatically either, deliberately, so a 3-commit fixup doesn't spend 3 reviews — a push past a review obliges the author to ask a second time. **If you're reviewing, assume the commit you were handed is the one the author intends to be final** — they chose to spend a review on it — and note that a review counts only while its `commit_id` is still head. Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
 
 ## Review mechanics
 
