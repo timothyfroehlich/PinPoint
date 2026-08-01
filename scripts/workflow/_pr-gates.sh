@@ -201,11 +201,13 @@ check_ci() {
 #   pushed_after     head is NEWER than the newest request — you pushed after asking
 #   never_requested  no Copilot review_requested event exists on this PR at all
 #
-# `never_requested` does not occur in practice while the repo's PR-open auto-request is
-# enabled (measured 2026-08-01: it fires ~1s after PR creation on every PR). It is kept
-# distinct anyway — it becomes real the moment that setting is turned off, and a gate
-# that only asked "was a review ever requested" would answer yes on every PR and catch
-# nothing. `pushed_after` is the state that actually bites today.
+# `never_requested` is now the common opening state. Copilot review is fully request-only
+# as of 2026-08-01: nothing asks on your behalf, so a PR has no request until an agent runs
+# `gh pr edit <PR> --add-reviewer "@copilot"`. (Earlier that same day a PR-open auto-request
+# still fired ~1s after creation on every PR, which made this state unreachable in practice;
+# it came from an account-level preference at github.com/settings/copilot that overrode the
+# already-disabled repo toggle. Turning that off is what made it real.) `pushed_after` — you
+# asked, then pushed past the answer — remains the subtler failure of the two.
 #
 # Sets globals: RS_STATE RS_DETAIL RS_HEAD_SHA RS_REQUEST_AT RS_REQUEST_COVERS_HEAD
 # RS_REQUEST_PENDING
