@@ -177,3 +177,4 @@ supabase/migrations/
 
 # oxlint tsgolint scratch emit dir (never written; see tsconfig.app.json) — PP-4zcj
 .oxlint-tsbuild/
+.oxlintrc.json.bak
