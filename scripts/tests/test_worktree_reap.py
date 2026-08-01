@@ -450,6 +450,31 @@ class TestKeepTier:
         assert str(world.repo) not in err
 
 
+def test_this_scripts_own_exit_codes_never_collide_with_cleanups() -> None:
+    """A propagated code has to be readable as cleanup's, unambiguously.
+
+    Surfacing `worktree_cleanup.py`'s codes verbatim is the whole point
+    (PP-r7tv), and it only works if this script mints its own statuses outside
+    cleanup's range. Sharing a value would make a top-level 1 mean either "gh
+    was unreachable" or "a cleanup failed" — the same information loss as
+    flattening, arrived at from the other direction.
+    """
+    own = [
+        reap.EXIT_CLEANUP_MIXED,
+        reap.EXIT_GH_UNAVAILABLE,
+        reap.EXIT_CLEANUP_UNRUNNABLE,
+    ]
+    reserved = set(reap.CLEANUP_EXIT_MEANINGS)
+
+    assert set(own).isdisjoint(reserved), (
+        f"{set(own) & reserved} is both ours and cleanup's"
+    )
+    assert len(set(own)) == len(own), (
+        "the self-minted codes must differ from each other"
+    )
+    assert reap.EXIT_OK not in own
+
+
 class TestRepoContext:
     def test_gh_is_asked_from_the_repo_not_the_callers_cwd(
         self,
@@ -608,6 +633,29 @@ class TestApply:
         assert "volume state was UNKNOWN" in err
         assert "FAILED" not in err
 
+    def test_an_unlaunchable_cleanup_is_not_reported_as_cleanup_failing(
+        self,
+        world: World,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Nothing ran, so there is no cleanup verdict — say that, not "exited 1"."""
+        world.add_worktree("worktree-bridge-idle")
+        real_run = reap.subprocess.run
+
+        def fail_only_the_cleanup(args, **kwargs):  # type: ignore[no-untyped-def]
+            if args[:1] == [sys.executable]:
+                raise OSError("Exec format error")
+            return real_run(args, **kwargs)
+
+        monkeypatch.setattr(reap.subprocess, "run", fail_only_the_cleanup)
+
+        code, out, err = run_reap(world, monkeypatch, capsys, "--apply")
+
+        assert code == reap.EXIT_CLEANUP_UNRUNNABLE
+        assert "could not run worktree_cleanup.py" in err
+        assert "REAPED:" not in out
+
     def test_two_failures_sharing_one_code_still_count_as_two(
         self,
         world: World,
@@ -652,8 +700,8 @@ class TestApply:
         code, _, err = run_reap(world, monkeypatch, capsys, "--apply")
 
         assert code == reap.EXIT_CLEANUP_MIXED
-        assert "FAILED — worktree not removed" in err
-        assert "volume state was UNKNOWN" in err
+        assert reap.CLEANUP_EXIT_MEANINGS[1] in err
+        assert reap.CLEANUP_EXIT_MEANINGS[4] in err
 
 
 class TestBranchFilter:
