@@ -18,14 +18,28 @@
 # Subcommands:
 #   whoami SESSION_ID        Print the registered name for SESSION_ID. Exits 1
 #                            with usage if SESSION_ID is omitted.
-#   register NAME SESSION_ID
-#                            Add or update SESSION_ID → NAME in the JSON map.
-#                            Exits 1 with usage if SESSION_ID is omitted.
+#   register [--force] NAME SESSION_ID
+#                            Add SESSION_ID → NAME to the JSON map. Refuses to
+#                            rebind a SESSION_ID that already holds a DIFFERENT
+#                            name unless --force is passed. Exits 1 with usage
+#                            if SESSION_ID is omitted.
 #   list                     Dump all session_id → name pairs (sorted by name).
 #   discover                 Print the best-guess session_id of the calling
 #                            shell. Prefers $CLAUDE_SESSION_ID when set;
 #                            falls back to the transcript heuristic with a
 #                            warning (Claude Code only; see WARNING below).
+#
+# OWNERSHIP — a session_id is owned by whoever registered it first. `register`
+# guards BOTH directions of collision:
+#   - name → other sid: the name is taken; pick a different one (no override).
+#   - sid → other name: refuse the rebind; --force overrides, for the genuine
+#     "I want to rename my own session" case.
+# The second guard is the fix for PP-788v. The write used to be an
+# unconditional `. + {($sid): $name}` — last writer won, silently, and printed
+# a cheerful success line. On 2026-07-31 three consecutive subagents each
+# overwrote the orchestrator's mapping for the orchestrator's OWN session_id,
+# which broke its self-filter (it saw its own posts re-injected as a peer's)
+# and misattributed its huddle comments to the subagents — even to Tim.
 #
 # WARNING — the transcript-based session_id discovery is a Claude-Code-specific
 # best-effort heuristic. It reads ~/.claude/projects/<mangled-root>/<session_id>.jsonl,
@@ -96,6 +110,45 @@ discover_session_id() {
   basename "$newest" .jsonl
 }
 
+# Is the calling process a dispatched Claude Code subagent (`Agent({...})`)?
+#
+# A subagent CANNOT learn its own session_id, so it must never register:
+#   - $CLAUDE_CODE_SESSION_ID is seeded with the PARENT's id;
+#   - discover_session_id below returns the newest TOP-LEVEL transcript, which
+#     excludes subagents/ by construction — so also the parent's;
+#   - the scratchpad path handed to a subagent embeds the parent's UUID.
+# Every available route yields the parent's id (PP-788v). Telling agents to
+# "use your own id" was tried twice and failed both times, because the value
+# it asks for does not exist anywhere in a subagent's environment.
+#
+# Detection: Claude Code spawns a subagent as its own process seeded with
+# CLAUDE_CODE_CHILD_SESSION=1 AND AI_AGENT=claude-code_<version>_agent. The
+# CHILD_SESSION marker alone is NOT sufficient — harness-spawned TOP-LEVEL
+# sessions (cmux, the web bridge) carry it too and are legitimate registrants;
+# only the `_agent` suffix marks a dispatch (a harness session gets
+# `_harness`). Requiring both keeps top-level sessions registerable.
+#
+# Fails open by design: other harnesses (Antigravity, Codex) set neither var,
+# so they are unaffected, and a Claude Code version that stops setting them
+# just falls back to the harness-agnostic rebind guard in `register`.
+caller_is_subagent() {
+  [[ -n "${CLAUDE_CODE_CHILD_SESSION:-}" ]] || return 1
+  [[ "${AI_AGENT:-}" == *_agent ]] || return 1
+  return 0
+}
+
+# Shared refusal for the subagent case. $1 is the subcommand being refused.
+refuse_subagent() {
+  printf 'huddle-whoami.sh: refusing to %s — this is a dispatched subagent.\n' "$1" >&2
+  printf 'A subagent cannot determine its own session_id: every route (the\n' >&2
+  printf 'CLAUDE_CODE_SESSION_ID env var, the transcript heuristic, the scratchpad\n' >&2
+  printf 'path) yields the id of the PARENT session, so registering would rename\n' >&2
+  printf 'the parent out from under it (PP-788v).\n\n' >&2
+  printf 'Subagents are ephemeral and must not hold huddle names — see the\n' >&2
+  printf 'pinpoint-huddle skill, "Subagent sessions". Sign your huddle posts with\n' >&2
+  printf '—<YourName> instead; a signature needs no registration.\n' >&2
+}
+
 cmd="${1:-whoami}"
 
 case "$cmd" in
@@ -111,9 +164,38 @@ case "$cmd" in
     ;;
 
   register)
-    name="${2:-}"
+    # A subagent has no correct id to register, so refuse before parsing —
+    # there is no combination of arguments that makes the write correct, and
+    # that includes --force.
+    if caller_is_subagent; then
+      refuse_subagent "register"
+      exit 1
+    fi
+    shift
+    force=0
+    positional=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --force) force=1 ;;
+        --)
+          shift
+          while [[ $# -gt 0 ]]; do
+            positional+=("$1")
+            shift
+          done
+          break
+          ;;
+        -*)
+          echo "huddle-whoami.sh: unknown option '$1' (register accepts --force)" >&2
+          exit 1
+          ;;
+        *) positional+=("$1") ;;
+      esac
+      shift
+    done
+    name="${positional[0]:-}"
     if [[ -z "$name" ]]; then
-      echo "Usage: huddle-whoami.sh register NAME [SESSION_ID]" >&2
+      echo "Usage: huddle-whoami.sh register [--force] NAME SESSION_ID" >&2
       exit 1
     fi
     # Restrict names to alphanumeric + underscore + hyphen. Defense in depth:
@@ -123,9 +205,9 @@ case "$cmd" in
       echo "huddle-whoami.sh: NAME must be alphanumeric (plus _ and -); got: $name" >&2
       exit 1
     fi
-    sid="${3:-}"
+    sid="${positional[1]:-}"
     if [[ -z "$sid" ]]; then
-      printf 'Usage: huddle-whoami.sh register NAME SESSION_ID\n' >&2
+      printf 'Usage: huddle-whoami.sh register [--force] NAME SESSION_ID\n' >&2
       printf 'SESSION_ID is required — the heuristic is unreliable when multiple sessions are active.\n' >&2
       printf 'Use: bash scripts/hooks/huddle-whoami.sh discover  to get the discovered session_id.\n' >&2
       exit 1
@@ -142,10 +224,30 @@ case "$cmd" in
       echo "Pick a different name (e.g. ${name}2, ${name}B) and retry." >&2
       exit 1
     fi
+    # Reject the REVERSE-direction collision (PP-788v): this session_id is
+    # already registered under a DIFFERENT name. Overwriting it renames the
+    # session that owns it — silently corrupting that session's self-filter
+    # and the attribution of every comment it has signed. Re-registering the
+    # same name is still idempotent; only a genuine rename needs --force.
+    current=$(jq -r --arg sid "$sid" '.[$sid] // ""' "$NAMES_JSON")
+    if [[ -n "$current" && "$current" != "$name" && $force -eq 0 ]]; then
+      printf 'huddle-whoami.sh: session %s is already registered as %s\n' "$sid" "$current" >&2
+      printf 'Refusing to rebind it to %s — that would rename whoever owns this\n' "$name" >&2
+      printf 'session and break their self-filter and comment attribution (PP-788v).\n\n' >&2
+      printf 'If you were handed this session_id by another agent, it is almost\n' >&2
+      printf 'certainly NOT yours — do not register; sign your huddle posts instead.\n\n' >&2
+      printf 'If this really is your own session and you mean to rename it:\n' >&2
+      printf '  bash scripts/hooks/huddle-whoami.sh register --force %s %s\n' "$name" "$sid" >&2
+      exit 1
+    fi
     tmp=$(mktemp)
     jq --arg sid "$sid" --arg name "$name" '. + {($sid): $name}' "$NAMES_JSON" > "$tmp"
     mv "$tmp" "$NAMES_JSON"
-    echo "Registered: $sid → $name"
+    if [[ -n "$current" && "$current" != "$name" ]]; then
+      echo "Renamed (--force): $sid → $name (was $current)"
+    else
+      echo "Registered: $sid → $name"
+    fi
     ;;
 
   list)
@@ -153,6 +255,14 @@ case "$cmd" in
     ;;
 
   discover)
+    # Refuse for subagents rather than handing back the parent's id. Both
+    # branches below resolve to the parent for a subagent — the env var
+    # because Claude Code seeds it with the parent's id, the heuristic because
+    # it only considers TOP-LEVEL transcripts (PP-788v cause #1).
+    if caller_is_subagent; then
+      refuse_subagent "discover a session_id"
+      exit 1
+    fi
     # Prefer the env var set by Claude Code's hook context — it is guaranteed
     # correct for the calling session. Fall back to the transcript heuristic
     # only when the env var is absent, and warn that the result may be wrong
@@ -168,7 +278,7 @@ case "$cmd" in
     ;;
 
   *)
-    echo "Usage: huddle-whoami.sh [whoami|register NAME|list|discover] [SESSION_ID]" >&2
+    echo "Usage: huddle-whoami.sh [whoami|register [--force] NAME|list|discover] [SESSION_ID]" >&2
     exit 1
     ;;
 esac
