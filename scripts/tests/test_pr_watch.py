@@ -49,9 +49,11 @@ OLD_SHA = "3ab14b1f0000000000000000000000000000aaaa"
 BRANCH = "feat/example-branch"
 PR = 1734
 
-# The exact stderr `gh` produced on 2026-07-26 when the shared user-level quota
-# ran out mid-watch on PR #1748 — the live evidence behind PP-qkl8.
-RATE_LIMIT_403 = "HTTP 403: API rate limit exceeded for user ID 5819722"
+# The stderr `gh` produced on 2026-07-26 when the shared user-level quota ran
+# out mid-watch on PR #1748 — the live evidence behind PP-qkl8. The real message
+# named the account whose quota it was; the numeric id is dropped here because
+# nothing under test reads it.
+RATE_LIMIT_403 = "HTTP 403: API rate limit exceeded for user ID"
 
 
 def _gate(conclusion: str, status: str = "COMPLETED", completed_at: str = "") -> dict:
@@ -266,10 +268,27 @@ def test_run_conclusion_raises_when_gh_fails(monkeypatch, stderr):
 
 
 @pytest.mark.unit
-def test_run_conclusion_raises_on_unparseable_json(monkeypatch):
+def test_run_conclusion_quotes_unparseable_output(monkeypatch):
+    """ "Expecting value: line 1 column 1" alone is unactionable — show the body."""
     monkeypatch.setattr(pr_watch, "gh", lambda *_a: "<html>rate limited</html>")
-    with pytest.raises(pr_watch.RunStateUnavailable):
+    with pytest.raises(pr_watch.RunStateUnavailable, match="rate limited"):
         pr_watch._run_conclusion(30184323661)
+
+
+@pytest.mark.unit
+def test_run_conclusion_normalises_null_fields(monkeypatch):
+    """`conclusion` is null on a run that hasn't finished — return "", not None."""
+    monkeypatch.setattr(
+        pr_watch, "gh", lambda *_a: json.dumps({"status": "in_progress"})
+    )
+    assert pr_watch._run_conclusion(30184323661) == ("in_progress", "")
+
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        lambda *_a: json.dumps({"status": "in_progress", "conclusion": None}),
+    )
+    assert pr_watch._run_conclusion(30184323661) == ("in_progress", "")
 
 
 @pytest.mark.unit

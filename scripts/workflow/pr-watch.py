@@ -415,12 +415,22 @@ def _run_conclusion(run_id: int) -> tuple[str, str]:
     Raises RunStateUnavailable if the gh call itself failed — a rate-limit 403,
     a network drop, an expired token. That is "we could not find out", which is
     not a verdict about the run and must never be reported as one.
+
+    The two failure modes are decoded separately so the reason carried up is
+    actionable: a bare "Expecting value: line 1 column 1" tells the reader
+    nothing, so unparseable output is quoted back with the raw prefix.
     """
     try:
-        data = json.loads(gh("run", "view", str(run_id), "--json", "status,conclusion"))
-    except (RuntimeError, json.JSONDecodeError) as exc:
+        raw = gh("run", "view", str(run_id), "--json", "status,conclusion")
+    except RuntimeError as exc:
         raise RunStateUnavailable(str(exc) or "gh run view failed") from exc
-    return data.get("status", ""), data.get("conclusion", "")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RunStateUnavailable(
+            f"gh run view returned unparseable output ({exc}): {raw[:120]!r}"
+        ) from exc
+    return data.get("status") or "", data.get("conclusion") or ""
 
 
 def _run_conclusion_retrying(
