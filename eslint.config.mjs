@@ -336,6 +336,17 @@ export default [
     },
   },
   {
+    // Workflow/maintenance scripts run under Node, not the browser or Next's
+    // bundler, so `console` and `process` are legitimate globals here rather
+    // than `no-undef` violations. Until PP-ojv5 these files were never linted
+    // at all (`lint` was `eslint src/`), which is why this block did not exist
+    // — the 133 `no-undef` errors it clears were latent, not new.
+    files: ["scripts/**/*.mjs", "scripts/**/*.ts"],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
     // ===== React Hooks correctness (PP-k6jp) =====
     // eslint-config-next was installed but never loaded, so react-hooks rules
     // ran nowhere. Wire the plugin directly (not via the legacy next config) and
