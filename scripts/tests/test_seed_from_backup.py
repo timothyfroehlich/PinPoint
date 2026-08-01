@@ -126,18 +126,51 @@ def test_selects_newest_by_filename_not_mtime(tmp_path: Path) -> None:
     assert "pinpoint_prod_20260101_010101.sql" not in result.stdout
 
 
-def test_handles_filename_with_spaces(tmp_path: Path) -> None:
-    """The old find pipeline split on whitespace; the glob must not."""
+def test_ignores_names_without_a_timestamp(tmp_path: Path) -> None:
+    """'Greatest name == newest' only holds for the timestamped shape, so the
+    glob must not match hand-named dumps. `pinpoint_prod_manual.sql` sorts above
+    every timestamp and would otherwise hijack the selection."""
     home = tmp_path / "home"
     home.mkdir()
     backup_dir = make_backup_dir(home)
-    (backup_dir / "pinpoint_prod_20260101_000000 copy.sql").write_text("")
+    (backup_dir / "pinpoint_prod_20260102_000000.sql").write_text("")
+    (backup_dir / "pinpoint_prod_manual.sql").write_text("")
+    (backup_dir / "pinpoint_prod_20260103.sql").write_text("")  # date, no time
+
+    result = run_discovery(home, tmp_path)
+
+    assert "Found 1 backup(s)" in result.stdout
+    assert str(backup_dir / "pinpoint_prod_20260102_000000.sql") in result.stdout
+    assert "pinpoint_prod_manual.sql" not in result.stdout
+
+
+def test_handles_a_home_directory_containing_a_space(tmp_path: Path) -> None:
+    """macOS home directories are routinely `/Users/First Last`. The array/glob
+    path must carry that through without word-splitting the resolved path."""
+    home = tmp_path / "Some User"
+    home.mkdir()
+    backup_dir = make_backup_dir(home)
+    (backup_dir / "pinpoint_prod_20260101_000000.sql").write_text("")
     (backup_dir / "pinpoint_prod_20260102_000000.sql").write_text("")
 
     result = run_discovery(home, tmp_path)
 
     assert "Found 2 backup(s)" in result.stdout
     assert str(backup_dir / "pinpoint_prod_20260102_000000.sql") in result.stdout
+
+
+def test_reports_a_non_directory_path_accurately(tmp_path: Path) -> None:
+    """A regular file sitting at the backup path is not a missing directory, and
+    'run db:backup to create one' would be bad advice — that would fail too."""
+    home = tmp_path / "home"
+    (home / ".pinpoint").mkdir(parents=True)
+    (home / ".pinpoint" / "db-backups").write_text("not a directory")
+
+    result = run_discovery(home, tmp_path)
+
+    assert result.returncode == 1
+    assert "exists but is not a directory" in result.stdout
+    assert "does not exist" not in result.stdout
 
 
 def test_explicit_argument_skips_discovery(tmp_path: Path) -> None:

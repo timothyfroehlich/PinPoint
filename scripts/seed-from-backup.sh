@@ -22,8 +22,14 @@ if [ -z "$BACKUP_FILE" ]; then
     # are three different problems. Report them separately — collapsing a failed
     # lookup into "no backups found" is the exact bug being fixed here.
     if [ ! -d "$BACKUP_DIR" ]; then
-        echo -e "${RED}❌ Backup directory does not exist: $BACKUP_DIR${NC}"
-        echo -e "${YELLOW}   Run 'pnpm run db:backup' to create one.${NC}"
+        if [ -e "$BACKUP_DIR" ]; then
+            # Not "missing" — something is there, it just isn't a directory, and
+            # "run db:backup" would be bad advice because that would fail too.
+            echo -e "${RED}❌ $BACKUP_DIR exists but is not a directory.${NC}"
+        else
+            echo -e "${RED}❌ Backup directory does not exist: $BACKUP_DIR${NC}"
+            echo -e "${YELLOW}   Run 'pnpm run db:backup' to create one.${NC}"
+        fi
         exit 1
     fi
 
@@ -42,8 +48,17 @@ if [ -z "$BACKUP_FILE" ]; then
     # `find -printf '%T@ %p\n' 2>/dev/null`; -printf is GNU findutils only, so
     # on macOS find errored, the redirect ate the message, and the script
     # claimed the directory was empty — PP-euhg.)
+    #
+    # The glob spells out 8 date digits + 6 time digits rather than using a bare
+    # `*`, because that literal shape is what makes "greatest name == newest"
+    # true. It mirrors `date +%Y%m%d_%H%M%S` in scripts/backup-production.sh. A
+    # loose `pinpoint_prod_*.sql` would also match a hand-named file like
+    # pinpoint_prod_manual.sql, which sorts above every timestamp and would be
+    # picked as the "newest" backup.
     shopt -s nullglob
-    backup_candidates=("$BACKUP_DIR"/pinpoint_prod_*.sql)
+    backup_candidates=(
+        "$BACKUP_DIR"/pinpoint_prod_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].sql
+    )
     shopt -u nullglob
 
     if [ ${#backup_candidates[@]} -eq 0 ]; then
