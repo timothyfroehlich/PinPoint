@@ -368,13 +368,22 @@ await expect(page.getByText("Data loaded")).toBeVisible();
 **Over-Mocking**:
 
 ```typescript
-// ❌ Bad: Mocking everything (for DB logic)
-vi.mock("~/server/db");
+// ❌ Bad: canned return values — this tests the mock, not the query
+vi.mock("~/server/db", () => ({
+  db: { query: { issues: { findFirst: vi.fn() } } },
+}));
 vi.mock("drizzle-orm");
 
-// ✅ Good: Use PGlite integration test instead
-// Integration tests with PGlite test real DB logic
+// ✅ Good: forward the db singleton to worker-scoped PGlite — the real query runs
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  return { db: await getTestDb() };
+});
 ```
+
+The ❌ case is mocking `~/server/db` with **canned return values**, or mocking `drizzle-orm` at all — the assertions then only prove the mock returned what you told it to.
+
+The ✅ case is the **house pattern**, used broadly across `src/test/integration/`. It's how you integration-test a service function that imports the `db` singleton directly instead of accepting it as a parameter: the mock forwards to `getTestDb()`, so the real SQL executes against real Postgres. `src/test/integration/transaction-tripwire.test.ts` is a representative example. This composes with CORE-TEST-001 rather than violating it — `getTestDb()` hands back the **worker-scoped** instance, so no per-test database is created.
 
 **Testing Server Components Directly**:
 
