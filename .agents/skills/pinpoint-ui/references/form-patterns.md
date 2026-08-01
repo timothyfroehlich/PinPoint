@@ -35,7 +35,7 @@ export function CreateIssueForm() {
   return (
     <form action={formAction}>
       <input name="title" required />
-      {state.message && <p className="text-destructive">{state.message}</p>}
+      {state.message && <p className="text-destructive-text">{state.message}</p>}
       <button type="submit">Create Issue</button>
     </form>
   );

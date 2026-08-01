@@ -66,10 +66,16 @@ export type CreateMachineInput = z.infer<typeof createMachineSchema>;
  */
 export const updateMachineSchema = z.object({
   id: z.string().uuid(),
+  // Optional on update: `undefined` means "leave the name alone". Forms that
+  // do not edit the name (ownership transfer) must omit it rather than
+  // resubmit a page-load snapshot — doing so reverted a concurrent rename
+  // (PP-o355.19 review). Absent is not the same as empty: a submitted name
+  // still has to be 1-100 chars.
   name: z
     .string()
     .min(1, "Name is required")
-    .max(100, "Machine name must be less than 100 characters"),
+    .max(100, "Machine name must be less than 100 characters")
+    .optional(),
   ownerId: z.string().uuid().optional(),
   presenceStatus: z.enum(VALID_MACHINE_PRESENCE_STATUSES).optional(),
   forcePromoteUserId: z.string().uuid().optional(),

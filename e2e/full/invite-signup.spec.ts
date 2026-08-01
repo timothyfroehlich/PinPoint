@@ -156,12 +156,16 @@ test.describe("User Invitation & Signup Flow", () => {
       page.getByRole("heading", { name: /Humpty Dumpty/i })
     ).toBeVisible();
 
-    // Open the Edit Machine dialog (admin has edit permission)
-    await page.getByTestId("edit-machine-button").click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    // Open the machine edit page (admin has edit permission)
+    await page.getByTestId("machine-tab-edit").click();
+    await expect(page).toHaveURL(/\/edit$/);
 
-    // Click the owner dropdown and select the invited user (shown with "(INVITED)" suffix).
-    // Invited users are hidden by default — toggle the checkbox to reveal them.
+    // Ownership lives in the Danger zone behind a disclosure (PP-o355.19).
+    await page.getByTestId("open-owner-transfer").click();
+
+    // Click the owner dropdown and select the invited user (shown with
+    // "(INVITED)" suffix). Invited users are hidden by default — toggle the
+    // checkbox to reveal them.
     const ownerSelect = page.getByTestId("owner-select");
     await ownerSelect.click();
     await page.getByLabel(/Show guests and invited users/i).click();
@@ -169,9 +173,10 @@ test.describe("User Invitation & Signup Flow", () => {
       .getByRole("option", { name: /Owner Transfer.*\(Invited\)/i })
       .click();
 
-    // Save the machine (dialog closes on success)
-    await page.getByRole("button", { name: /Update Machine/i }).click();
-    await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 10000 });
+    await page.getByRole("button", { name: /^Transfer ownership$/ }).click();
+    await expect(page.getByTestId("open-owner-transfer")).toBeVisible({
+      timeout: 10000,
+    });
     hdOwnerChanged = true;
 
     // 3. Logout and complete signup

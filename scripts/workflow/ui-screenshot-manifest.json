@@ -36,6 +36,18 @@
     "authRole": "member",
     "seedNeeds": "default seed"
   },
+  "machine-edit": {
+    "label": "Machine Manage (Addams Family)",
+    "route": "/m/TAF/edit",
+    "authRole": "admin",
+    "seedNeeds": "seeded machine TAF (addamsFamily) from src/test/data/machines.json. Shot as admin on purpose: the page hides sections by permission (Pinball Map link/sync, Danger zone), and admin is the only role that renders all of them in one frame."
+  },
+  "machine-new": {
+    "label": "New Machine",
+    "route": "/m/new",
+    "authRole": "admin",
+    "seedNeeds": "default seed (owner picker options + PinballMap catalog mirror). Added by PP-o355.19: this page hosts PinballMapLinkField, whose Model/Edition pairing is driven by the field's own container — a regression here is invisible from the Manage tab alone."
+  },
   "machine-settings": {
     "label": "Machine Settings (Attack from Mars)",
     "route": "/m/AFM/settings",

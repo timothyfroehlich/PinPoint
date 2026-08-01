@@ -21,11 +21,29 @@ import type { PbmMachineStatus } from "~/lib/pinballmap/status";
  * it in.
  */
 
-/** Human-facing copy per desync reason. Reasons without an entry show no alert. */
+/**
+ * Human-facing copy per desync reason. Reasons without an entry show no alert.
+ *
+ * Deliberately states the mismatch and names no control. The earlier copy told
+ * the reader to "verify" and implied a Connect action, both of which PP-o355.19
+ * removed from the Manage tab and PP-o355.21 retires for good — an alert that
+ * names a button the reader cannot find is worse than one that just reports
+ * what it sees. When .21 lands and the listing control can resolve these
+ * states, this copy should regain a call to action pointing at it.
+ */
 const DESYNC_COPY: Partial<Record<PbmMachineStatus["reason"], string>> = {
-  listed_locally_absent_on_pbm: "Listed here but not showing on Pinball Map.",
-  on_pbm_not_listed_locally: "On Pinball Map but not marked listed here.",
-  lmx_drifted: "Pinball Map link moved — verify.",
+  listed_locally_absent_on_pbm: "Listed here, but not showing on Pinball Map.",
+  on_pbm_not_listed_locally: "On Pinball Map, but not marked listed here.",
+  // `lmx_drifted` is deliberately absent. `reconcileAfterSync` heals every
+  // drifted machine on each hourly cron, and its heal condition is the very
+  // same `derivePbmMachineStatus` predicate that raises this reason — so the
+  // state is only ever visible in the window between PBM moving a row id and
+  // the next cron, and it repairs itself. Showing it would report a
+  // self-healing transient to someone who can do nothing about it.
+  //
+  // The two that remain are NOT self-healing: sync deliberately never flips
+  // `pinballmapListed` ("that stays a human decision"), so those mismatches
+  // persist until a person acts, and this alert is the only signal they exist.
 };
 
 export interface MachinePinballmapCardProps {

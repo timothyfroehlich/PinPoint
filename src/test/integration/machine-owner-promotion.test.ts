@@ -769,6 +769,47 @@ describe("Machine Owner Promotion — Server Action Integration (PP-rb8)", () =>
       expect(updatedMachine?.name).toBe("Admin Updated Name");
     });
 
+    it("transfers ownership without reverting a concurrent rename", async () => {
+      // The Danger-zone transfer form submits `id` + `ownerId` and deliberately
+      // NOT `name`. It used to resubmit a page-load snapshot of the name, so a
+      // transfer silently reverted a rename someone else had made in between
+      // (PP-o355.19 review).
+      const { createClient } = await import("~/lib/supabase/server");
+      const { updateMachineAction } = await import("~/app/(app)/m/actions");
+      const db = await getTestDb();
+
+      const adminUser = await createUser("admin");
+      const newOwner = await createUser("member");
+      const machine = await createMachine();
+
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: adminUser.id } } }),
+        },
+      } as any);
+
+      // Someone else renames the machine after the transfer page rendered.
+      await db
+        .update(machines)
+        .set({ name: "Renamed By Someone Else" })
+        .where(eq(machines.id, machine.id));
+
+      const formData = new FormData();
+      formData.append("id", machine.id);
+      formData.append("ownerId", newOwner.id);
+
+      const result = await updateMachineAction(undefined, formData);
+      expect(result.ok).toBe(true);
+
+      const updated = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+      });
+      expect(updated?.ownerId).toBe(newOwner.id);
+      expect(updated?.name).toBe("Renamed By Someone Else");
+    });
+
     it("should allow owner to update their own machine", async () => {
       const { createClient } = await import("~/lib/supabase/server");
       const { updateMachineAction } = await import("~/app/(app)/m/actions");

@@ -1,5 +1,14 @@
 import type React from "react";
 import { notFound } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { createClient } from "~/lib/supabase/server";
+import { db } from "~/server/db";
+import { userProfiles } from "~/server/db/schema";
+import {
+  getAccessLevel,
+  checkPermission,
+  type OwnershipContext,
+} from "~/lib/permissions/index";
 import { PageContainer } from "~/components/layout/PageContainer";
 import { MachineDetailHeader } from "~/components/machines/MachineDetailHeader";
 import { MachineTabStrip } from "~/components/machines/MachineTabStrip";
@@ -15,6 +24,12 @@ export default async function MachineDetailLayout({
   params: Promise<{ initials: string }>;
 }): Promise<React.JSX.Element> {
   const { initials } = await params;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { machine } = await getMachineForLayout(initials);
 
   if (!machine) {
@@ -26,6 +41,26 @@ export default async function MachineDetailLayout({
     openCount: machine.issues.length,
     status: deriveMachineStatus(machine.issues),
   };
+
+  // The Manage tab is only rendered for viewers who hold `machines.edit`; the
+  // Edit route re-checks the same permission so a deep link is still guarded.
+  const currentUserProfile = user
+    ? await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+        columns: { role: true },
+      })
+    : null;
+  const ownershipContext: OwnershipContext = {
+    userId: user?.id,
+    machineOwnerId: machine.ownerId ?? undefined,
+  };
+  const canEdit =
+    user !== null &&
+    checkPermission(
+      "machines.edit",
+      getAccessLevel(currentUserProfile?.role),
+      ownershipContext
+    );
 
   return (
     <PageContainer size="standard">
@@ -41,6 +76,7 @@ export default async function MachineDetailLayout({
             <MachineTabStrip
               initials={machine.initials}
               maintenance={maintenance}
+              canEdit={canEdit}
             />
           </div>
           <MachineBackboxTranslite

@@ -1,20 +1,16 @@
 import type React from "react";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { getUnifiedUsers } from "~/lib/users/queries";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles, pinballmapCatalog } from "~/server/db/schema";
+import { userProfiles } from "~/server/db/schema";
 import { deriveMachineStatus } from "~/lib/machines/status";
-import { EditButtonWithTooltip } from "../edit-button-tooltip";
-import { EditMachineDialog } from "../update-machine-form";
 import { RichTextDisplay } from "~/components/editor/RichTextDisplay";
 import { docIsEmpty } from "~/lib/tiptap/types";
 import { MachineRecentActivity } from "~/components/machines/timeline/MachineRecentActivity";
 import {
   getAccessLevel,
   checkPermission,
-  getPermissionDeniedReason,
   type OwnershipContext,
 } from "~/lib/permissions/index";
 import { getMachineForLayout } from "../_data";
@@ -71,30 +67,15 @@ export default async function MachineInfoTab({
     machineOwnerId: machine.ownerId ?? undefined,
   };
 
-  const canEdit = checkPermission(
-    "machines.edit",
-    accessLevel,
-    ownershipContext
-  );
-  const editDeniedReason = getPermissionDeniedReason(
-    "machines.edit",
-    accessLevel,
-    ownershipContext
-  );
-  const canEditAnyMachine =
-    accessLevel === "admin" || accessLevel === "technician";
-  const isOwner =
-    !!user &&
-    (user.id === machine.ownerId || user.id === machine.invitedOwnerId);
-
   const canCompose = checkPermission(
     "machines.timeline.comment.add",
     accessLevel
   );
 
-  // PinballMap linking (bead B / PP-o355.2): the edit dialog exposes the picker
-  // only to users who may link, and needs the linked title's display name (the
-  // machine row stores only the PBM id + metadata, not the catalog name).
+  // PinballMap linking (bead B / PP-o355.2) gates the maintainer-facing desync
+  // signal below. The catalog picker itself moved to the edit page
+  // (PP-o355.19), so this landing no longer resolves the linked title's display
+  // name or the unified-user list — both were dialog-only reads.
   const canLink = checkPermission(
     "machines.pinballmap.link",
     accessLevel,
@@ -102,49 +83,17 @@ export default async function MachineInfoTab({
   );
   const machineStatus = deriveMachineStatus(openIssues);
 
-  // Both reads are independent — resolve them concurrently so the QR-scan
-  // landing doesn't stack the PinballMap lookup and the unified-user list.
-  const pinballmapTitlePromise: Promise<string | null> =
-    canLink && machine.pinballmapMachineId !== null
-      ? db.query.pinballmapCatalog
-          .findFirst({
-            where: eq(
-              pinballmapCatalog.pinballmapMachineId,
-              machine.pinballmapMachineId
-            ),
-            columns: { name: true },
-          })
-          .then((linkedTitle) => linkedTitle?.name ?? null)
-      : Promise.resolve(null);
-  const allUsersPromise: Promise<Awaited<ReturnType<typeof getUnifiedUsers>>> =
-    canEdit ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]);
   // The stored PBM snapshot drives the desync signal, which is a maintainer-
   // facing alert (it points at a mismatch to resolve). Only read it when the
   // viewer may act on it (`canLink`) AND the machine is linked — so the public
   // QR-scan landing never pays for (or shows) it. Location-wide singleton.
-  const pbmStatePromise: Promise<
-    Awaited<ReturnType<typeof getPinballMapState>>
-  > =
+  const pbmState =
     canLink && machine.pinballmapMachineId !== null
-      ? getPinballMapState()
-      : Promise.resolve(null);
+      ? await getPinballMapState()
+      : null;
 
-  const [pinballmapTitleName, allUsersRaw, pbmState] = await Promise.all([
-    pinballmapTitlePromise,
-    allUsersPromise,
-    pbmStatePromise,
-  ]);
-  const allUsers = allUsersRaw.map((u) => ({
-    id: u.id,
-    name: u.name,
-    lastName: u.lastName,
-    machineCount: u.machineCount,
-    status: u.status,
-    role: u.role,
-  }));
-
-  // Description renders read-only inside the Details card; editing happens in
-  // the Edit Machine dialog (not inline). Gate on docIsEmpty rather than just
+  // Description renders read-only inside the Details card; editing happens on
+  // the Edit Machine page (not inline). Gate on docIsEmpty rather than just
   // `!== null`: a legacy or semantically-empty ProseMirror doc renders nothing
   // in RichTextDisplay, but a truthy slot still paints an empty prose block and
   // a stray divider above the owner row. docIsEmpty covers null, undefined, and
@@ -152,40 +101,6 @@ export default async function MachineInfoTab({
   const descriptionSlot = !docIsEmpty(machine.description) ? (
     <RichTextDisplay content={machine.description} />
   ) : null;
-
-  // Edit-machine control lives in the owner card. PP-o355.2 PinballMap fields
-  // are wired through the dialog for users who may link.
-  const editControl =
-    canEdit && user ? (
-      <EditMachineDialog
-        machine={{
-          id: machine.id,
-          name: machine.name,
-          initials: machine.initials,
-          presenceStatus: machine.presenceStatus,
-          ownerId: machine.ownerId,
-          invitedOwnerId: machine.invitedOwnerId,
-          owner: machine.owner ? { name: machine.owner.name } : null,
-          invitedOwner: machine.invitedOwner
-            ? { name: machine.invitedOwner.name }
-            : null,
-          pinballmapMachineId: machine.pinballmapMachineId,
-          pinballmapExcluded: machine.pinballmapExcluded,
-          pinballmapExcludedReason: machine.pinballmapExcludedReason,
-          pinballmapListed: machine.pinballmapListed,
-          pinballmapLmxId: machine.pinballmapLmxId,
-          pinballmapTitleName,
-          description: machine.description,
-        }}
-        allUsers={allUsers}
-        canEditAnyMachine={canEditAnyMachine}
-        isOwner={isOwner}
-        canLink={canLink}
-        pinballmapUrl={pinballmapLocationUrl()}
-      />
-    ) : user && editDeniedReason !== null ? (
-      <EditButtonWithTooltip reason={editDeniedReason} />
-    ) : null;
 
   // PinballMap card (PP-o355.3 + desync PP-o355.11): everyone sees the plain
   // "View on PinballMap" card for listed machines. The desync alert is
@@ -215,7 +130,6 @@ export default async function MachineInfoTab({
       invitedOwner={machine.invitedOwner}
       addedAt={machine.createdAt}
       descriptionSlot={descriptionSlot}
-      editSlot={editControl}
       pinballmapSlot={pinballmapCard}
     />
   );
