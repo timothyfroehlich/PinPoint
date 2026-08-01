@@ -206,20 +206,70 @@ paragraph, so byte-identical matching fires on every touched paragraph;
 an escape hatch, after which the work becomes writing justifications instead of
 deleting text.
 
-What survives without parsing prose is the ratio. From `git diff --numstat`:
+A deletion-ratio check (`git diff --numstat`, additions ≤10% of deletions), a
+link-resolution check, a CORE-ID-last-mention check, and a removal ledger were
+all offered and **declined** (Tim, 2026-08-01). The local gate is a review, not
+tooling.
 
-**Additions must be a small fraction of deletions — target ≤10%.**
+### The local gate: a cold-read reviewer
 
-A PR that deletes 500 lines and adds 400 is not deleting, whatever those added
-lines say. This is arithmetic, readable off the diff with no tool, and it has no
-failure mode that needs an escape hatch. A PR that legitimately exceeds it says
-why in its description.
+One subagent per sweep PR, run **before push**, given the diff and the brief
+below and **nothing else**.
 
-Beyond that, the constraint is a discipline enforced by the diff being legible:
-a delete-and-cite diff is visibly a delete-and-cite diff to any reviewer,
-including Copilot reading it cold.
+This shape is chosen from the PR #1793 measurement rather than by preference.
+Three targeted auditors, each handed a list of claims derived from my own
+analysis, found **0 of 8** real defects. Copilot, reading the diff cold with no
+list, found **8 of 8**. The variable was not model or effort — it was the list.
+An auditor given my hypotheses verifies my hypotheses and is structurally blind
+to everything I did not think to ask.
 
-### What the ratio cannot catch
+**Therefore the brief is fixed.** The text below is used verbatim for every
+sweep PR. The diff is the only variable input. I do not add a summary, a list of
+things to check, or an explanation of what the PR was trying to do — authoring a
+per-PR brief would reintroduce exactly the failure this gate exists to avoid.
+
+> You are reviewing a diff from a documentation deletion sweep. Its stated
+> intent is to remove text that (a) restates a `CORE-*` rule from
+> `docs/NON_NEGOTIABLES.md`, (b) describes what a script, hook, or gate already
+> does, or (c) is a code example — while keeping recorded decisions: choices
+> this project made that could not be re-derived from the code.
+>
+> Read the diff cold. Do not assume the intent was achieved. Report:
+>
+> 1. Anything deleted that is a decision — a choice with a rationale that exists
+>    nowhere else in the repo. Check before claiming it survives elsewhere.
+> 2. Any added line that asserts something new, rather than pointing at an
+>    existing source. Deletion cannot introduce a false claim; addition can.
+> 3. Any pointer that does not answer the question the deleted text answered. A
+>    pointer is only correct if the thing it points at addresses the same
+>    question, not a broader or narrower one.
+> 4. Anything the diff claims about a script, config, or source file that is not
+>    true of that file. Read the file.
+>
+> Verify against the repo. Report findings with file and line. If you find
+> nothing, say so — do not manufacture findings.
+
+Items 3 and 4 encode the two limits on "cite the source instead of restating it"
+that PR #1793 surfaced: an imprecise pointer (the `ignores` array answered "what
+does this rule skip", not "what may write raw palette"), and a doc describing
+mechanism it does not own (three separate passages asserted their own
+enforcement falsely, and no lint could catch that because the false claim was
+the comment, not the code). These are general failure modes, not claims about
+any specific PR — equipping the reviewer, not priming it.
+
+Findings are fixed before push. Copilot is then requested once, on finished
+work.
+
+**Plus my own source re-read.** Separately from the subagent, I re-read the
+actual source files behind every claim that survives in the diff — not my own
+diff, the files it describes. This is the reviewer's item 4 done a second time
+by the person most likely to have gotten it wrong. It is what I skipped on
+PR #1793 twice: the `§12` picker rule and `assertNoHorizontalOverflow` were both
+"corrected" from memory of a comment rather than from the file, and both
+overshot into false negations. Re-reading the diff is not a substitute — I know
+what I meant by it. Re-reading the source is.
+
+### What the cold-read gate does not cover
 
 **Routing loss.** A skill's `description` frontmatter is the sole routing
 signal; losing a distinctive term is silent capability loss. PR #1769 (PR 4)
@@ -255,13 +305,16 @@ The prior three-auditor gate is **dropped**. Measured on PR #1793: three
 targeted auditors, each handed a list of claims derived from my own analysis,
 found 0 of 8 real defects; Copilot, reading the diff cold with no list, found
 8 of 8. Auditors given my hypotheses verify my hypotheses. The replacement is
-the deletion ratio above plus one reviewer with no list.
+the cold-read gate above: a reviewer with no list, run locally before push, plus
+a source re-read by the lead. Copilot then reviews finished work once.
 
 ## Success criteria
 
 - In-scope corpus reduced by 3,500–4,500 lines.
-- Every sweep PR's `git diff --numstat` shows additions ≤10% of deletions, or
-  says in its description why not.
+- Every sweep PR passes a cold-read subagent review (fixed brief, diff-only
+  input) before push, with findings fixed rather than argued.
+- Every claim surviving in a sweep PR's diff is re-read against its source file
+  by the lead, not just against the diff.
 - No `CORE-*` rule loses its only statement.
 - No skill loses a routing term without that term landing somewhere named.
 - No file is deleted while an inbound reference to it survives (checked with
