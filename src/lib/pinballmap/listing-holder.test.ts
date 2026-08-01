@@ -22,9 +22,9 @@ function machine(
 describe("resolveListingHolder", () => {
   describe("an existing listing is knowledge — the incumbent wins", () => {
     it("returns the listed machine, with no tie, however many share its availability", () => {
-      // Three same-title cabinets all on the floor. Without rule 1 this is the
-      // worst possible tie; with it there is no ambiguity at all, because WE
-      // created that lmx and therefore know whose it is.
+      // Three same-title cabinets all on the floor. Without the incumbent
+      // branch this is the worst possible tie; with it there is no ambiguity
+      // at all, because WE created that lmx and therefore know whose it is.
       const holder = resolveListingHolder([
         machine("a", "on_the_floor"),
         machine("b", "on_the_floor", { listed: true }),

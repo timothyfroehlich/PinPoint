@@ -68,7 +68,7 @@ export type ListingHolder =
 export function resolveListingHolder(
   group: readonly ListingHolderCandidate[]
 ): ListingHolder {
-  // Rule 1 — an existing listing is knowledge, so the incumbent wins outright
+  // INCUMBENT — an existing listing is knowledge, so it wins outright
   // (Tim, 2026-07-25). No tie, ever, regardless of how many same-title cabinets
   // share its availability, and regardless of whether its OWN availability has
   // since drifted into an invalid one: a listed machine marked `removed` is a §6
@@ -77,7 +77,7 @@ export function resolveListingHolder(
   const incumbent = group.find((m) => m.pinballmapListed);
   if (incumbent) return { kind: "incumbent", machineId: incumbent.id };
 
-  // Rule 2 — nobody is listed, so we would have to *pick*. Drop the machines
+  // OPEN CONTEST — nobody is listed, so we would have to *pick*. Drop machines
   // whose availability makes Listed invalid, then rank what remains.
   const eligible = group.filter(
     (m) => !INVALID_WHEN_LISTED.has(m.presenceStatus)
