@@ -8,13 +8,21 @@ Check before building something new.
 
 Search the tree before you build. What this section records is the conventions that searching won't tell you.
 
-### The Picker Pattern (single-select from a list)
+### Choosing a single-select control: cardinality decides
 
-**Every single-select picker in PinPoint is Popover + cmdk `Command`.** Not a native `<select>`, not a bare `DropdownMenu` — `MachineCombobox`, `OwnerSelect`, `AssigneePicker`, `BaselineCombobox`, `PinballMapLinkField` and `CollectionCollaborators` all follow it. Copy from one of them; don't reimplement.
+There are two single-select patterns here, and picking between them is **not** a style preference. The test — which neither group's source code states, so it lives here:
 
-The reason it's a rule rather than a preference: PinPoint is built for collections of 100+ machines, and a flat native `<select>` at that length is unusable on mobile — you scroll forever, with no way to narrow. The Popover + `Command` pairing gives type-to-filter, and Radix Popover auto-focuses the search input on open, which is what surfaces the on-screen keyboard. A picker that "works fine" against your ten seeded rows will not work against a real collection.
+> **Is the list bounded and short, or does it grow with the collection?**
 
-Two conventions that come with it:
+**Bounded, short, fixed by the domain** → Radix `Select`. Status, severity, priority, frequency, role, presence, timeline tag. These lists change only when we change the enum, and every option fits on screen at once, so a filter input would be pure overhead.
+
+**Large or unbounded — it grows as the org grows** → **Popover + cmdk `Command`** (the picker pattern). Machines, owners, assignees, collaborators, PinballMap search results, baselines. The large-list pickers are `MachineCombobox`, `OwnerSelect`, `AssigneePicker`, `BaselineCombobox`, `PinballMapLinkField` and `CollectionCollaborators` — copy from one of them rather than reimplementing.
+
+The reason the second group is a rule and not a preference: PinPoint is built for collections of 100+ machines, and a flat list at that length is unusable on mobile — you scroll forever with no way to narrow. Popover + `Command` gives type-to-filter, and Radix Popover auto-focuses the search input on open, which is what surfaces the on-screen keyboard. A picker that "works fine" against ten seeded rows will not work against a real collection.
+
+That argument is exactly why it doesn't generalise: a five-option presence enum has no scrolling problem to solve, and wrapping it in a search-first popover makes it _worse_. Don't migrate a bounded enum onto the picker pattern, and don't reach for `Select` on a list whose length tracks the collection.
+
+Two conventions that come with the picker pattern:
 
 - **Export the filterable list separately from the popover wrapper.** Contexts that already own their own chrome (a dialog, a sheet) should render the list without a redundant nested popover. `MachineCombobox` splits exactly this way.
 - **Support native form submission** via an optional hidden input, so a picker can sit in a Server Action form without a bespoke bridge.

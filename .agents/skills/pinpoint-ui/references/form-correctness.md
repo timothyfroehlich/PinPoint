@@ -6,7 +6,7 @@ This file holds only the two things §20 can't: the shared primitives' validatio
 
 ## Where validation styling lives — and where it deliberately doesn't
 
-`:user-invalid` styling and the blur-time `aria-invalid` sync are implemented **once, in the shared primitives**: `src/components/ui/input.tsx` and `src/components/ui/textarea.tsx`. Read those two files rather than a description of them; both are under 40 lines. Never copy either treatment to a call site.
+`:user-invalid` styling and the blur-time `aria-invalid` sync are implemented **once, in the shared primitives**: `src/components/ui/input.tsx` and `src/components/ui/textarea.tsx`. Read those two files rather than a description of them; both are short. Never copy either treatment to a call site.
 
 Two boundaries are decisions rather than facts you can read off, so they're recorded here:
 

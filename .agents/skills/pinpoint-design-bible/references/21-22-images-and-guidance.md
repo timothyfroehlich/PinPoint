@@ -62,27 +62,10 @@ npx -y modern-web-guidance@latest retrieve "<id>,<id2>"  # fetch full guide(s)
 npx -y modern-web-guidance@latest list                   # browse the catalog
 ```
 
-### Guide map by PinPoint use case
+### What it covers
 
-This map is a curated PinPoint-use-case → guide-id index, and it is the **only** copy — `pinpoint-ui` points here rather than keeping a second one. It is a routing aid, not a cache of the guides' contents or their Baseline statuses; those come from the tool, live.
+Search it by intent; don't look for a guide-ID index here. There used to be one, and it was the same defect as the Baseline table two sections up — pre-computing the tool's answer and caching it, in a table whose own footer told you not to trust it. Guide IDs are the plugin's data and rot on its release schedule, not ours.
 
-| Building...                        | MWG search/retrieve                                                     |
-| :--------------------------------- | :---------------------------------------------------------------------- |
-| Sign-in / sign-up form             | `forms`, `autofill-sign-in-form`, `autofill-sign-up-form`               |
-| Address or anonymous reporter form | `autofill-address-form`, `forms`                                        |
-| Post-interaction validation        | `validate-input-after-interaction`, `required-field-feedback`           |
-| Accessible error announcement      | `accessible-error-announcement`                                         |
-| Modal / dialog / confirmation      | `html` §4, `light-dismiss-a-dialog`, `platform-controls-dismiss-dialog` |
-| Mobile drawer / slide-in           | `navigation-drawer`                                                     |
-| Tooltips on touch                  | `interest-triggered-tooltips` (most variants are Newly available)       |
-| Image priority / LCP               | `optimize-image-priority`, `optimize-preload-priority`                  |
-| Skeletons, `content-visibility`    | `defer-rendering-heavy-content`                                         |
-| Long-task / INP                    | `break-up-long-tasks`, `identify-inp-causes`                            |
-| Container-internal layout          | `css-layout`, `size-aware-styling`                                      |
-| Conditional styling via DOM state  | `style-parent-with-has`                                                 |
-| Hidden-but-findable content        | `search-hidden-content`                                                 |
-| Reduced-motion / animation         | `accessibility` § Motion                                                |
-| Skip-link / landmarks / focus      | `accessibility`, `html` §3                                              |
-| Tables                             | `accessibility` § Tables                                                |
+The **domains** are durable, and knowing them is what tells you whether the tool is worth a call: forms and autofill, post-interaction validation timing, accessible error announcement, dialogs and light-dismiss, mobile drawers, image priority and LCP, deferred rendering of heavy content, long tasks and INP, container-query layout, conditional styling from DOM state, accessibility (motion, landmarks, focus) and table semantics.
 
-Don't memorize the map — re-search per task. Plugin catalog updates more often than this document does.
+If your task touches any of those, `search` first — the catalog is updated far more often than this document.

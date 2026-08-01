@@ -4,7 +4,7 @@ Required input attributes, autocomplete tokens, required-field indicators, and v
 
 ## 20. Form Correctness Conventions
 
-Forms are the highest-leverage place to lean on the Widely-available web platform. The browser does post-interaction validation, autofill, mobile-keyboard hints, password-manager integration, and screen-reader announcement — opt in correctly and most "form polish" tickets disappear. Concrete rules and code in `pinpoint-ui` skill § "Form Correctness"; canonical rules in CORE-FORM-001..006.
+Forms are the highest-leverage place to lean on the Widely-available web platform. The browser does post-interaction validation, autofill, mobile-keyboard hints, password-manager integration, and screen-reader announcement — opt in correctly and most "form polish" tickets disappear. Concrete rules and code in `pinpoint-ui` skill → `references/form-correctness.md`; canonical rules in CORE-FORM-001..006.
 
 ### Required attributes on every form input
 

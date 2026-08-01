@@ -14,7 +14,11 @@ PinPoint's UI is built on **Baseline Widely available** (CORE-UI-005) — featur
 
 This section used to hold a sixteen-row table of features and Baseline dates. It was deleted deliberately. It was a hand-copied cache of data with an authoritative live source, it had silently rotted — several rows had drifted tier or date — and correcting them would only have restarted the clock on the rest. A wrong Baseline date is worse than no date, because it reads as authoritative and nobody re-checks it.
 
-The practical rule is unchanged and doesn't need the table: **if the guide says Widely available, use it directly** — no polyfill, no feature detection, no `@supports` gate. That covers the platform layer this project leans on (container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, `focus-visible`, `motion-reduce:`, `enterkeyhint`, logical properties, native `<dialog>` and `<details>`, native form validation). The two lists below are the ones that _are_ decisions — what we've chosen to defer, and what we've chosen to adopt below the floor — and those stay.
+The practical rule is unchanged and doesn't need the table: **if the guide says Widely available, use it directly** — no polyfill, no feature detection, no `@supports` gate. That covers the platform layer this project leans on (container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, `focus-visible`, `motion-reduce:`, `enterkeyhint`, logical properties, native `<dialog>` and `<details>`, native form validation).
+
+The deleted table also carried a "where it shows up in PinPoint" column. **To find a live example of a feature, grep its name in `src/`** — that answer is always current, which a list of filenames here would not be.
+
+The two lists below are the ones that _are_ decisions — what we've chosen to defer, and what we've chosen to adopt below the floor — and those stay.
 
 ### What is deferred (Baseline Newly available)
 
