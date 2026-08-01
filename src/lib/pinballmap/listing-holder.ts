@@ -23,9 +23,15 @@ import {
  * point (refresher §7).
  *
  * Pure: no DB, no `server-only`. Auto-link (PP-o355.20), the action layer, and
- * the dashboard all call this rather than re-deriving the rule — two
+ * the dashboard are all meant to call this rather than re-derive the rule — two
  * implementations would drift, and the partial unique index would start
  * rejecting writes one of them believed were legal.
+ *
+ * **No production caller yet.** This module lands ahead of its consumer on
+ * purpose: PP-o355.20 may not set `listed = true` until the rule deciding which
+ * cabinet may hold a listing exists, so the rule ships first. Until auto-link
+ * wires it up, the only thing actually preventing a duplicate listing at runtime
+ * is the 23505 backstop in `./listing-conflict` plus the DB index itself.
  */
 
 /** The fields the rule needs. Deliberately structural, so callers pass rows. */

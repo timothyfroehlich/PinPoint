@@ -43,10 +43,11 @@ import {
   proseMirrorDocSchema,
 } from "~/lib/tiptap/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
+import { isPgErrorCode } from "~/lib/db/postgres-errors";
 import {
-  isPgErrorCode,
-  getPostgresErrorConstraint,
-} from "~/lib/db/postgres-errors";
+  isPbmListingConflict,
+  pbmListingConflictMessage,
+} from "~/lib/pinballmap/listing-conflict";
 import {
   emitMachineUpdated,
   toMachineOwnerRef,
@@ -197,58 +198,6 @@ function readPbmLinkFormFields(formData: FormData): {
 /**
  * Create Machine Action
  *
- * Name of the partial unique index enforcing one PinballMap lister per catalog
- * title at our location (migration 0052). PBM's `POST /location_machine_xrefs`
- * is find-or-create on `(location_id, machine_id)`, so two cabinets of one title
- * physically cannot hold distinct lmx rows here.
- */
-const PBM_LISTED_UNIQUE = "machines_pinballmap_listed_unique";
-
-/**
- * True when a failed write is specifically a duplicate-listing collision.
- *
- * `machines` has TWO unique constraints — `machines_initials_unique` and the
- * partial listing index — and both raise SQLSTATE 23505. A bare code check
- * cannot tell them apart, which is why the write paths below used to answer
- * every 23505 with "Initials are already taken" (PP-o355.15).
- */
-function isPbmListingConflict(error: unknown): boolean {
-  return (
-    isPgErrorCode(error, "23505") &&
-    getPostgresErrorConstraint(error) === PBM_LISTED_UNIQUE
-  );
-}
-
-/**
- * Message for a duplicate-listing collision, naming the cabinet that already
- * holds the listing so the fix is obvious.
- *
- * This is a LAST-RESORT path. The tie guard (`resolveListingHolder`) is the
- * primary defence and stops us choosing when we cannot tell cabinets apart;
- * this catches what a race can still slip through.
- */
-async function pbmListingConflictMessage(
-  pinballmapMachineId: number | null | undefined
-): Promise<string> {
-  const incumbent =
-    pinballmapMachineId == null
-      ? undefined
-      : await db.query.machines.findFirst({
-          where: and(
-            eq(machines.pinballmapMachineId, pinballmapMachineId),
-            eq(machines.pinballmapListed, true)
-          ),
-          columns: { name: true, initials: true },
-        });
-
-  const holder = incumbent
-    ? `${incumbent.name} (${incumbent.initials})`
-    : "Another cabinet of this title";
-
-  return `${holder} already holds the PinballMap listing for this title at our location. Only one cabinet per title can hold it — unlist that one first.`;
-}
-
-/**
  * Creates a new machine with validation.
  * Requires authentication (CORE-SEC-001).
  * Validates input with Zod (CORE-SEC-002).

@@ -33,7 +33,10 @@ import {
 import { findLmxForMachine } from "~/lib/pinballmap/resolve-lmx";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
-import { isPgErrorCode } from "~/lib/db/postgres-errors";
+import {
+  isPbmListingConflict,
+  pbmListingConflictMessage,
+} from "~/lib/pinballmap/listing-conflict";
 import { type Result, ok, err } from "~/lib/result";
 
 export type { CatalogEdition, CatalogFamily } from "~/lib/pinballmap/catalog";
@@ -262,13 +265,15 @@ export async function linkPinballmapEntryAction(
     });
   } catch (error) {
     // Partial-unique (one lister per title at our location): a duplicate cabinet
-    // of this title is already the lister. Graceful 2nd-cabinet handling is
-    // PP-o355.15; here we surface a clear message rather than a 500.
-    if (isPgErrorCode(error, "23505"))
+    // of this title is already the lister. VALIDATION, not SERVER — the user can
+    // fix it by unlisting the other cabinet, and `SERVER` makes the UI treat a
+    // correctable condition as a crash (PP-o355.15).
+    if (isPbmListingConflict(error)) {
       return err(
-        "SERVER",
-        "Another cabinet of this title is already linked as the PinballMap lister for our location"
+        "VALIDATION",
+        await pbmListingConflictMessage(machine.pinballmapMachineId)
       );
+    }
     throw error;
   }
 
@@ -338,26 +343,42 @@ export async function verifyPinballmapLinkAction(
   if (lmx.id === machine.pinballmapLmxId) return ok({ state: "ok" });
 
   // Title now maps to a different lmx (PBM re-minted it) — heal the stored handle.
-  await db.transaction(async (tx) => {
-    await tx
-      .update(machines)
-      .set({ pinballmapLmxId: lmx.id, pinballmapListed: true })
-      .where(eq(machines.id, machine.id));
-    await createMachineTimelineEvent(
-      machine.id,
-      {
-        sourceType: "lifecycle",
-        tag: "lifecycle",
-        eventData: {
-          kind: "pinballmap_listing",
-          action: "reconnected",
-          lmxId: lmx.id,
+  //
+  // This sets `pinballmapListed: true`, so it can collide with the one-lister
+  // partial unique index exactly like the create/update paths: cabinets A and B
+  // share a title, A is listed and holds the lmx, B is linked but unlisted, and
+  // verifying B heals it onto A's lmx. Without this catch the violation escaped
+  // as a 500 — in the very duplicate-title case PP-o355.15 exists for.
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(machines)
+        .set({ pinballmapLmxId: lmx.id, pinballmapListed: true })
+        .where(eq(machines.id, machine.id));
+      await createMachineTimelineEvent(
+        machine.id,
+        {
+          sourceType: "lifecycle",
+          tag: "lifecycle",
+          eventData: {
+            kind: "pinballmap_listing",
+            action: "reconnected",
+            lmxId: lmx.id,
+          },
+          actorId: userId,
         },
-        actorId: userId,
-      },
-      tx
-    );
-  });
+        tx
+      );
+    });
+  } catch (error: unknown) {
+    if (isPbmListingConflict(error)) {
+      return err(
+        "VALIDATION",
+        await pbmListingConflictMessage(machine.pinballmapMachineId)
+      );
+    }
+    throw error;
+  }
 
   revalidatePath(`/m/${machine.initials}`);
   return ok({ state: "healed" });

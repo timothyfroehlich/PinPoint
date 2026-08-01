@@ -5,9 +5,10 @@
  * enforces one PinballMap lister per catalog title at our location, mirroring
  * PBM's find-or-create on `(location_id, machine_id)`.
  *
- * The tie guard (`resolveListingHolder`) is the primary defence — it stops US
- * choosing when cabinets are indistinguishable. This file covers the LAST-RESORT
- * path a race can still reach: the write actually hits the index.
+ * At head this catch is the ONLY defense. `resolveListingHolder` exists but has
+ * no production caller yet — it becomes the primary guard once auto-link
+ * consumes it (PP-o355.20). Until then, do not read these tests as covering a
+ * backstop behind something else; they cover the whole of it.
  *
  * The specific defect: `machines` has TWO unique constraints and both raise
  * SQLSTATE 23505, so the bare code check in these actions answered a listing
