@@ -30,20 +30,25 @@
 const { execFileSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const { resolveCommand } = require("./lib/resolve-command.cjs");
 
 // --- Pure classifier (unit-testable without spawning anything) ---------------
 // Decide whether a shell command string actually INVOKES one of the heavy
-// runners above. Mirrors the technique in block-main-worktree-branch-switch.cjs
-// (`classifyCommand`): resolve each segment's effective command instead of
-// regex-testing the raw string.
+// runners above. Command resolution — "what command is this segment?" — is
+// delegated to the shared lib/resolve-command.cjs primitive (PP-6t3c); this
+// file only holds the heavy/not-heavy POLICY on top of it.
 //
-// The old implementation ran the heavy regexes against the whole command, so
-// any command whose TEXT named a heavy runner — `echo "how to run pnpm run
+// The original implementation ran the heavy regexes against the whole command,
+// so any command whose TEXT named a heavy runner — `echo "how to run pnpm run
 // build"`, `bd comments add "…ran pnpm run smoke…"`, `rg "playwright test"
 // docs/`, `git commit -m "speed up vitest run"` — fired a memory probe that can
 // poll for up to five minutes. False positives are the cost that matters here:
 // the threat model is a well-meaning agent, not an attacker evading a filter,
 // so this deliberately does NOT try to be evasion-resistant.
+//
+// POSTURE ON `unresolvable`: ALLOW. A command whose runner cannot be known
+// statically is not worth a five-minute memory probe, and this gate protects
+// the host from thrash rather than enforcing a boundary.
 
 // `pnpm run <script>` is heavy for exactly these scripts. Anchored + \b so
 // `build` matches `build` (and today's `e2e:full`-style suffixes) but NOT
@@ -74,52 +79,28 @@ const RUNNER_EXEC_SUBCOMMANDS = new Set(["exec", "dlx", "x"]);
 // Runner subcommands that take a package.json SCRIPT name, not a binary.
 const RUNNER_RUN_SUBCOMMANDS = new Set(["run", "run-script"]);
 
-// Leading tokens that do not consume the command slot themselves.
-const WRAPPERS = new Set(["sudo", "env", "command", "time", "nice"]);
-const ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*[+:]?=/;
-
-/** Strip one pair of surrounding matching quotes: `"build"` → `build`. */
-function unquote(token) {
-  const t = String(token || "");
-  return (t.startsWith('"') && t.endsWith('"') && t.length > 1) ||
-    (t.startsWith("'") && t.endsWith("'") && t.length > 1)
-    ? t.slice(1, -1)
-    : t;
-}
-
 /**
- * Is this ONE segment a heavy invocation?
+ * Is this ONE resolved segment a heavy invocation?
  *
- * Resolves the segment's effective command by skipping leading env assignments
- * (VAR=value) and leading wrappers (sudo/env/command/time/nice), comparing on
- * BASENAME so `./node_modules/.bin/playwright test` and
- * `/usr/local/bin/pnpm run build` resolve correctly, then stepping through any
+ * The shared primitive has already resolved the segment's effective command
+ * (leading `VAR=value` assignments and wrappers skipped, quotes stripped,
+ * `sh -c` / `eval` payloads re-parsed). All that is left is to compare on
+ * BASENAME — so `./node_modules/.bin/playwright test` and
+ * `/usr/local/bin/pnpm run build` resolve correctly — and step through any
  * package runner + subcommand so the effective argv becomes e.g.
  * `playwright test`.
  */
 function isHeavySegment(segment) {
-  const tokens = segment.split(/\s+/).filter(Boolean);
-
-  let cmdIdx = -1;
-  for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i];
-    if (ENV_ASSIGN.test(t)) continue; // skip VAR=value
-    if (WRAPPERS.has(t)) continue; // skip wrapper command itself
-    cmdIdx = i;
-    break;
-  }
-  if (cmdIdx === -1) return false;
-
   // Walk package runners. The hop cap just bounds pathological input; two hops
   // covers every real shape (`pnpm exec playwright test`, `npx -y vitest run`).
-  let argv = tokens.slice(cmdIdx);
+  let argv = [segment.name, ...segment.args];
   for (let hops = 0; hops < 3; hops++) {
-    const name = path.basename(unquote(argv[0]));
+    const name = path.basename(argv[0]);
 
     if (!PACKAGE_RUNNERS.has(name)) {
       // Resolved to a real binary — heavy only in its run/test form.
       const expected = HEAVY_BINARIES.get(name);
-      return expected !== undefined && unquote(argv[1] || "") === expected;
+      return expected !== undefined && (argv[1] || "") === expected;
     }
 
     // Skip the runner's own flags (`npx -y …`, `pnpm --silent …`) to find its
@@ -128,12 +109,12 @@ function isHeavySegment(segment) {
     // missed exotic invocation is cheaper than a false positive.
     let i = 1;
     while (i < argv.length && argv[i].startsWith("-")) i++;
-    const sub = unquote(argv[i] || "");
+    const sub = argv[i] || "";
     if (!sub) return false;
 
     if (RUNNER_RUN_SUBCOMMANDS.has(sub)) {
       // `pnpm run <script>` — heaviness is decided by the script name.
-      return HEAVY_PNPM_SCRIPT.test(unquote(argv[i + 1] || ""));
+      return HEAVY_PNPM_SCRIPT.test(argv[i + 1] || "");
     }
     // `pnpm exec <cmd>` / `pnpm dlx <cmd>` consume one more token;
     // `npx <cmd>` / `yarn <cmd>` put the command right there.
@@ -145,29 +126,28 @@ function isHeavySegment(segment) {
 
 /**
  * Does this command string invoke a heavy runner in ANY of its segments?
- * Split on shell separators: && || ; | — deliberately NOT on newlines.
+ * Separators are && || ; | & ( ) — deliberately NOT newlines.
  *
- * Newlines are excluded on purpose (PP-qota). We have no shell parser, so
- * splitting on them made the classifier descend into heredoc bodies and
- * multi-line quoted arguments: any LINE beginning with a heavy invocation
- * became its own "segment" and fired a memory probe that can poll for five
- * minutes. `cat <<EOF > notes.md` / `pnpm run build` / `EOF` is a `cat`, and
- * `bd comments add PP-x "…\npnpm run e2e\n…"` is a `bd`.
+ * Newlines stay excluded (PP-qota). The shared tokenizer now handles heredoc
+ * bodies and multi-line quoted arguments correctly on its own, so newline
+ * splitting would no longer descend into them — but this gate's cost function
+ * is asymmetric (a false positive costs a memory probe that can poll for five
+ * minutes) and the newline-split posture was chosen deliberately. Keeping
+ * `splitNewlines: false` means this refactor changes NO verdict here; revisit
+ * it as its own decision, not as a side effect of sharing a parser.
  *
- * Accepted cost: a genuine multi-line sequence —
+ * Accepted cost, unchanged: a genuine multi-line sequence —
  *   cd foo
  *   pnpm run build
- * — is no longer gated (false negative). That is the right trade under the
- * same principle documented above at the runner-flag walk: a missed exotic
- * invocation is cheaper than a false positive. Agents overwhelmingly write
- * that shape as `cd foo && pnpm run build`, which still gates.
+ * — is not gated (false negative). Same principle as the runner-flag walk
+ * above: a missed exotic invocation is cheaper than a false positive. Agents
+ * overwhelmingly write that shape as `cd foo && pnpm run build`, which gates.
  */
 function isHeavyCommand(command) {
-  const segments = String(command || "").split(/&&|\|\||;|\|/);
-  return segments.some((raw) => {
-    const segment = raw.trim();
-    return segment !== "" && isHeavySegment(segment);
+  const { segments } = resolveCommand(String(command || ""), {
+    splitNewlines: false,
   });
+  return segments.some(isHeavySegment);
 }
 
 module.exports = { isHeavyCommand };

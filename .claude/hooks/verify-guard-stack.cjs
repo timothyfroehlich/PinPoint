@@ -16,6 +16,12 @@
  *               / bash just fails to load a missing file on every matching
  *               tool call.
  * ...or if permissions.deny / permissions.ask have been stripped.
+ *
+ * It ALSO probes behaviour, not just registration (PP-6t3c). Registration is a
+ * weak proxy: on 2026-07-26 the merge guard was fully registered, fully present
+ * on disk — and allowed `eval "gh pr merge 123"`. A guard that no longer blocks
+ * a known-bad command is as degraded as a missing one, so each guard's exported
+ * pure classifier is called here with a small BLOCK/ALLOW table.
  * It is PURELY INFORMATIONAL:
  *   - It NEVER blocks anything and NEVER exits non-zero.
  *   - Healthy path prints NOTHING (no session noise).
@@ -208,10 +214,108 @@ function evaluateGuardStack(settings, options = {}) {
   return problems;
 }
 
+// --- Behaviour probes ---------------------------------------------------------
+// "Is the guard still wired?" is not the same question as "does the guard still
+// block?". Each entry names a guard, the pure classifier it exports, and a few
+// commands with their required verdicts. Probes run IN-PROCESS against the
+// exported classifier (no subprocess, no git, no fs) so this stays well inside
+// the SessionStart hook's 5 s budget.
+//
+// Keep the ALLOW rows: a guard that starts blocking everything is also broken,
+// and these are the exact prose shapes agents legitimately type.
+const BEHAVIOR_PROBES = [
+  {
+    hook: "block-direct-merge.cjs",
+    export: "classifyMerge",
+    // classifyMerge(toolName, command) → { block }
+    verdict: (fn, command) => fn("Bash", command).block,
+    mustBlock: [
+      "gh pr merge 123 --squash",
+      'eval "gh pr merge 123 --squash"',
+      'sh -c "scripts/workflow/merge-pr.sh 123 --human"',
+      "xargs -I{} gh pr merge {} < prs.txt",
+      "gh api -X PUT repos/o/r/pulls/123/merge",
+    ],
+    mustAllow: ["gh pr view 123", 'echo "run merge-pr.sh when ready"'],
+  },
+  {
+    hook: "block-main-worktree-branch-switch.cjs",
+    export: "classifyCommand",
+    verdict: (fn, command) => fn(command).block,
+    mustBlock: ["git checkout feature/x", 'eval "git switch feature/x"'],
+    mustAllow: ["git checkout main", "echo git checkout feature/x"],
+  },
+  {
+    hook: "block-heavy-under-pressure.cjs",
+    export: "isHeavyCommand",
+    verdict: (fn, command) => fn(command),
+    mustBlock: ["pnpm run build", "pnpm exec playwright test"],
+    mustAllow: ['echo "how to run pnpm run build"', "pnpm run lint"],
+  },
+];
+
+/**
+ * Run the behaviour probes. Returns a list of human-readable problems; empty
+ * === healthy. Never throws — a guard that cannot even be loaded is reported as
+ * a problem rather than crashing the canary.
+ *
+ * `options.load` overrides module loading with a `(basename) => module`
+ * function so tests can inject a deliberately-broken guard.
+ */
+function evaluateGuardBehavior(options = {}) {
+  const problems = [];
+  const load =
+    typeof options.load === "function"
+      ? options.load
+      : (basename) => require(path.join(__dirname, basename));
+
+  for (const probe of BEHAVIOR_PROBES) {
+    let fn;
+    try {
+      const mod = load(probe.hook);
+      fn = mod && mod[probe.export];
+    } catch (err) {
+      problems.push(
+        `${probe.hook} could not be loaded (${err && err.code ? err.code : "error"})`,
+      );
+      continue;
+    }
+    if (typeof fn !== "function") {
+      problems.push(`${probe.hook} no longer exports ${probe.export}()`);
+      continue;
+    }
+
+    const failures = [];
+    for (const command of probe.mustBlock) {
+      let blocked;
+      try {
+        blocked = probe.verdict(fn, command) === true;
+      } catch {
+        blocked = false;
+      }
+      if (!blocked) failures.push(`allows ${JSON.stringify(command)}`);
+    }
+    for (const command of probe.mustAllow) {
+      let blocked;
+      try {
+        blocked = probe.verdict(fn, command) === true;
+      } catch {
+        blocked = true;
+      }
+      if (blocked) failures.push(`blocks ${JSON.stringify(command)}`);
+    }
+    if (failures.length > 0) {
+      problems.push(`${probe.hook} ${failures.join(", ")}`);
+    }
+  }
+
+  return problems;
+}
+
 // --- Hook entrypoint ---------------------------------------------------------
 // Does the IO: resolve path (incl. VERIFY_GUARD_SETTINGS override), read/parse
-// settings, call evaluateGuardStack, print one warning line on problems (else
-// silent), and fail open on any error. Always exits 0.
+// settings, call evaluateGuardStack + evaluateGuardBehavior, print one warning
+// line on problems (else silent), and fail open on any error. Always exits 0.
 function main() {
   // Fail-open helper: a single one-line note, never a stack trace, never
   // non-zero. Collapse any embedded line breaks so it stays one line.
@@ -241,7 +345,7 @@ function main() {
     return;
   }
 
-  const problems = evaluateGuardStack(settings);
+  const problems = [...evaluateGuardStack(settings), ...evaluateGuardBehavior()];
   if (problems.length === 0) {
     // Healthy — stay silent.
     process.exit(0);
@@ -254,7 +358,13 @@ function main() {
   process.exit(0);
 }
 
-module.exports = { evaluateGuardStack, extractScriptPaths, main };
+module.exports = {
+  evaluateGuardStack,
+  evaluateGuardBehavior,
+  extractScriptPaths,
+  main,
+  BEHAVIOR_PROBES,
+};
 
 // Only run as a hook when invoked directly (not when require()'d by a test).
 if (require.main === module) {
