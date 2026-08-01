@@ -62,7 +62,8 @@ Everything above happens **in a worktree** — the root checkout is read-only (A
 
 ### `requesting-code-review` / `receiving-code-review`
 
-- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** review gate is **CI Gate + the head-commit review requirement** in `pinpoint-pr-workflow` (Copilot, or your own manual pass over the diff plus `mark-claude-review.sh`), not a plugin subagent.
+- Superpowers' reviewer-subagent is fine as an **optional local self-check**. The **authoritative** review gate is **CI Gate + the head-commit review requirement** in `pinpoint-pr-workflow` (Copilot, or your own manual pass over the diff plus `mark-claude-review.sh`), not a plugin subagent. Running the plugin's review does **not** satisfy that requirement.
+- **`requesting-code-review` does not request the Copilot review.** Copilot is request-only in this repo — a review still gates the merge, but nothing fires it for you. Once you have stopped iterating, ask for it explicitly and once: `gh pr edit <PR> --add-reviewer "@copilot"`. Full rules (re-request after a post-request push, when the marker fallback applies): `pinpoint-pr-workflow` Phase 3.4.
 - **Reply to review comments via MCP** (`add_reply_to_pull_request_comment` + resolve the thread with `pull_request_review_write method:"resolve_thread"`), **signed with your agent name** (`—Claude` / `—Gemini` / `—Codex` / `—Antigravity`, per AGENTS.md §5 "Review comments"). Declined comments still get a one-sentence reply — no silent ignores. Do not use the plugin's own reply flow.
 
 ### `finishing-a-development-branch` — the biggest override

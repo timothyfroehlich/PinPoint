@@ -44,6 +44,8 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 A Copilot review whose body says it could not review (quota limit, nothing to analyze) is **not** counted as a review by either review-state gate — it carries a real login and timestamp, so counting it made both gates green on a review that read nothing (PP-jw0s).
 
+**Copilot is request-only (since 2026-08-01), and both 600s timers above are still measured from the head push.** So a PR whose author never ran `gh pr edit <PR> --add-reviewer "@copilot"` waits out `currency` for a review that is never coming, then lands on a `reviewed` FAIL. Read that FAIL as "the review was never requested," not as "post a Claude marker" — the marker is the fallback for a request Copilot didn't answer. PP-lzaw re-keys both timers to the request and splits "never requested" from "requested, still waiting" into distinct reported states.
+
 ## Status Token Vocabulary
 
 Scripts emit machine-parseable status with these prefixes:

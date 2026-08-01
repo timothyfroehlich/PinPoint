@@ -19,6 +19,8 @@
 
 `REVIEW.md` at the repo root is the canonical review rubric, shared with Copilot and Antigravity. Read it before launching the code-review skill.
 
+**Copilot is request-only (since 2026-08-01) — nothing requests it for you.** A review covering the head commit is still required to merge; only its timing changed. Finish churning (implementation, CI fixes, self-review fixes, merge-from-main), then ask once: `gh pr edit <PR> --add-reviewer "@copilot"`. A push after requesting invalidates that review and there is no auto re-request — batch the fixes, then re-request once. Requesting is a step in finishing a PR, not an optional extra; the `ready-for-review` label does **not** do it for you. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+
 ### Sandbox network isolation
 
 - `gh` CLI TLS errors are fixed by `enableWeakerNetworkIsolation: true` in `.claude/settings.local.json`.
