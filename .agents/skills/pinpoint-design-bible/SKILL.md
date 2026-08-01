@@ -1,6 +1,6 @@
 ---
 name: pinpoint-design-bible
-description: Design system rules, page archetypes, spacing rhythm, surface hierarchy, responsive strategy, and the player-centric issue severity vocabulary (cosmetic / minor / major / unplayable — never low/medium/high or critical). Use when building any new UI, page, or component to ensure visual consistency, or when naming, labelling, or writing copy for issue severity levels.
+description: Design system rules, page archetypes, spacing rhythm, surface hierarchy, responsive strategy, and the player-centric issue severity vocabulary (cosmetic / minor / major / unplayable — never low/medium/high or critical). Sole owner of the browser-support policy (§19 — the Baseline Widely available floor, deferred Newly-available features, and the per-feature opt-in), the form-correctness conventions (§20 — required input attributes, autocomplete tokens, validation-feedback timing), the picker pattern and component inventory (§12), and the modern-web-guidance lookup (§22). Use when building any new UI, page, or component to ensure visual consistency; when naming, labelling, or writing copy for issue severity levels; when deciding whether a web platform feature is safe to use; or when writing a form or a single-select picker.
 ---
 
 # PinPoint Design Bible
@@ -74,7 +74,7 @@ opportunistically, not extended.
 
 - **All color references in component code must use semantic tokens.** Never write raw Tailwind palette classes (`text-purple-400`, `bg-amber-500/20`, `border-fuchsia-500`) or hardcoded hex (`#d946ef`, `bg-[#abcdef]`) anywhere under `src/app/**`, `src/components/**`, or any `.tsx` / `.ts` file that renders or styles UI. Use `text-primary`, `bg-destructive`, `text-muted-foreground`, `border-success/40`, etc.
 - **`dark:` utility classes are forbidden.** PinPoint is dark-only; `dark:` classes are dead code. Remove them when you touch a file that still contains them.
-- **Design-layer config is the only exception.** The four color tables in [`src/lib/issues/status.ts`](../../../src/lib/issues/status.ts) (`STATUS_CONFIG`, `SEVERITY_CONFIG`, `PRIORITY_CONFIG`, `FREQUENCY_CONFIG`) and the equivalent mapping in `src/lib/machines/presence.ts` may use raw Tailwind palette classes — because the raw palette _is_ the design decision being expressed. Component code consumes the resulting class strings via `STATUS_CONFIG[status].styles`; never replicate those class strings at call sites.
+- **Design-layer config is the only exception, and the ESLint config is its registry.** A small number of `src/lib/**` modules may write raw Tailwind palette classes, because in those files the raw palette _is_ the design decision being expressed rather than a shortcut around the token system. The authoritative list is the `ignores` array on the `better-tailwindcss` block in `eslint.config.mjs` — read it there; a copy here would be one more thing to drift. Read it with care: that array mixes two unrelated things. Its `src/**` entries are the design-layer exemptions this rule is about; the test, spec, `e2e/**` and fixture globs alongside them are just files the rule doesn't run on, and are not licence to write raw palette classes anywhere. **Adding a file to that list is a design decision, not a lint fix.** If a component is tripping the rule, the answer is almost always a token, not an exemption. Component code consumes the resulting class strings via the config (`STATUS_CONFIG[status].styles`); never replicate those class strings at call sites.
 - Status colors come from `STATUS_CONFIG` / `SEVERITY_CONFIG` / `PRIORITY_CONFIG` / `FREQUENCY_CONFIG` -- never freestyle status colors in components.
 - Glow effects (`glow-primary`, `glow-secondary`) are for interactive hover states only, never static decoration. Apply `hover:glow-primary` to navigable card surfaces: machine cards (list and dashboard panels), issue cards, and interactive stat cards. Apply `hover:glow-success` to "recently fixed" machine cards where the success color already conveys status semantically. Do not apply any glow to form controls, buttons, modals, destructive actions, nav links, input fields, or dropdown triggers. Glow is permitted **as an interactivity affordance on editable fields** — a text-glow that fades in on hover marks "you can edit this" (`glow-editable-text`, PP-43q3). This is distinct from decorative glow on arbitrary form controls, which remains banned. Editable Machine Settings fields use it via `~/components/machines/settings/affordance`.
 - Frosted glass (bg-card with opacity + `backdrop-blur-sm`) is reserved for navigation chrome.
@@ -120,11 +120,13 @@ PinPoint uses a **two-layer responsive framework**. Each layer has a distinct jo
 
 Use viewport breakpoints when the decision depends on the browser window size — showing or hiding entire sections, switching page-level grid columns, top-level padding.
 
-| Breakpoint | Viewport | Role                 | Example                                       |
-| :--------- | :------- | :------------------- | :-------------------------------------------- |
-| `md:`      | 768px    | Primary layout pivot | Single column → multi-column, show nav icons  |
-| `lg:`      | 1024px   | Element enrichment   | Icon-only nav → icon+text, APC logo appears   |
-| `sm:`      | 640px    | Padding/spacing only | `sm:px-8`, `sm:gap-4` — no structural changes |
+| Breakpoint    | Viewport        | Role                 | Example                                       |
+| :------------ | :-------------- | :------------------- | :-------------------------------------------- |
+| `md:`         | 768px           | Primary layout pivot | Single column → multi-column, show nav icons  |
+| `lg:` / `xl:` | 1024px / 1280px | Element enrichment   | Icon-only → icon+text, secondary chrome       |
+| `sm:`         | 640px           | Padding/spacing only | `sm:px-8`, `sm:gap-4` — no structural changes |
+
+**Which of `lg:` and `xl:` a given piece of chrome enriches at is a per-component fitting decision, not a rule** — it depends on how much is competing for the same row. Read the component; don't assume from this table.
 
 **`sm:` is padding only.** Never use `sm:grid-cols-2`, `sm:flex-row`, or `hidden sm:block`.
 
@@ -159,12 +161,14 @@ Use container queries when the decision depends on the component's available wid
 ### Rules
 
 - Mobile-first: write the mobile layout, then add `md:` / `@lg:` overrides.
-- `md:` shows/hides sections and sets page structure. `lg:` enriches elements (icon → icon+text).
-- AppHeader uses a **two-tier** pattern: nav items appear at `md:` (icon-only), text labels expand at `lg:`. See Section 8.
+- `md:` shows/hides sections and sets page structure. `lg:` and `xl:` enrich elements (icon → icon+text).
+- **Don't move an existing breakpoint to match this document.** AppHeader in particular carries an inline comment recording the overflow constraint that put its nav labels where they are — that comment exists because the obvious-looking breakpoint was tried and broke the header. Read the component's own comments before "correcting" a tier; a spec is not evidence about a layout that has already been fitted.
 - **No JavaScript viewport detection.** No `window.innerWidth`, `useMediaQuery`, or `matchMedia` — use CSS. These cause hydration mismatches and duplicate CSS's job.
 - **`@container` propagation:** Adding `@container` to a parent changes how all descendant container queries resolve. Audit children before adding it to an existing element.
-- **Overflow testing:** Every page must pass `assertNoHorizontalOverflow()` in its smoke test — `document.scrollWidth <= document.clientWidth` at both mobile (375px) and desktop (1024px) viewports. Add new pages to `e2e/smoke/responsive-overflow.spec.ts`.
-- **Documented exception:** `use-table-responsive-columns` for IssueList (PP-rs9) uses a JS hook — this is the sole approved exception.
+- **Overflow testing:** Every page must pass `assertNoHorizontalOverflow()` in its smoke test, at both mobile (375px) and desktop (1024px) viewports. Add new pages to `e2e/smoke/responsive-overflow.spec.ts`. It makes **two** assertions, and the second is the one that catches real bugs. `scrollWidth <= clientWidth` is kept as a cheap backstop, but under the app shell it can never fail — `overflow-x: hidden` on `<html>`/`<body>` means an overrun is clipped rather than widening the document — so it only bites on surfaces rendered outside the shell. The assertion that finds the mobile-overflow class is an element walk for visible content that a **non-scrollable** ancestor has clipped off-screen; real scroll containers (carousels, tab strips) are treated as fine, and there's a small tolerance for deliberate graceful clipping. Read `e2e/support/actions.ts` before changing what a page does about overflow — a page tuned to satisfy only the `scrollWidth` half is tuned to satisfy a check that cannot fail.
+- **Two hooks are sanctioned exceptions**, not one: `use-table-responsive-columns` (PP-rs9) and `use-is-mobile` (PP-43q3). Both are listed in AGENTS.md non-negotiable #12, and each carries its own justification in its docstring.
+
+  The **test** for a third — which is the part that lives nowhere but here: the hook must swap _behavior_, never layout. Two different component trees with different event wiring is a legitimate exception, because CSS genuinely cannot express it. Two stylings of one tree is not, no matter how awkward the CSS. If CSS _can_ express it, CSS wins, and "it was easier in JS" has already been rejected twice.
 
 ## 6. Spacing Rhythm
 

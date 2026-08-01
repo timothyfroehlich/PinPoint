@@ -8,26 +8,17 @@ PinPoint's UI is built on **Baseline Widely available** (CORE-UI-005) — featur
 
 **shadcn/ui and Radix remain the design system.** The Baseline floor is the _platform layer underneath_ — what we trust to "just work" in our users' browsers. We don't migrate components off Radix to chase native primitives; we layer Widely-available web platform features (`:user-invalid`, `inert`, container queries, `:has()`, `fetchpriority`, `motion-reduce:`, `aspect-ratio`, `enterkeyhint`, autocomplete tokens, semantic `<table>` markup, native `required`/`pattern` validation, etc.) onto our shadcn-based components so they get the full benefit of the platform.
 
-### What is in-scope today
+### What is in-scope today — and why there is no table of it
 
-| Capability                                  | Where it shows up in PinPoint                              | Baseline since |
-| :------------------------------------------ | :--------------------------------------------------------- | :------------- |
-| Container queries (`@container`)            | IssueMetadata, IssueTimeline, AddCommentForm, ImageGallery | Feb 2023       |
-| `:has()`                                    | DOM-state-driven styling, removes JS mirroring             | Dec 2023       |
-| `:user-valid` / `:user-invalid`             | Shared Input/Textarea primitives (CORE-FORM-003)           | Nov 2023       |
-| `inert` attribute                           | Background regions when modals open (CORE-A11Y-006)        | Mar 2022       |
-| `aspect-ratio`                              | ImageGallery, calendar day cells                           | Mar 2021       |
-| `accent-color`                              | Checkbox/radio/range accent matching                       | May 2022       |
-| `fetchpriority` (img/script/link)           | LCP candidate images (Next/Image `priority`)               | Sep 2023       |
-| CSS subgrid                                 | Multi-column form alignment                                | Sep 2023       |
-| `gap` on flexbox                            | Standard spacing everywhere                                | Apr 2021       |
-| `prefers-reduced-motion` (`motion-reduce:`) | Every animation utility (CORE-A11Y-002)                    | Jul 2020       |
-| `focus-visible`                             | All interactive primitives in `src/components/ui/`         | Mar 2022       |
-| Native form validation (`required` …)       | Every form                                                 | (pre-Baseline) |
-| `enterkeyhint`                              | Multi-field forms (CORE-FORM-006)                          | Dec 2021       |
-| Logical properties (`inline-start`)         | RTL-ready text alignment                                   | Mar 2023       |
-| Native `<dialog>`                           | Narrow one-off cases — see §17                             | Mar 2023       |
-| Native `<details>` / `<summary>`            | Trivial disclosure where Accordion would be overkill       | (pre-Baseline) |
+**PinPoint does not maintain a local Baseline table.** A feature's tier and date must be derived **live**, from `modern-web-guidance`, at the moment you need it (CORE-UI-006, and the commands are below).
+
+This section used to hold a sixteen-row table of features and Baseline dates. It was deleted deliberately. It was a hand-copied cache of data with an authoritative live source, it had silently rotted — several rows had drifted tier or date — and correcting them would only have restarted the clock on the rest. A wrong Baseline date is worse than no date, because it reads as authoritative and nobody re-checks it.
+
+The practical rule is unchanged and doesn't need the table: **if the guide says Widely available, use it directly** — no polyfill, no feature detection, no `@supports` gate. That covers the platform layer this project leans on (container queries, `:has()`, `:user-invalid`, `inert`, `aspect-ratio`, `fetchpriority`, `focus-visible`, `motion-reduce:`, `enterkeyhint`, logical properties, native `<dialog>` and `<details>`, native form validation).
+
+The deleted table also carried a "where it shows up in PinPoint" column. **To find a live example of a feature, grep its name in `src/`** — that answer is always current, which a list of filenames here would not be.
+
+The two lists below are the ones that _are_ decisions — what we've chosen to defer, and what we've chosen to adopt below the floor — and those stay.
 
 ### What is deferred (Baseline Newly available)
 
@@ -70,9 +61,8 @@ If the guide says "Baseline Widely available" — use directly. If "Baseline New
 
 If a Newly-available feature becomes load-bearing for a planned design:
 
-1. Open a PR that adds a row to the "in-scope" table above (or moves one from "deferred").
-2. Document the fallback strategy in the row (e.g., "Use `@supports` to feature-detect; fall back to existing pattern X").
+1. Open a PR that removes it from the "deferred" list above, with the reasoning.
+2. Document the fallback strategy (e.g., "Use `@supports` to feature-detect; fall back to existing pattern X").
 3. Link the spec/explainer + the MWG guide id.
-4. Add the feature to `pinpoint-ui` skill's relevant section.
 
 Don't sneak a Newly-available feature in without updating this section — it's the single source of truth for what the project considers safe.

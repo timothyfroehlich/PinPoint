@@ -8,7 +8,7 @@ Image loading sits at the intersection of LCP, layout stability, and bandwidth. 
 
 ### `priority` is for the LCP candidate only (CORE-PERF-003)
 
-`priority` emits `fetchpriority="high"` (Baseline Widely available since Sep 2025) plus eager loading. The browser interprets this as "this image is critical to first paint." Every prioritized image deprioritizes every other resource — so adding `priority` to a non-LCP image actively hurts LCP.
+`priority` emits `fetchpriority="high"` plus eager loading. The browser interprets this as "this image is critical to first paint." Every prioritized image deprioritizes every other resource — so adding `priority` to a non-LCP image actively hurts LCP.
 
 | Place                              | Should `priority`?                           |
 | :--------------------------------- | :------------------------------------------- |
@@ -62,24 +62,10 @@ npx -y modern-web-guidance@latest retrieve "<id>,<id2>"  # fetch full guide(s)
 npx -y modern-web-guidance@latest list                   # browse the catalog
 ```
 
-### Guide map by PinPoint use case
+### What it covers
 
-| Building...                        | MWG search/retrieve                                                     |
-| :--------------------------------- | :---------------------------------------------------------------------- |
-| Sign-in / sign-up form             | `forms`, `autofill-sign-in-form`, `autofill-sign-up-form`               |
-| Address or anonymous reporter form | `autofill-address-form`, `forms`                                        |
-| Post-interaction validation        | `validate-input-after-interaction`, `required-field-feedback`           |
-| Accessible error announcement      | `accessible-error-announcement`                                         |
-| Modal / dialog / confirmation      | `html` §4, `light-dismiss-a-dialog`, `platform-controls-dismiss-dialog` |
-| Mobile drawer / slide-in           | `navigation-drawer`                                                     |
-| Tooltips on touch                  | `interest-triggered-tooltips` (most variants are Newly available)       |
-| Image priority / LCP               | `optimize-image-priority`, `optimize-preload-priority`                  |
-| Long-task / INP                    | `break-up-long-tasks`, `identify-inp-causes`                            |
-| Container-internal layout          | `css-layout`, `size-aware-styling`                                      |
-| Conditional styling via DOM state  | `style-parent-with-has`                                                 |
-| Hidden-but-findable content        | `search-hidden-content`                                                 |
-| Reduced-motion / animation         | `accessibility` § Motion                                                |
-| Skip-link / landmarks / focus      | `accessibility`, `html` §3                                              |
-| Tables                             | `accessibility` § Tables                                                |
+Search it by intent; don't look for a guide-ID index here. There used to be one, and it was the same defect as the Baseline table two sections up — pre-computing the tool's answer and caching it, in a table whose own footer told you not to trust it. Guide IDs are the plugin's data and rot on its release schedule, not ours.
 
-Don't memorize the map — re-search per task. Plugin catalog updates more often than this document does.
+The **domains** are durable, and knowing them is what tells you whether the tool is worth a call: forms and autofill, post-interaction validation timing, accessible error announcement, dialogs and light-dismiss, mobile drawers, image priority and LCP, deferred rendering of heavy content, long tasks and INP, container-query layout, conditional styling from DOM state, accessibility (motion, landmarks, focus) and table semantics.
+
+If your task touches any of those, `search` first — the catalog is updated far more often than this document.
