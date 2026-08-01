@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-27
 **Author:** Claude (investigation + empirical validation on this repo)
-**Status:** TS 7.0 GA landed 2026-07-08 (7.0.2); the `@typescript/native-preview` nightlies are retired. Phase 1 runs on the GA dual-install (PP-xu96): `@typescript/native` = `npm:typescript@^7` (native `tsc`, drives the typecheck gate), `typescript` = `npm:@typescript/typescript6@^6` (TS6 JS API for ESLint + `next build`, `tsc6` binary). Phase 2 done in PP-8mv1: `typecheck:tests` + `typecheck:e2e` moved onto native `tsc` and the `tsc-baseline` gate retired (0 divergences vs `tsc6` on `tsconfig.tests.check.json` and `e2e/tsconfig.json`). Remaining deferred: type-aware lint on Go, Next native build.
+**Status:** TS 7.0 GA landed 2026-07-08 (7.0.2); the `@typescript/native-preview` nightlies are retired. Phase 1 runs on the GA dual-install (PP-xu96): `@typescript/native` = `npm:typescript@^7` (native `tsc`, drives the typecheck gate), `typescript` = `npm:@typescript/typescript6@^6` (TS6 JS API for ESLint + `next build`, `tsc6` binary). Phase 2 done in PP-8mv1: `typecheck:tests` + `typecheck:e2e` moved onto native `tsc` and the `tsc-baseline` gate retired (0 divergences vs `tsc6` on `tsconfig.tests.check.json` and `e2e/tsconfig.json`). Phase 3 (type-aware lint on Go) landed in PP-4zcj once oxlint type-aware went stable 2026-07-22. Remaining deferred: Next native build (Phase 4), still gated on the TS 7.1 stable JS API, which has no announced date.
 **Branch:** `claude/typescript-7-upgrade-plan-o85h0g` (Phase 1 nightly shape: PR #1586; GA swap: PP-xu96; tests/e2e engine move: PP-8mv1)
 
 > **Update 2026-07-12:** TS 7.0 GA shipped 2026-07-08 (7.0.2), and the
@@ -258,17 +258,57 @@ fixtures, a missing module specifier in `email-and-notifications.spec.ts`, `acce
 literal-vs-union mismatches in `unified-report-form.test.tsx`, etc.). This is a real
 cleanup project — **file it as its own bead/PR**, don't fold it into Phase 1.
 
-### Phase 3 — _(later, ecosystem-gated)_ Type-aware linting on the Go engine
+### Phase 3 — Type-aware linting on the Go engine ✅ _(done — PP-4zcj)_
 
-The biggest remaining CI win is moving type-aware lint off the JS API. Watch:
+**Unblocked 2026-07-22**, when oxc shipped [type-aware linting stable](https://oxc.rs/blog/2026-07-22-type-aware-linting-stable)
+(oxlint v1.75.0, `oxlint-tsgolint@7` tracking TypeScript 7.0.2, 59/61 typescript-eslint
+type-aware rules). Landed on oxlint 1.76.0 / oxlint-tsgolint 7.0.2001.
 
-- **`tsgolint`** (typescript-eslint's Go-powered type-aware linter, ~40 rules) and its
-  **Oxlint** integration (reported 59/61 type-aware rules, 20–40× faster than ESLint +
-  typescript-eslint). When stable, this is the path to fast type-aware linting.
-- typescript-eslint's own native-API support, expected to follow the **TS 7.1 stable API**.
+**Shape: local mirror, authoritative CI backstop.** `eslint.config.mjs` stays complete and
+CI keeps running full ESLint unchanged — lint is not on CI's critical path (E2E is), so
+there was no reason to bet coverage on a second engine there. Only the _local_ path swaps:
+`pnpm run check` runs `lint:local` = `oxlint` (type-checked bulk) ∥ a slim ESLint pass
+(residual plugins, project service off). Drift fails safe. Full description: `AGENTS.md`
+§ "Lint engines".
 
-Revisit when one of these is production-ready. This is where the headline speed actually
-lands for `pnpm run check`.
+**Measured on this repo (3-run medians):**
+
+|                                     |      wall | peak RSS |
+| :---------------------------------- | --------: | -------: |
+| `lint` (full ESLint, authoritative) |    14.86s |  3152 MB |
+| `lint:_oxlint`                      |     0.94s |   932 MB |
+| `lint:_slim`                        |     3.47s |  1182 MB |
+| `lint:local` (the two in parallel)  | **3.76s** |  ~1.2 GB |
+
+**Fidelity: zero false negatives.** A seeded-probe union test — for every rule the full
+config caught, oxlint ∪ slim caught it too — passed on `no-explicit-any`,
+`no-floating-promises`, `no-unsafe-assignment`, `restrict-template-expressions`,
+`no-base-to-string`, `ban-ts-comment`, `explicit-function-return-type`,
+`no-unnecessary-condition`, plus the residual `pinpoint/no-side-effects-in-transaction`,
+`unused-imports`, `better-tailwindcss`, `eslint-comments`, `react-hooks`, `jsx-a11y`.
+`no-misused-promises` with `checksVoidReturn.attributes: false` stayed faithful (an async
+JSX `onClick` is correctly not flagged).
+
+**Three findings worth keeping:**
+
+1. **`no-unnecessary-condition` is still nursery in oxlint**, so `@oxlint/migrate` silently
+   omits it — a false negative on a rule we set to `"error"`. It is now listed by hand in
+   `.oxlintrc.json`, along with the two per-override `"off"`s (tests, e2e) that
+   `eslint.config.mjs` has. Any nursery rule we depend on needs the same treatment.
+2. **`outDir` is _not_ inert on these tsconfigs** — contrary to the original spike note.
+   tsgolint needs it (composite projects can't set `noEmit` (TS6310), so `.mjs` inputs hit
+   TS5055 "would overwrite input file"), but adding it makes composite demand that every
+   program file be listed, which broke `pnpm run typecheck` with 4 × TS6307 on JSON
+   imports. Fixed by adding `content/*.json` + `src/**/*.json` to `tsconfig.app.json`'s
+   `include`. Only `.tsbuildinfo` is ever written to `.oxlint-tsbuild/`; no JS.
+3. **oxlint's `no-unnecessary-type-assertion` found a true positive typescript-eslint
+   missed** — a redundant `as` in `src/lib/notifications/dispatch.ts`. Removed; the rule is
+   kept in the mirror.
+
+Phase 3 was originally described as "where the headline speed lands for `pnpm run check`."
+That framing was wrong: `check` runs its legs in parallel and its long pole is the ~40s
+unit-test run, not lint. `check` wall-clock is essentially unchanged. The real wins are the
+standalone lint path and the ~3.2 GB → ~1.2 GB memory drop.
 
 ### Phase 4 — _(later)_ Next.js native build type-check
 

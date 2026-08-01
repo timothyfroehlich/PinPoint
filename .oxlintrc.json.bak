@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript"],
+  "plugins": [],
   "categories": {
     "correctness": "off"
   },
@@ -68,6 +68,7 @@
     "no-sparse-arrays": "error",
     "no-this-before-super": "error",
     "no-unassigned-vars": "error",
+    "no-undef": "error",
     "no-unexpected-multiline": "error",
     "no-unreachable": "error",
     "no-unsafe-finally": "error",
@@ -76,6 +77,7 @@
     "no-unused-labels": "error",
     "no-unused-private-class-members": "error",
     "no-unused-vars": "error",
+    "no-useless-assignment": "error",
     "no-useless-backreference": "error",
     "no-useless-catch": "error",
     "no-useless-escape": "error",
@@ -89,6 +91,7 @@
     {
       "files": ["**/*.ts", "**/*.tsx"],
       "rules": {
+        "no-undef": "off",
         "no-empty-pattern": [
           "error",
           {
@@ -114,6 +117,16 @@
             ]
           }
         ],
+        "promise/catch-or-return": [
+          "error",
+          {
+            "allowFinally": true
+          }
+        ],
+        "promise/no-nesting": "warn",
+        "promise/no-promise-in-callback": "warn",
+        "promise/no-callback-in-promise": "warn",
+        "promise/no-return-wrap": "error",
         "typescript/await-thenable": "error",
         "typescript/ban-ts-comment": [
           "error",
@@ -149,7 +162,6 @@
         "typescript/no-redundant-type-constituents": "error",
         "typescript/no-require-imports": "error",
         "typescript/no-this-alias": "error",
-        "typescript/no-unnecessary-type-assertion": "error",
         "typescript/no-unnecessary-type-constraint": "error",
         "typescript/no-unsafe-argument": "error",
         "typescript/no-unsafe-assignment": "error",
@@ -207,7 +219,7 @@
         ],
         "typescript/no-unnecessary-condition": "error"
       },
-      "plugins": ["typescript"]
+      "plugins": ["typescript", "promise"]
     },
     {
       "files": [
@@ -247,6 +259,7 @@
         "typescript/no-unsafe-return": "off",
         "typescript/no-unsafe-argument": "off",
         "typescript/unbound-method": "off",
+        "typescript/no-unnecessary-condition": "off",
         "no-restricted-properties": [
           "warn",
           {
@@ -254,8 +267,7 @@
             "property": "waitForTimeout",
             "message": "Use Playwright assertions (auto-wait) instead of waitForTimeout"
           }
-        ],
-        "typescript/no-unnecessary-condition": "off"
+        ]
       },
       "plugins": ["typescript"]
     },
@@ -273,6 +285,24 @@
         "typescript/explicit-function-return-type": "off"
       },
       "plugins": ["typescript"]
+    },
+    {
+      "files": ["supabase/**/*.mjs"],
+      "env": {
+        "node": true
+      }
+    },
+    {
+      "files": ["src/**/*.ts", "src/**/*.tsx"],
+      "rules": {
+        "react/rules-of-hooks": "error",
+        "react/exhaustive-deps": "error"
+      },
+      "plugins": ["react"]
+    },
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {}
     }
   ]
 }
