@@ -496,58 +496,15 @@ describe("saveDiscordConfig", () => {
       ).toBe(true);
     });
 
-    it("create path: deletes the orphaned secret when the transaction fails", async () => {
-      mockHappyProbes();
-      mockFindFirst.mockResolvedValue({ botTokenVaultId: null });
-
-      // First execute = create_secret (returns id); later execute =
-      // delete_secret in the catch block.
-      mockExecute
-        .mockResolvedValueOnce([{ id: "new-vault-id" }])
-        .mockResolvedValue([]);
-
-      // Force the transaction to fail after the secret was created.
-      mockTransaction.mockImplementation(() => {
-        throw new Error("simulated transaction failure");
-      });
-
-      const fd = makeFormData({
-        enabled: "true",
-        newToken: VALID_TOKEN,
-        guildId: "123456789012345678",
-      });
-      const result = await saveDiscordConfig(fd);
-      expect(result.ok).toBe(false);
-
-      // create_secret + delete_secret both ran.
-      const calls = mockExecute.mock.calls.map((c) => JSON.stringify(c[0]));
-      expect(calls.some((c) => c.includes("create_secret"))).toBe(true);
-      expect(calls.some((c) => c.includes("delete_secret"))).toBe(true);
-    });
-
-    it("update path: does NOT delete the secret when the transaction fails (no orphan to undo)", async () => {
-      mockHappyProbes();
-      mockFindFirst.mockResolvedValue({ botTokenVaultId: "existing-vault-id" });
-      mockExecute.mockResolvedValue([]);
-
-      mockTransaction.mockImplementation(() => {
-        throw new Error("simulated transaction failure");
-      });
-
-      const fd = makeFormData({
-        enabled: "true",
-        newToken: VALID_TOKEN,
-        guildId: "123456789012345678",
-      });
-      const result = await saveDiscordConfig(fd);
-      expect(result.ok).toBe(false);
-
-      // Only update_secret ran — no delete_secret compensation on the
-      // rotate-in-place path.
-      const calls = mockExecute.mock.calls.map((c) => JSON.stringify(c[0]));
-      expect(calls.some((c) => c.includes("update_secret"))).toBe(true);
-      expect(calls.some((c) => c.includes("delete_secret"))).toBe(false);
-    });
+    // The two orphan-compensation cases (create path deletes the orphan;
+    // update path deletes nothing) deliberately do NOT live here. They used to,
+    // asserted as `JSON.stringify(sqlArg).includes("delete_secret")` — a test
+    // that inspects the SQL string the action generates without ever running
+    // it. That let a compensation calling a function supabase_vault does not
+    // ship pass review and ship (PP-w3d9). They now live in
+    // src/test/integration/admin/discord-vault-orphan-cleanup.test.ts, which
+    // executes every statement against Postgres and asserts on the surviving
+    // vault.secrets rows instead.
 
     it("vault RPC rejection returns {ok:false} and reports to Sentry instead of throwing uncaught", async () => {
       mockHappyProbes();

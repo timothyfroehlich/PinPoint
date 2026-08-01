@@ -120,11 +120,13 @@ try {
       }
     } catch (updateError) {
       try {
-        // vault.delete_secret is the inverse of vault.create_secret used
-        // above (pg_vault extension). Best-effort cleanup so we don't leave
-        // an encrypted secret with no DB reference; failure here is logged
-        // but not re-thrown — the original UPDATE error is what matters.
-        await sql`SELECT vault.delete_secret(${vaultId}::uuid)`;
+        // supabase_vault (0.3.1) exposes only create_secret and
+        // update_secret — there is no delete_secret — so deletion is a plain
+        // row DELETE against vault.secrets, scoped to the id we just created.
+        // Best-effort cleanup so we don't leave an encrypted secret with no
+        // DB reference; failure here is logged but not re-thrown — the
+        // original UPDATE error is what matters.
+        await sql`DELETE FROM vault.secrets WHERE id = ${vaultId}::uuid`;
       } catch (cleanupError) {
         console.error(
           "⚠️  Failed to clean up orphaned vault secret",

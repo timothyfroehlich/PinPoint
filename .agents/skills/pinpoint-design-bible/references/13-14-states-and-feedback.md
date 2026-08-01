@@ -55,13 +55,13 @@ Prefer `<Skeleton>` rectangles shaped like the content that will appear. Skeleto
 
 Three tiers based on scope. Pick the narrowest one that fits.
 
-| Scope                           | Pattern                                                                |
-| :------------------------------ | :--------------------------------------------------------------------- |
-| Form-level (submission failed)  | `<Alert variant="destructive"><AlertDescription>` at top of form       |
-| Field-level (one field invalid) | `<FormMessage>` (react-hook-form) or inline `text-sm text-destructive` |
-| Inline list edit (cell update)  | `toast.error("Failed to update X")`                                    |
-| Entire route crashed            | `error.tsx` boundary (already implemented)                             |
-| Route not found                 | `not-found.tsx` boundary (already implemented)                         |
+| Scope                           | Pattern                                                                     |
+| :------------------------------ | :-------------------------------------------------------------------------- |
+| Form-level (submission failed)  | `<Alert variant="destructive"><AlertDescription>` at top of form            |
+| Field-level (one field invalid) | `<FormMessage>` (react-hook-form) or inline `text-sm text-destructive-text` |
+| Inline list edit (cell update)  | `toast.error("Failed to update X")`                                         |
+| Entire route crashed            | `error.tsx` boundary (already implemented)                                  |
+| Route not found                 | `not-found.tsx` boundary (already implemented)                              |
 
 **Rules:**
 

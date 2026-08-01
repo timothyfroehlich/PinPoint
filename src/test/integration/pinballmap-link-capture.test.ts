@@ -23,6 +23,7 @@ import {
   authUsers,
   timelineEvents,
   pinballmapState,
+  pinballmapCatalog,
 } from "~/server/db/schema";
 
 vi.mock("~/server/db", async () => {
@@ -439,5 +440,170 @@ describe("verifyPinballmapLinkAction (PGlite)", () => {
     });
     expect(row?.pinballmapLmxId).toBe(900);
     expect(row?.pinballmapListed).toBe(true);
+  });
+});
+
+/**
+ * `pinballmapListed` is never a form field — only the two PBM-talking actions
+ * above flip it true. The edit form submits the picker but nothing for the
+ * listing flag, so `updateMachineAction` has to carry the stored value across an
+ * unrelated save or it silently unlists the machine (PP-o355.19 review finding).
+ */
+describe("updateMachineAction listing carry-over (PGlite)", () => {
+  setupTestDb();
+
+  /**
+   * `resolvePbmLinkColumns` derives metadata from the catalog mirror rather than
+   * trusting the form, so any title the edit form submits must exist here.
+   */
+  async function seedCatalog(...ids: number[]): Promise<void> {
+    const db = await getTestDb();
+    await db.insert(pinballmapCatalog).values(
+      ids.map((id) => ({
+        pinballmapMachineId: id,
+        name: `Title ${String(id)}`,
+        manufacturer: "Stern",
+        year: 2021,
+      }))
+    );
+  }
+
+  /** Assert success, surfacing the action's own message when it failed. */
+  function expectOk(res: { ok: boolean; message?: string }): void {
+    expect(res.ok ? "ok" : `failed: ${res.message ?? "(no message)"}`).toBe(
+      "ok"
+    );
+  }
+
+  /** The Manage tab's Details form: picker present, no `pinballmapListed`. */
+  function editFormData(
+    machineId: string,
+    pbmMachineId: number | null
+  ): FormData {
+    const fd = new FormData();
+    fd.set("id", machineId);
+    fd.set("name", "Godzilla");
+    fd.set("pbmLinkPresent", "1");
+    if (pbmMachineId !== null) {
+      fd.set("pinballmapMachineId", String(pbmMachineId));
+    }
+    return fd;
+  }
+
+  it("keeps a listed machine listed when an unrelated field is saved", async () => {
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedCatalog(42);
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    const res = await updateMachineAction(
+      undefined,
+      editFormData(machine.id, 42)
+    );
+    expectOk(res);
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(true);
+    expect(row?.pinballmapMachineId).toBe(42);
+    expect(row?.pinballmapLmxId).toBe(900);
+  });
+
+  it("unlists when the save re-targets the link to a different title", async () => {
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedCatalog(42, 43);
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    const res = await updateMachineAction(
+      undefined,
+      editFormData(machine.id, 43)
+    );
+    expectOk(res);
+
+    // The old listing describes a title this machine is no longer linked to.
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapMachineId).toBe(43);
+    // The lmx identified a listing of the OLD title — it must not survive.
+    expect(row?.pinballmapLmxId).toBeNull();
+  });
+
+  it("unlists and drops the lmx when a listed machine is marked not-on-PBM", async () => {
+    // The riskiest transition for the two lmx CHECK constraints: the machine
+    // leaves BOTH the linked and the listed state while carrying an lmx.
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedCatalog(42);
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    const fd = new FormData();
+    fd.set("id", machine.id);
+    fd.set("name", "Godzilla");
+    fd.set("pbmLinkPresent", "1");
+    fd.set("pinballmapExcluded", "on");
+    fd.set("pinballmapExcludedReason", "Home use only");
+
+    const res = await updateMachineAction(undefined, fd);
+    expectOk(res);
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapExcluded).toBe(true);
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapMachineId).toBeNull();
+    expect(row?.pinballmapLmxId).toBeNull();
+  });
+
+  it("unlists when the save clears the link entirely", async () => {
+    const db = await getTestDb();
+    const { updateMachineAction } = await import("~/app/(app)/m/actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    await seedCatalog(42);
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: true,
+      pinballmapLmxId: 900,
+    });
+
+    const res = await updateMachineAction(
+      undefined,
+      editFormData(machine.id, null)
+    );
+    expectOk(res);
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapMachineId).toBeNull();
+    expect(row?.pinballmapLmxId).toBeNull();
   });
 });
