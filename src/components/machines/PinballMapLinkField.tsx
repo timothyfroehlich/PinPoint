@@ -108,6 +108,10 @@ export function PinballMapLinkField({
   const [excluded, setExcluded] = useState(defaultExcluded);
   const [reason, setReason] = useState(defaultExcludedReason ?? "");
 
+  // Whether the USER has changed the selection. Until they do, the form submits
+  // the machine's STORED link — see `submittedId`.
+  const [userChanged, setUserChanged] = useState(false);
+
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CatalogFamily[]>([]);
@@ -115,16 +119,26 @@ export function PinballMapLinkField({
 
   // Edit preselect: resolve an existing link id back to its family + editions.
   // `defaultName` shows immediately while the round-trip is in flight.
+  //
+  // A rejection here must not be swallowed: `family` would stay null forever
+  // while the trigger kept showing the stored title, and what the form submits
+  // is decided by `userChanged` below rather than by whether this resolved.
   useEffect(() => {
     if (defaultMachineId === null) return;
     let active = true;
-    void resolvePinballMapLinkAction(defaultMachineId).then((resolved) => {
-      if (active && resolved) {
-        setFamily(resolved.family);
-        setEditions(resolved.editions);
-        setSelectedEditionId(resolved.pinballmapMachineId);
-      }
-    });
+    void resolvePinballMapLinkAction(defaultMachineId)
+      .then((resolved) => {
+        if (active && resolved) {
+          setFamily(resolved.family);
+          setEditions(resolved.editions);
+          setSelectedEditionId(resolved.pinballmapMachineId);
+        }
+      })
+      .catch((error: unknown) => {
+        // Non-fatal: the field stays usable and the stored link is still what
+        // gets submitted. Surfacing it beats an unhandled rejection.
+        console.error("Failed to resolve the stored PinballMap link", error);
+      });
     return () => {
       active = false;
     };
@@ -161,6 +175,7 @@ export function PinballMapLinkField({
     setExcluded(false); // mutual exclusion
     setOpen(false);
     setQuery("");
+    setUserChanged(true);
     onDirty?.();
 
     if (pick.pinballmapMachineId !== null) {
@@ -197,6 +212,7 @@ export function PinballMapLinkField({
     setSelectedEditionId(null);
     setOpen(false);
     setQuery("");
+    setUserChanged(true);
     onDirty?.();
   };
 
@@ -210,6 +226,22 @@ export function PinballMapLinkField({
   const resolvedId = family
     ? (family.pinballmapMachineId ?? selectedEditionId)
     : null;
+
+  /**
+   * What the form actually submits for the link.
+   *
+   * `resolvedId` is null until the preselect round-trip lands, but the trigger
+   * shows `defaultName` the whole time — so submitting `resolvedId` during that
+   * window silently unlinked a machine that looked linked, wiping the id,
+   * listing, lmx and catalog metadata with no error (PP-o355.19 review). Worse,
+   * a failed or empty resolve made that window permanent.
+   *
+   * So until the user actually changes something, submit the STORED link. If
+   * its catalog row has since disappeared, `resolvePbmLinkColumns` rejects the
+   * save with "no longer in the catalog — search again", which is the honest
+   * failure (CORE-ARCH-012) rather than a silent wipe.
+   */
+  const submittedId = userChanged ? resolvedId : defaultMachineId;
 
   const familyMeta = family ? formatMeta(family.manufacturer, family.year) : "";
   // While an existing link resolves on edit, show its known name; otherwise prompt.
@@ -239,7 +271,7 @@ export function PinballMapLinkField({
           <input
             type="hidden"
             name="pinballmapMachineId"
-            value={resolvedId !== null ? String(resolvedId) : ""}
+            value={submittedId !== null ? String(submittedId) : ""}
           />
         )}
 
@@ -435,6 +467,7 @@ export function PinballMapLinkField({
                 : {})}
               onValueChange={(v) => {
                 setSelectedEditionId(Number(v));
+                setUserChanged(true);
                 onDirty?.();
               }}
             >
