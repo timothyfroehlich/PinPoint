@@ -233,8 +233,11 @@ if [[ -n "$INPUT" ]]; then
   # The IFS prefix assignment does not persist — `read` is a regular builtin —
   # so the daily-injection loop further down still gets the default IFS.
   _SEP=$(printf '\002')
-  # python3 failure is handled by the read's `|| { … }` fallback; ignore masked return.
-  # shellcheck disable=SC2312
+  # A python3 or JSON failure is absorbed by the parse itself: sid/src stay empty,
+  # the here-string is a bare separator, and the `[[ -z "$SESSION_ID" ]]` guard
+  # below exits. The `|| { … }` is belt-and-braces for `read` itself failing — it
+  # rarely fires, since a here-string always supplies a trailing newline.
+  # shellcheck disable=SC2312  # the masked $(...) return is handled as described
   IFS="$_SEP" read -r SESSION_ID SOURCE <<<"$(
     printf '%s' "$INPUT" | SEP="$_SEP" python3 -c "
 import os, sys, json
