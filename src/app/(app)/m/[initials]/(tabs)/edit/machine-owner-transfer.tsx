@@ -142,9 +142,10 @@ export function MachineOwnerTransfer({
   // This form deliberately does NOT carry `action={formAction}` (PP-1ajq).
   // React 19 auto-resets a `<form action={...}>` once the action settles — on
   // failure as well as success — and this disclosure stays open on failure.
-  // A native reset would blank the controlled hidden `id`/`name` inputs in the
-  // DOM without re-rendering React, so a second attempt would submit an empty
-  // machine id. Dispatching `useActionState` directly means no form submission
+  // A native reset would blank the controlled hidden `id` input in the DOM
+  // without re-rendering React — and replay `OwnerSelect`'s mount-time value —
+  // so a second attempt would submit an empty machine id against a stale
+  // owner. Dispatching `useActionState` directly means no form submission
   // ever completes, so React never fires that reset. Same remedy as
   // `MachineDetailsForm` above (PP-1ajq).
   const dispatchForm = (mutate?: (fd: FormData) => void): void => {

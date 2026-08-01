@@ -433,7 +433,10 @@ export function PinballMapLinkField({
           >
             {excluded ? "Reason (optional)" : "Edition"}
             {needsEdition && !excluded && (
-              <span className="text-destructive-text"> *</span>
+              <span aria-hidden="true" className="text-destructive-text">
+                {" "}
+                *
+              </span>
             )}
           </Label>
           {excluded ? (
