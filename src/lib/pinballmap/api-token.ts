@@ -21,8 +21,11 @@ import "server-only";
  *
  * Returns null when unset — the live client then omits the header (fine while
  * PBM's gate is still off; the integration is dormant until the PP-o355.10
- * rollout). Local dev and CI never set it: PBM must never be reached from tests
- * (CORE-TEST-006), and `pinballmap_state.enabled` gates the integration anyway.
+ * rollout). Nothing outside a Vercel production deployment sets it, and nothing
+ * outside one needs it: `getPinballMapMode()` resolves to `mock` for local dev,
+ * CI, and previews alike, so no live request is made there to authenticate
+ * (CORE-TEST-006). That guarantee keys off `VERCEL_ENV`, not `NODE_ENV`, which
+ * Vercel sets to `production` in previews too (PP-o355.24).
  *
  * SECURITY: server-only; exposes secret material. The "server-only" import
  * guards against accidental client imports.
