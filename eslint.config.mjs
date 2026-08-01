@@ -209,8 +209,12 @@ export default [
       // Allow disabling rules in tests if needed (mocking often requires it)
       "eslint-comments/no-restricted-disable": "off",
 
+      // mocks/spies are inherently empty
       "@typescript-eslint/no-empty-function": "off",
+      // tsconfig gap: `tsconfig.tests.json` lacks `noUncheckedIndexedAccess`,
+      // causing false positives on legitimate defensive checks
       "@typescript-eslint/no-unnecessary-condition": "off",
+      // tests legitimately cross the src/e2e boundary
       "no-restricted-imports": "off",
     },
   },
