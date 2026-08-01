@@ -17,6 +17,8 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 | `pr-dashboard.sh [PR...]` | Status table: CI checks, merge state, draft state. All open PRs if no args.                                                                 |
 | `pr-watch.py <PR>`        | Stream CI run events. One timestamped line per event. Use with the Claude Code Monitor tool. Writes failure artifacts to `tmp/gh-monitor/`. |
 
+`pr-watch.py` exit codes: **0** passed (or stopped for a new Copilot review), **1** a run or the CI Gate actually failed, **2** the outcome could not be determined — the GitHub API was unreachable (rate-limit 403, network drop, auth failure), so nothing was observed. Exit 2 is not a red CI: re-run the watch once the API is back rather than hunting for a broken test. (PP-qkl8)
+
 ### UI Screenshots
 
 | Script                                                   | Purpose                                                                                                                                                                                                                                                     |
