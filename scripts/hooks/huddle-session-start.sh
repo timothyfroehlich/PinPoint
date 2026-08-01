@@ -215,16 +215,31 @@ fi
 SESSION_ID=""
 SOURCE=""
 if [[ -n "$INPUT" ]]; then
+  # The two fields are joined on STX (\x02) and split with IFS=STX, matching
+  # huddle-pr-announce.sh. The separator must be a NON-whitespace byte: bash
+  # treats space/tab/newline as "IFS whitespace" even when IFS names only one of
+  # them, which means leading separators are skipped and runs collapse. That is
+  # exactly how PP-txet bit — the fields were space-joined and read with the
+  # default IFS, so `{"session_id": "", "source": "startup"}` produced
+  # " startup" and parsed as SESSION_ID=startup, SOURCE="". The empty-session_id
+  # guard below never fired, the hook announced `startup` as the session id, and
+  # the compact check further down compared against an emptied SOURCE.
+  # A tab separator would NOT have fixed this; STX splits into a genuine empty
+  # leading field.
+  _SEP=$(printf '\002')
   # python3 failure is handled by the read's `|| { … }` fallback; ignore masked return.
   # shellcheck disable=SC2312
-  read -r SESSION_ID SOURCE <<<"$(
-    printf '%s' "$INPUT" | python3 -c "
-import sys, json
+  IFS="$_SEP" read -r SESSION_ID SOURCE <<<"$(
+    printf '%s' "$INPUT" | SEP="$_SEP" python3 -c "
+import os, sys, json
+sid = src = ''
 try:
     p = json.load(sys.stdin)
-    print((p.get('session_id') or '') + ' ' + (p.get('source') or ''))
+    sid = str(p.get('session_id') or '').strip()
+    src = str(p.get('source') or '').strip()
 except Exception:
-    print(' ')
+    pass
+print(sid + os.environ['SEP'] + src)
 " 2>/dev/null
   )" || { SESSION_ID=""; SOURCE=""; }
 fi
