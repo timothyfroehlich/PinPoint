@@ -1,12 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MachineDetailsForm } from "./machine-details-form";
 import { updateMachineAction } from "~/app/(app)/m/actions";
 import { err, ok } from "~/lib/result";
+import type { UpdateMachineResult } from "~/app/(app)/m/actions";
 
 vi.mock("~/app/(app)/m/actions", () => ({
   updateMachineAction: vi.fn(),
+}));
+
+const pushMock = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: pushMock, replace: pushMock }),
 }));
 
 // The real editor is a dynamic TipTap import. Swap it for a textarea that
@@ -72,6 +78,38 @@ function hiddenDescription(): HTMLInputElement {
 describe("MachineDetailsForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    pushMock.mockClear();
+  });
+
+  /** Dispatch a cancelable beforeunload and report whether anything blocked it. */
+  function beforeUnloadWasBlocked(): boolean {
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  }
+
+  it("does not block unload when the form is untouched", () => {
+    render(<MachineDetailsForm {...baseProps} />);
+    expect(beforeUnloadWasBlocked()).toBe(false);
+  });
+
+  it("blocks unload once the form is dirty", async () => {
+    const user = userEvent.setup();
+    render(<MachineDetailsForm {...baseProps} />);
+
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+
+    expect(beforeUnloadWasBlocked()).toBe(true);
+  });
+
+  it("stops blocking unload after Cancel reverts the edits", async () => {
+    const user = userEvent.setup();
+    render(<MachineDetailsForm {...baseProps} />);
+
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(beforeUnloadWasBlocked()).toBe(false);
   });
 
   it("serializes the editor's doc into the hidden description input", async () => {
@@ -269,5 +307,119 @@ describe("MachineDetailsForm", () => {
 
     expect.soft(follows(name, availability)).toBe(true);
     expect.soft(follows(availability, pinballMapFields)).toBe(true);
+  });
+
+  it("keeps guarding edits made while a save is in flight", async () => {
+    // The action resolves only when we say so, so we can type mid-flight.
+    let resolveSave: (value: UpdateMachineResult) => void = () => undefined;
+    vi.mocked(updateMachineAction).mockReturnValue(
+      new Promise<UpdateMachineResult>((resolve) => {
+        resolveSave = resolve;
+      })
+    );
+    const user = userEvent.setup();
+    render(<MachineDetailsForm {...baseProps} />);
+
+    await user.type(screen.getByLabelText(/Machine Name/), "!");
+    await user.click(screen.getByRole("button", { name: "Save details" }));
+
+    // Typed AFTER the FormData snapshot was taken — never submitted.
+    await user.type(screen.getByLabelText(/Machine Name/), "?");
+
+    // `act` so the resolution, its re-render, and the success effect have all
+    // flushed before we assert — a `waitFor` on the button resolves BEFORE the
+    // action settles, which made this assertion pass against the bug.
+    await act(async () => {
+      resolveSave(ok({ machineId: baseProps.machineId }));
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId("details-dirty-note")).toHaveTextContent(
+      "Unsaved changes"
+    );
+  });
+
+  describe("unsaved-changes navigation guard", () => {
+    /** A tab-strip-style link rendered as a sibling, like RouteTabStrip's. */
+    function renderWithTabLink(): void {
+      render(
+        <>
+          <a href="/m/TAF/settings">Settings</a>
+          <MachineDetailsForm {...baseProps} />
+        </>
+      );
+    }
+
+    it("lets a link through when the form is untouched", async () => {
+      const user = userEvent.setup();
+      renderWithTabLink();
+
+      await user.click(screen.getByRole("link", { name: "Settings" }));
+
+      expect(
+        screen.queryByText("Discard unsaved changes?")
+      ).not.toBeInTheDocument();
+    });
+
+    it("intercepts a link and asks before discarding", async () => {
+      const user = userEvent.setup();
+      renderWithTabLink();
+
+      await user.type(screen.getByLabelText(/Machine Name/), "!");
+      await user.click(screen.getByRole("link", { name: "Settings" }));
+
+      expect(
+        await screen.findByText("Discard unsaved changes?")
+      ).toBeInTheDocument();
+      expect(pushMock).not.toHaveBeenCalled();
+    });
+
+    it("stays put and keeps the edits when the user keeps editing", async () => {
+      const user = userEvent.setup();
+      renderWithTabLink();
+
+      await user.type(screen.getByLabelText(/Machine Name/), "!");
+      await user.click(screen.getByRole("link", { name: "Settings" }));
+      await user.click(
+        await screen.findByRole("button", { name: "Keep editing" })
+      );
+
+      expect(pushMock).not.toHaveBeenCalled();
+      expect(screen.getByLabelText(/Machine Name/)).toHaveValue(
+        "Godzilla (Premium)!"
+      );
+    });
+
+    it("completes the navigation when the user discards", async () => {
+      const user = userEvent.setup();
+      renderWithTabLink();
+
+      await user.type(screen.getByLabelText(/Machine Name/), "!");
+      await user.click(screen.getByRole("link", { name: "Settings" }));
+      await user.click(
+        await screen.findByRole("button", { name: "Discard changes" })
+      );
+
+      await waitFor(() => {
+        expect(pushMock).toHaveBeenCalledWith("/m/TAF/settings");
+      });
+    });
+
+    it("lets a link to the current page through", async () => {
+      const user = userEvent.setup();
+      render(
+        <>
+          <a href="/">Here</a>
+          <MachineDetailsForm {...baseProps} />
+        </>
+      );
+
+      await user.type(screen.getByLabelText(/Machine Name/), "!");
+      await user.click(screen.getByRole("link", { name: "Here" }));
+
+      expect(
+        screen.queryByText("Discard unsaved changes?")
+      ).not.toBeInTheDocument();
+    });
   });
 });
