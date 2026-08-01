@@ -96,6 +96,26 @@ describe("wrapper/env-prefixed real git invocations → BLOCK", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Shapes the hook's own tokenizer used to fold on, now handled by the shared
+// lib/resolve-command.cjs primitive (PP-6t3c). The wrapper/quoting class itself
+// is tested once in resolve-command.test.ts; these prove this guard's policy
+// actually rides on it.
+// ---------------------------------------------------------------------------
+describe("wrapped/quoted git invocations → BLOCK (PP-6t3c)", () => {
+  it.each([
+    'eval "git checkout feature/x"',
+    'sh -c "git switch feature/x"',
+    'bash -c "git checkout -b new-branch"',
+    "sudo -u root git checkout feature/x",
+    "timeout 30 git switch feature/x",
+    "/usr/bin/git checkout feature/x",
+    "git status\ngit checkout feature/x",
+  ])("blocks %s", (cmd) => {
+    expectBlock(cmd);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // git-as-argument (false-positive fix) — must ALLOW
 // ---------------------------------------------------------------------------
 describe("git as argument, not command → ALLOW (false-positive fix)", () => {
