@@ -571,6 +571,31 @@ class TestApply:
         assert "volume state was UNKNOWN" in err
         assert "FAILED" not in err
 
+    def test_two_failures_sharing_one_code_still_count_as_two(
+        self,
+        world: World,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The summary counts worktrees; the exit status collapses to codes.
+
+        Deriving the count from the set of distinct codes would report
+        "Reaped 1 of 2" here and leave one leaked worktree unaccounted for.
+        """
+        first = world.add_worktree("worktree-bridge-a")
+        second = world.add_worktree("worktree-bridge-b")
+        fake_cleanup(
+            world,
+            monkeypatch,
+            exit_code=0,
+            per_path={str(first): 1, str(second): 1},
+        )
+
+        code, _, err = run_reap(world, monkeypatch, capsys, "--apply")
+
+        assert code == 1
+        assert "Reaped 0 of 2 worktree(s)." in err
+
     def test_distinct_cleanup_codes_are_reported_individually(
         self,
         world: World,

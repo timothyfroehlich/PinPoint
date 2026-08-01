@@ -400,7 +400,7 @@ def format_kib(kib: int) -> str:
     return f"{size:.1f} GiB"
 
 
-def reap(path: str, not_quiet: bool) -> int:
+def run_cleanup(path: str, not_quiet: bool) -> int:
     """Delegate removal to worktree_cleanup.py and return its exit code."""
     try:
         result = subprocess.run(
@@ -542,7 +542,7 @@ def main() -> int:
                 )
 
     if not args.apply:
-        if reapable and not not_quiet:
+        if reapable and args.quiet:
             print(
                 f"worktree-reap: {len(reapable)} worktree(s) already landed and "
                 f"reclaimable ({merged_count} merged, {empty_count} empty), "
@@ -557,11 +557,22 @@ def main() -> int:
             )
         return EXIT_GH_UNAVAILABLE if unknown else EXIT_OK
 
+    # The set holds distinct *codes* (for the exit status); the counter holds
+    # how many worktrees failed. Conflating the two would report "reaped 4 of 5"
+    # when two worktrees failed with the same code.
     failures: set[int] = set()
+    failed_count = 0
     for verdict in reapable:
-        code = reap(verdict.path, not_quiet)
+        code = run_cleanup(verdict.path, not_quiet)
         if code != 0:
             failures.add(code)
+            failed_count += 1
+
+    if not_quiet:
+        print(
+            f"\nReaped {len(reapable) - failed_count} of {len(reapable)} worktree(s).",
+            file=sys.stderr,
+        )
 
     if failures:
         # Propagate the cleanup code when there is exactly one, so a caller sees
