@@ -306,6 +306,52 @@ describe("block-direct-merge.cjs — wrapped invocations (PP-6t3c, PP-ar8a)", ()
 });
 
 // ---------------------------------------------------------------------------
+// `env -S` (GNU split-string) — found by review on this PR, same bug class.
+//
+// The first cut of the shared resolver modelled `-S` as an ordinary value flag,
+// so the wrapper scan ate the payload and the segment resolved to NOTHING —
+// which this guard read as "not a merge" and allowed. A fix that closed
+// eval/sh -c/xargs while opening a fresh `env -S` hole would have replaced one
+// bypass with another while looking like a fix.
+// ---------------------------------------------------------------------------
+describe("block-direct-merge.cjs — env -S split-string", () => {
+  it.each([
+    "env -S 'gh pr merge 123'",
+    'env -S "gh pr merge 123"',
+    "env --split-string='gh pr merge 123'",
+    "env -S'gh pr merge 123'",
+    "env -i -S 'gh pr merge 123'",
+    "env -iS 'gh pr merge 123'",
+    "env -u FOO -S 'scripts/workflow/merge-pr.sh 1 --human'",
+    "env -S 'gh api -X PUT repos/o/r/pulls/1/merge'",
+    "sudo env -S 'gh pr merge 1'",
+    "xargs env -S 'gh pr merge 1'",
+  ])("blocks %s", (command) => {
+    const { status } = runHook(bashPayload(command));
+    expect(status).toBe(2);
+  });
+
+  it("blocks a dynamic split-string payload that names a merge elsewhere", () => {
+    const { status } = runHook(bashPayload("P='gh pr merge 1'; env -S \"$P\""));
+    expect(status).toBe(2);
+  });
+
+  it.each([
+    "env",
+    "env | rg merge-pr.sh",
+    "sudo -l",
+    "timeout 30",
+    "env -u NODE_OPTIONS pnpm run check",
+  ])("does NOT block %s (wrapper consumed the segment)", (command) => {
+    // These resolve to the wrapper itself. Reporting them unresolvable instead
+    // would push this guard onto its raw-text fallback for ordinary commands,
+    // and `env | rg merge-pr.sh` would block.
+    const { status } = runHook(bashPayload(command));
+    expect(status).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Prose must still pass. A guard that blocks the words is as broken as one
 // that misses the command — agents legitimately write these every session.
 // ---------------------------------------------------------------------------

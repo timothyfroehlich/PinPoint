@@ -234,9 +234,14 @@ const BEHAVIOR_PROBES = [
       'eval "gh pr merge 123 --squash"',
       'sh -c "scripts/workflow/merge-pr.sh 123 --human"',
       "xargs -I{} gh pr merge {} < prs.txt",
+      "env -S 'gh pr merge 123'",
       "gh api -X PUT repos/o/r/pulls/123/merge",
     ],
-    mustAllow: ["gh pr view 123", 'echo "run merge-pr.sh when ready"'],
+    mustAllow: [
+      "gh pr view 123",
+      'echo "run merge-pr.sh when ready"',
+      "env | rg merge-pr.sh",
+    ],
   },
   {
     hook: "block-main-worktree-branch-switch.cjs",

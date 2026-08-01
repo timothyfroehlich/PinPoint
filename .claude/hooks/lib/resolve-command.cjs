@@ -73,33 +73,43 @@
 
 const path = require("node:path");
 
-// Wrappers that run another command rather than being the command. Value is the
-// set of the wrapper's OWN flags that consume a separate following token, plus
-// how many positional arguments the wrapper eats before the command starts
-// (`timeout 30 cmd`).
+// Wrappers that run another command rather than being the command. Each entry
+// carries:
+//   valueFlags   – the wrapper's OWN flags that consume a separate token
+//   payloadFlags – flags whose value is a shell PROGRAM, re-parsed rather than
+//                  skipped (GNU `env -S 'gh pr merge 123'`)
+//   positionals  – positional arguments the wrapper eats before the command
+//                  (`timeout 30 cmd`)
 //
 // Skipping a wrapper's flags is deliberate. The previous per-guard logic
 // stopped at the first flag-like token and gave up, which is exactly why
 // `sudo -u root chmod +x f` slipped past the chmod guard while `sudo chmod` did
-// not.
+// not. `payloadFlags` is the counterpart: skipping `-S`'s value would eat the
+// command itself.
+const makeWrapper = (valueFlags, options = {}) => ({
+  valueFlags: new Set(valueFlags),
+  payloadFlags: options.payloadFlags ?? [],
+  positionals: options.positionals ?? 0,
+});
+
 const WRAPPERS = new Map([
-  ["sudo", { valueFlags: new Set(["-u", "-g", "-U", "-p", "-r", "-t", "-C", "-D", "-h", "--user", "--group", "--other-user", "--prompt", "--role", "--type", "--close-from", "--chdir", "--host"]), positionals: 0 }],
-  ["doas", { valueFlags: new Set(["-u", "-C"]), positionals: 0 }],
-  ["env", { valueFlags: new Set(["-u", "--unset", "-C", "--chdir", "-S", "--split-string"]), positionals: 0 }],
-  ["command", { valueFlags: new Set([]), positionals: 0 }],
-  ["builtin", { valueFlags: new Set([]), positionals: 0 }],
-  ["exec", { valueFlags: new Set(["-a"]), positionals: 0 }],
-  ["time", { valueFlags: new Set(["-o", "--output", "-f", "--format"]), positionals: 0 }],
-  ["nice", { valueFlags: new Set(["-n", "--adjustment"]), positionals: 0 }],
-  ["ionice", { valueFlags: new Set(["-c", "-n", "-p", "-P", "-u"]), positionals: 0 }],
-  ["nohup", { valueFlags: new Set([]), positionals: 0 }],
-  ["setsid", { valueFlags: new Set([]), positionals: 0 }],
-  ["stdbuf", { valueFlags: new Set(["-i", "-o", "-e", "--input", "--output", "--error"]), positionals: 0 }],
-  ["timeout", { valueFlags: new Set(["-s", "--signal", "-k", "--kill-after"]), positionals: 1 }],
+  ["sudo", makeWrapper(["-u", "-g", "-U", "-p", "-r", "-t", "-C", "-D", "-h", "--user", "--group", "--other-user", "--prompt", "--role", "--type", "--close-from", "--chdir", "--host"])],
+  ["doas", makeWrapper(["-u", "-C"])],
+  ["env", makeWrapper(["-u", "--unset", "-C", "--chdir"], { payloadFlags: ["--split-string", "-S"] })],
+  ["command", makeWrapper([])],
+  ["builtin", makeWrapper([])],
+  ["exec", makeWrapper(["-a"])],
+  ["time", makeWrapper(["-o", "--output", "-f", "--format"])],
+  ["nice", makeWrapper(["-n", "--adjustment"])],
+  ["ionice", makeWrapper(["-c", "-n", "-p", "-P", "-u"])],
+  ["nohup", makeWrapper([])],
+  ["setsid", makeWrapper([])],
+  ["stdbuf", makeWrapper(["-i", "-o", "-e", "--input", "--output", "--error"])],
+  ["timeout", makeWrapper(["-s", "--signal", "-k", "--kill-after"], { positionals: 1 })],
   // `xargs [flags] CMD ARGS…` — CMD really does run, with extra args appended
   // from stdin. Treating xargs as a wrapper is what closes
   // `xargs -I{} gh pr merge {} < prs.txt`.
-  ["xargs", { valueFlags: new Set(["-I", "-i", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "--replace", "--max-args", "--max-procs", "--delimiter", "--eof", "--max-lines", "--max-chars", "--arg-file"]), positionals: 0 }],
+  ["xargs", makeWrapper(["-I", "-i", "-n", "-P", "-d", "-E", "-L", "-s", "-a", "--replace", "--max-args", "--max-procs", "--delimiter", "--eof", "--max-lines", "--max-chars", "--arg-file"])],
 ]);
 
 // Shells: `sh -c "<program>"` re-parses its argument, and `sh <file>` makes the
@@ -212,6 +222,9 @@ function tokenize(src) {
   };
   const pushOp = (value) => {
     flush();
+    // A redirect target cannot cross a separator, so a pending drop must not
+    // either — otherwise `cmd >; cmd2` would swallow `cmd2` in silence.
+    dropWords = 0;
     tokens.push({ type: "op", value });
   };
 
@@ -445,9 +458,54 @@ function splitSegments(tokens, splitNewlines) {
   return segments;
 }
 
-/** Skip leading `VAR=value` assignments and wrappers. Returns the index of the
- *  effective command word, or -1 if the segment has none. */
-function findCommandIndex(words) {
+/**
+ * Is `words[i]` one of this wrapper's PAYLOAD flags — a flag whose value is a
+ * shell program rather than a plain value? GNU `env -S 'gh pr merge 123'` is
+ * the one that matters: env splits the string and runs it.
+ *
+ * Returns a `{ kind: "payload", word }` slot, or null. Handles all three
+ * spellings: `-S STR`, `-SSTR`, `--split-string=STR`.
+ */
+function readPayloadFlag(wrapper, words, i) {
+  const word = words[i];
+  const flag = word.value;
+  for (const pf of wrapper.payloadFlags) {
+    if (flag === pf) {
+      const next = words[i + 1];
+      // `env -S` with nothing after it runs nothing — fall through to the
+      // ordinary flag walk rather than inventing an empty payload.
+      return next ? { kind: "payload", word: next } : null;
+    }
+    const attached = pf.startsWith("--")
+      ? flag.startsWith(`${pf}=`) && flag.slice(pf.length + 1)
+      : flag.length > pf.length && flag.startsWith(pf) && flag.slice(pf.length);
+    if (attached) {
+      return {
+        kind: "payload",
+        word: { value: attached, dynamic: word.dynamic, subs: [] },
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve a segment's command slot past leading `VAR=value` assignments and
+ * wrappers. Returns one of:
+ *   { kind: "command", index }  – words[index] is the effective command
+ *   { kind: "payload", word }   – word.value is a shell program to re-parse
+ *   { kind: "none" }            – the segment is assignments-only (or empty),
+ *                                 which is a real "no command", not a failure
+ *
+ * There is deliberately NO "gave up" result. A wrapper that consumes the whole
+ * segment (`sudo -l`, `env`, `timeout 30`) resolves to the WRAPPER itself,
+ * because that is what actually runs. An earlier revision returned -1 there and
+ * `resolveSegment` dropped the segment in silence — which is how
+ * `env -S 'gh pr merge 123'` slipped past the merge guard: `-S` was modelled as
+ * an ordinary value flag, the scan ate the payload, and the segment vanished.
+ * A guard cannot pick a safe posture on a signal it never receives.
+ */
+function resolveCommandSlot(words) {
   let i = 0;
   while (i < words.length) {
     const w = words[i];
@@ -456,8 +514,9 @@ function findCommandIndex(words) {
       continue;
     }
     const wrapper = WRAPPERS.get(path.basename(w.value));
-    if (!wrapper) return i;
+    if (!wrapper) return { kind: "command", index: i };
 
+    const wrapperIdx = i;
     i++;
     // Skip the wrapper's own flags (and the values they consume).
     while (i < words.length && words[i].value.startsWith("-")) {
@@ -466,6 +525,9 @@ function findCommandIndex(words) {
         i++;
         break;
       }
+      const payload = readPayloadFlag(wrapper, words, i);
+      if (payload) return payload;
+
       // The value may already be attached — `--max-args=3`, `-I{}`, `-n1`.
       // Only a bare flag consumes the following token.
       const hasEquals = flag.includes("=");
@@ -477,8 +539,11 @@ function findCommandIndex(words) {
     }
     // Skip the wrapper's own positional arguments (`timeout 30 cmd`).
     for (let p = 0; p < wrapper.positionals && i < words.length; p++) i++;
+
+    // Nothing left after the wrapper — the wrapper IS the command.
+    if (i >= words.length) return { kind: "command", index: wrapperIdx };
   }
-  return -1;
+  return { kind: "none" };
 }
 
 /** Best-effort human-readable text for an unresolvable report. A word that is
@@ -503,11 +568,27 @@ function resolveSegment(words, out, depth, options) {
     }
   }
 
-  const cmdIdx = findCommandIndex(words);
-  if (cmdIdx === -1) return;
+  const slot = resolveCommandSlot(words);
 
-  const cmdWord = words[cmdIdx];
-  const argWords = words.slice(cmdIdx + 1);
+  // `env -S '<program>'` — GNU env splits the string and runs it.
+  if (slot.kind === "payload") {
+    if (slot.word.dynamic) {
+      out.unresolvable.push({
+        reason: "split-string-dynamic",
+        text: describeWords(words),
+      });
+      return;
+    }
+    resolveInto(slot.word.value, out, depth + 1, options);
+    return;
+  }
+
+  // Assignments-only segment (`FOO=bar; …`). A real "no command", not a
+  // parse failure — nothing to report.
+  if (slot.kind === "none") return;
+
+  const cmdWord = words[slot.index];
+  const argWords = words.slice(slot.index + 1);
 
   // The command slot itself is a substitution/variable → we cannot know what
   // runs. `$(pick-tool) pr merge 1`, `$CMD --squash`.
@@ -516,6 +597,25 @@ function resolveSegment(words, out, depth, options) {
       reason: "substituted-command",
       text: describeWords(words),
     });
+    return;
+  }
+
+  // A command slot containing whitespace is not a single binary. Either the
+  // shell fails to find it, or something we did not model splits it (a wrapper
+  // flag cluster like `env -iS 'gh pr merge 1'`). Report it AND re-parse it:
+  // a hard-boundary guard gets the signal, a fail-open guard still gets real
+  // segments.
+  if (/\s/.test(cmdWord.value)) {
+    out.unresolvable.push({
+      reason: "split-string-command",
+      text: describeWords(words),
+    });
+    resolveInto(
+      [cmdWord.value, ...argWords.map((w) => w.value)].join(" "),
+      out,
+      depth + 1,
+      options
+    );
     return;
   }
 
@@ -592,7 +692,27 @@ function resolveInto(command, out, depth, options) {
     out.unresolvable.push({ reason: "unbalanced-quote", text: src });
   }
   for (const words of splitSegments(tokens, options.splitNewlines)) {
+    const segmentsBefore = out.segments.length;
+    const unresolvableBefore = out.unresolvable.length;
     resolveSegment(words, out, depth, options);
+
+    // BACKSTOP — the invariant this module owes its callers: a segment that
+    // contains a real (non-assignment) word must produce EITHER a segment or an
+    // `unresolvable`. Never silence. A guard can pick a safe posture on any
+    // signal, but not on the absence of one — silence is how the merge boundary
+    // was bypassable in the first place. This should be unreachable; it exists
+    // so a future edit that reintroduces a dead end degrades to "I cannot tell"
+    // instead of "nothing to see here".
+    if (
+      out.segments.length === segmentsBefore &&
+      out.unresolvable.length === unresolvableBefore &&
+      words.some((w) => !ENV_ASSIGN.test(w.value))
+    ) {
+      out.unresolvable.push({
+        reason: "no-effective-command",
+        text: describeWords(words),
+      });
+    }
   }
 }
 

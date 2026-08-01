@@ -298,6 +298,63 @@ describe("heredoc bodies are never parsed as commands", () => {
 });
 
 // ---------------------------------------------------------------------------
+// `env -S` (GNU split-string) and the silent-drop class it exposed.
+//
+// `-S` was first modelled as an ordinary value flag, so the wrapper scan ATE
+// the payload, the segment yielded no command, and `resolveSegment` returned in
+// silence — no segment AND no `unresolvable`. A hard-boundary guard reading
+// that as "not a merge" fails open, which is the exact failure mode this module
+// exists to remove.
+// ---------------------------------------------------------------------------
+describe("env -S / --split-string re-parses its payload", () => {
+  it.each([
+    "env -S 'gh pr merge 123'",
+    'env -S "gh pr merge 123"',
+    "env --split-string='gh pr merge 123'",
+    "env -S'gh pr merge 123'",
+    "env -i -S 'gh pr merge 123'",
+    "env -u FOO -S 'gh pr merge 123'",
+    "sudo env -S 'gh pr merge 123'",
+    "xargs env -S 'gh pr merge 123'",
+  ])("resolves %s to gh", (cmd) => {
+    expect(names(cmd)).toEqual(["gh"]);
+  });
+
+  it("reports a dynamic split-string payload instead of dropping it", () => {
+    const { segments, unresolvable } = resolveCommand('env -S "$PAYLOAD"');
+    expect(segments).toEqual([]);
+    expect(unresolvable.map((u) => u.reason)).toContain("split-string-dynamic");
+  });
+
+  it("handles an unmodelled flag cluster by resolving AND flagging it", () => {
+    // `-iS` is not modelled, so the payload lands in the command slot as a
+    // whitespace-containing token. Both outputs are produced on purpose: the
+    // real segment for fail-open guards, the signal for hard-boundary ones.
+    const { segments, unresolvable } = resolveCommand(
+      "env -iS 'gh pr merge 1'"
+    );
+    expect(segments.map((s) => s.name)).toContain("gh");
+    expect(unresolvable.map((u) => u.reason)).toContain("split-string-command");
+  });
+});
+
+describe("a wrapper that consumes the whole segment resolves to the wrapper", () => {
+  // The alternative — reporting these unresolvable — would make a hard-boundary
+  // guard fall back to a raw-text scan on ordinary commands, so `env | rg
+  // merge-pr.sh` would block. They are real invocations of the wrapper itself.
+  it.each([
+    ["env", "env"],
+    ["sudo -l", "sudo"],
+    ["xargs", "xargs"],
+    ["timeout 30", "timeout"],
+  ])("resolves %s to %s with no unresolvable", (cmd, expected) => {
+    const { segments, unresolvable } = resolveCommand(cmd);
+    expect(segments.map((s) => s.name)).toEqual([expected]);
+    expect(unresolvable).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Unresolvable — the signal every guard was missing
 // ---------------------------------------------------------------------------
 describe("unresolvable", () => {
@@ -349,5 +406,68 @@ describe("unresolvable", () => {
     const { segments, unresolvable } = resolveCommand("gh pr view $NUMBER");
     expect(segments.map((s) => s.name)).toEqual(["gh"]);
     expect(unresolvable).toEqual([]);
+  });
+
+  it("stays empty for an assignments-only segment (a real 'no command')", () => {
+    expect(resolveCommand("FOO=bar")).toEqual({
+      segments: [],
+      unresolvable: [],
+    });
+    const { segments, unresolvable } = resolveCommand(
+      "CMD='pr merge'; echo hi"
+    );
+    expect(segments.map((s) => s.name)).toEqual(["echo"]);
+    expect(unresolvable).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The backstop invariant
+// ---------------------------------------------------------------------------
+describe("no segment is ever dropped in silence", () => {
+  it.each([
+    "sh -c", // -c with no payload
+    "eval", // eval with no words
+    'sh -c ""', // empty payload
+  ])("reports %s rather than returning nothing", (cmd) => {
+    const { segments, unresolvable } = resolveCommand(cmd);
+    expect(
+      segments.length + unresolvable.length,
+      `${JSON.stringify(cmd)} produced neither a segment nor an unresolvable`
+    ).toBeGreaterThan(0);
+  });
+
+  it("holds across a broad sweep of wrapper and payload shapes", () => {
+    // The invariant, asserted directly: any command with a real (non-assignment)
+    // word must yield a segment or an unresolvable — never silence.
+    for (const cmd of [
+      "env -S 'gh pr merge 1'",
+      "env -S",
+      "env -u",
+      "sudo",
+      "sudo --",
+      "timeout",
+      "timeout 30",
+      "xargs -I",
+      "xargs -I{}",
+      "nice -n",
+      "stdbuf -o",
+      "bash -c",
+      "bash",
+      "command",
+      "$X",
+      "eval $X",
+      "cmd >; cmd2",
+    ]) {
+      const { segments, unresolvable } = resolveCommand(cmd);
+      expect(
+        segments.length + unresolvable.length,
+        `${JSON.stringify(cmd)} produced neither a segment nor an unresolvable`
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("does not let a redirect drop the command after a separator", () => {
+    expect(names("cmd >; cmd2")).toEqual(["cmd", "cmd2"]);
   });
 });
