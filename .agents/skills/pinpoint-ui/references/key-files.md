@@ -29,7 +29,7 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 
 | File                                            | What It Teaches                                                                     |
 | :---------------------------------------------- | :---------------------------------------------------------------------------------- |
-| `src/lib/issues/status.ts`                      | STATUS_CONFIG, STATUS_GROUPS, the status colour system. Single source of truth.     |
+| `src/lib/issues/status.ts`                      | STATUS_CONFIG, STATUS_GROUPS, the status color system. Single source of truth.      |
 | `src/components/issues/IssueFilters.tsx`        | Smart badge grouping, filter composition, MultiSelect usage, "More Filters" pattern |
 | `src/components/issues/fields/StatusSelect.tsx` | Grouped select with icons, STATUS_GROUP_LABELS, separator pattern                   |
 | `src/components/ui/multi-select.tsx`            | Grouped/flat modes, indeterminate group headers, selected-items-first sorting       |
@@ -70,5 +70,5 @@ Every authenticated page should compose `<MainLayout>` → `<PageContainer>` →
 
 - Status group labels: import `STATUS_GROUP_LABELS` from `src/lib/issues/status.ts`. Never hardcode the strings at a call site.
 - Quick-select labels for "current user" filters are **"Me"** (assignee — `src/components/issues/AssigneePicker.tsx`) and **"My machines"**. Reuse those exact strings rather than inventing "Mine" / "My games".
-  **"My machines" filters _issues_ by the machines the current user owns**, so it lives on the issues side: `src/lib/issues/filter-utils.ts` builds the quick-select item, `src/components/issues/IssueFilters.tsx` renders it. It is **not** in `MachineFilters.tsx`, which is the machines-list filter bar and has no owner-of-mine logic at all — a plausible-looking wrong turn, which is why it's called out.
+  **"My machines" filters _issues_ by the machines the current user owns**, so it lives on the issues side: `src/components/issues/IssueFilters.tsx` builds and renders the quick-select from an `ownedMachineInitials` prop, which `src/app/(app)/issues/page.tsx` resolves. It is **not** in `MachineFilters.tsx`, which is the machines-list filter bar and has no owner-of-mine logic at all — a plausible-looking wrong turn, which is why it's called out. Note that `getMachineQuickSelectOrdering` in `src/lib/issues/filter-utils.ts` also produces a "My machines" item and has tests, but nothing in production calls it (PP-nri8) — don't take it for the live path.
 - Status `wait_owner`: render `STATUS_CONFIG.wait_owner.label`, never the raw enum value. Mockups occasionally spell it "Wait Owner" — **the config wins over the mockup**, and this has been decided; don't relitigate it from a design file.

@@ -14,7 +14,7 @@ The decision worth carrying: **both halves are load-bearing.** An anchor pointin
 
 ### `inert` on background regions when a modal opens (CORE-A11Y-006)
 
-**This rule is intent, not current behaviour — and that is deliberate.** Nothing in `src/` sets `inert`; the rule is adopted and tracked as PP-kqbk.8 (`docs/NON_NEGOTIABLES.md`, CORE-A11Y-006) but not yet implemented. You cannot learn that from the code, because "not there yet" and "decided against" look identical in an empty search. So: don't file the absence as a bug, and don't write your own partial version — implement it once, on the background container, when the bead comes up.
+**This rule is intent, not current behavior — and that is deliberate.** Nothing in `src/` sets `inert`; the rule is adopted and tracked as PP-kqbk.8 (`docs/NON_NEGOTIABLES.md`, CORE-A11Y-006) but not yet implemented. You cannot learn that from the code, because "not there yet" and "decided against" look identical in an empty search. So: don't file the absence as a bug, and don't write your own partial version — implement it once, on the background container, when the bead comes up.
 
 The gap it closes: Radix applies `aria-hidden` + pointer-events to the rest of the DOM when a modal opens, which covers AT and mouse but leaves a small focus-leak window. `inert` removes a subtree from tab order, click handling, and the AT tree in one declarative step. It layers on top of Radix — one attribute on the background container, not a replacement for Radix's focus management.
 

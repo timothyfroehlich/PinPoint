@@ -53,7 +53,7 @@ Everything below lives one hop away in `references/`. Load the file you need.
 ## Color System
 
 - **Use semantic tokens** (`bg-primary`, `text-destructive`, `text-muted-foreground`, `border-success/40`). Raw Tailwind palette classes and hardcoded hex are **forbidden in component code**, enforced by ESLint (`better-tailwindcss/no-restricted-classes`). The token values live in the Tailwind v4 `@theme` block in `src/app/globals.css`; the rule and its two design-layer exceptions are `pinpoint-design-bible` §1.
-- Status / severity / priority / frequency colors come from the configs in `src/lib/issues/status.ts` — never freestyle a status colour at a call site.
+- Status / severity / priority / frequency colors come from the configs in `src/lib/issues/status.ts` — never freestyle a status color at a call site.
 - **PinPoint is dark-only.** `dark:` utility classes are dead code; remove them when you touch a file that still has them.
 - **The secondary is teal, and purple is not in the palette** — a purple/fuchsia secondary was removed deliberately (PR #1204) so primary and secondary read as one green-family pairing rather than two competing brands. Do not reintroduce it.
 - For the full visual identity (surface hierarchy, glow rules, accessibility constraints) see `pinpoint-design-bible` §1–§2.
