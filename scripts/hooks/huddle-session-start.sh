@@ -215,17 +215,23 @@ fi
 SESSION_ID=""
 SOURCE=""
 if [[ -n "$INPUT" ]]; then
-  # The two fields are joined on STX (\x02) and split with IFS=STX, matching
-  # huddle-pr-announce.sh. The separator must be a NON-whitespace byte: bash
-  # treats space/tab/newline as "IFS whitespace" even when IFS names only one of
-  # them, which means leading separators are skipped and runs collapse. That is
-  # exactly how PP-txet bit — the fields were space-joined and read with the
-  # default IFS, so `{"session_id": "", "source": "startup"}` produced
-  # " startup" and parsed as SESSION_ID=startup, SOURCE="". The empty-session_id
-  # guard below never fired, the hook announced `startup` as the session id, and
-  # the compact check further down compared against an emptied SOURCE.
-  # A tab separator would NOT have fixed this; STX splits into a genuine empty
-  # leading field.
+  # The two fields are joined on STX (\x02) and split with IFS=STX — the same
+  # separator convention huddle-pr-announce.sh uses, and for the same reason.
+  # It must be a NON-whitespace byte: bash treats space/tab/newline as "IFS
+  # whitespace" even when IFS names only one of them, which means leading
+  # separators are skipped and runs collapse. That is exactly how PP-txet bit —
+  # the fields were space-joined and read with the default IFS, so
+  # `{"session_id": "", "source": "startup"}` produced " startup" and parsed as
+  # SESSION_ID=startup, SOURCE="". The empty-session_id guard below never fired,
+  # the hook announced `startup` as the session id, and the compact check
+  # further down compared against an emptied SOURCE. A tab separator would NOT
+  # have fixed this; STX splits into a genuine empty leading field.
+  #
+  # str() + strip() on the python side keep a non-string or whitespace-only
+  # field from reading as a truthy session_id.
+  #
+  # The IFS prefix assignment does not persist — `read` is a regular builtin —
+  # so the daily-injection loop further down still gets the default IFS.
   _SEP=$(printf '\002')
   # python3 failure is handled by the read's `|| { … }` fallback; ignore masked return.
   # shellcheck disable=SC2312
