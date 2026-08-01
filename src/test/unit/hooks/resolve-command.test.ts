@@ -248,6 +248,28 @@ describe("heredoc bodies are never parsed as commands", () => {
     ).toEqual(["cat"]);
   });
 
+  it("requires an EXACT terminator — an indented EOF is still body", () => {
+    // Trimming before comparing would end the body here and parse the rest of
+    // it as real commands.
+    expect(
+      names(
+        ["cat <<EOF", "  EOF", "gh pr merge 1", "EOF", "echo done"].join("\n")
+      )
+    ).toEqual(["cat", "echo"]);
+  });
+
+  it("does not accept a terminator with trailing spaces", () => {
+    expect(
+      names(["cat <<EOF", "EOF  ", "gh pr merge 1", "EOF"].join("\n"))
+    ).toEqual(["cat"]);
+  });
+
+  it("accepts a CRLF terminator line", () => {
+    expect(
+      names(["cat <<EOF", "body", "EOF", "echo done"].join("\r\n"))
+    ).toEqual(["cat", "echo"]);
+  });
+
   it("resumes parsing after the heredoc terminator", () => {
     expect(
       names(["cat <<EOF", "body line", "EOF", "gh pr merge 1"].join("\n"))

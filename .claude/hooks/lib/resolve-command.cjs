@@ -43,9 +43,10 @@
  *
  * KNOWN LIMITATIONS (all fail toward `unresolvable`, never toward a silent
  * "not a match"):
- *   - ANSI-C quoting (`$'it\'s'`) is read as a plain single-quoted span, so the
- *     backslash-escaped quote reads as unbalanced. The command would not run in
- *     bash either; it is reported unresolvable rather than mis-parsed.
+ *   - ANSI-C quoting (`$'it\'s'`) is not supported. It is valid bash, but this
+ *     reads it as a plain single-quoted span, where the backslash-escaped quote
+ *     looks unbalanced — so a valid command using it is reported `unresolvable`
+ *     rather than resolved.
  *   - `find -exec cmd \;` and `watch cmd` are not treated as wrappers, so the
  *     inner command is seen as arguments.
  *   - Only ONE `-c` payload per shell invocation is followed.
@@ -214,7 +215,12 @@ function tokenize(src) {
     tokens.push({ type: "op", value });
   };
 
-  /** Consume heredoc bodies queued by `<<TAG` operators on the line just ended. */
+  /** Consume heredoc bodies queued by `<<TAG` operators on the line just ended.
+   *
+   *  The terminator must match the tag EXACTLY, as bash requires — only `<<-`
+   *  allows leading tabs, and nothing allows surrounding spaces. Accepting a
+   *  trimmed match would end the body early on an indented `EOF` inside it, and
+   *  the remaining body lines would then be parsed as real commands. */
   const consumeHeredocs = (from) => {
     let i = from;
     while (pendingHeredocs.length > 0) {
@@ -222,9 +228,13 @@ function tokenize(src) {
       for (;;) {
         const nl = src.indexOf("\n", i);
         const line = nl === -1 ? src.slice(i) : src.slice(i, nl);
-        const cmp = stripTabs ? line.replace(/^\t+/, "") : line;
+        // Tolerate CRLF input; that is a line ending, not body content.
+        const cmp = (stripTabs ? line.replace(/^\t+/, "") : line).replace(
+          /\r$/,
+          ""
+        );
         i = nl === -1 ? src.length : nl + 1;
-        if (cmp.trim() === tag || nl === -1) break;
+        if (cmp === tag || nl === -1) break;
       }
     }
     return i;
