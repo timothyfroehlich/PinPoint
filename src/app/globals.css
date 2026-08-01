@@ -27,6 +27,17 @@
   --color-accent-foreground: #f8fafc;
   --color-destructive: #dc2626; /* red-600 — white on red-500 failed AA (~3.8:1); red-600 passes (~5.3:1) */
   --color-destructive-foreground: #ffffff;
+  /* Red used as TEXT on a dark surface — the inverse of the pair above, and a
+     genuinely different constraint. The 5.3:1 noted above is white-on-red for
+     FILLED controls; nobody had checked red-on-background, and #dc2626 there is
+     only 3.96:1 against #0f0f11 — under AA's 4.5:1 for normal text. red-500 is
+     5.09:1 and reads as more alarming than the lighter reds, which start
+     washing toward pink on a dark surface.
+     Use `text-destructive-text` for destructive TEXT (outline buttons, error
+     copy, required-field markers); keep `bg-destructive` + `text-destructive-foreground`
+     for filled controls. Caught by the axe pass in responsive-overflow.spec.ts
+     on the machine Manage tab (PP-o355.19). */
+  --color-destructive-text: #ef4444; /* red-500 — 5.09:1 on --color-background */
 
   /* Status Specific */
   --color-status-new: #4ade80;
