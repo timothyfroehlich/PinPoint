@@ -40,7 +40,7 @@
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
-6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **Merging is human-only, via ANY path** — never `gh pr merge`, never MCP `merge_pull_request`, and never `scripts/workflow/merge-pr.sh` (even though it enforces the merge gates, running it is still an agent merge). An agent's terminal state on a PR is: ready-for-review, CI green, reviews resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`. (PP-wi85.)
+6. **Never `--no-verify`**, never wildcard tool permissions — without explicit user approval each time. **Merging is human-only, via ANY path** — never `gh pr merge`, never MCP `merge_pull_request`, and never `scripts/workflow/merge-pr.sh` (even though it enforces the merge gates, running it is still an agent merge). An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (see §5 "Review requests"), reviews resolved, screenshots posted if UI-touching, then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`. (PP-wi85.)
 7. **Beads: `team-maintainer` policy** (not the conservative default).
 
 ## 3. Agent Skills
@@ -142,6 +142,18 @@ Always try local first — seconds vs minutes, full devtools. If a single-test r
 ### Migration conflicts
 
 Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like schema snapshots; manual edits corrupt the prevId chain. Full regenerate-don't-edit protocol: `pinpoint-deployment` skill.
+
+### Review requests
+
+**Copilot review is request-only as of 2026-08-01 — with one exception: you get a single automatic review at PR-open, against open-time head.** Nothing else asks: not an intermediate push, not the `ready-for-review` label, not green CI. The merge bar is unchanged — a PR still needs a review covering its **head commit** (Copilot, or a SHA-pinned Claude marker) with threads resolved. Only the timing changed, so an agent churning through CI failures and fixups doesn't spend a review on each intermediate push.
+
+So **finish your churn before opening the PR** where you can; the free open-time review then covers head and you spend nothing extra. If you do push after opening, that review is stale and nothing re-requests — finish all of it, then ask once:
+
+```bash
+gh pr edit <PR> --add-reviewer "@copilot"
+```
+
+Judge a review by comparing its `commit_id` to head, never by which event produced it: the automatic one counts when it covers head, and any review is worthless once you push past it. `mark-claude-review.sh` is the fallback for a request Copilot didn't answer, not a way to skip asking. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Review comments
 

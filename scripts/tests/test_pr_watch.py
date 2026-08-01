@@ -1,16 +1,23 @@
 """Regression tests for scripts/workflow/pr-watch.py.
 
-Cancellation handling (PP-r63o) — two bugs:
+Three false-alarm bugs are covered — all of the same family: the watcher
+reporting a failure for something that was not one.
 
 1. A `cancelled` run was classified as a failure — cancellation is routine
    (a newer commit cancels the in-flight run via concurrency groups, and the
    Preview Auto-Resync workflow cancels itself), so a normal push-twice cycle
    emitted a spurious "✗ CI — failed" plus a failure artifact whose log body
-   read "(no log available)".
+   read "(no log available)". (PP-r63o)
 2. The completed-runs scan and the CI Gate pre-check must only consider the
    CURRENT head SHA, so a stale cancelled run from an older commit — or a
    superseded CI Gate check left behind at the same commit — can't hard-exit
    the watcher. `--force` was the workaround; it should no longer be needed.
+   (PP-r63o)
+3. A failed `gh run view` (rate-limit 403, network drop, auth failure) was
+   swallowed into ("", ""), which is neither queued nor passing nor superseded
+   and so landed in the fail-safe branch: "✗ CI — failed" plus an artifact, for
+   a healthy run whose jobs were all still pending. "We could not find out" is
+   not a verdict. (PP-qkl8)
 
 Review-request state (PP-lzaw): Copilot review is request-only on this repo, so
 `--check-ready` has to say WHICH review state a PR is in. "Nobody asked",
@@ -49,6 +56,12 @@ HEAD_SHA = "1c33d34bb30884376eaf066f0024551df5c58368"
 OLD_SHA = "3ab14b1f0000000000000000000000000000aaaa"
 BRANCH = "feat/example-branch"
 PR = 1734
+
+# The stderr `gh` produced on 2026-07-26 when the shared user-level quota ran
+# out mid-watch on PR #1748 — the live evidence behind PP-qkl8. The real message
+# named the account whose quota it was; the numeric id is dropped here because
+# nothing under test reads it.
+RATE_LIMIT_403 = "HTTP 403: API rate limit exceeded for user ID"
 
 
 def _gate(conclusion: str, status: str = "COMPLETED", completed_at: str = "") -> dict:
@@ -258,12 +271,18 @@ def test_watch_run_cancelled_records_no_failure(monkeypatch, stub_run_watch, cap
     )
 
     failures: list[int] = []
+    undetermined: list[tuple[str, str]] = []
     pr_watch.watch_run(
-        30133783967, "Preview Auto-Resync", pr_watch.threading.Event(), failures
+        30133783967,
+        "Preview Auto-Resync",
+        pr_watch.threading.Event(),
+        failures,
+        undetermined,
     )
 
     out = capsys.readouterr().out
     assert failures == []
+    assert undetermined == []
     assert "superseded" in out
     assert "failed" not in out
 
@@ -275,10 +294,184 @@ def test_watch_run_failure_still_records_failure(monkeypatch, stub_run_watch, ca
     )
 
     failures: list[int] = []
-    pr_watch.watch_run(999, "CI", pr_watch.threading.Event(), failures)
+    undetermined: list[tuple[str, str]] = []
+    pr_watch.watch_run(999, "CI", pr_watch.threading.Event(), failures, undetermined)
 
     assert failures == [999]
+    assert undetermined == []
     assert "✗  CI — failed" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# _run_conclusion — a failed gh call is "unknown", not "no conclusion" (PP-qkl8)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def no_backoff(monkeypatch):
+    """Collapse the retry backoff so tests don't actually wait."""
+    monkeypatch.setattr(pr_watch, "RUN_STATE_BACKOFF", 0)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "stderr",
+    [
+        RATE_LIMIT_403,
+        "dial tcp: lookup api.github.com: no such host",
+        "HTTP 401: Bad credentials",
+    ],
+)
+def test_run_conclusion_raises_when_gh_fails(monkeypatch, stderr):
+    """Rate limit, network, auth — every gh failure is an unknown, not a state."""
+
+    def boom(*_args: str) -> str:
+        raise RuntimeError(stderr)
+
+    monkeypatch.setattr(pr_watch, "gh", boom)
+    with pytest.raises(pr_watch.RunStateUnavailable, match=stderr[:20]):
+        pr_watch._run_conclusion(30184323661)
+
+
+@pytest.mark.unit
+def test_run_conclusion_quotes_unparseable_output(monkeypatch):
+    """ "Expecting value: line 1 column 1" alone is unactionable — show the body."""
+    monkeypatch.setattr(pr_watch, "gh", lambda *_a: "<html>rate limited</html>")
+    with pytest.raises(pr_watch.RunStateUnavailable, match="rate limited"):
+        pr_watch._run_conclusion(30184323661)
+
+
+@pytest.mark.unit
+def test_run_conclusion_normalises_null_fields(monkeypatch):
+    """`conclusion` is null on a run that hasn't finished — return "", not None."""
+    monkeypatch.setattr(
+        pr_watch, "gh", lambda *_a: json.dumps({"status": "in_progress"})
+    )
+    assert pr_watch._run_conclusion(30184323661) == ("in_progress", "")
+
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        lambda *_a: json.dumps({"status": "in_progress", "conclusion": None}),
+    )
+    assert pr_watch._run_conclusion(30184323661) == ("in_progress", "")
+
+
+@pytest.mark.unit
+def test_run_conclusion_retrying_is_bounded(monkeypatch, no_backoff):
+    """A persistently unreachable API must terminate, not spin forever."""
+    attempts: list[int] = []
+
+    def boom(*_args: str) -> str:
+        attempts.append(1)
+        raise RuntimeError(RATE_LIMIT_403)
+
+    monkeypatch.setattr(pr_watch, "gh", boom)
+    with pytest.raises(pr_watch.RunStateUnavailable, match="rate limit exceeded"):
+        pr_watch._run_conclusion_retrying(30184323661, "CI", pr_watch.threading.Event())
+    assert len(attempts) == pr_watch.RUN_STATE_ATTEMPTS
+
+
+@pytest.mark.unit
+def test_run_conclusion_retrying_recovers_after_a_blip(monkeypatch, no_backoff):
+    calls: list[int] = []
+
+    def flaky(*_args: str) -> str:
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError(RATE_LIMIT_403)
+        return json.dumps({"status": "completed", "conclusion": "success"})
+
+    monkeypatch.setattr(pr_watch, "gh", flaky)
+    assert pr_watch._run_conclusion_retrying(
+        30184323661, "CI", pr_watch.threading.Event()
+    ) == ("completed", "success")
+    assert len(calls) == 2
+
+
+@pytest.mark.unit
+def test_run_conclusion_retrying_stops_when_asked_to_stop(monkeypatch, no_backoff):
+    """A stop request (watch_reviews saw a new Copilot review) ends the retries."""
+    attempts: list[int] = []
+
+    def boom(*_args: str) -> str:
+        attempts.append(1)
+        raise RuntimeError(RATE_LIMIT_403)
+
+    monkeypatch.setattr(pr_watch, "gh", boom)
+    stop = pr_watch.threading.Event()
+    stop.set()
+    with pytest.raises(pr_watch.RunStateUnavailable):
+        pr_watch._run_conclusion_retrying(30184323661, "CI", stop)
+    assert len(attempts) == 1
+
+
+# ---------------------------------------------------------------------------
+# watch_run — an unreachable API is recorded as undetermined, never a failure
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_watch_run_rate_limit_403_is_not_a_failure(
+    monkeypatch, stub_run_watch, no_backoff, capsys
+):
+    """The PR #1748 shape: gh 403s while every job in the run is still pending.
+
+    Before PP-qkl8 this emitted "✗ CI — failed" and wrote
+    tmp/gh-monitor/failure-30184323661.md for a healthy run.
+    """
+
+    def boom(*_args: str) -> str:
+        raise RuntimeError(RATE_LIMIT_403)
+
+    monkeypatch.setattr(pr_watch, "gh", boom)
+    monkeypatch.setattr(
+        pr_watch,
+        "write_failure_artifact",
+        lambda _id: pytest.fail("no artifact should be written when gh itself failed"),
+    )
+
+    failures: list[int] = []
+    undetermined: list[tuple[str, str]] = []
+    pr_watch.watch_run(
+        30184323661, "CI", pr_watch.threading.Event(), failures, undetermined
+    )
+
+    out = capsys.readouterr().out
+    assert failures == []
+    assert undetermined == [("CI", RATE_LIMIT_403)]
+    assert "failed" not in out
+    assert RATE_LIMIT_403 in out  # the message names the real cause
+
+
+@pytest.mark.unit
+def test_watch_run_silent_when_stopped_mid_outage(
+    monkeypatch, stub_run_watch, no_backoff, capsys
+):
+    """A stop mid-outage is a shutdown, not a verdict — record nothing, say nothing.
+
+    watch_reviews sets `stop` when a new Copilot review lands, which can happen
+    while a retry is in flight. Reporting "could not determine" then would be
+    noise about a watch we deliberately ended.
+    """
+    stop = pr_watch.threading.Event()
+    calls: list[int] = []
+
+    def boom(*_args: str) -> str:
+        calls.append(1)
+        if len(calls) == 2:
+            stop.set()
+        raise RuntimeError(RATE_LIMIT_403)
+
+    monkeypatch.setattr(pr_watch, "gh", boom)
+
+    failures: list[int] = []
+    undetermined: list[tuple[str, str]] = []
+    pr_watch.watch_run(30184323661, "CI", stop, failures, undetermined)
+
+    assert failures == []
+    assert undetermined == []
+    assert "could not determine" not in capsys.readouterr().out.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -521,6 +714,67 @@ def test_main_announces_a_superseded_run_only_once(
     assert pr_watch.main() == 0
     out = capsys.readouterr().out
     assert out.count("Preview Auto-Resync — superseded (cancelled)") == 1
+
+
+@pytest.mark.unit
+def test_main_reports_undetermined_runs_as_unknown_not_failure(
+    monkeypatch, stub_watch_loop, capsys
+):
+    """An unreadable run exits 2 with the cause — not 1 with "failure(s) detected".
+
+    CI Gate is deliberately not consulted: the same API is down, and under a
+    rate-limit 403 every extra call digs the shared quota deeper.
+    """
+    runs = [_run(30184323661, "in_progress", "", "CI")]
+    monkeypatch.setattr(
+        pr_watch, "gh", make_gh(runs=runs, rollup=[_gate("", status="IN_PROGRESS")])
+    )
+    monkeypatch.setattr(
+        pr_watch,
+        "watch_run",
+        lambda _id, name, _stop, _failures, undetermined: undetermined.append(
+            (name, RATE_LIMIT_403)
+        ),
+    )
+    monkeypatch.setattr(
+        pr_watch,
+        "_finalize_via_ci_gate",
+        lambda *_a, **_k: pytest.fail("CI Gate must not be polled while gh is down"),
+    )
+
+    assert pr_watch.main() == pr_watch.EXIT_UNDETERMINED
+    out = capsys.readouterr().out
+    assert "Could not determine the outcome of CI" in out
+    assert RATE_LIMIT_403 in out
+    assert "failure(s) detected" not in out
+    assert "failed" not in out
+
+
+@pytest.mark.unit
+def test_main_prefers_a_real_failure_over_an_undetermined_run(
+    monkeypatch, stub_watch_loop, capsys
+):
+    """One run unreadable, another observed failing — report the failure."""
+    runs = [
+        _run(30184323661, "in_progress", "", "CI"),
+        _run(30184323662, "in_progress", "", "E2E"),
+    ]
+    monkeypatch.setattr(
+        pr_watch, "gh", make_gh(runs=runs, rollup=[_gate("", status="IN_PROGRESS")])
+    )
+
+    def fake_watch(run_id, name, _stop, failures, undetermined):
+        if name == "CI":
+            undetermined.append((name, RATE_LIMIT_403))
+        else:
+            failures.append(run_id)
+
+    monkeypatch.setattr(pr_watch, "watch_run", fake_watch)
+
+    assert pr_watch.main() == 1
+    out = capsys.readouterr().out
+    assert "1 failure(s) detected" in out
+    assert "failure-30184323662.md" in out
 
 
 # ---------------------------------------------------------------------------

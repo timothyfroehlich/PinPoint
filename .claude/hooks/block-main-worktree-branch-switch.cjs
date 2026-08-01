@@ -17,6 +17,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
+const { resolveCommand } = require("./lib/resolve-command.cjs");
 
 // --- Pure classifier (unit-testable without git) -----------------------------
 // Decide whether a shell command string should be BLOCKED because it switches
@@ -30,45 +31,26 @@ const { execFileSync } = require("node:child_process");
 //   - Otherwise BLOCK: `git checkout <other-branch>`, `git switch <other-branch>`,
 //     `git checkout -b|-B <name>`, `git switch -c|-C|--create <name>`,
 //     `git checkout -`, `git switch -`.
+//
+// Command resolution — "is this segment actually a `git` invocation?" — is
+// delegated to lib/resolve-command.cjs (PP-6t3c). That shared primitive is what
+// keeps `echo git checkout x` / `rg 'git checkout'` from reading as git, while
+// wrapper and quoting shapes this hook's own tokenizer used to fold on
+// (`sudo -u root git checkout x`, `eval "git checkout x"`, `sh -c "git switch x"`)
+// now resolve correctly.
+//
+// POSTURE ON `unresolvable`: FAIL OPEN, consistent with every other ambiguous
+// case in this hook (non-git commands, git errors, linked worktrees all ALLOW).
+// This guard has a documented single-use bypass sentinel and only fires in the
+// main worktree, so over-blocking costs more here than the residual risk of a
+// dynamically-constructed `git checkout` in the root checkout.
 function classifyCommand(command) {
-  const cmd = String(command || "");
-  // Split on shell separators: && || ; |
-  const segments = cmd.split(/&&|\|\||;|\|/);
+  const { segments } = resolveCommand(String(command || ""));
 
-  for (const rawSegment of segments) {
-    const segment = rawSegment.trim();
-    if (!segment) continue;
+  for (const segment of segments) {
+    if (segment.name !== "git") continue;
 
-    // Tokenize on whitespace. Good enough for the flag/branch checks below.
-    const tokens = segment.split(/\s+/).filter(Boolean);
-
-    // Resolve the effective command of the segment by skipping:
-    //   (a) leading environment-assignment tokens (VAR=value, VAR+=value, etc.)
-    //   (b) leading wrapper commands that do not consume the command slot
-    //       themselves: sudo, env, command, time, nice.
-    // Only if the resulting resolved command token is exactly "git" does this
-    // segment count as a git invocation. Anything else (e.g. `echo git checkout`,
-    // `rg git checkout`) is NOT a git invocation → skip to the next segment.
-    //
-    // Fail-open on wrappers-with-flags: if a wrapper is followed by its own flags
-    // (e.g. `sudo -u root git checkout`) before `git`, we stop scanning wrappers
-    // the moment we see a flag-like token, so the segment ALLOWS (the resolved
-    // command would be the flag, not `git`). This is intentionally conservative.
-    const WRAPPERS = new Set(["sudo", "env", "command", "time", "nice"]);
-    const ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*[+:]?=/;
-
-    let cmdIdx = -1;
-    for (let i = 0; i < tokens.length; i++) {
-      const t = tokens[i];
-      if (ENV_ASSIGN.test(t)) continue; // skip VAR=value
-      if (WRAPPERS.has(t)) continue;    // skip wrapper command itself
-      cmdIdx = i;
-      break;
-    }
-    if (cmdIdx === -1 || tokens[cmdIdx] !== "git") continue;
-
-    // From here, `tokens[cmdIdx]` is exactly `git`.
-    const gitIdx = cmdIdx;
+    const tokens = segment.args;
 
     // Git global options that consume the NEXT token as their value
     // (e.g. `git -C path checkout`, `git --git-dir=... ` uses `=` so is self-contained).
@@ -85,7 +67,7 @@ function classifyCommand(command) {
 
     let subIdx = -1;
     let sub = "";
-    for (let i = gitIdx + 1; i < tokens.length; i++) {
+    for (let i = 0; i < tokens.length; i++) {
       const t = tokens[i];
       if (t === "checkout" || t === "switch") {
         subIdx = i;
@@ -156,19 +138,13 @@ function classifyCommand(command) {
       continue;
     }
 
-    // Strip a single pair of surrounding matching quotes so `git checkout "main"`
-    // / `git checkout 'main'` compare equal to `main` and ALLOW.
-    const unquoted =
-      (target.startsWith('"') && target.endsWith('"')) ||
-      (target.startsWith("'") && target.endsWith("'"))
-        ? target.slice(1, -1)
-        : target;
-
-    if (unquoted === "main") {
+    // Quotes are already stripped by the shared tokenizer, so `git checkout "main"`
+    // and `git checkout 'main'` both arrive here as `main` and ALLOW.
+    if (target === "main") {
       continue; // ALLOW switching to main.
     }
 
-    return { block: true, detail: `git ${sub} ${unquoted}` };
+    return { block: true, detail: `git ${sub} ${target}` };
   }
 
   return { block: false, detail: "" };

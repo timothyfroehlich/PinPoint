@@ -17,6 +17,8 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 | `pr-dashboard.sh [PR...]` | Status table: CI checks, merge state, draft state. All open PRs if no args.                                                                 |
 | `pr-watch.py <PR>`        | Stream CI run events. One timestamped line per event. Use with the Claude Code Monitor tool. Writes failure artifacts to `tmp/gh-monitor/`. |
 
+`pr-watch.py` exit codes: **0** passed (or stopped for a new Copilot review), **1** a run or the CI Gate actually failed, **2** the outcome could not be determined — the GitHub API was unreachable (rate-limit 403, network drop, auth failure), so nothing was observed. Exit 2 is not a red CI: re-run the watch once the API is back rather than hunting for a broken test. (PP-qkl8)
+
 ### UI Screenshots
 
 | Script                                                   | Purpose                                                                                                                                                                                                                                                     |
@@ -43,6 +45,10 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 | `no_conflict` | PR is MERGEABLE (never bypassable — GitHub rejects conflicting merges)                                                                                             | `none`      |
 
 A Copilot review whose body says it could not review (quota limit, nothing to analyze) is **not** counted as a review by either review-state gate — it carries a real login and timestamp, so counting it made both gates green on a review that read nothing (PP-jw0s).
+
+**Since 2026-08-01 only the PR-open review fires automatically; a push past it needs an explicit `gh pr edit <PR> --add-reviewer "@copilot"`.** Both 600s timers above are still measured from the head push, so a PR awaiting a re-request nobody made waits out `currency` for a review that is never coming, then lands on a `reviewed` FAIL. Read that FAIL as "nobody re-requested," not as "post a Claude marker" — the marker is the fallback for a request Copilot didn't answer.
+
+Note also that both gates compare review **timestamps** against the head commit date, not `commit_id`. A review submitted after a later push but which actually read an earlier tree therefore reads as covering head — observed on #1784. PP-lzaw re-keys the timers to the request, splits "never requested" from "requested, still waiting" into distinct reported states, and should switch the coverage test to `commit_id`.
 
 ## Status Token Vocabulary
 

@@ -39,10 +39,17 @@ Cancelled runs are neither a pass nor a failure — they are reported as
 here: pushing a second commit cancels the in-flight run via concurrency groups,
 and the Preview Auto-Resync workflow cancels itself the same way. (PP-r63o)
 
+A gh API error while probing a run (rate-limit 403, network drop, auth failure)
+is likewise not a failure — it means we could not find out. Those probes are
+retried with bounded backoff and, if the API stays unreachable, reported as
+"could not determine" (⚠) with the real cause, never as "✗ failed". (PP-qkl8)
+
 Exit 0: all checks passed, or stopped for new Copilot review,
         or (with --check-ready) the PR is ready for human review.
 Exit 1: one or more checks failed, no matching runs found,
         or (with --check-ready) the PR is not ready.
+Exit 2: the outcome could not be determined — the GitHub API was unreachable.
+        Nothing was observed, so this is neither a pass nor a failure.
 """
 
 from __future__ import annotations
@@ -103,6 +110,17 @@ LOG_DIR = "tmp/gh-monitor"
 # back cancelled. A cancel almost always means a newer run is already queued;
 # this bounds the wait so a genuinely abandoned run still terminates.
 SUPERSEDED_GATE_GRACE = 180  # seconds
+
+# How many times to re-probe a run's state when the gh call itself fails, and
+# the first backoff (doubling each attempt: 5s, 10s, 20s → ~35s total). The
+# retry is there to ride out a blip; a user-level rate limit resets on the hour,
+# so retrying past this is pointless — better to stop and say why. (PP-qkl8)
+RUN_STATE_ATTEMPTS = 4
+RUN_STATE_BACKOFF = 5  # seconds
+
+# Exit code for "we could not find out" — distinct from 1 ("it failed") so a
+# caller can tell an unobserved outcome from an observed bad one. (PP-qkl8)
+EXIT_UNDETERMINED = 2
 
 _lock = threading.Lock()
 
@@ -577,13 +595,61 @@ def run_audit(pr: int) -> bool:
 # ---------------------------------------------------------------------------
 
 
+class RunStateUnavailable(RuntimeError):
+    """The GitHub API could not be reached to determine a run's state.
+
+    Distinct from "the run reported a bad conclusion". Before PP-qkl8 the two
+    were collapsed: a failed `gh run view` returned ("", ""), which fell through
+    to the fail-safe branch and emitted "✗ — failed" plus a failure artifact for
+    a run that was, in the observed case, perfectly healthy and still pending.
+    """
+
+
 def _run_conclusion(run_id: int) -> tuple[str, str]:
-    """Return (status, conclusion) for a run. Returns ("", "") on error."""
+    """Return (status, conclusion) for a run.
+
+    Raises RunStateUnavailable if the gh call itself failed — a rate-limit 403,
+    a network drop, an expired token. That is "we could not find out", which is
+    not a verdict about the run and must never be reported as one.
+
+    The two failure modes are decoded separately so the reason carried up is
+    actionable: a bare "Expecting value: line 1 column 1" tells the reader
+    nothing, so unparseable output is quoted back with the raw prefix.
+    """
     try:
-        data = json.loads(gh("run", "view", str(run_id), "--json", "status,conclusion"))
-        return data.get("status", ""), data.get("conclusion", "")
-    except (RuntimeError, json.JSONDecodeError):
-        return "", ""
+        raw = gh("run", "view", str(run_id), "--json", "status,conclusion")
+    except RuntimeError as exc:
+        raise RunStateUnavailable(str(exc) or "gh run view failed") from exc
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RunStateUnavailable(
+            f"gh run view returned unparseable output ({exc}): {raw[:120]!r}"
+        ) from exc
+    return data.get("status") or "", data.get("conclusion") or ""
+
+
+def _run_conclusion_retrying(
+    run_id: int, name: str, stop: threading.Event
+) -> tuple[str, str]:
+    """_run_conclusion with bounded exponential backoff on API errors.
+
+    Re-raises RunStateUnavailable once the attempts are exhausted, so the caller
+    still has to decide what an undeterminable run means — it just gets to make
+    that decision after the API has had a fair chance to come back.
+    """
+    delay = RUN_STATE_BACKOFF
+    for attempt in range(RUN_STATE_ATTEMPTS):
+        try:
+            return _run_conclusion(run_id)
+        except RunStateUnavailable as exc:
+            if attempt == RUN_STATE_ATTEMPTS - 1 or stop.is_set():
+                raise
+            emit_event(f"↻  {name} — gh API error ({exc}); retrying in {delay}s")
+            if stop.wait(delay):
+                raise
+            delay *= 2
+    raise AssertionError("unreachable")  # pragma: no cover — loop always exits
 
 
 def watch_run(
@@ -591,8 +657,15 @@ def watch_run(
     name: str,
     stop: threading.Event,
     failures: list[int],
+    undetermined: list[tuple[str, str]],
 ) -> None:
-    """Watch one CI run via gh run watch. Retries if watcher exits prematurely."""
+    """Watch one CI run via gh run watch. Retries if watcher exits prematurely.
+
+    Appends to `failures` only for an observed bad conclusion. When the run's
+    state could not be read at all, appends (name, reason) to `undetermined`
+    instead — the caller reports that as an inability to determine, not as a
+    failure, and writes no failure artifact. (PP-qkl8)
+    """
     while not stop.is_set():
         with subprocess.Popen(
             ["gh", "run", "watch", str(run_id), "--exit-status"],
@@ -615,7 +688,18 @@ def watch_run(
 
         # Verify via API regardless of exit code — gh run watch can exit 0
         # prematurely if jobs haven't been assigned yet when the watcher starts.
-        status, conclusion = _run_conclusion(run_id)
+        try:
+            status, conclusion = _run_conclusion_retrying(run_id, name, stop)
+        except RunStateUnavailable as exc:
+            if stop.is_set():
+                return
+            emit_event(
+                f"⚠  {name} — could not determine run state after "
+                f"{RUN_STATE_ATTEMPTS} attempts: {exc}"
+            )
+            with _lock:
+                undetermined.append((name, str(exc)))
+            return
 
         if proc.returncode == 0 and status not in ("queued", "in_progress"):
             if _is_passing(conclusion):
@@ -863,11 +947,12 @@ def main() -> int:
     stop = threading.Event()
     review_seen = threading.Event()
     failures: list[int] = []
+    undetermined: list[tuple[str, str]] = []
 
     ci_threads = [
         threading.Thread(
             target=watch_run,
-            args=(run["databaseId"], run["name"], stop, failures),
+            args=(run["databaseId"], run["name"], stop, failures, undetermined),
             daemon=True,
         )
         for run in active
@@ -897,6 +982,20 @@ def main() -> int:
             emit(f"Failure details: {path}")
         emit(f"{len(failures)} failure(s) detected — check artifact for logs")
         return 1
+
+    if undetermined:
+        # No observed failure, but at least one run's outcome was never read.
+        # Say so and stop: claiming green here would be a guess, and claiming
+        # red would be the false alarm this exists to prevent. Skipping the CI
+        # Gate poll is deliberate — the same API is down, and under a rate-limit
+        # 403 every extra call digs the shared quota deeper. (PP-qkl8)
+        names = ", ".join(name for name, _ in undetermined)
+        emit(
+            f"⚠  Could not determine the outcome of {names} — "
+            f"the GitHub API was unreachable ({undetermined[0][1]}). "
+            "Nothing was observed, so this is neither a pass nor a failure."
+        )
+        return EXIT_UNDETERMINED
 
     # The watched workflow runs all finished without failures. CI Gate is the
     # aggregate that branch protection actually requires; verify it before

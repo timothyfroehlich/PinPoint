@@ -47,6 +47,18 @@ Copilot and Antigravity both read agent skills. Consult the relevant one for the
 - `pinpoint-ui` and `pinpoint-design-bible` — UI, component, and responsive-design changes. `pinpoint-ui` also owns Server Actions, data fetching, and the form conventions (Radix Select form-reset carve-out, CREATE form reset).
 - `pinpoint-deployment` — Drizzle migrations, DB connection/pooler config, preview deployments.
 
+## How a review gets triggered
+
+**One review fires automatically, at PR-open; every later one must be asked for.** Since 2026-08-01 Copilot code review is configured request-only on this repo apart from that: creating a PR fires a single request against open-time head, and nothing else does — not an intermediate push, not the `ready-for-review` label, not green CI. Antigravity likewise reviews when Tim asks.
+
+This did **not** loosen the merge bar. A PR still cannot merge without a review covering its **head commit** — a Copilot review, or a Claude author's SHA-pinned self-review marker — with every thread resolved. What changed is only _when_ the review is spent: an author still churning through CI failures and fixups used to have each intermediate push reviewed and superseded minutes later, at real quota cost. Now authors are expected to finish before opening, so the automatic review lands on finished work. If they push past it, they ask again — once:
+
+```bash
+gh pr edit <PR> --add-reviewer "@copilot"
+```
+
+Nothing re-requests automatically, deliberately, so a 3-commit fixup doesn't spend 3 reviews. **If you're reviewing, assume the commit you were handed is the one the author intends to be final** — and note that a review counts only while its `commit_id` is still head. Full author-side rules: `.agents/skills/pinpoint-pr-workflow/SKILL.md` Phase 3.4.
+
 ## Review mechanics
 
 Sign every review comment or reply with your agent name (`—Claude`, `—Gemini`, `—Codex`, `—Antigravity`). If you decline to act on a comment (Tim's or another agent's), don't leave it silent: reply with one sentence explaining why, then resolve the thread. Every comment gets a fix or a reply — never a silent ignore.
@@ -59,7 +71,7 @@ This is enforced two different ways depending on harness. In **Claude Code**, `b
 
 Take note if you're not Claude Code: `.agents/skills/pinpoint-pr-workflow/SKILL.md`, under "Phase 4: Merge — human-only," says direct merge paths are "ALL blocked for an agent by the `block-direct-merge.cjs` PreToolUse hook" with "no agent-usable bypass." That statement is true in Claude Code and **false in every other harness** — the hook simply isn't there. Don't take it at face value if you're reviewing or acting from Antigravity, Codex, or Gemini; the instruction in this section is what actually binds you.
 
-An agent's terminal state on a PR is: ready-for-review, CI green, review threads resolved, screenshots posted if UI-touching. Then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`.
+An agent's terminal state on a PR is: ready-for-review, CI green, a review covering the head commit (explicitly requested — see "How a review gets triggered"), review threads resolved, screenshots posted if UI-touching. Then hand Tim the exact command to run himself: `! scripts/workflow/merge-pr.sh <PR> --human`.
 
 ## Pointers, not copies
 

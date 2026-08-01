@@ -19,6 +19,8 @@
 
 `REVIEW.md` at the repo root is the canonical review rubric, shared with Copilot and Antigravity. Read it before launching the code-review skill.
 
+**Copilot review is request-only since 2026-08-01, except for one automatic review at PR-open against open-time head.** Nothing else asks — not an intermediate push, not the `ready-for-review` label, not green CI. A review covering the head commit is still required to merge; only its timing changed. So finish your churn _before_ opening the PR where you can, and the free open-time review covers head. If you push after opening, it's stale and nothing re-requests: finish all of it, then ask once with `gh pr edit <PR> --add-reviewer "@copilot"`. Judge a review by its `commit_id` vs head, not by which event produced it. Full rules: `pinpoint-pr-workflow` Phase 3.4.
+
 ### Sandbox network isolation
 
 - `gh` CLI TLS errors are fixed by `enableWeakerNetworkIsolation: true` in `.claude/settings.local.json`.
