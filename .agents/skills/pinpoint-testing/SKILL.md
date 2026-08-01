@@ -149,7 +149,7 @@ The line you're walking is "synthesizing state inside a third party's domain." R
 
 Read these files for comprehensive testing guidance:
 
-- [E2E_BEST_PRACTICES.md](../../../docs/E2E_BEST_PRACTICES.md) — E2E-specific patterns with Playwright
+- `pinpoint-e2e` skill (and its `references/e2e-best-practices.md`) — E2E-specific patterns with Playwright, worker isolation, environment defaults
 - [NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) — Testing-related non-negotiables
 - [e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md) — 2026-05 E2E suite audit (per-spec verdicts and bug-class framework history)
 
@@ -302,7 +302,9 @@ beforeEach(async () => {
 });
 ```
 
-## E2E Patterns from E2E_BEST_PRACTICES.md
+## E2E Patterns
+
+The full E2E guide is the `pinpoint-e2e` skill. What follows is the layer-selection-adjacent subset.
 
 ### Selector Strategy
 
@@ -366,13 +368,22 @@ await expect(page.getByText("Data loaded")).toBeVisible();
 **Over-Mocking**:
 
 ```typescript
-// ❌ Bad: Mocking everything (for DB logic)
-vi.mock("~/server/db");
+// ❌ Bad: canned return values — this tests the mock, not the query
+vi.mock("~/server/db", () => ({
+  db: { query: { issues: { findFirst: vi.fn() } } },
+}));
 vi.mock("drizzle-orm");
 
-// ✅ Good: Use PGlite integration test instead
-// Integration tests with PGlite test real DB logic
+// ✅ Good: forward the db singleton to worker-scoped PGlite — the real query runs
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  return { db: await getTestDb() };
+});
 ```
+
+The ❌ case is mocking `~/server/db` with **canned return values**, or mocking `drizzle-orm` at all — the assertions then only prove the mock returned what you told it to.
+
+The ✅ case is the **house pattern**, used broadly across `src/test/integration/`. It's how you integration-test a service function that imports the `db` singleton directly instead of accepting it as a parameter: the mock forwards to `getTestDb()`, so the real SQL executes against real Postgres. `src/test/integration/transaction-tripwire.test.ts` is a representative example. This composes with CORE-TEST-001 rather than violating it — `getTestDb()` hands back the **worker-scoped** instance, so no per-test database is created.
 
 **Testing Server Components Directly**:
 
@@ -395,7 +406,7 @@ Before committing tests:
 - [ ] Test files in correct location (unit vs integration vs E2E)
 - [ ] Integration tests use worker-scoped PGlite (`getTestDb()` and `setupTestDb()`)
 - [ ] No per-test PGlite instances (violates CORE-TEST-001)
-- [ ] E2E tests use roles/labels for selectors (see [Selector Strategy](../../../docs/E2E_BEST_PRACTICES.md#selector-strategy) in E2E_BEST_PRACTICES.md)
+- [ ] E2E tests use roles/labels for selectors (see **Selector Strategy** above)
 - [ ] No arbitrary `waitForTimeout()` in E2E tests (violates [Forbidden Patterns](../../../docs/NON_NEGOTIABLES.md#forbidden-patterns) in NON_NEGOTIABLES.md)
 - [ ] Tests are independent (no shared state)
 - [ ] Testing behavior, not implementation
@@ -403,7 +414,7 @@ Before committing tests:
 
 ## Additional Resources
 
-- E2E best practices: [E2E_BEST_PRACTICES.md](../../../docs/E2E_BEST_PRACTICES.md)
+- E2E best practices: `pinpoint-e2e` skill (`.agents/skills/pinpoint-e2e/`)
 - 2026-05 E2E suite audit: [e2e-audit-2026-05.md](../../../docs/testing/e2e-audit-2026-05.md)
 - Non-negotiables: [NON_NEGOTIABLES.md](../../../docs/NON_NEGOTIABLES.md#testing) (CORE-TEST-\* rules)
 - Playwright docs: Use the `context7` MCP server for current Playwright patterns and API references (resolve-library-id → get-library-docs)

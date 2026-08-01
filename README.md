@@ -72,7 +72,7 @@ If you’re changing code, **start here**:
 
 - `AGENTS.md` – project rules, constraints, and expectations
 - `docs/NON_NEGOTIABLES.md` – things you must not break
-- `docs/PATTERNS.md` – how we structure code (and why)
+- `.agents/skills/` – how we structure code (and why); `pinpoint-ui`, `pinpoint-typescript`, `pinpoint-security`, `pinpoint-testing` are the ones you'll reach for most
 - `docs/DEVELOPMENT.md` – day‑to‑day commands and workflow
 
 ### Prerequisites

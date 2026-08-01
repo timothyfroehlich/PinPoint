@@ -1,6 +1,6 @@
 ---
 name: pinpoint-typescript
-description: TypeScript strictest patterns, type guards, optional properties (exactOptionalPropertyTypes), Drizzle query safety, null checks. Use when fixing type errors, implementing complex types, or when user mentions TypeScript/types/generics.
+description: TypeScript strictest patterns, type guards, optional properties (exactOptionalPropertyTypes), Drizzle query safety, null checks, and database type inference — `InferSelectModel` yields camelCase types directly, so PinPoint has no db→app converter layer and none should be built (narrow with `Pick<>` at boundaries instead). Use when fixing type errors, implementing complex types, deciding how database rows should be typed on their way to a component, or when user mentions TypeScript/types/generics/InferSelectModel.
 ---
 
 # PinPoint TypeScript Guide
@@ -134,34 +134,24 @@ export async function getIssuesByMachine(machineId: string): Promise<Issue[]> {
 
 ### Database Type Inference
 
+**There is no db→app type converter layer, and you should not build one.** The Drizzle schema already maps camelCase JS fields to snake_case columns, so `InferSelectModel` yields camelCase application types directly. `src/lib/types/database.ts` re-exports those inferred types; import from there rather than redeclaring a parallel hand-written shape.
+
 ```typescript
-// Database types (Inferred from schema)
 import { userProfiles } from "~/server/db/schema";
 import { type InferSelectModel } from "drizzle-orm";
 
 type DbUser = InferSelectModel<typeof userProfiles>;
-// Resulting type uses camelCase from schema.ts:
+// Already camelCase — the snake_case column names live only in schema.ts:
 // { id: string, email: string, firstName: string, lastName: string, ... }
+```
 
-// Application types (Cleaned up or extended)
-import { type UserRole } from "~/lib/types/user";
+A `dbUserToUser` / `toProfileSummary` style converter would be pure ceremony: there is no second type system for it to translate into, and every such function is a place for the two shapes to drift.
 
-export type UserProfileSummary = {
-  id: string;
-  email: string;
-  fullName: string;
-  role: UserRole;
-};
+What _is_ legitimate is **narrowing** a row before it crosses a boundary — a Client Component prop type or an API response should be a minimal `Pick<>` / purpose-built shape, not the whole ORM row (CORE-SEC-006, and CORE-SEC-007 for `email` specifically). That's a projection, not a conversion:
 
-// Converter at boundary
-export function toProfileSummary(dbUser: DbUser): UserProfileSummary {
-  return {
-    id: dbUser.id,
-    email: dbUser.email,
-    fullName: `${dbUser.firstName} ${dbUser.lastName}`,
-    role: dbUser.role, // Inferred correctly from schema enum
-  };
-}
+```typescript
+// Narrow at the boundary — a shape, not a translation layer
+export type MachineOwnerOption = Pick<DbUser, "id" | "firstName" | "lastName">;
 ```
 
 ## Supabase SSR Safety

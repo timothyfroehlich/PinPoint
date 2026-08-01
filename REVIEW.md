@@ -44,8 +44,8 @@ Copilot and Antigravity both read agent skills. Consult the relevant one for the
 - `pinpoint-testing` — whether a PR picked the right test layer (unit/integration/E2E) for what it's testing.
 - `pinpoint-e2e` — Playwright/E2E stability: worker isolation, flake-prone patterns.
 - `pinpoint-typescript` — ts-strictest patterns, generics, Drizzle query typing.
-- `pinpoint-ui` and `pinpoint-design-bible` — UI, component, and responsive-design changes.
-- `pinpoint-patterns` — Server Actions, data fetching, and general architecture conventions.
+- `pinpoint-ui` and `pinpoint-design-bible` — UI, component, and responsive-design changes. `pinpoint-ui` also owns Server Actions, data fetching, and the form conventions (Radix Select form-reset carve-out, CREATE form reset).
+- `pinpoint-deployment` — Drizzle migrations, DB connection/pooler config, preview deployments.
 
 ## Review mechanics
 
