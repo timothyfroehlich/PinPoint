@@ -26,6 +26,7 @@ Each test builds a throwaway git repo so `huddle_state_dir` resolves to
 """
 
 import json
+import os
 import subprocess
 import tempfile
 from collections.abc import Iterator
@@ -80,11 +81,22 @@ def run(
     `pnpm run check:pytest` may itself be invoked from inside a subagent, whose
     environment carries the very vars the subagent guard keys off. Passing an
     explicit env keeps the tests deterministic wherever they run.
+
+    PATH is INHERITED, not hardcoded — it is not one of the identity vars this
+    is isolating, and the script needs `jq`. A fixed
+    "/usr/local/bin:/usr/bin:/bin" passes on Linux, where the distro ships
+    /usr/bin/jq, and fails on Apple Silicon macOS, where Homebrew installs jq
+    under /opt/homebrew/bin. CI is Linux-only, so that break would surface as a
+    local-only failure on a Mac and never in CI.
     """
     proc = subprocess.run(
         ["bash", str(SCRIPT), *args],
         cwd=repo,
-        env={"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(repo), **(env or {})},
+        env={
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "HOME": str(repo),
+            **(env or {}),
+        },
         capture_output=True,
         text=True,
     )
