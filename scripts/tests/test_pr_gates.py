@@ -75,9 +75,9 @@ def gate_env(
     only needs to distinguish the six shapes `_pr-gates.sh` actually issues.
 
     `request_ages` is a list of "seconds ago" for Copilot `review_requested` timeline
-    events. `None` means the PR has none at all — which does not occur in practice while
-    the repo's PR-open auto-request is enabled, but is the state the gates must report
-    distinctly the moment it is switched off.
+    events. `None` means the PR has none at all — the state every PR now opens in, since
+    Copilot review became fully request-only on 2026-08-01 and nothing asks on your
+    behalf.
     """
     now = time.time()
     with tempfile.TemporaryDirectory() as tmp:

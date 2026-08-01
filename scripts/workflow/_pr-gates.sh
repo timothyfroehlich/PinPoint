@@ -23,13 +23,13 @@ readonly COPILOT_LOGINS=("copilot-pull-request-reviewer" "copilot-pull-request-r
 # How long to wait for Copilot to answer a review REQUEST before escalating: `currency`
 # degrades WAIT → WARN, `reviewed` degrades WAIT → FAIL.
 #
-# Measured from the request, NOT from the head push (PP-lzaw). Copilot review is
-# request-only on this repo since 2026-08-01 — one automatic request at PR-open and
-# nothing after — so a timer keyed to the head push counts down against a review nobody
-# asked for, and every un-re-requested PR lands on the `reviewed` FAIL whose documented
-# remedy is the Claude marker. That makes the marker the DEFAULT path rather than the
-# fallback, gutting the guarantee this gate exists to provide. A timer only makes sense
-# once someone has actually asked.
+# Measured from the request, NOT from the head push (PP-lzaw). Copilot review is fully
+# request-only on this repo as of 2026-08-01 — nothing asks on your behalf — so a timer
+# keyed to the head push counts down against a review nobody asked for, and every
+# un-requested PR lands on the `reviewed` FAIL whose documented remedy is the Claude
+# marker. That makes the marker the DEFAULT path rather than the fallback, gutting the
+# guarantee this gate exists to provide. A timer only makes sense once someone has
+# actually asked.
 readonly COPILOT_REVIEW_WAIT_THRESHOLD=600
 
 # Copilot posts a review OBJECT even when it reviewed nothing — quota exhaustion, or
@@ -88,9 +88,11 @@ _epoch() {
 #
 # Matched on a case-insensitive "copilot" prefix rather than COPILOT_LOGINS: a request
 # names the reviewer as plain "Copilot", while the review it produces is authored by
-# "copilot-pull-request-reviewer[bot]". The actor is NOT a usable discriminator — the
-# repo owner is the actor for both the PR-open automatic request and an explicit
-# `gh pr edit --add-reviewer`.
+# "copilot-pull-request-reviewer[bot]". Deliberately does NOT filter on the actor. Every
+# request is an explicit `gh pr edit --add-reviewer` now, but while GitHub was still
+# auto-requesting at PR-open the actor was the repo owner for BOTH kinds — so actor never
+# discriminated anything, and re-adding it if automation returns would be a false lead.
+# Ordering against the head commit is what separates a live request from a spent one.
 _latest_copilot_request_at() {
   local pr=$1 owner_repo=$2
   gh api --paginate "repos/${owner_repo}/issues/${pr}/timeline?per_page=100" \
