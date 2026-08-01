@@ -67,6 +67,7 @@ def gate_env(
     head_age_seconds: int,
     request_ages: list[int] | None = None,
     head_sha: str = HEAD_SHA,
+    request_pending: bool = False,
 ) -> Iterator[dict]:
     """Yield an env dict wiring a fake `gh` that answers every call the gates make.
 
@@ -112,7 +113,7 @@ def gate_env(
             'args="$*"\n'
             'case "$args" in\n'
             '  *"--jq .headRefOid"*) printf "%s\\n" "$STUB_HEAD_SHA" ;;\n'
-            '  *"--json headRefOid"*) printf \'{"headRefOid":"%s"}\\n\' "$STUB_HEAD_SHA" ;;\n'
+            '  *"--json headRefOid"*) printf \'{"headRefOid":"%s","reviewRequests":%s}\\n\' "$STUB_HEAD_SHA" "$STUB_REVIEW_REQUESTS" ;;\n'
             '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
             '  *"/commits/"*) printf "%s\\n" "$STUB_HEAD_DATE" ;;\n'
             '  *"/issues/"*"/timeline"*) cat "$STUB_TIMELINE" ;;\n'
@@ -132,6 +133,9 @@ def gate_env(
         env["STUB_REVIEWS"] = str(tmp_path / "reviews.json")
         env["STUB_COMMENTS"] = str(tmp_path / "comments.json")
         env["STUB_TIMELINE"] = str(tmp_path / "timeline.json")
+        env["STUB_REVIEW_REQUESTS"] = (
+            '[{"__typename":"User","login":"Copilot"}]' if request_pending else "[]"
+        )
         yield env
 
 
@@ -283,6 +287,50 @@ def test_push_after_request_is_reported_distinctly_from_never_requested() -> Non
 
     assert "has ever been requested" in never
     assert "has ever been requested" not in pushed_after
+
+
+@pytest.mark.parametrize("gate", BOTH_GATES)
+def test_pushed_after_flags_a_lagging_timeline_when_copilot_is_pending(
+    gate: str,
+) -> None:
+    """The trap this note exists for, hit live while writing this PR.
+
+    GitHub's issue timeline is eventually consistent — a review_requested event
+    can take up to a minute to appear. In that window the state computes to
+    `pushed_after` even though the agent just re-requested, and the printed
+    remedy is a command they already ran. `reviewRequests` updates immediately,
+    so a pending Copilot entry alongside this verdict means "re-run".
+
+    Deliberately still a FAIL: a pending request does NOT imply coverage.
+    Copilot reviews the head as of the REQUEST, so a genuinely stale pending
+    request still produces a review of the wrong tree.
+    """
+    with gate_env(
+        reviews=[],
+        comments=[],
+        head_age_seconds=FRESH,
+        request_ages=[STALE],
+        request_pending=True,
+    ) as env:
+        result = run_gate(gate, env)
+
+    assert "Copilot IS a pending reviewer right now" in result.stdout
+    if gate == "check_review_happened":
+        assert result.returncode == 1, result.stdout
+
+
+@pytest.mark.parametrize("gate", BOTH_GATES)
+def test_pushed_after_omits_the_lag_note_when_nothing_is_pending(gate: str) -> None:
+    with gate_env(
+        reviews=[],
+        comments=[],
+        head_age_seconds=FRESH,
+        request_ages=[STALE],
+        request_pending=False,
+    ) as env:
+        result = run_gate(gate, env)
+
+    assert "pending reviewer right now" not in result.stdout
 
 
 def test_push_after_request_warns_on_currency_without_blocking() -> None:

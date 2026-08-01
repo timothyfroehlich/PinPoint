@@ -10,15 +10,20 @@ Usage: ./scripts/workflow/pr-watch.py [--check-ready | --force] [--verbose] <PR_
                  Gate absent or in-progress is NOT a blocking condition —
                  the watch loop handles those by waiting.
   --check-ready  Run the full readiness check (mergeable + CI Gate present
-                 + a review covering head + Copilot threads resolved +
-                 ready label) and exit. CI Gate absent IS a fail here —
-                 this mode answers "is this PR ready for human review
-                 right now?". The `copilot-review` line names one of six
-                 states rather than a bare yes/no: Copilot review is
-                 request-only on this repo, so "nobody asked yet",
-                 "asked, still waiting" and "you pushed past the request"
-                 need three different actions and only the middle one
-                 resolves by waiting (PP-lzaw).
+                 + a live review path + Copilot threads resolved + ready
+                 label) and exit. CI Gate absent IS a fail here — this
+                 mode answers "is this PR ready for human review right
+                 now?". "Live review path" means a review already covers
+                 head, OR a request newer than head is still outstanding
+                 — the latter passes here because it resolves by waiting,
+                 while `merge-pr.sh`'s `reviewed` gate still requires the
+                 review to have actually landed before a merge. The
+                 `copilot-review` line names one of six states rather
+                 than a bare yes/no: Copilot review is request-only on
+                 this repo, so "nobody asked yet", "asked, still waiting"
+                 and "you pushed past the request" need three different
+                 actions and only the middle one resolves by waiting
+                 (PP-lzaw).
   --force        Skip the pre-check entirely and watch unconditionally.
   --verbose      Emit per-job progressive updates ("X passed", "CI Gate
                  in_progress — continuing to wait", "Watching PR #N — N
@@ -275,7 +280,17 @@ def copilot_review_state(pr: int) -> tuple[str, str]:
     path (coverage itself is decided by commit_id).
     """
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    head_sha = gh("pr", "view", str(pr), "--json", "headRefOid", "--jq", ".headRefOid")
+    pr_data = json.loads(
+        gh("pr", "view", str(pr), "--json", "headRefOid,reviewRequests")
+    )
+    head_sha = pr_data["headRefOid"]
+    # Only used to explain a confusing `pushed_after` — see the note at the same
+    # spot in _pr-gates.sh. Never treated as coverage: Copilot reviews the head
+    # as of the REQUEST, not as of when it runs.
+    request_pending = any(
+        str(r.get("login") or r.get("name") or "").lower().startswith("copilot")
+        for r in pr_data.get("reviewRequests") or []
+    )
     head_date = gh(
         "api", f"{repo}/commits/{head_sha}", "--jq", ".commit.committer.date"
     )
@@ -326,11 +341,18 @@ def copilot_review_state(pr: int) -> tuple[str, str]:
 
     if not request_covers_head:
         behind = int(head_epoch - request_epoch)
+        lag = (
+            " (Copilot IS a pending reviewer right now — a request has probably "
+            "just been made and the issue timeline has not caught up; re-run "
+            "before acting)"
+            if request_pending
+            else ""
+        )
         return (
             "pushed_after",
             f"head is {behind}s NEWER than the last request ({latest_request}) — "
             f"you pushed after requesting; nothing re-requests automatically. "
-            f"When you stop iterating, run: {hint}",
+            f"When you stop iterating, run: {hint}{lag}",
         )
 
     waited = int(time.time() - request_epoch)

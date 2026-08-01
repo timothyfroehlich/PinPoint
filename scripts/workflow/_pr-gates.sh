@@ -208,6 +208,7 @@ check_ci() {
 # nothing. `pushed_after` is the state that actually bites today.
 #
 # Sets globals: RS_STATE RS_DETAIL RS_HEAD_SHA RS_REQUEST_AT RS_REQUEST_COVERS_HEAD
+# RS_REQUEST_PENDING
 # RS_DETAIL carries seconds — elapsed since the request (awaiting/overdue), or how far
 # head outruns the request (pushed_after).
 RS_STATE=""
@@ -215,13 +216,30 @@ RS_DETAIL=""
 RS_HEAD_SHA=""
 RS_REQUEST_AT=""
 RS_REQUEST_COVERS_HEAD=0
+RS_REQUEST_PENDING=0
 
 _compute_review_state() {
   local pr=$1
-  local owner_repo head_sha head_date request_at
+  local owner_repo pr_data head_sha head_date request_at
   owner_repo=$(_repo_slug)
 
-  head_sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
+  # headRefOid and reviewRequests in ONE call. reviewRequests is only used to
+  # explain a confusing `pushed_after`: the issue timeline is eventually
+  # consistent and can lag a freshly-created review_requested event by a minute,
+  # during which the state computes to `pushed_after` even though the agent just
+  # re-requested. reviewRequests updates immediately, so a Copilot entry there
+  # alongside a `pushed_after` verdict means "re-run, the timeline is catching
+  # up". It is NOT treated as coverage: Copilot reviews the head as of the
+  # REQUEST, not as of when it runs (measured on this PR — a request made at
+  # a4a26aad produced a review stamped a4a26aad two minutes after 7d672c4 was
+  # pushed), so a genuinely stale pending request still yields a stale review.
+  pr_data=$(gh pr view "$pr" --json headRefOid,reviewRequests)
+  head_sha=$(jq -r '.headRefOid' <<< "$pr_data")
+  if [ "$(jq -r '[.reviewRequests[]? | (.login // .name // "") | ascii_downcase | select(startswith("copilot"))] | length' <<< "$pr_data")" -gt 0 ]; then
+    RS_REQUEST_PENDING=1
+  else
+    RS_REQUEST_PENDING=0
+  fi
   head_date=$(gh api "repos/${owner_repo}/commits/${head_sha}" --jq '.commit.committer.date')
   request_at=$(_latest_copilot_request_at "$pr" "$owner_repo")
 
@@ -309,6 +327,14 @@ _marker_without_request_note() {
   echo "    $(_request_review_cmd "$pr")"
 }
 
+# Printed on `pushed_after` when Copilot is nonetheless a pending reviewer right now.
+# Almost always means the re-request has been made and the timeline has not caught up.
+_pending_request_lag_note() {
+  echo "  note: Copilot IS a pending reviewer right now, so a request has probably just"
+  echo "        been made and GitHub's issue timeline (which this gate reads) has not"
+  echo "        caught up — it lags by up to a minute. Re-run before acting."
+}
+
 # Gate 2: where the PR stands with its reviewer. Soft by design — this gate never
 # FAILs. It holds (WAIT) only while a request is genuinely outstanding; every other
 # non-covering state is reported as a WARN with the remedy, because no amount of waiting
@@ -339,6 +365,7 @@ check_copilot_currency() {
       echo "WARN: currency: head is ${RS_DETAIL}s NEWER than the last review request — you pushed after requesting"
       echo "  re-request once you have stopped iterating:"
       echo "    $(_request_review_cmd "$pr")"
+      if [ "$RS_REQUEST_PENDING" -eq 1 ]; then _pending_request_lag_note; fi
       return 0
       ;;
     never_requested)
@@ -450,6 +477,7 @@ check_review_happened() {
       echo "  that is deliberate, so a 3-commit fixup does not spend 3 reviews."
       echo "  remedy: once you have stopped iterating, re-request:"
       echo "    $(_request_review_cmd "$pr")"
+      if [ "$RS_REQUEST_PENDING" -eq 1 ]; then _pending_request_lag_note; fi
       return 1
       ;;
     never_requested)

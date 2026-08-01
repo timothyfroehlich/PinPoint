@@ -95,6 +95,7 @@ def make_gh(
     request_ages=(0,),
     reviews=(),
     issue_comments=(),
+    request_pending=False,
 ):
     """Build a fake `gh` that answers every call pr-watch makes.
 
@@ -121,8 +122,15 @@ def make_gh(
                 )
             if fields == "headRefName,headRefOid":
                 return json.dumps({"headRefName": BRANCH, "headRefOid": HEAD_SHA})
-            if fields == "headRefOid":
-                return HEAD_SHA
+            if fields == "headRefOid,reviewRequests":
+                return json.dumps(
+                    {
+                        "headRefOid": HEAD_SHA,
+                        "reviewRequests": [{"__typename": "User", "login": "Copilot"}]
+                        if request_pending
+                        else [],
+                    }
+                )
         if args[0] == "api" and args[1].endswith(f"/commits/{HEAD_SHA}"):
             return _ago(head_age)
         if args[:2] == ("api", "--paginate"):
@@ -596,6 +604,25 @@ def test_review_state_pushed_after_request(monkeypatch):
     assert state == "pushed_after"
     assert "NEWER than the last request" in detail
     assert REQUEST_CMD in detail
+
+
+@pytest.mark.unit
+def test_review_state_pushed_after_flags_a_lagging_timeline(monkeypatch):
+    """A pending Copilot reviewer alongside `pushed_after` means "re-run".
+
+    GitHub's issue timeline lags a freshly-created review_requested event by up
+    to a minute; `reviewRequests` updates immediately. Still `pushed_after`, not
+    `awaiting`: Copilot reviews the head as of the REQUEST, so a genuinely stale
+    pending request produces a review of the wrong tree.
+    """
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(head_age=FRESH, request_ages=(STALE,), request_pending=True),
+    )
+    state, detail = pr_watch.copilot_review_state(PR)
+    assert state == "pushed_after"
+    assert "pending reviewer right now" in detail
 
 
 @pytest.mark.unit
