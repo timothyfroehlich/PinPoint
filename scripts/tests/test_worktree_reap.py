@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import worktree_reap as reap  # noqa: E402
 
 GH_STUB = """#!/usr/bin/env bash
+printf "%s\\n" "$PWD" >> "$GH_STUB_CWDS"
 if [[ -n "${GH_STUB_FAIL:-}" ]]; then
   echo "gh: could not connect to api.github.com" >&2
   exit 1
@@ -66,6 +67,7 @@ class World:
         self.repo = tmp_path / "repo"
         self.worktrees = tmp_path / "worktrees"
         self.gh_data = tmp_path / "ghdata"
+        self.gh_cwds = tmp_path / "gh-cwds"
         self.gh_data.mkdir()
         self.worktrees.mkdir()
 
@@ -122,6 +124,7 @@ def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> World:
     built = World(tmp_path)
     monkeypatch.setenv("PATH", f"{built.bin_dir}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("GH_STUB_DIR", str(built.gh_data))
+    monkeypatch.setenv("GH_STUB_CWDS", str(built.gh_cwds))
     monkeypatch.delenv("GH_STUB_FAIL", raising=False)
     # The cwd guard would otherwise depend on where pytest was launched from.
     monkeypatch.chdir(tmp_path)
@@ -445,6 +448,40 @@ class TestKeepTier:
         _, _, err = run_reap(world, monkeypatch, capsys)
 
         assert str(world.repo) not in err
+
+
+class TestRepoContext:
+    def test_gh_is_asked_from_the_repo_not_the_callers_cwd(
+        self,
+        world: World,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """`gh` resolves which repo to query from its OWN cwd, not `--repo-dir`.
+
+        This script is invoked with an arbitrary cwd — a SessionStart hook, or
+        `merge-pr.sh` from wherever the shell happens to be. Inheriting that cwd
+        would at best make every branch UNKNOWN, and at worst answer from a
+        *different* repository, where a same-named branch with a merged PR
+        would read as proof that this repo's worktree had landed.
+        """
+        outside = world.root / "somewhere-else"
+        outside.mkdir()
+        monkeypatch.chdir(outside)
+        wt = world.add_worktree("feat/landed")
+        sha = world.commit_in(wt, "feature.py", "print(1)\n")
+        world.set_prs(
+            "feat/landed", {"number": 50, "state": "MERGED", "headRefOid": sha}
+        )
+
+        code, _, err = run_reap(world, monkeypatch, capsys)
+
+        assert code == reap.EXIT_OK, err
+        assert tier_of(err, "feat/landed") == reap.TIER_REAP
+        cwds = set(world.gh_cwds.read_text().split())
+        assert cwds == {str(world.repo)}, (
+            f"gh ran from {cwds}, not the repo — it would query the wrong repository"
+        )
 
 
 class TestGhUnavailable:

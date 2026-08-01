@@ -153,13 +153,21 @@ class Verdict:
     reason: str
 
 
-def query_branch_prs(branch: str) -> PrLookup:
-    """Ask GitHub for every PR whose head is `branch`.
+def query_branch_prs(branch: str, repo_dir: Path) -> PrLookup:
+    """Ask GitHub for every PR whose head is `branch`, as seen from `repo_dir`.
 
     `gh pr list --head` is used rather than a GraphQL `ref` lookup on purpose:
     the repo auto-deletes branches on merge, so the ref is *gone* for exactly
     the merged branches this script exists to find, and a ref query returns
     null for all of them.
+
+    Running with `cwd=repo_dir` is load-bearing, not tidiness. `gh` resolves
+    which repository to query from its *own* working directory, and this script
+    is invoked with an arbitrary cwd — a SessionStart hook, or `merge-pr.sh`
+    from wherever the shell happens to be. Left to inherit that cwd, `gh` would
+    at best fail (every branch UNKNOWN, the reap a no-op) and at worst answer
+    from a *different* repository, where a same-named branch with a merged PR
+    would look like proof that this repo's worktree had landed.
     """
     if not branch:
         # A detached worktree has no branch to look up. That is a known "no PR",
@@ -182,6 +190,7 @@ def query_branch_prs(branch: str) -> PrLookup:
             ],
             capture_output=True,
             text=True,
+            cwd=repo_dir,
         )
     except OSError as exc:
         return PrLookup(unknown_reason=f"could not run `gh pr list`: {exc}")
@@ -205,13 +214,15 @@ def query_branch_prs(branch: str) -> PrLookup:
     return PrLookup(prs=tuple(pr for pr in parsed if isinstance(pr, dict)))
 
 
-def query_all_branch_prs(branches: list[str]) -> dict[str, PrLookup]:
+def query_all_branch_prs(branches: list[str], repo_dir: Path) -> dict[str, PrLookup]:
     """Look every branch up concurrently, deduplicating shared branch names."""
     unique = sorted({b for b in branches if b})
     if not unique:
         return {}
     with ThreadPoolExecutor(max_workers=min(GH_CONCURRENCY, len(unique))) as pool:
-        return dict(zip(unique, pool.map(query_branch_prs, unique)))
+        return dict(
+            zip(unique, pool.map(lambda b: query_branch_prs(b, repo_dir), unique))
+        )
 
 
 def read_git_state(worktree: Path) -> GitState:
@@ -480,7 +491,7 @@ def main() -> int:
             print("No linked worktrees to consider.", file=sys.stderr)
         return EXIT_OK
 
-    lookups = query_all_branch_prs(list(worktrees.values()))
+    lookups = query_all_branch_prs(list(worktrees.values()), repo_dir)
     live_cwds, cwd_scan_reason = live_process_cwds()
     if cwd_scan_reason and not_quiet:
         print(
