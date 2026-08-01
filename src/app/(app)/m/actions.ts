@@ -43,7 +43,10 @@ import {
   proseMirrorDocSchema,
 } from "~/lib/tiptap/types";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
-import { isPgErrorCode } from "~/lib/db/postgres-errors";
+import {
+  isPgErrorCode,
+  getPostgresErrorConstraint,
+} from "~/lib/db/postgres-errors";
 import {
   emitMachineUpdated,
   toMachineOwnerRef,
@@ -194,6 +197,58 @@ function readPbmLinkFormFields(formData: FormData): {
 /**
  * Create Machine Action
  *
+ * Name of the partial unique index enforcing one PinballMap lister per catalog
+ * title at our location (migration 0052). PBM's `POST /location_machine_xrefs`
+ * is find-or-create on `(location_id, machine_id)`, so two cabinets of one title
+ * physically cannot hold distinct lmx rows here.
+ */
+const PBM_LISTED_UNIQUE = "machines_pinballmap_listed_unique";
+
+/**
+ * True when a failed write is specifically a duplicate-listing collision.
+ *
+ * `machines` has TWO unique constraints — `machines_initials_unique` and the
+ * partial listing index — and both raise SQLSTATE 23505. A bare code check
+ * cannot tell them apart, which is why the write paths below used to answer
+ * every 23505 with "Initials are already taken" (PP-o355.15).
+ */
+function isPbmListingConflict(error: unknown): boolean {
+  return (
+    isPgErrorCode(error, "23505") &&
+    getPostgresErrorConstraint(error) === PBM_LISTED_UNIQUE
+  );
+}
+
+/**
+ * Message for a duplicate-listing collision, naming the cabinet that already
+ * holds the listing so the fix is obvious.
+ *
+ * This is a LAST-RESORT path. The tie guard (`resolveListingHolder`) is the
+ * primary defence and stops us choosing when we cannot tell cabinets apart;
+ * this catches what a race can still slip through.
+ */
+async function pbmListingConflictMessage(
+  pinballmapMachineId: number | null | undefined
+): Promise<string> {
+  const incumbent =
+    pinballmapMachineId == null
+      ? undefined
+      : await db.query.machines.findFirst({
+          where: and(
+            eq(machines.pinballmapMachineId, pinballmapMachineId),
+            eq(machines.pinballmapListed, true)
+          ),
+          columns: { name: true, initials: true },
+        });
+
+  const holder = incumbent
+    ? `${incumbent.name} (${incumbent.initials})`
+    : "Another cabinet of this title";
+
+  return `${holder} already holds the PinballMap listing for this title at our location. Only one cabinet per title can hold it — unlist that one first.`;
+}
+
+/**
  * Creates a new machine with validation.
  * Requires authentication (CORE-SEC-001).
  * Validates input with Zod (CORE-SEC-002).
@@ -354,6 +409,12 @@ export async function createMachineAction(
         redirectTo: `/m/${machine.initials}`,
       });
     } catch (error: unknown) {
+      if (isPbmListingConflict(error)) {
+        return err(
+          "VALIDATION",
+          await pbmListingConflictMessage(pbmColumns.pinballmapMachineId)
+        );
+      }
       if (isPgErrorCode(error, "23505")) {
         return err("VALIDATION", `Initials '${initials}' are already taken.`);
       }
@@ -444,6 +505,12 @@ export async function createMachineAction(
       redirectTo: `/m/${machine.initials}`,
     });
   } catch (error: unknown) {
+    if (isPbmListingConflict(error)) {
+      return err(
+        "VALIDATION",
+        await pbmListingConflictMessage(pbmColumns.pinballmapMachineId)
+      );
+    }
     if (isPgErrorCode(error, "23505")) {
       return err("VALIDATION", `Initials '${initials}' are already taken.`);
     }
@@ -1087,6 +1154,17 @@ export async function updateMachineAction(
     }
     if (error instanceof MachineNotFoundError) {
       return err("NOT_FOUND", "Machine not found.");
+    }
+    // This action cannot touch `initials`, so a duplicate-listing collision is
+    // the only unique violation it can realistically raise — and it had no
+    // catch at all, so it surfaced as a 500 (PP-o355.15). `pbmColumns` is scoped
+    // inside the try; the submitted title id is the same value and is in scope
+    // here.
+    if (isPbmListingConflict(error)) {
+      return err(
+        "VALIDATION",
+        await pbmListingConflictMessage(validation.data.pinballmapMachineId)
+      );
     }
     return serverActionError(
       error,
