@@ -62,6 +62,13 @@ Read the full notice, derive a name from your first prompt, and register:
 - DO NOT use bead IDs, PR numbers, or generic labels like `Worker1`
 - If the name's taken, the helper suggests variations; pick one and retry
 
+**A session_id belongs to whoever registered it first.** `register` refuses to
+rebind a session_id that already holds a different name — no silent overwrite,
+which used to rename the owning session out from under it and corrupt huddle
+attribution (PP-788v). If you meant to rename **your own** session, re-run with
+`--force`. If you were _handed_ a session_id by another agent, it is not yours:
+don't register, just sign your posts.
+
 ### Work digest (follows identity)
 
     ## What we have been working on (last 7 days)
@@ -355,5 +362,9 @@ a purged/renamed daily self-heals instead of lingering as a broken reference.
 ## Subagent sessions
 
 Subagent sessions (`Agent({...})` dispatches) are skipped entirely. Detection: `transcript_path` contains `/subagents/`. Both hooks exit 0 without output. Subagents should not register names or post coordination updates — they're ephemeral.
+
+**`huddle-whoami.sh` enforces this, it isn't just guidance.** `register` and `discover` refuse outright when the caller is a dispatched subagent (detected via `CLAUDE_CODE_CHILD_SESSION` plus an `AI_AGENT` ending in `_agent` — a harness-spawned _top-level_ session carries the first marker but not the second, so it can still register). There is no `--force` for this, because a subagent has no correct id to supply: `CLAUDE_CODE_SESSION_ID` holds the **parent's** id, the transcript heuristic only sees top-level transcripts, and the scratchpad path embeds the parent's UUID. Every route returns the parent (PP-788v — three consecutive subagents overwrote the orchestrator's own mapping in one night; "just tell agents to use their own id" was tried twice and failed, because that value doesn't exist in a subagent's environment).
+
+If you're a subagent that needs to say something in the huddle: post the comment and sign it `—<YourName>`. A signature needs no registration.
 
 Full design: `docs/superpowers/specs/2026-05-17-huddle-system-design.md`.
