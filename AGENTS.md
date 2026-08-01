@@ -145,15 +145,15 @@ Never resolve `drizzle/meta` conflicts manually — the folder holds binary-like
 
 ### Review requests
 
-**Copilot review is request-only as of 2026-08-01 — with one exception: you get a single automatic review at PR-open, against open-time head.** Nothing else asks: not an intermediate push, not the `ready-for-review` label, not green CI. The merge bar is unchanged — a PR still needs a review covering its **head commit** (Copilot, or a SHA-pinned Claude marker) with threads resolved. Only the timing changed, so an agent churning through CI failures and fixups doesn't spend a review on each intermediate push.
+**Copilot reviews only when you explicitly ask, as of 2026-08-01. Nothing requests one on your behalf — ever.** Not opening the PR, not a push, not the `ready-for-review` label, not green CI. The merge bar is unchanged — a PR still needs a review covering its **head commit** (Copilot, or a SHA-pinned Claude marker) with threads resolved. Only the trigger changed: you decide when you're ready, and you know you need the review to merge.
 
-So **finish your churn before opening the PR** where you can; the free open-time review then covers head and you spend nothing extra. If you do push after opening, that review is stale and nothing re-requests — finish all of it, then ask once:
+That's what makes the spend efficient, so **finish your churn first** — CI fixes, review fixes, merge-from-main — and then ask, once, on work you're actually done with:
 
 ```bash
 gh pr edit <PR> --add-reviewer "@copilot"
 ```
 
-Judge a review by comparing its `commit_id` to head, never by which event produced it: the automatic one counts when it covers head, and any review is worthless once you push past it. `mark-claude-review.sh` is the fallback for a request Copilot didn't answer, not a way to skip asking. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
+Judge a review by comparing its `commit_id` to head, never by which event produced it — any review is worthless once you push past it, so a post-review push means asking again. `mark-claude-review.sh` is the fallback for a request Copilot didn't answer, not a way to skip asking. Full rules: `pinpoint-pr-workflow` skill Phase 3.4.
 
 ### Review comments
 
