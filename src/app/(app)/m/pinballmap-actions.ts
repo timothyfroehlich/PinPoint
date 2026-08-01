@@ -33,10 +33,8 @@ import {
 import { findLmxForMachine } from "~/lib/pinballmap/resolve-lmx";
 import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { createMachineTimelineEvent } from "~/lib/timeline/machine-events";
-import {
-  isPbmListingConflict,
-  pbmListingConflictMessage,
-} from "~/lib/pinballmap/listing-conflict";
+import { isPgErrorCode } from "~/lib/db/postgres-errors";
+import { pbmListingConflictMessage } from "~/lib/pinballmap/listing-conflict";
 import { type Result, ok, err } from "~/lib/result";
 
 export type { CatalogEdition, CatalogFamily } from "~/lib/pinballmap/catalog";
@@ -268,7 +266,13 @@ export async function linkPinballmapEntryAction(
     // of this title is already the lister. VALIDATION, not SERVER — the user can
     // fix it by unlisting the other cabinet, and `SERVER` makes the UI treat a
     // correctable condition as a crash (PP-o355.15).
-    if (isPbmListingConflict(error)) {
+    //
+    // Matched on the bare code, NOT `isPbmListingConflict`: this write touches
+    // only the listing columns, so the listing index is the sole unique
+    // constraint it can violate — and `getPostgresErrorConstraint` returns
+    // undefined when a driver drops the field, which would send a correctable
+    // condition back to being a 500.
+    if (isPgErrorCode(error, "23505")) {
       return err(
         "VALIDATION",
         await pbmListingConflictMessage(machine.pinballmapMachineId)
@@ -371,7 +375,9 @@ export async function verifyPinballmapLinkAction(
       );
     });
   } catch (error: unknown) {
-    if (isPbmListingConflict(error)) {
+    // Bare code for the same reason as the link path above — this transaction
+    // writes only listing columns, so any 23505 here is the one-lister index.
+    if (isPgErrorCode(error, "23505")) {
       return err(
         "VALIDATION",
         await pbmListingConflictMessage(machine.pinballmapMachineId)
