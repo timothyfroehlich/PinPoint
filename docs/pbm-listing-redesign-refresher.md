@@ -129,21 +129,30 @@ Dating caveat: `git log -S` attributes both the window and the rate limits to `b
 
 ---
 
-## 7. Duplicate titles: guard on **ties**, not duplicates
+## 7. Duplicate titles: the tie only blocks **automatic** decisions
 
-The guard exists because we can't tell which machine Pinball Map's single entry belongs to. Anything that disambiguates dissolves it.
+The guard exists for exactly one reason: we can't tell which machine Pinball Map's single entry belongs to. **Anything that disambiguates dissolves it — including a human clicking a button.** So a tie never hides an action and never needs an alert; it only ever means _we_ decline to choose.
 
-1. Take all machines sharing the catalog title edition.
-2. Drop any whose availability makes Listed **invalid** (`pending_arrival`, `removed`).
-3. Of the rest, take the lowest `MACHINE_PRESENCE_RANK` (0 = on the floor … 4 = removed).
-4. **Exactly one at that rank** → it holds the listing. No guard; auto-link and auto-heal run.
-5. **Two or more tied** → guard fires on the tied machines: automatic syncing pauses for that title, listing actions hidden, alert names the conflict.
+**An existing listing is knowledge, so the incumbent wins (Tim, 2026-07-25).** If one machine sharing the title already has `listed=true`, ambiguity is over: we created that lmx, so we know whose it is. It keeps the listing and its **Remove** action, and lmx auto-heal keeps running for it — no matter how many same-title cabinets sit at the same availability. The partial unique index guarantees "one" is the only possible count, so there is no second case to handle.
 
-**Where the alert surfaces (Tim, 2026-07-23): both places.** An inline banner on each tied machine's own settings page — that's where someone with the power to fix it is standing, and where the hidden Add/Remove actions need explaining — _and_ a row in the control room (PP-o355.7), so a tie can't hide just because nobody happens to open that machine.
+`resolveListingHolder(machines)` over all machines sharing a catalog title edition:
 
-Two Labyrinths, one on the floor and one off → no guard. Both on the floor → guard. Resolve by changing one machine's title or marking one "Not on Pinball Map". (Moving one to a different availability also works; we don't advertise it — invites bad data.)
+1. **One of them is already listed** → that machine is the holder. Done. No tie, ever.
+2. **None is listed** → we'd have to _pick_ one, so the tie rule applies:
+   - Drop any whose availability makes Listed **invalid** (`pending_arrival`, `removed`).
+   - Of the rest, take the lowest `MACHINE_PRESENCE_RANK` (0 = on the floor … 4 = removed).
+   - **Exactly one at that rank** → auto-link may link it.
+   - **Two or more tied** → **auto-link stands down for that title.** Nothing else changes.
 
-Backstop: the partial unique index already forbids two _listed_ machines sharing a title.
+**Humans are never blocked.** Add / Remove stay available on every machine the §5 state machine allows, tie or not, because an explicit "list _this_ one" _is_ the disambiguation. The only thing a tie suppresses is the system picking on its own.
+
+Two Labyrinths, one on the floor and one off → auto-link takes the on-the-floor one. Both on the floor and neither listed → auto-link leaves it alone until someone picks; either may be picked by hand. Once one is listed, rule 1 takes over and further availability changes are irrelevant.
+
+**What this does _not_ cover:** an incumbent whose availability makes Listed invalid (a listed machine marked `removed`) is a §6 matrix problem — a hard flag counted in the control room — not a tie. Keep the two separate; the incumbent still holds the listing, it's just flagged as wrong.
+
+**Control room (PP-o355.7):** the reportable condition is "no machine holds this listing and we declined to auto-pick." Informational, not urgent — the fleet still works, someone just has to choose. `findListingTies()` exposes it; PP-o355.7 owns the row.
+
+Backstop: the partial unique index already forbids two _listed_ machines sharing a title. The listing write paths must still catch `23505` gracefully (a race can reach it) rather than 500.
 
 ---
 

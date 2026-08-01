@@ -24,6 +24,7 @@ export async function resolvePbmLinkColumns(input: {
   pinballmapExcluded?: boolean | undefined;
   pinballmapExcludedReason?: string | undefined;
   pinballmapListed?: boolean | undefined;
+  pinballmapLmxId?: number | undefined;
 }): Promise<ResolvePbmLinkResult> {
   const pinballmapMachineId = input.pinballmapMachineId ?? null;
   const pinballmapExcluded = input.pinballmapExcluded ?? false;
@@ -54,6 +55,9 @@ export async function resolvePbmLinkColumns(input: {
     // Listing presupposes a link — only the linked branch below can set it true,
     // so every not-linked outcome (excluded, or neither) unlists the machine.
     pinballmapListed: false,
+    // The lmx describes a live PBM listing, so it cannot outlive one. Clearing
+    // it here is also what keeps the two lmx CHECK constraints satisfiable.
+    pinballmapLmxId: null,
     manufacturer: null,
     year: null,
     opdbId: null,
@@ -85,8 +89,15 @@ export async function resolvePbmLinkColumns(input: {
       columns: {
         ...empty,
         pinballmapMachineId,
-        // Only a linked machine can be listed on the public map.
+        // Only a linked machine can be listed on the public map. Callers that
+        // want to preserve an existing listing pass both flags through; anyone
+        // who omits them unlists, which is what an unqualified edit should do.
         pinballmapListed: input.pinballmapListed ?? false,
+        // Keep the lmx only while the listing it identifies survives.
+        pinballmapLmxId:
+          input.pinballmapListed === true
+            ? (input.pinballmapLmxId ?? null)
+            : null,
         manufacturer: entry.manufacturer,
         year: entry.year,
         opdbId: entry.opdbId,

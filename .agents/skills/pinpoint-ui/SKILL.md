@@ -120,11 +120,13 @@ How it surfaced in each shape:
 
 - **Auto-submitting from `onValueChange`** (the four inline issue-metadata forms, PP-0fvr): the replay looked like a real user selection and fired a **second write carrying the stale value** — silently reverting every status/priority/severity/frequency change.
 - **Submitting from a real button** (edit-machine, create-machine, unified-report, delete-account — PP-1ajq): no bad write, but a **failed** save silently wiped unsaved edits while the form was still on screen. Worst case was delete-account, where a reverted machine-reassignment left the confirmation text intact and the destructive button still enabled — a destructive control armed against a target the user could no longer see.
+- **A form with no Select at all** (machine owner transfer, `src/app/(app)/m/[initials]/(tabs)/edit/machine-owner-transfer.tsx` — PP-o355.19): this section is named for the Radix Select because that is the common case, but **Radix is only one symptom riding on React's reset**. Here a native reset blanked the form's _controlled_ hidden `id`/`name` inputs in the DOM without re-rendering React — the state behind them never changed, so React had no reason to re-sync — leaving a second attempt after a failed transfer to submit an **empty machine id**. If your form carries controlled hidden inputs, it has this bug whether or not a Select is anywhere near it.
 
-Two things worth knowing before you try to fix this some other way:
+Three things worth knowing before you try to fix this some other way:
 
 - **Making the Select controlled does not help.** Radix's replay calls `onValueChange`, so the stale value is written straight into your state — the controlled path is the very path the replay travels.
-- **Mocking `useActionState` is why this stayed invisible to a green suite for five days.** The regression guards (`src/test/unit/components/{issues,machines,settings,report}/*revert*.test.tsx`) deliberately mock neither `react` nor the Select wrappers. Keep it that way: a test that mocks `useActionState` or the Select wrapper cannot observe the reset, and will pass while the bug is live.
+- **Mocking `useActionState` is why this stayed invisible to a green suite for five days.** The regression guards (`src/test/unit/components/{issues,machines,settings,report}/*revert*.test.tsx`, plus the co-located `src/app/(app)/m/[initials]/(tabs)/edit/machine-details-form.test.tsx` for the machine Manage tab) deliberately mock neither `react` nor the Select wrappers. Keep it that way: a test that mocks `useActionState` or the Select wrapper cannot observe the reset, and will pass while the bug is live.
+- **"No Select" is not a clean bill of health.** See the owner-transfer case above — reach for this remedy whenever a form's values live anywhere React won't re-render on reset, not just when Radix is present.
 
 This is the form-level surface of CORE-ARCH-012 (honest failure).
 
