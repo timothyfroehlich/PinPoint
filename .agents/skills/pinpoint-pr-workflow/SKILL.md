@@ -28,7 +28,7 @@ End-to-end pipeline from "I have changes" to "merged in main". Replaces the depr
 
 ### 1.2 Pre-commit validation
 
-Default to `pnpm run check` (~12s; covers type, lint, format, unit tests, yamllint, actionlint, ruff, shellcheck). Use `pnpm run preflight` (full + integration) before commit for non-trivial changes, especially: migrations, security/auth changes, server actions, middleware.
+Default to `pnpm run check` (~17s; covers type, lint, format, yamllint, actionlint, ruff, shellcheck). It is **static-only — no unit tests** since PP-4zcj, so run `pnpm run test` too when you changed logic. Use `pnpm run preflight` (full + unit + integration) before commit for non-trivial changes, especially: migrations, security/auth changes, server actions, middleware.
 
 ### 1.3 E2E selection
 

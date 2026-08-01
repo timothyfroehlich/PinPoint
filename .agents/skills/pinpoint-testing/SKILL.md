@@ -59,7 +59,7 @@ If the canonical location doesn't exist yet, that's a signal you may need to cre
 ### Commands
 
 ```bash
-pnpm run check                     # Quick check: types, lint, formatting, and unit tests
+pnpm run check                     # Quick STATIC check: types, lint, formatting (no tests)
 pnpm test                          # Run unit tests only
 pnpm test -- path/to/file.test.ts  # Run targeted unit test
 pnpm run test:integration          # Run PGlite integration tests (fast, no Supabase required)
@@ -72,7 +72,7 @@ pnpm run preflight:unlocked        # Full pre-commit check (unlocked, bypasses c
 ### Which Tests to Run (Decision Tree)
 
 1. **Docs, hooks, config, or other non-source changes?** → `pnpm run check` is enough (~12s)
-2. **Changed pure logic/utils?** → `pnpm run check` (unit tests, ~12s)
+2. **Changed pure logic/utils?** → `pnpm run check` (~17s) **and `pnpm run test`** — check is static-only since PP-4zcj
 3. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/path/to/file.spec.ts --project=chromium` (~15-30s)
 4. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
 5. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs

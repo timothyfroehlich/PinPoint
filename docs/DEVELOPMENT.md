@@ -47,7 +47,8 @@ If you’re trying to understand how to implement something, read:
 4. **Run Fast Checks While Iterating**
 
    ```bash
-   pnpm run check      # typecheck + lint + unit tests
+   pnpm run check      # static gate: typecheck + lint + format (no unit tests)
+   pnpm test           # unit + PGlite integration tests
    ```
 
 5. **Before Pushing**

@@ -36,7 +36,7 @@
 ### 2.2 Process rules
 
 1. **Escape parentheses in paths**: `src/app/\(app\)/page.tsx`.
-2. **Run `pnpm run check` before committing** (~40s — the default floor; the unit-test leg dominates, the lint leg is ~4s since PP-4zcj). Reserve `pnpm run preflight` (the slower check + build + integration) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
+2. **Run `pnpm run check` before committing** (~17s — the default floor). It is a **static** gate: types, lint, format, and the shell/YAML/Python linters. **It does not run unit tests** (PP-4zcj) — those are a required CI job (`test-unit`), part of `preflight`, and available on demand via `pnpm run test` / `test:watch`. Reserve `pnpm run preflight` (the slower check + build + unit + integration) for **non-trivial changes**: migrations, security/auth, server actions, middleware, DB schema. Preflight is the exception, not the per-commit rule.
 3. **Don't kill processes you didn't start** — see §4 Process safety.
 4. **Sync with merge, never rebase** — see §5 Branches.
 5. **Root checkout is read-only.** It stays on `main`. All work — including planning docs — happens in a worktree. Dispatch a subagent or switch into an existing worktree. Tool-specific dispatch mechanics live in `CLAUDE.md`. (PP-46z, PP-bg45.)
@@ -90,7 +90,7 @@ Only stop services you started in this session, by specific PID or via worktree-
 
 | Command                               | What                                                                                                                                                                                                                             |
 | :------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm run check`                      | Fast: types, lint (via the `lint:local` oxlint mirror), format, unit, yamllint, actionlint, ruff, shellcheck (~40s, dominated by the unit-test leg)                                                                              |
+| `pnpm run check`                      | Fast **static** gate: types, lint (via the `lint:local` oxlint mirror), format, yamllint, actionlint, ruff, shellcheck (~17s; `check:pytest` is the long pole). **No unit tests** — see `pnpm run test`.                         |
 | `pnpm run preflight`                  | Full: check + build + integration. **For non-trivial changes** (migrations, auth, server actions, middleware, DB schema) — not every commit. Host-wide cap of 2 concurrent runs (via `sem`); use `preflight:unlocked` to bypass. |
 | `pnpm run smoke`                      | Smoke E2E (~60s)                                                                                                                                                                                                                 |
 | `pnpm run e2e:full`                   | Full E2E suite — CI's job by default; **on a resource-constrained system (a 16 GB laptop, especially with several agent sessions running), don't run it locally.**                                                               |
@@ -130,10 +130,10 @@ When the user explicitly asks for "prototype mode" / "rapid iteration" / "just e
 
 ### Which tests to run
 
-1. Docs, hooks, config, or other non-source changes → `pnpm run check` is enough (~40s)
-2. Pure logic / utils → `pnpm run check` (~40s)
+1. Docs, hooks, config, or other non-source changes → `pnpm run check` is enough (~17s)
+2. Pure logic / utils → `pnpm run check` (~17s) **plus `pnpm run test`** — check no longer runs unit tests
 3. Single E2E spec → `pnpm exec playwright test e2e/path/file.spec.ts --project=chromium` (~15–30s)
-4. UI components / forms → `pnpm run smoke`
+4. UI components / forms → `pnpm run test` (RTL unit) then `pnpm run smoke`
 5. Auth / permissions / middleware → `pnpm run smoke` + targeted specs
 6. DB schema / migrations → `pnpm run preflight`
 7. Final pre-review → push and let **CI** run the full suite; don't sweep locally.
