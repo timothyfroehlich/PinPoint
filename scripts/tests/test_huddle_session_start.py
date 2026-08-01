@@ -176,36 +176,46 @@ def register(repo: Path, name: str, session_id: str = SESSION_ID) -> None:
     )
 
 
+def run_hook_payload(repo: Path, payload: dict[str, object]) -> tuple[int, str, str]:
+    """Run the hook with an arbitrary stdin payload. Returns (rc, out, err).
+
+    Takes the payload dict verbatim so a test can omit a key or vary the key
+    order — `json.dumps` preserves insertion order, which is what makes the
+    "field ordering" cases in PP-txet expressible.
+    """
+    env = os.environ.copy()
+    env["PATH"] = f"{repo / 'bin'}{os.pathsep}{env['PATH']}"
+    env["BD_LOG"] = str(repo / "bd.log")
+    env["BD_SHOW_DIR"] = str(repo / "shows")
+    env["BD_CHILDREN_JSON"] = str(repo / "children.json")
+    proc = subprocess.run(
+        ["bash", str(HOOK_PATH)],
+        cwd=repo,
+        env=env,
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+    )
+    return proc.returncode, proc.stdout, proc.stderr
+
+
 def run_hook(
     repo: Path,
     session_id: str = SESSION_ID,
     source: str = "startup",
     transcript_path: str = "/tmp/transcripts/abc.jsonl",
 ) -> tuple[int, str, str]:
-    """Run the hook with a SessionStart payload on stdin. Returns (rc, out, err)."""
-    env = os.environ.copy()
-    env["PATH"] = f"{repo / 'bin'}{os.pathsep}{env['PATH']}"
-    env["BD_LOG"] = str(repo / "bd.log")
-    env["BD_SHOW_DIR"] = str(repo / "shows")
-    env["BD_CHILDREN_JSON"] = str(repo / "children.json")
-    payload = json.dumps(
+    """Run the hook with a well-formed SessionStart payload on stdin."""
+    return run_hook_payload(
+        repo,
         {
             "session_id": session_id,
             "transcript_path": transcript_path,
             "cwd": str(repo),
             "hook_event_name": "SessionStart",
             "source": source,
-        }
+        },
     )
-    proc = subprocess.run(
-        ["bash", str(HOOK_PATH)],
-        cwd=repo,
-        env=env,
-        input=payload,
-        capture_output=True,
-        text=True,
-    )
-    return proc.returncode, proc.stdout, proc.stderr
 
 
 ROTATION_MARKER = "Huddle rotation needed"
@@ -434,6 +444,104 @@ def test_identity_block_prompts_on_added_scope(repo: Path) -> None:
     assert "THE KICKOFF IS NOT THE LAST POST" in out
     assert "scope gets ADDED" in out
     assert "CHANGE DIRECTION" in out
+
+
+# --- PP-txet: the session_id / source parse must not collapse an empty field --
+#
+# The two fields were space-joined by the inline python and read back with the
+# default IFS, which skips leading whitespace. `{"session_id": "", "source":
+# "startup"}` therefore printed " startup" and parsed as SESSION_ID=startup,
+# SOURCE="" — the "no session_id, exit silently" guard never fired, the hook
+# announced the literal `startup` as the session id, and the compact
+# suppression check compared against an empty SOURCE.
+#
+# Claude Code always sends a session_id, so this was latent there; it bites
+# adapter-supplied payloads (.agents/hooks/antigravity-bootstrap.cjs), where an
+# empty or missing session_id is plausible.
+
+
+def test_missing_session_id_emits_rotation_notice_only(repo: Path) -> None:
+    """Empty session_id: the rotation notice still fires, nothing else does."""
+    set_rotation_pending(repo)
+    rc, out, err = run_hook(repo, session_id="")
+    assert rc == 0, err
+    assert ROTATION_MARKER in out
+    assert IDENTITY_MARKER not in out
+    assert REGISTRATION_MARKER not in out
+    # The pre-fix parse announced `source` as the session id. No part of the
+    # rotation notice contains that word, so this pins the actual defect.
+    assert "startup" not in out
+
+
+def test_missing_session_id_on_the_up_to_date_path_emits_nothing(repo: Path) -> None:
+    rc, out, err = run_hook(repo, session_id="")
+    assert rc == 0, err
+    assert out == ""
+
+
+def test_absent_session_id_key_emits_nothing(repo: Path) -> None:
+    """A payload that omits `session_id` entirely, not just an empty string."""
+    rc, out, err = run_hook_payload(
+        repo,
+        {
+            "transcript_path": "/tmp/transcripts/abc.jsonl",
+            "cwd": str(repo),
+            "hook_event_name": "SessionStart",
+            "source": "startup",
+        },
+    )
+    assert rc == 0, err
+    assert out == ""
+
+
+def test_compact_stays_suppressed_when_session_id_is_missing(repo: Path) -> None:
+    """The worst pre-fix case: an empty session_id defeated the compact check.
+
+    SESSION_ID took `compact` and SOURCE emptied out, so the hook skipped the
+    condensed post-compaction block and emitted the full registration wall
+    instead — naming `compact` as the session id.
+    """
+    register(repo, "Claude-HuddleFix")
+    rc, out, err = run_hook(repo, session_id="", source="compact")
+    assert rc == 0, err
+    assert out == ""
+
+
+def test_compact_is_suppressed_when_source_precedes_session_id(repo: Path) -> None:
+    """Key order in the JSON payload must not change which block is emitted."""
+    register(repo, "Claude-HuddleFix")
+    rc, out, err = run_hook_payload(
+        repo,
+        {
+            "source": "compact",
+            "hook_event_name": "SessionStart",
+            "cwd": str(repo),
+            "transcript_path": "/tmp/transcripts/abc.jsonl",
+            "session_id": SESSION_ID,
+        },
+    )
+    assert rc == 0, err
+    assert "## Huddle identity (post-compaction)" in out
+    # The full startup-only registration/etiquette wall stays suppressed.
+    assert "self-filter active" not in out
+    assert REGISTRATION_MARKER not in out
+
+
+def test_absent_source_key_still_emits_the_startup_block(repo: Path) -> None:
+    """A missing `source` leaves an empty trailing field, not a shifted one."""
+    register(repo, "Claude-HuddleFix")
+    rc, out, err = run_hook_payload(
+        repo,
+        {
+            "session_id": SESSION_ID,
+            "transcript_path": "/tmp/transcripts/abc.jsonl",
+            "cwd": str(repo),
+            "hook_event_name": "SessionStart",
+        },
+    )
+    assert rc == 0, err
+    assert "Registered as: **Claude-HuddleFix**" in out
+    assert "## Huddle identity (post-compaction)" not in out
 
 
 # --- Early-exit paths must keep short-circuiting -----------------------------

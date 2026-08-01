@@ -17,6 +17,8 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 | `pr-dashboard.sh [PR...]` | Status table: CI checks, Copilot review state, merge state, draft state. All open PRs if no args. The Copilot column shows the unresolved-thread count when there are any (they need action now), otherwise the review state: `reviewed`, `marker`, `awaiting`, `OVERDUE`, `RE-REQUEST` (`pushed_after`), `NOT ASKED` (`never_requested`).                                                                                    |
 | `pr-watch.py <PR>`        | Stream CI run events. One timestamped line per event. Use with the Claude Code Monitor tool. Writes failure artifacts to `tmp/gh-monitor/`. `--check-ready` also reports a `copilot-review` line naming the review state (the six below, or `unknown` if the API calls fail); it treats `awaiting` as OK (the request resolves by waiting), which the `reviewed` merge gate does not — check-ready green is not "will merge". |
 
+`pr-watch.py` exit codes: **0** passed (or stopped for a new Copilot review), **1** a run or the CI Gate actually failed, **2** the outcome could not be determined — the GitHub API was unreachable (rate-limit 403, network drop, auth failure), so nothing was observed. Exit 2 is not a red CI: re-run the watch once the API is back rather than hunting for a broken test. (PP-qkl8)
+
 ### UI Screenshots
 
 | Script                                                   | Purpose                                                                                                                                                                                                                                                     |
@@ -46,7 +48,7 @@ A Copilot review whose body says it could not review (quota limit, nothing to an
 
 ### Review state (shared by `currency` and `reviewed`)
 
-Both review-state gates answer one question — where does this PR stand with its reviewer? — from one shared computation (`_compute_review_state` in `_pr-gates.sh`), so they cannot drift apart the way they once did. It reports six states, and the two gates differ only in how they map them:
+**Since 2026-08-01 only the PR-open review fires automatically; a push past it needs an explicit `gh pr edit <PR> --add-reviewer "@copilot"`.** Both gates are built around that. They answer one question — where does this PR stand with its reviewer? — from one shared computation (`_compute_review_state` in `_pr-gates.sh`), so they cannot drift apart the way they once did. It reports six states, and the two gates differ only in how they map them:
 
 | State             | Meaning                                                         | `currency` | `reviewed` |
 | ----------------- | --------------------------------------------------------------- | ---------- | ---------- |
@@ -59,7 +61,7 @@ Both review-state gates answer one question — where does this PR stand with it
 
 `marker` and `covered` are decided before the request clock is consulted, so a head that already has a documented review never sits out a timer. `awaiting` is the only state waiting resolves; the other three are terminal, and each names the one action that clears it. The merge bar itself is unchanged — a review covering head is still required. What changed is _when_ the wait is spent and how precisely the non-covering states are named.
 
-**The 600s window is measured from the review request, not from the head push (PP-lzaw).** Copilot review is request-only on this repo since 2026-08-01 — one automatic request at PR-open, and nothing after — so a timer keyed to the push counts down against a review nobody asked for, and every un-re-requested PR lands on the `reviewed` FAIL whose documented remedy is the Claude marker. That makes the marker the default path rather than the fallback, gutting the guarantee the gate exists to provide. A timer only makes sense once someone has actually asked, so `awaiting` is the only state it applies to. Ask (or re-ask) with `gh pr edit <PR> --add-reviewer "@copilot"` — `--add-reviewer` re-requests when Copilot is already assigned, so it is the right command either way.
+**The 600s window is measured from the review request, not from the head push (PP-lzaw).** Under request-only Copilot a timer keyed to the push counts down against a review nobody asked for, so every un-re-requested PR lands on the `reviewed` FAIL whose documented remedy is the Claude marker. That makes the marker the default path rather than the fallback, gutting the guarantee the gate exists to provide. A timer only makes sense once someone has actually asked, so `awaiting` is the only state it applies to. `--add-reviewer` re-requests when Copilot is already assigned, so it is the right command whether or not a request already exists.
 
 **Coverage is judged by the review's `commit_id`, not by comparing `submitted_at` against the head commit date (PP-lzaw).** Copilot stamps every review with the commit it actually read; the timestamp comparison reported "covers head" for a review of an earlier tree that happened to be submitted after a later push (observed on PR #1784). Any matching review counts, not just the newest — a review whose `commit_id` is head demonstrably read head, whatever landed after it.
 
