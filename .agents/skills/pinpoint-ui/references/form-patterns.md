@@ -82,26 +82,7 @@ export function IssueActionsMenu({ issueId }: { issueId: string }) {
 </DropdownMenuItem>
 ```
 
-## CSS-First Interaction
-
-### CSS-Only Patterns
-
-```typescript
-// CSS-only hover effects
-<div className="group">
-  <Button className="group-hover:bg-primary/90">
-    Hover Me
-  </Button>
-</div>
-
-// Peer patterns for form validation
-<Input className="peer" />
-<p className="peer-invalid:visible invisible text-destructive">
-  Invalid input
-</p>
-```
-
-### Mutations go through a Server Action
+## Mutations go through a Server Action
 
 ```typescript
 // Mutation submitted through a Server Action

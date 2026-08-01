@@ -1,141 +1,29 @@
 # Form Correctness & Native HTML Primitives
 
-CORE-FORM-001..006 in practice, and where native platform primitives complement shadcn/Radix.
+`pinpoint-design-bible` §20 owns the CORE-FORM-001..006 conventions — required input attributes, the autocomplete token table, validation-feedback timing, submit-button state. Read it for the rules.
 
-## Form Correctness
+This file holds only the two things §20 can't: the shared primitives' validation boundary, and when a native platform primitive is the right answer instead of a shadcn component.
 
-Forms are the highest-leverage place to follow the Widely-available web platform — the browser already does post-interaction validation, autofill, mobile-keyboard hints, and password-manager integration. Opt in correctly and most "form polish" tickets disappear.
+## Where validation styling lives — and where it deliberately doesn't
 
-### Input type
+`:user-invalid` styling and the blur-time `aria-invalid` sync are implemented **once, in the shared primitives**: `src/components/ui/input.tsx` and `src/components/ui/textarea.tsx`. Read those two files rather than a description of them; both are under 40 lines. Never copy either treatment to a call site.
 
-| Field                             | Type                                |
-| :-------------------------------- | :---------------------------------- |
-| Email (login, signup, reporter)   | `type="email"`                      |
-| Phone                             | `type="tel"`                        |
-| URL                               | `type="url"`                        |
-| Password / new password / confirm | `type="password"`                   |
-| Numeric ID (postal, etc.)         | `type="text" inputMode="numeric"`   |
-| Number you do math on             | `type="number"`                     |
-| Date / time                       | `type="date"` / `type="time"`       |
-| Plain text                        | `type="text"` (the actual fallback) |
+Two boundaries are decisions rather than facts you can read off, so they're recorded here:
 
-Wrong types lose the mobile keyboard hint and native format validation. `type="text"` for an email field is a CORE-FORM-001 violation.
+**`select.tsx` is deliberately excluded, and "finishing the job" there is a mistake.** The shadcn `Select` trigger is a Radix `<button>`, not a form control: it has no native validity state, so `:user-invalid` can never match and `checkValidity()` has nothing to report. Invalid state on a Select is caller-driven — pass `aria-invalid` to `<SelectTrigger>`, which already styles it. If you find yourself adding a blur handler to `select.tsx`, stop; the mechanism you want is the caller's.
 
-### Autocomplete tokens
-
-Password managers and browser autofill key on `autocomplete`. Wrong/missing tokens silently break credential flows.
-
-```tsx
-// Sign-in form
-<Input id="email"            name="email"    type="email"    autoComplete="username" required />
-<Input id="current-password" name="password" type="password" autoComplete="current-password" required />
-
-// Sign-up form
-<Input id="email"            name="email"            type="email"    autoComplete="username" required />
-<Input id="new-password"     name="password"         type="password" autoComplete="new-password" required />
-<Input id="confirm-password" name="confirm-password" type="password" autoComplete="off" required />
-//                                                                                ^^^^^ off on confirm
-
-// Anonymous-reporter form
-<Input name="firstName" autoComplete="given-name" required />
-<Input name="lastName"  autoComplete="family-name" required />
-<Input name="email"     type="email" autoComplete="email" required />
-
-// Domain-specific picker that should NOT autofill
-<select id="machineId" name="machineId" autoComplete="off">…</select>
-```
-
-The full token list is in MDN; the auth-form-specific subset is in MWG `autofill-sign-in-form` and `autofill-sign-up-form`.
-
-### `enterkeyhint` for mobile flow
-
-Multi-field forms read better with the correct return-key label at each step. Baseline since Dec 2021.
-
-```tsx
-<Input enterKeyHint="next" /> // every field except the last
-<Input enterKeyHint="next" />
-<Input enterKeyHint="done" /> // last field
-```
-
-Use `"send"` on the last field of a message/search form, `"search"` on a search input, `"done"` on a generic last input.
-
-### Post-interaction validation styling (`:user-invalid`)
-
-> **Not yet implemented** — tracked under PP-kqbk.2. The shared `<Input>` currently only styles `aria-invalid:`. Add the `:user-invalid:` selectors in `src/components/ui/input.tsx` once; do not copy them per form site.
-
-`:user-invalid` flips a CSS pseudo-class only **after** the user interacts with the control — no premature red rings on page load, no JS state to manage. Adding the two CSS variants below to the shared `<Input>` (and `<Textarea>`, `<Select>`) primitive gives the entire app post-interaction validation feedback for free.
-
-```tsx
-// Add to src/components/ui/input.tsx (and textarea.tsx, select.tsx)
-<input
-  className={cn(
-    "border-input focus-visible:ring-ring",
-    "aria-invalid:border-destructive aria-invalid:ring-destructive/40",
-    "[&:user-invalid]:border-destructive [&:user-invalid]:ring-destructive/40",
-    className
-  )}
-/>
-```
-
-### Screen-reader error announcement (`aria-invalid`)
-
-> **Not yet implemented** — tracked under PP-kqbk.2 (bundled with `:user-invalid` styling above).
-
-`:user-invalid` is visual only — AT users need `aria-invalid="true"` to hear "invalid" next to the field label. Add the listener to `src/components/ui/input.tsx` once so every field across the app gets it automatically — don't copy it per form.
-
-```tsx
-// Add to src/components/ui/input.tsx (and textarea.tsx, select.tsx)
-function syncInvalid(e: React.FocusEvent<HTMLInputElement>) {
-  e.currentTarget.setAttribute(
-    "aria-invalid",
-    e.currentTarget.checkValidity() ? "false" : "true"
-  );
-}
-
-// In the primitive's render: pass syncInvalid as the default onBlur,
-// merging with any caller-supplied onBlur via composeEventHandlers.
-```
-
-### Required-field indicators
-
-Mark required fields visually before submission, not via a post-submit error.
-
-```tsx
-<Label htmlFor="email">
-  Email <span aria-hidden="true">*</span>
-</Label>
-<Input id="email" name="email" type="email" autoComplete="username" required />
-```
-
-For a form with many required fields, include a legend (`<p className="text-sm text-muted-foreground">* required</p>`) once near the top instead of explaining at every label.
+**A caller that passes `aria-invalid` owns it end to end.** The primitives' blur handler stands down when the caller supplies the attribute, so react-hook-form and Radix `FormControl` keep their schema-driven verdict instead of having it overwritten by the browser's weaker `checkValidity()` result. Don't "fix" the guard — it exists because the two validation sources disagree, and the richer one should win.
 
 ## Native HTML primitives alongside shadcn/Radix
 
-> **shadcn/Radix is the design system.** It owns Dialog, AlertDialog, Sheet, Drawer, Popover, Tooltip, DropdownMenu, Accordion, Form, etc. Don't migrate components off Radix to chase native primitives — Radix delivers consistent variants, theming, focus trapping, animation, and a single tested behavior across the app.
->
-> The web platform has Widely-available primitives that **complement** the shadcn stack. Reach for them in two situations: (1) one-off uses that don't deserve a new shadcn variant, and (2) attributes/behaviors that drop straight onto shadcn components and strengthen them.
+**shadcn/Radix is the design system.** It owns Dialog, AlertDialog, Sheet, Drawer, Popover, Tooltip, DropdownMenu, Accordion, Form. Don't migrate components off Radix to chase native primitives — Radix delivers consistent variants, theming, focus trapping, animation, and one tested behavior across the app.
 
-### Use `inert` to harden Radix modals (CORE-A11Y-006)
+The platform's Widely-available primitives **complement** that stack. Reach for them in two situations: a one-off use that doesn't deserve a new shadcn variant, or an attribute that drops straight onto a shadcn component and strengthens it.
 
-`inert` (Baseline since Mar 2022) removes a subtree from tab order, click handling, and the AT tree in one declarative step — stronger than `aria-hidden` (AT-only). Radix uses `aria-hidden` + pointer-events on the rest of the DOM when a modal opens; layering `inert` on top closes a small but real focus-leak gap.
+**Native `<dialog>` is not the default.** `<dialog>.showModal()` ships a focus trap, the top layer, and `::backdrop` for free, but product UI uses shadcn `<Dialog>` / `<AlertDialog>` / `<Sheet>` / `<Drawer>`. Reach for native only for one-off, self-contained surfaces that would never earn a variant — a debug-only inspector, an `<a href="#fragment">`-driven help blurb. If a Radix modal is doing its job, leave it.
 
-```tsx
-// Wrap the page content so it goes inert while any modal is open.
-<div inert={anyModalOpen || undefined}>{/* main page content */}</div>
-```
+**`<details>` + `<summary>` for trivial disclosure.** Collapsible content that doesn't animate and doesn't need `<Accordion>`'s visual treatment — debug panels, an inline "show more" — uses the native pair: keyboard- and SR-accessible with zero JS. Anything that is part of the product UI (FAQs, settings panels, content sections) uses `<Accordion>`.
 
-The shadcn primitives stay — `inert` is one attribute added to the background container, not a replacement.
+**Native validation layers with shadcn, it doesn't compete.** `<Input>` forwards `required`, `pattern`, `minLength`, `maxLength`; the browser validates, `:user-invalid` styles the result, and `useActionState` covers cross-field and server-side checks.
 
-### Native `<dialog>` only when a shadcn variant would be overkill
-
-`<dialog>.showModal()` is Baseline Widely available (Baseline since Mar 2023; see the Browser Support table in `references/browser-support.md`) and ships focus trap + top-layer + `::backdrop` for free. Use it for one-off, self-contained, single-purpose dialogs that don't earn a place in the shadcn variant system — for example, a debug-only inspector panel, an `<a href="#fragment">`-driven help blurb, or a tightly-scoped picker that doesn't need theming.
-
-**Default to shadcn `<Dialog>` / `<AlertDialog>` / `<Sheet>` / `<Drawer>` for product UI.** Native `<dialog>` is an option in your toolbox, not the new default. If a Radix modal is doing its job, leave it.
-
-### `<details>` + `<summary>` for trivial disclosure
-
-For collapsible content that doesn't animate and doesn't need the visual treatment of `<Accordion>` — collapsible debug panels, `<summary>` for an inline "show more" — the native pair is keyboard- and SR-accessible with zero JS. Use shadcn `<Accordion>` whenever the disclosure is part of the product UI (FAQs, settings panels, content sections).
-
-### Native form validation works with shadcn `<Input>`
-
-`<Input>` already forwards `required`, `pattern`, `minLength`, `maxLength`. The browser does the validation; `:user-invalid` styles the result. `useActionState` handles cross-field validation (e.g., "passwords match") and server-side checks. You don't choose between shadcn and native — they layer.
+(`inert` on modal backgrounds — CORE-A11Y-006 — is in `references/accessibility.md` with the rest of the a11y floor.)

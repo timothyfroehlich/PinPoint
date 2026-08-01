@@ -6,57 +6,21 @@ What PinPoint adds on top of Radix's built-in a11y, plus the `motion-reduce:` ru
 
 The shadcn primitives (and the Radix layer underneath) already handle a lot of a11y — focus trap, `aria-modal`, focus return, descendant labeling. These rules cover what PinPoint must add on top.
 
-### Semantic HTML
-
-```tsx
-// Semantic HTML
-<nav aria-label="Main navigation">
-  <ul>
-    <li><a href="/machines">Machines</a></li>
-    <li><a href="/issues">Issues</a></li>
-  </ul>
-</nav>
-
-// BAD: Div soup
-<div className="nav">
-  <div className="nav-item">Machines</div>
-  <div className="nav-item">Issues</div>
-</div>
-```
-
 ### Skip-to-main link (CORE-A11Y-001)
 
-> **Not yet implemented** — tracked under PP-kqbk.3. This rule applies to the implementation when it lands, and to any new layout introduced before then.
+The skip link and its target are split across two files — `src/app/layout.tsx` renders the anchor, `src/components/layout/MainLayout.tsx` owns the `<main>` it points at. Copy from those; don't reconstruct from memory.
 
-Add a skip link as the first child of `<body>` in `src/app/layout.tsx`, and add `id="main-content" tabIndex={-1}` to the `<main>` element in `MainLayout.tsx`. Without this, every page load forces a keyboard user through 6+ header tab stops before reaching content.
+The decision worth carrying: **both halves are load-bearing.** An anchor pointing at a `<main>` that isn't focusable moves the scroll position but not focus, which is the failure mode that reads as "we have a skip link" while doing nothing for the keyboard user. If you introduce a new layout shell, port the pair, not just the anchor.
 
-```tsx
-<body>
-  <a
-    href="#main-content"
-    className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:px-4 focus:py-2 focus:text-foreground focus:ring-2 focus:ring-primary"
-  >
-    Skip to main content
-  </a>
-  {/* … providers + children … */}
-</body>
-```
+### `inert` on background regions when a modal opens (CORE-A11Y-006)
+
+**This rule is intent, not current behaviour — and that is deliberate.** Nothing in `src/` sets `inert`; the rule is adopted and tracked as PP-kqbk.8 (`docs/NON_NEGOTIABLES.md`, CORE-A11Y-006) but not yet implemented. You cannot learn that from the code, because "not there yet" and "decided against" look identical in an empty search. So: don't file the absence as a bug, and don't write your own partial version — implement it once, on the background container, when the bead comes up.
+
+The gap it closes: Radix applies `aria-hidden` + pointer-events to the rest of the DOM when a modal opens, which covers AT and mouse but leaves a small focus-leak window. `inert` removes a subtree from tab order, click handling, and the AT tree in one declarative step. It layers on top of Radix — one attribute on the background container, not a replacement for Radix's focus management.
 
 ### Real `<button>` — never `<div role="button">` (CORE-A11Y-004)
 
-`<button>` is fully restylable. A `<div role="button" tabIndex={0} onKeyDown onClick>` is a reimplementation that almost always misses Space key, focus return, or an accessible name. If the existing pattern is a styled `<div>`, replace it with `<button type="button">`.
-
-```tsx
-// GOOD
-<button type="button" onClick={enterEditMode} className="block w-full text-left rounded-md p-2 hover:bg-muted">
-  <RichTextDisplay value={value} />
-</button>
-
-// BAD
-<div role="button" tabIndex={0} onClick={enterEditMode} onKeyDown={…}>
-  <RichTextDisplay value={value} />
-</div>
-```
+`<button>` is fully restylable, so the usual excuse for `<div role="button">` doesn't hold here. A hand-rolled div-button almost always misses the Space key, focus return, or an accessible name. When you meet a styled `<div>` that behaves like a button, converting it is in scope for whatever change you're already making.
 
 ### Tooltip ≠ `title` attribute (CORE-A11Y-005)
 
@@ -66,59 +30,17 @@ For **disabled controls** that need a "why disabled" explanation, the tooltip-on
 
 ### Data tables (CORE-A11Y-003)
 
-```tsx
-<table aria-label="Issues">
-  <thead>
-    <tr>
-      <th scope="col" aria-sort={sortBy === "title" ? sortDir : "none"}>
-        <button type="button" onClick={() => setSort("title")}>
-          Title
-        </button>
-      </th>
-      <th scope="col" aria-sort={sortBy === "status" ? sortDir : "none"}>
-        <button type="button" onClick={() => setSort("status")}>
-          Status
-        </button>
-      </th>
-      {/* … */}
-    </tr>
-  </thead>
-  {/* … */}
-</table>
-```
-
-Reference: `src/components/issues/IssueList.tsx`. Apply the same semantics to every new sortable table.
+`src/components/issues/IssueList.tsx` is the reference implementation for a sortable table — `<th scope="col">`, `aria-sort` tracking the live sort state, an accessible name on the table, and a real `<button>` in the header cell. Copy its semantics into every new sortable table rather than re-deriving them.
 
 ### ARIA labels on icon-only triggers
 
-```tsx
-// Icon-only button
-<Button aria-label="Delete issue">
-  <Trash2 aria-hidden="true" />
-</Button>
+Icon-only buttons need an `aria-label`, and the decorative icon inside gets `aria-hidden="true"` so AT reads the label rather than the glyph.
 
-// Editable cell — name the field, not just the value
-<DropdownMenuTrigger asChild>
-  <Button aria-label={`Status: ${current.label} — change status`}>
-    <StatusIcon aria-hidden="true" />
-    {current.label}
-  </Button>
-</DropdownMenuTrigger>
-```
+The judgement call worth stating: **on an editable cell, name the field, not just its current value.** `aria-label="Open"` tells a screen-reader user what the value is; `aria-label="Status: Open — change status"` tells them what the control does and which field it belongs to. A trigger whose accessible name is only its value is indistinguishable from a label.
 
 ### Label-to-control association (especially Radix `<Select>`)
 
-`<Label htmlFor="x">` must target the actual interactive element. Radix `<SelectTrigger>` is a `<button>` underneath; pass `id` through to that trigger, not to the wrapping `<Select>` component.
-
-```tsx
-<Label htmlFor="severity">Severity</Label>
-<Select name="severity" defaultValue="medium">
-  <SelectTrigger id="severity"> {/* id goes here, on the trigger */}
-    <SelectValue />
-  </SelectTrigger>
-  {/* … */}
-</Select>
-```
+`<Label htmlFor="x">` must target the actual interactive element. Radix `<SelectTrigger>` is the `<button>` underneath, so the `id` goes **on the trigger**, not on the wrapping `<Select>`. Putting it on `<Select>` produces a label that points at nothing and an unlabelled control — with no error, no lint failure, and a visually identical render.
 
 ### Live regions for async feedback
 
@@ -126,17 +48,6 @@ shadcn `<Alert>` already carries `role="alert"`. Sonner toasts fire in `role="st
 
 ## Animation & Motion (CORE-A11Y-002)
 
-`prefers-reduced-motion` is Baseline Widely available since Jul 2020. Tailwind exposes it as the `motion-reduce:` variant. Every `animate-*` and non-essential `transition-*` utility pairs with a `motion-reduce:` counterpart.
+Every `animate-*` and non-essential `transition-*` utility pairs with its `motion-reduce:` counterpart — `motion-reduce:animate-none` for animations, `motion-reduce:transition-none` for transitions. The test for "non-essential" is whether the motion carries information: a spinner's rotation doesn't (the static icon still says "loading"), a skeleton's pulse doesn't, a height transition doesn't — keep the structural change, drop the movement.
 
-```tsx
-// Loading spinner — static icon still communicates "loading" without motion
-<Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-
-// Skeleton pulse
-<div className="h-4 w-32 animate-pulse motion-reduce:animate-none bg-muted rounded" />
-
-// Layout transitions — keep the structural change, drop the motion
-<div className="transition-[height] duration-300 motion-reduce:transition-none">
-```
-
-Essential motion (e.g., a sheet sliding into view — the slide is what tells the user what just happened) can opt out by omitting the `motion-reduce:` variant; document the choice in a one-line comment.
+**Essential motion may opt out**, and that exemption is narrow: a sheet sliding in from the side is the thing that tells the user where the surface came from, so removing it removes meaning rather than discomfort. When you take the exemption, leave a one-line comment saying so — otherwise the next reviewer reads it as a missed `motion-reduce:` and "fixes" it.

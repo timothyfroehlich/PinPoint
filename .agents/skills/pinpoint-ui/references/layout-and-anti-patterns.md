@@ -180,11 +180,6 @@ export function Card({ children, className }: CardProps) {
 <div className="mt-2.5 text-destructive">
 ```
 
-## Troubleshooting
-
-- **Styles not applying**: Check Tailwind specificity, check `cn()` usage, clear `.next` cache
-- **Hydration errors**: Ensure no random data (dates, Math.random) renders without `useEffect` or `suppressHydrationWarning`. Check for invalid HTML nesting (`<div>` inside `<p>`).
-
 ## External References
 
 - **modern-web-guidance** (Google Chrome): `npx -y modern-web-guidance@latest search "<query>"`. The canonical lookup for Widely-available web platform patterns. Each guide tags its Baseline status. CORE-UI-005/006.

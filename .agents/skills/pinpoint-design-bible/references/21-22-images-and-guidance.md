@@ -8,7 +8,7 @@ Image loading sits at the intersection of LCP, layout stability, and bandwidth. 
 
 ### `priority` is for the LCP candidate only (CORE-PERF-003)
 
-`priority` emits `fetchpriority="high"` (Baseline Widely available since Sep 2025) plus eager loading. The browser interprets this as "this image is critical to first paint." Every prioritized image deprioritizes every other resource — so adding `priority` to a non-LCP image actively hurts LCP.
+`priority` emits `fetchpriority="high"` plus eager loading. The browser interprets this as "this image is critical to first paint." Every prioritized image deprioritizes every other resource — so adding `priority` to a non-LCP image actively hurts LCP.
 
 | Place                              | Should `priority`?                           |
 | :--------------------------------- | :------------------------------------------- |
@@ -64,6 +64,8 @@ npx -y modern-web-guidance@latest list                   # browse the catalog
 
 ### Guide map by PinPoint use case
 
+This map is a curated PinPoint-use-case → guide-id index, and it is the **only** copy — `pinpoint-ui` points here rather than keeping a second one. It is a routing aid, not a cache of the guides' contents or their Baseline statuses; those come from the tool, live.
+
 | Building...                        | MWG search/retrieve                                                     |
 | :--------------------------------- | :---------------------------------------------------------------------- |
 | Sign-in / sign-up form             | `forms`, `autofill-sign-in-form`, `autofill-sign-up-form`               |
@@ -74,6 +76,7 @@ npx -y modern-web-guidance@latest list                   # browse the catalog
 | Mobile drawer / slide-in           | `navigation-drawer`                                                     |
 | Tooltips on touch                  | `interest-triggered-tooltips` (most variants are Newly available)       |
 | Image priority / LCP               | `optimize-image-priority`, `optimize-preload-priority`                  |
+| Skeletons, `content-visibility`    | `defer-rendering-heavy-content`                                         |
 | Long-task / INP                    | `break-up-long-tasks`, `identify-inp-causes`                            |
 | Container-internal layout          | `css-layout`, `size-aware-styling`                                      |
 | Conditional styling via DOM state  | `style-parent-with-has`                                                 |

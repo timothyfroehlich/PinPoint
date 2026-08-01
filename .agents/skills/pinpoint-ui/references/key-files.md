@@ -2,6 +2,8 @@
 
 The canonical pattern sources to read, plus field ordering and label conventions.
 
+## Component Basics
+
 ### Adding Components
 
 ```bash
@@ -25,12 +27,12 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 
 ### Status & Filter System
 
-| File                                            | What It Teaches                                                                      |
-| :---------------------------------------------- | :----------------------------------------------------------------------------------- |
-| `src/lib/issues/status.ts`                      | STATUS_CONFIG, STATUS_GROUPS, color system, all 11 statuses. Single source of truth. |
-| `src/components/issues/IssueFilters.tsx`        | Smart badge grouping, filter composition, MultiSelect usage, "More Filters" pattern  |
-| `src/components/issues/fields/StatusSelect.tsx` | Grouped select with icons, STATUS_GROUP_LABELS, separator pattern                    |
-| `src/components/ui/multi-select.tsx`            | Grouped/flat modes, indeterminate group headers, selected-items-first sorting        |
+| File                                            | What It Teaches                                                                     |
+| :---------------------------------------------- | :---------------------------------------------------------------------------------- |
+| `src/lib/issues/status.ts`                      | STATUS_CONFIG, STATUS_GROUPS, the status colour system. Single source of truth.     |
+| `src/components/issues/IssueFilters.tsx`        | Smart badge grouping, filter composition, MultiSelect usage, "More Filters" pattern |
+| `src/components/issues/fields/StatusSelect.tsx` | Grouped select with icons, STATUS_GROUP_LABELS, separator pattern                   |
+| `src/components/ui/multi-select.tsx`            | Grouped/flat modes, indeterminate group headers, selected-items-first sorting       |
 
 ### Pickers & Selects
 
@@ -58,14 +60,15 @@ Every authenticated page should compose `<MainLayout>` → `<PageContainer>` →
 | `src/components/layout/MainLayout.tsx`      | App shell (AppHeader + content + BottomTabBar), horizontal padding                                                |
 | `src/components/layout/PageContainer.tsx`   | Width + vertical padding wrapper. `size="narrow" \| "standard" (default) \| "wide" \| "full"`                     |
 | `src/components/layout/PageHeader.tsx`      | Page title (h1, text-balance, 3xl bold) + optional `titleAdornment` + optional `actions`. Bottom border separator |
-| `src/components/layout/AppHeader.tsx`       | Unified responsive header (icon-only at md:, icon+text at lg:)                                                    |
-| `src/components/layout/BottomTabBar.tsx`    | Mobile tab bar (md:hidden), More sheet with secondary nav                                                         |
+| `src/components/layout/AppHeader.tsx`       | Unified responsive header. Its comments record why each tier appears where it does — read before changing one     |
+| `src/components/layout/BottomTabBar.tsx`    | Mobile tab bar (`md:hidden`) + the secondary-nav drawer (vaul `Drawer`, not `Sheet`)                              |
 | `src/components/layout/nav-config.ts`       | Shared NAV_ITEMS array used by AppHeader and BottomTabBar                                                         |
 | `src/components/layout/HelpMenu.tsx`        | Help dropdown (Feedback, What's New, Help, About) with badge                                                      |
 | `src/components/layout/ClientProviders.tsx` | Hoists `<TooltipProvider>` (`delayDuration={300}`) — don't add nested providers                                   |
 
 ## Label Standards
 
-- Status group labels: import from `STATUS_GROUP_LABELS` in `src/lib/issues/status.ts` ("Open", "In Progress", "Closed"). Never hardcode the strings.
-- Quick-select labels for "current user" filters are "Me" (assignee) and "My machines" (machines). Both shipped — see `AssigneePicker` and `MachineFilters`.
-- Status `wait_owner`: use `STATUS_CONFIG.wait_owner.label` as the canonical display string (currently "Pending Owner"). Mockups occasionally use "Wait Owner"; the config wins.
+- Status group labels: import `STATUS_GROUP_LABELS` from `src/lib/issues/status.ts`. Never hardcode the strings at a call site.
+- Quick-select labels for "current user" filters are **"Me"** (assignee — `src/components/issues/AssigneePicker.tsx`) and **"My machines"**. Reuse those exact strings rather than inventing "Mine" / "My games".
+  **"My machines" filters _issues_ by the machines the current user owns**, so it lives on the issues side: `src/lib/issues/filter-utils.ts` builds the quick-select item, `src/components/issues/IssueFilters.tsx` renders it. It is **not** in `MachineFilters.tsx`, which is the machines-list filter bar and has no owner-of-mine logic at all — a plausible-looking wrong turn, which is why it's called out.
+- Status `wait_owner`: render `STATUS_CONFIG.wait_owner.label`, never the raw enum value. Mockups occasionally spell it "Wait Owner" — **the config wins over the mockup**, and this has been decided; don't relitigate it from a design file.

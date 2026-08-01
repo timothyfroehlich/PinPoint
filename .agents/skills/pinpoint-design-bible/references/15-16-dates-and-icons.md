@@ -4,23 +4,17 @@ The date-formatting vocabulary and the lucide-react icon sizing rules.
 
 ## 15. Date Formatting Vocabulary
 
-> **Status — implemented.** Three canonical helpers live in [`src/lib/dates.ts`](../../../../src/lib/dates.ts). Use them; never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.
+**Dates are a closed vocabulary owned by [`src/lib/dates.ts`](../../../../src/lib/dates.ts).** Read that file for the helpers it currently exports and what each one renders — it is short, and it has grown since this section was first written, which is exactly why the list isn't duplicated here.
 
-| Helper                 | Output                         | When to use                                                  |
-| :--------------------- | :----------------------------- | :----------------------------------------------------------- |
-| `formatRelative(date)` | `"3 days ago"`, `"in 2 hours"` | Activity timestamps — comments, issue updates, notifications |
-| `formatDate(date)`     | `"Apr 17, 2026"`               | Absolute dates in detail views, created-at fields            |
-| `formatDateTime(date)` | `"Apr 17, 2026, 9:30 PM"`      | Admin audit logs, precise timestamps, debug info             |
+The rules, which the file can't tell you:
 
-All three accept `Date | string | number`. For `null` / `undefined` dates, null-guard at the call site and choose a context-appropriate placeholder (e.g., hiding the element, rendering `"—"`, or using a semantic placeholder like `"never"`).
+- **Never call `formatDistanceToNow` or `toLocaleDateString` directly from a component.** Every rendered date goes through the vocabulary.
+- **If no helper fits, add one to `dates.ts` — don't inline a variant at the call site.** The vocabulary is meant to grow; what it must not do is fragment.
+- **Null-guard at the call site.** The helpers take a real date; deciding what an absent date looks like — hidden, `"—"`, `"never"` — is a per-context choice, and pushing a default into the helper makes every caller inherit someone else's copy.
 
-**Why a vocabulary instead of raw calls?**
+**Why a vocabulary at all:** consistency (the same instant reads the same everywhere), locale safety (`toLocaleDateString()` renders differently per locale, which silently breaks visual regression tests), and refactor leverage (switching date library, or adding absolute-date tooltips on hover, is one file).
 
-- **Consistency.** "2 days ago" and "Apr 17" look the same everywhere.
-- **Locale safety.** `toLocaleDateString()` renders differently per locale, which breaks visual regression tests.
-- **Refactor leverage.** If we ever switch from `date-fns` to `Temporal` or add tooltips showing absolute dates on hover, we change one file.
-
-**Don't:** build custom formatting helpers per feature. If `formatRelative` / `formatDate` / `formatDateTime` don't cover a case, expand the vocabulary rather than inlining a new variant.
+One trap worth knowing: a _local_ `formatDate` also exists in the CSV export path, deliberately machine-readable rather than human-readable. Same name, different contract — don't assume an imported `formatDate` is this vocabulary's.
 
 ## 16. Icon Library
 
