@@ -46,6 +46,10 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 A Copilot review whose body says it could not review (quota limit, nothing to analyze) is **not** counted as a review by either review-state gate — it carries a real login and timestamp, so counting it made both gates green on a review that read nothing (PP-jw0s).
 
+**Since 2026-08-01 only the PR-open review fires automatically; a push past it needs an explicit `gh pr edit <PR> --add-reviewer "@copilot"`.** Both 600s timers above are still measured from the head push, so a PR awaiting a re-request nobody made waits out `currency` for a review that is never coming, then lands on a `reviewed` FAIL. Read that FAIL as "nobody re-requested," not as "post a Claude marker" — the marker is the fallback for a request Copilot didn't answer.
+
+Note also that both gates compare review **timestamps** against the head commit date, not `commit_id`. A review submitted after a later push but which actually read an earlier tree therefore reads as covering head — observed on #1784. PP-lzaw re-keys the timers to the request, splits "never requested" from "requested, still waiting" into distinct reported states, and should switch the coverage test to `commit_id`.
+
 ## Status Token Vocabulary
 
 Scripts emit machine-parseable status with these prefixes:
