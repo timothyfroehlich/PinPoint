@@ -263,10 +263,16 @@ def copilot_review_state(pr: int) -> tuple[str, str]:
     states, same ordering, same clock. States: marker, covered, awaiting,
     overdue, pushed_after, never_requested.
 
-    The distinction that matters: a request NEWER than the head push means a
+    The distinction that matters: a request NEWER than the head commit means a
     wait is legitimate; a head newer than the newest request means nobody is
     coming, because nothing re-requests automatically. Collapsing those into one
     "not reviewed yet" is what turns a forgotten request into an overnight stall.
+
+    "Newer than the head commit" is measured against the head commit's committer
+    date, which stands in for when head arrived on the branch — GitHub exposes no
+    push timestamp for a PR head. See the note at the comparison site in
+    _pr-gates.sh for how the two can differ and why neither skew can open a merge
+    path (coverage itself is decided by commit_id).
     """
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
     head_sha = gh("pr", "view", str(pr), "--json", "headRefOid", "--jq", ".headRefOid")

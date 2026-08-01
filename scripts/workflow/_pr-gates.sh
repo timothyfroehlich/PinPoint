@@ -235,8 +235,23 @@ _compute_review_state() {
   now_epoch=$(date -u +%s)
   if [ -n "$request_at" ]; then
     request_epoch=$(_epoch "$request_at")
-    # THE question, in one comparison: is there a request newer than the head push?
-    # Not "was a review ever requested" — every PR answers yes to that.
+    # THE question, in one comparison: is the newest request newer than the head
+    # COMMIT? Not "was a review ever requested" — every PR answers yes to that.
+    #
+    # The head commit's committer date stands in for "when head arrived on the
+    # branch". GitHub exposes no push timestamp for a PR head, and the two differ:
+    # a commit can be authored well before it is pushed, and a cherry-pick or a
+    # `git commit --date` can carry an older date still. Both endpoints agree on
+    # the substitution — see the same note in pr-watch.py.
+    #
+    # It errs in a known direction. Committer date EARLIER than the real push makes
+    # a request look like it covers a head it predates, so the gate reports
+    # `awaiting` (and after the window, `overdue`) instead of `pushed_after`: it
+    # still refuses to PASS, it just names the wrong reason for a while. The
+    # opposite skew — a committer date in the future — would read as `pushed_after`
+    # and demand a re-request that is already outstanding, which is noisy but
+    # equally cannot open a merge path. Coverage itself is decided by commit_id, so
+    # neither skew can make an unreviewed head PASS.
     if [ "$request_epoch" -ge "$head_epoch" ]; then
       RS_REQUEST_COVERS_HEAD=1
     fi
