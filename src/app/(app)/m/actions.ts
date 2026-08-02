@@ -9,7 +9,7 @@
 
 import { after } from "next/server";
 import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
+import { db, type DbTransaction } from "~/server/db";
 import {
   createMachine,
   updateMachinePresence,
@@ -23,6 +23,8 @@ import {
 } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { resolvePbmLinkColumns } from "~/lib/pinballmap/link-columns";
+import { pbmListingConflictMessage } from "~/lib/pinballmap/listing-conflict";
+import { resolveAutoLinkForMachine } from "~/lib/pinballmap/sync";
 import { type Result, ok, err } from "~/lib/result";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
@@ -191,6 +193,33 @@ function readPbmLinkFormFields(formData: FormData): {
         ? reasonRaw
         : undefined,
   };
+}
+
+/**
+ * Mirror the timeline receipt for a listing this save auto-captured
+ * (PP-o355.20). Called inside the update transaction so the receipt and the
+ * columns it describes commit together — a listing without a receipt would be a
+ * change nobody can see on the machine's timeline.
+ *
+ * `linked` (not `listed`) is the right action word: we captured a handle for an
+ * entry PinballMap already showed. Nothing here writes to PBM.
+ */
+async function emitAutoLinkReceipt(
+  tx: DbTransaction,
+  machineId: string,
+  lmxId: number,
+  actorId: string
+): Promise<void> {
+  await createMachineTimelineEvent(
+    machineId,
+    {
+      sourceType: "lifecycle",
+      tag: "lifecycle",
+      eventData: { kind: "pinballmap_listing", action: "linked", lmxId },
+      actorId,
+    },
+    tx
+  );
 }
 
 /**
@@ -637,6 +666,12 @@ export async function updateMachineAction(
   const { id, name, ownerId, presenceStatus, forcePromoteUserId } =
     validation.data;
 
+  // Set when this save auto-captured a listing (PP-o355.20). Declared out here
+  // because three places need it: the two update transactions, which mirror the
+  // timeline receipt, and the catch, which needs the title to name the incumbent
+  // on a one-lister collision.
+  let autoLink: { lmxId: number; pinballmapMachineId: number } | null = null;
+
   try {
     // Load current machine by id — permission check is authoritative.
     // Pre-load presenceStatus and the joined active-owner display name so
@@ -720,6 +755,36 @@ export async function updateMachineAction(
       });
       if (!pbm.ok) return err("VALIDATION", pbm.message);
       pbmColumns = pbm.columns;
+
+      // Auto-link (PP-o355.20): the moment a cabinet is matched to a title that
+      // is already on Pinball Map's lineup, capture that listing in the same
+      // save. Matching is the human judgment; attaching the lmx is bookkeeping
+      // that mirrors what PBM already shows, so it is not a second button.
+      //
+      // Only from unlisted → listed. A row the carry-over above kept listed is
+      // skipped entirely, which is also why this can never produce a heal: lmx
+      // drift belongs to the hourly pass, not to whoever happened to hit Save.
+      if (
+        pbmColumns.pinballmapMachineId !== null &&
+        !pbmColumns.pinballmapListed
+      ) {
+        const titleId = pbmColumns.pinballmapMachineId;
+        const captured = await resolveAutoLinkForMachine({
+          machineId: id,
+          pinballmapMachineId: titleId,
+          // The prospective row: an edit can change availability in the same
+          // submit, and availability is what the tie guard ranks on.
+          presenceStatus: presenceStatus ?? currentMachine.presenceStatus,
+        });
+        if (captured) {
+          autoLink = { lmxId: captured.lmxId, pinballmapMachineId: titleId };
+          pbmColumns = {
+            ...pbmColumns,
+            pinballmapListed: true,
+            pinballmapLmxId: captured.lmxId,
+          };
+        }
+      }
     }
 
     // Handle forcePromoteUserId path
@@ -830,6 +895,10 @@ export async function updateMachineAction(
           },
           user.id
         );
+
+        if (autoLink) {
+          await emitAutoLinkReceipt(tx, id, autoLink.lmxId, user.id);
+        }
 
         return [updatedMachine];
       });
@@ -1037,6 +1106,10 @@ export async function updateMachineAction(
         user.id
       );
 
+      if (autoLink) {
+        await emitAutoLinkReceipt(tx, id, autoLink.lmxId, user.id);
+      }
+
       return [updatedMachine];
     });
 
@@ -1102,21 +1175,27 @@ export async function updateMachineAction(
     if (error instanceof MachineNotFoundError) {
       return err("NOT_FOUND", "Machine not found.");
     }
-    // NO listing-collision catch here, deliberately (PP-o355.29). This action
-    // cannot touch `initials`, so `machines_pinballmap_listed_unique` is the
-    // only unique constraint it could ever violate — and it cannot reach that
-    // one either. The sole way it sets `pinballmapListed` true is the carry-over
-    // above, gated on `linkUnchanged && currentMachine.pinballmapListed`: it
-    // rewrites a value the same row already holds for the same title, which
-    // cannot collide with itself. Nor can a concurrent writer set up the
-    // collision, because the precondition — two cabinets of one title both
-    // listed — is the exact state the index forbids; seeding it fails.
+    // Auto-link makes this action a listing writer again (PP-o355.20), so the
+    // one-lister index `machines_pinballmap_listed_unique` is reachable once
+    // more and a bare 23505 is unambiguous — this action cannot touch
+    // `initials`, the only other unique constraint on the table.
     //
-    // PP-o355.15 added a catch here, correctly, while a form post could set the
-    // flag. Closing that made the branch unreachable AND untestable, so it is
-    // removed rather than shipped uncovered. PP-o355.20 runs auto-link at
-    // title-save time, which makes this path a listing writer again — that bead
-    // re-adds the catch together with the test that can finally reach it.
+    // It is a CONCURRENCY backstop, not a load-bearing branch, and the honest
+    // reading of that is: it is not directly testable. `resolveAutoLinkForMachine`
+    // reads the title's whole group first and stands down unless this cabinet is
+    // the sole eligible holder, so a single writer never collides. Reaching it
+    // needs a second transaction to list another cabinet of the same title
+    // between our group read and our write — and the state that would let a test
+    // *seed* the collision (two cabinets of one title both listed) is the exact
+    // state the index forbids. VALIDATION, not SERVER: unlisting the other
+    // cabinet fixes it, and SERVER would render a correctable condition as a
+    // crash (PP-o355.15).
+    if (autoLink && isPgErrorCode(error, "23505")) {
+      return err(
+        "VALIDATION",
+        await pbmListingConflictMessage(autoLink.pinballmapMachineId, id)
+      );
+    }
     return serverActionError(
       error,
       "SERVER",

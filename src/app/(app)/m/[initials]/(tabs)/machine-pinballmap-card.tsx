@@ -41,9 +41,18 @@ const DESYNC_COPY: Partial<Record<PbmMachineStatus["reason"], string>> = {
   // the next cron, and it repairs itself. Showing it would report a
   // self-healing transient to someone who can do nothing about it.
   //
-  // The two that remain are NOT self-healing: sync deliberately never flips
-  // `pinballmapListed` ("that stays a human decision"), so those mismatches
-  // persist until a person acts, and this alert is the only signal they exist.
+  // Of the two that remain, only `listed_locally_absent_on_pbm` is durable:
+  // nothing ever auto-unlists, so it persists until a person acts and this
+  // alert is the only signal it exists.
+  //
+  // `on_pbm_not_listed_locally` became mostly transient with auto-link
+  // (PP-o355.20) — the hourly pass now captures the listing for a lone eligible
+  // cabinet, so the state clears itself within an hour. It survives only where
+  // auto-link stands down: same-title cabinets tied at the top presence rank.
+  // That is arguably the `lmx_drifted` argument again, and a tie is meant to be
+  // invisible (`listing-holder` §7), so this row is a candidate for removal —
+  // but which of the six listing states this card shows is PP-o355.21's call,
+  // not a side effect of the server-side bead. Left as-is deliberately.
 };
 
 export interface MachinePinballmapCardProps {

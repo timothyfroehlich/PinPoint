@@ -1,19 +1,25 @@
 /**
- * Integration Test: PinballMap reconcile pass (PP-o355.11)
+ * Integration Test: PinballMap reconcile pass (PP-o355.11, PP-o355.20)
  *
- * `reconcileAfterSync` reads the persisted location snapshot and heals stored
- * `pinballmapLmxId` drift — the title is still on PBM, just under a new lmx id
- * (a delete+re-add outside PBM's resurrection window). It NEVER auto-unlists a
- * machine that fell off PBM's lineup (that's a human decision on the status
- * page); it only counts those as `desynced` for reporting. No PBM HTTP here —
- * pure DB read/write off the stored snapshot.
+ * `reconcileAfterSync` reads the persisted location snapshot and applies the two
+ * writes it is allowed to make: capturing a listing for a matched, unlisted
+ * cabinet whose title is on the lineup (auto-link), and healing a stored
+ * `pinballmapLmxId` that drifted — same title, new lmx id after a delete+re-add
+ * outside PBM's resurrection window. It NEVER auto-unlists a machine that fell
+ * off PBM's lineup (that's a human decision on the status page); it only counts
+ * those as `desynced` for reporting. No PBM HTTP here — pure DB read/write off
+ * the stored snapshot.
+ *
+ * The write decisions themselves are unit-tested in
+ * `src/lib/pinballmap/auto-link.test.ts`; these cover the DB wiring — which rows
+ * change, what the counters report, and that each write leaves a receipt.
  */
 
 import { describe, it, expect, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { createTestMachine } from "~/test/helpers/factories";
-import { machines, pinballmapState } from "~/server/db/schema";
+import { machines, pinballmapState, timelineEvents } from "~/server/db/schema";
 import type { LocationSnapshot } from "~/lib/pinballmap/types";
 
 vi.mock("~/server/db", async () => {
@@ -78,6 +84,7 @@ describe("reconcileAfterSync (PGlite)", () => {
     const result = await reconcileAfterSync();
 
     expect(result.healed).toBe(1);
+    expect(result.linked).toBe(0);
     expect(result.desynced).toBe(1);
 
     const [healedRow] = await db
@@ -98,6 +105,90 @@ describe("reconcileAfterSync (PGlite)", () => {
   it("returns zeroes when there is no stored snapshot", async () => {
     const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
     const result = await reconcileAfterSync();
-    expect(result).toEqual({ healed: 0, desynced: 0 });
+    expect(result).toEqual({ healed: 0, linked: 0, desynced: 0 });
+  });
+
+  it("auto-links a matched, unlisted cabinet whose title is on the lineup", async () => {
+    const db = await getTestDb();
+    const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+    // Matched to title 42 but never listed — before PP-o355.20 this was the
+    // state APC's whole fleet sat in, reported as "on PBM, not listed here".
+    const matched = createTestMachine({
+      initials: "AL",
+      name: "Auto Linked",
+      pinballmapMachineId: 42,
+    });
+    await db.insert(machines).values([matched]);
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      snapshotJson: snapshotWith([{ id: 999, machineId: 42 }]),
+      lastSyncStatus: "ok",
+    });
+
+    const result = await reconcileAfterSync();
+
+    expect(result.linked).toBe(1);
+    expect(result.healed).toBe(0);
+    // It was the ONLY desynced machine; auto-linking it resolves the desync
+    // rather than leaving it to be counted twice over.
+    expect(result.desynced).toBe(0);
+
+    const [row] = await db
+      .select()
+      .from(machines)
+      .where(eq(machines.id, matched.id));
+    expect(row?.pinballmapListed).toBe(true);
+    expect(row?.pinballmapLmxId).toBe(999);
+
+    // A listing that appears with no timeline entry is a change nobody can see.
+    const events = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, matched.id));
+    expect(events).toHaveLength(1);
+    expect(events[0]?.eventData).toEqual({
+      kind: "pinballmap_listing",
+      action: "linked",
+      lmxId: 999,
+    });
+    // The hourly pass has no human behind it, so the receipt carries no actor.
+    expect(events[0]?.authorId).toBeNull();
+  });
+
+  it("stands down on a tie, and does not report the tie as needing attention", async () => {
+    const db = await getTestDb();
+    const { reconcileAfterSync } = await import("~/lib/pinballmap/sync");
+
+    // Two cabinets of one title, equally present. PBM gives that title a single
+    // lmx, and nothing tells us which cabinet it belongs to — so we choose
+    // neither. Crucially the tie must also stay OUT of `desynced`: it raises no
+    // alert by design (`listing-holder` §7), and counting it would be the alert.
+    const first = createTestMachine({
+      initials: "T1",
+      name: "Twin One",
+      pinballmapMachineId: 42,
+    });
+    const second = createTestMachine({
+      initials: "T2",
+      name: "Twin Two",
+      pinballmapMachineId: 42,
+    });
+    await db.insert(machines).values([first, second]);
+    await db.insert(pinballmapState).values({
+      id: "singleton",
+      locationId: 26454,
+      snapshotJson: snapshotWith([{ id: 999, machineId: 42 }]),
+      lastSyncStatus: "ok",
+    });
+
+    const result = await reconcileAfterSync();
+
+    expect(result).toEqual({ healed: 0, linked: 0, desynced: 0 });
+
+    const rows = await db.select().from(machines);
+    expect(rows.every((r) => !r.pinballmapListed)).toBe(true);
+    expect(rows.every((r) => r.pinballmapLmxId === null)).toBe(true);
   });
 });
