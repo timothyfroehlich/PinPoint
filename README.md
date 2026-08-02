@@ -118,9 +118,10 @@ This restarts Supabase, drops app tables, reapplies all migrations, regenerates 
 
 ```bash
 pnpm run dev          # start dev server
-pnpm run check        # typecheck + lint + unit/integration tests
-pnpm run test         # unit + PGlite integration tests
+pnpm run check        # static gate: typecheck + lint + format (no tests, no Python)
+pnpm run test         # unit tests (PGlite)
 pnpm run test:integration   # Supabase-backed integration tests
+pnpm run check:python # ruff + pytest over scripts/ and the hooks
 pnpm run smoke        # Playwright smoke E2E tests
 pnpm run preflight    # full local CI gate before pushing
 ```

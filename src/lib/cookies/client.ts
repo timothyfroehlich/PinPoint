@@ -12,8 +12,16 @@ import {
  * The cookie will be immediately available for the next server request.
  */
 function setClientCookie(name: string, value: string, maxAge: number): void {
+  // `window?.location` is NOT an equivalent rewrite: `?.` guards a nullish
+  // *value*, not an undeclared *binding*. Under SSR `window` is undeclared, so
+  // the optional chain would still throw a ReferenceError. typescript-eslint
+  // knows this and stays quiet; oxlint doesn't, so it is silenced here rather
+  // than dropped from the mirror wholesale. Block form because the expression
+  // wraps onto a continuation line and `-next-line` would miss it. (PP-4zcj.)
+  /* oxlint-disable typescript/prefer-optional-chain */
   const secure =
     typeof window !== "undefined" && window.location.protocol === "https:";
+  /* oxlint-enable typescript/prefer-optional-chain */
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax${secure ? "; Secure" : ""}`;
 }
 

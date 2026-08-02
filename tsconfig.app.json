@@ -15,7 +15,21 @@
     // Additional settings beyond @tsconfig/strictest
     "composite": true, // Referenceable leaf project (PP-4k76)
     "strictNullChecks": true, // Explicit for emphasis (part of "strict")
-    "forceConsistentCasingInFileNames": true // Cross-platform safety
+    "forceConsistentCasingInFileNames": true, // Cross-platform safety
+    // Required by oxlint's tsgolint engine. Because `noEmit` cannot be set here
+    // (TS6310, see above), the *default* output dir is each input's own
+    // directory — so a `.mjs` input like scripts/lib/db-target.mjs resolves to
+    // "write over yourself" (TS5055). `tsc` and `next build` never hit that
+    // (they pass/force --noEmit), but tsgolint builds the program directly and
+    // does, so emit is pointed at a scratch dir instead. Only `.tsbuildinfo`
+    // ever lands there, never JS; it is gitignored.
+    //
+    // NOT a no-op, despite only ever being read: setting `outDir` makes this
+    // composite project require that EVERY file in the program be listed in
+    // `include` (TS6307) — which is why the JSON globs below had to be added.
+    // Add a new import of a non-.ts file type and you may need to widen
+    // `include` again. (PP-4zcj.)
+    "outDir": "./.oxlint-tsbuild/app"
   },
   "include": [
     "next-env.d.ts",
@@ -27,7 +41,13 @@
     // Imported by scripts/mark-migration-applied.ts (a `**/*.ts` match). Under
     // `composite: true` every file pulled into the program must be listed
     // (TS6307), and the `**/*.ts` glob does not cover `.mjs`.
-    "scripts/lib/db-target.mjs"
+    "scripts/lib/db-target.mjs",
+    // JSON imports (resolveJsonModule). Same TS6307 rule as db-target.mjs above:
+    // once `outDir` is set, composite requires every program file to be listed,
+    // and JSON pulled in by an import is a program file. Globs rather than exact
+    // paths so a new JSON import doesn't silently break `typecheck`. (PP-4zcj.)
+    "content/**/*.json",
+    "src/**/*.json"
   ],
   "exclude": [
     "node_modules",

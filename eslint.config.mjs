@@ -10,6 +10,32 @@ import jsxA11y from "eslint-plugin-jsx-a11y";
 import globals from "globals";
 import { pinpointTransactionPlugin } from "./eslint-rules/no-side-effects-in-transaction.mjs";
 
+// ===== Slim mode (PP-4zcj) =====
+// This config is AUTHORITATIVE and complete. CI always runs it whole
+// (`pnpm run lint`, ci.yml "ESLint" job) with PINPOINT_LINT_SLIM unset, so the
+// ruleset CI evaluates is unchanged from before this flag existed.
+//
+// When the flag IS set, `pnpm run lint:_slim` drops every rule that needs type
+// information — because building the TypeScript Program is the entire cost of a
+// lint run (14.86s / 3152 MB). Those rules are covered locally by `oxlint`'s
+// tsgolint engine instead (0.94s / 932 MB), and the two run in parallel as
+// `pnpm run lint:local` (3.76s), which is what `pnpm run check` runs.
+//
+// The mirror is a SPEED optimization, never a coverage bet: this branch only
+// ever REMOVES rules, and anything it or oxlint misses is still caught by the
+// full ESLint run in CI. Drift therefore fails safe — CI-only failure, never
+// silent loss. Keep .oxlintrc.json in sync when you add a type-aware rule here.
+const SLIM = process.env["PINPOINT_LINT_SLIM"] === "1";
+
+// typescript-eslint's own switch for "turn off every rule that needs type
+// information" (61 rules). Using the upstream set rather than a hand-listed one
+// means a type-aware rule added to this config later is handled automatically
+// instead of silently crashing the slim pass. Spread LAST so it wins over the
+// tuned rules above it. Empty when not slim.
+const disableTypeChecked = SLIM
+  ? typescriptEslint.configs["disable-type-checked"].rules
+  : {};
+
 export default [
   js.configs.recommended,
   {
@@ -50,7 +76,9 @@ export default [
         // composite declarations, which made `eslint --fix`'s re-parse see
         // imported app types as error/any in test files and fail lint-staged
         // pre-commit with false positives (PP-v2ne).
-        projectService: true,
+        // Slim mode turns the project service off — that Program build is the
+        // whole cost, and with the type-aware rules gone nothing consumes it.
+        projectService: !SLIM,
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -174,8 +202,15 @@ export default [
       // Require description for all disable comments
       "eslint-comments/require-description": ["error", { ignore: [] }],
 
-      // Remove stale disable comments
-      "eslint-comments/no-unused-disable": "error",
+      // Remove stale disable comments. Off in slim mode: with the type-aware
+      // rules gone, every `-- @typescript-eslint/no-unnecessary-condition`
+      // disable in src/ reads as unused and reports a false positive. CI's full
+      // run still enforces it, so nothing is lost.
+      "eslint-comments/no-unused-disable": SLIM ? "off" : "error",
+
+      // Slim mode only (see the SLIM note at the top of this file). Must stay
+      // last in this object so it overrides the tuned type-aware rules above.
+      ...disableTypeChecked,
     },
   },
   {
