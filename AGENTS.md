@@ -125,12 +125,12 @@ Together ~3.8s vs full ESLint's ~14.9s, and peak RSS ~1.2 GB vs ~3.2 GB — the 
 1. Add a type-aware rule to `eslint.config.mjs` → add it to `.oxlintrc.json` too, **including any per-override `"off"`**. Rules oxlint still classifies as nursery (e.g. `no-unnecessary-condition`) are skipped by `@oxlint/migrate` and must be listed by hand.
 2. A lint failure that reproduces only in CI means the mirror drifted. Fix the mirror; don't treat it as flake.
 
-**`typescript/prefer-optional-chain` is deliberately absent from `.oxlintrc.json`** — do not "restore" it without reading this. ESLint has it at `"error"` and oxlint 1.76 implements it, but oxlint fires on two call sites where typescript-eslint stays silent, and the two are not the same kind of disagreement:
+**`typescript/prefer-optional-chain` is stricter in oxlint than in typescript-eslint.** It is enabled in both, but oxlint fires on two shapes ESLint stays silent on, and they needed opposite treatment:
 
-- `src/lib/cookies/client.ts:16` — `typeof window !== "undefined" && window.location.protocol === …`. Here **oxlint is simply wrong**: `?.` guards null/undefined _values_, not undeclared _bindings_, so `window?.location` still throws `ReferenceError` under SSR (verified: `undeclared?.foo` throws). Taking the suggestion would break the server render.
-- `src/components/machines/PinballMapLinkField.tsx:221` — `family !== null && family.pinballmapMachineId === null && family.editionCount > 1`. Here **oxlint is right and typescript-eslint is merely conservative**: the optional-chain rewrite is semantically equivalent and type-checks clean, because TS narrows `family` to non-null after `family?.pinballmapMachineId === null` (if `family` were nullish that operand would be `undefined === null`, i.e. false).
+- `src/lib/cookies/client.ts` — `typeof window !== "undefined" && window.location…`. **oxlint is wrong here**: `?.` guards a nullish _value_, not an undeclared _binding_, so `window?.location` still throws `ReferenceError` under SSR (verified: `undeclared?.foo` throws). Silenced with a scoped `/* oxlint-disable */` … `/* oxlint-enable */` pair — block form, because the expression wraps and `-next-line` would miss it. The suppression is narrow: a violation elsewhere in that file is still caught.
+- `src/components/machines/PinballMapLinkField.tsx` — a `family !== null && family.x === null && family.y > 1` chain. **oxlint was right and typescript-eslint merely conservative**: the rewrite is semantically equivalent and type-checks clean, because TS narrows `family` to non-null once `family?.x === null` holds. Rewritten.
 
-Either way the rule can't go in the mirror as things stand: it fires where authoritative ESLint does not, which is local RED / CI GREEN — the one failure direction this architecture exists to prevent. Enabling it would require fixing site 2 _and_ suppressing site 1. Re-test on a future oxlint release.
+The general rule this illustrates: when the mirror is stricter than authoritative ESLint, fix or suppress the specific site — don't drop the rule, which would silently widen the coverage gap. (PP-4zcj.)
 
 (PP-4zcj.)
 
