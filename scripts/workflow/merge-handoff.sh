@@ -55,31 +55,48 @@ is_draft=$(jq -r '.isDraft' <<< "$meta")
 pr_state=$(jq -r '.state' <<< "$meta")
 short_head="${head_sha:0:7}"
 
-# Both sides are fetched and read back off FETCH_HEAD as bare SHAs, so this script updates
-# no ref of yours — not the remote-tracking branches, not a local branch. It runs from
-# whatever worktree Tim happens to be in, often while agents hold other worktrees of the
-# same repo, and a reporting command has no business moving refs those depend on.
+# Both sides are read back off FETCH_HEAD as bare SHAs, and `--refmap=` suppresses the
+# opportunistic remote-tracking update that `git fetch origin main` would otherwise do
+# through the configured `refs/heads/*:refs/remotes/origin/*` refspec. So this genuinely
+# updates no ref of yours — not `origin/main`, not a local branch. It runs from whatever
+# worktree Tim happens to be in, often while agents hold worktrees of the same repo, and
+# a reporting command has no business moving refs those depend on.
 #
 # The PR head comes from its pull ref rather than its branch name: the branch may not exist
 # locally, may be checked out in another worktree, or may live on a fork.
-if ! git fetch -q origin "$base_ref"; then
+if ! git fetch -q --refmap= origin "$base_ref"; then
   echo "merge-handoff.sh: could not fetch ${base_ref} from origin" >&2
   exit 1
 fi
 base_sha=$(git rev-parse FETCH_HEAD)
 
-if ! git fetch -q origin "pull/${pr}/head"; then
-  echo "merge-handoff.sh: could not fetch head of PR #${pr} from origin" >&2
-  exit 1
-fi
-fetched_head=$(git rev-parse FETCH_HEAD)
+fetch_pr_head() {
+  if ! git fetch -q --refmap= origin "pull/${pr}/head"; then
+    echo "merge-handoff.sh: could not fetch head of PR #${pr} from origin" >&2
+    exit 1
+  fi
+  git rev-parse FETCH_HEAD
+}
+fetched_head=$(fetch_pr_head)
 
-if ! git cat-file -e "${head_sha}^{commit}" 2>/dev/null; then
-  # `gh` named a SHA the fetch did not bring down — a push landed in between. Report on
-  # what was actually fetched and say so, rather than mixing GitHub's view of head with
-  # git's view of the tree.
-  echo "merge-handoff.sh: warning — head moved during the report (gh said ${short_head}," >&2
-  echo "  fetched ${fetched_head:0:7}); reporting on the fetched commit." >&2
+# `gh` and the pull ref disagreeing means a push landed mid-report (or GitHub has not
+# propagated one to the other yet). ONE retry, because the pull ref catches up in seconds.
+#
+# Tested by SHA inequality, not by "is the object missing": the fetch brings down the new
+# head's whole ancestry, and in the race being guarded against the SHA `gh` named IS an
+# ancestor of what was fetched — so an existence check always passes and the guard never
+# fires. That is the dangerous direction. The gate answers (review marker, CI, threads)
+# come from `gh` at one SHA while the diff comes from git at another, and the report would
+# then hand over a merge command for a head nobody reviewed, which is the exact false
+# green this script exists to prevent.
+head_raced=""
+if [[ "$head_sha" != "$fetched_head" ]]; then
+  fetched_head=$(fetch_pr_head)
+fi
+if [[ "$head_sha" != "$fetched_head" ]]; then
+  head_raced="gh says ${short_head}, pull ref says ${fetched_head:0:7}"
+  echo "merge-handoff.sh: warning — head moved during the report (${head_raced})." >&2
+  echo "  Reporting on the fetched commit; re-run once the push settles." >&2
   head_sha=$fetched_head
   short_head="${head_sha:0:7}"
 fi
@@ -124,16 +141,24 @@ rv_sha=$(cut -f2 <<< "$record")
 rv_depth=$(cut -f3 <<< "$record")
 rv_at=$(cut -f4 <<< "$record")
 
+# Two of the depths do not name a `/code-review` level, and printing one for them would
+# be this script asserting a review that never ran — in the one place whose whole claim is
+# that nothing here is recalled. Shared by both marker branches: it was duplicated, and
+# the stale branch was the copy that forgot.
+depth_phrase() {
+  case "$1" in
+    trivial) printf 'attested trivial (no /code-review run)\n' ;;
+    unrecorded) printf 'depth unrecorded (marker predates PP-9onv)\n' ;;
+    *) printf '/code-review %s\n' "$1" ;;
+  esac
+}
+
 review_desc=""
 since_review_from=""
+since_review_note=""
 case "$rv_state" in
   marker)
-    case "$rv_depth" in
-      trivial) review_desc="attested trivial (no /code-review run)" ;;
-      unrecorded) review_desc="depth unrecorded (marker predates PP-9onv)" ;;
-      *) review_desc="/code-review ${rv_depth}" ;;
-    esac
-    review_desc="${review_desc} · ${rv_at} · covers head ${short_head}"
+    review_desc="$(depth_phrase "$rv_depth") · ${rv_at} · covers head ${short_head}"
     ;;
   stale_marker)
     # "How many revisions back" only has an answer when the reviewed commit is still an
@@ -142,10 +167,11 @@ case "$rv_state" in
     if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
       && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
       behind=$(git rev-list --count "${rv_sha}..${head_sha}")
-      review_desc="/code-review ${rv_depth} · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
+      review_desc="$(depth_phrase "$rv_depth") · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
       since_review_from=$rv_sha
     else
-      review_desc="/code-review ${rv_depth} · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
+      review_desc="$(depth_phrase "$rv_depth") · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
+      since_review_note="unknowable — the reviewed commit is not an ancestor of head"
     fi
     ;;
   *)
@@ -214,6 +240,11 @@ diff_vs_main=$(format_buckets "${vs_main[@]}")
 if [[ -n "$since_review_from" ]]; then
   read -r -a since <<< "$(diff_buckets "$since_review_from" "$head_sha")"
   diff_since_review=$(format_buckets "${since[@]}")
+elif [[ -n "$since_review_note" ]]; then
+  # A review exists; it is the DISTANCE that has no answer. Saying "nothing reviewed to
+  # compare against" here would contradict the review line two rows above, which names
+  # the reviewed SHA.
+  diff_since_review=$since_review_note
 elif [[ "$rv_state" == "marker" ]]; then
   diff_since_review="none — the review covers head"
 else
@@ -255,16 +286,39 @@ if [[ -z "$env_added" ]]; then
   env_added="none"
 fi
 
+UI_PATHS='(^src/app/.*\.tsx$|^src/components/|\.css$)'
 ui_changed=no
-if grep -qE '(^src/app/.*\.tsx$|^src/components/|\.css$)' <<< "$changed_paths"; then
+if grep -qE "$UI_PATHS" <<< "$changed_paths"; then
   ui_changed=yes
 fi
 
 shots=$(gh api --paginate "repos/$(_repo_slug)/issues/${pr}/comments" \
   | jq -rs --arg marker "$SCREENSHOT_MARKER" \
       '[ .[] | flatten | .[] | select((.body // "") | startswith($marker)) ] | last.updated_at // ""')
+
+# "Screenshots exist" is not "screenshots of this" — the sticky comment survives every
+# later push, so a UI commit landing after it leaves the report vouching for pictures of
+# an older tree. Every other claim in this block is pinned to a commit; this was the one
+# "trust me" field.
+#
+# Compared as UTC strings in GitHub's own format, which sorts lexicographically — date
+# arithmetic would need GNU `date -d`, and this has to run on the Mac too. Commit dates
+# can be rewritten, so this is a staleness signal, not proof.
+last_ui_commit=""
+if [[ "$ui_changed" == "yes" ]]; then
+  ui_files=()
+  while IFS= read -r ui_file; do
+    ui_files+=("$ui_file")
+  done < <(grep -E "$UI_PATHS" <<< "$changed_paths")
+  last_ui_commit=$(TZ=UTC0 git log -1 --format='%cd' --date=format:'%Y-%m-%dT%H:%M:%SZ' \
+    "${merge_base}..${head_sha}" -- "${ui_files[@]}" 2>/dev/null || true)
+fi
+
 if [[ -n "$shots" ]]; then
   ui_line="${ui_changed} · screenshots posted ${shots}"
+  if [[ -n "$last_ui_commit" && "$last_ui_commit" > "$shots" ]]; then
+    ui_line="${ui_line} · STALE: UI changed at ${last_ui_commit}, after the screenshots"
+  fi
 elif [[ "$ui_changed" == "yes" ]]; then
   ui_line="yes · NO screenshots posted"
 else
@@ -314,6 +368,9 @@ printf '  %s\n' "$url"
 if [[ "$is_draft" == "true" ]]; then
   printf '  DRAFT — not ready for review\n'
 fi
+if [[ -n "$head_raced" ]]; then
+  printf '  HEAD MOVED while this ran (%s) — re-run before acting on it\n' "$head_raced"
+fi
 rule
 printf '  review        %s\n' "$review_desc"
 printf '  ci            %s\n' "$(gate_state "$ci_out")"
@@ -336,6 +393,9 @@ if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict:
 if [[ "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — Tim runs /code-review, then the agent attests"; fi
 if [[ "$is_draft" == "true" ]]; then add_block "draft: flip to ready-for-review"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
+# The gate answers came from `gh` at one SHA and the diff from git at another, so no
+# combination of them is a statement about a single tree. Nothing is merged on that.
+if [[ -n "$head_raced" ]]; then add_block "head moved mid-report (${head_raced}) — re-run"; fi
 
 if [[ ${#blocking[@]} -gt 0 ]]; then
   printf '  NOT MERGEABLE YET — %s gate(s) blocking:\n' "${#blocking[@]}"

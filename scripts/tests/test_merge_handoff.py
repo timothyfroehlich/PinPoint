@@ -81,6 +81,7 @@ class Scenario:
     draft: bool = False
     review: str | None = None
     review_depth: str = "medium"
+    gh_head: str = "head"
     threads: list[dict] = field(default_factory=list)
     comments: list[dict] = field(default_factory=list)
     title: str = "feat(thing): do the thing (PP-abcd)"
@@ -98,10 +99,17 @@ def marker(sha: str, depth: str = "medium") -> dict:
     }
 
 
-def screenshot_comment() -> dict:
+# Fixed timestamps, not "now": the staleness check compares the screenshot comment's
+# time against the last UI commit's, and the fixture's commits happen at run time. A
+# real clock would make one of these two tests pass or fail depending on the hour.
+SHOTS_AFTER_COMMITS = "2099-01-01T00:00:00Z"
+SHOTS_BEFORE_COMMITS = "2000-01-01T00:00:00Z"
+
+
+def screenshot_comment(at: str = SHOTS_AFTER_COMMITS) -> dict:
     return {
         "body": "<!-- pr-screenshots -->\n| desktop | mobile |",
-        "updated_at": "2026-08-02T19:10:00Z",
+        "updated_at": at,
     }
 
 
@@ -174,7 +182,11 @@ def repo_with_pr(
             "title": scenario.title,
             "url": f"https://github.com/acme/widget/pull/{PR}",
             "headRefName": scenario.branch,
-            "headRefOid": head_sha,
+            "headRefOid": (
+                head_sha
+                if scenario.gh_head == "head"
+                else git("rev-parse", f"HEAD~{scenario.gh_head}", cwd=work)
+            ),
             "baseRefName": "main",
             "isDraft": scenario.draft,
             "state": scenario.state,
@@ -405,7 +417,22 @@ def test_posted_screenshots_are_reported_with_their_timestamp() -> None:
         branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
         scenario=Scenario(comments=[screenshot_comment()]),
     ) as (_head, run):
-        assert "screenshots posted 2026-08-02T19:10:00Z" in run.stdout, run.stdout
+        assert f"screenshots posted {SHOTS_AFTER_COMMITS}" in run.stdout, run.stdout
+        assert "STALE" not in run.stdout
+
+
+def test_screenshots_older_than_the_last_ui_commit_are_flagged_stale() -> None:
+    """ "Screenshots exist" is not "screenshots of this".
+
+    The sticky comment survives every later push, so a UI commit landing after it leaves
+    the report vouching for pictures of an older tree — the one field that was still
+    "trust me" while every other claim is pinned to a commit.
+    """
+    with repo_with_pr(
+        branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
+        scenario=Scenario(comments=[screenshot_comment(SHOTS_BEFORE_COMMITS)]),
+    ) as (_head, run):
+        assert "STALE: UI changed at" in run.stdout, run.stdout
 
 
 # --- Review distance ----------------------------------------------------------------
@@ -483,3 +510,83 @@ def test_a_pr_with_no_bead_says_so_rather_than_inventing_one() -> None:
         scenario=Scenario(title="chore: tidy up", branch="chore/tidy-up"),
     ) as (_head, run):
         assert "bead none in title or branch" in run.stdout, run.stdout
+
+
+# --- The head-moved race ------------------------------------------------------------
+
+
+def test_a_head_that_moved_mid_report_blocks_the_merge_command() -> None:
+    """`gh` and the pull ref naming different commits means no single tree was reported.
+
+    The gate answers (review marker, CI, threads) come from `gh` at one SHA while the
+    diff comes from git at another, so the block is not a statement about anything
+    mergeable — even when every individual gate reads green.
+    """
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(review="head", gh_head="1"),
+    ) as (_head, run):
+        assert run.returncode == 0, run.stderr
+        assert "HEAD MOVED" in run.stdout, run.stdout
+        assert "head moved mid-report" in run.stdout
+        assert MERGE_CMD not in run.stdout
+
+
+def test_the_race_is_detected_by_sha_not_by_a_missing_object() -> None:
+    """The trap this replaced: the fetch brings down the new head's whole ancestry.
+
+    In the race being guarded against, the SHA `gh` named IS an ancestor of what was
+    fetched — `git cat-file -e` therefore always succeeded and the guard never fired,
+    silently reporting gate answers for one commit and a diff for another.
+    """
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(review="head", gh_head="1"),
+    ) as (head, run):
+        # The commit gh reported is a real, locally-present ancestor of head.
+        assert head not in run.stdout.split("HEAD MOVED")[0]
+        assert "HEAD MOVED" in run.stdout, run.stdout
+
+
+# --- Depths that name no /code-review level -----------------------------------------
+
+
+@pytest.mark.parametrize(
+    "depth,expected",
+    [
+        pytest.param("trivial", "attested trivial (no /code-review run)", id="trivial"),
+        pytest.param(
+            "unrecorded", "depth unrecorded (marker predates PP-9onv)", id="unrecorded"
+        ),
+    ],
+)
+def test_a_stale_marker_does_not_invent_a_code_review_level(
+    depth: str, expected: str
+) -> None:
+    """The stale branch used to hardcode `/code-review <depth>`.
+
+    A stale `trivial` self-attestation rendered as `/code-review trivial`, and every
+    pre-PP-9onv marker as `/code-review unrecorded` — this script asserting a review
+    that never ran, in the one place whose whole claim is that nothing is recalled.
+    """
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        extra_branch_commit={"src/lib/other.ts": "y\n"},
+        scenario=Scenario(review="previous", review_depth=depth),
+    ) as (_head, run):
+        assert expected in run.stdout, run.stdout
+        assert f"/code-review {depth}" not in run.stdout
+
+
+def test_an_unknowable_review_distance_does_not_read_as_no_review() -> None:
+    """A review exists; it is the DISTANCE that has no answer.
+
+    "nothing reviewed to compare against" would contradict the review line two rows
+    above, which names the reviewed SHA.
+    """
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(review="orphan"),
+    ) as (_head, run):
+        assert "since review  unknowable" in run.stdout, run.stdout
+        assert "nothing reviewed to compare against" not in run.stdout
