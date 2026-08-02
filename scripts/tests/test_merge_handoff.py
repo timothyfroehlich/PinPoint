@@ -1,0 +1,485 @@
+"""Unit tests for scripts/workflow/merge-handoff.sh — the PR merge handoff report.
+
+The report exists because the handoff used to be prose an agent wrote from memory, and
+every number in it is one an agent can get subtly wrong. So the tests are about the
+claims the block makes, not its layout:
+
+  - the merge command appears only when the PR could actually merge, because the whole
+    point of handing Tim a command is that he can run it without re-deriving readiness;
+  - the diff is split into buckets that cannot silently swallow a change — a workflow or
+    migration edit hiding inside "mostly docs" is the failure this format prevents;
+  - migrations and newly-registered env vars are called out separately, because they are
+    the two things that go wrong AT merge (prod migration on the deploy build,
+    CORE-SEC-009 build gate) rather than in the diff;
+  - "how far back was the review" is only reported when it is knowable.
+
+Each test drives the real bash against a real temporary git repository and a stubbed
+`gh`, so the git plumbing and the jq filters are exercised rather than mocked away.
+"""
+
+import json
+import os
+import stat
+import subprocess
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import pytest
+
+SCRIPT = Path(__file__).parent.parent / "workflow" / "merge-handoff.sh"
+
+PR = 123
+BRANCH = "feat/thing-PP-abcd"
+
+GIT_ENV = {
+    "GIT_AUTHOR_NAME": "Test",
+    "GIT_AUTHOR_EMAIL": "test@example.com",
+    "GIT_COMMITTER_NAME": "Test",
+    "GIT_COMMITTER_EMAIL": "test@example.com",
+}
+
+
+def git(*args: str, cwd: Path) -> str:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        env={**os.environ, **GIT_ENV},
+        timeout=60,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def write(repo: Path, path: str, body: str) -> None:
+    target = repo / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body)
+
+
+@dataclass
+class Scenario:
+    """What the stubbed GitHub says about the PR. Defaults describe a mergeable PR.
+
+    `review` names WHICH commit the marker pins, rather than a SHA: commit hashes depend
+    on commit time, so a fixture built twice does not produce the same head, and a test
+    that hard-codes one would attest a commit that no longer exists.
+
+      "head"      the marker covers head — the reviewed case
+      "previous"  the marker covers head~1 — a commit was pushed after the review
+      "orphan"    the marker pins a commit unrelated to the branch — post-force-push
+    """
+
+    ci_status: str = "COMPLETED"
+    ci_conclusion: str = "SUCCESS"
+    mergeable: str = "MERGEABLE"
+    state: str = "OPEN"
+    draft: bool = False
+    review: str | None = None
+    review_depth: str = "medium"
+    threads: list[dict] = field(default_factory=list)
+    comments: list[dict] = field(default_factory=list)
+    title: str = "feat(thing): do the thing (PP-abcd)"
+    branch: str = BRANCH
+
+
+def marker(sha: str, depth: str = "medium") -> dict:
+    return {
+        "body": (
+            f"<!-- pinpoint-claude-review: {sha} -->\n"
+            f"<!-- pinpoint-review-depth: {depth} -->\n"
+            f"Claude review of head {sha[:7]} — `/code-review {depth}` — no serious findings"
+        ),
+        "updated_at": "2026-08-02T20:43:19Z",
+    }
+
+
+def screenshot_comment() -> dict:
+    return {
+        "body": "<!-- pr-screenshots -->\n| desktop | mobile |",
+        "updated_at": "2026-08-02T19:10:00Z",
+    }
+
+
+@contextmanager
+def repo_with_pr(
+    *,
+    branch_changes: dict[str, str],
+    scenario: Scenario | None = None,
+    merge_main_in: bool = False,
+    extra_branch_commit: dict[str, str] | None = None,
+) -> Iterator[tuple[str, subprocess.CompletedProcess]]:
+    """Build origin + a PR branch, run merge-handoff.sh against it, yield (head_sha, run).
+
+    The PR head is published to `refs/pull/<PR>/head` on the origin remote — the same ref
+    the script fetches — so no local branch has to exist for the report to work, which is
+    the case that matters: Tim runs this from whatever worktree he is in.
+    """
+    scenario = scenario or Scenario()
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        origin = tmp_path / "origin.git"
+        work = tmp_path / "work"
+        subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+        subprocess.run(["git", "init", "-q", "-b", "main", str(work)], check=True)
+
+        write(work, "src/app/page.tsx", "export default function Page() {}\n")
+        write(work, "docs/thing.md", "# thing\n")
+        write(work, "next.config.ts", 'const REQUIRED = [["POSTGRES_URL"]];\n')
+        git("add", "-A", cwd=work)
+        git("commit", "-qm", "base", cwd=work)
+        git("remote", "add", "origin", str(origin), cwd=work)
+        git("push", "-q", "origin", "main", cwd=work)
+
+        git("checkout", "-qb", scenario.branch, cwd=work)
+        for path, body in branch_changes.items():
+            write(work, path, body)
+        git("add", "-A", cwd=work)
+        git("commit", "-qm", "branch work", cwd=work)
+
+        if merge_main_in:
+            # Main moves, then is merged in — the shape §5 "sync with merge" produces.
+            git("checkout", "-q", "main", cwd=work)
+            write(work, "docs/other.md", "# moved on\n")
+            git("add", "-A", cwd=work)
+            git("commit", "-qm", "main moves", cwd=work)
+            git("push", "-q", "origin", "main", cwd=work)
+            git("checkout", "-q", scenario.branch, cwd=work)
+            git("merge", "-q", "--no-ff", "-m", "Merge origin/main", "main", cwd=work)
+
+        if extra_branch_commit is not None:
+            for path, body in extra_branch_commit.items():
+                write(work, path, body)
+            git("add", "-A", cwd=work)
+            git("commit", "-qm", "post-review fixup", cwd=work)
+
+        head_sha = git("rev-parse", "HEAD", cwd=work)
+        git("push", "-q", "origin", f"HEAD:refs/pull/{PR}/head", cwd=work)
+
+        comments = list(scenario.comments)
+        if scenario.review is not None:
+            reviewed = {
+                "head": head_sha,
+                "previous": git("rev-parse", "HEAD~1", cwd=work),
+                "orphan": "0" * 40,
+            }[scenario.review]
+            comments.append(marker(reviewed, depth=scenario.review_depth))
+
+        meta = {
+            "number": PR,
+            "title": scenario.title,
+            "url": f"https://github.com/acme/widget/pull/{PR}",
+            "headRefName": scenario.branch,
+            "headRefOid": head_sha,
+            "baseRefName": "main",
+            "isDraft": scenario.draft,
+            "state": scenario.state,
+        }
+        rollup = (
+            ""
+            if scenario.ci_status == "MISSING"
+            else json.dumps(
+                {
+                    "name": "CI Gate",
+                    "status": scenario.ci_status,
+                    "conclusion": scenario.ci_conclusion,
+                }
+            )
+        )
+        threads_payload = {
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "reviewThreads": {
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                            "nodes": scenario.threads,
+                        }
+                    }
+                }
+            }
+        }
+
+        (tmp_path / "meta.json").write_text(json.dumps(meta))
+        (tmp_path / "rollup.json").write_text(rollup)
+        (tmp_path / "threads.json").write_text(json.dumps(threads_payload))
+        (tmp_path / "comments.json").write_text(json.dumps(comments))
+
+        # Dispatches on the joined argument string, most specific first: `gh pr view`
+        # carries a different --json set per caller and they must not collide.
+        gh_stub = tmp_path / "gh"
+        gh_stub.write_text(
+            "#!/usr/bin/env bash\n"
+            'args="$*"\n'
+            'case "$args" in\n'
+            '  *"nameWithOwner"*) printf "acme/widget\\n" ;;\n'
+            '  *"statusCheckRollup"*) cat "$STUB_ROLLUP" ;;\n'
+            '  *"--json mergeable"*) printf "%s\\n" "$STUB_MERGEABLE" ;;\n'
+            '  *"--jq .headRefOid"*) jq -r .headRefOid "$STUB_META" ;;\n'
+            '  *"pr view"*) cat "$STUB_META" ;;\n'
+            '  *"api graphql"*) cat "$STUB_THREADS" ;;\n'
+            '  *"/comments"*) cat "$STUB_COMMENTS" ;;\n'
+            '  *) printf "UNEXPECTED gh call: %s\\n" "$args" >&2; exit 1 ;;\n'
+            "esac\n"
+        )
+        gh_stub.chmod(
+            gh_stub.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        env = {
+            **os.environ,
+            **GIT_ENV,
+            "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}",
+            "STUB_META": str(tmp_path / "meta.json"),
+            "STUB_ROLLUP": str(tmp_path / "rollup.json"),
+            "STUB_THREADS": str(tmp_path / "threads.json"),
+            "STUB_COMMENTS": str(tmp_path / "comments.json"),
+            "STUB_MERGEABLE": scenario.mergeable,
+        }
+        run = subprocess.run(
+            ["bash", str(SCRIPT), str(PR)],
+            cwd=work,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=120,
+        )
+        yield head_sha, run
+
+
+MERGE_CMD = f"! scripts/workflow/merge-pr.sh {PR} --human"
+RERUN_CMD = f"! bash scripts/workflow/merge-handoff.sh {PR}"
+
+
+# --- The merge command is a readiness claim -----------------------------------------
+
+
+def test_a_ready_pr_gets_the_merge_command() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "export const x = 1;\n"},
+        scenario=Scenario(review="head"),
+    ) as (_head, run):
+        assert run.returncode == 0, run.stderr
+        assert MERGE_CMD in run.stdout, run.stdout
+        assert "NOT MERGEABLE YET" not in run.stdout
+
+
+@pytest.mark.parametrize(
+    "scenario,reason",
+    [
+        pytest.param(
+            Scenario(review="head", ci_status="IN_PROGRESS"),
+            "ci",
+            id="ci-still-running",
+        ),
+        pytest.param(
+            Scenario(review="head", ci_conclusion="FAILURE"), "ci", id="ci-red"
+        ),
+        pytest.param(
+            Scenario(review="head", threads=[{"isResolved": False}]),
+            "threads",
+            id="open-threads",
+        ),
+        pytest.param(
+            Scenario(review="head", mergeable="CONFLICTING"),
+            "no_conflict",
+            id="conflicting",
+        ),
+        pytest.param(Scenario(review="head", draft=True), "draft", id="draft"),
+        pytest.param(Scenario(review="head", state="MERGED"), "state", id="merged"),
+    ],
+)
+def test_an_unready_pr_gets_the_reason_instead_of_the_merge_command(
+    scenario: Scenario, reason: str
+) -> None:
+    """Handing over a merge command while a gate is red invites a merge on a guess.
+
+    Each case is otherwise ready — reviewed, green, clean — so the blocked outcome is
+    attributable to the one gate under test.
+    """
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "export const x = 1;\n"}, scenario=scenario
+    ) as (_head, run):
+        assert run.returncode == 0, run.stderr
+        assert MERGE_CMD not in run.stdout, run.stdout
+        assert "NOT MERGEABLE YET" in run.stdout
+        assert reason in run.stdout
+
+
+def test_an_unreviewed_head_is_named_as_the_blocker() -> None:
+    """The one gate an agent cannot clear on its own — so it must be legible."""
+    with repo_with_pr(branch_changes={"src/lib/thing.ts": "x\n"}) as (_head, run):
+        assert MERGE_CMD not in run.stdout, run.stdout
+        assert "reviewed: unreviewed" in run.stdout
+
+
+def test_the_report_always_offers_to_re_run_itself() -> None:
+    """Every number here is a snapshot; the re-run is how a stale block gets refreshed."""
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(ci_conclusion="FAILURE"),
+    ) as (_head, run):
+        assert RERUN_CMD in run.stdout, run.stdout
+
+
+# --- Diff shape ---------------------------------------------------------------------
+
+
+def test_the_diff_splits_source_from_tests_from_docs() -> None:
+    """ "900 lines" and "880 of them docs" are different facts about the same PR."""
+    with repo_with_pr(
+        branch_changes={
+            "src/lib/thing.ts": "export const x = 1;\n",
+            "src/lib/thing.test.ts": "test1\ntest2\n",
+            "docs/thing.md": "# thing\nnew\nlines\nhere\n",
+        }
+    ) as (_head, run):
+        assert "src +1 -0" in run.stdout, run.stdout
+        assert "tests +2 -0" in run.stdout
+        assert "docs +3 -0" in run.stdout
+
+
+def test_a_change_outside_the_three_buckets_is_still_counted() -> None:
+    """`other` is what stops a workflow or config edit hiding inside "mostly docs"."""
+    with repo_with_pr(
+        branch_changes={
+            "docs/thing.md": "# thing\nnew\n",
+            ".github/workflows/ci.yml": "on: push\n",
+        }
+    ) as (_head, run):
+        assert "other +1 -0" in run.stdout, run.stdout
+
+
+def test_a_test_file_under_src_counts_as_tests_not_source() -> None:
+    """Bucket order is the point: the test pattern is checked before the `src/` prefix."""
+    with repo_with_pr(
+        branch_changes={"src/components/Thing.test.tsx": "a\nb\nc\n"}
+    ) as (_head, run):
+        assert "tests +3 -0" in run.stdout, run.stdout
+        assert "src +" not in run.stdout
+
+
+# --- Merge-time-only risks ----------------------------------------------------------
+
+
+def test_a_migration_is_called_out_by_name() -> None:
+    """Migrations run against PROD on the merge build — a different risk class."""
+    with repo_with_pr(
+        branch_changes={"drizzle/0042_add_column.sql": "ALTER TABLE x ADD y int;\n"}
+    ) as (_head, run):
+        assert "drizzle/0042_add_column.sql" in run.stdout, run.stdout
+
+
+def test_a_newly_registered_env_var_is_called_out() -> None:
+    """CORE-SEC-009: it must be set in Vercel BEFORE the merge, or the prod build fails.
+
+    Merge is the last moment this can be caught, and nothing else checks it.
+    """
+    with repo_with_pr(
+        branch_changes={
+            "next.config.ts": 'const REQUIRED = [["POSTGRES_URL"], ["DISCORD_WEBHOOK_URL"]];\n'
+        }
+    ) as (_head, run):
+        assert "DISCORD_WEBHOOK_URL" in run.stdout, run.stdout
+
+
+def test_no_migration_and_no_env_var_reads_as_none() -> None:
+    with repo_with_pr(branch_changes={"src/lib/thing.ts": "x\n"}) as (_head, run):
+        assert "migrations    none" in run.stdout, run.stdout
+        assert "new env vars  none" in run.stdout
+
+
+def test_ui_changes_without_screenshots_say_so() -> None:
+    """A UI-touching PR needs screenshots posted; silence reads as "not applicable"."""
+    with repo_with_pr(
+        branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"}
+    ) as (_head, run):
+        assert "yes · NO screenshots posted" in run.stdout, run.stdout
+
+
+def test_posted_screenshots_are_reported_with_their_timestamp() -> None:
+    with repo_with_pr(
+        branch_changes={"src/components/Thing.tsx": "export const T = () => null;\n"},
+        scenario=Scenario(comments=[screenshot_comment()]),
+    ) as (_head, run):
+        assert "screenshots posted 2026-08-02T19:10:00Z" in run.stdout, run.stdout
+
+
+# --- Review distance ----------------------------------------------------------------
+
+
+def test_a_review_covering_head_reports_its_depth_and_no_delta() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(review="head", review_depth="high"),
+    ) as (_head, run):
+        assert "/code-review high" in run.stdout, run.stdout
+        assert "since review  none — the review covers head" in run.stdout
+
+
+def test_commits_pushed_after_the_review_are_counted_and_diffed() -> None:
+    """ "How many revisions back" — the question that decides re-review vs re-attest."""
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        extra_branch_commit={"src/lib/other.ts": "a\nb\n"},
+        scenario=Scenario(review="previous"),
+    ) as (_head, run):
+        assert "STALE: 1 commit(s) back" in run.stdout, run.stdout
+        assert "since review  +2 -0" in run.stdout
+
+
+def test_a_review_of_an_unrelated_commit_reports_the_distance_as_unknowable() -> None:
+    """After a force-push the reviewed commit is not an ancestor of head.
+
+    Counting commits from it would produce a number, and the number would be fiction.
+    """
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(review="orphan"),
+    ) as (_head, run):
+        assert "not an ancestor of head" in run.stdout, run.stdout
+
+
+# --- Branch freshness ---------------------------------------------------------------
+
+
+def test_a_branch_that_never_merged_main_says_when_it_branched() -> None:
+    with repo_with_pr(branch_changes={"src/lib/thing.ts": "x\n"}) as (_head, run):
+        assert "main merged   never — branched" in run.stdout, run.stdout
+
+
+def test_merging_main_in_is_reported_with_its_distance() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        merge_main_in=True,
+        extra_branch_commit={"src/lib/after.ts": "y\n"},
+    ) as (_head, run):
+        assert "never" not in run.stdout, run.stdout
+        assert "1 commit(s) ago" in run.stdout
+
+
+# --- Identification -----------------------------------------------------------------
+
+
+def test_the_bead_id_is_pulled_off_the_title_or_branch() -> None:
+    with repo_with_pr(branch_changes={"src/lib/thing.ts": "x\n"}) as (_head, run):
+        assert "bead PP-abcd" in run.stdout, run.stdout
+
+
+def test_the_branch_name_carries_the_bead_when_the_title_does_not() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(title="chore: tidy up"),
+    ) as (_head, run):
+        assert "bead PP-abcd" in run.stdout, run.stdout
+
+
+def test_a_pr_with_no_bead_says_so_rather_than_inventing_one() -> None:
+    with repo_with_pr(
+        branch_changes={"src/lib/thing.ts": "x\n"},
+        scenario=Scenario(title="chore: tidy up", branch="chore/tidy-up"),
+    ) as (_head, run):
+        assert "bead none in title or branch" in run.stdout, run.stdout

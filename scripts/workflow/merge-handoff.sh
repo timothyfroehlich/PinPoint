@@ -1,0 +1,340 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# merge-handoff.sh — the report an agent hands Tim when a PR is ready for him to merge.
+#
+# Every number here is COMPUTED, which is the whole point (PP-9onv). The handoff used to
+# be prose an agent wrote from memory — "CI is green, you reviewed it a couple of commits
+# back, mostly docs" — and each of those claims is one an agent can get wrong without
+# noticing. `git` and `gh` already know all of them, so the agent's job is to run this
+# and paste the block, not to narrate it.
+#
+# The report is a SNAPSHOT and says so: it is stale the moment CI re-runs, someone pushes,
+# or main moves. That is why the last two lines are commands rather than conclusions — the
+# first re-runs this report, the second merges. Both are `!`-prefixed because Tim types
+# them into the Claude Code prompt, where `!` runs a command outside the agent tool-call
+# path (which is also how merging stays human-only: `merge-pr.sh` is blocked for agents in
+# every invocation shape, so an agent cannot run either the merge or, indirectly, itself
+# into one).
+#
+# The merge command is only printed when all four merge gates actually pass. Handing over a
+# merge command while CI is still yellow invites a merge on a guess, and the gates would
+# refuse it anyway — so an un-ready PR gets the blocking reasons instead.
+#
+# Usage:
+#   bash scripts/workflow/merge-handoff.sh <PR>
+#
+# Environment:
+#   gh must be authenticated; the repo slug is resolved dynamically.
+#   Fetches from origin (the PR head and main) — read-only, touches no local branch.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./_pr-gates.sh
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/_pr-gates.sh"
+
+SCREENSHOT_MARKER="<!-- pr-screenshots -->"
+
+pr="${1:-}"
+if [[ -z "$pr" || ! "$pr" =~ ^[0-9]+$ ]]; then
+  echo "usage: merge-handoff.sh <PR>" >&2
+  exit 2
+fi
+
+# ---------------------------------------------------------------------------------
+# Facts from GitHub
+# ---------------------------------------------------------------------------------
+
+meta=$(gh pr view "$pr" --json number,title,url,headRefName,headRefOid,baseRefName,isDraft,state)
+title=$(jq -r '.title' <<< "$meta")
+url=$(jq -r '.url' <<< "$meta")
+head_ref=$(jq -r '.headRefName' <<< "$meta")
+head_sha=$(jq -r '.headRefOid' <<< "$meta")
+base_ref=$(jq -r '.baseRefName' <<< "$meta")
+is_draft=$(jq -r '.isDraft' <<< "$meta")
+pr_state=$(jq -r '.state' <<< "$meta")
+short_head="${head_sha:0:7}"
+
+# Both sides are fetched and read back off FETCH_HEAD as bare SHAs, so this script updates
+# no ref of yours — not the remote-tracking branches, not a local branch. It runs from
+# whatever worktree Tim happens to be in, often while agents hold other worktrees of the
+# same repo, and a reporting command has no business moving refs those depend on.
+#
+# The PR head comes from its pull ref rather than its branch name: the branch may not exist
+# locally, may be checked out in another worktree, or may live on a fork.
+if ! git fetch -q origin "$base_ref"; then
+  echo "merge-handoff.sh: could not fetch ${base_ref} from origin" >&2
+  exit 1
+fi
+base_sha=$(git rev-parse FETCH_HEAD)
+
+if ! git fetch -q origin "pull/${pr}/head"; then
+  echo "merge-handoff.sh: could not fetch head of PR #${pr} from origin" >&2
+  exit 1
+fi
+fetched_head=$(git rev-parse FETCH_HEAD)
+
+if ! git cat-file -e "${head_sha}^{commit}" 2>/dev/null; then
+  # `gh` named a SHA the fetch did not bring down — a push landed in between. Report on
+  # what was actually fetched and say so, rather than mixing GitHub's view of head with
+  # git's view of the tree.
+  echo "merge-handoff.sh: warning — head moved during the report (gh said ${short_head}," >&2
+  echo "  fetched ${fetched_head:0:7}); reporting on the fetched commit." >&2
+  head_sha=$fetched_head
+  short_head="${head_sha:0:7}"
+fi
+
+merge_base=$(git merge-base "$head_sha" "$base_sha")
+
+# ---------------------------------------------------------------------------------
+# Gates (the same four merge-pr.sh evaluates, asked here for reporting only)
+# ---------------------------------------------------------------------------------
+
+# Each gate prints `TOKEN: <gate>: <state>` on its first line and may add remedy lines;
+# `|| true` because a failing gate returns non-zero and this script is a reporter.
+gate_line() { head -n1 <<< "$1"; }
+gate_token() { cut -d: -f1 <<< "$(gate_line "$1")"; }
+
+# Reported in the gate's own words — the gates are the authority on their own state, and a
+# paraphrase here is one more thing that can drift out of step with what merge-pr.sh will
+# say. Anything other than PASS is prefixed with its token, so a WAIT ("CI Gate check not
+# reported yet") cannot be skimmed as a pass.
+gate_state() {
+  local token state
+  token=$(gate_token "$1")
+  state=$(gate_line "$1" | cut -d: -f3- | sed 's/^ *//')
+  if [[ "$token" == "PASS" ]]; then
+    printf '%s\n' "$state"
+  else
+    printf '[%s] %s\n' "$token" "$state"
+  fi
+}
+
+ci_out=$(check_ci "$pr" 2>&1) || true
+threads_out=$(check_unresolved_threads "$pr" 2>&1) || true
+conflict_out=$(check_no_merge_conflict "$pr" 2>&1) || true
+
+# ---------------------------------------------------------------------------------
+# Review state: which review, how long ago, and what has landed since
+# ---------------------------------------------------------------------------------
+
+record=$(_marker_record "$pr" "$(_repo_slug)" "$head_sha")
+rv_state=$(cut -f1 <<< "$record")
+rv_sha=$(cut -f2 <<< "$record")
+rv_depth=$(cut -f3 <<< "$record")
+rv_at=$(cut -f4 <<< "$record")
+
+review_desc=""
+since_review_from=""
+case "$rv_state" in
+  marker)
+    case "$rv_depth" in
+      trivial) review_desc="attested trivial (no /code-review run)" ;;
+      unrecorded) review_desc="depth unrecorded (marker predates PP-9onv)" ;;
+      *) review_desc="/code-review ${rv_depth}" ;;
+    esac
+    review_desc="${review_desc} · ${rv_at} · covers head ${short_head}"
+    ;;
+  stale_marker)
+    # "How many revisions back" only has an answer when the reviewed commit is still an
+    # ancestor of head. After a force-push it is not, and the honest report is that the
+    # distance is unknowable — not a number computed from an unrelated commit.
+    if git cat-file -e "${rv_sha}^{commit}" 2>/dev/null \
+      && git merge-base --is-ancestor "$rv_sha" "$head_sha" 2>/dev/null; then
+      behind=$(git rev-list --count "${rv_sha}..${head_sha}")
+      review_desc="/code-review ${rv_depth} · ${rv_at} · STALE: ${behind} commit(s) back, reviewed ${rv_sha:0:7}, head is ${short_head}"
+      since_review_from=$rv_sha
+    else
+      review_desc="/code-review ${rv_depth} · ${rv_at} · STALE: reviewed ${rv_sha:0:7}, not an ancestor of head (force-push?)"
+    fi
+    ;;
+  *)
+    review_desc="NONE — no review marker on this PR"
+    ;;
+esac
+
+# ---------------------------------------------------------------------------------
+# Diff shape
+# ---------------------------------------------------------------------------------
+
+# Buckets, in match order: a `src/**/*.test.ts` is a test, a `docs/**/*.md` is docs, and
+# `content/**` is product MDX that ships as pages, so it counts as source rather than docs.
+# Anything left over — config, CI, drizzle, scripts — is `other`, reported only when it is
+# non-zero, because a silent bucket is how "mostly docs" hides a workflow edit.
+diff_buckets() {
+  local from=$1 to=$2
+  git diff --numstat "$from" "$to" | awk '
+    function bucket(p) {
+      if (p ~ /(^|\/)e2e\// || p ~ /\.(test|spec)\.[jt]sx?$/ || p ~ /__tests__\// ||
+          p ~ /^src\/test\// || p ~ /^scripts\/tests\//) return "tests"
+      if (p ~ /^docs\// || p ~ /^\.agents\// ||
+          (p ~ /\.mdx?$/ && p !~ /^content\//)) return "docs"
+      if (p ~ /^src\// || p ~ /^content\//) return "src"
+      return "other"
+    }
+    {
+      files++
+      path = $3
+      for (i = 4; i <= NF; i++) path = path " " $i   # renames: `{a => b}/f.ts`
+      b = bucket(path)
+      if ($1 == "-") { binary++; next }              # binary: counted as a file, not lines
+      add[b] += $1; del[b] += $2; ta += $1; td += $2
+    }
+    END {
+      printf "%d %d %d %d", files + 0, binary + 0, ta + 0, td + 0
+      split("src tests docs other", order, " ")
+      for (i = 1; i <= 4; i++) { b = order[i]; printf " %d %d", add[b] + 0, del[b] + 0 }
+      printf "\n"
+    }'
+}
+
+format_buckets() {
+  local -a f=("$@")
+  local out
+  out=$(printf '+%s -%s' "${f[2]}" "${f[3]}")
+  out+=$(printf '   %s file(s)' "${f[0]}")
+  if [[ "${f[1]}" -gt 0 ]]; then
+    out+=$(printf ', %s binary' "${f[1]}")
+  fi
+  local -a names=(src tests docs other)
+  local i sep="   "
+  for i in 0 1 2 3; do
+    local a=${f[$((4 + i * 2))]} d=${f[$((5 + i * 2))]}
+    if [[ "$a" -ne 0 || "$d" -ne 0 ]]; then
+      out+=$(printf '%s%s +%s -%s' "$sep" "${names[$i]}" "$a" "$d")
+      sep=" · "
+    fi
+  done
+  printf '%s\n' "$out"
+}
+
+read -r -a vs_main <<< "$(diff_buckets "$merge_base" "$head_sha")"
+diff_vs_main=$(format_buckets "${vs_main[@]}")
+
+if [[ -n "$since_review_from" ]]; then
+  read -r -a since <<< "$(diff_buckets "$since_review_from" "$head_sha")"
+  diff_since_review=$(format_buckets "${since[@]}")
+elif [[ "$rv_state" == "marker" ]]; then
+  diff_since_review="none — the review covers head"
+else
+  diff_since_review="n/a — nothing reviewed to compare against"
+fi
+
+changed_paths=$(git diff --name-only "$merge_base" "$head_sha")
+
+# ---------------------------------------------------------------------------------
+# Merge-time-only risks
+# ---------------------------------------------------------------------------------
+
+# Migrations run against PROD on the merge build (`migrate:production`), so they are a
+# different risk class from any other diff of the same size.
+migrations=$(grep -E '^(drizzle/[^/]+\.sql|supabase/migrations/)' <<< "$changed_paths" || true)
+if [[ -n "$migrations" ]]; then
+  migration_line="$(wc -l <<< "$migrations" | tr -d ' ') — $(tr '\n' ' ' <<< "$migrations")"
+  migration_line=${migration_line% }
+else
+  migration_line="none"
+fi
+
+# Vars added to the next.config.ts build registry must be set in Vercel BEFORE the merge
+# (CORE-SEC-009) — the registry is a deploy gate, so a merge ahead of the Vercel setting
+# fails the production build. Nothing else checks this, and merge is the last moment it
+# can be checked.
+#
+# Names on removed lines are subtracted, so editing a registry line (or moving a var
+# between the all-deployments and production-only groups) does not report vars that were
+# already there as new. A false name here costs a trip to the Vercel dashboard to
+# discover nothing needed doing, which is how a check earns being ignored.
+env_names() {
+  grep -E "$1" <<< "$env_diff" | grep -oE '"[A-Z][A-Z0-9_]+"' | tr -d '"' | sort -u || true
+}
+env_diff=$(git diff "$merge_base" "$head_sha" -- next.config.ts || true)
+env_added=$(comm -23 <(env_names '^\+') <(env_names '^-') | grep -v '^$' | tr '\n' ' ' || true)
+env_added=${env_added% }
+if [[ -z "$env_added" ]]; then
+  env_added="none"
+fi
+
+ui_changed=no
+if grep -qE '(^src/app/.*\.tsx$|^src/components/|\.css$)' <<< "$changed_paths"; then
+  ui_changed=yes
+fi
+
+shots=$(gh api --paginate "repos/$(_repo_slug)/issues/${pr}/comments" \
+  | jq -rs --arg marker "$SCREENSHOT_MARKER" \
+      '[ .[] | flatten | .[] | select((.body // "") | startswith($marker)) ] | last.updated_at // ""')
+if [[ -n "$shots" ]]; then
+  ui_line="${ui_changed} · screenshots posted ${shots}"
+elif [[ "$ui_changed" == "yes" ]]; then
+  ui_line="yes · NO screenshots posted"
+else
+  ui_line="no"
+fi
+
+# ---------------------------------------------------------------------------------
+# Branch freshness
+# ---------------------------------------------------------------------------------
+
+behind_main=$(git rev-list --count "${head_sha}..${base_sha}")
+branch_commits=$(git rev-list --count "${merge_base}..${head_sha}")
+
+# The newest merge commit on the branch whose second parent is on main — i.e. the last
+# time main was merged IN, as distinct from the merge-base moving on its own.
+last_main_merge="never — branched $(git log -1 --format='%cI (%cr)' "$merge_base")"
+while read -r sha _p1 p2 _rest; do
+  if [[ -z "${p2:-}" ]]; then
+    continue
+  fi
+  if git merge-base --is-ancestor "$p2" "$base_sha" 2>/dev/null; then
+    ago=$(git rev-list --count "${sha}..${head_sha}")
+    last_main_merge="$(git log -1 --format='%cI (%cr)' "$sha") — ${ago} commit(s) ago"
+    break
+  fi
+done < <(git rev-list --merges --parents "${merge_base}..${head_sha}")
+
+bead=$(grep -oE 'PP-[a-z0-9]+(\.[0-9]+)*' <<< "${title} ${head_ref}" | head -n1 || true)
+if [[ -z "$bead" ]]; then
+  bead="none in title or branch"
+fi
+
+# ---------------------------------------------------------------------------------
+# Report
+# ---------------------------------------------------------------------------------
+
+printf '\n'
+printf 'PR #%s — %s\n' "$pr" "$title"
+printf '  %s -> %s · bead %s · %s\n' "$head_ref" "$base_ref" "$bead" "$url"
+if [[ "$is_draft" == "true" ]]; then
+  printf '  DRAFT — not ready for review\n'
+fi
+printf '\n'
+printf '  review        %s\n' "$review_desc"
+printf '  ci            %s\n' "$(gate_state "$ci_out")"
+printf '  threads       %s\n' "$(gate_state "$threads_out")"
+printf '  mergeable     %s · %s commit(s) behind %s\n' "$(gate_state "$conflict_out")" "$behind_main" "$base_ref"
+printf '  main merged   %s\n' "$last_main_merge"
+printf '\n'
+printf '  diff vs main  %s   (%s commit(s))\n' "$diff_vs_main" "$branch_commits"
+printf '  since review  %s\n' "$diff_since_review"
+printf '  migrations    %s\n' "$migration_line"
+printf '  new env vars  %s\n' "$env_added"
+printf '  ui            %s\n' "$ui_line"
+printf '\n'
+
+blocking=()
+add_block() { blocking+=("$1"); }
+if [[ "$(gate_token "$ci_out")" != "PASS" ]]; then add_block "ci: $(gate_state "$ci_out")"; fi
+if [[ "$(gate_token "$threads_out")" != "PASS" ]]; then add_block "threads: $(gate_state "$threads_out")"; fi
+if [[ "$(gate_token "$conflict_out")" != "PASS" ]]; then add_block "no_conflict: $(gate_state "$conflict_out")"; fi
+if [[ "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — Tim runs /code-review, then the agent attests"; fi
+if [[ "$is_draft" == "true" ]]; then add_block "draft: flip to ready-for-review"; fi
+if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
+
+printf '  ! bash scripts/workflow/merge-handoff.sh %s   (re-run — this report is a snapshot)\n' "$pr"
+if [[ ${#blocking[@]} -eq 0 ]]; then
+  printf '  ! scripts/workflow/merge-pr.sh %s --human\n' "$pr"
+else
+  printf '\n  NOT MERGEABLE YET — %s gate(s) blocking:\n' "${#blocking[@]}"
+  printf '    - %s\n' "${blocking[@]}"
+fi
+printf '\n'
