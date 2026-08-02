@@ -1,38 +1,32 @@
 #!/usr/bin/env python3
-"""PR CI + review watcher for the Claude Code Monitor tool.
+"""PR CI watcher for the Claude Code Monitor tool.
 
-Streams timestamped events to stdout as GitHub Actions runs complete
-and polls for new Copilot reviews. One Monitor call handles both.
+Streams timestamped events to stdout as GitHub Actions runs complete.
 
 Usage: ./scripts/workflow/pr-watch.py [--check-ready | --force] [--verbose] <PR_NUMBER>
   (no flag)      Run blocking pre-checks (mergeable, no failed CI Gate, no
-                 unresolved Copilot threads), then watch CI + reviews. CI
-                 Gate absent or in-progress is NOT a blocking condition —
-                 the watch loop handles those by waiting.
+                 unresolved review threads), then watch CI. CI Gate absent
+                 or in-progress is NOT a blocking condition — the watch
+                 loop handles those by waiting.
   --check-ready  Run the full readiness check (mergeable + CI Gate present
-                 + a live review path + Copilot threads resolved + ready
-                 label) and exit. CI Gate absent IS a fail here — this
-                 mode answers "is this PR ready for human review right
-                 now?". "Live review path" means a review already covers
-                 head, OR a request newer than head is still outstanding
-                 — the latter passes here because it resolves by waiting,
-                 while `merge-pr.sh`'s `reviewed` gate still requires the
-                 review to have actually landed before a merge. The
-                 `copilot-review` line names one of six states rather
-                 than a bare yes/no: Copilot review is request-only on
-                 this repo, so "nobody asked yet", "asked, still waiting"
-                 and "you pushed past the request" need three different
-                 actions and only the middle one resolves by waiting
-                 (PP-lzaw).
+                 + review threads resolved + ready label) and exit. CI
+                 Gate absent IS a fail here — this mode answers "is this
+                 PR ready for human review right now?". The `review` line
+                 is reported but is NOT part of the verdict: the whole
+                 point of this mode is to decide whether the PR is worth
+                 Tim's `/code-review`, so requiring the review to have
+                 already happened would be circular. `merge-pr.sh`'s
+                 `reviewed` gate is what refuses to merge an unreviewed
+                 head.
   --force        Skip the pre-check entirely and watch unconditionally.
   --verbose      Emit per-job progressive updates ("X passed", "CI Gate
                  in_progress — continuing to wait", "Watching PR #N — N
                  run(s)", per-run icon listing, startup retries). Default
                  behavior is quiet — only terminal verdicts (CI Gate
                  decided, check PASS/FAIL) and action items (failure
-                 details, new Copilot review) are emitted, so that
-                 running under Claude Code's Monitor doesn't wake the
-                 agent on every job transition.
+                 details) are emitted, so that running under Claude
+                 Code's Monitor doesn't wake the agent on every job
+                 transition.
 
 Cancelled runs are neither a pass nor a failure — they are reported as
 "superseded" (⊘) and never produce a failure artifact. Cancellation is routine
@@ -44,8 +38,8 @@ is likewise not a failure — it means we could not find out. Those probes are
 retried with bounded backoff and, if the API stays unreachable, reported as
 "could not determine" (⚠) with the real cause, never as "✗ failed". (PP-qkl8)
 
-Exit 0: all checks passed, or stopped for new Copilot review,
-        or (with --check-ready) the PR is ready for human review.
+Exit 0: all checks passed, or (with --check-ready) the PR is ready for
+        human review.
 Exit 1: one or more checks failed, no matching runs found,
         or (with --check-ready) the PR is not ready.
 Exit 2: the outcome could not be determined — the GitHub API was unreachable.
@@ -56,7 +50,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 import sys
 import threading
@@ -65,43 +58,22 @@ from datetime import datetime, timezone
 
 REPO_OWNER = "timothyfroehlich"
 REPO_NAME = "PinPoint"
-COPILOT_LOGINS = (
-    "copilot-pull-request-reviewer",
-    "copilot-pull-request-reviewer[bot]",
-)
 READY_LABEL = "ready-for-review"
 CI_GATE_NAME = "CI Gate"
 
-# --- Review-request state (PP-lzaw) -----------------------------------------
+# --- Review state (PP-lzaw, rewritten for marker-only review in PP-4ric) -----
 # Kept deliberately in sync with scripts/workflow/_pr-gates.sh, which is the
 # canonical implementation. Duplicated rather than shelled out to because this
 # script is the read-only reporter and _pr-gates.sh is sourced by merge-pr.sh,
 # which agents may not invoke at all. scripts/tests/test_pr_watch.py pins the
 # two vocabularies together.
-
-# Copilot posts a review OBJECT even when it reviewed nothing (quota exhausted,
-# no analyzable files). Those must be treated as absent — see the long rationale
-# in _pr-gates.sh (PP-jw0s). This pattern is a CHARACTER-FOR-CHARACTER copy of
-# COPILOT_NON_REVIEW_BODY_RE there; two hand-written variants would silently
-# diverge on the next wording added, and a body the bash eats but the Python
-# keeps (or vice versa) is exactly the kind of disagreement that makes the
-# gates untrustworthy. Change one, change both.
-COPILOT_NON_REVIEW_BODY_RE = re.compile(
-    "reached their quota limit"
-    "|unable to review this pull request"
-    "|not able to review any files"
-    "|wasn.t able to review any files",
-    re.IGNORECASE,
-)
 CLAUDE_MARKER_PREFIX = "<!-- pinpoint-claude-review:"
 
-# Seconds to wait for Copilot to answer a REQUEST before the wait stops being
-# legitimate. Measured from the request, not the head push.
-COPILOT_REVIEW_WAIT_THRESHOLD = 600
+REVIEW_HINT = (
+    "ask Tim to run /code-review, then attest with "
+    "scripts/workflow/mark-claude-review.sh {pr}"
+)
 
-REQUEST_REVIEW_HINT = 'gh pr edit {pr} --add-reviewer "@copilot"'
-
-REVIEW_POLL_INTERVAL = 60  # seconds — GitHub rate limit friendly
 STARTUP_RETRIES = 6  # attempts to find runs for current SHA
 STARTUP_WAIT = 10  # seconds between startup retries
 LOG_DIR = "tmp/gh-monitor"
@@ -149,7 +121,7 @@ def emit_event(msg: str) -> None:
     informational lines that are useful interactively but noisy when the
     script is invoked under Monitor (each stdout line is a notification).
     Reserve emit() for terminal verdicts (CI Gate decided, audit PASS/FAIL)
-    and action items (failure details, new Copilot review).
+    and action items (failure details).
     """
     if VERBOSE_MODE:
         emit(msg)
@@ -228,10 +200,7 @@ def get_review_threads(pr: int) -> list[dict]:
             pullRequest(number: {pr}) {{
               reviewThreads(first: 100{after_arg}) {{
                 pageInfo {{ hasNextPage endCursor }}
-                nodes {{
-                  isResolved
-                  comments(first: 1) {{ nodes {{ author {{ login }} }} }}
-                }}
+                nodes {{ isResolved }}
               }}
             }}
           }}
@@ -267,134 +236,57 @@ def _gh_api_list(path: str) -> list[dict]:
     return items
 
 
-def _is_substantive(review: dict) -> bool:
-    return not COPILOT_NON_REVIEW_BODY_RE.search(review.get("body") or "")
+def _marker_sha(pr: int) -> str:
+    """Return the SHA pinned by the PR's review marker, or "" if there is none."""
+    repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
+    pinned = [
+        (c.get("body") or "")[len(CLAUDE_MARKER_PREFIX) :].split("-->")[0].strip()
+        for c in _gh_api_list(f"{repo}/issues/{pr}/comments")
+        if (c.get("body") or "").startswith(CLAUDE_MARKER_PREFIX)
+    ]
+    return pinned[-1] if pinned else ""
 
 
-def _iso_to_epoch(value: str) -> float:
-    return (
-        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
-        .replace(tzinfo=timezone.utc)
-        .timestamp()
-    )
-
-
-def copilot_review_state(pr: int) -> tuple[str, str]:
+def review_state(pr: int) -> tuple[str, str]:
     """Return (state, human-readable detail) for the PR's review situation.
 
-    Mirrors `_compute_review_state` in scripts/workflow/_pr-gates.sh — same six
-    states, same ordering, same clock. States: marker, covered, awaiting,
-    overdue, pushed_after, never_requested.
+    Mirrors `_compute_review_state` in scripts/workflow/_pr-gates.sh — same three
+    states, same ordering. States: marker, stale_marker, unreviewed.
 
-    The distinction that matters: a request NEWER than the head commit means a
-    wait is legitimate; a head newer than the newest request means nobody is
-    coming, because nothing re-requests automatically. Collapsing those into one
-    "not reviewed yet" is what turns a forgotten request into an overnight stall.
-
-    "Newer than the head commit" is measured against the head commit's committer
-    date, which stands in for when head arrived on the branch — GitHub exposes no
-    push timestamp for a PR head. See the note at the comparison site in
-    _pr-gates.sh for how the two can differ and why neither skew can open a merge
-    path (coverage itself is decided by commit_id).
+    The distinction that matters is `stale_marker`: the PR visibly HAS a review,
+    so the reflex is to read it as reviewed, when in fact the commit about to
+    merge was never looked at. Nothing re-attests automatically.
     """
-    repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    pr_data = json.loads(
-        gh("pr", "view", str(pr), "--json", "headRefOid,reviewRequests")
-    )
-    head_sha = pr_data["headRefOid"]
-    # Only used to explain a confusing `pushed_after` — see the note at the same
-    # spot in _pr-gates.sh. Never treated as coverage: Copilot reviews the head
-    # as of the REQUEST, not as of when it runs.
-    request_pending = any(
-        str(r.get("login") or r.get("name") or "").lower().startswith("copilot")
-        for r in pr_data.get("reviewRequests") or []
-    )
-    head_date = gh(
-        "api", f"{repo}/commits/{head_sha}", "--jq", ".commit.committer.date"
-    )
-    head_epoch = _iso_to_epoch(head_date)
-
-    # The review REQUEST clock lives on the issue timeline; the reviews endpoint
-    # cannot tell "nobody asked" from "asked, still waiting". A request names the
-    # reviewer as plain "Copilot" — not the bot login its reviews are authored
-    # under — so match a case-insensitive "copilot" prefix.
-    requests = [
-        ev.get("created_at", "")
-        for ev in _gh_api_list(f"{repo}/issues/{pr}/timeline")
-        if ev.get("event") == "review_requested"
-        and ((ev.get("requested_reviewer") or {}).get("login") or "")
-        .lower()
-        .startswith("copilot")
+    head_sha = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))[
+        "headRefOid"
     ]
-    latest_request = max(requests) if requests else ""
-    request_epoch = _iso_to_epoch(latest_request) if latest_request else 0.0
-    request_covers_head = bool(latest_request) and request_epoch >= head_epoch
+    marker_sha = _marker_sha(pr)
 
-    marker = f"{CLAUDE_MARKER_PREFIX} {head_sha} -->"
-    if any(
-        marker in (c.get("body") or "")
-        for c in _gh_api_list(f"{repo}/issues/{pr}/comments")
-    ):
-        detail = f"Claude review marker pins head {head_sha[:7]}"
-        if not request_covers_head:
-            detail += " (standing in — no Copilot review was requested for this head)"
-        return "marker", detail
-
-    # Coverage is judged by commit_id, not by timestamp: a review submitted after
-    # a later push can still have read an earlier tree.
-    if any(
-        r.get("commit_id") == head_sha
-        and (r.get("user") or {}).get("login") in COPILOT_LOGINS
-        and _is_substantive(r)
-        for r in _gh_api_list(f"{repo}/pulls/{pr}/reviews")
-    ):
-        return "covered", f"Copilot review carries head SHA {head_sha[:7]}"
-
-    hint = REQUEST_REVIEW_HINT.format(pr=pr)
-    if not latest_request:
+    if not marker_sha:
         return (
-            "never_requested",
-            f"no Copilot review has ever been requested — run: {hint}",
+            "unreviewed",
+            f"no review marker — head {head_sha[:7]} is unreviewed; "
+            f"{REVIEW_HINT.format(pr=pr)}",
         )
-
-    if not request_covers_head:
-        behind = int(head_epoch - request_epoch)
-        lag = (
-            " (Copilot IS a pending reviewer right now — a request has probably "
-            "just been made and the issue timeline has not caught up; re-run "
-            "before acting)"
-            if request_pending
-            else ""
-        )
-        return (
-            "pushed_after",
-            f"head is {behind}s NEWER than the last request ({latest_request}) — "
-            f"you pushed after requesting; nothing re-requests automatically. "
-            f"When you stop iterating, run: {hint}{lag}",
-        )
-
-    waited = int(time.time() - request_epoch)
-    if waited < COPILOT_REVIEW_WAIT_THRESHOLD:
-        return (
-            "awaiting",
-            f"review requested {waited}s ago, Copilot has not answered yet",
-        )
+    if marker_sha == head_sha:
+        return "marker", f"review marker pins head {head_sha[:7]}"
     return (
-        "overdue",
-        f"review requested {waited}s ago and still unanswered — re-request ({hint}) "
-        f"or attest head with scripts/workflow/mark-claude-review.sh",
+        "stale_marker",
+        f"the marker pins {marker_sha[:7]} but head is {head_sha[:7]} — you "
+        f"pushed after the review, so what would merge was never read; "
+        f"{REVIEW_HINT.format(pr=pr)}",
     )
 
 
-def _unresolved_copilot(threads: list[dict]) -> int:
-    count = 0
-    for t in threads:
-        if t["isResolved"]:
-            continue
-        nodes = t["comments"]["nodes"]
-        if nodes and nodes[0]["author"]["login"] in COPILOT_LOGINS:
-            count += 1
-    return count
+def _unresolved_threads(threads: list[dict]) -> int:
+    """Count unresolved review threads, from any author.
+
+    Author-agnostic since PP-4ric: the old Copilot-login filter would match
+    nothing now that Copilot is retired, silently turning every thread check
+    into a pass. Threads come from Tim or another agent, and AGENTS.md §5
+    requires each to be fixed or declined-and-resolved either way.
+    """
+    return sum(1 for t in threads if not t["isResolved"])
 
 
 def _ci_gate_state(pr: int) -> tuple[str, str]:
@@ -494,7 +386,7 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
 
     Used by the default watch mode as a fail-fast pre-check BEFORE entering the
     watch loop. Distinguishes conditions that won't resolve by waiting (bad merge
-    state, already-failed CI Gate, unresolved Copilot threads) from conditions
+    state, already-failed CI Gate, unresolved review threads) from conditions
     that the watch loop is designed to wait through (CI Gate not yet posted, CI
     Gate in progress). The latter MUST pass this pre-check so the watch loop can
     fire and `_finalize_via_ci_gate` can poll for completion.
@@ -520,9 +412,9 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
                 f"CI Gate already failed (conclusion={ci_conclusion or 'unknown'})",
             )
 
-    unresolved = _unresolved_copilot(get_review_threads(pr))
+    unresolved = _unresolved_threads(get_review_threads(pr))
     if unresolved > 0:
-        return False, f"{unresolved} unresolved Copilot thread(s)"
+        return False, f"{unresolved} unresolved review thread(s)"
 
     return True, ""
 
@@ -531,7 +423,7 @@ def run_audit(pr: int) -> bool:
     """Print a pass/fail report for review-readiness. Return True if all pass."""
     merge_state, labels = _fetch_merge_state(pr)
     ci_status, ci_conclusion = _ci_gate_state(pr)
-    unresolved = _unresolved_copilot(get_review_threads(pr))
+    unresolved = _unresolved_threads(get_review_threads(pr))
 
     bad_merge = merge_state in ("DIRTY", "CONFLICTING", "BEHIND")
     merge_detail = f"mergeStateStatus={merge_state}"
@@ -557,25 +449,24 @@ def run_audit(pr: int) -> bool:
         "applied" if READY_LABEL in labels else "not applied (orchestrator applies)"
     )
 
-    # A review covering head is part of an agent's terminal state on a PR, and
-    # under request-only Copilot it does not happen unless someone asks. Report
-    # WHICH state the PR is in — "nobody asked", "asked and waiting", and "you
-    # pushed past the request" need three different actions, and only the middle
-    # one resolves by waiting. `awaiting` is not a failure: the request is
-    # outstanding and the answer is on its way.
+    # Reported, but NOT part of the verdict. This mode answers "is this PR worth
+    # Tim's /code-review right now?", and the review is what happens AFTER that
+    # answer is yes — gating on it would make the check circular and permanently
+    # red. merge-pr.sh's `reviewed` gate is the one that refuses to merge an
+    # unreviewed head. `stale_marker` is worth seeing here anyway: it means the
+    # PR looks reviewed and is not.
     try:
-        review_state, review_detail = copilot_review_state(pr)
+        state, review_detail = review_state(pr)
     except (RuntimeError, ValueError, KeyError) as exc:
-        review_state, review_detail = "unknown", f"could not determine ({exc})"
-    review_ok = review_state in ("marker", "covered", "awaiting")
+        state, review_detail = "unknown", f"could not determine ({exc})"
 
     checks = [
         (not bad_merge, "mergeable", merge_detail),
         (ci_check[0], "ci-gate", ci_check[1]),
-        (review_ok, "copilot-review", f"{review_state}: {review_detail}"),
+        (True, "review", f"{state}: {review_detail}"),
         (
             unresolved == 0,
-            "copilot-resolved",
+            "threads-resolved",
             "all resolved"
             if unresolved == 0
             else f"{unresolved} unresolved (use MCP pull_request_read to inspect threads)",
@@ -731,45 +622,6 @@ def watch_run(
         with _lock:
             failures.append(run_id)
         return
-
-
-_COPILOT_JQ = (
-    '[.[] | select(.user.login == "copilot-pull-request-reviewer"'
-    ' or .user.login == "copilot-pull-request-reviewer[bot]")] | length'
-)
-
-
-def watch_reviews(
-    pr: int,
-    baseline: int | None,
-    stop: threading.Event,
-    review_seen: threading.Event,
-) -> None:
-    """Poll for new Copilot-only reviews every REVIEW_POLL_INTERVAL seconds.
-
-    baseline=None means the initial fetch failed; the first successful poll
-    establishes the baseline instead of comparing against zero.
-    """
-    while not stop.wait(REVIEW_POLL_INTERVAL):
-        try:
-            count = int(
-                gh(
-                    "api",
-                    f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews?per_page=100",
-                    "--jq",
-                    _COPILOT_JQ,
-                )
-            )
-        except Exception:  # noqa: BLE001
-            continue  # transient API failure — skip cycle
-        if baseline is None:
-            baseline = count  # establish baseline on first successful poll
-            continue
-        if count > baseline:
-            emit("📝 New Copilot review posted")
-            review_seen.set()
-            stop.set()
-            return
 
 
 def write_failure_artifact(run_id: int) -> str:
@@ -931,21 +783,7 @@ def main() -> int:
         icon = "▶ " if run["status"] == "in_progress" else "⏳"
         emit_event(f"{icon} {run['name']}")
 
-    baseline: int | None
-    try:
-        baseline = int(
-            gh(
-                "api",
-                f"repos/{{owner}}/{{repo}}/pulls/{pr}/reviews?per_page=100",
-                "--jq",
-                _COPILOT_JQ,
-            )
-        )
-    except Exception:  # noqa: BLE001
-        baseline = None  # established on first successful poll in watch_reviews
-
     stop = threading.Event()
-    review_seen = threading.Event()
     failures: list[int] = []
     undetermined: list[tuple[str, str]] = []
 
@@ -957,24 +795,14 @@ def main() -> int:
         )
         for run in active
     ]
-    review_thread = threading.Thread(
-        target=watch_reviews,
-        args=(pr, baseline, stop, review_seen),
-        daemon=True,
-    )
 
     for t in ci_threads:
         t.start()
-    review_thread.start()
 
     for t in ci_threads:
         t.join()
 
     stop.set()
-    review_thread.join(timeout=5)
-
-    if review_seen.is_set():
-        return 0
 
     if failures:
         for run_id in failures:

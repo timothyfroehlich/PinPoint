@@ -1,7 +1,7 @@
 """Tests for scripts/check_rule_ids.py — the CORE-* citation gate.
 
 The gate exists because PinPoint states its rules in several hand-written
-places (catalog, CLAUDE.md, .claude/rules/, .github/instructions/) that are
+places (catalog, CLAUDE.md, AGENTS.md, REVIEW.md, .claude/rules/) that are
 deliberately NOT generated from one source. It catches the drift that bites:
 a rule renamed or deleted while citations linger, and (PP-22e4) a fragile
 "rule N" / "AGENTS.md §2.1" citation that a future restructuring of AGENTS.md

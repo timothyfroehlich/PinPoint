@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# mark-claude-review.sh — attest that a Claude Code review covered the PR's head commit.
+# mark-claude-review.sh — attest that a review covered the PR's head commit.
 #
 # Posts (or updates in place) a single sticky PR conversation comment carrying a
 # SHA-pinned marker `<!-- pinpoint-claude-review: <head_sha> -->`. The `reviewed`
 # gate in _pr-gates.sh detects this marker and, because the SHA is pinned to the
 # current head, a later fix (new head SHA) invalidates the attestation and forces
-# a fresh review. This is the Claude fallback for when Copilot silently skips.
+# a fresh review.
 #
-# The helper only *attests* — the caller is responsible for having actually run the
-# review first — a manual pass over the diff against REVIEW.md, since `/code-review`
-# is a user-triggered harness built-in an agent cannot launch. Same honesty model as
-# `merge-pr.sh --force`.
+# Since PP-4ric this is the ONLY thing that satisfies that gate — Copilot review was
+# retired on 2026-08-02 and no bot reviews this repo. What it attests to is Tim having
+# run `/code-review` over the branch: that is a Claude Code harness built-in an agent
+# cannot launch, so the review itself is a handoff and this helper is what records it.
+# The one exception is a genuinely trivial change (a typo, a comment, a one-line
+# mechanical fix), where the summary should say why it was trivial.
+#
+# The helper only *attests* — the caller is responsible for the review having actually
+# happened. Posting the marker for a review nobody ran is a false attestation, not a
+# shortcut. Same honesty model as `merge-pr.sh --force`.
 #
 # Usage:
 #   bash scripts/workflow/mark-claude-review.sh <PR> ["one-line findings summary"]

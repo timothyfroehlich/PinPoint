@@ -15,13 +15,15 @@ Work bead {beads_id}. First run `bd show {beads_id}` && `bd update {beads_id} --
 
 Run `pnpm run check` before returning. Then self-review **by hand**: read your own diff (`git diff origin/main...HEAD`) against `REVIEW.md` — the canonical rubric — plus the bead's acceptance criteria and out-of-scope list, and fix what you find. Don't reach for `/code-review` or `ultra`: both are user-triggered harness surfaces (`ultra` is also billed) and an agent cannot launch either.
 
-A review covering the head commit is still **required** to merge — only the trigger changed. **Nothing requests a Copilot review for you**: not opening the PR, not a push, not the `ready-for-review` label, not green CI. That's the point — you decide when you're ready, so the one review you spend lands on finished work.
+A review covering the head commit is **required** to merge, and **no bot reviews this repo**. The reviewer is Tim running `/code-review`, which you cannot launch — so getting reviewed is a handoff, not a command you run.
 
-Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, review fixes, merge-from-main — stop iterating, and ask once:
+Open the PR whenever you like and watch CI; it costs nothing. Then finish all of it — CI fixes, merge-from-main — stop iterating, and report the PR as needing Tim's review. Don't wait around for one to appear; nothing is coming on its own.
 
-`gh pr edit <PR> --add-reviewer "@copilot"`
+If the change is genuinely trivial (a typo, a comment, a one-line mechanical fix), attest it yourself and say why it was trivial:
 
-Judge coverage by comparing the review's `commit_id` to head, not by the fact that a review exists (`gh api repos/timothyfroehlich/PinPoint/pulls/<PR>/reviews --jq '.[] | {user: .user.login, commit_id}'`); push past a review and you have to ask again. Only if Copilot fails to answer a request you actually made (silent skip or quota limit) do you fall back to `bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"` — and only after genuinely reading the diff. The marker is an attestation, not a way to skip asking.
+`bash scripts/workflow/mark-claude-review.sh <PR> "typo in a comment; no behavior change"`
+
+The marker is an attestation that a review happened, never a way to skip one.
 
 ### Environment Setup
 
@@ -34,9 +36,9 @@ If tests fail with `POSTGRES_URL is not set`:
 
 1. Commit with conventional commit message
 2. Push: `git push -u origin {branch_name}`
-3. Create PR: `gh pr create --title "..." --body "..."` (no `--reviewer` — request the review at the end, not at creation)
+3. Create PR: `gh pr create --title "..." --body "..."`
 4. Verify CI: `gh pr checks <PR>`
-5. Once CI is green and you have stopped iterating, request the review — nothing does it for you: `gh pr edit <PR> --add-reviewer "@copilot"`. Then handle its threads
+5. Once CI is green and you have stopped iterating, report the PR as needing Tim's `/code-review` — unless it qualifies for the trivial-change exception above
 
 ### Return Format
 
@@ -44,7 +46,7 @@ If tests fail with `POSTGRES_URL is not set`:
 - **PR**: #{number}
 - **CI**: passing/failing/pending
 - **Self-review**: findings addressed
-- **Copilot review**: requested (when?) / landed / fell back to marker
+- **Review**: needs Tim's /code-review / attested at <sha> (trivial-change exception)
 - **Blockers**: none or description
 ```
 
