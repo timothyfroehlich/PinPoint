@@ -20,17 +20,22 @@ on review.
 
 ## `exactOptionalPropertyTypes`: omit the key, don't assign `undefined`
 
-The compiler flags this but does not teach the fix, and the two cheapest ways to
-silence it — widening the property to `| undefined`, or an `as` cast — are both
-CORE-TS-007 violations it will accept in silence. Build the object with a
-conditional spread so an absent value produces an absent key:
+The compiler flags this but does not teach the fix. Of the two cheapest
+silencers, an `as` cast is a CORE-TS-007 violation; widening the property to
+`| undefined` is not, but it changes the contract — the key must then always be
+present. Usually what you want is an absent key, which a conditional spread
+produces:
 
 ```typescript
 const data = {
   id: uuid(),
-  ...(name && { name }),
+  ...(name !== undefined && { name }),
 };
 ```
+
+Guard on `!== undefined`, not truthiness. `...(name && { name })` also drops `""`
+and `0`, which turns "the user cleared this field" into "the user never touched
+it."
 
 ## There is no db→app converter layer, and you should not build one
 
