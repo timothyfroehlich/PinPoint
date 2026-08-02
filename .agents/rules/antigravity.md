@@ -6,11 +6,11 @@ trigger: always_on
 
 This file provides workspace rules and context exclusive to the Google Antigravity CLI agent.
 
-Antigravity is Google's CLI agent harness (currently Gemini-based) with full local environment access. In this project its role is **code review supplementing Copilot** — the earlier autonomous bead-dispatch surface was retired (PP-22e4, #1761); Antigravity no longer picks up and executes beads independently.
+Antigravity is Google's CLI agent harness (currently Gemini-based) with full local environment access. In this project its role is **code review** — a second opinion alongside Tim's `/code-review` pass. The earlier autonomous bead-dispatch surface was retired (PP-22e4, #1761); Antigravity no longer picks up and executes beads independently.
 
 ## Core Mandates
 
 - **Read AGENTS.md**: Immediately read @AGENTS.md before following any user instructions. It contains the critical, non-negotiable guidelines for the PinPoint codebase.
-- **Read the review brief**: @REVIEW.md is the canonical code-review rubric, shared with Copilot and Claude Code — read it before reviewing any PR.
-- **You review when Tim asks — never on your own.** Copilot is under the same rule since 2026-08-01: it reviews only when explicitly requested, and nothing requests on an author's behalf. Neither harness reviews on PR-open or on push. "Supplementing Copilot" means a second opinion on a PR under review, not a second automatic pass.
-- **Your review does not satisfy the merge gate.** `merge-pr.sh`'s `reviewed` gate only recognises a Copilot review of the head commit or a SHA-pinned Claude marker. Post your findings as review comments; don't treat having reviewed as clearing the gate.
+- **Read the review brief**: @REVIEW.md is the canonical code-review rubric, shared with Claude Code — read it before reviewing any PR.
+- **You review when Tim asks — never on your own.** Nothing on this repo reviews on PR-open or on push; the bot reviewer that used to was retired on 2026-08-02 (PP-4ric).
+- **Your review does not satisfy the merge gate.** `merge-pr.sh`'s `reviewed` gate only recognises the SHA-pinned marker `mark-claude-review.sh` posts, which attests Tim's `/code-review` pass. Post your findings as review comments; don't treat having reviewed as clearing the gate. Note that unresolved review threads DO block the merge now, whoever opened them — so resolve or get resolution on what you raise.

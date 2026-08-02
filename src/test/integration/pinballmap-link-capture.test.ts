@@ -320,6 +320,39 @@ describe("verifyPinballmapLinkAction (PGlite)", () => {
     expect(events).toHaveLength(0);
   });
 
+  it("refuses (and does not list) a linked-but-unlisted machine", async () => {
+    // An unlisted row's lmx is null by schema CHECK, so it can never match the
+    // live lmx — without an explicit guard every verify here would fall into
+    // the heal branch and set `pinballmapListed`, putting the machine on
+    // Pinball Map as a side effect of a spot-check.
+    const db = await getTestDb();
+    const { verifyPinballmapLinkAction } =
+      await import("~/app/(app)/m/pinballmap-actions");
+    const admin = await createUser("admin");
+    await mockAuthAs(admin.id);
+    pbm.lineup = [{ id: 900, machineId: 42 }];
+    const machine = await seedMachine({
+      initials: "GZ",
+      pinballmapMachineId: 42,
+      pinballmapListed: false,
+    });
+
+    const res = await verifyPinballmapLinkAction(undefined, fdFor(machine.id));
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.code).toBe("VALIDATION");
+
+    const row = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(row?.pinballmapListed).toBe(false);
+    expect(row?.pinballmapLmxId).toBeNull();
+    const events = await db
+      .select()
+      .from(timelineEvents)
+      .where(eq(timelineEvents.machineId, machine.id));
+    expect(events).toHaveLength(0);
+  });
+
   it("heals the stored lmx when the title now maps to a new id", async () => {
     const db = await getTestDb();
     const { verifyPinballmapLinkAction } =
