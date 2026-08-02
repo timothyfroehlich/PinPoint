@@ -4,11 +4,26 @@ import {
   isPostgresError,
   getPostgresErrorCode,
   isPgErrorCode,
+  getPostgresErrorConstraint,
 } from "~/lib/db/postgres-errors";
 
 const makeBareError = (code: string): Error => {
   const e = new Error("postgres error") as Error & { code: string };
   e.code = code;
+  return e;
+};
+
+/** postgres-js shape (production): the Postgres wire field name, snake_case. */
+const makeConstraintError = (code: string, constraint: string): Error => {
+  const e = makeBareError(code) as Error & { constraint_name: string };
+  e.constraint_name = constraint;
+  return e;
+};
+
+/** PGlite shape (integration tests): pg-protocol's camelCase naming. */
+const makePgliteConstraintError = (code: string, constraint: string): Error => {
+  const e = makeBareError(code) as Error & { constraint: string };
+  e.constraint = constraint;
   return e;
 };
 
@@ -98,6 +113,67 @@ describe("postgres-errors", () => {
     it("returns false for non-Postgres errors", () => {
       expect(isPgErrorCode(new Error("plain"), "23505")).toBe(false);
       expect(isPgErrorCode(null, "23505")).toBe(false);
+    });
+  });
+
+  describe("getPostgresErrorConstraint", () => {
+    it("reads postgres-js's `constraint_name` (the production driver)", () => {
+      expect(
+        getPostgresErrorConstraint(
+          makeConstraintError("23505", "machines_initials_unique")
+        )
+      ).toBe("machines_initials_unique");
+    });
+
+    it("reads PGlite's `constraint` (every integration test)", () => {
+      // The two drivers genuinely disagree — verified 2026-08-01 against
+      // postgres/src/connection.js:46 and a live PGlite error dump. Reading only
+      // one spelling passes one environment and silently fails the other, which
+      // is exactly how the first attempt at this fix went green in unit tests
+      // and dead in the integration suite.
+      expect(
+        getPostgresErrorConstraint(
+          makePgliteConstraintError("23505", "machines_initials_unique")
+        )
+      ).toBe("machines_initials_unique");
+    });
+
+    it("finds it through the Drizzle cause chain", () => {
+      const wrapped = makeDrizzleWrap(
+        makeConstraintError("23505", "machines_pinballmap_listed_unique")
+      );
+      expect(getPostgresErrorConstraint(wrapped)).toBe(
+        "machines_pinballmap_listed_unique"
+      );
+    });
+
+    it("distinguishes two unique violations that share SQLSTATE 23505", () => {
+      // The whole point: one table, several unique constraints, one code. Code
+      // that assumes which one fired reports the wrong cause (PP-o355.15).
+      const initials = makeConstraintError("23505", "machines_initials_unique");
+      const listing = makeConstraintError(
+        "23505",
+        "machines_pinballmap_listed_unique"
+      );
+
+      expect(isPgErrorCode(initials, "23505")).toBe(true);
+      expect(isPgErrorCode(listing, "23505")).toBe(true);
+      expect(getPostgresErrorConstraint(initials)).not.toBe(
+        getPostgresErrorConstraint(listing)
+      );
+    });
+
+    it("returns undefined when the error carries no constraint name", () => {
+      // Callers must keep a general fallback — not every unique violation names
+      // its constraint.
+      expect(
+        getPostgresErrorConstraint(makeBareError("23505"))
+      ).toBeUndefined();
+    });
+
+    it("returns undefined for non-Postgres errors", () => {
+      expect(getPostgresErrorConstraint(new Error("plain"))).toBeUndefined();
+      expect(getPostgresErrorConstraint(null)).toBeUndefined();
     });
   });
 });
