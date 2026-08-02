@@ -244,8 +244,16 @@ export default [
       // Allow disabling rules in tests if needed (mocking often requires it)
       "eslint-comments/no-restricted-disable": "off",
 
+      // mocks/spies are inherently empty
       "@typescript-eslint/no-empty-function": "off",
+      // tsconfig gap: `tsconfig.tests.json` lacks `noUncheckedIndexedAccess`,
+      // causing false positives on legitimate defensive checks. Scope: src
+      // tests. The `**/*.spec.ts` glob above also matches e2e specs, but the
+      // later `e2e/**/*` block re-declares this rule and wins for them — and
+      // `e2e/tsconfig.json` has no such gap, so this reason does not carry
+      // over to it. See PP-8xk7.
       "@typescript-eslint/no-unnecessary-condition": "off",
+      // tests legitimately cross the src/e2e boundary
       "no-restricted-imports": "off",
     },
   },
