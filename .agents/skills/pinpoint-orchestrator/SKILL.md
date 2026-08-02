@@ -42,13 +42,16 @@ gh pr edit <PR> --add-reviewer "@copilot"                     # Ask Copilot for 
 bash scripts/workflow/mark-claude-review.sh <PR> "<summary>"  # Fallback ONLY after requesting: SHA-pinned Claude-review marker, and only if you actually read the diff
 node scripts/workflow/pr-screenshots.mjs <PR>                 # UI-touching PRs: desktop+mobile screenshots, sticky PR comment
 
-# Worktree health — covers manually created ../pinpoint-worktrees/* ONLY;
-# agent-created .claude/worktrees/* are handled by the WorktreeRemove hook and not scanned here
+# Worktree health — stale-worktrees.sh covers manually created ../pinpoint-worktrees/* ONLY.
+# The WorktreeRemove hook does NOT remove finished agent worktrees; it only runs cleanup
+# when something else initiates removal, so a background agent that pushes and ends leaves
+# its directory on disk forever. worktree_reap.py is what removes them (PP-49x5).
 ./scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
 ./scripts/workflow/stale-worktrees.sh --clean            # Auto-remove stale worktrees
 
 # Worktree management (post-checkout hook auto-configures ports + Supabase)
 git worktree list                                             # Show all worktrees
+python3 scripts/worktree_reap.py                              # Report worktrees whose work already landed (dry-run; --apply to reclaim)
 python3 scripts/worktree_cleanup.py <worktree-path>           # Full cleanup (Supabase stop, Docker volumes, manifest, worktree removal)
 ```
 
