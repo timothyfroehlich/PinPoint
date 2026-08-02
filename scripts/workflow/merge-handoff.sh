@@ -301,25 +301,32 @@ fi
 # Report
 # ---------------------------------------------------------------------------------
 
+# Ruled sections rather than blank lines: the block is pasted into a chat transcript
+# among prose, and a wall of aligned label/value pairs there reads as one undifferentiated
+# paragraph. The three groups answer three different questions — may it merge, what is in
+# it, what do I run — and the rules are what make that visible at a glance.
+rule() { printf '  %s\n' "────────────────────────────────────────────────────────────────────────"; }
+
 printf '\n'
 printf 'PR #%s — %s\n' "$pr" "$title"
-printf '  %s -> %s · bead %s · %s\n' "$head_ref" "$base_ref" "$bead" "$url"
+printf '  %s -> %s · bead %s\n' "$head_ref" "$base_ref" "$bead"
+printf '  %s\n' "$url"
 if [[ "$is_draft" == "true" ]]; then
   printf '  DRAFT — not ready for review\n'
 fi
-printf '\n'
+rule
 printf '  review        %s\n' "$review_desc"
 printf '  ci            %s\n' "$(gate_state "$ci_out")"
 printf '  threads       %s\n' "$(gate_state "$threads_out")"
 printf '  mergeable     %s · %s commit(s) behind %s\n' "$(gate_state "$conflict_out")" "$behind_main" "$base_ref"
 printf '  main merged   %s\n' "$last_main_merge"
-printf '\n'
+rule
 printf '  diff vs main  %s   (%s commit(s))\n' "$diff_vs_main" "$branch_commits"
 printf '  since review  %s\n' "$diff_since_review"
 printf '  migrations    %s\n' "$migration_line"
 printf '  new env vars  %s\n' "$env_added"
 printf '  ui            %s\n' "$ui_line"
-printf '\n'
+rule
 
 blocking=()
 add_block() { blocking+=("$1"); }
@@ -330,11 +337,14 @@ if [[ "$rv_state" != "marker" ]]; then add_block "reviewed: ${rv_state} — Tim 
 if [[ "$is_draft" == "true" ]]; then add_block "draft: flip to ready-for-review"; fi
 if [[ "$pr_state" != "OPEN" ]]; then add_block "state: PR is ${pr_state}, not open"; fi
 
+if [[ ${#blocking[@]} -gt 0 ]]; then
+  printf '  NOT MERGEABLE YET — %s gate(s) blocking:\n' "${#blocking[@]}"
+  printf '    - %s\n' "${blocking[@]}"
+  rule
+fi
 printf '  ! bash scripts/workflow/merge-handoff.sh %s   (re-run — this report is a snapshot)\n' "$pr"
 if [[ ${#blocking[@]} -eq 0 ]]; then
   printf '  ! scripts/workflow/merge-pr.sh %s --human\n' "$pr"
-else
-  printf '\n  NOT MERGEABLE YET — %s gate(s) blocking:\n' "${#blocking[@]}"
-  printf '    - %s\n' "${blocking[@]}"
 fi
+rule
 printf '\n'
