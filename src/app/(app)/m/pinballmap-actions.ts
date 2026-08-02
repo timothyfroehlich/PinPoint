@@ -275,7 +275,7 @@ export async function linkPinballmapEntryAction(
     if (isPgErrorCode(error, "23505")) {
       return err(
         "VALIDATION",
-        await pbmListingConflictMessage(machine.pinballmapMachineId)
+        await pbmListingConflictMessage(machine.pinballmapMachineId, machine.id)
       );
     }
     throw error;
@@ -393,10 +393,13 @@ export async function verifyPinballmapLinkAction(
   } catch (error: unknown) {
     // Bare code for the same reason as the link path above — this transaction
     // writes only listing columns, so any 23505 here is the one-lister index.
+    // Exclude self from the incumbent lookup: this machine IS the listed row
+    // for its title (the guard above guarantees it), so an unfiltered lookup
+    // would name it and tell the operator to unlist what they're verifying.
     if (isPgErrorCode(error, "23505")) {
       return err(
         "VALIDATION",
-        await pbmListingConflictMessage(machine.pinballmapMachineId)
+        await pbmListingConflictMessage(machine.pinballmapMachineId, machine.id)
       );
     }
     throw error;

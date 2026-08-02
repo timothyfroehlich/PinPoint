@@ -358,6 +358,9 @@ export async function createMachineAction(
         redirectTo: `/m/${machine.initials}`,
       });
     } catch (error: unknown) {
+      // Name-matched rather than bare, unlike the listing actions: create is the
+      // only write that can violate EITHER unique constraint, so it has to tell
+      // them apart. See `isPbmListingConflict` for the tradeoff that buys.
       if (isPbmListingConflict(error)) {
         return err(
           "VALIDATION",
@@ -454,6 +457,8 @@ export async function createMachineAction(
       redirectTo: `/m/${machine.initials}`,
     });
   } catch (error: unknown) {
+    // Name-matched rather than bare — see the forcePromote catch above and
+    // `isPbmListingConflict`.
     if (isPbmListingConflict(error)) {
       return err(
         "VALIDATION",
@@ -698,11 +703,16 @@ export async function updateMachineAction(
           "You do not have permission to link this machine to Pinball Map."
         );
       }
-      // `pinballmapListed` is NOT a form field — it is flipped only by
+      // `pinballmapListed` is not a user-facing field — the edit form renders no
+      // control for it, and it is meant to be flipped only by
       // `linkPinballmapEntryAction` / the verify action, which talk to PBM. The
-      // edit form therefore submits nothing for it, and without this carry-over
+      // form therefore submits nothing for it, and without this carry-over
       // `resolvePbmLinkColumns` would default it to `false` — silently unlisting
       // a listed machine on every unrelated "Save details" (PP-o355.19 review).
+      //
+      // `readPbmLinkFormFields` does still READ the raw field, so a crafted POST
+      // can set it with no PBM interaction at all — PP-o355.29, to close before
+      // PP-o355.21 wires the listing controls up for real.
       // Carry the stored value only while the link target is unchanged;
       // re-targeting the link makes the old listing meaningless, and the
       // resolver already forces `false` on the unlinked/excluded branches.
@@ -1112,10 +1122,16 @@ export async function updateMachineAction(
     // the collision surfaced as a 500 (PP-o355.15). `pbmColumns` is scoped
     // inside the try; the submitted title id is the same value and is in scope
     // here.
-    if (isPgErrorCode(error, "23505")) {
+    //
+    // Gated on `pbmFormPresent`: without the picker on this form no listing
+    // column is written, so a 23505 cannot be the one-lister index. Claiming it
+    // anyway would answer an unrelated unique violation with a confident,
+    // wrong PinballMap message AND skip `serverActionError`'s reporting,
+    // leaving no telemetry for a genuine defect.
+    if (pbmFormPresent && isPgErrorCode(error, "23505")) {
       return err(
         "VALIDATION",
-        await pbmListingConflictMessage(validation.data.pinballmapMachineId)
+        await pbmListingConflictMessage(validation.data.pinballmapMachineId, id)
       );
     }
     return serverActionError(
