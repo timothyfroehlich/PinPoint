@@ -13,7 +13,14 @@ import { createIssueIdempotencyKey } from "./create-issue";
 
 const USER = "11111111-1111-4111-8111-111111111111";
 const MACHINE = "22222222-2222-4222-8222-222222222222";
-const NOW = 1_770_000_000_000;
+/**
+ * Deliberately *mid*-bucket, not on a boundary. `1_770_000_000_000` is an exact
+ * multiple of the 10-minute window, so a test anchored there always sits at the
+ * start of a bucket and the "a retry seconds later collides" assertion holds
+ * trivially — it would keep passing even if the near-boundary protection
+ * regressed to nothing.
+ */
+const NOW = 1_770_000_000_000 + 100_000;
 
 const base = {
   machine: "AFM",
@@ -72,6 +79,17 @@ describe("createIssueIdempotencyKey", () => {
     // silently resolving to the closed one.
     expect(key({}, NOW + 5_000)).toBe(key());
     expect(key({}, NOW + 30 * 24 * 60 * 60 * 1000)).not.toBe(key());
+  });
+
+  it("does not protect a retry that straddles a window boundary", () => {
+    // Pins a known limitation rather than a guarantee. The window is tumbling,
+    // not sliding, so a call late in one bucket and its retry moments later in
+    // the next produce different keys and file a duplicate. That is the safe
+    // direction to fail — a visible duplicate, honestly reported as created —
+    // and the tool description is worded to match ("usually"), but it must not
+    // silently become the common case.
+    const boundary = 1_770_000_000_000 + 600_000;
+    expect(key({}, boundary - 1_000)).not.toBe(key({}, boundary + 1_000));
   });
 
   it("does not collide when content shifts across the field boundary", () => {

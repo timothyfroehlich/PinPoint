@@ -155,6 +155,38 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(result.hasMore).toBe(true);
     });
 
+    it("pages past the limit with offset until hasMore clears (PP-u4ab.4)", async () => {
+      const admin = await makeUser("admin");
+      for (const name of ["Page A", "Page B", "Page C"]) {
+        await seedMachine({ name });
+      }
+
+      interface Page {
+        count: number;
+        total: number;
+        hasMore: boolean;
+      }
+      const first = (
+        await runListMachines(
+          { search: "Page", limit: 2, offset: 0 },
+          ctx("admin", admin)
+        )
+      ).result as Page;
+      const second = (
+        await runListMachines(
+          { search: "Page", limit: 2, offset: 2 },
+          ctx("admin", admin)
+        )
+      ).result as Page;
+
+      expect(first.hasMore).toBe(true);
+      // The last page must report hasMore false even though total > count —
+      // otherwise an enumerating caller loops forever.
+      expect(second.count).toBe(1);
+      expect(second.total).toBe(3);
+      expect(second.hasMore).toBe(false);
+    });
+
     it("reports hasMore false when the page holds every match", async () => {
       const admin = await makeUser("admin");
       await seedMachine({ name: "Complete Alpha" });
@@ -411,6 +443,13 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       // A transport-level retry resends identical arguments; it must resolve to
       // the issue already filed rather than a second one.
       expect(second.issueId).toBe(first.issueId);
+
+      // ...and it must SAY so. Reporting the pre-existing issue's number with
+      // no signal that nothing was written is the success-for-work-not-done
+      // shape CORE-ARCH-012 forbids — the caller would tell a member their
+      // second report was logged when it was dropped.
+      expect((first.result as { created: boolean }).created).toBe(true);
+      expect((second.result as { created: boolean }).created).toBe(false);
 
       const db = await getTestDb();
       const rows = await db

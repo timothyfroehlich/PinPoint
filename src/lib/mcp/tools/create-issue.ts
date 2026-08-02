@@ -133,7 +133,7 @@ export async function runCreateIssue(
   // reaching the service (which would otherwise throw a generic not-found).
   const machine = await resolveMachine(args.machine);
 
-  const { issue, deliveryPlan } = await createIssue({
+  const { issue, deliveryPlan, deduped } = await createIssue({
     title: args.title,
     description: args.description ? plainTextToDoc(args.description) : null,
     machineInitials: machine.initials,
@@ -153,6 +153,12 @@ export async function runCreateIssue(
 
   return {
     result: {
+      // Whether this call actually filed something. Dedupe makes "your report
+      // was recorded" and "an identical report already existed and yours was
+      // not written" two different outcomes, and they must not look alike:
+      // reporting the pre-existing issue's number as if it were newly filed is
+      // exactly the success-for-work-not-done shape CORE-ARCH-012 forbids.
+      created: !deduped,
       number: issue.issueNumber,
       title: issue.title,
       machine: machine.initials,
@@ -171,7 +177,7 @@ export function registerCreateIssue(server: McpServer): void {
     {
       title: "Create issue",
       description:
-        "File an issue against a machine (identified by initials or UUID). Requires a title; optional plain-text description, severity (cosmetic/minor/major/unplayable), priority (low/medium/high), and frequency (intermittent/frequent/constant). Attributed to the authenticated admin. Safe to retry: repeating the identical call within a few minutes returns the issue already filed rather than a duplicate.",
+        "File an issue against a machine (identified by initials or UUID). Requires a title; optional plain-text description, severity (cosmetic/minor/major/unplayable), priority (low/medium/high), and frequency (intermittent/frequent/constant). Attributed to the authenticated admin. Retrying an identical call shortly after one usually resolves to the issue already filed instead of a duplicate — check 'created' in the response: false means nothing new was written and 'number' refers to the pre-existing issue, so report it as already filed rather than as a new one.",
       inputSchema: createIssueSchema.shape,
     },
     (args, extra) =>

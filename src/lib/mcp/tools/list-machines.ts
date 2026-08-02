@@ -41,7 +41,15 @@ const listMachinesSchema = z.object({
     .max(100)
     .optional()
     .describe(
-      `Maximum machines to return (default ${DEFAULT_LIMIT}). The response reports the matching 'total' and 'hasMore' so you can tell a full list from a truncated page.`
+      `Maximum machines to return (default ${DEFAULT_LIMIT}, max 100). The response reports the matching 'total' and 'hasMore' so you can tell a full list from a truncated page.`
+    ),
+  offset: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      "How many matches to skip, for paging past the limit. Machines are ordered by name, so a stable full listing is offset 0, then offset+limit until 'hasMore' is false."
     ),
 });
 
@@ -68,6 +76,7 @@ export async function runListMachines(
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
   const limit = args.limit ?? DEFAULT_LIMIT;
+  const offset = args.offset ?? 0;
 
   // Count alongside the page so the caller can tell a complete answer from a
   // truncated one. Without this a 50-machine page of a 120-machine collection
@@ -86,6 +95,7 @@ export async function runListMachines(
       },
       orderBy: (m, { asc }) => [asc(m.name)],
       limit,
+      offset,
     }),
     db.select({ value: count() }).from(machines).where(where),
   ]);
@@ -108,7 +118,8 @@ export async function runListMachines(
     result: {
       count: machineList.length,
       total,
-      hasMore: total > machineList.length,
+      offset,
+      hasMore: offset + machineList.length < total,
       machines: machineList,
     },
   };
@@ -120,7 +131,7 @@ export function registerListMachines(server: McpServer): void {
     {
       title: "List machines",
       description:
-        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search and a presence filter. Returns 'count' (this page), 'total' (all matches), and 'hasMore' — when hasMore is true the list is truncated, so narrow it with search/presence or raise limit before answering a counting question.",
+        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search and a presence filter. Returns 'count' (this page), 'total' (every match), 'offset', and 'hasMore'. Answer counting questions from 'total', never from 'count' or the array length. To enumerate a collection larger than one page, keep requesting with offset += limit until hasMore is false — raising limit alone caps at 100 and will not reach the rest.",
       inputSchema: listMachinesSchema.shape,
     },
     (args, extra) =>
