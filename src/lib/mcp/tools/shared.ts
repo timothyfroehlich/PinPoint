@@ -14,6 +14,7 @@ import { OPEN_STATUSES } from "~/lib/issues/status";
 import type { MachinePresenceStatus } from "~/lib/machines/presence";
 import { reportError } from "~/lib/observability/report-error";
 import { getSiteUrl } from "~/lib/url";
+import type { MachinePbmColumns } from "~/services/machines";
 import { db } from "~/server/db";
 import {
   invitedUsers,
@@ -102,8 +103,16 @@ export async function runTool(
 
 const uuidSchema = z.string().uuid();
 
-/** The minimal machine snapshot tools need for permission + service calls. */
-export interface MachineRef {
+/**
+ * The minimal machine snapshot tools need for permission + service calls.
+ *
+ * Extends {@link MachinePbmColumns} — the same column set the create/edit paths
+ * write — so a resolved machine carries its full PinballMap state. That is what
+ * `get_machine` reports (via `buildMachinePinballmap`) and what any future write
+ * tool needs to carry `pinballmapListed`/`pinballmapLmxId` over from the STORED
+ * row rather than from its arguments (PP-o355.29).
+ */
+export interface MachineRef extends MachinePbmColumns {
   id: string;
   initials: string;
   name: string;
@@ -130,6 +139,15 @@ export async function resolveMachine(ref: string): Promise<MachineRef> {
       ownerId: true,
       invitedOwnerId: true,
       presenceStatus: true,
+      pinballmapMachineId: true,
+      pinballmapExcluded: true,
+      pinballmapExcludedReason: true,
+      pinballmapListed: true,
+      pinballmapLmxId: true,
+      manufacturer: true,
+      year: true,
+      opdbId: true,
+      ipdbId: true,
     },
   });
   if (!machine) {

@@ -15,7 +15,13 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
 
-import { authUsers, issues, machines, userProfiles } from "~/server/db/schema";
+import {
+  authUsers,
+  issues,
+  machines,
+  pinballmapCatalog,
+  userProfiles,
+} from "~/server/db/schema";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import type * as NotificationsModule from "~/lib/notifications";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
@@ -44,6 +50,12 @@ import { runAddMachine } from "~/lib/mcp/tools/add-machine";
 import { runCreateIssue } from "~/lib/mcp/tools/create-issue";
 import { runGetMachine } from "~/lib/mcp/tools/get-machine";
 import { runListMachines } from "~/lib/mcp/tools/list-machines";
+import { runSearchPinballmapCatalog } from "~/lib/mcp/tools/search-pinballmap-catalog";
+import type {
+  McpCatalogEditionResult,
+  McpCatalogFamilyResult,
+} from "~/lib/mcp/tools/search-pinballmap-catalog";
+import type { McpMachinePinballmap } from "~/lib/mcp/tools/pinballmap-block";
 import { runSetMachineAvailability } from "~/lib/mcp/tools/set-machine-availability";
 import { runSetMachineOwner } from "~/lib/mcp/tools/set-machine-owner";
 import { McpToolError } from "~/lib/mcp/tools/shared";
@@ -82,10 +94,24 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
     return `MC${String(counter).padStart(3, "0")}`;
   }
 
+  /** PinballMap columns a seeded machine may carry (schema CHECKs still apply). */
+  interface SeedPbm {
+    pinballmapMachineId?: number;
+    pinballmapExcluded?: boolean;
+    pinballmapExcludedReason?: string;
+    pinballmapListed?: boolean;
+    pinballmapLmxId?: number;
+    manufacturer?: string;
+    year?: number;
+    opdbId?: string;
+    ipdbId?: number;
+  }
+
   async function seedMachine(overrides?: {
     name?: string;
     ownerId?: string | null;
     presenceStatus?: "on_the_floor" | "off_the_floor";
+    pbm?: SeedPbm;
   }): Promise<{ id: string; initials: string }> {
     const db = await getTestDb();
     const [machine] = await db
@@ -95,10 +121,72 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
         initials: nextInitials(),
         ownerId: overrides?.ownerId ?? null,
         presenceStatus: overrides?.presenceStatus ?? "on_the_floor",
+        ...(overrides?.pbm ?? {}),
       })
       .returning();
     if (!machine) throw new Error("failed to seed machine");
     return machine;
+  }
+
+  /**
+   * Seed the local PinballMap catalog mirror. Every catalog read in these tests
+   * is served from this table — nothing reaches pinballmap.com (CORE-PBM-001).
+   */
+  async function seedCatalog(
+    rows: {
+      pinballmapMachineId: number;
+      name: string;
+      manufacturer?: string;
+      year?: number;
+      opdbId?: string;
+      ipdbId?: number;
+      machineGroupId?: number;
+      groupName?: string;
+    }[]
+  ): Promise<void> {
+    const db = await getTestDb();
+    await db.insert(pinballmapCatalog).values(rows);
+  }
+
+  const ELVIRA_GROUP_ID = 7001;
+  const ELVIRA_PREMIUM_ID = 70012;
+
+  /** The Elvira family (Pro/Premium/LE) plus one standalone title. */
+  async function seedElviraCatalog(): Promise<void> {
+    await seedCatalog([
+      {
+        pinballmapMachineId: 70011,
+        name: "Elvira's House of Horrors (Pro)",
+        manufacturer: "Stern",
+        year: 2019,
+        machineGroupId: ELVIRA_GROUP_ID,
+        groupName: "Elvira's House of Horrors",
+      },
+      {
+        pinballmapMachineId: ELVIRA_PREMIUM_ID,
+        name: "Elvira's House of Horrors (Premium)",
+        manufacturer: "Stern",
+        year: 2019,
+        opdbId: "GRBN4-MQGE5",
+        ipdbId: 6587,
+        machineGroupId: ELVIRA_GROUP_ID,
+        groupName: "Elvira's House of Horrors",
+      },
+      {
+        pinballmapMachineId: 70013,
+        name: "Elvira's House of Horrors (LE)",
+        manufacturer: "Stern",
+        year: 2019,
+        machineGroupId: ELVIRA_GROUP_ID,
+        groupName: "Elvira's House of Horrors",
+      },
+      {
+        pinballmapMachineId: 70020,
+        name: "Elvira and the Party Monsters",
+        manufacturer: "Bally",
+        year: 1989,
+      },
+    ]);
   }
 
   describe("list_machines", () => {
@@ -235,6 +323,205 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       await expect(
         runGetMachine({ machine: "ZZZ" }, ctx("admin", admin))
       ).rejects.toBeInstanceOf(McpToolError);
+    });
+
+    describe("pinballmap block (PP-u4ab.8)", () => {
+      it("reports the linked catalog title, edition family, model metadata and listing state", async () => {
+        const admin = await makeUser("admin");
+        await seedElviraCatalog();
+        const machine = await seedMachine({
+          name: "Elvira's House of Horrors",
+          pbm: {
+            pinballmapMachineId: ELVIRA_PREMIUM_ID,
+            pinballmapListed: true,
+            pinballmapLmxId: 55555,
+            manufacturer: "Stern",
+            year: 2019,
+            opdbId: "GRBN4-MQGE5",
+            ipdbId: 6587,
+          },
+        });
+
+        const outcome = await runGetMachine(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        );
+        const { pinballmap } = outcome.result as {
+          pinballmap: McpMachinePinballmap | null;
+        };
+
+        // The walk-the-floor question this bead exists for: "is our Elvira
+        // recorded as the Premium?" must be answerable from this block alone.
+        expect(pinballmap).toEqual({
+          status: "linked",
+          pinballmapMachineId: ELVIRA_PREMIUM_ID,
+          title: "Elvira's House of Horrors (Premium)",
+          machineGroupId: ELVIRA_GROUP_ID,
+          group: "Elvira's House of Horrors",
+          manufacturer: "Stern",
+          year: 2019,
+          opdbId: "GRBN4-MQGE5",
+          ipdbId: 6587,
+          listed: true,
+          lmxId: 55555,
+        });
+      });
+
+      it("reports a null title for a link the catalog mirror no longer holds", async () => {
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({
+          pbm: { pinballmapMachineId: 999_111 },
+        });
+
+        const outcome = await runGetMachine(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        );
+        const { pinballmap } = outcome.result as {
+          pinballmap: McpMachinePinballmap | null;
+        };
+
+        // Still "linked" — the stored id is real; the mirror just can't name it.
+        expect(pinballmap).toMatchObject({
+          status: "linked",
+          pinballmapMachineId: 999_111,
+          title: null,
+          machineGroupId: null,
+          group: null,
+        });
+      });
+
+      it("reports the excluded state and its reason, not null", async () => {
+        const admin = await makeUser("admin");
+        const machine = await seedMachine({
+          pbm: {
+            pinballmapExcluded: true,
+            pinballmapExcludedReason: "Homebrew, not a catalog title",
+          },
+        });
+
+        const outcome = await runGetMachine(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        );
+        const { pinballmap } = outcome.result as {
+          pinballmap: McpMachinePinballmap | null;
+        };
+
+        // "Deliberately not on Pinball Map" is a recorded fact; collapsing it to
+        // null would make it indistinguishable from "nobody has looked yet".
+        expect(pinballmap).toEqual({
+          status: "excluded",
+          reason: "Homebrew, not a catalog title",
+        });
+      });
+
+      it("returns pinballmap as an explicit null when neither linked nor excluded", async () => {
+        const admin = await makeUser("admin");
+        const machine = await seedMachine();
+
+        const outcome = await runGetMachine(
+          { machine: machine.initials },
+          ctx("admin", admin)
+        );
+        const result = outcome.result as {
+          pinballmap: McpMachinePinballmap | null;
+        };
+
+        expect(result.pinballmap).toBeNull();
+        // Present-and-null, never absent: an omitted key reads as "this tool
+        // doesn't report PBM state" rather than "this machine has none".
+        expect(Object.keys(result)).toContain("pinballmap");
+      });
+    });
+  });
+
+  describe("search_pinballmap_catalog (PP-u4ab.8)", () => {
+    it("returns the family with its edition count for a query", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      const outcome = await runSearchPinballmapCatalog(
+        { query: "elvira" },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as McpCatalogFamilyResult;
+
+      expect(result.mode).toBe("families");
+      expect(result.hasMore).toBe(false);
+      const family = result.families.find(
+        (f) => f.machineGroupId === ELVIRA_GROUP_ID
+      );
+      expect(family?.editionCount).toBeGreaterThan(1);
+      // A multi-edition family must NOT resolve to a single id — that's the
+      // second step's job.
+      expect(family?.pinballmapMachineId).toBeNull();
+      // The standalone Bally title is its own family alongside the group.
+      expect(result.count).toBe(2);
+    });
+
+    it("returns a family's individual editions for its machineGroupId", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      const outcome = await runSearchPinballmapCatalog(
+        { machineGroupId: ELVIRA_GROUP_ID },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as McpCatalogEditionResult;
+
+      expect(result.mode).toBe("editions");
+      expect(result.count).toBe(3);
+      expect(
+        result.editions.find(
+          (e) => e.name === "Elvira's House of Horrors (Premium)"
+        )?.pinballmapMachineId
+      ).toBe(ELVIRA_PREMIUM_ID);
+    });
+
+    it("reports hasMore when more families match than the limit returns", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      const outcome = await runSearchPinballmapCatalog(
+        { query: "elvira", limit: 1 },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as McpCatalogFamilyResult;
+
+      expect(result.count).toBe(1);
+      expect(result.hasMore).toBe(true);
+    });
+
+    it("returns no editions for a group id the mirror doesn't have", async () => {
+      const admin = await makeUser("admin");
+      await seedElviraCatalog();
+
+      const outcome = await runSearchPinballmapCatalog(
+        { machineGroupId: 424_242 },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as McpCatalogEditionResult;
+
+      expect(result.count).toBe(0);
+      expect(result.editions).toEqual([]);
+    });
+
+    it("rejects a call with neither query nor machineGroupId", async () => {
+      const admin = await makeUser("admin");
+      await expect(
+        runSearchPinballmapCatalog({}, ctx("admin", admin))
+      ).rejects.toMatchObject({ reason: "invalid" });
+    });
+
+    it("rejects a call with both query and machineGroupId", async () => {
+      const admin = await makeUser("admin");
+      await expect(
+        runSearchPinballmapCatalog(
+          { query: "elvira", machineGroupId: ELVIRA_GROUP_ID },
+          ctx("admin", admin)
+        )
+      ).rejects.toMatchObject({ reason: "invalid" });
     });
   });
 
