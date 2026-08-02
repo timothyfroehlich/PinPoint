@@ -236,15 +236,20 @@ def _gh_api_list(path: str) -> list[dict]:
     return items
 
 
-def _marker_sha(pr: int) -> str:
-    """Return the SHA pinned by the PR's review marker, or "" if there is none."""
+def _marker_shas(pr: int) -> list[str]:
+    """Every SHA pinned by a review marker comment on the PR, oldest first.
+
+    A list rather than "the" marker: mark-claude-review.sh keeps one sticky
+    comment, but nothing stops a second session or a hand-posted comment from
+    leaving two, and a reader that picks one comment can disagree with the
+    writer about which is canonical — see `_marker_verdict` in _pr-gates.sh.
+    """
     repo = f"repos/{REPO_OWNER}/{REPO_NAME}"
-    pinned = [
+    return [
         (c.get("body") or "")[len(CLAUDE_MARKER_PREFIX) :].split("-->")[0].strip()
         for c in _gh_api_list(f"{repo}/issues/{pr}/comments")
         if (c.get("body") or "").startswith(CLAUDE_MARKER_PREFIX)
     ]
-    return pinned[-1] if pinned else ""
 
 
 def review_state(pr: int) -> tuple[str, str]:
@@ -260,16 +265,17 @@ def review_state(pr: int) -> tuple[str, str]:
     head_sha = json.loads(gh("pr", "view", str(pr), "--json", "headRefOid"))[
         "headRefOid"
     ]
-    marker_sha = _marker_sha(pr)
+    pinned = _marker_shas(pr)
 
-    if not marker_sha:
+    if head_sha in pinned:
+        return "marker", f"review marker pins head {head_sha[:7]}"
+    if not pinned:
         return (
             "unreviewed",
             f"no review marker — head {head_sha[:7]} is unreviewed; "
             f"{REVIEW_HINT.format(pr=pr)}",
         )
-    if marker_sha == head_sha:
-        return "marker", f"review marker pins head {head_sha[:7]}"
+    marker_sha = pinned[-1]
     return (
         "stale_marker",
         f"the marker pins {marker_sha[:7]} but head is {head_sha[:7]} — you "
@@ -386,10 +392,13 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
 
     Used by the default watch mode as a fail-fast pre-check BEFORE entering the
     watch loop. Distinguishes conditions that won't resolve by waiting (bad merge
-    state, already-failed CI Gate, unresolved review threads) from conditions
-    that the watch loop is designed to wait through (CI Gate not yet posted, CI
-    Gate in progress). The latter MUST pass this pre-check so the watch loop can
-    fire and `_finalize_via_ci_gate` can poll for completion.
+    state, already-failed CI Gate) from conditions that the watch loop is
+    designed to wait through (CI Gate not yet posted, CI Gate in progress). The
+    latter MUST pass this pre-check so the watch loop can fire and
+    `_finalize_via_ci_gate` can poll for completion.
+
+    Unresolved review threads are reported but do NOT block — watching CI is a
+    step *inside* the address-the-findings loop, not after it.
 
     Readiness-check mode (run_audit, --check-ready) keeps its stricter
     semantics — there, CI-Gate-absent IS correctly a "no, not ready right now".
@@ -414,7 +423,17 @@ def _pre_check_blocking(pr: int) -> tuple[bool, str]:
 
     unresolved = _unresolved_threads(get_review_threads(pr))
     if unresolved > 0:
-        return False, f"{unresolved} unresolved review thread(s)"
+        # A notice, not a block. Threads are author-agnostic since PP-4ric, so
+        # these are Tim's /code-review findings, and the documented loop is
+        # fix → push → watch CI → resolve once it is green. Blocking here would
+        # refuse to watch the very push that addresses them, leaving --force as
+        # the only way through — which also drops the merge-state and
+        # already-failed-CI pre-checks that are worth keeping. `merge-pr.sh`'s
+        # `threads` gate is what actually refuses to merge on an open thread,
+        # and --check-ready still reports one as not-ready.
+        # emit(), not emit_event(): this is an action item the agent still owes,
+        # not per-job progress noise, so it must survive non-verbose runs.
+        emit(f"{unresolved} unresolved review thread(s) — resolve before merge")
 
     return True, ""
 

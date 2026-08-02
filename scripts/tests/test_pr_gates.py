@@ -222,15 +222,38 @@ def test_marker_on_a_later_page_is_still_found() -> None:
     assert result.returncode == 0, result.stdout
 
 
-def test_the_newest_marker_wins() -> None:
-    """mark-claude-review.sh rewrites one sticky comment, so duplicates are a stray.
+@pytest.mark.parametrize(
+    "order",
+    [
+        pytest.param([OTHER_SHA, HEAD_SHA], id="attestation-is-newest"),
+        pytest.param([HEAD_SHA, OTHER_SHA], id="attestation-is-oldest"),
+    ],
+)
+def test_any_marker_pinning_head_passes_whatever_the_order(order: list[str]) -> None:
+    """The gate asks "does ANY marker pin head?", not "does the newest one?".
 
-    If one ever lands, the later comment is the current attestation.
+    Duplicate markers are a stray — mark-claude-review.sh rewrites one sticky comment —
+    but a second session or a hand-posted comment can leave two. Reading only one of
+    them lets writer and reader disagree about which is canonical: re-attesting would
+    rewrite a comment the gate never reads, and a genuinely reviewed head would report
+    stale_marker forever with --force as the only exit. The `attestation-is-oldest`
+    case is the one that broke.
     """
-    pages = [[marker_comment(OTHER_SHA), marker_comment(HEAD_SHA)]]
+    pages = [[marker_comment(sha) for sha in order]]
     with gate_env(comment_pages=pages) as env:
         result = run_gate("check_review_happened", env)
     assert result.returncode == 0, result.stdout
+
+
+def test_stale_marker_names_the_newest_marker_when_none_pins_head() -> None:
+    """With nothing pinning head, the SHA reported is the most recent review."""
+    older = "1111111111111111111111111111111111111111"
+    pages = [[marker_comment(older), marker_comment(OTHER_SHA)]]
+    with gate_env(comment_pages=pages) as env:
+        result = run_gate("check_review_happened", env)
+    assert result.returncode != 0, result.stdout
+    assert OTHER_SHA[:7] in result.stdout, result.stdout
+    assert older[:7] not in result.stdout, result.stdout
 
 
 def test_a_comment_merely_mentioning_the_marker_is_not_one() -> None:

@@ -31,24 +31,35 @@ _repo_slug() {
   printf '%s\n' "$_REPO_SLUG_CACHE"
 }
 
-# The SHA the review marker pins, or empty when no marker exists on the PR.
+# The review markers' verdict on a given head, printed as "<state> <sha>".
 #
-# mark-claude-review.sh keeps ONE sticky comment and rewrites it in place, so there is
-# normally a single marker; `last` picks the newest if a stray duplicate ever lands.
-# Reading the SHA out (rather than testing for `<prefix> <head> -->`) is what lets the
-# gates tell "reviewed, then you pushed past it" apart from "never reviewed" — two
-# states with different remedies.
+# Asked as "does ANY marker pin this head?", deliberately — not "does the newest one?".
+# mark-claude-review.sh keeps ONE sticky comment and rewrites it in place, so a PR
+# normally carries a single marker, but nothing enforces that: a second session, or a
+# hand-posted comment, can leave two. If the reader picks one comment and the writer
+# picks a different one, re-attesting rewrites a marker the gate never reads, and a
+# genuinely reviewed head reports stale_marker forever with `--force` as the only exit.
+# Membership has no such failure mode: a marker pinning head means someone attested
+# head, whatever order the comments landed in.
+#
+# When nothing pins head, the newest marker is the one reported — it is the most recent
+# review the PR actually got, and naming its SHA is what lets the gate say "you pushed
+# past the review" instead of "nobody reviewed this".
 #
 # `jq -rs` (slurp) rather than gh's `--jq`, which runs per-page under --paginate and so
 # misses a marker sitting on page 2+ of a busy PR.
-_marker_sha() {
-  local pr=$1 owner_repo=$2
+_marker_verdict() {
+  local pr=$1 owner_repo=$2 head=$3
   gh api --paginate "repos/${owner_repo}/issues/${pr}/comments" \
-    | jq -rs --arg prefix "$CLAUDE_MARKER_PREFIX" \
+    | jq -rs --arg prefix "$CLAUDE_MARKER_PREFIX" --arg head "$head" \
         '[ .[] | flatten | .[] | (.body // "")
            | select(startswith($prefix))
            | ltrimstr($prefix) | split("-->")[0] | gsub("^\\s+|\\s+$"; "")
-         ] | last // empty'
+         ] as $pinned
+         | if ($pinned | index($head)) then "marker \($head)"
+           elif ($pinned | length) > 0 then "stale_marker \($pinned | last)"
+           else "unreviewed "
+           end'
 }
 
 # Gate 1: CI Gate check has SUCCESS conclusion.
@@ -121,22 +132,15 @@ RS_MARKER_SHA=""
 
 _compute_review_state() {
   local pr=$1
-  local owner_repo head_sha marker_sha
+  local owner_repo head_sha verdict
   owner_repo=$(_repo_slug)
 
   head_sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
-  marker_sha=$(_marker_sha "$pr" "$owner_repo")
+  verdict=$(_marker_verdict "$pr" "$owner_repo" "$head_sha")
 
   RS_HEAD_SHA=$head_sha
-  RS_MARKER_SHA=$marker_sha
-
-  if [ -z "$marker_sha" ]; then
-    RS_STATE=unreviewed
-  elif [ "$marker_sha" = "$head_sha" ]; then
-    RS_STATE=marker
-  else
-    RS_STATE=stale_marker
-  fi
+  RS_STATE=${verdict%% *}
+  RS_MARKER_SHA=${verdict#* }
 }
 
 # The remedy every un-reviewed state prints. Two steps, in order, because the agent

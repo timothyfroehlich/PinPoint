@@ -517,6 +517,26 @@ def test_pre_check_passes_on_green_ci_gate(monkeypatch):
     assert pr_watch._pre_check_blocking(PR) == (True, "")
 
 
+@pytest.mark.unit
+def test_pre_check_reports_unresolved_threads_without_blocking(monkeypatch, capsys):
+    """Watching CI is a step INSIDE the address-the-findings loop, not after it.
+
+    Threads became author-agnostic in PP-4ric, so they are now the reviewer's
+    `/code-review` findings. The documented loop is fix → push → watch CI →
+    resolve once green; blocking here would refuse to watch the very push that
+    addresses them, leaving --force (which also drops the merge-state and
+    already-failed-CI pre-checks) as the only way through.
+    """
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(rollup=[_gate("SUCCESS")], threads=[{"isResolved": False}]),
+    )
+    ok, reason = pr_watch._pre_check_blocking(PR)
+    assert (ok, reason) == (True, "")
+    assert "1 unresolved review thread(s)" in capsys.readouterr().out
+
+
 # ---------------------------------------------------------------------------
 # _finalize_via_ci_gate — cancelled gets a bounded grace, not an instant failure
 # ---------------------------------------------------------------------------
@@ -785,8 +805,14 @@ def test_marker_prefix_is_identical_to_the_bash_gate():
 @pytest.mark.unit
 @pytest.mark.parametrize("state", ["marker", "stale_marker", "unreviewed"])
 def test_state_vocabulary_is_shared_with_the_bash_gate(state):
-    """Both implementations name the same three states, so reports are comparable."""
-    assert f"RS_STATE={state}" in GATES_PATH.read_text()
+    """Both implementations name the same three states, so reports are comparable.
+
+    Pinned against the `case` arms of `check_review_happened` rather than the
+    assignments — the bash computes RS_STATE in one step from `_marker_verdict`,
+    so the arms are the only place each name is spelled out.
+    """
+    arms = re.findall(r"^    (\w+)\)$", GATES_PATH.read_text(), re.M)
+    assert state in arms, arms
 
 
 @pytest.mark.unit
@@ -817,6 +843,30 @@ def test_review_state_stale_marker(monkeypatch):
     assert OLD_SHA[:7] in detail
     assert HEAD_SHA[:7] in detail
     assert "/code-review" in detail
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "order",
+    [
+        pytest.param([OLD_SHA, HEAD_SHA], id="attestation-is-newest"),
+        pytest.param([HEAD_SHA, OLD_SHA], id="attestation-is-oldest"),
+    ],
+)
+def test_review_state_accepts_any_marker_pinning_head(monkeypatch, order):
+    """Parity with `_marker_verdict` in the bash: membership, not "the newest".
+
+    Duplicate markers are a stray, but if one lands, a reader that inspects only
+    one comment can disagree with mark-claude-review.sh about which is canonical
+    and report a reviewed head as stale forever.
+    """
+    monkeypatch.setattr(
+        pr_watch,
+        "gh",
+        make_gh(issue_comments=[marker_comment(sha) for sha in order]),
+    )
+    state, _detail = pr_watch.review_state(PR)
+    assert state == "marker"
 
 
 @pytest.mark.unit

@@ -12,10 +12,10 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 ### PR Monitoring
 
-| Script                    | Purpose                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pr-dashboard.sh [PR...]` | Status table: CI checks, review state, merge state, draft state. All open PRs if no args. The Review column shows the unresolved-thread count when there are any (they need action now), otherwise the review state: `reviewed`, `RE-REVIEW` (`stale_marker`), `NOT REVIEWED` (`unreviewed`).                                                                                                                      |
-| `pr-watch.py <PR>`        | Stream CI run events. One timestamped line per event. Use with the Claude Code Monitor tool. Writes failure artifacts to `tmp/gh-monitor/`. `--check-ready` also reports a `review` line naming the review state (the three below, or `unknown` if the API calls fail) — reported, not gated: this mode answers "is this PR worth Tim's `/code-review`?", and the review is what happens after that answer is yes. |
+| Script                    | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pr-dashboard.sh [PR...]` | Status table: CI checks, review state, merge state, draft state. All open PRs if no args. The Review column shows the unresolved-thread count when there are any (they need action now), otherwise the review state: `reviewed`, `RE-REVIEW` (`stale_marker`), `NOT REVIEWED` (`unreviewed`).                                                                                                                                                                                                                                                    |
+| `pr-watch.py <PR>`        | Stream CI run events. One timestamped line per event. Use with the Claude Code Monitor tool. Writes failure artifacts to `tmp/gh-monitor/`. Unresolved threads print a reminder but do **not** stop the watch — watching CI is a step _inside_ the fix→push→resolve loop. `--check-ready` also reports a `review` line naming the review state (the three below, or `unknown` if the API calls fail) — reported, not gated: this mode answers "is this PR worth Tim's `/code-review`?", and the review is what happens after that answer is yes. |
 
 `pr-watch.py` exit codes: **0** passed, **1** a run or the CI Gate actually failed, **2** the outcome could not be determined — the GitHub API was unreachable (rate-limit 403, network drop, auth failure), so nothing was observed. Exit 2 is not a red CI: re-run the watch once the API is back rather than hunting for a broken test. (PP-qkl8)
 
@@ -49,11 +49,13 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 `_compute_review_state` in `_pr-gates.sh` reports three states:
 
-| State          | Meaning                                    | `reviewed` |
-| -------------- | ------------------------------------------ | ---------- |
-| `marker`       | A SHA-pinned review marker pins head's SHA | PASS       |
-| `stale_marker` | A marker exists but pins an OLDER SHA      | FAIL       |
-| `unreviewed`   | No marker on this PR at all                | FAIL       |
+| State          | Meaning                                         | `reviewed` |
+| -------------- | ----------------------------------------------- | ---------- |
+| `marker`       | **Some** review marker pins head's SHA          | PASS       |
+| `stale_marker` | Markers exist, none pins head — newest reported | FAIL       |
+| `unreviewed`   | No marker on this PR at all                     | FAIL       |
+
+The `marker` test is membership — does _any_ marker pin head — not "does the newest one". A PR normally carries exactly one, since `mark-claude-review.sh` rewrites a single sticky comment, but a second session or a hand-posted comment can leave two. If reader and writer each picked a comment and picked differently, re-attesting would rewrite one the gate never reads, and a genuinely reviewed head would report `stale_marker` forever with `--force` as the only way out.
 
 Nothing here WAITs. Under Copilot a request could be outstanding with an answer genuinely on its way, so `awaiting` was a legitimate hold; with no bot in the loop there is no such state, and a WAIT would poll for an hour before timing out on a review that was never going to arrive on its own.
 
