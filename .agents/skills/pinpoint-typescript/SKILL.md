@@ -1,22 +1,31 @@
 ---
 name: pinpoint-typescript
-description: The PinPoint-specific database typing decision — `InferSelectModel` yields camelCase types directly, so there is no db→app converter layer and none should be built; narrow with `Pick<>` at boundaries instead, and convert only on reads Drizzle does not map. Also carries the `exactOptionalPropertyTypes` resolution the compiler flags but does not teach. Use when typing a database row on its way to a component, when tempted to write a row-mapping function, or when the user mentions InferSelectModel, exactOptionalPropertyTypes, or snake_case/camelCase. General TypeScript technique is deliberately not covered.
+description: The PinPoint-specific database typing decision — `InferSelectModel` yields camelCase types directly, so there is no db→app converter layer and none should be built; narrow with `Pick<>` at boundaries instead, and convert only on reads Drizzle does not map. Also carries the `exactOptionalPropertyTypes` resolution the compiler flags but does not teach, and which parts of CORE-TS-006/007 no tool enforces. Use when typing a database row on its way to a component, when tempted to write a row-mapping function, when reviewing a non-null assertion (`!`) or an `any`, or when the user mentions InferSelectModel, exactOptionalPropertyTypes, or snake_case/camelCase. General TypeScript technique is deliberately not covered.
 ---
 
 # PinPoint TypeScript
 
-In app and e2e code, general strictest compliance is enforced rather than
-documented: `pnpm run typecheck` runs `tsc --noEmit -p tsconfig.app.json`, which
-extends `@tsconfig/strictest` (`exactOptionalPropertyTypes` and
-`noUncheckedIndexedAccess` both on), as does `e2e/tsconfig.json`. Test files are
-the exception — `tsconfig.tests.json` extends only `tsconfig.base.json` with
-`strict: true`, so both flags are off across everything it owns:
+## What the toolchain actually enforces
+
+`pnpm run typecheck` runs `tsc --noEmit -p tsconfig.app.json`, which extends
+`@tsconfig/strictest` — `exactOptionalPropertyTypes` and
+`noUncheckedIndexedAccess` both on. `e2e/tsconfig.json` extends it too. Test
+files do not: `tsconfig.tests.json` extends only `tsconfig.base.json` with
+`strict: true`, so both flags are off across everything it owns —
 `src/**/*.test.ts(x)`, `src/**/*.spec.ts(x)`, `src/test/**`, and `vitest.config.ts`.
 
-What no compiler checks is `CORE-TS-001..008` in `docs/NON_NEGOTIABLES.md` — and
-note that CORE-TS-007's ban on `!` is not linted either
-(`@typescript-eslint/no-non-null-assertion` is never enabled), so that one rests
-on review.
+The `CORE-TS-*` rules the compiler cannot express are carried by ESLint, and only
+in app code. `no-explicit-any` (CORE-TS-007) and `explicit-function-return-type`
+(CORE-TS-006) are both switched **off** for `e2e/**`, for test files, and for
+`*.config.*` / `scripts/**`. Writing `const page: any` in an e2e spec passes
+every gate.
+
+And CORE-TS-007's ban on `!` is enforced **nowhere**:
+`@typescript-eslint/no-non-null-assertion` is never enabled, and `!` is valid
+TypeScript at every strictness level. That third of a Critical rule rests
+entirely on review.
+
+Full catalog: `CORE-TS-001..008` in `docs/NON_NEGOTIABLES.md`.
 
 ## `exactOptionalPropertyTypes`: omit the key, don't assign `undefined`
 
@@ -39,9 +48,12 @@ it."
 
 ## There is no db→app converter layer, and you should not build one
 
-Import row types from the `~/lib/types` barrel (CORE-TS-001), which re-exports
-the `InferSelectModel` types declared in `src/lib/types/database.ts`. Do not
-redeclare a parallel hand-written shape.
+Row types are declared in `src/lib/types/database.ts` — import them from there.
+The `~/lib/types` barrel re-exports most but not all of them (`Notification`,
+`IssueWatcher`, `IssueImage`, and the PinballMap types are not re-exported), so
+reach for the barrel first and fall back to the direct path. Either way, do not
+redeclare a parallel hand-written shape. Most are plain `InferSelectModel`; `Issue`
+is the exception, an `Omit<>` that narrows four text columns to string unions.
 
 A `dbUserToUser` / `toProfileSummary` style converter would be pure ceremony:
 there is no second type system for it to translate into, and every such function
@@ -68,7 +80,7 @@ Conversion is correct wherever Drizzle's mapping does not run — it is the
 supabase-js and raw-SQL paths that need it, not Drizzle rows:
 
 - `db.execute()` and raw SQL (results skip Drizzle's `mapResultRow` entirely)
-- supabase-js reads and writes, both `.rpc()` and `.from().select()`
-  (`src/lib/discord/config.ts:59,128`)
-- Supabase auth metadata (`src/lib/auth/profile.ts:44-46`)
+- supabase-js reads and writes, both `.rpc()` and `.from().select()` — see
+  `getDiscordConfig` and `isDiscordIntegrationEnabled` in `src/lib/discord/config.ts`
+- Supabase auth metadata — the `user_metadata` extraction in `src/lib/auth/profile.ts`
 - External APIs (`src/lib/pinballmap/parse.ts`)
