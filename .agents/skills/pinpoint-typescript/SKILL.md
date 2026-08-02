@@ -1,334 +1,47 @@
 ---
 name: pinpoint-typescript
-description: TypeScript strictest patterns, type guards, optional properties (exactOptionalPropertyTypes), Drizzle query safety, null checks, and database type inference — `InferSelectModel` yields camelCase types directly, so PinPoint has no db→app converter layer and none should be built (narrow with `Pick<>` at boundaries instead). Use when fixing type errors, implementing complex types, deciding how database rows should be typed on their way to a component, or when user mentions TypeScript/types/generics/InferSelectModel.
+description: The PinPoint-specific database typing decision — `InferSelectModel` yields camelCase types directly, so there is no db→app converter layer and none should be built; narrow with `Pick<>` at boundaries instead, and convert only on reads Drizzle does not map. Use when typing a database row on its way to a component, when tempted to write a row-mapping function, or when the user mentions InferSelectModel or snake_case/camelCase. General TypeScript technique is deliberately not covered.
 ---
 
-# PinPoint TypeScript Guide
-
-## When to Use This Skill
-
-Use this skill when:
-
-- Fixing TypeScript compilation errors
-- Implementing complex types or generics
-- Dealing with optional properties and `exactOptionalPropertyTypes`
-- Working with Drizzle ORM types
-- Handling null/undefined safety
-- User mentions: "TypeScript", "type error", "type guard", "optional", "nullable"
-
-## Quick Reference
-
-### Critical TypeScript Rules
-
-1. **Strictest config**: No `any`, no `!`, no unsafe `as` (NON_NEGOTIABLE #7)
-2. **Explicit return types**: Required for public functions
-3. **Path aliases**: Always use `~/` (e.g., `~/lib/utils`)
-4. **Optional property assignment**: Use conditional spread for `exactOptionalPropertyTypes` safety
-5. **Type guards**: Use predicates for narrowing (e.g., `profile is UserProfile`)
-
-### Common Fixes
-
-**Optional Properties (exactOptionalPropertyTypes)**:
-
-```typescript
-// ✅ Correct: Conditional spread
-const data = {
-  id: uuid(),
-  ...(name && { name }),
-  ...(description && { description }),
-};
-
-// ❌ Wrong: Direct assignment (fails if value is undefined)
-const data = { name: value };
-```
-
-## Detailed Documentation
-
-Read these files for comprehensive TypeScript patterns and rules:
-
-- `docs/TYPESCRIPT_STRICTEST_PATTERNS.md` — Detailed generic and union patterns
-- `docs/NON_NEGOTIABLES.md` — Core project constraints (CORE-TS-\* rules)
-- `src/lib/types/database.ts` — Canonical database entity types
-
-## Core Safety Patterns
-
-### Null Safety & Optional Chaining
-
-```typescript
-// ✅ Safe array access
-const firstItem = items[0]?.name ?? "No items";
-const lastItem = items.at(-1)?.name ?? "No items";
-
-// ✅ Safe object property access (Drizzle relational)
-const machineName = issue.machine?.name ?? "Unknown";
-```
-
-### Date Formatting (Narrowing Required)
-
-Helpers in `~/lib/dates.ts` (**formatDate**, **formatDateTime**, **formatRelative**) currently throw `TypeError` on `null` or `undefined`. You MUST narrow before calling.
-
-```typescript
-// ✅ Correct: Narrowing with fallback
-<span>{machine.fixedAt ? formatDate(machine.fixedAt) : "—"}</span>
-
-// ✅ Correct: Early return/guard
-if (!issue.createdAt) return null;
-return <div>{formatDate(issue.createdAt)}</div>
-
-// ❌ Wrong: Passing potentially null value
-<div>{formatDate(issue.closedAt)}</div> // Throws if closedAt is null
-```
-
-### Type Guards
-
-```typescript
-// ✅ Type guard for arrays
-function hasItems<T>(arr: T[] | null | undefined): arr is T[] {
-  return !!arr && arr.length > 0;
-}
-
-// ✅ Type guard for UserProfile (Auth context)
-import { type UserProfile } from "~/lib/types/database";
-
-function isUserProfile(profile: unknown): profile is UserProfile {
-  return (
-    typeof profile === "object" &&
-    profile !== null &&
-    "id" in profile &&
-    "email" in profile &&
-    "role" in profile
-  );
-}
-
-// ✅ Type guard for discriminated unions
-type Result =
-  { type: "success"; data: string } | { type: "error"; message: string };
-
-function processResult(result: Result) {
-  if (result.type === "success") {
-    console.log(result.data); // Safe - narrowing works
-  } else {
-    console.log(result.message); // Safe - narrowing works
-  }
-}
-```
-
-## Drizzle Query Safety
-
-### Safe Query Patterns
-
-```typescript
-import { eq, desc } from "drizzle-orm";
-import { db } from "~/server/db";
-import { issues, userProfiles } from "~/server/db/schema";
-import { type Issue } from "~/lib/types/database";
-
-// ✅ Safe Drizzle queries with explicit typing
-export async function getIssuesByMachine(machineId: string): Promise<Issue[]> {
-  return await db.query.issues.findMany({
-    where: eq(issues.machineId, machineId),
-    orderBy: desc(issues.createdAt),
-  });
-}
-```
-
-### Database Type Inference
-
-**There is no db→app type converter layer, and you should not build one.** The Drizzle schema already maps camelCase JS fields to snake_case columns, so `InferSelectModel` yields camelCase application types directly. `src/lib/types/database.ts` re-exports those inferred types; import from there rather than redeclaring a parallel hand-written shape.
-
-```typescript
-import { userProfiles } from "~/server/db/schema";
-import { type InferSelectModel } from "drizzle-orm";
-
-type DbUser = InferSelectModel<typeof userProfiles>;
-// Already camelCase — the snake_case column names live only in schema.ts:
-// { id: string, email: string, firstName: string, lastName: string, ... }
-```
-
-A `dbUserToUser` / `toProfileSummary` style converter would be pure ceremony: there is no second type system for it to translate into, and every such function is a place for the two shapes to drift.
-
-What _is_ legitimate is **narrowing** a row before it crosses a boundary — a Client Component prop type or an API response should be a minimal `Pick<>` / purpose-built shape, not the whole ORM row (CORE-SEC-006, and CORE-SEC-007 for `email` specifically). That's a projection, not a conversion:
-
-```typescript
-// Narrow at the boundary — a shape, not a translation layer
-export type MachineOwnerOption = Pick<DbUser, "id" | "firstName" | "lastName">;
-```
-
-## Supabase SSR Safety
-
-### Safe Auth Context
-
-```typescript
-// ✅ Safe auth context in Server Component
-import { createClient } from "~/lib/supabase/server";
-import { redirect } from "next/navigation";
-
-export default async function ProtectedPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  return <DashboardContent user={user} />;
-}
-```
-
-### Server Action Safety
-
-```typescript
-// ✅ Safe Server Action with auth
-"use server";
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
-import { db } from "~/server/db";
-import { userProfiles } from "~/server/db/schema";
-import { createClient } from "~/lib/supabase/server";
-
-export async function updateProfile(formData: FormData): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const firstName = formData.get("firstName");
-  if (typeof firstName !== "string") {
-    throw new Error("First name must be a string");
-  }
-
-  await db
-    .update(userProfiles)
-    .set({ firstName })
-    .where(eq(userProfiles.id, user.id));
-  revalidatePath("/profile");
-}
-```
-
-## Strict Function Signatures
-
-```typescript
-// ✅ Explicit return types prevent inference errors
-import { type Issue } from "~/lib/types/database";
-import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
-
-export async function getIssuesByMachine(machineId: string): Promise<Issue[]> {
-  return await db.query.issues.findMany({
-    where: eq(issues.machineId, machineId),
-  });
-}
-
-// ✅ Strict parameter validation (Zod schemas)
-import { publicIssueSchema } from "~/app/(app)/report/schemas";
-```
-
-## Anti-Patterns to Avoid
-
-```typescript
-// ❌ Never: any types
-const data: any = await fetchData();
-
-// ❌ Never: Non-null assertion without justification
-const user = getUser()!.email; // Dangerous (CORE-TS-007)
-
-// ❌ Never: Ignoring TypeScript errors
-// @ts-ignore
-const result = dangerousOperation();
-
-// ❌ Never: Unsafe type assertions
-const user = data as UserProfile; // Without validation (CORE-TS-007)
-
-// ✅ Instead: Proper validation / Type guards
-if (isUserProfile(data)) {
-  const user = data; // Safe narrowed type
-}
-```
-
-## Server Components Safety
-
-### Async Component Patterns
-
-```typescript
-// ✅ Safe async Server Component (Next.js 15)
-import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
-import { eq, desc } from "drizzle-orm";
-
-export default async function MachineIssuesPage({
-  params
-}: {
-  params: Promise<{ machineId: string }>
-}): Promise<JSX.Element> {
-  const { machineId } = await params;
-
-  const issuesResult = await db.query.issues.findMany({
-    where: eq(issues.machineId, machineId),
-    orderBy: desc(issues.createdAt),
-  });
-
-  return (
-    <div>
-      {issuesResult.map((issue) => (
-        <IssueCard key={issue.id} issue={issue} />
-      ))}
-    </div>
-  );
-}
-```
-
-### Form Data Validation (Zod)
-
-```typescript
-// ✅ Safe FormData handling with Zod schemas from route directory
-// ⚠️ Note: Use per-field extraction or helpers for boolean coercion (like watchIssue)
-"use server";
-import { revalidatePath } from "next/cache";
-import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
-import { publicIssueSchema } from "~/app/(app)/report/schemas";
-
-export async function createIssueAction(formData: FormData) {
-  // Simple extraction for strings; use parsePublicIssueForm() for booleans/coercion
-  const rawData = {
-    machineId: String(formData.get("machineId")),
-    title: String(formData.get("title")),
-    // ...
-  };
-
-  // Type-safe validation
-  const validation = publicIssueSchema.safeParse(rawData);
-  if (!validation.success) {
-    return { error: validation.error.flatten() };
-  }
-
-  const [issue] = await db.insert(issues).values(validation.data).returning();
-  revalidatePath("/issues");
-  return issue;
-}
-```
-
-## TypeScript Checklist
-
-Before committing TypeScript code:
-
-- [ ] No `any` types
-- [ ] No non-null assertions (`!`)
-- [ ] No unsafe type assertions (`as`)
-- [ ] Explicit return types on public functions
-- [ ] Optional properties use conditional spread
-- [ ] Type guards for complex narrowing
-- [ ] Path aliases (`~/`) instead of relative imports
-- [ ] `pnpm run typecheck` passes
-
-## Additional Resources
-
-- TypeScript patterns: `docs/TYPESCRIPT_STRICTEST_PATTERNS.md`
-- Non-negotiables: `docs/NON_NEGOTIABLES.md` (CORE-TS-\* rules)
-- Drizzle types: Use `src/lib/types/database.ts` as canonical source
+# PinPoint TypeScript
+
+In app and e2e code, general strictest compliance is enforced rather than
+documented: `pnpm run typecheck` runs `tsc --noEmit -p tsconfig.app.json`, which
+extends `@tsconfig/strictest` (`exactOptionalPropertyTypes` and
+`noUncheckedIndexedAccess` both on), as does `e2e/tsconfig.json`. Test files are
+the exception — `tsconfig.tests.json` extends only `tsconfig.base.json` with
+`strict: true`, so both of those flags are off under `src/**/*.test.*` and
+`src/test/**`.
+
+What no compiler checks is `CORE-TS-001`…`CORE-TS-008` in
+`docs/NON_NEGOTIABLES.md` — and note that CORE-TS-007's ban on `!` is not linted
+either (`@typescript-eslint/no-non-null-assertion` is never enabled), so that one
+rests on review. This skill carries only the decision none of the above covers.
+
+## There is no db→app converter layer, and you should not build one
+
+`src/lib/types/database.ts` re-exports the `InferSelectModel` types. Import from
+there rather than redeclaring a parallel hand-written shape.
+
+A `dbUserToUser` / `toProfileSummary` style converter would be pure ceremony:
+there is no second type system for it to translate into, and every such function
+is a place for the two shapes to drift.
+
+This is not hypothetical. PinPoint ran exactly that layer until #480: a
+type-level `DrizzleToCamelCase<T>` wrapping essentially every response type, and
+a runtime `transformKeysToCamelCase` at nine call sites across the DAL. Because a
+runtime transform cannot carry types through, it forced an `as` assertion at
+nearly every one of those sites — the one currency ts-strictest exists to refuse. It was only necessary because the v1 schema
+omitted column names; the v2 schema declares both (`firstName: text("first_name")`),
+and that single authoring choice is what made the layer unnecessary. Do not
+reintroduce it, and never reach for a Drizzle row by its column name
+(`row.full_name`) — that property does not exist. (CORE-TS-003.)
+
+What _is_ legitimate is **narrowing** a row before it crosses a boundary — a
+Client Component prop type or an API response should be a minimal `Pick<>` /
+purpose-built shape, not the whole ORM row. That's a projection, not a
+conversion. (CORE-SEC-006, and CORE-SEC-007 for `email` specifically.)
+
+Conversion is only correct where Drizzle's mapping does not run: `db.execute()`
+and raw SQL, Supabase RPC (`src/lib/discord/config.ts`), Supabase auth metadata
+(`src/lib/auth/profile.ts`), and external APIs (`src/lib/pinballmap/parse.ts`).

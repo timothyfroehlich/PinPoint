@@ -16,7 +16,7 @@
 ## Quick Start Checklist
 
 1. Import reusable types from `~/lib/types`; do not duplicate types (CORE-TS-001/002)
-2. Keep DB types (snake_case) in schema; convert to camelCase at boundaries (CORE-TS-003/004)
+2. Drizzle rows are already camelCase — never convert them; convert only on non-Drizzle reads (CORE-TS-003/004)
 3. Use Supabase SSR wrapper `~/lib/supabase/server`, call `auth.getUser()` immediately (CORE-SSR-001/002)
 4. Ensure Next.js middleware for Supabase SSR token refresh is present (CORE-SSR-003)
 5. Use database trigger for auto-profile creation (OAuth-proof, atomic) (CORE-SSR-006)
@@ -61,8 +61,8 @@
 
 - **Severity:** High
 - **Why:** Prevents snake_case leaking into application code
-- **Do:** Keep snake_case in schema, convert to camelCase at boundaries
-- **Don't:** Export snake_case DB types to components
+- **Do:** Drizzle rows need no conversion — every column declares both names (`firstName: text("first_name")`), so `InferSelectModel` yields camelCase directly. Convert only where Drizzle's mapping does not run: `db.execute()` and raw SQL, Supabase RPC, auth metadata, and external APIs.
+- **Don't:** Export snake_case DB types to components. Never access a Drizzle row by its column name (`row.full_name`) — that property does not exist, and re-deriving that wrong model is the recurring churn this rule exists to stop. Never reintroduce a generic key transformer: until #480, `DrizzleToCamelCase` wrapped essentially every response type and `transformKeysToCamelCase` forced an `as` cast at nearly every DAL call site.
 
 **CORE-TS-004:** Drizzle naming (snake_case schema)
 

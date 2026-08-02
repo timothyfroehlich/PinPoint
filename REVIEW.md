@@ -43,7 +43,7 @@ Copilot and Antigravity both read agent skills. Consult the relevant one for the
 - `pinpoint-security` — auth, CSP, Zod validation, Supabase SSR changes.
 - `pinpoint-testing` — whether a PR picked the right test layer (unit/integration/E2E) for what it's testing.
 - `pinpoint-e2e` — Playwright/E2E stability: worker isolation, flake-prone patterns.
-- `pinpoint-typescript` — ts-strictest patterns, generics, Drizzle query typing.
+- `pinpoint-typescript` — the db→app typing decision: no converter layer, narrow with `Pick<>` at boundaries. CORE-TS-007's `!` ban is not linted, so non-null assertions stay a review question.
 - `pinpoint-ui` and `pinpoint-design-bible` — UI, component, and responsive-design changes. `pinpoint-ui` also owns Server Actions, data fetching, and the form conventions (Radix Select form-reset carve-out, CREATE form reset).
 - `pinpoint-deployment` — Drizzle migrations, DB connection/pooler config, preview deployments.
 
