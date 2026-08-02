@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { and, eq, ilike, or } from "drizzle-orm";
+import { and, count, eq, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { checkPermission } from "~/lib/permissions/helpers";
@@ -17,6 +17,9 @@ import {
   type ToolOutcome,
 } from "./shared";
 import type { McpAuthContext } from "~/lib/mcp/verify-token";
+
+/** Page size when the caller doesn't ask for one. */
+const DEFAULT_LIMIT = 50;
 
 const listMachinesSchema = z.object({
   search: z
@@ -37,7 +40,9 @@ const listMachinesSchema = z.object({
     .min(1)
     .max(100)
     .optional()
-    .describe("Maximum machines to return (default 50)."),
+    .describe(
+      `Maximum machines to return (default ${DEFAULT_LIMIT}). The response reports the matching 'total' and 'hasMore' so you can tell a full list from a truncated page.`
+    ),
 });
 
 type ListMachinesArgs = z.infer<typeof listMachinesSchema>;
@@ -61,19 +66,30 @@ export async function runListMachines(
     );
   }
 
-  const rows = await db.query.machines.findMany({
-    where: conditions.length > 0 ? and(...conditions) : undefined,
-    columns: {
-      id: true,
-      initials: true,
-      name: true,
-      presenceStatus: true,
-      ownerId: true,
-      invitedOwnerId: true,
-    },
-    orderBy: (m, { asc }) => [asc(m.name)],
-    limit: args.limit ?? 50,
-  });
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const limit = args.limit ?? DEFAULT_LIMIT;
+
+  // Count alongside the page so the caller can tell a complete answer from a
+  // truncated one. Without this a 50-machine page of a 120-machine collection
+  // reads as "there are 50", and the model answers "how many are off the floor"
+  // wrongly with no way to know it was cut off (CORE-ARCH-012 honest failure).
+  const [rows, totalRows] = await Promise.all([
+    db.query.machines.findMany({
+      where,
+      columns: {
+        id: true,
+        initials: true,
+        name: true,
+        presenceStatus: true,
+        ownerId: true,
+        invitedOwnerId: true,
+      },
+      orderBy: (m, { asc }) => [asc(m.name)],
+      limit,
+    }),
+    db.select({ value: count() }).from(machines).where(where),
+  ]);
+  const total = totalRows[0]?.value ?? 0;
 
   const [ownerNames, openCounts] = await Promise.all([
     getOwnerNamesByMachine(rows),
@@ -88,7 +104,14 @@ export async function runListMachines(
     openIssues: openCounts.get(r.initials) ?? 0,
   }));
 
-  return { result: { count: machineList.length, machines: machineList } };
+  return {
+    result: {
+      count: machineList.length,
+      total,
+      hasMore: total > machineList.length,
+      machines: machineList,
+    },
+  };
 }
 
 export function registerListMachines(server: McpServer): void {
@@ -97,7 +120,7 @@ export function registerListMachines(server: McpServer): void {
     {
       title: "List machines",
       description:
-        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search and a presence filter.",
+        "List machines with their initials, name, availability, owner name, and open-issue count. Use this to find a machine's initials before acting on it (e.g. disambiguate 'the Medieval Madness by the door'). Supports a name/initials search and a presence filter. Returns 'count' (this page), 'total' (all matches), and 'hasMore' — when hasMore is true the list is truncated, so narrow it with search/presence or raise limit before answering a counting question.",
       inputSchema: listMachinesSchema.shape,
     },
     (args, extra) =>

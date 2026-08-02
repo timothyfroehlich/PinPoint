@@ -131,6 +131,48 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       expect(result.machines[0]?.owner).toBe("Pat Owner");
       expect(result.machines[0]?.openIssues).toBe(1);
     });
+
+    it("reports total and hasMore when the page is truncated (PP-u4ab.4)", async () => {
+      const admin = await makeUser("admin");
+      for (const name of ["Truncate A", "Truncate B", "Truncate C"]) {
+        await seedMachine({ name });
+      }
+
+      const outcome = await runListMachines(
+        { search: "Truncate", limit: 2 },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        count: number;
+        total: number;
+        hasMore: boolean;
+      };
+
+      // The bug this pins: `count` alone reads as "there are 2", which is how a
+      // 100+ machine collection gets miscounted from a 50-row page.
+      expect(result.count).toBe(2);
+      expect(result.total).toBe(3);
+      expect(result.hasMore).toBe(true);
+    });
+
+    it("reports hasMore false when the page holds every match", async () => {
+      const admin = await makeUser("admin");
+      await seedMachine({ name: "Complete Alpha" });
+
+      const outcome = await runListMachines(
+        { search: "Complete Alpha" },
+        ctx("admin", admin)
+      );
+      const result = outcome.result as {
+        count: number;
+        total: number;
+        hasMore: boolean;
+      };
+
+      expect(result.count).toBe(1);
+      expect(result.total).toBe(1);
+      expect(result.hasMore).toBe(false);
+    });
   });
 
   describe("get_machine", () => {
@@ -351,6 +393,53 @@ describe("MCP tool handlers (PP-u4ab.2)", () => {
       await expect(
         runCreateIssue({ machine: "NOPE", title: "x" }, ctx("admin", admin))
       ).rejects.toBeInstanceOf(McpToolError);
+    });
+
+    it("returns the original issue when an identical call is retried (PP-u4ab.4)", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+      const args = {
+        machine: machine.initials,
+        title: "right flipper sticking",
+        description: "Sticks on multiball.",
+        severity: "major",
+      } as const;
+
+      const first = await runCreateIssue({ ...args }, ctx("admin", admin));
+      const second = await runCreateIssue({ ...args }, ctx("admin", admin));
+
+      // A transport-level retry resends identical arguments; it must resolve to
+      // the issue already filed rather than a second one.
+      expect(second.issueId).toBe(first.issueId);
+
+      const db = await getTestDb();
+      const rows = await db
+        .select()
+        .from(issues)
+        .where(eq(issues.machineInitials, machine.initials));
+      expect(rows).toHaveLength(1);
+    });
+
+    it("files a separate issue when the content differs", async () => {
+      const admin = await makeUser("admin");
+      const machine = await seedMachine();
+
+      const first = await runCreateIssue(
+        { machine: machine.initials, title: "left flipper weak" },
+        ctx("admin", admin)
+      );
+      const second = await runCreateIssue(
+        { machine: machine.initials, title: "right flipper weak" },
+        ctx("admin", admin)
+      );
+
+      expect(second.issueId).not.toBe(first.issueId);
+      const db = await getTestDb();
+      const rows = await db
+        .select()
+        .from(issues)
+        .where(eq(issues.machineInitials, machine.initials));
+      expect(rows).toHaveLength(2);
     });
   });
 });
