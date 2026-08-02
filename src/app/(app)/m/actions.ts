@@ -1104,12 +1104,15 @@ export async function updateMachineAction(
     if (error instanceof MachineNotFoundError) {
       return err("NOT_FOUND", "Machine not found.");
     }
-    // This action cannot touch `initials`, so a duplicate-listing collision is
-    // the only unique violation it can realistically raise — and it had no
-    // catch at all, so it surfaced as a 500 (PP-o355.15). `pbmColumns` is scoped
+    // Matched on the bare code, NOT `isPbmListingConflict`, for the same reason
+    // as the listing actions: this action cannot touch `initials`, so the
+    // one-lister index is the only unique constraint it can violate, and
+    // matching the constraint NAME would put a correctable conflict back to a
+    // 500 on any driver that omits the field. It had no catch at all before, so
+    // the collision surfaced as a 500 (PP-o355.15). `pbmColumns` is scoped
     // inside the try; the submitted title id is the same value and is in scope
     // here.
-    if (isPbmListingConflict(error)) {
+    if (isPgErrorCode(error, "23505")) {
       return err(
         "VALIDATION",
         await pbmListingConflictMessage(validation.data.pinballmapMachineId)

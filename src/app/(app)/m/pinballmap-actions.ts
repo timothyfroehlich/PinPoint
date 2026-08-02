@@ -321,6 +321,21 @@ export async function verifyPinballmapLinkAction(
   if (machine.pinballmapMachineId === null)
     return err("VALIDATION", "Machine isn't linked to a PinballMap title yet");
 
+  // Verify re-checks a listing we HOLD, and an unlisted cabinet holds none.
+  // Without this guard, verifying one would silently LIST it: the schema CHECK
+  // `machines_pinballmap_lmx_requires_listed` forces an unlisted row's
+  // `pinballmapLmxId` to null, so the `lmx.id === machine.pinballmapLmxId`
+  // comparison below can never match and every such verify falls into the heal
+  // branch — which sets `pinballmapListed: true`. Putting a machine on Pinball
+  // Map is a human decision (see `sync.ts`), never a side effect of a
+  // spot-check. Refuse before the sync so a request we will not honour never
+  // spends a manual-refresh slot (CORE-PBM-001).
+  if (!machine.pinballmapListed)
+    return err(
+      "VALIDATION",
+      "This machine isn't listed on Pinball Map, so there's no listing to re-check."
+    );
+
   // Verify means "check right now" — force a fresh sync before resolving. Bail
   // out (rather than resolve against a stale snapshot) if the sync didn't land.
   const sync = await syncLocationSnapshot({
@@ -348,11 +363,12 @@ export async function verifyPinballmapLinkAction(
 
   // Title now maps to a different lmx (PBM re-minted it) — heal the stored handle.
   //
-  // This sets `pinballmapListed: true`, so it can collide with the one-lister
-  // partial unique index exactly like the create/update paths: cabinets A and B
-  // share a title, A is listed and holds the lmx, B is linked but unlisted, and
-  // verifying B heals it onto A's lmx. Without this catch the violation escaped
-  // as a 500 — in the very duplicate-title case PP-o355.15 exists for.
+  // This writes `pinballmapListed`, so the one-lister partial unique index
+  // applies and a violation would escape as a 500 the way it did on the
+  // create/update paths (PP-o355.15). The not-listed guard above closes the
+  // concrete duplicate-cabinet path — reaching here means this machine is
+  // already the sole listed row for its title, so it can only collide with a
+  // concurrent write. Kept as a genuine backstop, not a load-bearing catch.
   try {
     await db.transaction(async (tx) => {
       await tx
